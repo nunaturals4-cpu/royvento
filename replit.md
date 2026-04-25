@@ -1,27 +1,39 @@
-# Workspace
+# Royvento
 
-## Overview
-
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A full-stack event management marketplace for hosts and vendors.
 
 ## Stack
+- **Frontend**: React + Vite (artifact: `royvento`, served at `/`)
+- **Backend**: Express + TypeScript (artifact: `api-server`, port 8080, mounted at `/api`)
+- **Database**: PostgreSQL via Drizzle ORM (`lib/db`)
+- **API contract**: OpenAPI 3 (`lib/api-spec/openapi.yaml`) → Zod (`lib/api-zod`) + React Query hooks (`lib/api-client-react`)
+- **Auth**: JWT (HS256, 30-day) via cookie `royvento_token` + Authorization Bearer header. SESSION_SECRET as signing key.
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+## Roles
+- `user`: book events, leave reviews
+- `vendor`: create vendor profile (auto-flips role from user → vendor on creation), manage events, bookings, availability
+- `admin`: approve vendors, manage users, view analytics
 
-## Key Commands
+## Key directories
+- `artifacts/api-server/src/routes/` — auth, users, vendors, events, bookings, reviews, availability, admin
+- `artifacts/api-server/src/lib/auth.ts` — JWT, requireAuth middleware, password hashing
+- `artifacts/api-server/src/lib/aggregates.ts` — vendor/event rating aggregation
+- `artifacts/royvento/src/pages/` — home, explore, vendors, event-detail, vendor-detail, login, register, contact, vendor-dashboard, bookings, admin
+- `scripts/src/seed.ts` — seed data
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+## Demo accounts (after running `pnpm --filter @workspace/scripts run seed`)
+- `admin@royvento.com` / `admin123`
+- `alice@example.com` / `password123`
+- `bob@example.com` / `password123`
+- `lumiere@royvento.com` / `vendor123` (approved vendor)
+- `atelier@royvento.com` / `vendor123` (approved vendor)
+- `harvest@royvento.com` / `vendor123` (approved vendor)
+- `newvendor@royvento.com` / `vendor123` (pending vendor)
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## Common tasks
+- Regenerate API client: `pnpm --filter @workspace/api-spec run codegen`
+- Push DB schema: `pnpm --filter @workspace/db run push`
+- Seed database: `pnpm --filter @workspace/scripts run seed`
+
+## Design tokens
+Deep plum primary on warm parchment background. Serif (display) + sans (body). See `artifacts/royvento/src/index.css`.

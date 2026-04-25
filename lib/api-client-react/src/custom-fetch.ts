@@ -349,12 +349,27 @@ export async function customFetch<T = unknown>(
     headers.set("accept", DEFAULT_JSON_ACCEPT);
   }
 
+  // Set credentials to include always
+  init.credentials = "include";
+
   // Attach bearer token when an auth getter is configured and no
   // Authorization header has been explicitly provided.
   if (_authTokenGetter && !headers.has("authorization")) {
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    }
+  }
+
+  // Also read from localStorage if no token is set via getter
+  if (!headers.has("authorization")) {
+    try {
+      const localToken = localStorage.getItem("royvento_token");
+      if (localToken) {
+        headers.set("authorization", `Bearer ${localToken}`);
+      }
+    } catch (e) {
+      // ignore localStorage errors (e.g. SSR or incognito)
     }
   }
 

@@ -1,2 +1,27 @@
 export * from "./generated/api";
-export * from "./generated/types";
+export type {
+  AdminAnalytics,
+  AdminAnalyticsBookingsByStatusItem,
+  AdminAnalyticsTopVendorsItem,
+  AuthResponse,
+  Availability,
+  AvailabilityStatus,
+  Booking,
+  BookingStatus,
+  CreateVendorBody,
+  Event,
+  EventDetail,
+  HealthStatus,
+  ListEventsParams,
+  ListVendorsParams,
+  MeResponse,
+  MyVendorResponse,
+  Ok,
+  Review,
+  Role,
+  UpdateRoleBody,
+  UpdateVendorBody,
+  User,
+  Vendor,
+  VendorStatus,
+} from "./generated/types";

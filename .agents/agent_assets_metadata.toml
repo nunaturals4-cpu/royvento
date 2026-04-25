@@ -1,0 +1,50 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "S3tso-185DSm-Djm7zzEy"
+uri = "file://artifacts/royvento/public/images/hero.png"
+type = "image"
+title = "Event platform hero banner"
+
+[[generated]]
+id = "wnbzPkvWMveBbTQvuy7Ol"
+uri = "file://artifacts/royvento/public/images/category-wedding.png"
+type = "image"
+title = "Wedding category image"
+
+[[generated]]
+id = "Jbau386q1PLoer815LZtt"
+uri = "file://artifacts/royvento/public/images/category-corporate.png"
+type = "image"
+title = "Corporate category image"
+
+[[generated]]
+id = "30xtSWK_jahwon5yM-tCx"
+uri = "file://artifacts/royvento/public/images/category-concert.png"
+type = "image"
+title = "Concert category image"
+
+[[generated]]
+id = "LPd1YxY4Ii0Lamg-CZa9t"
+uri = "file://artifacts/royvento/public/images/event-1.png"
+type = "image"
+title = "Event cover 1"
+
+[[generated]]
+id = "PLt0olU2jezYYu6zJd17l"
+uri = "file://artifacts/royvento/public/images/event-2.png"
+type = "image"
+title = "Event cover 2"
+
+[[generated]]
+id = "rSPW0f_UAhlgdVYmotT4n"
+uri = "file://artifacts/royvento/public/images/event-3.png"
+type = "image"
+title = "Event cover 3"
+
+[[generated]]
+id = "aIZI8hKa6MCzNqmfr8kRT"
+uri = "file://artifacts/royvento/public/images/event-4.png"
+type = "image"
+title = "Event cover 4"

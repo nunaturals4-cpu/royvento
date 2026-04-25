@@ -3,20 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Royvento event management platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: users
+  - name: vendors
+  - name: events
+  - name: bookings
+  - name: reviews
+  - name: availability
+  - name: admin
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,609 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "200":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Current authenticated user
+      responses:
+        "200":
+          description: The current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{userId}/role:
+    patch:
+      operationId: updateUserRole
+      tags: [users]
+      summary: Update a user's role (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{userId}:
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a user (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      summary: List approved vendors
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendors list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vendor"
+
+  /vendors/me:
+    get:
+      operationId: getMyVendor
+      tags: [vendors]
+      summary: Get the current user's vendor profile
+      responses:
+        "200":
+          description: Vendor profile (or null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyVendorResponse"
+    post:
+      operationId: createMyVendor
+      tags: [vendors]
+      summary: Create or apply for a vendor profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorBody"
+      responses:
+        "200":
+          description: Vendor created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+    patch:
+      operationId: updateMyVendor
+      tags: [vendors]
+      summary: Update the current vendor profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVendorBody"
+      responses:
+        "200":
+          description: Updated vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /vendors/{vendorId}:
+    get:
+      operationId: getVendor
+      tags: [vendors]
+      summary: Get a vendor profile
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /vendors/pending:
+    get:
+      operationId: listPendingVendors
+      tags: [vendors]
+      summary: List vendors pending approval (admin)
+      responses:
+        "200":
+          description: Pending vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vendor"
+
+  /vendors/{vendorId}/approve:
+    post:
+      operationId: approveVendor
+      tags: [vendors]
+      summary: Approve a vendor (admin)
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /vendors/{vendorId}/reject:
+    post:
+      operationId: rejectVendor
+      tags: [vendors]
+      summary: Reject a vendor (admin)
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List events
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Events list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create an event (vendor only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventBody"
+      responses:
+        "200":
+          description: Event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/featured:
+    get:
+      operationId: listFeaturedEvents
+      tags: [events]
+      summary: Featured events for the homepage
+      responses:
+        "200":
+          description: Featured events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+
+  /events/{eventId}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Event details
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+    patch:
+      operationId: updateEvent
+      tags: [events]
+      summary: Update an event (owning vendor)
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEventBody"
+      responses:
+        "200":
+          description: Event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /events/vendor/me:
+    get:
+      operationId: listMyVendorEvents
+      tags: [events]
+      summary: List events owned by the current vendor
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+
+  /bookings:
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Create a booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingBody"
+      responses:
+        "200":
+          description: Booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/me:
+    get:
+      operationId: listMyBookings
+      tags: [bookings]
+      summary: Bookings made by the current user
+      responses:
+        "200":
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+  /bookings/vendor:
+    get:
+      operationId: listVendorBookings
+      tags: [bookings]
+      summary: Bookings received by the current vendor
+      responses:
+        "200":
+          description: Bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+  /bookings/{bookingId}/status:
+    patch:
+      operationId: updateBookingStatus
+      tags: [bookings]
+      summary: Update a booking status (vendor)
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingStatusBody"
+      responses:
+        "200":
+          description: Booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /reviews:
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Submit a review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewBody"
+      responses:
+        "200":
+          description: Review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /reviews/event/{eventId}:
+    get:
+      operationId: listEventReviews
+      tags: [reviews]
+      summary: Reviews for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+  /reviews/vendor/{vendorId}:
+    get:
+      operationId: listVendorReviews
+      tags: [reviews]
+      summary: Reviews for a vendor
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+  /availability/vendor/{vendorId}:
+    get:
+      operationId: listVendorAvailability
+      tags: [availability]
+      summary: Availability calendar for a vendor
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Availability entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Availability"
+
+  /availability:
+    post:
+      operationId: setAvailability
+      tags: [availability]
+      summary: Set availability for the current vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetAvailabilityBody"
+      responses:
+        "200":
+          description: Availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Availability"
+
+  /availability/{availabilityId}:
+    delete:
+      operationId: deleteAvailability
+      tags: [availability]
+      summary: Remove an availability entry
+      parameters:
+        - name: availabilityId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /admin/analytics:
+    get:
+      operationId: getAdminAnalytics
+      tags: [admin]
+      summary: Platform analytics
+      responses:
+        "200":
+          description: Analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAnalytics"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +641,402 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    Ok:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required: [ok]
+
+    Role:
+      type: string
+      enum: [user, vendor, admin]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        createdAt:
+          type: string
+      required: [id, email, name, role, createdAt]
+
+    RegisterBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+      required: [email, password, name]
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required: [token, user]
+
+    MeResponse:
+      type: object
+      properties:
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/User"
+            - type: "null"
+      required: [user]
+
+    UpdateRoleBody:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+      required: [role]
+
+    VendorStatus:
+      type: string
+      enum: [pending, approved, rejected]
+
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        businessName:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        bannerImage:
+          type: string
+        portfolioImages:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: "#/components/schemas/VendorStatus"
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, userId, businessName, category, description, location, bannerImage, portfolioImages, status, rating, reviewCount, createdAt]
+
+    MyVendorResponse:
+      type: object
+      properties:
+        vendor:
+          oneOf:
+            - $ref: "#/components/schemas/Vendor"
+            - type: "null"
+      required: [vendor]
+
+    CreateVendorBody:
+      type: object
+      properties:
+        businessName:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        bannerImage:
+          type: string
+        portfolioImages:
+          type: array
+          items:
+            type: string
+      required: [businessName, category, description, location]
+
+    UpdateVendorBody:
+      type: object
+      properties:
+        businessName:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        bannerImage:
+          type: string
+        portfolioImages:
+          type: array
+          items:
+            type: string
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+        price:
+          type: number
+        capacity:
+          type: integer
+        imageUrl:
+          type: string
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        vendorName:
+          type: string
+        createdAt:
+          type: string
+      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, createdAt]
+
+    EventDetail:
+      allOf:
+        - $ref: "#/components/schemas/Event"
+        - type: object
+          properties:
+            vendor:
+              $ref: "#/components/schemas/Vendor"
+          required: [vendor]
+
+    CreateEventBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+        price:
+          type: number
+        capacity:
+          type: integer
+        imageUrl:
+          type: string
+      required: [title, description, category, location, price, capacity]
+
+    UpdateEventBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+        price:
+          type: number
+        capacity:
+          type: integer
+        imageUrl:
+          type: string
+
+    BookingStatus:
+      type: string
+      enum: [pending, confirmed, cancelled, completed]
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        userId:
+          type: integer
+        vendorId:
+          type: integer
+        bookingDate:
+          type: string
+        guests:
+          type: integer
+        totalPrice:
+          type: number
+        notes:
+          type: string
+        status:
+          $ref: "#/components/schemas/BookingStatus"
+        createdAt:
+          type: string
+        eventTitle:
+          type: string
+        eventImage:
+          type: string
+        vendorName:
+          type: string
+        userName:
+          type: string
+        userEmail:
+          type: string
+      required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail]
+
+    CreateBookingBody:
+      type: object
+      properties:
+        eventId:
+          type: integer
+        bookingDate:
+          type: string
+        guests:
+          type: integer
+        notes:
+          type: string
+      required: [eventId, bookingDate, guests]
+
+    UpdateBookingStatusBody:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/BookingStatus"
+      required: [status]
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        eventId:
+          type: integer
+        vendorId:
+          type: integer
+        rating:
+          type: integer
+        comment:
+          type: string
+        createdAt:
+          type: string
+        userName:
+          type: string
+      required: [id, userId, vendorId, rating, comment, createdAt, userName]
+
+    CreateReviewBody:
+      type: object
+      properties:
+        eventId:
+          type: integer
+        vendorId:
+          type: integer
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+      required: [vendorId, rating, comment]
+
+    AvailabilityStatus:
+      type: string
+      enum: [available, booked, blocked]
+
+    Availability:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        date:
+          type: string
+        status:
+          $ref: "#/components/schemas/AvailabilityStatus"
+      required: [id, vendorId, date, status]
+
+    SetAvailabilityBody:
+      type: object
+      properties:
+        date:
+          type: string
+        status:
+          $ref: "#/components/schemas/AvailabilityStatus"
+      required: [date, status]
+
+    AdminAnalytics:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalVendors:
+          type: integer
+        pendingVendors:
+          type: integer
+        totalEvents:
+          type: integer
+        totalBookings:
+          type: integer
+        totalRevenue:
+          type: number
+        bookingsByStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+            required: [status, count]
+        recentBookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+        topVendors:
+          type: array
+          items:
+            type: object
+            properties:
+              vendorId:
+                type: integer
+              businessName:
+                type: string
+              bookingCount:
+                type: integer
+              revenue:
+                type: number
+            required: [vendorId, businessName, bookingCount, revenue]
+      required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, bookingsByStatus, recentBookings, topVendors]
