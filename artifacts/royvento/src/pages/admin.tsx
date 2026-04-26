@@ -10,36 +10,49 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Briefcase, CalendarCheck, DollarSign, Clock, Mail, UserPlus } from "lucide-react";
+import {
+  Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
+  Tag, Megaphone, Trash2, Crown, IndianRupee,
+} from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiDelete, apiPatch, formatINR } from "@/lib/api";
 
 export function AdminPanel() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="mb-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Admin</p>
-        <h1 className="font-serif text-4xl tracking-tight">Royvento control room</h1>
+        <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Admin</p>
+        <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">Royvento control room</h1>
       </header>
 
       <Tabs defaultValue="analytics" className="space-y-6">
-        <TabsList className="bg-card flex-wrap h-auto">
+        <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="vendors">Vendor approvals</TabsTrigger>
-          <TabsTrigger value="requests">Vendor requests</TabsTrigger>
+          <TabsTrigger value="vendors">Partner approvals</TabsTrigger>
+          <TabsTrigger value="requests">Partner requests</TabsTrigger>
+          <TabsTrigger value="events">Events</TabsTrigger>
+          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+          <TabsTrigger value="coupons">Coupons</TabsTrigger>
+          <TabsTrigger value="ads">Ads</TabsTrigger>
           <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><PendingVendors /></TabsContent>
         <TabsContent value="requests"><VendorRequests /></TabsContent>
+        <TabsContent value="events"><EventsAdmin /></TabsContent>
+        <TabsContent value="subscriptions"><SubscriptionsAdmin /></TabsContent>
+        <TabsContent value="coupons"><CouponsAdmin /></TabsContent>
+        <TabsContent value="ads"><AdsAdmin /></TabsContent>
         <TabsContent value="messages"><Messages /></TabsContent>
         <TabsContent value="users"><UsersPanel /></TabsContent>
       </Tabs>
@@ -49,12 +62,14 @@ export function AdminPanel() {
 
 function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="rounded-2xl border bg-card p-5">
+    <div className="rounded-2xl glass-card p-5 lift-3d">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
-        <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><Icon className="h-4 w-4" /></div>
+        <div className="w-9 h-9 rounded-lg bg-red-600/15 text-primary flex items-center justify-center red-ring">
+          <Icon className="h-4 w-4" />
+        </div>
       </div>
-      <p className="font-serif text-3xl tracking-tight">{value}</p>
+      <p className="stat-number text-3xl">{value}</p>
     </div>
   );
 }
@@ -67,14 +82,14 @@ function Analytics() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Stat icon={Users} label="Users" value={String(data.totalUsers)} />
-        <Stat icon={Briefcase} label="Vendors" value={String(data.totalVendors)} />
+        <Stat icon={Briefcase} label="Partners" value={String(data.totalVendors)} />
         <Stat icon={Clock} label="Pending" value={String(data.pendingVendors)} />
         <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
-        <Stat icon={DollarSign} label="Revenue" value={`$${data.totalRevenue.toLocaleString()}`} />
+        <Stat icon={IndianRupee} label="Revenue" value={formatINR(data.totalRevenue)} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl border bg-card p-6">
+        <div className="rounded-2xl glass-card p-6">
           <h3 className="font-serif text-xl mb-4">Bookings by status</h3>
           <div className="h-64">
             <ResponsiveContainer>
@@ -89,35 +104,35 @@ function Analytics() {
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-card p-6">
-          <h3 className="font-serif text-xl mb-4">Top vendors</h3>
+        <div className="rounded-2xl glass-card p-6">
+          <h3 className="font-serif text-xl mb-4">Top partners</h3>
           <div className="space-y-3">
             {data.topVendors.length === 0 ? (
               <p className="text-sm text-muted-foreground">No data yet.</p>
             ) : data.topVendors.map((v) => (
-              <div key={v.vendorId} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+              <div key={v.vendorId} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
                 <span className="font-medium">{v.businessName}</span>
-                <span className="text-muted-foreground">{v.bookingCount} bookings · ${v.revenue.toLocaleString()}</span>
+                <span className="text-muted-foreground">{v.bookingCount} bookings · {formatINR(v.revenue)}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-card p-6">
+      <div className="rounded-2xl glass-card p-6">
         <h3 className="font-serif text-xl mb-4">Recent bookings</h3>
         <div className="space-y-2">
           {data.recentBookings.length === 0 ? (
             <p className="text-sm text-muted-foreground">No bookings yet.</p>
           ) : data.recentBookings.map((b) => (
-            <div key={b.id} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+            <div key={b.id} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
               <div>
                 <span className="font-medium">{b.eventTitle}</span>
                 <span className="text-muted-foreground"> · {b.userName}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Badge variant="secondary">{b.status}</Badge>
-                <span className="text-muted-foreground">${b.totalPrice.toLocaleString()}</span>
+                <span className="text-muted-foreground">{formatINR(b.totalPrice)}</span>
               </div>
             </div>
           ))}
@@ -133,11 +148,11 @@ function PendingVendors() {
   const reject = useRejectVendor();
   const { toast } = useToast();
 
-  if (pending.length === 0) return <p className="text-muted-foreground">No vendors awaiting approval. 🎉</p>;
+  if (pending.length === 0) return <p className="text-muted-foreground">No partners awaiting approval.</p>;
   return (
     <div className="space-y-4">
       {pending.map((v) => (
-        <div key={v.id} className="rounded-2xl border bg-card overflow-hidden flex flex-col md:flex-row">
+        <div key={v.id} className="rounded-2xl glass-card overflow-hidden flex flex-col md:flex-row">
           {v.bannerImage && <div className="md:w-48 aspect-video md:aspect-auto bg-muted"><img src={v.bannerImage} alt="" className="h-full w-full object-cover" /></div>}
           <div className="flex-1 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -150,20 +165,295 @@ function PendingVendors() {
               <Button
                 onClick={() =>
                   approve.mutate({ vendorId: v.id }, {
-                    onSuccess: () => { toast({ title: "Vendor approved" }); refetch(); },
+                    onSuccess: () => { toast({ title: "Partner approved" }); refetch(); },
                     onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
                   })
                 }
+                className="bg-gradient-to-br from-red-600 to-red-800 border-0"
               >Approve</Button>
               <Button
                 variant="outline"
                 onClick={() =>
                   reject.mutate({ vendorId: v.id }, {
-                    onSuccess: () => { toast({ title: "Vendor rejected" }); refetch(); },
+                    onSuccess: () => { toast({ title: "Partner rejected" }); refetch(); },
                   })
                 }
               >Reject</Button>
             </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface AdminEvent {
+  id: number;
+  title: string;
+  category: string;
+  type: string;
+  price: number;
+  vendorName: string;
+  city: string;
+  state: string;
+  isPublished: boolean;
+  popular: boolean;
+  imageUrl: string;
+}
+
+function EventsAdmin() {
+  const [items, setItems] = useState<AdminEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<AdminEvent[]>("/api/admin/events")
+      .then(setItems)
+      .catch((e) => toast({ title: "Failed to load", description: e?.message, variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const remove = async (id: number, title: string) => {
+    if (!confirm(`Delete "${title}"?`)) return;
+    try {
+      await apiDelete(`/api/admin/events/${id}`);
+      toast({ title: "Deleted" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+  const togglePopular = async (e: AdminEvent) => {
+    try {
+      await apiPatch(`/api/admin/events/${e.id}`, { popular: !e.popular });
+      load();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground">No events yet.</p>;
+  return (
+    <div className="rounded-2xl glass-card overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+          <tr>
+            <th className="text-left p-3">Title</th>
+            <th className="text-left p-3">Partner</th>
+            <th className="text-left p-3">Type</th>
+            <th className="text-left p-3">Location</th>
+            <th className="text-right p-3">Price</th>
+            <th className="text-center p-3">Popular</th>
+            <th className="text-right p-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((e) => (
+            <tr key={e.id} className="border-t border-white/5">
+              <td className="p-3 font-medium">{e.title}</td>
+              <td className="p-3 text-muted-foreground">{e.vendorName}</td>
+              <td className="p-3"><Badge variant="outline">{e.type}</Badge></td>
+              <td className="p-3 text-muted-foreground">{e.city}{e.state ? `, ${e.state}` : ""}</td>
+              <td className="p-3 text-right">{formatINR(e.price)}</td>
+              <td className="p-3 text-center">
+                <button onClick={() => togglePopular(e)} className={`text-xs px-2 py-1 rounded ${e.popular ? "bg-red-600/30 text-red-200" : "bg-white/5 text-white/40"}`}>
+                  ★ {e.popular ? "Yes" : "No"}
+                </button>
+              </td>
+              <td className="p-3 text-right">
+                <Button size="sm" variant="ghost" onClick={() => remove(e.id, e.title)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+interface AdminSub {
+  id: number; userId: number; planType: string; planPeriod: string;
+  price: string; status: string; expiresAt: string; userName: string; userEmail: string;
+}
+function SubscriptionsAdmin() {
+  const [items, setItems] = useState<AdminSub[]>([]);
+  const { toast } = useToast();
+  const load = () => apiGet<AdminSub[]>("/api/admin/subscriptions").then(setItems).catch(() => {});
+  useEffect(() => { load(); }, []);
+  return (
+    <div className="rounded-2xl glass-card overflow-hidden">
+      {items.length === 0 ? (
+        <p className="p-6 text-muted-foreground">No subscriptions yet.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="text-left p-3">User</th>
+              <th className="text-left p-3">Plan</th>
+              <th className="text-left p-3">Status</th>
+              <th className="text-right p-3">Price</th>
+              <th className="text-right p-3">Expires</th>
+              <th className="p-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((s) => (
+              <tr key={s.id} className="border-t border-white/5">
+                <td className="p-3">
+                  <p className="font-medium">{s.userName}</p>
+                  <p className="text-xs text-muted-foreground">{s.userEmail}</p>
+                </td>
+                <td className="p-3">
+                  <Badge variant={s.planType === "partner" ? "default" : "secondary"}>{s.planType}</Badge>
+                  <span className="text-xs text-muted-foreground ml-1">{s.planPeriod}</span>
+                </td>
+                <td className="p-3"><Badge variant={s.status === "active" ? "default" : "outline"}>{s.status}</Badge></td>
+                <td className="p-3 text-right">{formatINR(Number(s.price))}</td>
+                <td className="p-3 text-right text-muted-foreground">{new Date(s.expiresAt).toLocaleDateString()}</td>
+                <td className="p-3 text-right">
+                  <Button size="sm" variant="ghost" onClick={async () => {
+                    if (!confirm("Cancel this subscription?")) return;
+                    await apiDelete(`/api/admin/subscriptions/${s.id}`).catch(() => {});
+                    toast({ title: "Cancelled" });
+                    load();
+                  }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+interface AdminCoupon {
+  id: number; code: string; userId: number | null; discountPercent: number;
+  isUsed: boolean; expiresAt: string | null; createdAt: string;
+  userName: string | null; userEmail: string | null;
+}
+function CouponsAdmin() {
+  const [items, setItems] = useState<AdminCoupon[]>([]);
+  const [email, setEmail] = useState("");
+  const [discount, setDiscount] = useState(10);
+  const { toast } = useToast();
+  const load = () => apiGet<AdminCoupon[]>("/api/admin/coupons").then(setItems).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  const grant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiPost("/api/admin/coupons", { email, discountPercent: discount });
+      toast({ title: "Coupon granted" });
+      setEmail("");
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={grant} className="rounded-2xl glass-card-strong p-5 grid md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+        <div>
+          <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5 text-primary" /> Grant coupon to user (email)</Label>
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" required className="bg-black/40 border-white/10 mt-1" />
+        </div>
+        <div>
+          <Label>Discount %</Label>
+          <Input type="number" min={1} max={50} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
+        </div>
+        <Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">Grant</Button>
+      </form>
+
+      <div className="rounded-2xl glass-card overflow-hidden">
+        {items.length === 0 ? (
+          <p className="p-6 text-muted-foreground">No coupons issued.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">Code</th>
+                <th className="text-left p-3">Owner</th>
+                <th className="text-right p-3">Discount</th>
+                <th className="text-center p-3">Used</th>
+                <th className="text-right p-3">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((c) => (
+                <tr key={c.id} className="border-t border-white/5">
+                  <td className="p-3 font-mono text-xs">{c.code}</td>
+                  <td className="p-3">
+                    {c.userName ? (<><span>{c.userName}</span><span className="text-xs text-muted-foreground ml-2">{c.userEmail}</span></>) : <span className="text-muted-foreground">— public —</span>}
+                  </td>
+                  <td className="p-3 text-right">{c.discountPercent}%</td>
+                  <td className="p-3 text-center">{c.isUsed ? "Yes" : "No"}</td>
+                  <td className="p-3 text-right text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AdminAd {
+  id: number; vendorId: number; status: string; message: string;
+  createdAt: string; reviewedAt: string | null; vendorName: string;
+}
+function AdsAdmin() {
+  const [items, setItems] = useState<AdminAd[]>([]);
+  const { toast } = useToast();
+  const load = () => apiGet<AdminAd[]>("/api/admin/ads").then(setItems).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  const act = async (id: number, action: "approve" | "reject") => {
+    try {
+      await apiPost(`/api/admin/ads/${id}/${action}`);
+      toast({ title: action === "approve" ? "Ad approved" : "Ad rejected" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  if (items.length === 0)
+    return <div className="rounded-2xl glass-card p-10 text-center">
+      <Megaphone className="h-8 w-8 text-primary mx-auto mb-3" />
+      <p className="text-muted-foreground">No ad requests.</p>
+    </div>;
+  return (
+    <div className="space-y-4">
+      {items.map((a) => (
+        <div key={a.id} className="rounded-2xl glass-card p-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Megaphone className="h-4 w-4 text-primary" />
+                <Badge variant={a.status === "approved" ? "default" : a.status === "rejected" ? "outline" : "secondary"}>
+                  {a.status}
+                </Badge>
+              </div>
+              <p className="font-serif text-lg">{a.vendorName}</p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-xl">{a.message}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleString()}</p>
+            </div>
+            {a.status === "pending" && (
+              <div className="flex gap-2">
+                <Button onClick={() => act(a.id, "approve")} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Approve</Button>
+                <Button variant="outline" onClick={() => act(a.id, "reject")}>Reject</Button>
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -180,21 +470,23 @@ function UsersPanel() {
   const { toast } = useToast();
 
   return (
-    <div className="rounded-2xl border bg-card overflow-hidden">
+    <div className="rounded-2xl glass-card overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
+        <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="text-left p-4">Name</th>
             <th className="text-left p-4">Email</th>
+            <th className="text-left p-4">Phone</th>
             <th className="text-left p-4">Role</th>
             <th className="text-right p-4">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {users.map((u) => (
-            <tr key={u.id} className="border-t">
+          {users.map((u: any) => (
+            <tr key={u.id} className="border-t border-white/5">
               <td className="p-4 font-medium">{u.name}</td>
               <td className="p-4 text-muted-foreground">{u.email}</td>
+              <td className="p-4 text-muted-foreground">{u.phone ?? "—"}</td>
               <td className="p-4">
                 <Select
                   value={u.role}
@@ -208,7 +500,7 @@ function UsersPanel() {
                     )
                   }
                 >
-                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-32 bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
                   <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                 </Select>
               </td>
@@ -259,12 +551,15 @@ function VendorRequests() {
   useEffect(() => { load(); }, []);
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (items.length === 0) return <p className="text-muted-foreground">No vendor requests yet.</p>;
+  if (items.length === 0) return <p className="text-muted-foreground">No partner requests yet.</p>;
 
   const act = async (id: number, action: "approve" | "reject") => {
     try {
       await apiPost(`/api/admin/vendor-requests/${id}/${action}`);
-      toast({ title: action === "approve" ? "Request approved" : "Request rejected", description: action === "approve" ? "User has been promoted to vendor." : undefined });
+      toast({
+        title: action === "approve" ? "Request approved" : "Request rejected",
+        description: action === "approve" ? "User has been promoted to partner." : undefined,
+      });
       load();
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
@@ -274,7 +569,7 @@ function VendorRequests() {
   return (
     <div className="space-y-4">
       {items.map((r) => (
-        <div key={r.id} className="rounded-2xl border bg-card p-6">
+        <div key={r.id} className="rounded-2xl glass-card p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -294,7 +589,9 @@ function VendorRequests() {
             </div>
             {r.status === "pending" && (
               <div className="flex gap-2">
-                <Button onClick={() => act(r.id, "approve")}>Approve & promote</Button>
+                <Button onClick={() => act(r.id, "approve")} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
+                  <Crown className="h-4 w-4 mr-1" /> Approve &amp; promote
+                </Button>
                 <Button variant="outline" onClick={() => act(r.id, "reject")}>Reject</Button>
               </div>
             )}
@@ -342,7 +639,7 @@ function Messages() {
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border bg-card p-10 text-center">
+      <div className="rounded-2xl glass-card p-10 text-center">
         <Mail className="h-8 w-8 text-primary mx-auto mb-3" />
         <p className="text-muted-foreground">No contact messages right now.</p>
       </div>
@@ -352,7 +649,7 @@ function Messages() {
   return (
     <div className="space-y-4">
       {items.map((m) => (
-        <div key={m.id} className="rounded-2xl border bg-card p-6">
+        <div key={m.id} className="rounded-2xl glass-card p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -367,7 +664,7 @@ function Messages() {
               <p className="mt-3 text-xs text-muted-foreground">{new Date(m.createdAt).toLocaleString()}</p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => remove(m.id, "Marked resolved")}>Resolved</Button>
+              <Button onClick={() => remove(m.id, "Marked resolved")} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Resolved</Button>
               <Button variant="outline" onClick={() => remove(m.id, "Cancelled")}>Cancel</Button>
             </div>
           </div>

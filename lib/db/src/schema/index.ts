@@ -23,6 +23,7 @@ export const usersTable = pgTable(
     phone: varchar("phone", { length: 50 }).notNull().default(""),
     about: text("about").notNull().default(""),
     profileImage: text("profile_image").notNull().default(""),
+    googleId: varchar("google_id", { length: 255 }).notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -41,8 +42,19 @@ export const vendorsTable = pgTable(
     category: varchar("category", { length: 100 }).notNull(),
     description: text("description").notNull().default(""),
     location: varchar("location", { length: 255 }).notNull().default(""),
+    state: varchar("state", { length: 100 }).notNull().default(""),
+    city: varchar("city", { length: 100 }).notNull().default(""),
+    country: varchar("country", { length: 100 }).notNull().default("India"),
     bannerImage: text("banner_image").notNull().default(""),
     portfolioImages: text("portfolio_images").array().notNull().default([]),
+    eventTypes: text("event_types").array().notNull().default([]),
+    budgetMin: numeric("budget_min", { precision: 14, scale: 2 })
+      .notNull()
+      .default("0"),
+    budgetMax: numeric("budget_max", { precision: 14, scale: 2 })
+      .notNull()
+      .default("0"),
+    isPremium: boolean("is_premium").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -62,11 +74,17 @@ export const eventsTable = pgTable(
     title: varchar("title", { length: 255 }).notNull(),
     description: text("description").notNull().default(""),
     category: varchar("category", { length: 100 }).notNull(),
+    type: varchar("type", { length: 20 }).notNull().default("event"),
     location: varchar("location", { length: 255 }).notNull().default(""),
+    state: varchar("state", { length: 100 }).notNull().default(""),
+    city: varchar("city", { length: 100 }).notNull().default(""),
+    country: varchar("country", { length: 100 }).notNull().default("India"),
     price: numeric("price", { precision: 12, scale: 2 }).notNull().default("0"),
     capacity: integer("capacity").notNull().default(0),
     imageUrl: text("image_url").notNull().default(""),
+    eventDate: date("event_date"),
     featured: boolean("featured").notNull().default(false),
+    popular: boolean("popular").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -74,6 +92,7 @@ export const eventsTable = pgTable(
   (t) => ({
     vendorIdx: index("events_vendor_idx").on(t.vendorId),
     categoryIdx: index("events_category_idx").on(t.category),
+    typeIdx: index("events_type_idx").on(t.type),
   }),
 );
 
@@ -89,6 +108,14 @@ export const bookingsTable = pgTable(
     totalPrice: numeric("total_price", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    couponCode: varchar("coupon_code", { length: 64 }).notNull().default(""),
+    discountAmount: numeric("discount_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    finalPrice: numeric("final_price", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    budgetRange: varchar("budget_range", { length: 50 }).notNull().default(""),
     notes: text("notes").notNull().default(""),
     eventType: varchar("event_type", { length: 50 }).notNull().default("other"),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
@@ -178,6 +205,123 @@ export const vendorRequestsTable = pgTable(
   }),
 );
 
+export const subscriptionsTable = pgTable(
+  "subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    planType: varchar("plan_type", { length: 20 }).notNull().default("user"),
+    planPeriod: varchar("plan_period", { length: 20 })
+      .notNull()
+      .default("monthly"),
+    price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("subscriptions_user_idx").on(t.userId),
+    statusIdx: index("subscriptions_status_idx").on(t.status),
+  }),
+);
+
+export const couponsTable = pgTable(
+  "coupons",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    code: varchar("code", { length: 64 }).notNull(),
+    discountPercent: integer("discount_percent").notNull().default(10),
+    used: boolean("used").notNull().default(false),
+    source: varchar("source", { length: 30 }).notNull().default("admin_grant"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("coupons_user_idx").on(t.userId),
+    codeIdx: uniqueIndex("coupons_code_idx").on(t.code),
+  }),
+);
+
+export const partnerMediaTable = pgTable(
+  "partner_media",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull(),
+    type: varchar("type", { length: 10 }).notNull().default("photo"),
+    url: text("url").notNull(),
+    caption: varchar("caption", { length: 255 }).notNull().default(""),
+    eventCategories: text("event_categories").array().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("partner_media_vendor_idx").on(t.vendorId),
+  }),
+);
+
+export const partnerBlockedDatesTable = pgTable(
+  "partner_blocked_dates",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull(),
+    date: date("date").notNull(),
+    reason: varchar("reason", { length: 255 }).notNull().default(""),
+    source: varchar("source", { length: 20 }).notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    vendorDateIdx: uniqueIndex("blocked_dates_vendor_date_idx").on(
+      t.vendorId,
+      t.date,
+    ),
+  }),
+);
+
+export const adsRequestsTable = pgTable(
+  "ads_requests",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull(),
+    message: text("message").notNull().default(""),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("ads_vendor_idx").on(t.vendorId),
+    statusIdx: index("ads_status_idx").on(t.status),
+  }),
+);
+
+export const profileViewsTable = pgTable(
+  "profile_views",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull(),
+    viewerUserId: integer("viewer_user_id"),
+    viewerName: varchar("viewer_name", { length: 255 }).notNull().default(""),
+    viewerEmail: varchar("viewer_email", { length: 255 }).notNull().default(""),
+    viewedAt: timestamp("viewed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("profile_views_vendor_idx").on(t.vendorId),
+  }),
+);
+
 export type User = typeof usersTable.$inferSelect;
 export type Vendor = typeof vendorsTable.$inferSelect;
 export type Event = typeof eventsTable.$inferSelect;
@@ -186,3 +330,9 @@ export type Review = typeof reviewsTable.$inferSelect;
 export type Availability = typeof availabilityTable.$inferSelect;
 export type ContactMessage = typeof contactMessagesTable.$inferSelect;
 export type VendorRequest = typeof vendorRequestsTable.$inferSelect;
+export type Subscription = typeof subscriptionsTable.$inferSelect;
+export type Coupon = typeof couponsTable.$inferSelect;
+export type PartnerMedia = typeof partnerMediaTable.$inferSelect;
+export type PartnerBlockedDate = typeof partnerBlockedDatesTable.$inferSelect;
+export type AdsRequest = typeof adsRequestsTable.$inferSelect;
+export type ProfileView = typeof profileViewsTable.$inferSelect;

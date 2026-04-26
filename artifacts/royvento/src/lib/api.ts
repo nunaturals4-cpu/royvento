@@ -79,3 +79,27 @@ export const EVENT_CATEGORIES = [
   "Concert",
   "Brand Activation",
 ] as const;
+
+// Budget ranges in INR (5,000 → 100 crore)
+export const BUDGET_RANGES = [
+  { value: "5k-25k", label: "₹5,000 — ₹25,000", min: 5000, max: 25000 },
+  { value: "25k-1L", label: "₹25,000 — ₹1 Lakh", min: 25000, max: 100000 },
+  { value: "1L-5L", label: "₹1 Lakh — ₹5 Lakh", min: 100000, max: 500000 },
+  { value: "5L-25L", label: "₹5 Lakh — ₹25 Lakh", min: 500000, max: 2500000 },
+  { value: "25L-1Cr", label: "₹25 Lakh — ₹1 Crore", min: 2500000, max: 10000000 },
+  { value: "1Cr-10Cr", label: "₹1 Crore — ₹10 Crore", min: 10000000, max: 100000000 },
+  { value: "10Cr-100Cr", label: "₹10 Crore — ₹100 Crore", min: 100000000, max: 1000000000 },
+] as const;
+
+export const INDIAN_STATES = [
+  "West Bengal", "Maharashtra", "Karnataka", "Delhi", "Tamil Nadu",
+  "Telangana", "Gujarat", "Rajasthan", "Punjab", "Uttar Pradesh",
+  "Kerala", "Goa", "Madhya Pradesh", "Haryana", "Bihar",
+] as const;
+
+export function formatINR(value: number): string {
+  if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)} Cr`;
+  if (value >= 100000) return `₹${(value / 100000).toFixed(2)} L`;
+  if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
+  return `₹${value.toLocaleString("en-IN")}`;
+}

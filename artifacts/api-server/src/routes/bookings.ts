@@ -6,6 +6,7 @@ import {
   vendorsTable,
   usersTable,
   availabilityTable,
+  couponsTable,
 } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -28,6 +29,8 @@ const CreateBookingBody = z.object({
   guests: z.number().int().positive(),
   notes: z.string().optional().default(""),
   eventType: z.enum(EVENT_TYPES).optional().default("other"),
+  budgetRange: z.string().optional().default(""),
+  couponCode: z.string().optional().default(""),
 });
 import {
   sendBookingCreatedEmails,
@@ -44,6 +47,10 @@ interface BookingRow {
   bookingDate: string;
   guests: number;
   totalPrice: string;
+  couponCode: string;
+  discountAmount: string;
+  finalPrice: string;
+  budgetRange: string;
   notes: string;
   eventType: string;
   status: string;
@@ -75,6 +82,10 @@ async function serializeBookings(rows: BookingRow[]) {
       bookingDate: b.bookingDate,
       guests: b.guests,
       totalPrice: Number(b.totalPrice),
+      couponCode: b.couponCode,
+      discountAmount: Number(b.discountAmount),
+      finalPrice: Number(b.finalPrice),
+      budgetRange: b.budgetRange,
       notes: b.notes,
       eventType: b.eventType,
       status: b.status,
@@ -82,6 +93,7 @@ async function serializeBookings(rows: BookingRow[]) {
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",
       vendorName: v?.businessName ?? "",
+      partnerName: v?.businessName ?? "",
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
     };
@@ -115,6 +127,34 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ? rawDate.toISOString().slice(0, 10)
       : String(rawDate).slice(0, 10);
   const totalPrice = Number(evt.price) * parsed.data.guests;
+
+  // Apply coupon if provided
+  let discountAmount = 0;
+  let validCode = "";
+  if (parsed.data.couponCode) {
+    const couponRows = await db
+      .select()
+      .from(couponsTable)
+      .where(
+        and(
+          eq(couponsTable.code, parsed.data.couponCode.trim().toUpperCase()),
+          eq(couponsTable.userId, user.id),
+          eq(couponsTable.used, false),
+        ),
+      )
+      .limit(1);
+    const coupon = couponRows[0];
+    if (coupon) {
+      discountAmount = Math.round(totalPrice * (coupon.discountPercent / 100));
+      validCode = coupon.code;
+      await db
+        .update(couponsTable)
+        .set({ used: true })
+        .where(eq(couponsTable.id, coupon.id));
+    }
+  }
+  const finalPrice = Math.max(0, totalPrice - discountAmount);
+
   const [b] = await db
     .insert(bookingsTable)
     .values({
@@ -124,6 +164,10 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       bookingDate: dateStr,
       guests: parsed.data.guests,
       totalPrice: String(totalPrice),
+      couponCode: validCode,
+      discountAmount: String(discountAmount),
+      finalPrice: String(finalPrice),
+      budgetRange: parsed.data.budgetRange ?? "",
       notes: parsed.data.notes ?? "",
       eventType: parsed.data.eventType ?? "other",
       status: "pending",
@@ -133,7 +177,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     res.status(500).json({ error: "Failed" });
     return;
   }
-  // mark availability for that date as booked (if not already blocked)
   await db
     .insert(availabilityTable)
     .values({ vendorId: evt.vendorId, date: dateStr, status: "booked" })
@@ -143,7 +186,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     });
   const [out] = await serializeBookings([b]);
 
-  // Fire-and-log notifications (no real provider configured).
   try {
     const vRows = await db
       .select()
@@ -175,7 +217,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       notes: b.notes || undefined,
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("Failed to send booking notifications:", err);
   }
 
@@ -276,7 +317,6 @@ router.patch(
     }
     const [out] = await serializeBookings([updated]);
 
-    // Notify the booking owner of the status change.
     if (out && b.status !== updated.status) {
       try {
         await sendBookingStatusEmail({
@@ -289,7 +329,6 @@ router.patch(
           status: updated.status,
         });
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error("Failed to send status notification:", err);
       }
     }

@@ -10,6 +10,11 @@ import availabilityRouter from "./availability";
 import adminRouter from "./admin";
 import contactRouter from "./contact";
 import vendorRequestsRouter from "./vendorRequests";
+import subscriptionsRouter from "./subscriptions";
+import couponsRouter from "./coupons";
+import partnerMediaRouter from "./partnerMedia";
+import blockedDatesRouter from "./blockedDates";
+import adsRouter from "./ads";
 
 const router: IRouter = Router();
 
@@ -24,5 +29,10 @@ router.use(availabilityRouter);
 router.use(adminRouter);
 router.use(contactRouter);
 router.use(vendorRequestsRouter);
+router.use(subscriptionsRouter);
+router.use(couponsRouter);
+router.use(partnerMediaRouter);
+router.use(blockedDatesRouter);
+router.use(adsRouter);
 
 export default router;

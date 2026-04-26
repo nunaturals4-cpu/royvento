@@ -145,11 +145,53 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
     recentBookings,
     topVendors: top.map((t) => ({
       vendorId: t.vendorId,
-      businessName: vMap.get(t.vendorId)?.businessName ?? "Vendor",
+      businessName: vMap.get(t.vendorId)?.businessName ?? "Partner",
       bookingCount: t.bookingCount,
       revenue: Number(t.revenue),
     })),
   });
+});
+
+router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(eventsTable)
+    .orderBy(desc(eventsTable.createdAt));
+  if (rows.length === 0) return res.json([]);
+  const vendors = await db.select().from(vendorsTable);
+  const vMap = new Map(vendors.map((v) => [v.id, v]));
+  res.json(
+    rows.map((e) => ({
+      id: e.id,
+      vendorId: e.vendorId,
+      title: e.title,
+      type: e.type,
+      category: e.category,
+      city: e.city,
+      state: e.state,
+      price: Number(e.price),
+      imageUrl: e.imageUrl,
+      partnerName: vMap.get(e.vendorId)?.businessName ?? "",
+      createdAt: e.createdAt.toISOString(),
+    })),
+  );
+});
+
+router.get("/admin/users", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .orderBy(desc(usersTable.createdAt));
+  res.json(
+    rows.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      phone: u.phone,
+      createdAt: u.createdAt.toISOString(),
+    })),
+  );
 });
 
 export default router;

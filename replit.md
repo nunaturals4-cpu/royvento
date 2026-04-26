@@ -10,9 +10,21 @@ A full-stack event management marketplace for hosts and vendors.
 - **Auth**: JWT (HS256, 30-day) via cookie `royvento_token` + Authorization Bearer header. SESSION_SECRET as signing key.
 
 ## Roles
-- `user`: book events, leave reviews
-- `vendor`: create vendor profile (auto-flips role from user → vendor on creation), manage events, bookings, availability
-- `admin`: approve vendors, manage users, view analytics
+- `user`: book events, leave reviews, claim coupons, subscribe (₹200/mo)
+- `vendor` (UI label: **Partner**): create profile, manage events/pubs, bookings, availability, media tied to event types/budget, blocked dates (Google Calendar sync stub), ad requests, leads/CRM (premium ₹999/mo)
+- `admin`: approve partners, manage users, view analytics, grant coupons, approve ads, delete events/pubs
+
+## UI overhaul (Apr 2026)
+- Premium 3D dark theme (red/white/black) — `index.css` utilities: `glass-card`, `glass-card-strong`, `lift-3d`, `red-glow`, `red-ring`, `accent-underline`, `text-gradient-red`, `hero-grid`, `stat-number`, `perspective-card`. Inter + Playfair Display fonts.
+- All prices INR via `formatINR` (artifacts/royvento/src/lib/api.ts). Budget filter ranges defined in `BUDGET_RANGES` (₹5k–₹100cr).
+- Pubs are events with `type='pub'` rendered on `/pubs`. Popular events surface on `/` via `/api/events/popular`.
+- Coupon = login-gated 10% off. Subscribing auto-grants a coupon. Admin can grant per-user coupons.
+- Vendor → "Partner" rename in UI/new endpoints; DB table stays `vendors`.
+- Auth additions: phone field on signup, Google OAuth STUB at `/api/auth/google/*`.
+- Demo accounts: `admin@admin.com` / `admin123@`, `showcase@royvento.in` / `partner123`.
+
+## New backend routes (April 2026)
+`/api/subscriptions/me|POST`, `/api/coupons/me|validate`, `/api/partner/media`, `/api/partner/blocked-dates` (+ google-sync stub), `/api/partner/ads`, `/api/partner/leads/me`, `/api/partner/profile`, `/api/admin/{events,subscriptions,coupons,ads}`, `/api/events/popular`, `/api/events?type=pub&category=&state=&city=&country=&minPrice=&maxPrice=`. Routes use `apiGet/apiPost/apiPatch/apiDelete` from `lib/api.ts` (no orval regen for new endpoints).
 
 ## Key directories
 - `artifacts/api-server/src/routes/` — auth, users, vendors, events, bookings, reviews, availability, admin

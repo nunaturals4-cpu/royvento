@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { RegisterBody, LoginBody } from "@workspace/api-zod";
+import { z } from "zod";
 import {
   hashPassword,
   comparePassword,
@@ -15,13 +15,26 @@ import {
 
 const router: IRouter = Router();
 
+const RegisterBodyExt = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  name: z.string().min(1),
+  role: z.enum(["user", "vendor", "admin"]).optional(),
+  phone: z.string().optional().default(""),
+});
+
+const LoginBodyExt = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 router.post("/auth/register", async (req, res) => {
-  const parsed = RegisterBody.safeParse(req.body);
+  const parsed = RegisterBodyExt.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error });
     return;
   }
-  const { email, password, name, role } = parsed.data;
+  const { email, password, name, role, phone } = parsed.data;
   const safeRole: Role = role === "vendor" || role === "admin" ? role : "user";
 
   const existing = await db
@@ -36,7 +49,7 @@ router.post("/auth/register", async (req, res) => {
   const passwordHash = await hashPassword(password);
   const [created] = await db
     .insert(usersTable)
-    .values({ email, passwordHash, name, role: safeRole })
+    .values({ email, passwordHash, name, role: safeRole, phone: phone ?? "" })
     .returning();
   if (!created) {
     res.status(500).json({ error: "Failed to create user" });
@@ -48,7 +61,7 @@ router.post("/auth/register", async (req, res) => {
 });
 
 router.post("/auth/login", async (req, res) => {
-  const parsed = LoginBody.safeParse(req.body);
+  const parsed = LoginBodyExt.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input" });
     return;
@@ -82,6 +95,32 @@ router.post("/auth/logout", async (_req, res) => {
 router.get("/auth/me", async (req, res) => {
   const user = await loadUserFromRequest(req);
   res.json({ user });
+});
+
+// Google OAuth status endpoint — used by frontend to know if Google sign-in is enabled
+router.get("/auth/google/status", async (_req, res) => {
+  const enabled =
+    !!process.env["GOOGLE_CLIENT_ID"] && !!process.env["GOOGLE_CLIENT_SECRET"];
+  res.json({
+    enabled,
+    message: enabled
+      ? "Google sign-in is enabled."
+      : "Google sign-in requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables. Configure them to enable.",
+  });
+});
+
+// Stub initiate flow — only works if env is configured
+router.get("/auth/google/start", async (_req, res) => {
+  if (!process.env["GOOGLE_CLIENT_ID"]) {
+    return res
+      .status(503)
+      .json({ error: "Google sign-in not configured on this deployment." });
+  }
+  // In production, redirect to actual Google OAuth — placeholder for demo
+  return res.status(501).json({
+    error:
+      "OAuth initiation not implemented in this demo. Add Google credentials and the OAuth flow.",
+  });
 });
 
 export default router;

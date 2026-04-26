@@ -1,14 +1,44 @@
 import { Link } from "wouter";
-import { ArrowRight, Calendar, Sparkles, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ArrowRight,
+  Calendar,
+  Sparkles,
+  ShieldCheck,
+  Crown,
+  Flame,
+  PartyPopper,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useListFeaturedEvents, useListVendors } from "@workspace/api-client-react";
+import { useListFeaturedEvents } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
-import { VendorCard } from "@/components/VendorCard";
+import { apiGet, formatINR } from "@/lib/api";
+
+interface PublicEvent {
+  id: number;
+  title: string;
+  category: string;
+  type: string;
+  location: string;
+  city: string;
+  state: string;
+  price: number;
+  imageUrl: string;
+  rating: number;
+  reviewCount: number;
+  partnerName: string;
+  popular: boolean;
+}
 
 export function Home() {
   const { data: featured = [] } = useListFeaturedEvents();
-  const { data: vendors = [] } = useListVendors();
-  const topVendors = vendors.slice(0, 3);
+  const [popular, setPopular] = useState<PublicEvent[]>([]);
+  const [pubs, setPubs] = useState<PublicEvent[]>([]);
+
+  useEffect(() => {
+    apiGet<PublicEvent[]>("/api/events/popular").then(setPopular).catch(() => {});
+    apiGet<PublicEvent[]>("/api/events?type=pub").then((r) => setPubs(r.slice(0, 6))).catch(() => {});
+  }, []);
 
   return (
     <div>
@@ -16,101 +46,161 @@ export function Home() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <img
-            src="https://images.unsplash.com/photo-1519741497674-611481863552?w=2400&q=80"
+            src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=2400&q=80"
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover opacity-40"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/60 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/70 to-background" />
+          <div className="absolute inset-0 hero-grid opacity-40" />
         </div>
-        <div className="container mx-auto px-4 md:px-6 py-28 md:py-44 relative">
+        <div className="container mx-auto px-4 md:px-6 py-32 md:py-44 relative">
           <div className="max-w-3xl">
-            <p className="text-sm uppercase tracking-[0.25em] text-primary mb-6 font-medium">
-              An event marketplace for hosts who notice
-            </p>
-            <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] tracking-tight text-foreground">
+            <div className="inline-flex items-center gap-2 rounded-full glass-card px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-white/80 mb-8">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+              India's premier event marketplace
+            </div>
+            <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] tracking-tight">
               Heirloom events,<br />
-              <span className="italic text-primary">remarkable craft.</span>
+              <span className="italic text-gradient-red">remarkable craft.</span>
             </h1>
-            <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
-              From estate weddings to founder summits and harvest festivals — discover and book the most considered vendors and events in one place.
+            <p className="mt-6 text-lg md:text-xl text-white/70 max-w-2xl leading-relaxed">
+              From estate weddings and founder summits to harvest festivals — discover the most considered partners and experiences across India, in a single, premium destination.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link href="/explore">
-                <Button size="lg" className="gap-2">Explore events <ArrowRight className="h-4 w-4" /></Button>
+                <Button size="lg" className="gap-2 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 red-glow border-0 h-12 px-7">
+                  Explore events <ArrowRight className="h-4 w-4" />
+                </Button>
               </Link>
-              <Link href="/vendors">
-                <Button size="lg" variant="outline">Browse vendors</Button>
+              <Link href="/pubs">
+                <Button size="lg" variant="outline" className="h-12 px-7 border-white/20 hover:bg-white/5">
+                  Browse pubs
+                </Button>
               </Link>
+            </div>
+
+            {/* Stats */}
+            <div className="mt-14 grid grid-cols-3 gap-6 max-w-xl">
+              <div>
+                <p className="stat-number text-3xl">500+</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Vetted partners</p>
+              </div>
+              <div>
+                <p className="stat-number text-3xl">12K</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Events booked</p>
+              </div>
+              <div>
+                <p className="stat-number text-3xl">4.9★</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Avg. rating</p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Value props */}
-      <section className="container mx-auto px-4 md:px-6 py-20">
+      <section className="container mx-auto px-4 md:px-6 py-24">
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { icon: Sparkles, title: "Curated, never crowded", body: "Every vendor on Royvento is reviewed and approved by our team before they appear." },
+            { icon: Sparkles, title: "Curated, never crowded", body: "Every partner on Royvento is reviewed and approved by our team before they appear." },
             { icon: Calendar, title: "Real-time availability", body: "See open dates instantly and book without the back-and-forth." },
             { icon: ShieldCheck, title: "Verified reviews", body: "Reviews come from confirmed bookings — no astroturf, no surprises." },
           ].map((f) => (
-            <div key={f.title} className="rounded-2xl border bg-card p-7">
-              <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+            <div key={f.title} className="rounded-3xl glass-card p-7 lift-3d">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600/30 to-red-900/10 text-primary flex items-center justify-center mb-5 red-ring">
                 <f.icon className="h-5 w-5" />
               </div>
-              <h3 className="font-serif text-xl tracking-tight mb-2">{f.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{f.body}</p>
+              <h3 className="font-serif text-2xl tracking-tight mb-2">{f.title}</h3>
+              <p className="text-sm text-white/60 leading-relaxed">{f.body}</p>
             </div>
           ))}
         </div>
       </section>
 
+      {/* Popular section */}
+      {popular.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-12">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
+                <Flame className="h-3.5 w-3.5" /> Trending right now
+              </p>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Popular this season</h2>
+            </div>
+            <Link href="/explore" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
+              View all <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {popular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} />)}
+          </div>
+        </section>
+      )}
+
       {/* Featured events */}
       <section className="container mx-auto px-4 md:px-6 py-12">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">In the spotlight</p>
-            <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Featured events</h2>
+            <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5" /> In the spotlight
+            </p>
+            <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Featured events</h2>
           </div>
-          <Link href="/explore" className="text-sm text-muted-foreground hover:text-foreground hidden md:flex items-center gap-1">
+          <Link href="/explore" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
             View all <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featured.map((e) => <EventCard key={e.id} event={e} />)}
+          {featured.map((e) => <EventCard key={e.id} event={e as any} />)}
         </div>
       </section>
 
-      {/* Top vendors */}
-      <section className="container mx-auto px-4 md:px-6 py-20">
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">The makers</p>
-            <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Vendors of note</h2>
+      {/* Pubs */}
+      {pubs.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-16">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
+                <PartyPopper className="h-3.5 w-3.5" /> Nightlife
+              </p>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Pubs &amp; lounges</h2>
+            </div>
+            <Link href="/pubs" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
+              All pubs <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <Link href="/vendors" className="text-sm text-muted-foreground hover:text-foreground hidden md:flex items-center gap-1">
-            All vendors <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {topVendors.map((v) => <VendorCard key={v.id} vendor={v} />)}
-        </div>
-      </section>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {pubs.map((e) => <EventCard key={e.id} event={e} />)}
+          </div>
+        </section>
+      )}
 
-      {/* CTA */}
-      <section className="container mx-auto px-4 md:px-6 py-20">
-        <div className="rounded-3xl bg-primary text-primary-foreground p-10 md:p-16 grid md:grid-cols-[1.4fr_1fr] gap-8 items-center">
-          <div>
-            <h2 className="font-serif text-3xl md:text-5xl tracking-tight italic">
-              Host an event people will write home about.
+      {/* CTA — Premium */}
+      <section className="container mx-auto px-4 md:px-6 py-24">
+        <div className="relative rounded-[2rem] overflow-hidden glass-card-strong red-glow p-10 md:p-16 grid md:grid-cols-[1.4fr_1fr] gap-10 items-center">
+          <div className="absolute -top-20 -right-20 h-80 w-80 rounded-full bg-red-600/30 blur-3xl pointer-events-none" />
+          <div className="relative">
+            <div className="inline-flex items-center gap-2 rounded-full bg-red-600/20 border border-red-500/40 px-3 py-1 text-xs uppercase tracking-wider text-red-300 mb-5">
+              <Crown className="h-3.5 w-3.5" /> Royvento Premium
+            </div>
+            <h2 className="font-serif text-3xl md:text-5xl tracking-tight italic leading-tight">
+              Host an event <br />people will write home about.
             </h2>
-            <p className="mt-4 text-primary-foreground/80 max-w-xl leading-relaxed">
-              Join Royvento as a host and start booking with the most considered vendors in the country. Or apply to become one.
+            <p className="mt-5 text-white/70 max-w-xl leading-relaxed">
+              Subscribe for early-access drops, members-only pubs, complimentary upgrades, and partner concierge. From {formatINR(200)} for personal hosts and {formatINR(999)} for partners.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row md:flex-col gap-3 md:items-end">
-            <Link href="/register"><Button size="lg" variant="secondary" className="w-full md:w-auto">Create an account</Button></Link>
-            <Link href="/contact"><Button size="lg" variant="outline" className="w-full md:w-auto bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10">Talk to our team</Button></Link>
+          <div className="relative flex flex-col gap-3">
+            <Link href="/subscription">
+              <Button size="lg" className="w-full bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0 h-12">
+                See plans
+              </Button>
+            </Link>
+            <Link href="/dashboard/become-vendor">
+              <Button size="lg" variant="outline" className="w-full border-white/20 hover:bg-white/5 h-12">
+                Become a partner
+              </Button>
+            </Link>
           </div>
         </div>
       </section>

@@ -10,6 +10,7 @@ import { Footer } from "@/components/layout/Footer";
 // Pages
 import { Home } from "@/pages/home";
 import { Explore } from "@/pages/explore";
+import { Pubs } from "@/pages/pubs";
 import { Vendors } from "@/pages/vendors";
 import { EventDetail } from "@/pages/event-detail";
 import { VendorDetail } from "@/pages/vendor-detail";
@@ -21,6 +22,7 @@ import { Bookings } from "@/pages/bookings";
 import { AdminPanel } from "@/pages/admin";
 import { Profile } from "@/pages/profile";
 import { BecomeVendor } from "@/pages/become-vendor";
+import { Subscription } from "@/pages/subscription";
 
 import { RequireAuth } from "@/components/RequireAuth";
 
@@ -34,13 +36,17 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/explore" component={Explore} />
+          <Route path="/pubs" component={Pubs} />
           <Route path="/vendors" component={Vendors} />
+          <Route path="/partners" component={Vendors} />
           <Route path="/events/:id" component={EventDetail} />
           <Route path="/vendors/:id" component={VendorDetail} />
+          <Route path="/partners/:id" component={VendorDetail} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/contact" component={Contact} />
-          
+          <Route path="/subscription" component={Subscription} />
+
           <Route path="/dashboard/profile">
             {() => <RequireAuth><Profile /></RequireAuth>}
           </Route>
@@ -50,13 +56,16 @@ function Router() {
           <Route path="/dashboard/vendor">
             {() => <RequireAuth role="vendor"><VendorDashboard /></RequireAuth>}
           </Route>
+          <Route path="/dashboard/partner">
+            {() => <RequireAuth role="vendor"><VendorDashboard /></RequireAuth>}
+          </Route>
           <Route path="/dashboard/bookings">
             {() => <RequireAuth><Bookings /></RequireAuth>}
           </Route>
           <Route path="/admin">
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}
           </Route>
-          
+
           <Route component={NotFound} />
         </Switch>
       </main>

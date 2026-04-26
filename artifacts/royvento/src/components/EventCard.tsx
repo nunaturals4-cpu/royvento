@@ -1,58 +1,85 @@
 import { Link } from "wouter";
 import { Star, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { formatINR } from "@/lib/api";
 
 interface Props {
   event: {
     id: number;
     title: string;
     category: string;
+    type?: string;
     location: string;
+    city?: string;
+    state?: string;
     price: number;
     imageUrl: string;
     rating: number;
     reviewCount: number;
-    vendorName: string;
+    vendorName?: string;
+    partnerName?: string;
+    popular?: boolean;
   };
 }
 
 export function EventCard({ event }: Props) {
+  const partner = event.partnerName ?? event.vendorName ?? "";
+  const loc = event.city
+    ? `${event.city}${event.state ? ", " + event.state : ""}`
+    : event.location;
   return (
     <Link href={`/events/${event.id}`}>
-      <div className="group cursor-pointer overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-1 hover:shadow-xl">
-        <div className="aspect-[4/3] overflow-hidden bg-muted">
+      <div className="group cursor-pointer relative overflow-hidden rounded-2xl glass-card lift-3d perspective-card">
+        <div className="aspect-[4/3] overflow-hidden bg-black/40 relative tilt-on-hover">
           {event.imageUrl ? (
             <img
               src={event.imageUrl}
               alt={event.title}
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+              className="h-full w-full object-cover transition-transform duration-[900ms] group-hover:scale-110"
               loading="lazy"
             />
           ) : null}
-        </div>
-        <div className="p-5 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <Badge variant="secondary" className="font-normal">{event.category}</Badge>
-            <div className="flex items-center gap-1 text-sm">
-              <Star className="h-4 w-4 fill-primary text-primary" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+          {event.popular && (
+            <div className="absolute top-3 left-3">
+              <Badge className="bg-gradient-to-br from-red-500 to-red-700 text-white border-0 red-glow">
+                ★ Popular
+              </Badge>
+            </div>
+          )}
+          {event.type === "pub" && (
+            <div className="absolute top-3 right-3">
+              <Badge variant="outline" className="bg-black/70 border-white/20 text-white">
+                Pub
+              </Badge>
+            </div>
+          )}
+          <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
+            <Badge variant="secondary" className="bg-white/10 text-white border-white/10 backdrop-blur">
+              {event.category}
+            </Badge>
+            <div className="flex items-center gap-1 text-xs text-white/90 bg-black/50 px-2 py-1 rounded-md backdrop-blur">
+              <Star className="h-3.5 w-3.5 fill-primary text-primary" />
               <span className="font-medium">{event.rating > 0 ? event.rating.toFixed(1) : "New"}</span>
-              {event.reviewCount > 0 && (
-                <span className="text-muted-foreground text-xs">({event.reviewCount})</span>
-              )}
+              {event.reviewCount > 0 && <span className="opacity-70">({event.reviewCount})</span>}
             </div>
           </div>
-          <h3 className="font-serif text-xl leading-tight tracking-tight group-hover:text-primary transition-colors">
+        </div>
+        <div className="p-5 space-y-2.5">
+          <h3 className="font-serif text-xl leading-tight tracking-tight group-hover:text-primary transition-colors line-clamp-2">
             {event.title}
           </h3>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">{event.vendorName}</p>
-          <div className="flex items-center justify-between pt-2 border-t">
+          {partner && (
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{partner}</p>
+          )}
+          <div className="flex items-center justify-between pt-2 border-t border-white/5">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              <span className="truncate">{event.location}</span>
+              <MapPin className="h-3.5 w-3.5 text-primary" />
+              <span className="truncate">{loc}</span>
             </div>
             <div className="text-right">
-              <span className="font-semibold">${event.price.toLocaleString()}</span>
-              <span className="text-xs text-muted-foreground"> / event</span>
+              <span className="font-semibold text-white">{formatINR(event.price)}</span>
+              <span className="text-xs text-muted-foreground"> /pp</span>
             </div>
           </div>
         </div>
