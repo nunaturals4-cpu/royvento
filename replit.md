@@ -18,6 +18,7 @@ A full-stack event management marketplace for hosts and vendors.
 - `artifacts/api-server/src/routes/` — auth, users, vendors, events, bookings, reviews, availability, admin
 - `artifacts/api-server/src/lib/auth.ts` — JWT, requireAuth middleware, password hashing
 - `artifacts/api-server/src/lib/aggregates.ts` — vendor/event rating aggregation
+- `artifacts/api-server/src/lib/notifications.ts` — booking confirmation + status emails. Currently logs formatted emails to the server console (no real provider configured). To enable real delivery, replace the `deliver()` function body with a SendGrid / SMTP / Resend call.
 - `artifacts/royvento/src/pages/` — home, explore, vendors, event-detail, vendor-detail, login, register, contact, vendor-dashboard, bookings, admin
 - `scripts/src/seed.ts` — seed data
 

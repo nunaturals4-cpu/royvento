@@ -10,6 +10,10 @@ import {
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { CreateBookingBody, UpdateBookingStatusBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import {
+  sendBookingCreatedEmails,
+  sendBookingStatusEmail,
+} from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -116,6 +120,43 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       set: { status: "booked" },
     });
   const [out] = await serializeBookings([b]);
+
+  // Fire-and-log notifications (no real provider configured).
+  try {
+    const vRows = await db
+      .select()
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, evt.vendorId))
+      .limit(1);
+    const vendor = vRows[0];
+    let vendorEmail = "";
+    let vendorName = out?.vendorName ?? "";
+    if (vendor) {
+      const vuRows = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, vendor.userId))
+        .limit(1);
+      vendorEmail = vuRows[0]?.email ?? "";
+      vendorName = vendor.businessName;
+    }
+    await sendBookingCreatedEmails({
+      bookingId: b.id,
+      eventTitle: out?.eventTitle ?? evt.title,
+      vendorName,
+      vendorEmail,
+      userName: user.name,
+      userEmail: user.email,
+      bookingDate: b.bookingDate,
+      guests: b.guests,
+      totalPrice: Number(b.totalPrice),
+      notes: b.notes || undefined,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("Failed to send booking notifications:", err);
+  }
+
   res.json(out);
 });
 
@@ -212,6 +253,25 @@ router.patch(
       return;
     }
     const [out] = await serializeBookings([updated]);
+
+    // Notify the booking owner of the status change.
+    if (out && b.status !== updated.status) {
+      try {
+        await sendBookingStatusEmail({
+          bookingId: updated.id,
+          eventTitle: out.eventTitle,
+          vendorName: out.vendorName,
+          userName: out.userName,
+          userEmail: out.userEmail,
+          bookingDate: updated.bookingDate,
+          status: updated.status,
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to send status notification:", err);
+      }
+    }
+
     res.json(out);
   },
 );
