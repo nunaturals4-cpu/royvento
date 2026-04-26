@@ -8,8 +8,27 @@ import {
   availabilityTable,
 } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
-import { CreateBookingBody, UpdateBookingStatusBody } from "@workspace/api-zod";
+import { z } from "zod";
+import { UpdateBookingStatusBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+
+const EVENT_TYPES = [
+  "wedding",
+  "birthday",
+  "casual",
+  "surprise",
+  "corporate",
+  "cultural",
+  "other",
+] as const;
+
+const CreateBookingBody = z.object({
+  eventId: z.number().int().positive(),
+  bookingDate: z.string().min(1),
+  guests: z.number().int().positive(),
+  notes: z.string().optional().default(""),
+  eventType: z.enum(EVENT_TYPES).optional().default("other"),
+});
 import {
   sendBookingCreatedEmails,
   sendBookingStatusEmail,
@@ -26,6 +45,7 @@ interface BookingRow {
   guests: number;
   totalPrice: string;
   notes: string;
+  eventType: string;
   status: string;
   createdAt: Date;
 }
@@ -56,6 +76,7 @@ async function serializeBookings(rows: BookingRow[]) {
       guests: b.guests,
       totalPrice: Number(b.totalPrice),
       notes: b.notes,
+      eventType: b.eventType,
       status: b.status,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
@@ -104,6 +125,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       guests: parsed.data.guests,
       totalPrice: String(totalPrice),
       notes: parsed.data.notes ?? "",
+      eventType: parsed.data.eventType ?? "other",
       status: "pending",
     })
     .returning();

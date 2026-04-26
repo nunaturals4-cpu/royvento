@@ -15,6 +15,9 @@ export interface AuthUser {
   email: string;
   name: string;
   role: Role;
+  phone: string;
+  about: string;
+  profileImage: string;
   createdAt: string;
 }
 
@@ -86,13 +89,7 @@ export async function loadUserFromRequest(
     .limit(1);
   const u = rows[0];
   if (!u) return null;
-  return {
-    id: u.id,
-    email: u.email,
-    name: u.name,
-    role: u.role as Role,
-    createdAt: u.createdAt.toISOString(),
-  };
+  return userToPublic(u);
 }
 
 export interface AuthedRequest extends Request {
@@ -120,6 +117,9 @@ export function userToPublic(u: {
   email: string;
   name: string;
   role: string;
+  phone?: string | null;
+  about?: string | null;
+  profileImage?: string | null;
   createdAt: Date;
 }): AuthUser {
   return {
@@ -127,6 +127,9 @@ export function userToPublic(u: {
     email: u.email,
     name: u.name,
     role: u.role as Role,
+    phone: u.phone ?? "",
+    about: u.about ?? "",
+    profileImage: u.profileImage ?? "",
     createdAt: u.createdAt.toISOString(),
   };
 }

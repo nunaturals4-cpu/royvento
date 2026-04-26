@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
+import { EVENT_CATEGORIES } from "@/lib/api";
+import { ChevronDown } from "lucide-react";
 
 export function Navbar() {
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
@@ -23,11 +25,11 @@ export function Navbar() {
         localStorage.removeItem("royvento_token");
         refetch();
         setLocation("/");
-      }
+      },
     });
   };
 
-  const user = me?.user;
+  const user = me?.user as any;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
@@ -42,7 +44,27 @@ export function Navbar() {
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
             <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
             <Link href="/explore" className="text-muted-foreground hover:text-foreground transition-colors">Explore</Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors focus:outline-none">
+                  Categories <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                {EVENT_CATEGORIES.map((c) => (
+                  <DropdownMenuItem key={c} asChild>
+                    <Link
+                      href={`/explore?category=${encodeURIComponent(c)}`}
+                      className="cursor-pointer w-full"
+                    >
+                      {c}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link href="/vendors" className="text-muted-foreground hover:text-foreground transition-colors">Vendors</Link>
+            <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
           </nav>
         </div>
 
@@ -52,6 +74,7 @@ export function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10 border border-primary/20">
+                    {user.profileImage ? <AvatarImage src={user.profileImage} /> : null}
                     <AvatarFallback className="bg-primary/10 text-primary">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -64,15 +87,23 @@ export function Navbar() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/profile" className="cursor-pointer w-full">My Profile</Link>
+                </DropdownMenuItem>
                 {user.role === "user" && (
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard/bookings" className="cursor-pointer w-full">My Bookings</Link>
                   </DropdownMenuItem>
                 )}
                 {user.role === "vendor" && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/vendor" className="cursor-pointer w-full">Vendor Dashboard</Link>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/bookings" className="cursor-pointer w-full">My Bookings</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/vendor" className="cursor-pointer w-full">Vendor Dashboard</Link>
+                    </DropdownMenuItem>
+                  </>
                 )}
                 {user.role === "admin" && (
                   <DropdownMenuItem asChild>

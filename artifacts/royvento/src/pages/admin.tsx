@@ -14,10 +14,12 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Briefcase, CalendarCheck, DollarSign, Clock } from "lucide-react";
+import { Users, Briefcase, CalendarCheck, DollarSign, Clock, Mail, UserPlus } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
+import { useEffect, useState } from "react";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 
 export function AdminPanel() {
   return (
@@ -28,13 +30,17 @@ export function AdminPanel() {
       </header>
 
       <Tabs defaultValue="analytics" className="space-y-6">
-        <TabsList className="bg-card">
+        <TabsList className="bg-card flex-wrap h-auto">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="vendors">Vendor approvals</TabsTrigger>
+          <TabsTrigger value="requests">Vendor requests</TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><PendingVendors /></TabsContent>
+        <TabsContent value="requests"><VendorRequests /></TabsContent>
+        <TabsContent value="messages"><Messages /></TabsContent>
         <TabsContent value="users"><UsersPanel /></TabsContent>
       </Tabs>
     </div>
@@ -223,6 +229,150 @@ function UsersPanel() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+interface VendorReqRow {
+  id: number;
+  userId: number;
+  status: "pending" | "approved" | "rejected";
+  businessName: string;
+  category: string;
+  message: string;
+  createdAt: string;
+  user: { name: string; email: string; phone: string };
+}
+
+function VendorRequests() {
+  const [items, setItems] = useState<VendorReqRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<VendorReqRow[]>("/api/admin/vendor-requests")
+      .then((r) => setItems(r))
+      .catch((e) => toast({ title: "Failed to load", description: e?.message, variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground">No vendor requests yet.</p>;
+
+  const act = async (id: number, action: "approve" | "reject") => {
+    try {
+      await apiPost(`/api/admin/vendor-requests/${id}/${action}`);
+      toast({ title: action === "approve" ? "Request approved" : "Request rejected", description: action === "approve" ? "User has been promoted to vendor." : undefined });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {items.map((r) => (
+        <div key={r.id} className="rounded-2xl border bg-card p-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <UserPlus className="h-4 w-4 text-primary" />
+                <Badge variant="outline">{r.category}</Badge>
+                <Badge variant={r.status === "pending" ? "secondary" : r.status === "approved" ? "default" : "outline"}>
+                  {r.status}
+                </Badge>
+              </div>
+              <p className="font-serif text-xl">{r.businessName}</p>
+              <p className="text-sm text-muted-foreground">
+                From {r.user.name} · {r.user.email}
+                {r.user.phone ? <> · {r.user.phone}</> : null}
+              </p>
+              <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{r.message}</p>
+              <p className="mt-2 text-xs text-muted-foreground">Submitted {new Date(r.createdAt).toLocaleString()}</p>
+            </div>
+            {r.status === "pending" && (
+              <div className="flex gap-2">
+                <Button onClick={() => act(r.id, "approve")}>Approve & promote</Button>
+                <Button variant="outline" onClick={() => act(r.id, "reject")}>Reject</Button>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface ContactMessage {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  createdAt: string;
+}
+
+function Messages() {
+  const [items, setItems] = useState<ContactMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<ContactMessage[]>("/api/admin/messages")
+      .then((r) => setItems(r))
+      .catch((e) => toast({ title: "Failed to load", description: e?.message, variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const remove = async (id: number, label: string) => {
+    try {
+      await apiDelete(`/api/admin/messages/${id}`);
+      toast({ title: label });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border bg-card p-10 text-center">
+        <Mail className="h-8 w-8 text-primary mx-auto mb-3" />
+        <p className="text-muted-foreground">No contact messages right now.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {items.map((m) => (
+        <div key={m.id} className="rounded-2xl border bg-card p-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Mail className="h-4 w-4 text-primary" />
+                <p className="font-serif text-lg">{m.subject || "(no subject)"}</p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                From <span className="font-medium text-foreground">{m.name}</span> · {m.email}
+                {m.phone ? <> · {m.phone}</> : null}
+              </p>
+              <p className="mt-3 whitespace-pre-wrap text-sm">{m.message}</p>
+              <p className="mt-3 text-xs text-muted-foreground">{new Date(m.createdAt).toLocaleString()}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => remove(m.id, "Marked resolved")}>Resolved</Button>
+              <Button variant="outline" onClick={() => remove(m.id, "Cancelled")}>Cancel</Button>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

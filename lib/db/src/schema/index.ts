@@ -20,6 +20,9 @@ export const usersTable = pgTable(
     passwordHash: text("password_hash").notNull(),
     name: varchar("name", { length: 255 }).notNull(),
     role: varchar("role", { length: 20 }).notNull().default("user"),
+    phone: varchar("phone", { length: 50 }).notNull().default(""),
+    about: text("about").notNull().default(""),
+    profileImage: text("profile_image").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -87,6 +90,7 @@ export const bookingsTable = pgTable(
       .notNull()
       .default("0"),
     notes: text("notes").notNull().default(""),
+    eventType: varchar("event_type", { length: 50 }).notNull().default("other"),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -137,9 +141,48 @@ export const availabilityTable = pgTable(
   }),
 );
 
+export const contactMessagesTable = pgTable(
+  "contact_messages",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    phone: varchar("phone", { length: 50 }).notNull().default(""),
+    subject: varchar("subject", { length: 255 }).notNull(),
+    message: text("message").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    createdIdx: index("contact_messages_created_idx").on(t.createdAt),
+  }),
+);
+
+export const vendorRequestsTable = pgTable(
+  "vendor_requests",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    businessName: varchar("business_name", { length: 255 }).notNull().default(""),
+    category: varchar("category", { length: 100 }).notNull().default(""),
+    message: text("message").notNull().default(""),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("vendor_requests_user_idx").on(t.userId),
+    statusIdx: index("vendor_requests_status_idx").on(t.status),
+  }),
+);
+
 export type User = typeof usersTable.$inferSelect;
 export type Vendor = typeof vendorsTable.$inferSelect;
 export type Event = typeof eventsTable.$inferSelect;
 export type Booking = typeof bookingsTable.$inferSelect;
 export type Review = typeof reviewsTable.$inferSelect;
 export type Availability = typeof availabilityTable.$inferSelect;
+export type ContactMessage = typeof contactMessagesTable.$inferSelect;
+export type VendorRequest = typeof vendorRequestsTable.$inferSelect;

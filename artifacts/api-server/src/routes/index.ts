@@ -8,6 +8,8 @@ import bookingsRouter from "./bookings";
 import reviewsRouter from "./reviews";
 import availabilityRouter from "./availability";
 import adminRouter from "./admin";
+import contactRouter from "./contact";
+import vendorRequestsRouter from "./vendorRequests";
 
 const router: IRouter = Router();
 
@@ -20,5 +22,7 @@ router.use(bookingsRouter);
 router.use(reviewsRouter);
 router.use(availabilityRouter);
 router.use(adminRouter);
+router.use(contactRouter);
+router.use(vendorRequestsRouter);
 
 export default router;

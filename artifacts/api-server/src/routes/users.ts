@@ -1,10 +1,50 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { z } from "zod";
 import { UpdateUserRoleBody } from "@workspace/api-zod";
-import { requireAuth, userToPublic, type Role } from "../lib/auth";
+import { requireAuth, loadUserFromRequest, userToPublic, type Role } from "../lib/auth";
 
 const router: IRouter = Router();
+
+const UpdateMeBody = z.object({
+  name: z.string().min(1).max(255).optional(),
+  phone: z.string().max(50).optional(),
+  about: z.string().max(2000).optional(),
+  profileImage: z.string().max(2048).optional(),
+});
+
+router.patch("/users/me", requireAuth(), async (req, res) => {
+  const me = await loadUserFromRequest(req);
+  if (!me) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const parsed = UpdateMeBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid input" });
+    return;
+  }
+  const patch: Record<string, string> = {};
+  if (parsed.data.name !== undefined) patch["name"] = parsed.data.name;
+  if (parsed.data.phone !== undefined) patch["phone"] = parsed.data.phone;
+  if (parsed.data.about !== undefined) patch["about"] = parsed.data.about;
+  if (parsed.data.profileImage !== undefined) patch["profileImage"] = parsed.data.profileImage;
+  if (Object.keys(patch).length === 0) {
+    res.json(userToPublic(me as never));
+    return;
+  }
+  const [updated] = await db
+    .update(usersTable)
+    .set(patch)
+    .where(eq(usersTable.id, me.id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(userToPublic(updated));
+});
 
 router.get("/users", requireAuth(["admin"]), async (_req, res) => {
   const rows = await db

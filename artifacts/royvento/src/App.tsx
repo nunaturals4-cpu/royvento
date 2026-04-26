@@ -19,6 +19,8 @@ import { Contact } from "@/pages/contact";
 import { VendorDashboard } from "@/pages/vendor-dashboard";
 import { Bookings } from "@/pages/bookings";
 import { AdminPanel } from "@/pages/admin";
+import { Profile } from "@/pages/profile";
+import { BecomeVendor } from "@/pages/become-vendor";
 
 import { RequireAuth } from "@/components/RequireAuth";
 
@@ -39,11 +41,17 @@ function Router() {
           <Route path="/register" component={Register} />
           <Route path="/contact" component={Contact} />
           
+          <Route path="/dashboard/profile">
+            {() => <RequireAuth><Profile /></RequireAuth>}
+          </Route>
+          <Route path="/dashboard/become-vendor">
+            {() => <RequireAuth role="user"><BecomeVendor /></RequireAuth>}
+          </Route>
           <Route path="/dashboard/vendor">
             {() => <RequireAuth role="vendor"><VendorDashboard /></RequireAuth>}
           </Route>
           <Route path="/dashboard/bookings">
-            {() => <RequireAuth role="user"><Bookings /></RequireAuth>}
+            {() => <RequireAuth><Bookings /></RequireAuth>}
           </Route>
           <Route path="/admin">
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}

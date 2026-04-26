@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EVENT_TYPES } from "@/lib/api";
 import { Star, MapPin, Users, Calendar as CalIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,6 +33,7 @@ export function EventDetail() {
   const [date, setDate] = useState("");
   const [guests, setGuests] = useState(1);
   const [notes, setNotes] = useState("");
+  const [eventType, setEventType] = useState<string>("other");
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
 
@@ -55,7 +58,7 @@ export function EventDetail() {
       return;
     }
     createBooking.mutate(
-      { data: { eventId: event.id, bookingDate: date, guests, notes } },
+      { data: { eventId: event.id, bookingDate: date, guests, notes, eventType } as any },
       {
         onSuccess: () => {
           toast({ title: "Booking requested!", description: "Your booking is pending vendor confirmation." });
@@ -183,6 +186,17 @@ export function EventDetail() {
                 {date && blockedDates.has(date) && (
                   <p className="text-xs text-destructive mt-1">That date is unavailable.</p>
                 )}
+              </div>
+              <div>
+                <Label htmlFor="etype">Event type</Label>
+                <Select value={eventType} onValueChange={setEventType}>
+                  <SelectTrigger id="etype"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EVENT_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="guests">Guests</Label>
