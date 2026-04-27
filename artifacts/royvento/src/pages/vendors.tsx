@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useListVendors } from "@workspace/api-client-react";
 import { VendorCard } from "@/components/VendorCard";
 import { Button } from "@/components/ui/button";
+import { EVENT_CATEGORIES } from "@/lib/api";
 
-const CATEGORIES = ["All", "Wedding", "Corporate", "Festival", "Private", "Birthday"];
+const CATEGORIES = ["All", ...EVENT_CATEGORIES];
 
 export function Vendors() {
   const [active, setActive] = useState<string>("All");
