@@ -316,8 +316,8 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       priceMen: priceMen != null ? String(priceMen) : "0",
       priceCouple: priceCouple != null ? String(priceCouple) : "0",
       pubEventTypes,
-      galleryImages: Array.isArray(body["galleryImages"]) ? (body["galleryImages"] as string[]) : null,
-      galleryVideos: Array.isArray(body["galleryVideos"]) ? (body["galleryVideos"] as string[]) : null,
+      galleryImages: parsed.data.galleryImages ?? null,
+      galleryVideos: parsed.data.galleryVideos ?? null,
     })
     .returning();
   if (!created) {
