@@ -202,9 +202,9 @@ export function EventDetail() {
         <div className="container mx-auto px-4 md:px-6 absolute inset-x-0 bottom-0 pb-12">
           <div className="flex items-center gap-2 mb-3">
             <Badge className="bg-white/10 border-white/10 text-white backdrop-blur">{event.category}</Badge>
-            {(event as any).type === "pub" && <Badge className="bg-red-600/30 text-red-100 border-red-500/30">Pub</Badge>}
+            {(event as any).type === "pub" && <Badge className="bg-primary/30 text-primary-foreground border-primary/30">Pub</Badge>}
             {(event as any).popular && (
-              <Badge className="bg-gradient-to-br from-red-500 to-red-700 border-0">★ Popular</Badge>
+              <Badge className="bg-primary border-0 text-primary-foreground">★ Popular</Badge>
             )}
           </div>
           <h1 className="font-serif text-4xl md:text-7xl tracking-tight max-w-4xl">{event.title}</h1>
@@ -304,7 +304,7 @@ export function EventDetail() {
                   ))}
                 </div>
                 <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="Share your experience…" className="bg-black/40 border-white/10" />
-                <Button onClick={handleReview} disabled={createReview.isPending || !reviewComment.trim()} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Post review</Button>
+                <Button onClick={handleReview} disabled={createReview.isPending || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Post review</Button>
               </div>
             )}
           </section>
@@ -481,7 +481,7 @@ export function EventDetail() {
                             key={c.id}
                             type="button"
                             onClick={() => setCouponInput(c.code)}
-                            className="text-[10px] px-2 py-1 rounded bg-red-600/15 border border-red-500/30 text-red-200 hover:bg-red-600/25"
+                            className="text-[10px] px-2 py-1 rounded bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25"
                           >
                             {c.code} — {c.discountPercent}%
                           </button>
@@ -524,7 +524,7 @@ export function EventDetail() {
                   <span>{formatINRExact(finalTotal)}</span>
                 </div>
               </div>
-              <Button className="w-full bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0 h-12" size="lg" onClick={handleBook} disabled={booking}>
+              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12" size="lg" onClick={handleBook} disabled={booking}>
                 <CalIcon className="h-4 w-4 mr-2" />
                 {booking ? "Booking…" : "Request booking"}
               </Button>

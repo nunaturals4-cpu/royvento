@@ -56,7 +56,7 @@ export function Home() {
         <div className="container mx-auto px-4 md:px-6 py-32 md:py-44 relative">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full glass-card px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-white/80 mb-8">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
               India's premier event marketplace
             </div>
             <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] tracking-tight">
@@ -68,7 +68,7 @@ export function Home() {
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link href="/explore">
-                <Button size="lg" className="gap-2 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 red-glow border-0 h-12 px-7">
+                <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0 h-12 px-7">
                   Explore events <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -107,7 +107,7 @@ export function Home() {
             { icon: ShieldCheck, title: "Verified reviews", body: "Reviews come from confirmed bookings — no astroturf, no surprises." },
           ].map((f) => (
             <div key={f.title} className="rounded-3xl glass-card p-7 lift-3d">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600/30 to-red-900/10 text-primary flex items-center justify-center mb-5 red-ring">
+              <div className="w-12 h-12 rounded-xl bg-primary/20 text-primary flex items-center justify-center mb-5 red-ring">
                 <f.icon className="h-5 w-5" />
               </div>
               <h3 className="font-serif text-2xl tracking-tight mb-2">{f.title}</h3>
@@ -178,9 +178,9 @@ export function Home() {
       {/* CTA — Premium */}
       <section className="container mx-auto px-4 md:px-6 py-24">
         <div className="relative rounded-[2rem] overflow-hidden glass-card-strong red-glow p-10 md:p-16 grid md:grid-cols-[1.4fr_1fr] gap-10 items-center">
-          <div className="absolute -top-20 -right-20 h-80 w-80 rounded-full bg-red-600/30 blur-3xl pointer-events-none" />
+          <div className="absolute -top-20 -right-20 h-80 w-80 rounded-full bg-primary/30 blur-3xl pointer-events-none" />
           <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-red-600/20 border border-red-500/40 px-3 py-1 text-xs uppercase tracking-wider text-red-300 mb-5">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-5">
               <Crown className="h-3.5 w-3.5" /> Royvento Premium
             </div>
             <h2 className="font-serif text-3xl md:text-5xl tracking-tight italic leading-tight">
@@ -192,7 +192,7 @@ export function Home() {
           </div>
           <div className="relative flex flex-col gap-3">
             <Link href="/subscription">
-              <Button size="lg" className="w-full bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0 h-12">
+              <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12">
                 See plans
               </Button>
             </Link>

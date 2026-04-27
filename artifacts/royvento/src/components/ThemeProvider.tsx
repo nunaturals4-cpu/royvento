@@ -1,26 +1,31 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "dark" | "light";
+export type Theme = "noir" | "gold" | "frost" | "dusk";
 const STORAGE_KEY = "royvento_theme";
 
-interface Ctx { theme: Theme; setTheme: (t: Theme) => void; toggle: () => void; }
+interface Ctx { theme: Theme; setTheme: (t: Theme) => void; }
 const ThemeContext = createContext<Ctx | null>(null);
 
 function applyTheme(t: Theme) {
   const root = document.documentElement;
-  if (t === "dark") root.classList.add("dark");
-  else root.classList.remove("dark");
   root.dataset["theme"] = t;
+  if (t === "frost") {
+    root.classList.remove("dark");
+  } else {
+    root.classList.add("dark");
+  }
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "dark";
+    if (typeof window === "undefined") return "noir";
     try {
       const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-      if (stored === "dark" || stored === "light") return stored;
+      if (stored === "noir" || stored === "gold" || stored === "frost" || stored === "dusk") return stored;
+      const legacy = localStorage.getItem(STORAGE_KEY);
+      if (legacy === "light") return "frost";
     } catch {}
-    return "dark";
+    return "noir";
   });
 
   useEffect(() => {
@@ -29,9 +34,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   const setTheme = (t: Theme) => setThemeState(t);
-  const toggle = () => setThemeState((t) => (t === "dark" ? "light" : "dark"));
 
-  return <ThemeContext.Provider value={{ theme, setTheme, toggle }}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

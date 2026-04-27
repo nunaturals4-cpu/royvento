@@ -155,7 +155,7 @@ export function Explore() {
             size="sm"
             onClick={() => setActive(c)}
             className={active === c
-              ? "rounded-full bg-gradient-to-br from-red-600 to-red-800 border-0 red-glow"
+              ? "rounded-full bg-primary text-primary-foreground border-0 red-glow"
               : "rounded-full border-white/15 hover:bg-white/5"
             }
           >

@@ -8,8 +8,8 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
-import { Crown, Search, Sun, Moon, Bell } from "lucide-react";
-import { useTheme } from "@/components/ThemeProvider";
+import { Crown, Search, Bell } from "lucide-react";
+import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { apiGet, apiPatch } from "@/lib/api";
 
 interface Notification {
@@ -20,11 +20,61 @@ interface Notification {
   createdAt: string;
 }
 
+const THEMES: { id: Theme; label: string; color: string; bg: string }[] = [
+  { id: "noir", label: "Midnight Noir", color: "#dc2626", bg: "#0D0D0D" },
+  { id: "gold", label: "Royal Gold",    color: "#D4A017", bg: "#111016" },
+  { id: "frost", label: "Arctic Frost", color: "#00a3e0", bg: "#F7F8FA" },
+  { id: "dusk",  label: "Velvet Dusk",  color: "#dc5078", bg: "#0E0B14" },
+];
+
+function ThemeSwitcher() {
+  const { theme, setTheme } = useTheme();
+  const [tooltip, setTooltip] = useState<string | null>(null);
+
+  return (
+    <div className="flex items-center gap-1.5" role="group" aria-label="Theme switcher">
+      {THEMES.map((t) => {
+        const isActive = theme === t.id;
+        return (
+          <div key={t.id} className="relative">
+            <button
+              onClick={() => setTheme(t.id)}
+              onMouseEnter={() => setTooltip(t.id)}
+              onMouseLeave={() => setTooltip(null)}
+              aria-label={`Switch to ${t.label} theme`}
+              aria-pressed={isActive}
+              className="relative h-6 w-6 rounded-full transition-transform duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              style={{ background: t.color }}
+            >
+              {isActive && (
+                <span
+                  className="absolute inset-0 rounded-full pointer-events-none"
+                  style={{ boxShadow: `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${t.color}` }}
+                />
+              )}
+              <span
+                className="absolute inset-0 rounded-full opacity-30"
+                style={{ background: `radial-gradient(circle at 35% 35%, rgba(255,255,255,0.6), transparent 70%)` }}
+              />
+            </button>
+            {tooltip === t.id && (
+              <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none whitespace-nowrap">
+                <div className="glass-card-strong text-xs px-2 py-1 rounded-md text-foreground font-medium shadow-lg border border-border">
+                  {t.label}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Navbar() {
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
   const logout = useLogout();
   const [, setLocation] = useLocation();
-  const { theme, toggle } = useTheme();
   const [q, setQ] = useState("");
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -95,8 +145,8 @@ export function Navbar() {
         <div className="flex items-center gap-6 min-w-0">
           <Link href="/" className="flex items-center gap-2.5 group shrink-0">
             <div className="relative">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-500 via-red-600 to-red-800 flex items-center justify-center red-glow">
-                <span className="text-white font-bold font-serif text-lg">R</span>
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center red-glow">
+                <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
               </div>
             </div>
             <span className="font-serif font-bold text-xl tracking-tight">Royvento</span>
@@ -123,15 +173,7 @@ export function Navbar() {
             />
           </form>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggle}
-            aria-label="Toggle theme"
-            className="h-9 w-9 rounded-full hover:bg-foreground/5"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <ThemeSwitcher />
 
           {user && (
             <div className="relative" ref={notifRef}>
@@ -144,7 +186,7 @@ export function Navbar() {
               >
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -152,7 +194,7 @@ export function Navbar() {
 
               {notifOpen && (
                 <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl glass-card-strong border border-border shadow-2xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <p className="font-semibold text-sm">Notifications</p>
                     {unreadCount > 0 && (
                       <button
@@ -169,16 +211,16 @@ export function Navbar() {
                       <p className="text-sm text-muted-foreground">No notifications yet</p>
                     </div>
                   ) : (
-                    <div className="max-h-80 overflow-y-auto divide-y divide-white/5">
+                    <div className="max-h-80 overflow-y-auto divide-y divide-border">
                       {notifs.map((n) => (
                         <div
                           key={n.id}
-                          className={`px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors ${!n.isRead ? "bg-red-900/10" : ""}`}
+                          className={`px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors ${!n.isRead ? "bg-primary/5" : ""}`}
                           onClick={() => markRead(n.id)}
                         >
                           <div className="flex items-start gap-2">
                             {!n.isRead && (
-                              <span className="mt-1.5 h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                              <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
                             )}
                             <div className={!n.isRead ? "" : "ml-4"}>
                               <p className="text-sm font-medium leading-tight">{n.title}</p>
@@ -203,7 +245,7 @@ export function Navbar() {
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-foreground/5">
                   <Avatar className="h-10 w-10 border border-primary/40 ring-2 ring-primary/10">
                     {user.profileImage ? <AvatarImage src={user.profileImage} /> : null}
-                    <AvatarFallback className="bg-gradient-to-br from-red-600 to-red-900 text-white font-semibold">
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground font-semibold">
                       {user.name.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -264,7 +306,7 @@ export function Navbar() {
                 Log in
               </Link>
               <Link href="/register">
-                <Button className="bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 red-glow border-0">
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0">
                   Get started
                 </Button>
               </Link>

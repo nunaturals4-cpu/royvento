@@ -42,7 +42,7 @@ export function EventCard({ event }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
           {event.popular && (
             <div className="absolute top-3 left-3">
-              <Badge className="bg-gradient-to-br from-red-500 to-red-700 text-white border-0 red-glow">
+              <Badge className="bg-primary text-primary-foreground border-0 red-glow">
                 ★ Popular
               </Badge>
             </div>

@@ -73,7 +73,7 @@ export function Subscription() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-16">
       <header className="max-w-3xl mx-auto text-center mb-14">
-        <div className="inline-flex items-center gap-2 rounded-full bg-red-600/20 border border-red-500/40 px-3 py-1 text-xs uppercase tracking-wider text-red-300 mb-5">
+        <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-5">
           <Crown className="h-3.5 w-3.5" /> Royvento Premium
         </div>
         <h1 className="font-serif text-4xl md:text-6xl tracking-tight">A members club for hosts &amp; partners</h1>
@@ -99,7 +99,7 @@ export function Subscription() {
               Renews on {new Date(active.expiresAt).toLocaleDateString()}
             </p>
           </div>
-          <Badge className="bg-gradient-to-br from-red-500 to-red-700 border-0">{formatINR(Number(active.price))}</Badge>
+          <Badge className="bg-primary border-0 text-primary-foreground">{formatINR(Number(active.price))}</Badge>
         </div>
       )}
 
@@ -191,7 +191,7 @@ function PlanCard({
     <div className={`relative rounded-3xl ${accent ? "glass-card-strong red-glow" : "glass-card"} p-8 lift-3d`}>
       {accent && (
         <div className="absolute -top-3 left-8">
-          <Badge className="bg-gradient-to-br from-red-500 to-red-700 border-0">Most popular</Badge>
+          <Badge className="bg-primary border-0 text-primary-foreground">Most popular</Badge>
         </div>
       )}
       {hasDiscount && (
@@ -200,7 +200,7 @@ function PlanCard({
         </div>
       )}
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-11 h-11 rounded-xl bg-red-600/20 text-primary flex items-center justify-center red-ring">
+        <div className="w-11 h-11 rounded-xl bg-primary/20 text-primary flex items-center justify-center red-ring">
           <Icon className="h-5 w-5" />
         </div>
         <div>
@@ -228,7 +228,7 @@ function PlanCard({
       <Button
         onClick={onSubscribe}
         disabled={disabled}
-        className={`w-full mt-7 h-12 ${accent ? "bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0" : ""}`}
+        className={`w-full mt-7 h-12 ${accent ? "bg-primary hover:bg-primary/90 text-primary-foreground border-0" : ""}`}
       >
         {cta}
       </Button>

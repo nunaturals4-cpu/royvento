@@ -61,7 +61,7 @@ export function VendorDashboard() {
           <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">Studio dashboard</h1>
         </div>
         {vendor?.isPremium && (
-          <Badge className="bg-gradient-to-br from-red-500 to-red-700 border-0 red-glow gap-1">
+          <Badge className="bg-primary border-0 text-primary-foreground red-glow gap-1">
             <Crown className="h-3.5 w-3.5" /> Premium partner
           </Badge>
         )}
@@ -181,7 +181,7 @@ function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
         {coverImageUrl && <img src={coverImageUrl} alt="" className="mt-2 rounded-xl max-h-28 w-full object-cover" />}
       </div>
       <div><Label>Description</Label><Textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
-      <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">{create.isPending ? "Submitting…" : "Submit for review"}</Button>
+      <Button type="submit" disabled={create.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">{create.isPending ? "Submitting…" : "Submit for review"}</Button>
     </form>
   );
 }
@@ -298,7 +298,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
                 onClick={() => toggleType(t)}
                 className={`text-xs px-3 py-1.5 rounded-full border ${
                   eventTypes.includes(t)
-                    ? "bg-red-600/20 border-red-500/50 text-red-200"
+                    ? "bg-primary/20 border-primary/50 text-primary"
                     : "border-white/10 text-white/60 hover:bg-white/5"
                 }`}
               >
@@ -321,7 +321,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           <Label>Portfolio image URLs (one per line)</Label>
           <Textarea rows={5} value={portfolio} onChange={(e) => setPortfolio(e.target.value)} className="bg-black/40 border-white/10" />
         </div>
-        <Button type="submit" disabled={update.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
+        <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}
         </Button>
       </form>
@@ -333,7 +333,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant={vendor.status === "approved" ? "default" : "secondary"}>{vendor.status}</Badge>
           <Badge variant="outline">{category}</Badge>
-          {vendor.isPremium && <Badge className="bg-gradient-to-br from-red-500 to-red-700 border-0">Premium</Badge>}
+          {vendor.isPremium && <Badge className="bg-primary text-primary-foreground border-0">Premium</Badge>}
         </div>
         {(city || stateF) && (
           <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -370,7 +370,7 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h2 className="font-serif text-2xl">Your events &amp; pubs</h2>
-        <Button onClick={() => { setShow((s) => !s); setEditingId(null); }} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
+        <Button onClick={() => { setShow((s) => !s); setEditingId(null); }} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {showForm ? "Close" : "+ New listing"}
         </Button>
       </div>
@@ -404,7 +404,7 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
                   <div>
                     <div className="flex gap-1 mb-2 flex-wrap">
                       <Badge variant="secondary" className="bg-white/10 border-white/10">{e.category}</Badge>
-                      {(e.type === "pub") && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />Pub</Badge>}
+                      {(e.type === "pub") && <Badge className="bg-primary/20 border-primary/40 text-primary"><Wine className="h-3 w-3 mr-1" />Pub</Badge>}
                       {e.type === "pub" && e.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Tickets</Badge>}
                       {e.type === "pub" && e.pubMode === "event" && <Badge variant="outline">Events</Badge>}
                       {e.type === "pub" && e.pubMode === "both" && <Badge variant="outline">Both</Badge>}
@@ -425,6 +425,7 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
                         {(e.pubEventTypes as string[]).join(" · ")}
                       </p>
                     )}
+                  </div>
                   </div>
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-sm font-medium">
@@ -630,7 +631,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                     onClick={() => togglePubEvent(t)}
                     className={`text-xs px-3 py-1.5 rounded-full border ${
                       pubEventTypes.includes(t)
-                        ? "bg-red-600/20 border-red-500/50 text-red-200"
+                        ? "bg-primary/20 border-primary/50 text-primary"
                         : "border-white/10 text-white/60 hover:bg-white/5"
                     }`}
                   >{t}</button>
@@ -661,7 +662,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                 <button
                   type="button"
                   onClick={() => setGalleryImages((a) => a.filter((_, idx) => idx !== i))}
-                  className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1.5 -right-1.5 bg-destructive rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >×</button>
               </div>
             ))}
@@ -684,7 +685,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                 <button
                   type="button"
                   onClick={() => setGalleryVideos((a) => a.filter((_, idx) => idx !== i))}
-                  className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1.5 -right-1.5 bg-destructive rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >×</button>
               </div>
             ))}
@@ -693,7 +694,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       </div>
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Submit for review</Button>
+        <Button type="submit" disabled={create.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Submit for review</Button>
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
       </div>
     </form>
@@ -779,7 +780,7 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                 <div key={i} className="relative group">
                   <img src={src} alt="" className="h-20 w-20 rounded-lg object-cover" />
                   <button type="button" onClick={() => setGalleryImages((a) => a.filter((_, idx) => idx !== i))}
-                    className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                    className="absolute -top-1.5 -right-1.5 bg-destructive rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                 </div>
               ))}
             </div>
@@ -792,7 +793,7 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                 <div key={i} className="relative group">
                   <video src={src} className="h-20 w-20 rounded-lg object-cover" muted />
                   <button type="button" onClick={() => setGalleryVideos((a) => a.filter((_, idx) => idx !== i))}
-                    className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                    className="absolute -top-1.5 -right-1.5 bg-destructive rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                 </div>
               ))}
             </div>
@@ -831,7 +832,7 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                     onClick={() => togglePubEvent(t)}
                     className={`text-xs px-3 py-1.5 rounded-full border ${
                       pubEventTypes.includes(t)
-                        ? "bg-red-600/20 border-red-500/50 text-red-200"
+                        ? "bg-primary/20 border-primary/50 text-primary"
                         : "border-white/10 text-white/60 hover:bg-white/5"
                     }`}
                   >{t}</button>
@@ -842,7 +843,7 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
         )}
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" className="bg-gradient-to-br from-red-600 to-red-800 border-0">Save</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Save</Button>
         </div>
       </form>
     </div>
@@ -907,7 +908,7 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
                     <div className="flex gap-2">
-                      <Button onClick={() => approve(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5 text-sm">
+                      <Button onClick={() => approve(b.id)} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0 gap-1.5 text-sm">
                         Approve
                       </Button>
                       <Button variant="outline" className="gap-1.5 text-sm" onClick={() => { setRejectingId(b.id); setReason(""); }}>
@@ -931,7 +932,7 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
                       className="bg-black/40 border-white/10"
                     />
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => reject(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
+                      <Button size="sm" onClick={() => reject(b.id)} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
                         Confirm rejection
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setRejectingId(null); setReason(""); }}>
@@ -1038,7 +1039,7 @@ function MediaManager() {
                 type="button"
                 onClick={() => toggleCat(c)}
                 className={`text-xs px-2.5 py-1 rounded-full border ${
-                  cats.includes(c) ? "bg-red-600/20 border-red-500/50 text-red-200" : "border-white/10 text-white/60 hover:bg-white/5"
+                  cats.includes(c) ? "bg-primary/20 border-primary/50 text-primary" : "border-white/10 text-white/60 hover:bg-white/5"
                 }`}
               >
                 {c}
@@ -1046,7 +1047,7 @@ function MediaManager() {
             ))}
           </div>
         </div>
-        <Button type="submit" className="bg-gradient-to-br from-red-600 to-red-800 border-0">Upload</Button>
+        <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Upload</Button>
       </form>
       <div className="rounded-3xl glass-card p-6">
         <p className="font-serif text-xl mb-3">Your gallery</p>
@@ -1064,7 +1065,7 @@ function MediaManager() {
                   </div>
                 )}
                 <button
-                  className="absolute top-1 right-1 bg-black/70 hover:bg-red-600/80 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition"
+                  className="absolute top-1 right-1 bg-black/70 hover:bg-destructive/80 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition"
                   onClick={() => apiDelete(`/api/partner/media/${m.id}`).then(load)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -1126,7 +1127,7 @@ function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
           <Input value={reason} onChange={(e) => setReason(e.target.value)} className="bg-black/40 border-white/10" />
         </div>
         <div className="flex gap-2">
-          <Button type="submit" className="bg-gradient-to-br from-red-600 to-red-800 border-0">Block date</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Block date</Button>
           <Button type="button" variant="outline" onClick={sync} className="border-white/15 gap-2">
             <CalIcon className="h-4 w-4" /> Sync Google Calendar
           </Button>
@@ -1185,7 +1186,7 @@ function AdsPanel() {
         <p className="font-serif text-xl flex items-center gap-2"><Megaphone className="h-5 w-5 text-primary" />Request promoted placement</p>
         <p className="text-sm text-muted-foreground">Approved ads appear in the Popular section.</p>
         <Textarea rows={5} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="What would you like to promote?" className="bg-black/40 border-white/10" />
-        <Button type="submit" className="bg-gradient-to-br from-red-600 to-red-800 border-0">Submit request</Button>
+        <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Submit request</Button>
       </form>
       <div className="rounded-3xl glass-card p-6">
         <p className="font-serif text-xl mb-3">Your requests</p>
@@ -1221,7 +1222,7 @@ function LeadsPanel({ isPremium }: { isPremium: boolean }) {
         <Crown className="h-10 w-10 text-primary mx-auto mb-4" />
         <p className="font-serif text-3xl mb-2">Leads &amp; CRM is a Premium feature</p>
         <p className="text-muted-foreground mb-6">Subscribe to Partner Premium ({formatINR(999)}/mo) to unlock who's viewing your profile and conversion analytics.</p>
-        <a href="/subscription"><Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">Upgrade to Premium</Button></a>
+        <a href="/subscription"><Button className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Upgrade to Premium</Button></a>
       </div>
     );
   }
