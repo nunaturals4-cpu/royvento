@@ -545,6 +545,7 @@ export const CreateBookingResponse = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
+  rejectionReason: zod.string().optional(),
 });
 
 /**
@@ -566,6 +567,7 @@ export const ListMyBookingsResponseItem = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
+  rejectionReason: zod.string().optional(),
 });
 export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 
@@ -588,6 +590,7 @@ export const ListVendorBookingsResponseItem = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
+  rejectionReason: zod.string().optional(),
 });
 export const ListVendorBookingsResponse = zod.array(
   ListVendorBookingsResponseItem,
@@ -602,6 +605,7 @@ export const UpdateBookingStatusParams = zod.object({
 
 export const UpdateBookingStatusBody = zod.object({
   status: zod.enum(["pending", "confirmed", "cancelled", "completed"]),
+  rejectionReason: zod.string().optional(),
 });
 
 export const UpdateBookingStatusResponse = zod.object({
@@ -620,6 +624,38 @@ export const UpdateBookingStatusResponse = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
+  rejectionReason: zod.string().optional(),
+});
+
+/**
+ * @summary List current user's notifications
+ */
+export const ListNotificationsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  title: zod.string(),
+  message: zod.string(),
+  isRead: zod.boolean(),
+  createdAt: zod.string(),
+});
+export const ListNotificationsResponse = zod.array(
+  ListNotificationsResponseItem,
+);
+
+/**
+ * @summary Mark a notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkNotificationReadResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  title: zod.string(),
+  message: zod.string(),
+  isRead: zod.boolean(),
+  createdAt: zod.string(),
 });
 
 /**
@@ -761,6 +797,7 @@ export const GetAdminAnalyticsResponse = zod.object({
       vendorName: zod.string(),
       userName: zod.string(),
       userEmail: zod.string(),
+      rejectionReason: zod.string().optional(),
     }),
   ),
   topVendors: zod.array(

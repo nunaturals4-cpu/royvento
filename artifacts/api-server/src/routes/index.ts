@@ -16,6 +16,7 @@ import partnerMediaRouter from "./partnerMedia";
 import blockedDatesRouter from "./blockedDates";
 import adsRouter from "./ads";
 import referralsRouter from "./referrals";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(partnerMediaRouter);
 router.use(blockedDatesRouter);
 router.use(adsRouter);
 router.use(referralsRouter);
+router.use(notificationsRouter);
 
 export default router;

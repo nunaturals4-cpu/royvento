@@ -26,6 +26,7 @@ export * from "./listVendorsParams";
 export * from "./loginBody";
 export * from "./meResponse";
 export * from "./myVendorResponse";
+export * from "./notification";
 export * from "./ok";
 export * from "./registerBody";
 export * from "./review";

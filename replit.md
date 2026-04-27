@@ -26,6 +26,19 @@ A full-stack event management marketplace for hosts and vendors.
 ## New backend routes (April 2026)
 `/api/subscriptions/me|POST`, `/api/coupons/me|validate`, `/api/partner/media`, `/api/partner/blocked-dates` (+ google-sync stub), `/api/partner/ads`, `/api/partner/leads/me`, `/api/partner/profile`, `/api/admin/{events,subscriptions,coupons,ads}`, `/api/events/popular`, `/api/events?type=pub&category=&state=&city=&country=&minPrice=&maxPrice=`. Routes use `apiGet/apiPost/apiPatch/apiDelete` from `lib/api.ts` (no orval regen for new endpoints).
 
+## Booking approval system & notifications (Task #3, Apr 2026)
+- `bookingsTable` gets `rejectionReason text` (nullable) column
+- `notificationsTable` added: id, userId, title, message, isRead, createdAt
+- PATCH `/api/bookings/:id/status` and `/api/admin/bookings/:id/status` now:
+  - Require `rejectionReason` when cancelling (400 if missing)
+  - Create an in-app notification for the booking's user on status change
+- GET `/api/notifications` — returns user's notifications newest-first (auth required)
+- PATCH `/api/notifications/:id/read` — marks a notification as read (auth required)
+- **Navbar** now shows a Bell icon (logged-in only) with unread count badge; clicking opens a dropdown with notification list and mark-all-read; polls every 30s
+- **admin.tsx** has a new "Booking Requests" tab listing pending bookings with Approve / Reject (+ required reason) actions
+- **vendor-dashboard.tsx** BookingsManager split into Pending requests (Approve/Reject with reason) vs. All bookings sections
+- **bookings.tsx** displays rejection reason in a red callout on cancelled bookings
+
 ## Key directories
 - `artifacts/api-server/src/routes/` — auth, users, vendors, events, bookings, reviews, availability, admin
 - `artifacts/api-server/src/lib/auth.ts` — JWT, requireAuth middleware, password hashing

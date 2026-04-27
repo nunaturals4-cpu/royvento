@@ -8,6 +8,7 @@ import {
   availabilityTable,
   couponsTable,
   referralsTable,
+  notificationsTable,
 } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -70,6 +71,7 @@ interface BookingRow {
   personName: string;
   pointsUsed: number;
   approvedBy: string;
+  rejectionReason: string | null;
   createdAt: Date;
 }
 
@@ -113,6 +115,7 @@ async function serializeBookings(rows: BookingRow[]) {
       personName: b.personName || u?.name || "",
       pointsUsed: b.pointsUsed,
       approvedBy: b.approvedBy,
+      rejectionReason: b.rejectionReason ?? null,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",
@@ -379,9 +382,19 @@ router.patch(
       }
       approver = "partner";
     }
+    const rejectionReason =
+      parsed.data.status === "cancelled"
+        ? ((req.body as Record<string, unknown>)["rejectionReason"] as string | undefined)?.trim() || null
+        : null;
+
+    if (parsed.data.status === "cancelled" && !rejectionReason) {
+      res.status(400).json({ error: "A rejection reason is required when cancelling a booking." });
+      return;
+    }
+
     const [updated] = await db
       .update(bookingsTable)
-      .set({ status: parsed.data.status, approvedBy: approver })
+      .set({ status: parsed.data.status, approvedBy: approver, rejectionReason })
       .where(eq(bookingsTable.id, id))
       .returning();
     if (!updated) {
@@ -475,6 +488,31 @@ router.patch(
       } catch (err) {
         console.error("Failed to send status notification:", err);
       }
+
+      // Create in-app notification for the booking user
+      try {
+        let notifTitle = "";
+        let notifMessage = "";
+        if (updated.status === "confirmed") {
+          notifTitle = "Booking confirmed!";
+          notifMessage = `Your booking for "${out.eventTitle}" has been confirmed.`;
+        } else if (updated.status === "cancelled") {
+          notifTitle = "Booking rejected";
+          notifMessage = `Your booking for "${out.eventTitle}" was cancelled.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
+        } else if (updated.status === "completed") {
+          notifTitle = "Booking completed";
+          notifMessage = `Your booking for "${out.eventTitle}" is marked as completed. We hope you had a great time!`;
+        }
+        if (notifTitle) {
+          await db.insert(notificationsTable).values({
+            userId: b.userId,
+            title: notifTitle,
+            message: notifMessage,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to create notification:", err);
+      }
     }
 
     res.json(out);
@@ -496,9 +534,26 @@ router.patch(
       res.status(400).json({ error: "Invalid input" });
       return;
     }
+    const bRows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id)).limit(1);
+    const b = bRows[0];
+    if (!b) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    const rejectionReason =
+      parsed.data.status === "cancelled"
+        ? ((req.body as Record<string, unknown>)["rejectionReason"] as string | undefined)?.trim() || null
+        : null;
+
+    if (parsed.data.status === "cancelled" && !rejectionReason) {
+      res.status(400).json({ error: "A rejection reason is required when cancelling a booking." });
+      return;
+    }
+
     const [updated] = await db
       .update(bookingsTable)
-      .set({ status: parsed.data.status, approvedBy: "admin" })
+      .set({ status: parsed.data.status, approvedBy: "admin", rejectionReason })
       .where(eq(bookingsTable.id, id))
       .returning();
     if (!updated) {
@@ -506,6 +561,34 @@ router.patch(
       return;
     }
     const [out] = await serializeBookings([updated]);
+
+    // Create in-app notification for the booking user
+    if (out && b.status !== updated.status) {
+      try {
+        let notifTitle = "";
+        let notifMessage = "";
+        if (updated.status === "confirmed") {
+          notifTitle = "Booking confirmed!";
+          notifMessage = `Your booking for "${out.eventTitle}" has been confirmed by admin.`;
+        } else if (updated.status === "cancelled") {
+          notifTitle = "Booking rejected";
+          notifMessage = `Your booking for "${out.eventTitle}" was cancelled.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`;
+        } else if (updated.status === "completed") {
+          notifTitle = "Booking completed";
+          notifMessage = `Your booking for "${out.eventTitle}" is marked as completed.`;
+        }
+        if (notifTitle) {
+          await db.insert(notificationsTable).values({
+            userId: b.userId,
+            title: notifTitle,
+            message: notifMessage,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to create notification:", err);
+      }
+    }
+
     res.json(out);
   },
 );

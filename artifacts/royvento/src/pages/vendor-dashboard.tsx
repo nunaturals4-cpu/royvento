@@ -7,7 +7,6 @@ import {
   useCreateEvent,
   useDeleteEvent,
   useListVendorBookings,
-  useUpdateBookingStatus,
 } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ import { LocationSelect } from "@/components/LocationSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const CATEGORIES = [...EVENT_CATEGORIES];
-const STATUSES = ["pending", "confirmed", "completed", "cancelled"] as const;
 const EVENT_KIND = ["event", "pub"] as const;
 
 interface Media {
@@ -830,41 +828,124 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
 }
 
 function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () => void }) {
-  const update = useUpdateBookingStatus();
   const { toast } = useToast();
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+
+  const approve = async (id: number) => {
+    try {
+      await apiPatch(`/api/bookings/${id}/status`, { status: "confirmed" });
+      toast({ title: "Booking approved" });
+      refetch();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const reject = async (id: number) => {
+    if (!reason.trim()) {
+      toast({ title: "Please enter a rejection reason", variant: "destructive" });
+      return;
+    }
+    try {
+      await apiPatch(`/api/bookings/${id}/status`, { status: "cancelled", rejectionReason: reason.trim() });
+      toast({ title: "Booking rejected" });
+      setRejectingId(null);
+      setReason("");
+      refetch();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
   if (bookings.length === 0) return <p className="text-muted-foreground">No bookings yet.</p>;
+  const pending = bookings.filter((b) => b.status === "pending");
+  const others = bookings.filter((b) => b.status !== "pending");
+
   return (
-    <div className="space-y-4">
-      {bookings.map((b) => (
-        <div key={b.id} className="rounded-2xl glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <p className="font-serif text-lg">{b.eventTitle}</p>
-            <p className="text-sm text-muted-foreground">{b.userName} · {b.userEmail}</p>
-            <p className="text-sm mt-1">
-              {b.bookingDate} · {b.guests} guests · {formatINR(b.finalPrice ?? b.totalPrice)}
-              {b.couponCode && <span className="text-green-400 ml-2">(coupon {b.couponCode})</span>}
-            </p>
-            {b.notes && <p className="text-sm italic text-muted-foreground mt-1">"{b.notes}"</p>}
-          </div>
-          <div className="flex items-center gap-2">
-            <Select
-              value={b.status}
-              onValueChange={(v) =>
-                update.mutate(
-                  { bookingId: b.id, data: { status: v as any } },
-                  {
-                    onSuccess: () => { toast({ title: "Status updated" }); refetch(); },
-                    onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
-                  },
-                )
-              }
-            >
-              <SelectTrigger className="w-40 bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-              <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-            </Select>
+    <div className="space-y-6">
+      {pending.length > 0 && (
+        <div>
+          <h3 className="font-serif text-xl mb-3 flex items-center gap-2">
+            Pending requests
+            <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5">{pending.length}</span>
+          </h3>
+          <div className="space-y-3">
+            {pending.map((b) => (
+              <div key={b.id} className="rounded-2xl glass-card overflow-hidden border border-amber-500/20">
+                <div className="p-5 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div>
+                    <p className="font-serif text-lg">{b.eventTitle}</p>
+                    <p className="text-sm text-muted-foreground">{b.userName} · {b.userEmail}</p>
+                    <p className="text-sm mt-1">
+                      {b.bookingDate} · {b.guests} guests · {formatINR(b.finalPrice ?? b.totalPrice)}
+                      {b.couponCode && <span className="text-green-400 ml-2">(coupon {b.couponCode})</span>}
+                    </p>
+                    {b.notes && <p className="text-sm italic text-muted-foreground mt-1">"{b.notes}"</p>}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button onClick={() => approve(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5 text-sm">
+                      Approve
+                    </Button>
+                    <Button variant="outline" className="gap-1.5 text-sm" onClick={() => { setRejectingId(b.id); setReason(""); }}>
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+                {rejectingId === b.id && (
+                  <div className="border-t border-white/10 px-5 pb-5 pt-4 bg-black/20 space-y-3">
+                    <p className="text-sm font-medium">Rejection reason (required)</p>
+                    <Textarea
+                      rows={2}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Enter reason for rejection…"
+                      className="bg-black/40 border-white/10"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => reject(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
+                        Confirm rejection
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setRejectingId(null); setReason(""); }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      )}
+      {others.length > 0 && (
+        <div>
+          <h3 className="font-serif text-xl mb-3">All bookings</h3>
+          <div className="space-y-3">
+            {others.map((b) => (
+              <div key={b.id} className="rounded-2xl glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                      b.status === "confirmed" ? "bg-green-500/20 text-green-300 border-green-500/30" :
+                      b.status === "cancelled" ? "bg-red-500/20 text-red-300 border-red-500/30" :
+                      b.status === "completed" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
+                      "bg-white/10 text-white/60 border-white/10"
+                    }`}>{b.status}</span>
+                  </div>
+                  <p className="font-serif text-lg">{b.eventTitle}</p>
+                  <p className="text-sm text-muted-foreground">{b.userName} · {b.userEmail}</p>
+                  <p className="text-sm mt-1">
+                    {b.bookingDate} · {b.guests} guests · {formatINR(b.finalPrice ?? b.totalPrice)}
+                  </p>
+                  {b.rejectionReason && (
+                    <p className="text-xs text-red-400 mt-1">Reason: {b.rejectionReason}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

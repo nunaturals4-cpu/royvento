@@ -5,9 +5,12 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { BookingStatus } from "./bookingStatus";
 
-export interface UpdateBookingStatusBody {
-  status: BookingStatus;
-  rejectionReason?: string;
+export interface Notification {
+  id: number;
+  userId: number;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
 }

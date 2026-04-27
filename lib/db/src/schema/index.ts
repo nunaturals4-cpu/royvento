@@ -147,6 +147,7 @@ export const bookingsTable = pgTable(
     personName: varchar("person_name", { length: 255 }).notNull().default(""),
     pointsUsed: integer("points_used").notNull().default(0),
     approvedBy: varchar("approved_by", { length: 20 }).notNull().default(""),
+    rejectionReason: text("rejection_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -385,3 +386,22 @@ export const referralsTable = pgTable(
 );
 
 export type Referral = typeof referralsTable.$inferSelect;
+
+export const notificationsTable = pgTable(
+  "notifications",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    message: text("message").notNull().default(""),
+    isRead: boolean("is_read").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("notifications_user_idx").on(t.userId),
+  }),
+);
+
+export type Notification = typeof notificationsTable.$inferSelect;

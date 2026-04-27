@@ -174,6 +174,7 @@ export interface Booking {
   vendorName: string;
   userName: string;
   userEmail: string;
+  rejectionReason?: string;
 }
 
 export interface CreateBookingBody {
@@ -185,6 +186,16 @@ export interface CreateBookingBody {
 
 export interface UpdateBookingStatusBody {
   status: BookingStatus;
+  rejectionReason?: string;
+}
+
+export interface Notification {
+  id: number;
+  userId: number;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export interface Review {

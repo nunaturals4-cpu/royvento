@@ -92,6 +92,12 @@ function BookingCard({ b }: { b: any }) {
             {b.status === "pending" && (
               <p className="text-xs text-amber-400">Awaiting partner or admin approval.</p>
             )}
+            {b.status === "cancelled" && b.rejectionReason && (
+              <div className="mt-2 rounded-lg border border-red-500/30 bg-red-900/20 px-3 py-2">
+                <p className="text-xs text-red-300 font-medium mb-0.5">Rejection reason</p>
+                <p className="text-xs text-red-200">{b.rejectionReason}</p>
+              </div>
+            )}
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Total</p>
