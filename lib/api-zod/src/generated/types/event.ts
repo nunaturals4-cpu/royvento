@@ -19,5 +19,7 @@ export interface Event {
   rating: number;
   reviewCount: number;
   vendorName: string;
+  galleryImages: string[];
+  galleryVideos: string[];
   createdAt: string;
 }

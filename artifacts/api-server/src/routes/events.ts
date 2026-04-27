@@ -29,6 +29,8 @@ interface EventRow {
   priceMen: string;
   priceCouple: string;
   pubEventTypes: string[];
+  galleryImages: string[] | null;
+  galleryVideos: string[] | null;
   createdAt: Date;
 }
 
@@ -81,6 +83,8 @@ async function serializeEvents(rows: EventRow[]) {
       priceMen: Number(e.priceMen),
       priceCouple: Number(e.priceCouple),
       pubEventTypes: e.pubEventTypes ?? [],
+      galleryImages: e.galleryImages ?? [],
+      galleryVideos: e.galleryVideos ?? [],
       rating: r.rating,
       reviewCount: r.reviewCount,
       vendorName: v?.businessName ?? "",
@@ -312,6 +316,8 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       priceMen: priceMen != null ? String(priceMen) : "0",
       priceCouple: priceCouple != null ? String(priceCouple) : "0",
       pubEventTypes,
+      galleryImages: Array.isArray(body["galleryImages"]) ? (body["galleryImages"] as string[]) : null,
+      galleryVideos: Array.isArray(body["galleryVideos"]) ? (body["galleryVideos"] as string[]) : null,
     })
     .returning();
   if (!created) {
@@ -378,6 +384,10 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     updates["priceCouple"] = String(body["priceCouple"]);
   if (Array.isArray(body["pubEventTypes"]))
     updates["pubEventTypes"] = body["pubEventTypes"];
+  if (Array.isArray(body["galleryImages"]))
+    updates["galleryImages"] = body["galleryImages"];
+  if (Array.isArray(body["galleryVideos"]))
+    updates["galleryVideos"] = body["galleryVideos"];
 
   const [updated] = await db
     .update(eventsTable)

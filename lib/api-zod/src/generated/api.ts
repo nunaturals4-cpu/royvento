@@ -339,6 +339,8 @@ export const ListEventsResponseItem = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   vendorName: zod.string(),
+  galleryImages: zod.array(zod.string()),
+  galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
@@ -369,6 +371,8 @@ export const CreateEventResponse = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   vendorName: zod.string(),
+  galleryImages: zod.array(zod.string()),
+  galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
 });
 
@@ -388,6 +392,8 @@ export const ListFeaturedEventsResponseItem = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   vendorName: zod.string(),
+  galleryImages: zod.array(zod.string()),
+  galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
 });
 export const ListFeaturedEventsResponse = zod.array(
@@ -415,6 +421,8 @@ export const GetEventResponse = zod
     rating: zod.number(),
     reviewCount: zod.number(),
     vendorName: zod.string(),
+    galleryImages: zod.array(zod.string()),
+    galleryVideos: zod.array(zod.string()),
     createdAt: zod.string(),
   })
   .and(
@@ -452,6 +460,8 @@ export const UpdateEventBody = zod.object({
   price: zod.number().optional(),
   capacity: zod.number().optional(),
   imageUrl: zod.string().optional(),
+  galleryImages: zod.array(zod.string()).optional(),
+  galleryVideos: zod.array(zod.string()).optional(),
 });
 
 export const UpdateEventResponse = zod.object({
@@ -467,6 +477,8 @@ export const UpdateEventResponse = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   vendorName: zod.string(),
+  galleryImages: zod.array(zod.string()),
+  galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
 });
 
@@ -497,6 +509,8 @@ export const ListMyVendorEventsResponseItem = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   vendorName: zod.string(),
+  galleryImages: zod.array(zod.string()),
+  galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
 });
 export const ListMyVendorEventsResponse = zod.array(

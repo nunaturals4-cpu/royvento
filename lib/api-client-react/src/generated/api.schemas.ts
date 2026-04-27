@@ -116,6 +116,8 @@ export interface Event {
   rating: number;
   reviewCount: number;
   vendorName: string;
+  galleryImages: string[];
+  galleryVideos: string[];
   createdAt: string;
 }
 
@@ -141,6 +143,8 @@ export interface UpdateEventBody {
   price?: number;
   capacity?: number;
   imageUrl?: string;
+  galleryImages?: string[];
+  galleryVideos?: string[];
 }
 
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];

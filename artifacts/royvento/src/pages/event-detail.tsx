@@ -48,6 +48,7 @@ export function EventDetail() {
   const [myCoupons, setMyCoupons] = useState<Coupon[]>([]);
   const [booking, setBooking] = useState(false);
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   // Pub-specific state
   const isPub = (event as any)?.type === "pub";
@@ -212,6 +213,42 @@ export function EventDetail() {
           </p>
         </div>
       </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="" className="max-w-[95vw] max-h-[90vh] rounded-2xl object-contain" />
+          <button className="absolute top-4 right-6 text-white text-3xl leading-none" onClick={() => setLightbox(null)}>×</button>
+        </div>
+      )}
+
+      {/* Gallery strip */}
+      {((ev as any).galleryImages?.length > 0 || (ev as any).galleryVideos?.length > 0) && (
+        <div className="container mx-auto px-4 md:px-6 pt-8">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {((ev as any).galleryImages ?? []).map((src: string, i: number) => (
+              <img
+                key={`img-${i}`}
+                src={src}
+                alt=""
+                onClick={() => setLightbox(src)}
+                className="h-40 w-56 shrink-0 rounded-2xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+              />
+            ))}
+            {((ev as any).galleryVideos ?? []).map((src: string, i: number) => (
+              <video
+                key={`vid-${i}`}
+                src={src}
+                className="h-40 w-56 shrink-0 rounded-2xl object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="container mx-auto px-4 md:px-6 py-12 grid lg:grid-cols-[1.7fr_1fr] gap-10">
         <div className="space-y-10">

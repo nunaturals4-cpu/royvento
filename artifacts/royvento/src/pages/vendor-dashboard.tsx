@@ -464,6 +464,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   const [price, setPrice] = useState(0);
   const [capacity, setCapacity] = useState(50);
   const [imageUrl, setImageUrl] = useState("");
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryVideos, setGalleryVideos] = useState<string[]>([]);
   // pub-specific
   const [enableTickets, setEnableTickets] = useState(true);
   const [enableEvents, setEnableEvents] = useState(false);
@@ -477,6 +479,24 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   const onImageFile = async (f: File | null) => {
     if (!f) return;
     try { setImageUrl(await fileToDataUrl(f)); } catch { /* ignore */ }
+  };
+
+  const onGalleryImagesChange = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+    }
+    setGalleryImages((prev) => [...prev, ...urls]);
+  };
+
+  const onGalleryVideosChange = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+    }
+    setGalleryVideos((prev) => [...prev, ...urls]);
   };
 
   const togglePubEvent = (t: string) =>
@@ -502,6 +522,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       priceMen: type === "pub" ? priceMen : 0,
       priceCouple: type === "pub" ? priceCouple : 0,
       pubEventTypes: type === "pub" ? pubEventTypes : [],
+      galleryImages,
+      galleryVideos,
     };
     create.mutate(
       { data: body },
@@ -536,7 +558,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
           </Select>
         </div>
         <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image</Label>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
           <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
           {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-28 object-cover" />}
         </div>
@@ -600,6 +622,56 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       )}
 
       <div><Label>Description</Label><Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
+
+      {/* Gallery media */}
+      <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+        <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos</p>
+        <Input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => onGalleryImagesChange(e.target.files)}
+          className="bg-black/40 border-white/10"
+        />
+        {galleryImages.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-1">
+            {galleryImages.map((src, i) => (
+              <div key={i} className="relative group">
+                <img src={src} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setGalleryImages((a) => a.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery videos</p>
+        <Input
+          type="file"
+          accept="video/*"
+          multiple
+          onChange={(e) => onGalleryVideosChange(e.target.files)}
+          className="bg-black/40 border-white/10"
+        />
+        {galleryVideos.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-1">
+            {galleryVideos.map((src, i) => (
+              <div key={i} className="relative group">
+                <video src={src} className="h-20 w-20 rounded-lg object-cover" muted />
+                <button
+                  type="button"
+                  onClick={() => setGalleryVideos((a) => a.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-2">
         <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Publish</Button>
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
@@ -612,6 +684,8 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   const [imageUrl, setImageUrl] = useState(event.imageUrl ?? "");
+  const [galleryImages, setGalleryImages] = useState<string[]>(event.galleryImages ?? []);
+  const [galleryVideos, setGalleryVideos] = useState<string[]>(event.galleryVideos ?? []);
   const [price, setPrice] = useState(Number(event.price ?? 0));
   const [priceWomen, setPriceWomen] = useState(Number(event.priceWomen ?? 0));
   const [priceMen, setPriceMen] = useState(Number(event.priceMen ?? 0));
@@ -627,12 +701,30 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
     try { setImageUrl(await fileToDataUrl(f)); } catch { /* ignore */ }
   };
 
+  const onGalleryImagesChange = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+    }
+    setGalleryImages((prev) => [...prev, ...urls]);
+  };
+
+  const onGalleryVideosChange = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+    }
+    setGalleryVideos((prev) => [...prev, ...urls]);
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await apiPatch(`/api/events/${event.id}`, {
         title, description, imageUrl, capacity,
-        price,
+        price, galleryImages, galleryVideos,
         ...(isPub ? { pubMode, priceWomen, priceMen, priceCouple, pubEventTypes } : {}),
       });
       toast({ title: "Updated" });
@@ -652,10 +744,41 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
         <div><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" /></div>
         <div><Label>Description</Label><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
         <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image</Label>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
           <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
           {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
         </div>
+
+        {/* Gallery media */}
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+          <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos</p>
+          <Input type="file" accept="image/*" multiple onChange={(e) => onGalleryImagesChange(e.target.files)} className="bg-black/40 border-white/10" />
+          {galleryImages.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {galleryImages.map((src, i) => (
+                <div key={i} className="relative group">
+                  <img src={src} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                  <button type="button" onClick={() => setGalleryImages((a) => a.filter((_, idx) => idx !== i))}
+                    className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery videos</p>
+          <Input type="file" accept="video/*" multiple onChange={(e) => onGalleryVideosChange(e.target.files)} className="bg-black/40 border-white/10" />
+          {galleryVideos.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {galleryVideos.map((src, i) => (
+                <div key={i} className="relative group">
+                  <video src={src} className="h-20 w-20 rounded-lg object-cover" muted />
+                  <button type="button" onClick={() => setGalleryVideos((a) => a.filter((_, idx) => idx !== i))}
+                    className="absolute -top-1.5 -right-1.5 bg-red-600 rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Price (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
           <div><Label>Capacity</Label><Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>

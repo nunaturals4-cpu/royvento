@@ -101,6 +101,8 @@ export const eventsTable = pgTable(
       .notNull()
       .default("0"),
     pubEventTypes: text("pub_event_types").array().notNull().default([]),
+    galleryImages: text("gallery_images").array(),
+    galleryVideos: text("gallery_videos").array(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

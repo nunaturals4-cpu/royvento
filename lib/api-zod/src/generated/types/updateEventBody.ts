@@ -14,4 +14,6 @@ export interface UpdateEventBody {
   price?: number;
   capacity?: number;
   imageUrl?: string;
+  galleryImages?: string[];
+  galleryVideos?: string[];
 }

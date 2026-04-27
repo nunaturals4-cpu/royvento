@@ -831,9 +831,17 @@ components:
           type: integer
         vendorName:
           type: string
+        galleryImages:
+          type: array
+          items:
+            type: string
+        galleryVideos:
+          type: array
+          items:
+            type: string
         createdAt:
           type: string
-      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, createdAt]
+      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt]
 
     EventDetail:
       allOf:
@@ -880,6 +888,14 @@ components:
           type: integer
         imageUrl:
           type: string
+        galleryImages:
+          type: array
+          items:
+            type: string
+        galleryVideos:
+          type: array
+          items:
+            type: string
 
     BookingStatus:
       type: string
