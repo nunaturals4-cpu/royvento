@@ -869,6 +869,14 @@ components:
           type: integer
         imageUrl:
           type: string
+        galleryImages:
+          type: array
+          items:
+            type: string
+        galleryVideos:
+          type: array
+          items:
+            type: string
       required: [title, description, category, location, price, capacity]
 
     UpdateEventBody:

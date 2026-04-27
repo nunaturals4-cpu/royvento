@@ -133,6 +133,8 @@ export interface CreateEventBody {
   price: number;
   capacity: number;
   imageUrl?: string;
+  galleryImages?: string[];
+  galleryVideos?: string[];
 }
 
 export interface UpdateEventBody {

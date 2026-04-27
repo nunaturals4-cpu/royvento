@@ -359,6 +359,11 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
+  const parsed = UpdateEventBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues });
+    return;
+  }
   const updates: Record<string, unknown> = {};
   const body = req.body as Record<string, unknown>;
   for (const k of [
@@ -384,10 +389,10 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     updates["priceCouple"] = String(body["priceCouple"]);
   if (Array.isArray(body["pubEventTypes"]))
     updates["pubEventTypes"] = body["pubEventTypes"];
-  if (Array.isArray(body["galleryImages"]))
-    updates["galleryImages"] = body["galleryImages"];
-  if (Array.isArray(body["galleryVideos"]))
-    updates["galleryVideos"] = body["galleryVideos"];
+  if (parsed.data.galleryImages !== undefined)
+    updates["galleryImages"] = parsed.data.galleryImages;
+  if (parsed.data.galleryVideos !== undefined)
+    updates["galleryVideos"] = parsed.data.galleryVideos;
 
   const [updated] = await db
     .update(eventsTable)

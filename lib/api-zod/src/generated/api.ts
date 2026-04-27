@@ -356,6 +356,8 @@ export const CreateEventBody = zod.object({
   price: zod.number(),
   capacity: zod.number(),
   imageUrl: zod.string().optional(),
+  galleryImages: zod.array(zod.string()).optional(),
+  galleryVideos: zod.array(zod.string()).optional(),
 });
 
 export const CreateEventResponse = zod.object({
