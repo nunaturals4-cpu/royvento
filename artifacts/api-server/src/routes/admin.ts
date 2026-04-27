@@ -171,10 +171,92 @@ router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
       state: e.state,
       price: Number(e.price),
       imageUrl: e.imageUrl,
+      popular: e.popular,
+      approvalStatus: e.approvalStatus,
       partnerName: vMap.get(e.vendorId)?.businessName ?? "",
       createdAt: e.createdAt.toISOString(),
     })),
   );
+});
+
+router.get("/admin/events/pending", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(eventsTable)
+    .where(eq(eventsTable.approvalStatus, "pending"))
+    .orderBy(desc(eventsTable.createdAt));
+  if (rows.length === 0) return res.json([]);
+  const vendors = await db.select().from(vendorsTable);
+  const vMap = new Map(vendors.map((v) => [v.id, v]));
+  res.json(
+    rows.map((e) => ({
+      id: e.id,
+      vendorId: e.vendorId,
+      title: e.title,
+      type: e.type,
+      category: e.category,
+      city: e.city,
+      state: e.state,
+      price: Number(e.price),
+      imageUrl: e.imageUrl,
+      description: e.description,
+      galleryImages: e.galleryImages ?? [],
+      approvalStatus: e.approvalStatus,
+      partnerName: vMap.get(e.vendorId)?.businessName ?? "",
+      createdAt: e.createdAt.toISOString(),
+    })),
+  );
+});
+
+router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  const updates: Record<string, unknown> = {};
+
+  if (typeof body["popular"] === "boolean") updates["popular"] = body["popular"];
+  if (typeof body["featured"] === "boolean") updates["featured"] = body["featured"];
+  if (typeof body["approvalStatus"] === "string") {
+    const status = body["approvalStatus"];
+    if (!["approved", "rejected", "pending"].includes(status)) {
+      res.status(400).json({ error: "Invalid approvalStatus" });
+      return;
+    }
+    updates["approvalStatus"] = status;
+    updates["rejectionReason"] = typeof body["rejectionReason"] === "string"
+      ? body["rejectionReason"]
+      : null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No valid fields to update" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(eventsTable)
+    .set(updates)
+    .where(eq(eventsTable.id, id))
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json({ ok: true, approvalStatus: updated.approvalStatus });
+});
+
+router.delete("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  await db.delete(eventsTable).where(eq(eventsTable.id, id));
+  res.json({ ok: true });
 });
 
 router.get("/admin/users", requireAuth(["admin"]), async (_req, res) => {

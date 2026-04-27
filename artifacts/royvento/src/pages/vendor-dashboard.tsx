@@ -393,53 +393,69 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
       )}
 
       {events.length === 0 ? (
-        <p className="text-muted-foreground">No listings yet.</p>
+        <p className="text-muted-foreground">No listings yet. Submit a new listing above for admin review.</p>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {events.map((e: any) => (
-            <div key={e.id} className="rounded-2xl glass-card overflow-hidden flex">
-              {e.imageUrl && <div className="w-32 bg-muted shrink-0"><img src={e.imageUrl} alt="" className="h-full w-full object-cover" /></div>}
-              <div className="flex-1 p-4 flex flex-col justify-between">
-                <div>
-                  <div className="flex gap-1 mb-2 flex-wrap">
-                    <Badge variant="secondary" className="bg-white/10 border-white/10">{e.category}</Badge>
-                    {(e.type === "pub") && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />Pub</Badge>}
-                    {e.type === "pub" && e.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Tickets</Badge>}
-                    {e.type === "pub" && e.pubMode === "event" && <Badge variant="outline">Events</Badge>}
-                    {e.type === "pub" && e.pubMode === "both" && <Badge variant="outline">Both</Badge>}
+            <div key={e.id} className="rounded-2xl glass-card overflow-hidden flex flex-col">
+              <div className="flex flex-1">
+                {e.imageUrl && <div className="w-32 bg-muted shrink-0"><img src={e.imageUrl} alt="" className="h-full w-full object-cover" /></div>}
+                <div className="flex-1 p-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex gap-1 mb-2 flex-wrap">
+                      <Badge variant="secondary" className="bg-white/10 border-white/10">{e.category}</Badge>
+                      {(e.type === "pub") && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />Pub</Badge>}
+                      {e.type === "pub" && e.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Tickets</Badge>}
+                      {e.type === "pub" && e.pubMode === "event" && <Badge variant="outline">Events</Badge>}
+                      {e.type === "pub" && e.pubMode === "both" && <Badge variant="outline">Both</Badge>}
+                      {e.approvalStatus === "approved" && (
+                        <Badge className="bg-green-600/20 border-green-500/40 text-green-300 text-[10px]">● Live</Badge>
+                      )}
+                      {e.approvalStatus === "pending" && (
+                        <Badge className="bg-amber-600/20 border-amber-500/40 text-amber-300 text-[10px]">⏳ Pending review</Badge>
+                      )}
+                      {e.approvalStatus === "rejected" && (
+                        <Badge className="bg-red-600/20 border-red-500/40 text-red-300 text-[10px]">✕ Rejected</Badge>
+                      )}
+                    </div>
+                    <p className="font-serif text-lg">{e.title}</p>
+                    <p className="text-xs text-muted-foreground">{e.location}</p>
+                    {e.type === "pub" && (e.pubEventTypes ?? []).length > 0 && (
+                      <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1">
+                        {(e.pubEventTypes as string[]).join(" · ")}
+                      </p>
+                    )}
                   </div>
-                  <p className="font-serif text-lg">{e.title}</p>
-                  <p className="text-xs text-muted-foreground">{e.location}</p>
-                  {e.type === "pub" && (e.pubEventTypes ?? []).length > 0 && (
-                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1">
-                      {(e.pubEventTypes as string[]).join(" · ")}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-sm font-medium">
-                    {e.type === "pub" ? `from ${formatINR(e.startingPrice ?? e.price)}` : formatINR(e.price)}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => setEditingId(e.id)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        if (!confirm("Delete this listing?")) return;
-                        del.mutate({ eventId: e.id }, {
-                          onSuccess: () => { toast({ title: "Deleted" }); refetchEvents(); },
-                          onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
-                        });
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-sm font-medium">
+                      {e.type === "pub" ? `from ${formatINR(e.startingPrice ?? e.price)}` : formatINR(e.price)}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => setEditingId(e.id)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          if (!confirm("Delete this listing?")) return;
+                          del.mutate({ eventId: e.id }, {
+                            onSuccess: () => { toast({ title: "Deleted" }); refetchEvents(); },
+                            onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
+                          });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
+              {e.approvalStatus === "rejected" && e.rejectionReason && (
+                <div className="border-t border-red-500/20 bg-red-900/10 px-4 py-2">
+                  <p className="text-xs text-red-300"><span className="font-medium">Rejection reason:</span> {e.rejectionReason}</p>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -532,7 +548,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
     create.mutate(
       { data: body },
       {
-        onSuccess: () => { toast({ title: type === "pub" ? "Pub published" : "Event published" }); onSaved(); },
+        onSuccess: () => { toast({ title: "Submitted for review! An admin will approve your listing shortly." }); onSaved(); },
         onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
       },
     );
@@ -677,7 +693,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       </div>
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Publish</Button>
+        <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Submit for review</Button>
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
       </div>
     </form>

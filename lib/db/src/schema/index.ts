@@ -103,6 +103,10 @@ export const eventsTable = pgTable(
     pubEventTypes: text("pub_event_types").array().notNull().default([]),
     galleryImages: text("gallery_images").array(),
     galleryVideos: text("gallery_videos").array(),
+    approvalStatus: varchar("approval_status", { length: 20 })
+      .notNull()
+      .default("pending"),
+    rejectionReason: text("rejection_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -111,6 +115,7 @@ export const eventsTable = pgTable(
     vendorIdx: index("events_vendor_idx").on(t.vendorId),
     categoryIdx: index("events_category_idx").on(t.category),
     typeIdx: index("events_type_idx").on(t.type),
+    approvalIdx: index("events_approval_idx").on(t.approvalStatus),
   }),
 );
 

@@ -42,6 +42,7 @@ export function AdminPanel() {
           <TabsTrigger value="vendors">Partner approvals</TabsTrigger>
           <TabsTrigger value="requests">Partner requests</TabsTrigger>
           <TabsTrigger value="booking-requests">Booking Requests</TabsTrigger>
+          <TabsTrigger value="event-approvals">Event Approvals</TabsTrigger>
           <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
           <TabsTrigger value="coupons">Coupons</TabsTrigger>
@@ -53,6 +54,7 @@ export function AdminPanel() {
         <TabsContent value="vendors"><PendingVendors /></TabsContent>
         <TabsContent value="requests"><VendorRequests /></TabsContent>
         <TabsContent value="booking-requests"><BookingRequestsAdmin /></TabsContent>
+        <TabsContent value="event-approvals"><EventApprovalsAdmin /></TabsContent>
         <TabsContent value="events"><EventsAdmin /></TabsContent>
         <TabsContent value="subscriptions"><SubscriptionsAdmin /></TabsContent>
         <TabsContent value="coupons"><CouponsAdmin /></TabsContent>
@@ -328,11 +330,154 @@ interface AdminEvent {
   type: string;
   price: number;
   vendorName: string;
+  partnerName: string;
   city: string;
   state: string;
   isPublished: boolean;
   popular: boolean;
+  approvalStatus: string;
   imageUrl: string;
+}
+
+interface PendingEvent {
+  id: number;
+  title: string;
+  category: string;
+  type: string;
+  price: number;
+  partnerName: string;
+  city: string;
+  state: string;
+  imageUrl: string;
+  description: string;
+  galleryImages: string[];
+  approvalStatus: string;
+  createdAt: string;
+}
+
+function EventApprovalsAdmin() {
+  const [items, setItems] = useState<PendingEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<PendingEvent[]>("/api/admin/events/pending")
+      .then(setItems)
+      .catch((e) => toast({ title: "Failed to load", description: e?.message, variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id: number) => {
+    try {
+      await apiPatch(`/api/admin/events/${id}`, { approvalStatus: "approved" });
+      toast({ title: "Event approved — it is now live." });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const reject = async (id: number) => {
+    if (!reason.trim()) {
+      toast({ title: "Please provide a reason for rejection", variant: "destructive" });
+      return;
+    }
+    try {
+      await apiPatch(`/api/admin/events/${id}`, { approvalStatus: "rejected", rejectionReason: reason.trim() });
+      toast({ title: "Event rejected" });
+      setRejecting(null);
+      setReason("");
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (items.length === 0) return (
+    <div className="rounded-2xl glass-card p-8 text-center">
+      <CheckCircle className="h-10 w-10 text-green-400 mx-auto mb-3" />
+      <p className="font-serif text-xl">No pending event submissions</p>
+      <p className="text-muted-foreground mt-1 text-sm">All events have been reviewed.</p>
+    </div>
+  );
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">{items.length} event{items.length !== 1 ? "s" : ""} awaiting review</p>
+      {items.map((e) => (
+        <div key={e.id} className="rounded-2xl glass-card overflow-hidden">
+          <div className="flex gap-4 p-4">
+            {e.imageUrl ? (
+              <img src={e.imageUrl} alt="" className="w-24 h-24 rounded-xl object-cover shrink-0" />
+            ) : (
+              <div className="w-24 h-24 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                <CalendarCheck className="h-8 w-8 text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="font-serif text-lg">{e.title}</p>
+                  <p className="text-xs text-muted-foreground">{e.partnerName} · {e.city}{e.state ? `, ${e.state}` : ""}</p>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  <Badge variant="outline">{e.type}</Badge>
+                  <Badge variant="secondary" className="bg-white/10">{e.category}</Badge>
+                </div>
+              </div>
+              {e.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{e.description}</p>}
+              {e.galleryImages.length > 0 && (
+                <div className="flex gap-1.5 mt-2 flex-wrap">
+                  {e.galleryImages.slice(0, 4).map((src, i) => (
+                    <img key={i} src={src} alt="" className="h-12 w-12 rounded-lg object-cover" />
+                  ))}
+                  {e.galleryImages.length > 4 && (
+                    <div className="h-12 w-12 rounded-lg bg-white/5 flex items-center justify-center text-xs text-muted-foreground">
+                      +{e.galleryImages.length - 4}
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="text-sm font-medium mt-2">{formatINR(e.price)}</p>
+            </div>
+          </div>
+
+          {rejecting === e.id ? (
+            <div className="border-t border-white/10 p-4 space-y-3 bg-red-900/10">
+              <p className="text-sm font-medium text-red-300">Reason for rejection (required)</p>
+              <Textarea
+                value={reason}
+                onChange={(ev) => setReason(ev.target.value)}
+                rows={2}
+                placeholder="E.g. Incomplete information, inappropriate content…"
+                className="bg-black/40 border-white/10"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => reject(e.id)} className="bg-red-700 hover:bg-red-600 border-0">
+                  <XCircle className="h-4 w-4 mr-1" /> Confirm rejection
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setRejecting(null); setReason(""); }}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="border-t border-white/10 p-4 flex gap-2 justify-end">
+              <Button size="sm" onClick={() => approve(e.id)} className="bg-green-700 hover:bg-green-600 border-0">
+                <CheckCircle className="h-4 w-4 mr-1" /> Approve
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setRejecting(e.id); setReason(""); }}
+                className="border-red-500/40 text-red-300 hover:bg-red-900/20">
+                <XCircle className="h-4 w-4 mr-1" /> Reject
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function EventsAdmin() {
@@ -380,6 +525,7 @@ function EventsAdmin() {
             <th className="text-left p-3">Type</th>
             <th className="text-left p-3">Location</th>
             <th className="text-right p-3">Price</th>
+            <th className="text-center p-3">Status</th>
             <th className="text-center p-3">Popular</th>
             <th className="text-right p-3"></th>
           </tr>
@@ -388,10 +534,17 @@ function EventsAdmin() {
           {items.map((e) => (
             <tr key={e.id} className="border-t border-white/5">
               <td className="p-3 font-medium">{e.title}</td>
-              <td className="p-3 text-muted-foreground">{e.vendorName}</td>
+              <td className="p-3 text-muted-foreground">{e.partnerName}</td>
               <td className="p-3"><Badge variant="outline">{e.type}</Badge></td>
               <td className="p-3 text-muted-foreground">{e.city}{e.state ? `, ${e.state}` : ""}</td>
               <td className="p-3 text-right">{formatINR(e.price)}</td>
+              <td className="p-3 text-center">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  e.approvalStatus === "approved" ? "bg-green-500/20 text-green-300" :
+                  e.approvalStatus === "rejected" ? "bg-red-500/20 text-red-300" :
+                  "bg-amber-500/20 text-amber-300"
+                }`}>{e.approvalStatus}</span>
+              </td>
               <td className="p-3 text-center">
                 <button onClick={() => togglePopular(e)} className={`text-xs px-2 py-1 rounded ${e.popular ? "bg-red-600/30 text-red-200" : "bg-white/5 text-white/40"}`}>
                   ★ {e.popular ? "Yes" : "No"}

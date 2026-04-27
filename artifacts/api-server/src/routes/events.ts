@@ -31,6 +31,8 @@ interface EventRow {
   pubEventTypes: string[];
   galleryImages: string[] | null;
   galleryVideos: string[] | null;
+  approvalStatus: string;
+  rejectionReason: string | null;
   createdAt: Date;
 }
 
@@ -85,6 +87,8 @@ async function serializeEvents(rows: EventRow[]) {
       pubEventTypes: e.pubEventTypes ?? [],
       galleryImages: e.galleryImages ?? [],
       galleryVideos: e.galleryVideos ?? [],
+      approvalStatus: e.approvalStatus,
+      rejectionReason: e.rejectionReason ?? null,
       rating: r.rating,
       reviewCount: r.reviewCount,
       vendorName: v?.businessName ?? "",
@@ -96,7 +100,7 @@ async function serializeEvents(rows: EventRow[]) {
 
 router.get("/events", async (req, res) => {
   const q = req.query as Record<string, string | undefined>;
-  const conditions = [];
+  const conditions = [eq(eventsTable.approvalStatus, "approved")];
   if (q["category"]) conditions.push(eq(eventsTable.category, q["category"]));
   if (q["type"]) conditions.push(eq(eventsTable.type, q["type"]));
   if (q["state"]) conditions.push(ilike(eventsTable.state, `%${q["state"]}%`));
@@ -107,18 +111,17 @@ router.get("/events", async (req, res) => {
   if (q["maxPrice"]) conditions.push(lte(eventsTable.price, q["maxPrice"]));
   if (q["search"]) {
     const s = `%${q["search"]}%`;
-    conditions.push(
-      or(
-        ilike(eventsTable.title, s),
-        ilike(eventsTable.description, s),
-        ilike(eventsTable.city, s),
-      )!,
+    const searchCond = or(
+      ilike(eventsTable.title, s),
+      ilike(eventsTable.description, s),
+      ilike(eventsTable.city, s),
     );
+    if (searchCond) conditions.push(searchCond);
   }
   const rows = await db
     .select()
     .from(eventsTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(eventsTable.createdAt));
   res.json(await serializeEvents(rows));
 });
@@ -127,13 +130,14 @@ router.get("/events/featured", async (_req, res) => {
   const rows = await db
     .select()
     .from(eventsTable)
-    .where(eq(eventsTable.featured, true))
+    .where(and(eq(eventsTable.featured, true), eq(eventsTable.approvalStatus, "approved")))
     .orderBy(desc(eventsTable.createdAt))
     .limit(8);
   if (rows.length === 0) {
     const fallback = await db
       .select()
       .from(eventsTable)
+      .where(eq(eventsTable.approvalStatus, "approved"))
       .orderBy(desc(eventsTable.createdAt))
       .limit(6);
     res.json(await serializeEvents(fallback));
@@ -146,7 +150,7 @@ router.get("/events/popular", async (_req, res) => {
   const rows = await db
     .select()
     .from(eventsTable)
-    .where(eq(eventsTable.popular, true))
+    .where(and(eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved")))
     .orderBy(desc(eventsTable.createdAt))
     .limit(8);
   res.json(await serializeEvents(rows));
@@ -318,6 +322,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       pubEventTypes,
       galleryImages: parsed.data.galleryImages ?? null,
       galleryVideos: parsed.data.galleryVideos ?? null,
+      approvalStatus: "pending",
     })
     .returning();
   if (!created) {

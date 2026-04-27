@@ -166,6 +166,7 @@ async function main() {
         imageUrl:
           "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=80",
         featured: true,
+        approvalStatus: "approved",
       },
       {
         vendorId: v1.id,

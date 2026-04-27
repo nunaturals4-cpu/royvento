@@ -264,6 +264,7 @@ async function ensureDemoEvents(vendorId: number) {
       eventDate: e.eventDate ?? null,
       featured: true,
       popular: true,
+      approvalStatus: "approved",
       ...(isPub ? PUB_TICKET_DEFAULTS : {}),
     });
   }

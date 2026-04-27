@@ -56,6 +56,16 @@ A full-stack event management marketplace for hosts and vendors.
 - "Ticket scanner" link button added to vendor dashboard tab bar (links out to scanner page)
 - Route added in App.tsx with RequireAuth role="vendor" guard
 
+## Event approval workflow (Apr 2026)
+- `eventsTable` gains `approvalStatus varchar(20) default 'pending'` + `rejectionReason text` columns (db:push applied)
+- All public listing endpoints (`GET /events`, `GET /events/featured`, `GET /events/popular`) filter by `approvalStatus = 'approved'`
+- `POST /events` always sets `approvalStatus: 'pending'` on creation
+- Admin endpoints: `GET /admin/events` returns `approvalStatus` + `partnerName`; new `GET /admin/events/pending`; `PATCH /admin/events/:id` handles approval/rejection with optional `rejectionReason`; `DELETE /admin/events/:id`
+- Admin panel has new "Event Approvals" tab with pending event cards (gallery thumbnails) and Approve / Reject (requires reason) buttons
+- Partner dashboard event cards show coloured status badges: Live (green), Pending review (amber), Rejected (red) plus a rejection reason callout strip
+- Event create form "Publish" button renamed to "Submit for review"; success toast updated accordingly
+- Admin all-events table now shows Status column alongside Popular toggle
+
 ## Key directories
 - `artifacts/api-server/src/routes/` — auth, users, vendors, events, bookings, reviews, availability, admin
 - `artifacts/api-server/src/lib/auth.ts` — JWT, requireAuth middleware, password hashing
