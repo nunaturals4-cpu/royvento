@@ -25,6 +25,7 @@ import {
 } from "recharts";
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { Link } from "wouter";
 import { apiGet, apiPost, apiDelete, apiPatch, formatINR } from "@/lib/api";
 
 export function AdminPanel() {
@@ -229,17 +230,24 @@ function BookingRequestsAdmin() {
                 {b.notes && <p className="text-sm italic text-muted-foreground mt-1">"{b.notes}"</p>}
               </div>
             </div>
-            <div className="flex gap-2 shrink-0">
-              <Button onClick={() => approve(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5">
-                <CheckCircle className="h-4 w-4" />Approve
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => { setRejectingId(b.id); setReason(""); }}
-              >
-                <XCircle className="h-4 w-4" />Reject
-              </Button>
+            <div className="flex flex-col gap-2 shrink-0">
+              <div className="flex gap-2">
+                <Button onClick={() => approve(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5">
+                  <CheckCircle className="h-4 w-4" />Approve
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => { setRejectingId(b.id); setReason(""); }}
+                >
+                  <XCircle className="h-4 w-4" />Reject
+                </Button>
+              </div>
+              <Link href={`/events/${b.eventId}`}>
+                <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground">
+                  View event details →
+                </Button>
+              </Link>
             </div>
           </div>
           {rejectingId === b.id && (

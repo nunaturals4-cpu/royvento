@@ -562,8 +562,69 @@ router.patch(
     }
     const [out] = await serializeBookings([updated]);
 
-    // Create in-app notification for the booking user
+    // Award referral points when booking moves to confirmed/completed (same logic as partner path)
+    if (
+      (parsed.data.status === "confirmed" || parsed.data.status === "completed") &&
+      b.status !== "confirmed" &&
+      b.status !== "completed"
+    ) {
+      try {
+        const priorPaid = await db
+          .select()
+          .from(bookingsTable)
+          .where(
+            and(
+              eq(bookingsTable.userId, b.userId),
+              inArray(bookingsTable.status, ["confirmed", "completed"]),
+            ),
+          );
+        const otherPriorCount = priorPaid.filter((p) => p.id !== b.id).length;
+        if (otherPriorCount === 0) {
+          const refRows = await db
+            .select()
+            .from(referralsTable)
+            .where(
+              and(
+                eq(referralsTable.referredId, b.userId),
+                eq(referralsTable.status, "pending"),
+              ),
+            )
+            .limit(1);
+          const ref = refRows[0];
+          if (ref) {
+            const [referrer] = await db.select().from(usersTable).where(eq(usersTable.id, ref.referrerId)).limit(1);
+            const [referred] = await db.select().from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+            if (referrer) {
+              await db.update(usersTable).set({ points: (referrer.points || 0) + 50 }).where(eq(usersTable.id, referrer.id));
+            }
+            if (referred) {
+              await db.update(usersTable).set({ points: (referred.points || 0) + 50 }).where(eq(usersTable.id, referred.id));
+            }
+            await db.update(referralsTable).set({ status: "completed", pointsAwarded: 50, completedAt: new Date() }).where(eq(referralsTable.id, ref.id));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to award referral points (admin path)", err);
+      }
+    }
+
     if (out && b.status !== updated.status) {
+      // Email simulation
+      try {
+        await sendBookingStatusEmail({
+          bookingId: updated.id,
+          eventTitle: out.eventTitle,
+          vendorName: out.vendorName,
+          userName: out.userName,
+          userEmail: out.userEmail,
+          bookingDate: updated.bookingDate,
+          status: updated.status,
+        });
+      } catch (err) {
+        console.error("Failed to send status notification (admin path):", err);
+      }
+
+      // Create in-app notification for the booking user
       try {
         let notifTitle = "";
         let notifMessage = "";
@@ -585,7 +646,7 @@ router.patch(
           });
         }
       } catch (err) {
-        console.error("Failed to create notification:", err);
+        console.error("Failed to create notification (admin path):", err);
       }
     }
 

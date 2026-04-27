@@ -883,13 +883,19 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
                     </p>
                     {b.notes && <p className="text-sm italic text-muted-foreground mt-1">"{b.notes}"</p>}
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <Button onClick={() => approve(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5 text-sm">
-                      Approve
-                    </Button>
-                    <Button variant="outline" className="gap-1.5 text-sm" onClick={() => { setRejectingId(b.id); setReason(""); }}>
-                      Reject
-                    </Button>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <div className="flex gap-2">
+                      <Button onClick={() => approve(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5 text-sm">
+                        Approve
+                      </Button>
+                      <Button variant="outline" className="gap-1.5 text-sm" onClick={() => { setRejectingId(b.id); setReason(""); }}>
+                        Reject
+                      </Button>
+                    </div>
+                    <a href={`/events/${b.eventId}`} target="_blank" rel="noreferrer"
+                      className="text-xs text-center text-muted-foreground hover:text-foreground transition-colors">
+                      View event details →
+                    </a>
                   </div>
                 </div>
                 {rejectingId === b.id && (
