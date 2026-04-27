@@ -426,7 +426,6 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
                       </p>
                     )}
                   </div>
-                  </div>
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-sm font-medium">
                       {e.type === "pub" ? `from ${formatINR(e.startingPrice ?? e.price)}` : formatINR(e.price)}
