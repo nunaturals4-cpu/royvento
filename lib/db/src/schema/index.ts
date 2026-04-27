@@ -391,7 +391,7 @@ export const notificationsTable = pgTable(
   "notifications",
   {
     id: serial("id").primaryKey(),
-    userId: integer("user_id").notNull(),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
     title: varchar("title", { length: 255 }).notNull(),
     message: text("message").notNull().default(""),
     isRead: boolean("is_read").notNull().default(false),

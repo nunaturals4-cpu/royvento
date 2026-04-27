@@ -9,5 +9,5 @@ import type { BookingStatus } from "./bookingStatus";
 
 export interface UpdateBookingStatusBody {
   status: BookingStatus;
-  rejectionReason?: string;
+  rejectionReason?: string | null;
 }

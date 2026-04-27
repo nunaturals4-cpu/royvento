@@ -23,5 +23,5 @@ export interface Booking {
   vendorName: string;
   userName: string;
   userEmail: string;
-  rejectionReason?: string;
+  rejectionReason?: string | null;
 }

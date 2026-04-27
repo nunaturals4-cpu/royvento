@@ -545,7 +545,7 @@ export const CreateBookingResponse = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
-  rejectionReason: zod.string().optional(),
+  rejectionReason: zod.string().nullish(),
 });
 
 /**
@@ -567,7 +567,7 @@ export const ListMyBookingsResponseItem = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
-  rejectionReason: zod.string().optional(),
+  rejectionReason: zod.string().nullish(),
 });
 export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 
@@ -590,7 +590,7 @@ export const ListVendorBookingsResponseItem = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
-  rejectionReason: zod.string().optional(),
+  rejectionReason: zod.string().nullish(),
 });
 export const ListVendorBookingsResponse = zod.array(
   ListVendorBookingsResponseItem,
@@ -605,7 +605,7 @@ export const UpdateBookingStatusParams = zod.object({
 
 export const UpdateBookingStatusBody = zod.object({
   status: zod.enum(["pending", "confirmed", "cancelled", "completed"]),
-  rejectionReason: zod.string().optional(),
+  rejectionReason: zod.string().nullish(),
 });
 
 export const UpdateBookingStatusResponse = zod.object({
@@ -624,7 +624,7 @@ export const UpdateBookingStatusResponse = zod.object({
   vendorName: zod.string(),
   userName: zod.string(),
   userEmail: zod.string(),
-  rejectionReason: zod.string().optional(),
+  rejectionReason: zod.string().nullish(),
 });
 
 /**
@@ -797,7 +797,7 @@ export const GetAdminAnalyticsResponse = zod.object({
       vendorName: zod.string(),
       userName: zod.string(),
       userEmail: zod.string(),
-      rejectionReason: zod.string().optional(),
+      rejectionReason: zod.string().nullish(),
     }),
   ),
   topVendors: zod.array(

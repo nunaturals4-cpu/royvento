@@ -384,17 +384,17 @@ router.patch(
     }
     const rejectionReason =
       parsed.data.status === "cancelled"
-        ? ((req.body as Record<string, unknown>)["rejectionReason"] as string | undefined)?.trim() || null
+        ? (parsed.data.rejectionReason ?? null)
         : null;
 
-    if (parsed.data.status === "cancelled" && !rejectionReason) {
+    if (parsed.data.status === "cancelled" && !rejectionReason?.trim()) {
       res.status(400).json({ error: "A rejection reason is required when cancelling a booking." });
       return;
     }
 
     const [updated] = await db
       .update(bookingsTable)
-      .set({ status: parsed.data.status, approvedBy: approver, rejectionReason })
+      .set({ status: parsed.data.status, approvedBy: approver, rejectionReason: rejectionReason?.trim() ?? null })
       .where(eq(bookingsTable.id, id))
       .returning();
     if (!updated) {
@@ -543,17 +543,17 @@ router.patch(
 
     const rejectionReason =
       parsed.data.status === "cancelled"
-        ? ((req.body as Record<string, unknown>)["rejectionReason"] as string | undefined)?.trim() || null
+        ? (parsed.data.rejectionReason ?? null)
         : null;
 
-    if (parsed.data.status === "cancelled" && !rejectionReason) {
+    if (parsed.data.status === "cancelled" && !rejectionReason?.trim()) {
       res.status(400).json({ error: "A rejection reason is required when cancelling a booking." });
       return;
     }
 
     const [updated] = await db
       .update(bookingsTable)
-      .set({ status: parsed.data.status, approvedBy: "admin", rejectionReason })
+      .set({ status: parsed.data.status, approvedBy: "admin", rejectionReason: rejectionReason?.trim() ?? null })
       .where(eq(bookingsTable.id, id))
       .returning();
     if (!updated) {

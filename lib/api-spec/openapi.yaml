@@ -982,6 +982,7 @@ components:
           type: string
         rejectionReason:
           type: string
+          nullable: true
       required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail]
 
     CreateBookingBody:
@@ -1004,6 +1005,7 @@ components:
           $ref: "#/components/schemas/BookingStatus"
         rejectionReason:
           type: string
+          nullable: true
       required: [status]
 
     Notification:

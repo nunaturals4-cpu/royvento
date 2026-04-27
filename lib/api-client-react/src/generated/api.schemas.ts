@@ -174,7 +174,7 @@ export interface Booking {
   vendorName: string;
   userName: string;
   userEmail: string;
-  rejectionReason?: string;
+  rejectionReason?: string | null;
 }
 
 export interface CreateBookingBody {
@@ -186,7 +186,7 @@ export interface CreateBookingBody {
 
 export interface UpdateBookingStatusBody {
   status: BookingStatus;
-  rejectionReason?: string;
+  rejectionReason?: string | null;
 }
 
 export interface Notification {
