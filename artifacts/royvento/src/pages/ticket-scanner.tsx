@@ -4,17 +4,33 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine } from "lucide-react";
 
+interface BookingData {
+  id: number;
+  eventTitle: string;
+  vendorName: string;
+  eventImage: string | null;
+  bookingDate: string;
+  personName: string | null;
+  userName: string;
+  pubMode: string;
+  eventType_: string;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  guests: number;
+}
+
 interface ScanSuccess {
   code: "OK";
   checkedInAt: string;
-  booking: any;
+  booking: BookingData;
 }
 
 interface ScanAlreadyUsed {
   code: "ALREADY_CHECKED_IN";
   message: string;
   checkedInAt: string | null;
-  booking: any;
+  booking: BookingData;
 }
 
 interface ScanError {
@@ -23,6 +39,14 @@ interface ScanError {
 }
 
 type ScanResult = ScanSuccess | ScanAlreadyUsed | ScanError;
+
+function isScanSuccess(r: ScanResult): r is ScanSuccess {
+  return r.code === "OK";
+}
+
+function isScanAlreadyUsed(r: ScanResult): r is ScanAlreadyUsed {
+  return r.code === "ALREADY_CHECKED_IN";
+}
 
 export function TicketScanner() {
   const [input, setInput] = useState("");
@@ -47,22 +71,28 @@ export function TicketScanner() {
         },
         body: JSON.stringify({ code }),
       });
-      const json = await res.json();
       if (res.ok) {
-        setResult(json as ScanSuccess);
+        const json = (await res.json()) as ScanSuccess;
+        setResult(json);
       } else {
-        const scanResult: ScanResult = {
-          code: json?.code ?? "UNKNOWN",
-          message: json?.message ?? `Error ${res.status}`,
-          ...(json?.checkedInAt ? { checkedInAt: json.checkedInAt } : {}),
-          ...(json?.booking ? { booking: json.booking } : {}),
-        } as ScanResult;
-        setResult(scanResult);
-        if (json?.code !== "ALREADY_CHECKED_IN") {
-          toast({ title: "Scan failed", description: (scanResult as ScanError).message, variant: "destructive" });
+        const json = (await res.json()) as Record<string, unknown>;
+        const errCode = typeof json.code === "string" ? json.code : "UNKNOWN";
+        const message = typeof json.message === "string" ? json.message : `Error ${res.status}`;
+        if (errCode === "ALREADY_CHECKED_IN") {
+          const scanResult: ScanAlreadyUsed = {
+            code: "ALREADY_CHECKED_IN",
+            message,
+            checkedInAt: typeof json.checkedInAt === "string" ? json.checkedInAt : null,
+            booking: json.booking as BookingData,
+          };
+          setResult(scanResult);
+        } else {
+          const scanResult: ScanError = { code: errCode, message };
+          setResult(scanResult);
+          toast({ title: "Scan failed", description: message, variant: "destructive" });
         }
       }
-    } catch (err: any) {
+    } catch {
       const scanErr: ScanError = { code: "NETWORK_ERROR", message: "Network error. Check your connection." };
       setResult(scanErr);
       toast({ title: "Scan failed", description: scanErr.message, variant: "destructive" });
@@ -70,9 +100,6 @@ export function TicketScanner() {
       setLoading(false);
     }
   };
-
-  const resultCode = result ? (result as any).code : null;
-  const booking = result ? (result as any).booking : null;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
@@ -109,13 +136,13 @@ export function TicketScanner() {
 
       {result && (
         <div className={`mt-6 rounded-3xl overflow-hidden border ${
-          resultCode === "OK"
+          result.code === "OK"
             ? "border-green-500/40 bg-green-900/10"
-            : resultCode === "ALREADY_CHECKED_IN"
+            : result.code === "ALREADY_CHECKED_IN"
             ? "border-red-500/60 bg-red-900/20"
             : "border-red-500/40 bg-red-900/10"
         }`}>
-          {resultCode === "OK" && booking ? (
+          {isScanSuccess(result) ? (
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="rounded-full bg-green-500/20 border border-green-500/40 p-2">
@@ -124,13 +151,13 @@ export function TicketScanner() {
                 <div>
                   <p className="text-green-300 font-semibold text-lg">Entry granted</p>
                   <p className="text-xs text-muted-foreground">
-                    Checked in at {new Date((result as ScanSuccess).checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                    Checked in at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
               </div>
-              <BookingDetails booking={booking} />
+              <BookingDetails booking={result.booking} />
             </div>
-          ) : resultCode === "ALREADY_CHECKED_IN" ? (
+          ) : isScanAlreadyUsed(result) ? (
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="rounded-full bg-red-500/20 border border-red-500/60 p-2">
@@ -139,13 +166,13 @@ export function TicketScanner() {
                 <div>
                   <p className="text-red-300 font-semibold text-lg">Already used</p>
                   <p className="text-xs text-muted-foreground">
-                    {(result as ScanAlreadyUsed).checkedInAt
-                      ? `Checked in at ${new Date((result as ScanAlreadyUsed).checkedInAt!).toLocaleString("en-IN")}`
+                    {result.checkedInAt
+                      ? `Checked in at ${new Date(result.checkedInAt).toLocaleString("en-IN")}`
                       : "This ticket was already checked in."}
                   </p>
                 </div>
               </div>
-              {booking && <BookingDetails booking={booking} />}
+              <BookingDetails booking={result.booking} />
             </div>
           ) : (
             <div className="p-6 flex items-center gap-3">
@@ -154,7 +181,7 @@ export function TicketScanner() {
               </div>
               <div>
                 <p className="text-red-300 font-semibold">Invalid ticket</p>
-                <p className="text-sm text-muted-foreground mt-0.5">{(result as ScanError).message}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{result.message}</p>
               </div>
             </div>
           )}
@@ -176,7 +203,7 @@ export function TicketScanner() {
   );
 }
 
-function BookingDetails({ booking: b }: { booking: any }) {
+function BookingDetails({ booking: b }: { booking: BookingData }) {
   const isPubTicket = b.pubMode === "ticket";
   return (
     <div className="rounded-2xl bg-black/30 border border-white/10 p-4 space-y-2">
@@ -192,7 +219,7 @@ function BookingDetails({ booking: b }: { booking: any }) {
       <div className="border-t border-white/10 pt-3 grid grid-cols-2 gap-2 text-sm">
         <div>
           <p className="text-xs text-muted-foreground">Guest</p>
-          <p className="font-medium">{b.personName || b.userName}</p>
+          <p className="font-medium">{b.personName ?? b.userName}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Date</p>
@@ -215,7 +242,7 @@ function BookingDetails({ booking: b }: { booking: any }) {
           </p>
         </div>
       </div>
-      {isPubTicket && (b.ticketWomen || b.ticketMen || b.ticketCouple) ? (
+      {isPubTicket && (b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0) ? (
         <div className="flex flex-wrap gap-2 pt-1">
           {b.ticketWomen > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-200">

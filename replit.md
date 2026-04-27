@@ -43,7 +43,7 @@ A full-stack event management marketplace for hosts and vendors.
 - `bookingsTable` gains `checkedIn boolean default false` + `checkedInAt timestamp` nullable columns (db:push applied)
 - POST `/api/partner/scan-ticket` — vendor-only endpoint:
   - Accepts `{ code: "RV-000042" }` (also accepts RV000042 or bare number)
-  - Validates ownership (must belong to calling partner's vendor), status (must be "confirmed"/"completed"), and checkedIn state
+  - Validates ownership (must belong to calling partner's vendor), status (must be "confirmed"), and checkedIn state
   - On success: sets checkedIn=true + checkedInAt, returns full booking details
   - Structured error codes: INVALID_CODE, NOT_FOUND, WRONG_VENDOR, NOT_CONFIRMED, CANCELLED, ALREADY_CHECKED_IN, SERVER_ERROR
 - `/dashboard/vendor/scanner` route — vendor-only TicketScanner page with:

@@ -715,7 +715,7 @@ router.post("/partner/scan-ticket", requireAuth(["vendor"]), async (req, res) =>
     res.status(422).json({ code: "CANCELLED", message: "This booking was cancelled and cannot be used for entry." });
     return;
   }
-  if (b.status !== "confirmed" && b.status !== "completed") {
+  if (b.status !== "confirmed") {
     res.status(422).json({ code: "INVALID_STATUS", message: `Booking is in status "${b.status}" and cannot be used for entry.` });
     return;
   }
