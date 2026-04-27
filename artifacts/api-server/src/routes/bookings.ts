@@ -733,15 +733,32 @@ router.post("/partner/scan-ticket", requireAuth(["vendor"]), async (req, res) =>
     return;
   }
 
-  // Check in the guest
+  // Atomic check-in: only update if checkedIn is still false (prevents double-scan race)
   const now = new Date();
   const [updated] = await db
     .update(bookingsTable)
     .set({ checkedIn: true, checkedInAt: now })
-    .where(eq(bookingsTable.id, b.id))
+    .where(and(eq(bookingsTable.id, b.id), eq(bookingsTable.checkedIn, false)))
     .returning();
+
+  // Zero rows updated = another request beat us to it; re-fetch the current state
   if (!updated) {
-    res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
+    const [current] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, b.id));
+    if (current) {
+      const checkedInAt = current.checkedInAt ? current.checkedInAt.toISOString() : null;
+      const [out] = await serializeBookings([current]);
+      res.status(409).json({
+        code: "ALREADY_CHECKED_IN",
+        message: "This ticket has already been used for entry.",
+        checkedInAt,
+        booking: out ?? null,
+      });
+    } else {
+      res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
+    }
     return;
   }
 
