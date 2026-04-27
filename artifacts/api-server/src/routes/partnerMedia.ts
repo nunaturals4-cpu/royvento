@@ -42,7 +42,7 @@ router.get("/partners/:vendorId/media", async (req, res) => {
 
 const AddMediaBody = z.object({
   type: z.enum(["photo", "video"]),
-  url: z.string().url(),
+  url: z.string().min(1),
   caption: z.string().optional().default(""),
   eventCategories: z.array(z.string()).optional().default([]),
 });

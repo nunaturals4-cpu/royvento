@@ -3,6 +3,7 @@ import {
   db,
   vendorRequestsTable,
   usersTable,
+  vendorsTable,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
@@ -121,11 +122,27 @@ router.post(
       .update(vendorRequestsTable)
       .set({ status: "approved" })
       .where(eq(vendorRequestsTable.id, id));
-    // Promote the user to vendor role so they can build their vendor profile
+    // Promote the user to vendor role
     await db
       .update(usersTable)
       .set({ role: "vendor" })
       .where(eq(usersTable.id, r.userId));
+    // Auto-create the vendor profile if it doesn't already exist
+    const existing = await db
+      .select()
+      .from(vendorsTable)
+      .where(eq(vendorsTable.userId, r.userId))
+      .limit(1);
+    if (!existing[0]) {
+      await db.insert(vendorsTable).values({
+        userId: r.userId,
+        businessName: r.businessName,
+        category: r.category,
+        description: "",
+        location: "",
+        status: "approved",
+      });
+    }
     res.json({ ok: true });
   },
 );

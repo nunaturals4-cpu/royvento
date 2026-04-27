@@ -25,9 +25,8 @@ import {
 } from "lucide-react";
 import {
   apiGet, apiPost, apiDelete, apiPatch,
-  EVENT_CATEGORIES, INDIAN_STATES, BUDGET_RANGES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
+  EVENT_CATEGORIES, INDIAN_STATES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
 } from "@/lib/api";
-import { LocationSelect } from "@/components/LocationSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const CATEGORIES = [...EVENT_CATEGORIES];
@@ -53,6 +52,8 @@ export function VendorDashboard() {
   const { data: events = [], refetch: refetchEvents } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
   const { data: bookings = [], refetch: refetchBookings } = useListVendorBookings({ query: { enabled: !!vendor } as any });
 
+  const hasPub = (events as any[]).some((e: any) => e.type === "pub");
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="mb-10 flex items-end justify-between gap-4 flex-wrap">
@@ -68,14 +69,17 @@ export function VendorDashboard() {
       </header>
 
       {!vendor ? (
-        <CreateVendorForm onCreated={refetchVendor} />
+        <div className="rounded-3xl glass-card p-10 text-center">
+          <p className="font-serif text-2xl mb-2">Setting up your dashboard…</p>
+          <p className="text-muted-foreground">Your partner profile is being prepared. Please refresh in a moment or contact support if this persists.</p>
+        </div>
       ) : (
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
             <TabsTrigger value="overview">Profile</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
-            <TabsTrigger value="media">Media</TabsTrigger>
+            {!hasPub && <TabsTrigger value="media">Media</TabsTrigger>}
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="ads">Ads</TabsTrigger>
             <TabsTrigger value="leads">
@@ -91,7 +95,7 @@ export function VendorDashboard() {
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
           <TabsContent value="bookings"><BookingsManager bookings={bookings} refetch={refetchBookings} /></TabsContent>
-          <TabsContent value="media"><MediaManager /></TabsContent>
+          {!hasPub && <TabsContent value="media"><MediaManager vendor={vendor} events={events} /></TabsContent>}
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
           <TabsContent value="leads"><LeadsPanel isPremium={!!vendor.isPremium} /></TabsContent>
@@ -101,129 +105,27 @@ export function VendorDashboard() {
   );
 }
 
-function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
-  const [businessName, setName] = useState("");
-  const [category, setCategory] = useState("Wedding");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [bannerImage, setBanner] = useState("");
-  const [coverImageUrl, setCover] = useState("");
-  const [country, setCountry] = useState("India");
-  const [stateF, setStateF] = useState("");
-  const [city, setCity] = useState("");
-  const create = useCreateMyVendor();
-  const { toast } = useToast();
-
-  const onBannerFile = async (f: File | null) => {
-    if (!f) return;
-    try { setBanner(await fileToDataUrl(f)); } catch { /* ignore */ }
-  };
-  const onCoverFile = async (f: File | null) => {
-    if (!f) return;
-    try { setCover(await fileToDataUrl(f)); } catch { /* ignore */ }
-  };
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const loc = location || [city, stateF].filter(Boolean).join(", ");
-    create.mutate(
-      { data: { businessName, category, description, location: loc, bannerImage, portfolioImages: [] } },
-      {
-        onSuccess: async () => {
-          try { await apiPatch("/api/partner/profile", { state: stateF, city, country, coverImageUrl }); } catch { /* silent */ }
-          toast({ title: "Partner profile submitted!" });
-          onCreated();
-        },
-        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
-      },
-    );
-  };
-
-  return (
-    <form onSubmit={submit} className="max-w-2xl rounded-3xl glass-card-strong p-8 space-y-4">
-      <div>
-        <h2 className="font-serif text-2xl">Create your partner profile</h2>
-        <p className="text-sm text-muted-foreground mt-1">Submit your studio for review.</p>
-      </div>
-      <div><Label>Business name</Label><Input required value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" /></div>
-      <div>
-        <Label>Category</Label>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-          <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-primary" />Location</Label>
-        <div className="mt-1.5">
-          <LocationSelect
-            country={country}
-            state={stateF}
-            city={city}
-            onChange={(n) => { setCountry(n.country); setStateF(n.state); setCity(n.city); }}
-          />
-        </div>
-        <Input
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="Optional location label (e.g. Park Street)"
-          className="bg-black/40 border-white/10 mt-2"
-        />
-      </div>
-      <div>
-        <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Profile banner image</Label>
-        <Input type="file" accept="image/*" onChange={(e) => onBannerFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10 mt-1" />
-        {bannerImage && <img src={bannerImage} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
-      </div>
-      <div>
-        <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Cover photo <span className="text-muted-foreground text-[10px] ml-1">(shown to visitors on your page)</span></Label>
-        <Input type="file" accept="image/*" onChange={(e) => onCoverFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10 mt-1" />
-        {coverImageUrl && <img src={coverImageUrl} alt="" className="mt-2 rounded-xl max-h-28 w-full object-cover" />}
-      </div>
-      <div><Label>Description</Label><Textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
-      <Button type="submit" disabled={create.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">{create.isPending ? "Submitting…" : "Submit for review"}</Button>
-    </form>
-  );
-}
-
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [category, setCategory] = useState(vendor.category);
   const [description, setDescription] = useState(vendor.description);
   const [location, setLocation] = useState(vendor.location);
-  const [bannerImage, setBanner] = useState(vendor.bannerImage);
   const [coverImageUrl, setCover] = useState(vendor.coverImageUrl ?? "");
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [city, setCity] = useState(vendor.city ?? "");
   const [country, setCountry] = useState(vendor.country ?? "India");
-  const [eventTypes, setEventTypes] = useState<string[]>(vendor.eventTypes ?? []);
-  const [budgetMin, setBudgetMin] = useState<number>(Number(vendor.budgetMin ?? 0));
-  const [budgetMax, setBudgetMax] = useState<number>(Number(vendor.budgetMax ?? 0));
-  const [portfolio, setPortfolio] = useState((vendor.portfolioImages ?? []).join("\n"));
   const update = useUpdateMyVendor();
   const { toast } = useToast();
-
-  const toggleType = (t: string) =>
-    setEventTypes((arr) => arr.includes(t) ? arr.filter((x) => x !== t) : [...arr, t]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     update.mutate(
-      {
-        data: {
-          businessName, category, description, location, bannerImage,
-          portfolioImages: portfolio.split("\n").map((s: string) => s.trim()).filter(Boolean),
-        },
-      },
+      { data: { businessName, category, description, location, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: async () => {
           try {
-            await apiPatch("/api/partner/profile", {
-              eventTypes, budgetMin, budgetMax, state: stateF, city, country, coverImageUrl,
-            });
-          } catch {
-            // silent
-          }
+            await apiPatch("/api/partner/profile", { state: stateF, city, country, coverImageUrl });
+          } catch { /* silent */ }
           toast({ title: "Profile updated" });
           onSaved();
         },
@@ -236,7 +138,10 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     <div className="grid lg:grid-cols-[1fr_auto] gap-6">
       <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
-          <div><Label>Business name</Label><Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          <div>
+            <Label>Business name</Label>
+            <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
+          </div>
           <div>
             <Label>Category</Label>
             <Select value={category} onValueChange={setCategory}>
@@ -259,19 +164,6 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           <div><Label>Location label</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} className="bg-black/40 border-white/10" /></div>
         </div>
         <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Profile banner image</Label>
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={async (e) => {
-              const f = e.target.files?.[0]; if (!f) return;
-              try { setBanner(await fileToDataUrl(f)); } catch { /* ignore */ }
-            }}
-            className="bg-black/40 border-white/10 mt-1"
-          />
-          {bannerImage && <img src={bannerImage} alt="" className="mt-2 rounded-xl max-h-24 object-cover" />}
-        </div>
-        <div>
           <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Cover photo <span className="text-muted-foreground text-[10px] ml-1">(full-width hero shown to visitors)</span></Label>
           <Input
             type="file"
@@ -288,47 +180,11 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           <Label>Description</Label>
           <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" />
         </div>
-        <div>
-          <Label>Event types you serve</Label>
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {["Wedding","Birthday","Corporate","Cultural","Festival","Concert","Private","Brand Activation"].map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => toggleType(t)}
-                className={`text-xs px-3 py-1.5 rounded-full border ${
-                  eventTypes.includes(t)
-                    ? "bg-primary/20 border-primary/50 text-primary"
-                    : "border-white/10 text-white/60 hover:bg-white/5"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <Label>Min budget (₹)</Label>
-            <Input type="number" min={0} value={budgetMin} onChange={(e) => setBudgetMin(Number(e.target.value))} className="bg-black/40 border-white/10" />
-          </div>
-          <div>
-            <Label>Max budget (₹)</Label>
-            <Input type="number" min={0} value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="bg-black/40 border-white/10" />
-          </div>
-        </div>
-        <div>
-          <Label>Portfolio image URLs (one per line)</Label>
-          <Textarea rows={5} value={portfolio} onChange={(e) => setPortfolio(e.target.value)} className="bg-black/40 border-white/10" />
-        </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}
         </Button>
       </form>
       <aside className="rounded-3xl glass-card p-6 lg:w-72 h-fit space-y-3">
-        <div className="aspect-video bg-muted rounded-xl overflow-hidden">
-          {bannerImage && <img src={bannerImage} alt="" className="h-full w-full object-cover" />}
-        </div>
         <p className="font-serif text-xl">{businessName}</p>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant={vendor.status === "approved" ? "default" : "secondary"}>{vendor.status}</Badge>
@@ -339,9 +195,6 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             <MapPin className="h-3 w-3" /> {city}{stateF && `, ${stateF}`}
           </p>
-        )}
-        {budgetMin > 0 && budgetMax > 0 && (
-          <p className="text-xs text-muted-foreground">{formatINR(budgetMin)} – {formatINR(budgetMax)}</p>
         )}
       </aside>
     </div>
@@ -370,20 +223,25 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h2 className="font-serif text-2xl">Your events &amp; pubs</h2>
-        <Button onClick={() => { setShow((s) => !s); setEditingId(null); }} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-          {showForm ? "Close" : "+ New listing"}
-        </Button>
+        {!hasPub && (
+          <Button onClick={() => { setShow((s) => !s); setEditingId(null); }} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
+            {showForm ? "Close" : "+ New listing"}
+          </Button>
+        )}
       </div>
 
-      {(hasPub || hasNonPub) && (
+      {hasPub && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2 text-xs text-amber-300">
+          You have a pub listing active. Delete it first if you want to add a different type of listing.
+        </div>
+      )}
+      {!hasPub && hasNonPub && (
         <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-xs text-muted-foreground">
-          {hasPub
-            ? "Your profile is set up for pubs — only pub listings can be added."
-            : "Your profile is set up for events — pubs can't be added alongside other types."}
+          Your profile is set up for events — pubs can't be added alongside other types.
         </div>
       )}
 
-      {showForm && (
+      {showForm && !hasPub && (
         <EventForm
           vendor={vendor}
           lockedType={hasPub ? "pub" : hasNonPub ? "event" : null}
@@ -475,12 +333,12 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
 function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   vendor: any; lockedType: "pub" | "event" | null; onCancel: () => void; onSaved: () => void;
 }) {
-  const [title, setTitle] = useState("");
   const [category, setCategory] = useState(vendor.category);
   const [type, setType] = useState<string>(lockedType ?? "event");
   const [description, setDescription] = useState("");
   const [city, setCity] = useState(vendor.city ?? "");
   const [stateF, setStateF] = useState(vendor.state ?? "");
+  const [country, setCountry] = useState(vendor.country ?? "India");
   const [price, setPrice] = useState(0);
   const [capacity, setCapacity] = useState(50);
   const [imageUrl, setImageUrl] = useState("");
@@ -532,11 +390,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       ? (enableTickets && enableEvents ? "both" : enableTickets ? "ticket" : "event")
       : "";
     const body: any = {
-      title, description, category,
+      title: vendor.businessName, description, category,
       location: `${city}${stateF ? ", " + stateF : ""}`,
       price: type === "pub" && enableTickets ? Math.min(...[priceWomen, priceMen, priceCouple].filter((n) => n > 0).concat([price || 0])) : price,
       capacity, imageUrl,
-      type, city, state: stateF, country: "India",
+      type, city, state: stateF, country,
       pubMode,
       priceWomen: type === "pub" ? priceWomen : 0,
       priceMen: type === "pub" ? priceMen : 0,
@@ -556,6 +414,10 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
 
   return (
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
+      <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-2">
+        <p className="text-xs text-muted-foreground mb-0.5">Business name (listing title)</p>
+        <p className="font-serif text-lg">{vendor.businessName}</p>
+      </div>
       <div className="grid md:grid-cols-2 gap-3">
         <div>
           <Label>Type</Label>
@@ -565,10 +427,6 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
               {EVENT_KIND.map((k) => <SelectItem key={k} value={k}>{k === "event" ? "Event" : "Pub / Lounge"}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
-        <div>
-          <Label>Title</Label>
-          <Input required value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" />
         </div>
         <div>
           <Label>Category</Label>
@@ -593,8 +451,12 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
             </SelectContent>
           </Select>
         </div>
+        <div>
+          <Label>Country</Label>
+          <Input value={country} onChange={(e) => setCountry(e.target.value)} className="bg-black/40 border-white/10" />
+        </div>
         {type !== "pub" && (
-          <div><Label>Price (₹ per person)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+          <div><Label>Minimum price per person (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
         )}
         <div><Label>Capacity</Label><Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
       </div>
@@ -978,75 +840,98 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
   );
 }
 
-function MediaManager() {
+function MediaManager({ events }: { vendor: any; events: any[] }) {
   const [items, setItems] = useState<Media[]>([]);
-  const [type, setType] = useState<"photo" | "video">("photo");
-  const [url, setUrl] = useState("");
-  const [caption, setCaption] = useState("");
-  const [cats, setCats] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>(EVENT_CATEGORIES[0] ?? "");
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
   const load = () => apiGet<Media[]>("/api/partner/media/me").then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
 
+  const onFilesChange = async (fl: FileList | null) => {
+    if (!fl || fl.length === 0) return;
+    const arr = Array.from(fl);
+    setFiles(arr);
+    const urls: string[] = [];
+    for (const f of arr) {
+      try { urls.push(await fileToDataUrl(f)); } catch { /* ignore */ }
+    }
+    setPreviews(urls);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await apiPost("/api/partner/media", { type, url, caption, eventCategories: cats });
-      toast({ title: "Media added" });
-      setUrl(""); setCaption(""); setCats([]);
+    if (files.length === 0) {
+      toast({ title: "Please select at least one file", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    let success = 0;
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const url = previews[i];
+      if (!url) continue;
+      const type = f.type.startsWith("video/") ? "video" : "photo";
+      try {
+        await apiPost("/api/partner/media", { type, url, caption: "", eventCategories: [selectedCategory] });
+        success++;
+      } catch { /* ignore individual */ }
+    }
+    setUploading(false);
+    if (success > 0) {
+      toast({ title: `${success} file${success > 1 ? "s" : ""} uploaded` });
+      setFiles([]); setPreviews([]);
       load();
-    } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    } else {
+      toast({ title: "Upload failed", variant: "destructive" });
     }
   };
 
-  const toggleCat = (c: string) =>
-    setCats((arr) => arr.includes(c) ? arr.filter((x) => x !== c) : [...arr, c]);
-
   return (
     <div className="grid lg:grid-cols-[1fr_1.4fr] gap-6">
-      <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
+      <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-4">
         <div className="flex items-center gap-2">
           <ImageIcon className="h-4 w-4 text-primary" />
-          <p className="font-serif text-xl">Add photo or video</p>
+          <p className="font-serif text-xl">Upload photos &amp; videos</p>
         </div>
         <div>
-          <Label>Type</Label>
-          <Select value={type} onValueChange={(v) => setType(v as any)}>
+          <Label>Event category</Label>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="photo">Photo</SelectItem>
-              <SelectItem value="video">Video</SelectItem>
+              {EVENT_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label>URL</Label>
-          <Input required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" className="bg-black/40 border-white/10" />
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Select files (photos or videos)</Label>
+          <Input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={(e) => onFilesChange(e.target.files)}
+            className="bg-black/40 border-white/10 mt-1"
+          />
+          {previews.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {previews.map((src, i) => (
+                files[i]?.type.startsWith("video/") ? (
+                  <div key={i} className="h-16 w-16 rounded-lg bg-black/40 flex items-center justify-center border border-white/10">
+                    <Video className="h-5 w-5 text-primary" />
+                  </div>
+                ) : (
+                  <img key={i} src={src} alt="" className="h-16 w-16 rounded-lg object-cover border border-white/10" />
+                )
+              ))}
+            </div>
+          )}
         </div>
-        <div>
-          <Label>Caption</Label>
-          <Input value={caption} onChange={(e) => setCaption(e.target.value)} className="bg-black/40 border-white/10" />
-        </div>
-        <div>
-          <Label>Tag event categories &amp; budget</Label>
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {[...EVENT_CATEGORIES, ...BUDGET_RANGES.map((b) => b.label)].map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => toggleCat(c)}
-                className={`text-xs px-2.5 py-1 rounded-full border ${
-                  cats.includes(c) ? "bg-primary/20 border-primary/50 text-primary" : "border-white/10 text-white/60 hover:bg-white/5"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-        <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Upload</Button>
+        <Button type="submit" disabled={uploading || files.length === 0} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
+          {uploading ? "Uploading…" : `Upload ${files.length > 0 ? files.length + " file" + (files.length > 1 ? "s" : "") : ""}`}
+        </Button>
       </form>
       <div className="rounded-3xl glass-card p-6">
         <p className="font-serif text-xl mb-3">Your gallery</p>
@@ -1057,10 +942,15 @@ function MediaManager() {
             {items.map((m) => (
               <div key={m.id} className="relative rounded-xl overflow-hidden border border-white/10 group">
                 {m.type === "photo" ? (
-                  <img src={m.url} alt={m.caption} className="aspect-square object-cover w-full" />
+                  <img src={m.url} alt="" className="aspect-square object-cover w-full" />
                 ) : (
                   <div className="aspect-square bg-black/40 flex items-center justify-center">
                     <Video className="h-8 w-8 text-primary" />
+                  </div>
+                )}
+                {(m.eventCategories ?? []).length > 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-[10px] text-white truncate">
+                    {m.eventCategories[0]}
                   </div>
                 )}
                 <button
@@ -1069,11 +959,6 @@ function MediaManager() {
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
-                {m.caption && (
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-[10px] text-white truncate">
-                    {m.caption}
-                  </div>
-                )}
               </div>
             ))}
           </div>
