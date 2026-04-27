@@ -32,6 +32,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 const CATEGORIES = [...EVENT_CATEGORIES];
 const EVENT_KIND = ["event", "pub"] as const;
 
+const COUNTRIES = ["India", "United States", "United Kingdom", "United Arab Emirates", "Singapore", "Australia", "Canada", "Other"];
+
+const INDIAN_CITIES = [
+  "Agra", "Ahmedabad", "Amritsar", "Aurangabad", "Bengaluru", "Bhopal", "Bhubaneswar",
+  "Chandigarh", "Chennai", "Coimbatore", "Dehradun", "Delhi", "Guwahati", "Gwalior",
+  "Hyderabad", "Indore", "Jaipur", "Jamshedpur", "Jodhpur", "Kochi", "Kolkata",
+  "Lucknow", "Ludhiana", "Madurai", "Mangaluru", "Mumbai", "Mysuru", "Nagpur",
+  "Nashik", "Noida", "Patna", "Pune", "Raipur", "Rajkot", "Ranchi", "Surat",
+  "Thiruvananthapuram", "Udaipur", "Vadodara", "Varanasi", "Vijayawada", "Visakhapatnam",
+];
+
 interface Media {
   id: number; type: "photo" | "video"; url: string; caption: string;
   eventCategories: string[];
@@ -107,20 +118,24 @@ export function VendorDashboard() {
 
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
-  const [category, setCategory] = useState(vendor.category);
   const [description, setDescription] = useState(vendor.description);
-  const [location, setLocation] = useState(vendor.location);
   const [coverImageUrl, setCover] = useState(vendor.coverImageUrl ?? "");
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [city, setCity] = useState(vendor.city ?? "");
-  const [country, setCountry] = useState(vendor.country ?? "India");
+  const [country, setCountry] = useState(vendor.country || "India");
+  const [descError, setDescError] = useState("");
   const update = useUpdateMyVendor();
   const { toast } = useToast();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (description.trim().length < 300) {
+      setDescError("Description must be at least 300 characters.");
+      return;
+    }
+    setDescError("");
     update.mutate(
-      { data: { businessName, category, description, location, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
+      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: async () => {
           try {
@@ -129,7 +144,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           toast({ title: "Profile updated" });
           onSaved();
         },
-        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+        onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
       },
     );
   };
@@ -138,18 +153,20 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     <div className="grid lg:grid-cols-[1fr_auto] gap-6">
       <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
-          <div>
+          <div className="md:col-span-2">
             <Label>Business name</Label>
             <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
           </div>
           <div>
-            <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-              <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+            <Label>City</Label>
+            <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">— select —</SelectItem>
+                {INDIAN_CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
             </Select>
           </div>
-          <div><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} className="bg-black/40 border-white/10" /></div>
           <div>
             <Label>State</Label>
             <Select value={stateF || "any"} onValueChange={(v) => setStateF(v === "any" ? "" : v)}>
@@ -160,8 +177,15 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               </SelectContent>
             </Select>
           </div>
-          <div><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} className="bg-black/40 border-white/10" /></div>
-          <div><Label>Location label</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} className="bg-black/40 border-white/10" /></div>
+          <div className="md:col-span-2">
+            <Label>Country</Label>
+            <Select value={country || "India"} onValueChange={setCountry}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Cover photo <span className="text-muted-foreground text-[10px] ml-1">(full-width hero shown to visitors)</span></Label>
@@ -177,8 +201,23 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           {coverImageUrl && <img src={coverImageUrl} alt="" className="mt-2 rounded-xl max-h-24 w-full object-cover" />}
         </div>
         <div>
-          <Label>Description</Label>
-          <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" />
+          <Label>Description <span className="text-muted-foreground text-xs">(min 300 characters)</span></Label>
+          <Textarea
+            rows={6}
+            value={description}
+            onChange={(e) => { setDescription(e.target.value); if (descError) setDescError(""); }}
+            className="bg-black/40 border-white/10"
+          />
+          <div className="flex items-center justify-between mt-1">
+            {descError ? (
+              <p className="text-xs text-destructive">{descError}</p>
+            ) : (
+              <span />
+            )}
+            <p className={`text-xs ml-auto ${description.length >= 300 ? "text-green-400" : "text-muted-foreground"}`}>
+              {description.length} / 300
+            </p>
+          </div>
         </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}
@@ -188,7 +227,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
         <p className="font-serif text-xl">{businessName}</p>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant={vendor.status === "approved" ? "default" : "secondary"}>{vendor.status}</Badge>
-          <Badge variant="outline">{category}</Badge>
+          <Badge variant="outline">{vendor.category}</Badge>
           {vendor.isPremium && <Badge className="bg-primary text-primary-foreground border-0">Premium</Badge>}
         </div>
         {(city || stateF) && (
@@ -196,6 +235,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             <MapPin className="h-3 w-3" /> {city}{stateF && `, ${stateF}`}
           </p>
         )}
+        {country && <p className="text-xs text-muted-foreground">{country}</p>}
       </aside>
     </div>
   );
@@ -440,7 +480,16 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
           <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
           {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-28 object-cover" />}
         </div>
-        <div><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} className="bg-black/40 border-white/10" /></div>
+        <div>
+          <Label>City</Label>
+          <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">— select —</SelectItem>
+              {INDIAN_CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <div>
           <Label>State</Label>
           <Select value={stateF || "any"} onValueChange={(v) => setStateF(v === "any" ? "" : v)}>
@@ -453,7 +502,12 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
         </div>
         <div>
           <Label>Country</Label>
-          <Input value={country} onChange={(e) => setCountry(e.target.value)} className="bg-black/40 border-white/10" />
+          <Select value={country || "India"} onValueChange={setCountry}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         {type !== "pub" && (
           <div><Label>Minimum price per person (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
@@ -870,12 +924,10 @@ function MediaManager({ events }: { vendor: any; events: any[] }) {
     }
     setUploading(true);
     let success = 0;
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      const url = previews[i];
-      if (!url) continue;
-      const type = f.type.startsWith("video/") ? "video" : "photo";
+    for (const f of files) {
       try {
+        const url = await fileToDataUrl(f);
+        const type = f.type.startsWith("video/") ? "video" : "photo";
         await apiPost("/api/partner/media", { type, url, caption: "", eventCategories: [selectedCategory] });
         success++;
       } catch { /* ignore individual */ }
@@ -886,7 +938,7 @@ function MediaManager({ events }: { vendor: any; events: any[] }) {
       setFiles([]); setPreviews([]);
       load();
     } else {
-      toast({ title: "Upload failed", variant: "destructive" });
+      toast({ title: "Upload failed — please try a smaller file", variant: "destructive" });
     }
   };
 
