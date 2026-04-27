@@ -72,6 +72,8 @@ interface BookingRow {
   pointsUsed: number;
   approvedBy: string;
   rejectionReason: string | null;
+  checkedIn: boolean;
+  checkedInAt: Date | null;
   createdAt: Date;
 }
 
@@ -116,6 +118,8 @@ async function serializeBookings(rows: BookingRow[]) {
       pointsUsed: b.pointsUsed,
       approvedBy: b.approvedBy,
       rejectionReason: b.rejectionReason ?? null,
+      checkedIn: b.checkedIn,
+      checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",
@@ -653,6 +657,97 @@ router.patch(
     res.json(out);
   },
 );
+
+// Partner ticket scanner
+router.post("/partner/scan-ticket", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const rawCode = (req.body as Record<string, unknown>)["code"];
+  if (typeof rawCode !== "string" || !rawCode.trim()) {
+    res.status(400).json({ code: "INVALID_CODE", message: "Please enter a ticket code." });
+    return;
+  }
+  const code = rawCode.trim().toUpperCase();
+  // Accept RV-000042 or RV000042 or just the number
+  const match = code.match(/^(?:RV-?)?(\d+)$/);
+  if (!match || !match[1]) {
+    res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code format. Expected e.g. RV-000042." });
+    return;
+  }
+  const bookingId = parseInt(match[1]!, 10);
+  if (!Number.isFinite(bookingId) || bookingId <= 0) {
+    res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code." });
+    return;
+  }
+
+  // Load partner's vendor profile
+  const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  const vendor = vRows[0];
+  if (!vendor) {
+    res.status(403).json({ code: "FORBIDDEN", message: "No partner profile found." });
+    return;
+  }
+
+  // Load booking
+  const bRows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+  const b = bRows[0];
+  if (!b) {
+    res.status(404).json({ code: "NOT_FOUND", message: "Ticket not found. Check the code and try again." });
+    return;
+  }
+
+  // Verify the booking belongs to this partner's venue
+  if (b.vendorId !== vendor.id) {
+    res.status(403).json({ code: "WRONG_VENDOR", message: "This ticket belongs to a different partner's event." });
+    return;
+  }
+
+  // Status checks
+  if (b.status === "pending") {
+    res.status(422).json({ code: "NOT_CONFIRMED", message: "This booking has not been confirmed yet." });
+    return;
+  }
+  if (b.status === "cancelled") {
+    res.status(422).json({ code: "CANCELLED", message: "This booking was cancelled and cannot be used for entry." });
+    return;
+  }
+  if (b.status !== "confirmed" && b.status !== "completed") {
+    res.status(422).json({ code: "INVALID_STATUS", message: `Booking is in status "${b.status}" and cannot be used for entry.` });
+    return;
+  }
+
+  // Already checked in?
+  if (b.checkedIn) {
+    const checkedInAt = b.checkedInAt ? b.checkedInAt.toISOString() : null;
+    const [out] = await serializeBookings([b]);
+    res.status(409).json({
+      code: "ALREADY_CHECKED_IN",
+      message: "This ticket has already been used for entry.",
+      checkedInAt,
+      booking: out ?? null,
+    });
+    return;
+  }
+
+  // Check in the guest
+  const now = new Date();
+  const [updated] = await db
+    .update(bookingsTable)
+    .set({ checkedIn: true, checkedInAt: now })
+    .where(eq(bookingsTable.id, b.id))
+    .returning();
+  if (!updated) {
+    res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
+    return;
+  }
+
+  const [out] = await serializeBookings([updated]);
+  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ?? null });
+});
 
 router.get("/admin/bookings", requireAuth(["admin"]), async (_req, res) => {
   const rows = await db

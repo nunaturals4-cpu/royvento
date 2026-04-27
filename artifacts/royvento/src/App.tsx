@@ -18,6 +18,7 @@ import { Login } from "@/pages/login";
 import { Register } from "@/pages/register";
 import { Contact } from "@/pages/contact";
 import { VendorDashboard } from "@/pages/vendor-dashboard";
+import { TicketScanner } from "@/pages/ticket-scanner";
 import { Bookings } from "@/pages/bookings";
 import { AdminPanel } from "@/pages/admin";
 import { Profile } from "@/pages/profile";
@@ -59,6 +60,9 @@ function Router() {
           </Route>
           <Route path="/dashboard/partner">
             {() => <RequireAuth role="vendor"><VendorDashboard /></RequireAuth>}
+          </Route>
+          <Route path="/dashboard/vendor/scanner">
+            {() => <RequireAuth role="vendor"><TicketScanner /></RequireAuth>}
           </Route>
           <Route path="/dashboard/bookings">
             {() => <RequireAuth><Bookings /></RequireAuth>}

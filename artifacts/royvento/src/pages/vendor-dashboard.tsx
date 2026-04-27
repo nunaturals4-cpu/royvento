@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import {
   useGetMyVendor,
   useCreateMyVendor,
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
-  Megaphone, Crown, Users, Eye, MapPin, Wine, Pencil, Upload, Ticket as TicketIcon,
+  Megaphone, Crown, Users, Eye, MapPin, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
 } from "lucide-react";
 import {
   apiGet, apiPost, apiDelete, apiPatch,
@@ -80,6 +81,11 @@ export function VendorDashboard() {
             <TabsTrigger value="leads">
               <Crown className="h-3.5 w-3.5 mr-1 text-primary" /> Leads
             </TabsTrigger>
+            <Link href="/dashboard/vendor/scanner">
+              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors">
+                <ScanLine className="h-3.5 w-3.5" /> Ticket scanner
+              </button>
+            </Link>
           </TabsList>
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>

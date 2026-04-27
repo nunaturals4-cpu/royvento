@@ -148,6 +148,8 @@ export const bookingsTable = pgTable(
     pointsUsed: integer("points_used").notNull().default(0),
     approvedBy: varchar("approved_by", { length: 20 }).notNull().default(""),
     rejectionReason: text("rejection_reason"),
+    checkedIn: boolean("checked_in").notNull().default(false),
+    checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
