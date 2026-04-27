@@ -1,10 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, eventsTable, vendorsTable } from "@workspace/db";
 import { eq, desc, and, ilike, sql, gte, lte, or } from "drizzle-orm";
-import {
-  CreateEventBody,
-  UpdateEventBody,
-} from "@workspace/api-zod";
+import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { getEventRatings } from "../lib/aggregates";
 
@@ -27,6 +24,11 @@ interface EventRow {
   eventDate: string | null;
   featured: boolean;
   popular: boolean;
+  pubMode: string;
+  priceWomen: string;
+  priceMen: string;
+  priceCouple: string;
+  pubEventTypes: string[];
   createdAt: Date;
 }
 
@@ -45,6 +47,17 @@ async function serializeEvents(rows: EventRow[]) {
   return rows.map((e) => {
     const v = vendorMap.get(e.vendorId);
     const r = ratings.get(e.id) ?? { rating: 0, reviewCount: 0 };
+    const startingAt =
+      e.type === "pub"
+        ? Math.min(
+            ...[
+              Number(e.priceWomen),
+              Number(e.priceMen),
+              Number(e.priceCouple),
+              Number(e.price),
+            ].filter((n) => n > 0),
+          ) || Number(e.price)
+        : Number(e.price);
     return {
       id: e.id,
       vendorId: e.vendorId,
@@ -57,11 +70,17 @@ async function serializeEvents(rows: EventRow[]) {
       city: e.city,
       country: e.country,
       price: Number(e.price),
+      startingPrice: Number.isFinite(startingAt) ? startingAt : Number(e.price),
       capacity: e.capacity,
       imageUrl: e.imageUrl,
       eventDate: e.eventDate,
       featured: e.featured,
       popular: e.popular,
+      pubMode: e.pubMode,
+      priceWomen: Number(e.priceWomen),
+      priceMen: Number(e.priceMen),
+      priceCouple: Number(e.priceCouple),
+      pubEventTypes: e.pubEventTypes ?? [],
       rating: r.rating,
       reviewCount: r.reviewCount,
       vendorName: v?.businessName ?? "",
@@ -192,6 +211,9 @@ router.get("/events/:eventId", async (req, res) => {
           category: v.category,
           description: v.description,
           location: v.location,
+          state: v.state,
+          city: v.city,
+          country: v.country,
           bannerImage: v.bannerImage,
           portfolioImages: v.portfolioImages,
           status: v.status,
@@ -229,6 +251,43 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     return;
   }
   const body = req.body as Record<string, unknown>;
+  const newType =
+    typeof body["type"] === "string" ? (body["type"] as string) : "event";
+
+  // Mutual exclusivity: if first event is pub, only pubs allowed; if first is non-pub, no pubs allowed.
+  const existingRows = await db
+    .select()
+    .from(eventsTable)
+    .where(eq(eventsTable.vendorId, vendor.id))
+    .limit(50);
+  if (existingRows.length > 0) {
+    const hasPub = existingRows.some((e) => e.type === "pub");
+    const hasNonPub = existingRows.some((e) => e.type !== "pub");
+    if (newType === "pub" && hasNonPub) {
+      res.status(400).json({
+        error:
+          "Your profile already has non-pub events. You can't add pubs alongside other event types.",
+      });
+      return;
+    }
+    if (newType !== "pub" && hasPub) {
+      res.status(400).json({
+        error:
+          "Your profile is set up for pubs. You can't mix other event types in the same profile.",
+      });
+      return;
+    }
+  }
+
+  const pubMode =
+    typeof body["pubMode"] === "string" ? (body["pubMode"] as string) : "";
+  const priceWomen = body["priceWomen"];
+  const priceMen = body["priceMen"];
+  const priceCouple = body["priceCouple"];
+  const pubEventTypes = Array.isArray(body["pubEventTypes"])
+    ? (body["pubEventTypes"] as string[])
+    : [];
+
   const [created] = await db
     .insert(eventsTable)
     .values({
@@ -236,15 +295,22 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       title: parsed.data.title,
       description: parsed.data.description ?? "",
       category: parsed.data.category,
-      type: typeof body["type"] === "string" ? (body["type"] as string) : "event",
+      type: newType,
       location: parsed.data.location ?? "",
       state: typeof body["state"] === "string" ? (body["state"] as string) : "",
       city: typeof body["city"] === "string" ? (body["city"] as string) : "",
       country:
-        typeof body["country"] === "string" ? (body["country"] as string) : "India",
+        typeof body["country"] === "string"
+          ? (body["country"] as string)
+          : "India",
       price: String(parsed.data.price),
       capacity: parsed.data.capacity,
       imageUrl: parsed.data.imageUrl ?? "",
+      pubMode,
+      priceWomen: priceWomen != null ? String(priceWomen) : "0",
+      priceMen: priceMen != null ? String(priceMen) : "0",
+      priceCouple: priceCouple != null ? String(priceCouple) : "0",
+      pubEventTypes,
     })
     .returning();
   if (!created) {
@@ -264,11 +330,6 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const parsed = UpdateEventBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
     return;
   }
   const eRows = await db
@@ -292,18 +353,31 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     return;
   }
   const updates: Record<string, unknown> = {};
+  const body = req.body as Record<string, unknown>;
   for (const k of [
     "title",
     "description",
     "category",
     "location",
-    "capacity",
     "imageUrl",
-  ] as const) {
-    const v = parsed.data[k];
-    if (v !== undefined) updates[k] = v;
+    "state",
+    "city",
+    "country",
+    "pubMode",
+  ]) {
+    if (typeof body[k] === "string") updates[k] = body[k];
   }
-  if (parsed.data.price !== undefined) updates["price"] = String(parsed.data.price);
+  if (typeof body["capacity"] === "number") updates["capacity"] = body["capacity"];
+  if (body["price"] !== undefined) updates["price"] = String(body["price"]);
+  if (body["priceWomen"] !== undefined)
+    updates["priceWomen"] = String(body["priceWomen"]);
+  if (body["priceMen"] !== undefined)
+    updates["priceMen"] = String(body["priceMen"]);
+  if (body["priceCouple"] !== undefined)
+    updates["priceCouple"] = String(body["priceCouple"]);
+  if (Array.isArray(body["pubEventTypes"]))
+    updates["pubEventTypes"] = body["pubEventTypes"];
+
   const [updated] = await db
     .update(eventsTable)
     .set(updates)
@@ -338,13 +412,11 @@ router.delete("/events/:eventId", requireAuth(), async (req, res) => {
     res.json({ ok: true });
     return;
   }
-  // Admins can delete any event/pub
   if (user.role === "admin") {
     await db.delete(eventsTable).where(eq(eventsTable.id, id));
     res.json({ ok: true });
     return;
   }
-  // Otherwise only the owning partner
   const vrows = await db
     .select()
     .from(vendorsTable)

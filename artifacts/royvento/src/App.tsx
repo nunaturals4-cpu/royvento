@@ -25,6 +25,7 @@ import { BecomeVendor } from "@/pages/become-vendor";
 import { Subscription } from "@/pages/subscription";
 
 import { RequireAuth } from "@/components/RequireAuth";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const queryClient = new QueryClient();
 
@@ -77,12 +78,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

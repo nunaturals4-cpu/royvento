@@ -9,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiPatch, apiGet } from "@/lib/api";
-import { CalendarCheck, Sparkles, Tag, Crown } from "lucide-react";
+import { apiPatch, apiGet, fileToDataUrl } from "@/lib/api";
+import { CalendarCheck, Sparkles, Tag, Crown, Gift, Sparkle, Copy, Upload } from "lucide-react";
 
 interface VendorRequest {
   id: number;
@@ -22,6 +22,12 @@ interface VendorRequest {
 
 interface Coupon { id: number; code: string; discountPercent: number; isUsed: boolean; }
 interface Sub { planType: string; planPeriod: string; status: string; expiresAt: string; }
+interface ReferralData {
+  code: string;
+  points: number;
+  referrals: { id: number; referredName: string; referredEmail: string; status: string; pointsAwarded: number; createdAt: string }[];
+}
+interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
 
 export function Profile() {
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
@@ -38,6 +44,8 @@ export function Profile() {
   const [request, setRequest] = useState<VendorRequest | null>(null);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [sub, setSub] = useState<Sub | null>(null);
+  const [referrals, setReferrals] = useState<ReferralData | null>(null);
+  const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -50,7 +58,36 @@ export function Profile() {
       .catch(() => {});
     apiGet<Coupon[]>("/api/coupons/me").then(setCoupons).catch(() => {});
     apiGet<Sub | null>("/api/subscriptions/me").then(setSub).catch(() => {});
+    apiGet<ReferralData>("/api/referrals/me").then(setReferrals).catch(() => {});
+    apiGet<DiscountInfo>("/api/users/me/discounts").then(setDiscountInfo).catch(() => {});
   }, [user]);
+
+  const handleProfileFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) {
+      toast({ title: "Image too large", description: "Max 2 MB.", variant: "destructive" });
+      return;
+    }
+    try {
+      const url = await fileToDataUrl(f);
+      setProfileImage(url);
+      toast({ title: "Image ready — click Save changes." });
+    } catch {
+      toast({ title: "Could not read image", variant: "destructive" });
+    }
+  };
+
+  const copyReferral = async () => {
+    if (!referrals?.code) return;
+    const url = `${window.location.origin}${import.meta.env.BASE_URL}register?ref=${referrals.code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Referral link copied" });
+    } catch {
+      toast({ title: "Copy failed", description: url });
+    }
+  };
 
   if (!user) {
     return <div className="container mx-auto px-4 md:px-6 py-20">Loading…</div>;
@@ -100,8 +137,22 @@ export function Profile() {
             <div><Label htmlFor="pphone">Phone</Label><Input id="pphone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 …" className="bg-black/40 border-white/10" /></div>
           </div>
           <div>
-            <Label htmlFor="ppic">Profile picture URL</Label>
-            <Input id="ppic" value={profileImage} onChange={(e) => setProfileImage(e.target.value)} placeholder="https://…" className="bg-black/40 border-white/10" />
+            <Label htmlFor="ppic">Profile picture</Label>
+            <div className="flex items-center gap-3 mt-1">
+              <Avatar className="h-12 w-12 border border-white/10">
+                {profileImage ? <AvatarImage src={profileImage} /> : null}
+                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <label className="inline-flex items-center gap-2 px-3 h-10 rounded-md border border-white/15 cursor-pointer text-sm hover:bg-white/5">
+                <Upload className="h-4 w-4" /> Upload image
+                <input id="ppic" type="file" accept="image/*" className="hidden" onChange={handleProfileFile} />
+              </label>
+              {profileImage && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setProfileImage("")}>
+                  Remove
+                </Button>
+              )}
+            </div>
           </div>
           <div>
             <Label htmlFor="pabout">About you</Label>
@@ -113,6 +164,53 @@ export function Profile() {
         </form>
 
         <aside className="space-y-4">
+          {discountInfo?.isNewUser && (
+            <div className="rounded-3xl glass-card-strong p-6 red-ring border border-primary/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkle className="h-5 w-5 text-primary" />
+                <h2 className="font-serif text-lg">Welcome perks</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                You're a new member! Enjoy these for the next {discountInfo.daysLeft} day{discountInfo.daysLeft === 1 ? "" : "s"}:
+              </p>
+              <ul className="mt-3 text-sm space-y-1">
+                <li>• <span className="text-primary font-medium">{discountInfo.bookingDiscountPercent}% off</span> any booking</li>
+                <li>• <span className="text-primary font-medium">{discountInfo.subscriptionDiscountPercent}% off</span> a subscription plan</li>
+              </ul>
+            </div>
+          )}
+          {referrals && (
+            <div className="rounded-3xl glass-card-strong p-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Gift className="h-5 w-5 text-primary" />
+                <h2 className="font-serif text-lg">Refer &amp; earn</h2>
+              </div>
+              <p className="text-xs text-muted-foreground">Share your code — you both get 50 pts (₹50) when they make their first paid booking.</p>
+              <div className="mt-3 flex items-center gap-2">
+                <code className="px-3 py-2 rounded-lg bg-black/40 border border-white/10 font-mono text-sm tracking-wider flex-1 text-center">{referrals.code}</code>
+                <Button size="icon" variant="outline" onClick={copyReferral} aria-label="Copy referral link">
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Points balance</span>
+                <span className="font-semibold text-primary">{referrals.points} pts</span>
+              </div>
+              {referrals.referrals.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Recent referrals</p>
+                  {referrals.referrals.slice(0, 4).map((r) => (
+                    <div key={r.id} className="flex items-center justify-between text-xs">
+                      <span className="truncate">{r.referredName || r.referredEmail}</span>
+                      <Badge variant={r.status === "completed" ? "default" : "outline"} className="text-[10px]">
+                        {r.status === "completed" ? `+${r.pointsAwarded}` : r.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {sub && (
             <div className="rounded-3xl glass-card-strong p-6 red-ring">
               <div className="flex items-center gap-2 mb-2">

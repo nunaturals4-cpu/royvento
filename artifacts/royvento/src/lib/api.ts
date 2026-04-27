@@ -103,3 +103,33 @@ export function formatINR(value: number): string {
   if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
   return `₹${value.toLocaleString("en-IN")}`;
 }
+
+export function formatINRExact(value: number): string {
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+export const PUB_EVENT_TYPES = [
+  "Live Music",
+  "DJ Night",
+  "Karaoke",
+  "Stand-up Comedy",
+  "Themed Party",
+  "Quiz Night",
+  "Sports Screening",
+  "Sundowner",
+  "Brunch",
+  "New Year",
+  "Holi Bash",
+  "Diwali Soiree",
+  "Christmas Eve",
+] as const;
+
+// File → base64 data URL (for demo profile/banner uploads, no object storage required).
+export async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

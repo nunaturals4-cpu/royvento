@@ -7,11 +7,16 @@ import {
   usersTable,
   availabilityTable,
   couponsTable,
+  referralsTable,
 } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateBookingStatusBody } from "@workspace/api-zod";
-import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
+import {
+  sendBookingCreatedEmails,
+  sendBookingStatusEmail,
+} from "../lib/notifications";
 
 const EVENT_TYPES = [
   "wedding",
@@ -26,16 +31,19 @@ const EVENT_TYPES = [
 const CreateBookingBody = z.object({
   eventId: z.number().int().positive(),
   bookingDate: z.string().min(1),
-  guests: z.number().int().positive(),
+  guests: z.number().int().nonnegative().optional().default(0),
   notes: z.string().optional().default(""),
   eventType: z.enum(EVENT_TYPES).optional().default("other"),
   budgetRange: z.string().optional().default(""),
   couponCode: z.string().optional().default(""),
+  pubMode: z.enum(["", "ticket", "event"]).optional().default(""),
+  ticketWomen: z.number().int().nonnegative().optional().default(0),
+  ticketMen: z.number().int().nonnegative().optional().default(0),
+  ticketCouple: z.number().int().nonnegative().optional().default(0),
+  selectedPubEvent: z.string().optional().default(""),
+  personName: z.string().optional().default(""),
+  pointsToUse: z.number().int().nonnegative().optional().default(0),
 });
-import {
-  sendBookingCreatedEmails,
-  sendBookingStatusEmail,
-} from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -54,6 +62,14 @@ interface BookingRow {
   notes: string;
   eventType: string;
   status: string;
+  pubMode: string;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  selectedPubEvent: string;
+  personName: string;
+  pointsUsed: number;
+  approvedBy: string;
   createdAt: Date;
 }
 
@@ -89,9 +105,21 @@ async function serializeBookings(rows: BookingRow[]) {
       notes: b.notes,
       eventType: b.eventType,
       status: b.status,
+      pubMode: b.pubMode,
+      ticketWomen: b.ticketWomen,
+      ticketMen: b.ticketMen,
+      ticketCouple: b.ticketCouple,
+      selectedPubEvent: b.selectedPubEvent,
+      personName: b.personName || u?.name || "",
+      pointsUsed: b.pointsUsed,
+      approvedBy: b.approvedBy,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",
+      eventType_: e?.type ?? "",
+      eventCity: e?.city ?? "",
+      eventState: e?.state ?? "",
+      eventCountry: e?.country ?? "",
       vendorName: v?.businessName ?? "",
       partnerName: v?.businessName ?? "",
       userName: u?.name ?? "",
@@ -126,9 +154,26 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     rawDate instanceof Date
       ? rawDate.toISOString().slice(0, 10)
       : String(rawDate).slice(0, 10);
-  const totalPrice = Number(evt.price) * parsed.data.guests;
 
-  // Apply coupon if provided
+  // Compute base total based on mode
+  let totalPrice = 0;
+  let guestsCount = parsed.data.guests || 0;
+
+  if (evt.type === "pub" && parsed.data.pubMode === "ticket") {
+    const w = parsed.data.ticketWomen || 0;
+    const m = parsed.data.ticketMen || 0;
+    const c = parsed.data.ticketCouple || 0;
+    totalPrice =
+      w * Number(evt.priceWomen) +
+      m * Number(evt.priceMen) +
+      c * Number(evt.priceCouple);
+    guestsCount = w + m + c * 2;
+  } else {
+    totalPrice = Number(evt.price) * Math.max(1, guestsCount);
+    if (guestsCount === 0) guestsCount = 1;
+  }
+
+  // Apply coupon
   let discountAmount = 0;
   let validCode = "";
   if (parsed.data.couponCode) {
@@ -153,7 +198,25 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         .where(eq(couponsTable.id, coupon.id));
     }
   }
-  const finalPrice = Math.max(0, totalPrice - discountAmount);
+
+  // Apply new-user 20% off (within 10 days of signup, no coupon used)
+  if (!validCode && isNewUser(user.createdAt)) {
+    const newUserDiscount = Math.round(totalPrice * 0.2);
+    discountAmount = Math.max(discountAmount, newUserDiscount);
+  }
+
+  // Apply points (1 point = 1 INR)
+  const pointsToUse = Math.min(parsed.data.pointsToUse || 0, user.points);
+  const pointsCap = Math.max(0, totalPrice - discountAmount);
+  const pointsUsed = Math.min(pointsToUse, pointsCap);
+  if (pointsUsed > 0) {
+    await db
+      .update(usersTable)
+      .set({ points: user.points - pointsUsed })
+      .where(eq(usersTable.id, user.id));
+  }
+
+  const finalPrice = Math.max(0, totalPrice - discountAmount - pointsUsed);
 
   const [b] = await db
     .insert(bookingsTable)
@@ -162,7 +225,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       userId: user.id,
       vendorId: evt.vendorId,
       bookingDate: dateStr,
-      guests: parsed.data.guests,
+      guests: guestsCount,
       totalPrice: String(totalPrice),
       couponCode: validCode,
       discountAmount: String(discountAmount),
@@ -171,6 +234,14 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       notes: parsed.data.notes ?? "",
       eventType: parsed.data.eventType ?? "other",
       status: "pending",
+      pubMode: parsed.data.pubMode || "",
+      ticketWomen: parsed.data.ticketWomen || 0,
+      ticketMen: parsed.data.ticketMen || 0,
+      ticketCouple: parsed.data.ticketCouple || 0,
+      selectedPubEvent: parsed.data.selectedPubEvent || "",
+      personName: parsed.data.personName || user.name,
+      pointsUsed,
+      approvedBy: "",
     })
     .returning();
   if (!b) {
@@ -290,6 +361,7 @@ router.patch(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    let approver: "partner" | "admin" = "admin";
     if (user.role !== "admin") {
       const vRows = await db
         .select()
@@ -305,16 +377,88 @@ router.patch(
         res.status(403).json({ error: "Forbidden" });
         return;
       }
+      approver = "partner";
     }
     const [updated] = await db
       .update(bookingsTable)
-      .set({ status: parsed.data.status })
+      .set({ status: parsed.data.status, approvedBy: approver })
       .where(eq(bookingsTable.id, id))
       .returning();
     if (!updated) {
       res.status(500).json({ error: "Failed" });
       return;
     }
+
+    // Award referral points when booking moves to confirmed (paid)
+    if (
+      (parsed.data.status === "confirmed" ||
+        parsed.data.status === "completed") &&
+      b.status !== "confirmed" &&
+      b.status !== "completed"
+    ) {
+      try {
+        // Was this user's first paid booking?
+        const priorPaid = await db
+          .select()
+          .from(bookingsTable)
+          .where(
+            and(
+              eq(bookingsTable.userId, b.userId),
+              inArray(bookingsTable.status, ["confirmed", "completed"]),
+            ),
+          );
+        const otherPriorCount = priorPaid.filter((p) => p.id !== b.id).length;
+        if (otherPriorCount === 0) {
+          // Find pending referral row for this user
+          const refRows = await db
+            .select()
+            .from(referralsTable)
+            .where(
+              and(
+                eq(referralsTable.referredId, b.userId),
+                eq(referralsTable.status, "pending"),
+              ),
+            )
+            .limit(1);
+          const ref = refRows[0];
+          if (ref) {
+            const [referrer] = await db
+              .select()
+              .from(usersTable)
+              .where(eq(usersTable.id, ref.referrerId))
+              .limit(1);
+            const [referred] = await db
+              .select()
+              .from(usersTable)
+              .where(eq(usersTable.id, b.userId))
+              .limit(1);
+            if (referrer) {
+              await db
+                .update(usersTable)
+                .set({ points: (referrer.points || 0) + 50 })
+                .where(eq(usersTable.id, referrer.id));
+            }
+            if (referred) {
+              await db
+                .update(usersTable)
+                .set({ points: (referred.points || 0) + 50 })
+                .where(eq(usersTable.id, referred.id));
+            }
+            await db
+              .update(referralsTable)
+              .set({
+                status: "completed",
+                pointsAwarded: 50,
+                completedAt: new Date(),
+              })
+              .where(eq(referralsTable.id, ref.id));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to award referral points", err);
+      }
+    }
+
     const [out] = await serializeBookings([updated]);
 
     if (out && b.status !== updated.status) {
@@ -336,5 +480,42 @@ router.patch(
     res.json(out);
   },
 );
+
+// Admin can approve any booking
+router.patch(
+  "/admin/bookings/:bookingId/status",
+  requireAuth(["admin"]),
+  async (req, res) => {
+    const id = Number(req.params["bookingId"]);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const parsed = UpdateBookingStatusBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid input" });
+      return;
+    }
+    const [updated] = await db
+      .update(bookingsTable)
+      .set({ status: parsed.data.status, approvedBy: "admin" })
+      .where(eq(bookingsTable.id, id))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [out] = await serializeBookings([updated]);
+    res.json(out);
+  },
+);
+
+router.get("/admin/bookings", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(bookingsTable)
+    .orderBy(desc(bookingsTable.createdAt));
+  res.json(await serializeBookings(rows));
+});
 
 export default router;

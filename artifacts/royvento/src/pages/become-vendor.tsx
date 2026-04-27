@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LocationSelect } from "@/components/LocationSelect";
 import { useToast } from "@/hooks/use-toast";
 import { apiPost, EVENT_CATEGORIES } from "@/lib/api";
-import { Sparkles } from "lucide-react";
+import { Sparkles, MapPin } from "lucide-react";
 
 export function BecomeVendor() {
   const { toast } = useToast();
@@ -15,13 +16,23 @@ export function BecomeVendor() {
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState("Wedding");
   const [reason, setReason] = useState("");
+  const [country, setCountry] = useState("India");
+  const [stateF, setStateF] = useState("");
+  const [city, setCity] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await apiPost("/api/vendor-requests", { businessName, category, message: reason });
+      await apiPost("/api/vendor-requests", {
+        businessName,
+        category,
+        message: reason,
+        country,
+        state: stateF,
+        city,
+      });
       toast({ title: "Request submitted", description: "An admin will review your application shortly." });
       setLocation("/dashboard/profile");
     } catch (err: any) {
@@ -33,10 +44,10 @@ export function BecomeVendor() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
-      <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Vendor application</p>
+      <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Partner application</p>
       <div className="flex items-center gap-3 mb-2">
         <Sparkles className="h-7 w-7 text-primary" />
-        <h1 className="font-serif text-4xl tracking-tight">Become a vendor</h1>
+        <h1 className="font-serif text-4xl tracking-tight">Become a partner</h1>
       </div>
       <p className="mt-2 text-muted-foreground">
         Tell us about your business. Once an admin approves your request, you'll be able to publish events and accept bookings.
@@ -56,6 +67,17 @@ export function BecomeVendor() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div>
+          <Label className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />Where are you based?</Label>
+          <div className="mt-2">
+            <LocationSelect
+              country={country}
+              state={stateF}
+              city={city}
+              onChange={(next) => { setCountry(next.country); setStateF(next.state); setCity(next.city); }}
+            />
+          </div>
         </div>
         <div>
           <Label htmlFor="breason">Why join Royvento?</Label>

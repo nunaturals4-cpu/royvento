@@ -12,6 +12,7 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -22,6 +23,11 @@ export function Register() {
     apiGet<{ enabled: boolean }>("/api/auth/google/status")
       .then((r) => setGoogleEnabled(r.enabled))
       .catch(() => {});
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get("ref");
+      if (r) setReferralCode(r);
+    } catch {}
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -30,7 +36,7 @@ export function Register() {
     try {
       const data = await apiPost<{ token?: string; user: { name: string; role: string } }>(
         "/api/auth/register",
-        { name, email, password, phone },
+        { name, email, password, phone, referralCode: referralCode.trim().toUpperCase() },
       );
       if (data.token) localStorage.setItem("royvento_token", data.token);
       qc.invalidateQueries();
@@ -96,6 +102,19 @@ export function Register() {
           <div>
             <Label htmlFor="password">Password</Label>
             <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+          </div>
+          <div>
+            <Label htmlFor="referralCode">Referral code <span className="text-muted-foreground">(optional)</span></Label>
+            <Input
+              id="referralCode"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+              placeholder="ABCD1234"
+              className="bg-black/40 border-white/10 mt-1 uppercase tracking-wider"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Both you and your referrer earn 50 points (₹50) on your first paid booking.
+            </p>
           </div>
           <Button type="submit" className="w-full h-11 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0" disabled={busy}>
             {busy ? "Creating…" : "Create account"}

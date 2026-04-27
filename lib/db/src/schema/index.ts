@@ -24,12 +24,16 @@ export const usersTable = pgTable(
     about: text("about").notNull().default(""),
     profileImage: text("profile_image").notNull().default(""),
     googleId: varchar("google_id", { length: 255 }).notNull().default(""),
+    referralCode: varchar("referral_code", { length: 32 }).notNull().default(""),
+    referredBy: integer("referred_by"),
+    points: integer("points").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => ({
     emailIdx: uniqueIndex("users_email_idx").on(t.email),
+    referralCodeIdx: uniqueIndex("users_referral_code_idx").on(t.referralCode),
   }),
 );
 
@@ -85,6 +89,17 @@ export const eventsTable = pgTable(
     eventDate: date("event_date"),
     featured: boolean("featured").notNull().default(false),
     popular: boolean("popular").notNull().default(false),
+    pubMode: varchar("pub_mode", { length: 20 }).notNull().default(""),
+    priceWomen: numeric("price_women", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    priceMen: numeric("price_men", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    priceCouple: numeric("price_couple", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    pubEventTypes: text("pub_event_types").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -119,6 +134,16 @@ export const bookingsTable = pgTable(
     notes: text("notes").notNull().default(""),
     eventType: varchar("event_type", { length: 50 }).notNull().default("other"),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
+    pubMode: varchar("pub_mode", { length: 20 }).notNull().default(""),
+    ticketWomen: integer("ticket_women").notNull().default(0),
+    ticketMen: integer("ticket_men").notNull().default(0),
+    ticketCouple: integer("ticket_couple").notNull().default(0),
+    selectedPubEvent: varchar("selected_pub_event", { length: 100 })
+      .notNull()
+      .default(""),
+    personName: varchar("person_name", { length: 255 }).notNull().default(""),
+    pointsUsed: integer("points_used").notNull().default(0),
+    approvedBy: varchar("approved_by", { length: 20 }).notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -336,3 +361,24 @@ export type PartnerMedia = typeof partnerMediaTable.$inferSelect;
 export type PartnerBlockedDate = typeof partnerBlockedDatesTable.$inferSelect;
 export type AdsRequest = typeof adsRequestsTable.$inferSelect;
 export type ProfileView = typeof profileViewsTable.$inferSelect;
+
+export const referralsTable = pgTable(
+  "referrals",
+  {
+    id: serial("id").primaryKey(),
+    referrerId: integer("referrer_id").notNull(),
+    referredId: integer("referred_id").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    pointsAwarded: integer("points_awarded").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => ({
+    referrerIdx: index("referrals_referrer_idx").on(t.referrerId),
+    referredIdx: uniqueIndex("referrals_referred_idx").on(t.referredId),
+  }),
+);
+
+export type Referral = typeof referralsTable.$inferSelect;

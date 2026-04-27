@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, referralsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -15,12 +15,17 @@ import {
 
 const router: IRouter = Router();
 
+function genReferralCode(): string {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
 const RegisterBodyExt = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(1),
   role: z.enum(["user", "vendor", "admin"]).optional(),
   phone: z.string().optional().default(""),
+  referralCode: z.string().optional().default(""),
 });
 
 const LoginBodyExt = z.object({
@@ -34,7 +39,7 @@ router.post("/auth/register", async (req, res) => {
     res.status(400).json({ error: "Invalid input", details: parsed.error });
     return;
   }
-  const { email, password, name, role, phone } = parsed.data;
+  const { email, password, name, role, phone, referralCode } = parsed.data;
   const safeRole: Role = role === "vendor" || role === "admin" ? role : "user";
 
   const existing = await db
@@ -46,15 +51,62 @@ router.post("/auth/register", async (req, res) => {
     res.status(409).json({ error: "Email already in use" });
     return;
   }
+
+  // Resolve referrer if code provided
+  let referredBy: number | null = null;
+  if (referralCode) {
+    const refUsers = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.referralCode, referralCode.trim().toUpperCase()))
+      .limit(1);
+    referredBy = refUsers[0]?.id ?? null;
+  }
+
+  // Generate a unique referralCode
+  let myCode = "";
+  for (let i = 0; i < 5; i++) {
+    const candidate = genReferralCode();
+    const taken = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.referralCode, candidate))
+      .limit(1);
+    if (!taken[0]) { myCode = candidate; break; }
+  }
+  if (!myCode) myCode = genReferralCode() + Date.now().toString(36).slice(-2).toUpperCase();
+
   const passwordHash = await hashPassword(password);
   const [created] = await db
     .insert(usersTable)
-    .values({ email, passwordHash, name, role: safeRole, phone: phone ?? "" })
+    .values({
+      email,
+      passwordHash,
+      name,
+      role: safeRole,
+      phone: phone ?? "",
+      referralCode: myCode,
+      referredBy,
+    })
     .returning();
   if (!created) {
     res.status(500).json({ error: "Failed to create user" });
     return;
   }
+
+  // Track referral
+  if (referredBy) {
+    try {
+      await db.insert(referralsTable).values({
+        referrerId: referredBy,
+        referredId: created.id,
+        status: "pending",
+      });
+    } catch (e) {
+      console.error("Failed to record referral", e);
+    }
+  }
+
   const token = signToken({ userId: created.id, role: safeRole });
   setAuthCookie(res, token);
   res.json({ token, user: userToPublic(created) });
@@ -97,7 +149,6 @@ router.get("/auth/me", async (req, res) => {
   res.json({ user });
 });
 
-// Google OAuth status endpoint — used by frontend to know if Google sign-in is enabled
 router.get("/auth/google/status", async (_req, res) => {
   const enabled =
     !!process.env["GOOGLE_CLIENT_ID"] && !!process.env["GOOGLE_CLIENT_SECRET"];
@@ -105,21 +156,18 @@ router.get("/auth/google/status", async (_req, res) => {
     enabled,
     message: enabled
       ? "Google sign-in is enabled."
-      : "Google sign-in requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables. Configure them to enable.",
+      : "Google sign-in requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.",
   });
 });
 
-// Stub initiate flow — only works if env is configured
 router.get("/auth/google/start", async (_req, res) => {
   if (!process.env["GOOGLE_CLIENT_ID"]) {
     return res
       .status(503)
       .json({ error: "Google sign-in not configured on this deployment." });
   }
-  // In production, redirect to actual Google OAuth — placeholder for demo
   return res.status(501).json({
-    error:
-      "OAuth initiation not implemented in this demo. Add Google credentials and the OAuth flow.",
+    error: "OAuth initiation not implemented in this demo.",
   });
 });
 

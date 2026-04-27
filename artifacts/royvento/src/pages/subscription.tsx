@@ -4,7 +4,7 @@ import { useGetMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Crown, Check, Sparkles, Calendar, Users } from "lucide-react";
+import { Crown, Check, Sparkles, Calendar, Users, Sparkle } from "lucide-react";
 import { apiGet, apiPost, formatINR } from "@/lib/api";
 
 interface Sub {
@@ -16,16 +16,23 @@ interface Sub {
   expiresAt: string;
 }
 
+interface PriceData {
+  user: { monthly: number; yearly: number; newUserDiscountPercent: number };
+  partner: { monthly: number; yearly: number; newUserDiscountPercent: number };
+  isNewUser: boolean;
+}
+
 export function Subscription() {
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
   const user = me?.user as any;
   const [active, setActive] = useState<Sub | null>(null);
+  const [prices, setPrices] = useState<PriceData | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!user) return;
-    apiGet<Sub | null>("/api/subscriptions/me").then(setActive).catch(() => {});
+    apiGet<PriceData>("/api/subscriptions/prices").then(setPrices).catch(() => {});
+    if (user) apiGet<Sub | null>("/api/subscriptions/me").then(setActive).catch(() => {});
   }, [user]);
 
   const subscribe = async (planType: "user" | "partner", planPeriod: "monthly" | "yearly") => {
@@ -48,7 +55,7 @@ export function Subscription() {
       refetch();
       toast({
         title: "Subscription activated",
-        description: "Welcome to Royvento Premium! A coupon may have been added to your profile.",
+        description: "Welcome to Royvento Premium!",
       });
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
@@ -56,6 +63,12 @@ export function Subscription() {
       setLoading(false);
     }
   };
+
+  const userMonthly = prices?.user.monthly ?? 199;
+  const partnerMonthly = prices?.partner.monthly ?? 999;
+  const newUserDiscount = prices?.isNewUser ? prices.user.newUserDiscountPercent : 0;
+  const userPriceFinal = newUserDiscount > 0 ? Math.round(userMonthly * (1 - newUserDiscount / 100)) : userMonthly;
+  const partnerPriceFinal = newUserDiscount > 0 ? Math.round(partnerMonthly * (1 - newUserDiscount / 100)) : partnerMonthly;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-16">
@@ -65,8 +78,13 @@ export function Subscription() {
         </div>
         <h1 className="font-serif text-4xl md:text-6xl tracking-tight">A members club for hosts &amp; partners</h1>
         <p className="mt-5 text-white/60 leading-relaxed">
-          Demo pricing only — no real payment is processed. Once subscribed your account is upgraded instantly.
+          Demo pricing only — no real payment is processed.
         </p>
+        {prices?.isNewUser && (
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary/15 border border-primary/40 px-4 py-2 text-sm text-primary">
+            <Sparkle className="h-4 w-4" /> New-member offer: <strong>50% off</strong> any plan.
+          </div>
+        )}
       </header>
 
       {active && (
@@ -89,7 +107,9 @@ export function Subscription() {
         <PlanCard
           title="Royvento Member"
           tagline="For hosts who plan ahead"
-          price={200}
+          basePrice={userMonthly}
+          finalPrice={userPriceFinal}
+          discountPercent={newUserDiscount}
           period="monthly"
           icon={Sparkles}
           features={[
@@ -99,14 +119,16 @@ export function Subscription() {
             "Members-only pubs &amp; lounges",
             "Concierge add-ons (demo)",
           ]}
-          cta={loading ? "Activating…" : "Subscribe — ₹200/mo"}
+          cta={loading ? "Activating…" : `Subscribe — ${formatINR(userPriceFinal)}/mo`}
           onSubscribe={() => subscribe("user", "monthly")}
           disabled={loading}
         />
         <PlanCard
           title="Partner Premium"
           tagline="For studios &amp; venues"
-          price={999}
+          basePrice={partnerMonthly}
+          finalPrice={partnerPriceFinal}
+          discountPercent={newUserDiscount}
           period="monthly"
           icon={Crown}
           accent
@@ -116,9 +138,8 @@ export function Subscription() {
             "Run promoted ads (admin-approved)",
             "Unlimited media uploads",
             "Premium badge on your listings",
-            "Google Calendar block-out (stub)",
           ]}
-          cta={loading ? "Activating…" : "Subscribe — ₹999/mo"}
+          cta={loading ? "Activating…" : `Subscribe — ${formatINR(partnerPriceFinal)}/mo`}
           onSubscribe={() => subscribe("partner", "monthly")}
           disabled={loading || (user && user.role !== "vendor")}
           footer={
@@ -149,11 +170,13 @@ export function Subscription() {
 }
 
 function PlanCard({
-  title, tagline, price, period, icon: Icon, features, cta, onSubscribe, disabled, accent, footer,
+  title, tagline, basePrice, finalPrice, discountPercent, period, icon: Icon, features, cta, onSubscribe, disabled, accent, footer,
 }: {
   title: string;
   tagline: string;
-  price: number;
+  basePrice: number;
+  finalPrice: number;
+  discountPercent: number;
   period: string;
   icon: any;
   features: string[];
@@ -163,11 +186,17 @@ function PlanCard({
   accent?: boolean;
   footer?: React.ReactNode;
 }) {
+  const hasDiscount = discountPercent > 0 && finalPrice < basePrice;
   return (
     <div className={`relative rounded-3xl ${accent ? "glass-card-strong red-glow" : "glass-card"} p-8 lift-3d`}>
       {accent && (
         <div className="absolute -top-3 left-8">
           <Badge className="bg-gradient-to-br from-red-500 to-red-700 border-0">Most popular</Badge>
+        </div>
+      )}
+      {hasDiscount && (
+        <div className="absolute -top-3 right-8">
+          <Badge className="bg-primary/90 border-0">New-member {discountPercent}% off</Badge>
         </div>
       )}
       <div className="flex items-center gap-3 mb-4">
@@ -179,10 +208,15 @@ function PlanCard({
           <p className="text-xs uppercase tracking-wider text-muted-foreground">{tagline}</p>
         </div>
       </div>
-      <p className="font-serif text-5xl tracking-tight mt-6">
-        {formatINR(price)}
-        <span className="text-sm text-muted-foreground font-sans"> /{period === "monthly" ? "mo" : "yr"}</span>
-      </p>
+      <div className="mt-6">
+        {hasDiscount && (
+          <p className="text-base text-muted-foreground line-through">{formatINR(basePrice)}</p>
+        )}
+        <p className="font-serif text-5xl tracking-tight">
+          {formatINR(finalPrice)}
+          <span className="text-sm text-muted-foreground font-sans"> /{period === "monthly" ? "mo" : "yr"}</span>
+        </p>
+      </div>
       <ul className="mt-6 space-y-2 text-sm">
         {features.map((f) => (
           <li key={f} className="flex items-start gap-2">

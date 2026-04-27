@@ -21,12 +21,14 @@ import {
 } from "@/components/ui/select";
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
-  Megaphone, Crown, Users, Eye, MapPin, Wine,
+  Megaphone, Crown, Users, Eye, MapPin, Wine, Pencil, Upload, Ticket as TicketIcon,
 } from "lucide-react";
 import {
   apiGet, apiPost, apiDelete, apiPatch,
-  EVENT_CATEGORIES, INDIAN_STATES, BUDGET_RANGES, formatINR,
+  EVENT_CATEGORIES, INDIAN_STATES, BUDGET_RANGES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
 } from "@/lib/api";
+import { LocationSelect } from "@/components/LocationSelect";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const CATEGORIES = [...EVENT_CATEGORIES];
 const STATUSES = ["pending", "confirmed", "completed", "cancelled"] as const;
@@ -101,15 +103,28 @@ function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [bannerImage, setBanner] = useState("");
+  const [country, setCountry] = useState("India");
+  const [stateF, setStateF] = useState("");
+  const [city, setCity] = useState("");
   const create = useCreateMyVendor();
   const { toast } = useToast();
 
+  const onBannerFile = async (f: File | null) => {
+    if (!f) return;
+    try { setBanner(await fileToDataUrl(f)); } catch { /* ignore */ }
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    const loc = location || [city, stateF].filter(Boolean).join(", ");
     create.mutate(
-      { data: { businessName, category, description, location, bannerImage, portfolioImages: [] } },
+      { data: { businessName, category, description, location: loc, bannerImage, portfolioImages: [] } },
       {
-        onSuccess: () => { toast({ title: "Partner profile submitted!" }); onCreated(); },
+        onSuccess: async () => {
+          try { await apiPatch("/api/partner/profile", { state: stateF, city, country }); } catch { /* silent */ }
+          toast({ title: "Partner profile submitted!" });
+          onCreated();
+        },
         onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
       },
     );
@@ -129,8 +144,29 @@ function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
           <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} className="bg-black/40 border-white/10" /></div>
-      <div><Label>Banner image URL</Label><Input value={bannerImage} onChange={(e) => setBanner(e.target.value)} placeholder="https://…" className="bg-black/40 border-white/10" /></div>
+      <div>
+        <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-primary" />Location</Label>
+        <div className="mt-1.5">
+          <LocationSelect
+            country={country}
+            state={stateF}
+            city={city}
+            onChange={(n) => { setCountry(n.country); setStateF(n.state); setCity(n.city); }}
+          />
+        </div>
+        <Input
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Optional location label (e.g. Park Street)"
+          className="bg-black/40 border-white/10 mt-2"
+        />
+      </div>
+      <div>
+        <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Banner image</Label>
+        <Input type="file" accept="image/*" onChange={(e) => onBannerFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10 mt-1" />
+        <Input value={bannerImage} onChange={(e) => setBanner(e.target.value)} placeholder="…or paste an image URL" className="bg-black/40 border-white/10 mt-2" />
+        {bannerImage && <img src={bannerImage} alt="" className="mt-2 rounded-xl max-h-40 object-cover" />}
+      </div>
       <div><Label>Description</Label><Textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
       <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">{create.isPending ? "Submitting…" : "Submit for review"}</Button>
     </form>
@@ -209,8 +245,17 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           <div><Label>Location label</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} className="bg-black/40 border-white/10" /></div>
         </div>
         <div>
-          <Label>Banner image URL</Label>
-          <Input value={bannerImage} onChange={(e) => setBanner(e.target.value)} className="bg-black/40 border-white/10" />
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Banner image</Label>
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const f = e.target.files?.[0]; if (!f) return;
+              try { setBanner(await fileToDataUrl(f)); } catch { /* ignore */ }
+            }}
+            className="bg-black/40 border-white/10 mt-1"
+          />
+          <Input value={bannerImage} onChange={(e) => setBanner(e.target.value)} placeholder="…or paste an image URL" className="bg-black/40 border-white/10 mt-2" />
         </div>
         <div>
           <Label>Description</Label>
@@ -278,16 +323,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
 
 function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events: any[]; refetchEvents: () => void }) {
   const [showForm, setShow] = useState(false);
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState(vendor.category);
-  const [type, setType] = useState<string>("event");
-  const [description, setDescription] = useState("");
-  const [city, setCity] = useState(vendor.city ?? "");
-  const [stateF, setStateF] = useState(vendor.state ?? "");
-  const [price, setPrice] = useState(0);
-  const [capacity, setCapacity] = useState(50);
-  const [imageUrl, setImageUrl] = useState("");
-  const create = useCreateEvent();
+  const [editingId, setEditingId] = useState<number | null>(null);
   const del = useDeleteEvent();
   const { toast } = useToast();
 
@@ -300,79 +336,35 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
     );
   }
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const body: any = { title, description, category, location: `${city}${stateF ? ", " + stateF : ""}`, price, capacity, imageUrl };
-    body.type = type;
-    body.city = city;
-    body.state = stateF;
-    body.country = "India";
-    create.mutate(
-      { data: body },
-      {
-        onSuccess: () => {
-          toast({ title: type === "pub" ? "Pub published" : "Event published" });
-          setShow(false); setTitle(""); setDescription(""); setImageUrl(""); setPrice(0); setCapacity(50);
-          refetchEvents();
-        },
-        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
-      },
-    );
-  };
+  const hasPub = events.some((e: any) => e.type === "pub");
+  const hasNonPub = events.some((e: any) => e.type !== "pub");
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h2 className="font-serif text-2xl">Your events &amp; pubs</h2>
-        <Button onClick={() => setShow((s) => !s)} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
+        <Button onClick={() => { setShow((s) => !s); setEditingId(null); }} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
           {showForm ? "Close" : "+ New listing"}
         </Button>
       </div>
-      {showForm && (
-        <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
-              <Label>Type</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {EVENT_KIND.map((k) => <SelectItem key={k} value={k}>{k === "event" ? "Event" : "Pub / Lounge"}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Title</Label>
-              <Input required value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" />
-            </div>
-            <div>
-              <Label>Category</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Image URL</Label>
-              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="bg-black/40 border-white/10" />
-            </div>
-            <div><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} className="bg-black/40 border-white/10" /></div>
-            <div>
-              <Label>State</Label>
-              <Select value={stateF || "any"} onValueChange={(v) => setStateF(v === "any" ? "" : v)}>
-                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">— select —</SelectItem>
-                  {INDIAN_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div><Label>Price (₹ per person)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-            <div><Label>Capacity</Label><Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-          </div>
-          <div><Label>Description</Label><Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
-          <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Publish</Button>
-        </form>
+
+      {(hasPub || hasNonPub) && (
+        <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-xs text-muted-foreground">
+          {hasPub
+            ? "Your profile is set up for pubs — only pub listings can be added."
+            : "Your profile is set up for events — pubs can't be added alongside other types."}
+        </div>
       )}
+
+      {showForm && (
+        <EventForm
+          vendor={vendor}
+          lockedType={hasPub ? "pub" : hasNonPub ? "event" : null}
+          onCancel={() => setShow(false)}
+          onSaved={() => { setShow(false); refetchEvents(); }}
+        />
+      )}
+
       {events.length === 0 ? (
         <p className="text-muted-foreground">No listings yet.</p>
       ) : (
@@ -382,24 +374,312 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
               {e.imageUrl && <div className="w-32 bg-muted shrink-0"><img src={e.imageUrl} alt="" className="h-full w-full object-cover" /></div>}
               <div className="flex-1 p-4 flex flex-col justify-between">
                 <div>
-                  <div className="flex gap-1 mb-2">
+                  <div className="flex gap-1 mb-2 flex-wrap">
                     <Badge variant="secondary" className="bg-white/10 border-white/10">{e.category}</Badge>
                     {(e.type === "pub") && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />Pub</Badge>}
+                    {e.type === "pub" && e.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Tickets</Badge>}
+                    {e.type === "pub" && e.pubMode === "event" && <Badge variant="outline">Events</Badge>}
+                    {e.type === "pub" && e.pubMode === "both" && <Badge variant="outline">Both</Badge>}
                   </div>
                   <p className="font-serif text-lg">{e.title}</p>
                   <p className="text-xs text-muted-foreground">{e.location}</p>
+                  {e.type === "pub" && (e.pubEventTypes ?? []).length > 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1">
+                      {(e.pubEventTypes as string[]).join(" · ")}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-sm font-medium">{formatINR(e.price)}</span>
-                  <Button size="icon" variant="ghost" onClick={() => del.mutate({ eventId: e.id }, { onSuccess: () => refetchEvents() })}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <span className="text-sm font-medium">
+                    {e.type === "pub" ? `from ${formatINR(e.startingPrice ?? e.price)}` : formatINR(e.price)}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => setEditingId(e.id)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        if (!confirm("Delete this listing?")) return;
+                        del.mutate({ eventId: e.id }, {
+                          onSuccess: () => { toast({ title: "Deleted" }); refetchEvents(); },
+                          onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
+                        });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {editingId != null && (
+        <EditEventModal
+          event={events.find((e: any) => e.id === editingId)!}
+          onClose={() => setEditingId(null)}
+          onSaved={() => { setEditingId(null); refetchEvents(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EventForm({ vendor, lockedType, onCancel, onSaved }: {
+  vendor: any; lockedType: "pub" | "event" | null; onCancel: () => void; onSaved: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState(vendor.category);
+  const [type, setType] = useState<string>(lockedType ?? "event");
+  const [description, setDescription] = useState("");
+  const [city, setCity] = useState(vendor.city ?? "");
+  const [stateF, setStateF] = useState(vendor.state ?? "");
+  const [price, setPrice] = useState(0);
+  const [capacity, setCapacity] = useState(50);
+  const [imageUrl, setImageUrl] = useState("");
+  // pub-specific
+  const [enableTickets, setEnableTickets] = useState(true);
+  const [enableEvents, setEnableEvents] = useState(false);
+  const [priceWomen, setPriceWomen] = useState(0);
+  const [priceMen, setPriceMen] = useState(0);
+  const [priceCouple, setPriceCouple] = useState(0);
+  const [pubEventTypes, setPubEventTypes] = useState<string[]>([]);
+  const create = useCreateEvent();
+  const { toast } = useToast();
+
+  const onImageFile = async (f: File | null) => {
+    if (!f) return;
+    try { setImageUrl(await fileToDataUrl(f)); } catch { /* ignore */ }
+  };
+
+  const togglePubEvent = (t: string) =>
+    setPubEventTypes((arr) => arr.includes(t) ? arr.filter((x) => x !== t) : [...arr, t]);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (type === "pub" && !enableTickets && !enableEvents) {
+      toast({ title: "Pick at least one of Tickets or Events", variant: "destructive" });
+      return;
+    }
+    const pubMode = type === "pub"
+      ? (enableTickets && enableEvents ? "both" : enableTickets ? "ticket" : "event")
+      : "";
+    const body: any = {
+      title, description, category,
+      location: `${city}${stateF ? ", " + stateF : ""}`,
+      price: type === "pub" && enableTickets ? Math.min(...[priceWomen, priceMen, priceCouple].filter((n) => n > 0).concat([price || 0])) : price,
+      capacity, imageUrl,
+      type, city, state: stateF, country: "India",
+      pubMode,
+      priceWomen: type === "pub" ? priceWomen : 0,
+      priceMen: type === "pub" ? priceMen : 0,
+      priceCouple: type === "pub" ? priceCouple : 0,
+      pubEventTypes: type === "pub" ? pubEventTypes : [],
+    };
+    create.mutate(
+      { data: body },
+      {
+        onSuccess: () => { toast({ title: type === "pub" ? "Pub published" : "Event published" }); onSaved(); },
+        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
+      <div className="grid md:grid-cols-2 gap-3">
+        <div>
+          <Label>Type</Label>
+          <Select value={type} onValueChange={setType} disabled={!!lockedType}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {EVENT_KIND.map((k) => <SelectItem key={k} value={k}>{k === "event" ? "Event" : "Pub / Lounge"}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Title</Label>
+          <Input required value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" />
+        </div>
+        <div>
+          <Label>Category</Label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+            <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Image</Label>
+          <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
+          <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste URL" className="bg-black/40 border-white/10 mt-1" />
+        </div>
+        <div><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} className="bg-black/40 border-white/10" /></div>
+        <div>
+          <Label>State</Label>
+          <Select value={stateF || "any"} onValueChange={(v) => setStateF(v === "any" ? "" : v)}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">— select —</SelectItem>
+              {INDIAN_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        {type !== "pub" && (
+          <div><Label>Price (₹ per person)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+        )}
+        <div><Label>Capacity</Label><Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+      </div>
+
+      {type === "pub" && (
+        <div className="rounded-2xl border border-white/10 p-4 space-y-3 bg-black/20">
+          <p className="font-serif text-lg flex items-center gap-2"><Wine className="h-4 w-4 text-primary" />Pub setup</p>
+          <div className="flex items-center gap-6 flex-wrap">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={enableTickets} onCheckedChange={(v) => setEnableTickets(!!v)} />
+              <TicketIcon className="h-4 w-4 text-primary" /> Sell tickets
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={enableEvents} onCheckedChange={(v) => setEnableEvents(!!v)} />
+              <CalIcon className="h-4 w-4 text-primary" /> Host events
+            </label>
+          </div>
+          {enableTickets && (
+            <div className="grid md:grid-cols-3 gap-3">
+              <div><Label>Women (₹)</Label><Input type="number" min={0} value={priceWomen} onChange={(e) => setPriceWomen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+              <div><Label>Men (₹)</Label><Input type="number" min={0} value={priceMen} onChange={(e) => setPriceMen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+              <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+            </div>
+          )}
+          {enableEvents && (
+            <div>
+              <Label>Event types you host</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {PUB_EVENT_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => togglePubEvent(t)}
+                    className={`text-xs px-3 py-1.5 rounded-full border ${
+                      pubEventTypes.includes(t)
+                        ? "bg-red-600/20 border-red-500/50 text-red-200"
+                        : "border-white/10 text-white/60 hover:bg-white/5"
+                    }`}
+                  >{t}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div><Label>Description</Label><Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">Publish</Button>
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
+  );
+}
+
+function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState(event.title);
+  const [description, setDescription] = useState(event.description ?? "");
+  const [imageUrl, setImageUrl] = useState(event.imageUrl ?? "");
+  const [price, setPrice] = useState(Number(event.price ?? 0));
+  const [priceWomen, setPriceWomen] = useState(Number(event.priceWomen ?? 0));
+  const [priceMen, setPriceMen] = useState(Number(event.priceMen ?? 0));
+  const [priceCouple, setPriceCouple] = useState(Number(event.priceCouple ?? 0));
+  const [capacity, setCapacity] = useState(Number(event.capacity ?? 0));
+  const [pubEventTypes, setPubEventTypes] = useState<string[]>(event.pubEventTypes ?? []);
+  const [pubMode, setPubMode] = useState<string>(event.pubMode ?? "");
+  const { toast } = useToast();
+  const isPub = event.type === "pub";
+
+  const onImageFile = async (f: File | null) => {
+    if (!f) return;
+    try { setImageUrl(await fileToDataUrl(f)); } catch { /* ignore */ }
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiPatch(`/api/events/${event.id}`, {
+        title, description, imageUrl, capacity,
+        price,
+        ...(isPub ? { pubMode, priceWomen, priceMen, priceCouple, pubEventTypes } : {}),
+      });
+      toast({ title: "Updated" });
+      onSaved();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    }
+  };
+
+  const togglePubEvent = (t: string) =>
+    setPubEventTypes((arr) => arr.includes(t) ? arr.filter((x) => x !== t) : [...arr, t]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <form onSubmit={save} className="bg-card border border-white/10 rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-3 my-auto" onClick={(e) => e.stopPropagation()}>
+        <p className="font-serif text-2xl">Edit listing</p>
+        <div><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" /></div>
+        <div><Label>Description</Label><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
+        <div>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Image</Label>
+          <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
+          <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste URL" className="bg-black/40 border-white/10 mt-1" />
+          {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label>Price (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+          <div><Label>Capacity</Label><Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+        </div>
+        {isPub && (
+          <>
+            <div>
+              <Label>Mode</Label>
+              <Select value={pubMode || "both"} onValueChange={setPubMode}>
+                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ticket">Tickets only</SelectItem>
+                  <SelectItem value="event">Events only</SelectItem>
+                  <SelectItem value="both">Both tickets &amp; events</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>Women (₹)</Label><Input type="number" min={0} value={priceWomen} onChange={(e) => setPriceWomen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+              <div><Label>Men (₹)</Label><Input type="number" min={0} value={priceMen} onChange={(e) => setPriceMen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+              <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+            </div>
+            <div>
+              <Label>Event types</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {PUB_EVENT_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => togglePubEvent(t)}
+                    className={`text-xs px-3 py-1.5 rounded-full border ${
+                      pubEventTypes.includes(t)
+                        ? "bg-red-600/20 border-red-500/50 text-red-200"
+                        : "border-white/10 text-white/60 hover:bg-white/5"
+                    }`}
+                  >{t}</button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="bg-gradient-to-br from-red-600 to-red-800 border-0">Save</Button>
+        </div>
+      </form>
     </div>
   );
 }

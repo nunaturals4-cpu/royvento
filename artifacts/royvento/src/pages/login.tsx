@@ -32,9 +32,7 @@ export function Login() {
           if (data.token) localStorage.setItem("royvento_token", data.token);
           qc.invalidateQueries();
           toast({ title: `Welcome back, ${data.user.name.split(" ")[0]}` });
-          if (data.user.role === "admin") setLocation("/admin");
-          else if (data.user.role === "vendor") setLocation("/dashboard/partner");
-          else setLocation("/dashboard/bookings");
+          setLocation("/");
         },
         onError: (err: any) =>
           toast({ title: "Login failed", description: err?.message ?? "Check your credentials.", variant: "destructive" }),

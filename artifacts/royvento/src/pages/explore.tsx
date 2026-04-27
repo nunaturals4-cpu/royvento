@@ -7,7 +7,9 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { apiGet, BUDGET_RANGES, EVENT_CATEGORIES, INDIAN_STATES } from "@/lib/api";
+import { apiGet, BUDGET_RANGES, EVENT_CATEGORIES } from "@/lib/api";
+import { LocationSelect } from "@/components/LocationSelect";
+import { useLocation } from "wouter";
 
 interface PublicEvent {
   id: number;
@@ -29,13 +31,21 @@ interface PublicEvent {
 const CATEGORIES = ["All", ...EVENT_CATEGORIES] as const;
 
 export function Explore() {
-  const [search, setSearch] = useState("");
+  const [location] = useLocation();
+  const initialSearch = (() => {
+    try {
+      const idx = location.indexOf("?");
+      if (idx === -1) return "";
+      return new URLSearchParams(location.slice(idx)).get("search") ?? "";
+    } catch { return ""; }
+  })();
+  const [search, setSearch] = useState(initialSearch);
   const [active, setActive] = useState<string>("All");
   const [minRating, setMinRating] = useState<string>("any");
   const [budget, setBudget] = useState<string>("any");
-  const [stateF, setStateF] = useState<string>("any");
+  const [country, setCountry] = useState<string>("");
+  const [stateF, setStateF] = useState<string>("");
   const [city, setCity] = useState<string>("");
-  const [country, setCountry] = useState<string>("India");
   const [events, setEvents] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,9 +53,9 @@ export function Explore() {
     const params = new URLSearchParams();
     if (active !== "All") params.set("category", active);
     if (search.trim()) params.set("search", search.trim());
-    if (stateF !== "any") params.set("state", stateF);
-    if (city.trim()) params.set("city", city.trim());
-    if (country.trim()) params.set("country", country.trim());
+    if (stateF) params.set("state", stateF);
+    if (city) params.set("city", city);
+    if (country) params.set("country", country);
     if (budget !== "any") {
       const b = BUDGET_RANGES.find((x) => x.value === budget);
       if (b) {
@@ -68,7 +78,7 @@ export function Explore() {
 
   const clear = () => {
     setSearch(""); setActive("All"); setMinRating("any");
-    setBudget("any"); setStateF("any"); setCity(""); setCountry("India");
+    setBudget("any"); setCountry(""); setStateF(""); setCity("");
   };
 
   return (
@@ -89,8 +99,8 @@ export function Explore() {
             <X className="h-3 w-3" /> Clear all
           </button>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-3">
-          <div className="lg:col-span-2 relative">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="relative md:col-span-2 lg:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
@@ -121,34 +131,19 @@ export function Explore() {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Select value={stateF} onValueChange={setStateF}>
-              <SelectTrigger className="h-11 bg-black/40 border-white/10"><SelectValue placeholder="State" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any state</SelectItem>
-                {INDIAN_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="City"
-              className="h-11 bg-black/40 border-white/10"
-            />
-          </div>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-3 mt-3">
-          <div className="lg:col-span-2">
-            <Label className="text-xs text-muted-foreground">Country</Label>
-            <Input
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              placeholder="Country"
-              className="h-11 bg-black/40 border-white/10 mt-1"
-            />
-          </div>
+        <div className="mt-3">
+          <Label className="text-xs text-muted-foreground mb-1 block">Location</Label>
+          <LocationSelect
+            country={country}
+            state={stateF}
+            city={city}
+            onChange={(next) => {
+              setCountry(next.country);
+              setStateF(next.state);
+              setCity(next.city);
+            }}
+          />
         </div>
       </div>
 

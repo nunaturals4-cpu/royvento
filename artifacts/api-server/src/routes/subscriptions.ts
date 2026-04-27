@@ -7,13 +7,12 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, gt } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
 
 const router: IRouter = Router();
 
-// Demo prices (no real payment integration)
 const PLAN_PRICES = {
-  user: { monthly: 200, yearly: 2500 },
+  user: { monthly: 199, yearly: 1999 },
   partner: { monthly: 999, yearly: 9999 },
 } as const;
 
@@ -29,15 +28,35 @@ function expiresFor(period: "monthly" | "yearly"): Date {
   return d;
 }
 
+router.get("/subscriptions/prices", async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  const newUser = user ? isNewUser(user.createdAt) : false;
+  res.json({
+    user: {
+      monthly: PLAN_PRICES.user.monthly,
+      yearly: PLAN_PRICES.user.yearly,
+      newUserDiscountPercent: newUser ? 50 : 0,
+    },
+    partner: {
+      monthly: PLAN_PRICES.partner.monthly,
+      yearly: PLAN_PRICES.partner.yearly,
+      newUserDiscountPercent: newUser ? 50 : 0,
+    },
+    isNewUser: newUser,
+  });
+});
+
 router.post("/subscriptions", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = SubscribeBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
   const { planType, planPeriod } = parsed.data;
-  const price = PLAN_PRICES[planType][planPeriod];
+  let price = PLAN_PRICES[planType][planPeriod];
+  if (isNewUser(user.createdAt)) {
+    price = Math.round(price * 0.5);
+  }
 
-  // expire previous active
   await db
     .update(subscriptionsTable)
     .set({ status: "expired" })
@@ -60,7 +79,6 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
     })
     .returning();
 
-  // If partner subscription, mark vendor as premium
   if (planType === "partner") {
     await db
       .update(vendorsTable)
@@ -94,7 +112,6 @@ router.get("/admin/subscriptions", requireAuth(["admin"]), async (_req, res) => 
     .from(subscriptionsTable)
     .orderBy(desc(subscriptionsTable.createdAt));
   if (subs.length === 0) return res.json([]);
-  const userIds = Array.from(new Set(subs.map((s) => s.userId)));
   const users = await db.select().from(usersTable);
   const uMap = new Map(users.map((u) => [u.id, u]));
   return res.json(

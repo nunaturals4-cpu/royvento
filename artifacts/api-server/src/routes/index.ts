@@ -15,6 +15,7 @@ import couponsRouter from "./coupons";
 import partnerMediaRouter from "./partnerMedia";
 import blockedDatesRouter from "./blockedDates";
 import adsRouter from "./ads";
+import referralsRouter from "./referrals";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(couponsRouter);
 router.use(partnerMediaRouter);
 router.use(blockedDatesRouter);
 router.use(adsRouter);
+router.use(referralsRouter);
 
 export default router;

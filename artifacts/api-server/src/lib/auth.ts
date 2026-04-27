@@ -18,6 +18,9 @@ export interface AuthUser {
   phone: string;
   about: string;
   profileImage: string;
+  referralCode: string;
+  referredBy: number | null;
+  points: number;
   createdAt: string;
 }
 
@@ -120,6 +123,9 @@ export function userToPublic(u: {
   phone?: string | null;
   about?: string | null;
   profileImage?: string | null;
+  referralCode?: string | null;
+  referredBy?: number | null;
+  points?: number | null;
   createdAt: Date;
 }): AuthUser {
   return {
@@ -130,6 +136,22 @@ export function userToPublic(u: {
     phone: u.phone ?? "",
     about: u.about ?? "",
     profileImage: u.profileImage ?? "",
+    referralCode: u.referralCode ?? "",
+    referredBy: u.referredBy ?? null,
+    points: u.points ?? 0,
     createdAt: u.createdAt.toISOString(),
   };
+}
+
+export function isNewUser(createdAt: string | Date): boolean {
+  const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  const tenDays = 10 * 24 * 60 * 60 * 1000;
+  return Date.now() - d.getTime() <= tenDays;
+}
+
+export function newUserDaysLeft(createdAt: string | Date): number {
+  const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  const tenDays = 10 * 24 * 60 * 60 * 1000;
+  const remaining = tenDays - (Date.now() - d.getTime());
+  return Math.max(0, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
 }
