@@ -214,6 +214,14 @@ const DEMO_PUBS = [
   },
 ];
 
+const PUB_TICKET_DEFAULTS = {
+  pubMode: "both",
+  priceWomen: "1500",
+  priceMen: "2000",
+  priceCouple: "3500",
+  pubEventTypes: ["DJ Night", "Live Music", "Themed Party"],
+};
+
 async function ensureDemoEvents(vendorId: number) {
   const all = [...DEMO_EVENTS, ...DEMO_PUBS];
   for (const e of all) {
@@ -222,12 +230,29 @@ async function ensureDemoEvents(vendorId: number) {
       .from(eventsTable)
       .where(eq(eventsTable.title, e.title))
       .limit(1);
-    if (existing[0]) continue;
+    if (existing[0]) {
+      // Update pub events: fix category to "Pubs" and add pub fields if missing
+      if (e.type === "pub") {
+        await db
+          .update(eventsTable)
+          .set({
+            category: "Pubs",
+            pubMode: existing[0].pubMode || PUB_TICKET_DEFAULTS.pubMode,
+            priceWomen: existing[0].priceWomen === "0" ? PUB_TICKET_DEFAULTS.priceWomen : existing[0].priceWomen,
+            priceMen: existing[0].priceMen === "0" ? PUB_TICKET_DEFAULTS.priceMen : existing[0].priceMen,
+            priceCouple: existing[0].priceCouple === "0" ? PUB_TICKET_DEFAULTS.priceCouple : existing[0].priceCouple,
+            pubEventTypes: existing[0].pubEventTypes?.length ? existing[0].pubEventTypes : PUB_TICKET_DEFAULTS.pubEventTypes,
+          })
+          .where(eq(eventsTable.id, existing[0].id));
+      }
+      continue;
+    }
+    const isPub = e.type === "pub";
     await db.insert(eventsTable).values({
       vendorId,
       title: e.title,
       description: e.description,
-      category: e.category,
+      category: isPub ? "Pubs" : e.category,
       type: e.type,
       price: e.price,
       capacity: e.capacity,
@@ -239,6 +264,7 @@ async function ensureDemoEvents(vendorId: number) {
       eventDate: e.eventDate ?? null,
       featured: true,
       popular: true,
+      ...(isPub ? PUB_TICKET_DEFAULTS : {}),
     });
   }
   console.log(`Seeded ${all.length} demo events/pubs.`);

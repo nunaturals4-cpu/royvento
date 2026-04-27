@@ -183,8 +183,16 @@ export function EventDetail() {
     ? `${(event as any).city}${(event as any).state ? ", " + (event as any).state : ""}`
     : event.location;
 
+  const vendorCover = (ev.vendor as any)?.coverImageUrl;
+
   return (
     <div>
+      {/* Pub venue cover photo shown as a full-width banner above the event hero */}
+      {isPub && vendorCover && (
+        <div className="w-full h-48 md:h-64 overflow-hidden">
+          <img src={vendorCover} alt="Venue cover" className="w-full h-full object-cover" />
+        </div>
+      )}
       <div className="relative h-[58vh] w-full overflow-hidden">
         {event.imageUrl ? (
           <img src={event.imageUrl} alt={event.title} className="absolute inset-0 h-full w-full object-cover" />
@@ -522,16 +530,23 @@ function TicketRow({ label, price, value, onChange }: { label: string; price: nu
         <span className="text-muted-foreground ml-2">{price > 0 ? formatINRExact(price) : "—"}</span>
       </div>
       <div className="flex items-center gap-1">
-        <button type="button" onClick={() => onChange(Math.max(0, value - 1))} className="h-7 w-7 rounded border border-white/15 hover:bg-white/5">−</button>
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(0, value - 1))}
+          className="h-7 w-7 rounded border border-border bg-background hover:bg-muted flex items-center justify-center font-bold select-none"
+        >−</button>
         <input
           type="number"
           min={0}
           value={value}
           onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-          className="h-7 w-12 rounded border border-white/15 bg-black/40 text-center text-sm"
-          disabled={price <= 0}
+          className="h-7 w-12 rounded border border-border bg-background text-center text-sm text-foreground"
         />
-        <button type="button" onClick={() => onChange(value + 1)} className="h-7 w-7 rounded border border-white/15 hover:bg-white/5" disabled={price <= 0}>+</button>
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          className="h-7 w-7 rounded border border-border bg-background hover:bg-muted flex items-center justify-center font-bold select-none"
+        >+</button>
       </div>
     </div>
   );

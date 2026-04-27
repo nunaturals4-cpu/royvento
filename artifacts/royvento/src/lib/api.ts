@@ -78,6 +78,7 @@ export const EVENT_CATEGORIES = [
   "Festival",
   "Concert",
   "Brand Activation",
+  "Pubs",
 ] as const;
 
 // Budget ranges in INR (5,000 → 100 crore)

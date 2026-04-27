@@ -22,6 +22,12 @@ export function VendorDetail() {
 
   return (
     <div>
+      {/* Cover photo (full-width) displayed above the banner hero when set */}
+      {(vendor as any).coverImageUrl && (
+        <div className="w-full h-52 md:h-72 overflow-hidden">
+          <img src={(vendor as any).coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+        </div>
+      )}
       <div className="relative h-[50vh] w-full overflow-hidden">
         {vendor.bannerImage ? (
           <img src={vendor.bannerImage} alt={vendor.businessName} className="absolute inset-0 h-full w-full object-cover" />

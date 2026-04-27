@@ -19,6 +19,7 @@ interface VendorRow {
   description: string;
   location: string;
   bannerImage: string;
+  coverImageUrl: string;
   portfolioImages: string[];
   status: string;
   createdAt: Date;
@@ -34,6 +35,7 @@ async function serializeVendor(v: VendorRow) {
     description: v.description,
     location: v.location,
     bannerImage: v.bannerImage,
+    coverImageUrl: v.coverImageUrl ?? "",
     portfolioImages: v.portfolioImages,
     status: v.status,
     rating: summary.rating,
@@ -54,6 +56,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       description: v.description,
       location: v.location,
       bannerImage: v.bannerImage,
+      coverImageUrl: v.coverImageUrl ?? "",
       portfolioImages: v.portfolioImages,
       status: v.status,
       rating: r.rating,
@@ -166,8 +169,13 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     "bannerImage",
     "portfolioImages",
   ] as const) {
-    const v = parsed.data[k];
-    if (v !== undefined) updates[k] = v;
+    const val = parsed.data[k];
+    if (val !== undefined) updates[k] = val;
+  }
+  // coverImageUrl is not in the zod schema; read from raw body
+  const rawBody = req.body as Record<string, unknown>;
+  if (typeof rawBody["coverImageUrl"] === "string") {
+    updates["coverImageUrl"] = rawBody["coverImageUrl"];
   }
   const [v] = await db
     .update(vendorsTable)

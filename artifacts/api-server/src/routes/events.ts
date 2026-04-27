@@ -215,6 +215,7 @@ router.get("/events/:eventId", async (req, res) => {
           city: v.city,
           country: v.country,
           bannerImage: v.bannerImage,
+          coverImageUrl: (v as any).coverImageUrl ?? "",
           portfolioImages: v.portfolioImages,
           status: v.status,
           rating: rating.rating,

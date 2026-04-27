@@ -206,6 +206,42 @@ html:not(.dark) {
   h1, h2, h3, h4 { letter-spacing: -0.01em; }
 }
 
+/* ── Light-theme utility overrides ── */
+html:not(.dark) .text-white { color: hsl(0 0% 10%); }
+html:not(.dark) .text-white\/80 { color: rgba(0,0,0,0.80); }
+html:not(.dark) .text-white\/90 { color: rgba(0,0,0,0.90); }
+html:not(.dark) .text-red-200 { color: rgb(153,27,27); }
+html:not(.dark) .text-red-100 { color: rgb(127,29,29); }
+html:not(.dark) .bg-black\/20 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .bg-black\/70 { background-color: rgba(255,255,255,0.92); }
+html:not(.dark) .bg-black\/80 { background-color: rgba(255,255,255,0.94); }
+html:not(.dark) .border-white\/5 { border-color: rgba(0,0,0,0.05); }
+
+/* Hero image overlay: slightly transparent so image stays visible */
+html:not(.dark) .from-background {
+  --tw-gradient-from: rgba(250,250,250,0.82) var(--tw-gradient-from-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(250,250,250,0));
+}
+html:not(.dark) .via-background\/40 {
+  --tw-gradient-via: rgba(250,250,250,0.20) var(--tw-gradient-via-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to, rgba(250,250,250,0));
+}
+
+/* Hero grid lines */
+html:not(.dark) .hero-grid {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);
+}
+
+/* Stat number gradient — dark on light bg */
+html:not(.dark) .stat-number {
+  background: linear-gradient(180deg, hsl(0 0% 10%), hsl(0 0% 30%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 html:not(.dark) .glass-card {
   background: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.005));
   border: 1px solid rgba(0,0,0,0.08);

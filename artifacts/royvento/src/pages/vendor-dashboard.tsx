@@ -103,6 +103,7 @@ function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [bannerImage, setBanner] = useState("");
+  const [coverImageUrl, setCover] = useState("");
   const [country, setCountry] = useState("India");
   const [stateF, setStateF] = useState("");
   const [city, setCity] = useState("");
@@ -113,6 +114,10 @@ function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
     if (!f) return;
     try { setBanner(await fileToDataUrl(f)); } catch { /* ignore */ }
   };
+  const onCoverFile = async (f: File | null) => {
+    if (!f) return;
+    try { setCover(await fileToDataUrl(f)); } catch { /* ignore */ }
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +126,7 @@ function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
       { data: { businessName, category, description, location: loc, bannerImage, portfolioImages: [] } },
       {
         onSuccess: async () => {
-          try { await apiPatch("/api/partner/profile", { state: stateF, city, country }); } catch { /* silent */ }
+          try { await apiPatch("/api/partner/profile", { state: stateF, city, country, coverImageUrl }); } catch { /* silent */ }
           toast({ title: "Partner profile submitted!" });
           onCreated();
         },
@@ -162,10 +167,14 @@ function CreateVendorForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
       <div>
-        <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Banner image</Label>
+        <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Profile banner image</Label>
         <Input type="file" accept="image/*" onChange={(e) => onBannerFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10 mt-1" />
-        <Input value={bannerImage} onChange={(e) => setBanner(e.target.value)} placeholder="…or paste an image URL" className="bg-black/40 border-white/10 mt-2" />
-        {bannerImage && <img src={bannerImage} alt="" className="mt-2 rounded-xl max-h-40 object-cover" />}
+        {bannerImage && <img src={bannerImage} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
+      </div>
+      <div>
+        <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Cover photo <span className="text-muted-foreground text-[10px] ml-1">(shown to visitors on your page)</span></Label>
+        <Input type="file" accept="image/*" onChange={(e) => onCoverFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10 mt-1" />
+        {coverImageUrl && <img src={coverImageUrl} alt="" className="mt-2 rounded-xl max-h-28 w-full object-cover" />}
       </div>
       <div><Label>Description</Label><Textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
       <Button type="submit" disabled={create.isPending} className="bg-gradient-to-br from-red-600 to-red-800 border-0">{create.isPending ? "Submitting…" : "Submit for review"}</Button>
@@ -179,6 +188,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [description, setDescription] = useState(vendor.description);
   const [location, setLocation] = useState(vendor.location);
   const [bannerImage, setBanner] = useState(vendor.bannerImage);
+  const [coverImageUrl, setCover] = useState(vendor.coverImageUrl ?? "");
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [city, setCity] = useState(vendor.city ?? "");
   const [country, setCountry] = useState(vendor.country ?? "India");
@@ -205,7 +215,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
         onSuccess: async () => {
           try {
             await apiPatch("/api/partner/profile", {
-              eventTypes, budgetMin, budgetMax, state: stateF, city, country,
+              eventTypes, budgetMin, budgetMax, state: stateF, city, country, coverImageUrl,
             });
           } catch {
             // silent
@@ -245,7 +255,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           <div><Label>Location label</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} className="bg-black/40 border-white/10" /></div>
         </div>
         <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Banner image</Label>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Profile banner image</Label>
           <Input
             type="file"
             accept="image/*"
@@ -255,7 +265,20 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             }}
             className="bg-black/40 border-white/10 mt-1"
           />
-          <Input value={bannerImage} onChange={(e) => setBanner(e.target.value)} placeholder="…or paste an image URL" className="bg-black/40 border-white/10 mt-2" />
+          {bannerImage && <img src={bannerImage} alt="" className="mt-2 rounded-xl max-h-24 object-cover" />}
+        </div>
+        <div>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Cover photo <span className="text-muted-foreground text-[10px] ml-1">(full-width hero shown to visitors)</span></Label>
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const f = e.target.files?.[0]; if (!f) return;
+              try { setCover(await fileToDataUrl(f)); } catch { /* ignore */ }
+            }}
+            className="bg-black/40 border-white/10 mt-1"
+          />
+          {coverImageUrl && <img src={coverImageUrl} alt="" className="mt-2 rounded-xl max-h-24 w-full object-cover" />}
         </div>
         <div>
           <Label>Description</Label>
@@ -513,9 +536,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
           </Select>
         </div>
         <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Image</Label>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image</Label>
           <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
-          <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste URL" className="bg-black/40 border-white/10 mt-1" />
+          {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-28 object-cover" />}
         </div>
         <div><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} className="bg-black/40 border-white/10" /></div>
         <div>
@@ -629,9 +652,8 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
         <div><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" /></div>
         <div><Label>Description</Label><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
         <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Image</Label>
+          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image</Label>
           <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
-          <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste URL" className="bg-black/40 border-white/10 mt-1" />
           {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
         </div>
         <div className="grid grid-cols-2 gap-3">

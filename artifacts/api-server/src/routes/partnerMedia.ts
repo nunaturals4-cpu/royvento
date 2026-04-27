@@ -94,6 +94,7 @@ const UpdatePartnerProfileBody = z.object({
   state: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
+  coverImageUrl: z.string().optional(),
 });
 
 router.patch(
@@ -119,6 +120,8 @@ router.patch(
     if (parsed.data.city !== undefined) updates["city"] = parsed.data.city;
     if (parsed.data.country !== undefined)
       updates["country"] = parsed.data.country;
+    if (parsed.data.coverImageUrl !== undefined)
+      updates["coverImageUrl"] = parsed.data.coverImageUrl;
     const [v] = await db
       .update(vendorsTable)
       .set(updates)

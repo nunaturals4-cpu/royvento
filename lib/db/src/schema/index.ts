@@ -50,6 +50,7 @@ export const vendorsTable = pgTable(
     city: varchar("city", { length: 100 }).notNull().default(""),
     country: varchar("country", { length: 100 }).notNull().default("India"),
     bannerImage: text("banner_image").notNull().default(""),
+    coverImageUrl: text("cover_image_url").notNull().default(""),
     portfolioImages: text("portfolio_images").array().notNull().default([]),
     eventTypes: text("event_types").array().notNull().default([]),
     budgetMin: numeric("budget_min", { precision: 14, scale: 2 })
