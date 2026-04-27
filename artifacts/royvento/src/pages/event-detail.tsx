@@ -183,7 +183,7 @@ export function EventDetail() {
     ? `${(event as any).city}${(event as any).state ? ", " + (event as any).state : ""}`
     : event.location;
 
-  const vendorCover = (ev.vendor as any)?.coverImageUrl;
+  const vendorCover = ev.vendor?.coverImageUrl;
 
   return (
     <div>

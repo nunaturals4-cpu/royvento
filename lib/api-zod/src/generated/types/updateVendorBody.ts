@@ -12,5 +12,6 @@ export interface UpdateVendorBody {
   description?: string;
   location?: string;
   bannerImage?: string;
+  coverImageUrl?: string;
   portfolioImages?: string[];
 }

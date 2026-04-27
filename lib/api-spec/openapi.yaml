@@ -738,6 +738,8 @@ components:
           type: string
         bannerImage:
           type: string
+        coverImageUrl:
+          type: string
         portfolioImages:
           type: array
           items:
@@ -750,7 +752,7 @@ components:
           type: integer
         createdAt:
           type: string
-      required: [id, userId, businessName, category, description, location, bannerImage, portfolioImages, status, rating, reviewCount, createdAt]
+      required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt]
 
     MyVendorResponse:
       type: object
@@ -774,6 +776,8 @@ components:
           type: string
         bannerImage:
           type: string
+        coverImageUrl:
+          type: string
         portfolioImages:
           type: array
           items:
@@ -792,6 +796,8 @@ components:
         location:
           type: string
         bannerImage:
+          type: string
+        coverImageUrl:
           type: string
         portfolioImages:
           type: array

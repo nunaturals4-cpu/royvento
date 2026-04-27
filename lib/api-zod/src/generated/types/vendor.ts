@@ -15,6 +15,7 @@ export interface Vendor {
   description: string;
   location: string;
   bannerImage: string;
+  coverImageUrl: string;
   portfolioImages: string[];
   status: VendorStatus;
   rating: number;

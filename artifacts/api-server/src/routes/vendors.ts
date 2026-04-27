@@ -167,15 +167,11 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     "description",
     "location",
     "bannerImage",
+    "coverImageUrl",
     "portfolioImages",
   ] as const) {
     const val = parsed.data[k];
     if (val !== undefined) updates[k] = val;
-  }
-  // coverImageUrl is not in the zod schema; read from raw body
-  const rawBody = req.body as Record<string, unknown>;
-  if (typeof rawBody["coverImageUrl"] === "string") {
-    updates["coverImageUrl"] = rawBody["coverImageUrl"];
   }
   const [v] = await db
     .update(vendorsTable)

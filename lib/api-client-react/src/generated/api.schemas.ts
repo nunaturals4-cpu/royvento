@@ -71,6 +71,7 @@ export interface Vendor {
   description: string;
   location: string;
   bannerImage: string;
+  coverImageUrl: string;
   portfolioImages: string[];
   status: VendorStatus;
   rating: number;
@@ -88,6 +89,7 @@ export interface CreateVendorBody {
   description: string;
   location: string;
   bannerImage?: string;
+  coverImageUrl?: string;
   portfolioImages?: string[];
 }
 
@@ -97,6 +99,7 @@ export interface UpdateVendorBody {
   description?: string;
   location?: string;
   bannerImage?: string;
+  coverImageUrl?: string;
   portfolioImages?: string[];
 }
 

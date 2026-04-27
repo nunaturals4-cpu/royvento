@@ -12,5 +12,6 @@ export interface CreateVendorBody {
   description: string;
   location: string;
   bannerImage?: string;
+  coverImageUrl?: string;
   portfolioImages?: string[];
 }
