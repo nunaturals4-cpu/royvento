@@ -73,8 +73,10 @@ export default function ProfileScreen() {
     if (!editName.trim()) { Alert.alert("Name required"); return; }
     const phoneNormalized = editPhone.replace(/\D/g, "").slice(-10) || undefined;
     updateMeMutation.mutate({
-      name: editName.trim(),
-      ...(phoneNormalized !== undefined ? { phone: phoneNormalized } : {}),
+      data: {
+        name: editName.trim(),
+        ...(phoneNormalized !== undefined ? { phone: phoneNormalized } : {}),
+      },
     });
   };
 

@@ -27,7 +27,7 @@ export default function WishlistScreen() {
   const qc = useQueryClient();
 
   const { data, isLoading, refetch } = useGetWishlist({
-    query: { enabled: !!user },
+    query: { queryKey: getGetWishlistQueryKey(), enabled: !!user },
   });
 
   const removeMutation = useRemoveFromWishlist({

@@ -75,7 +75,7 @@ export default function EventDetailScreen() {
 
   const bookingDate = bookingDateObj.toISOString().slice(0, 10);
 
-  const wishlistQuery = useGetWishlist({ query: { enabled: !!user } });
+  const wishlistQuery = useGetWishlist({ query: { queryKey: getGetWishlistQueryKey(), enabled: !!user } });
   const isWishlisted = wishlistQuery.data?.some((w) => w.id === eventId) ?? false;
 
   const addMutation = useAddToWishlist({
@@ -91,7 +91,7 @@ export default function EventDetailScreen() {
     if (isWishlisted) {
       removeMutation.mutate({ eventId });
     } else {
-      addMutation.mutate({ eventId });
+      addMutation.mutate({ data: { eventId } });
     }
   };
 
