@@ -377,8 +377,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     }
   }
 
-  // Daily revenue — last 30 days
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  // Daily revenue — last 30 days (keys are the exact 30 UTC dates)
   const dailyMap = new Map<string, number>();
   // Pre-fill all 30 days with zero
   for (let i = 29; i >= 0; i--) {
@@ -388,7 +387,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   }
   for (const b of allBookings) {
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
-    if (new Date(b.createdAt) >= thirtyDaysAgo) {
+    if (dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
     }
   }
