@@ -47,10 +47,7 @@ const INDIAN_CITIES = [
   "Thiruvananthapuram", "Udaipur", "Vadodara", "Varanasi", "Vijayawada", "Visakhapatnam",
 ];
 
-interface Media {
-  id: number; type: "photo" | "video"; url: string; caption: string;
-  eventCategories: string[];
-}
+
 interface BlockedDate {
   id: number; date: string; reason: string; source: string;
 }
@@ -97,7 +94,6 @@ export function VendorDashboard() {
             <TabsTrigger value="analytics">
               <TrendingUp className="h-3.5 w-3.5 mr-1 text-primary" /> Analytics
             </TabsTrigger>
-            {!hasPub && <TabsTrigger value="media">Media</TabsTrigger>}
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="ads">Ads</TabsTrigger>
             <TabsTrigger value="announcements">
@@ -117,7 +113,6 @@ export function VendorDashboard() {
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
           <TabsContent value="bookings"><BookingsManager bookings={bookings} refetch={refetchBookings} /></TabsContent>
           <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
-          {!hasPub && <TabsContent value="media"><MediaManager vendor={vendor} events={events} /></TabsContent>}
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
           <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
@@ -920,131 +915,6 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
   );
 }
 
-function MediaManager({ events }: { vendor: any; events: any[] }) {
-  const [items, setItems] = useState<Media[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>(EVENT_CATEGORIES[0] ?? "");
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const { toast } = useToast();
-
-  const load = () => apiGet<Media[]>("/api/partner/media/me").then(setItems).catch(() => {});
-  useEffect(() => { load(); }, []);
-
-  const onFilesChange = async (fl: FileList | null) => {
-    if (!fl || fl.length === 0) return;
-    const arr = Array.from(fl);
-    setFiles(arr);
-    const urls: string[] = [];
-    for (const f of arr) {
-      try { urls.push(await fileToDataUrl(f)); } catch { /* ignore */ }
-    }
-    setPreviews(urls);
-  };
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (files.length === 0) {
-      toast({ title: "Please select at least one file", variant: "destructive" });
-      return;
-    }
-    setUploading(true);
-    let success = 0;
-    for (const f of files) {
-      try {
-        const url = await fileToDataUrl(f);
-        const type = f.type.startsWith("video/") ? "video" : "photo";
-        await apiPost("/api/partner/media", { type, url, caption: "", eventCategories: [selectedCategory] });
-        success++;
-      } catch { /* ignore individual */ }
-    }
-    setUploading(false);
-    if (success > 0) {
-      toast({ title: `${success} file${success > 1 ? "s" : ""} uploaded` });
-      setFiles([]); setPreviews([]);
-      load();
-    } else {
-      toast({ title: "Upload failed — please try a smaller file", variant: "destructive" });
-    }
-  };
-
-  return (
-    <div className="grid lg:grid-cols-[1fr_1.4fr] gap-6">
-      <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <ImageIcon className="h-4 w-4 text-primary" />
-          <p className="font-serif text-xl">Upload photos &amp; videos</p>
-        </div>
-        <div>
-          <Label>Event category</Label>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {EVENT_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Select files (photos or videos)</Label>
-          <Input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={(e) => onFilesChange(e.target.files)}
-            className="bg-black/40 border-white/10 mt-1"
-          />
-          {previews.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {previews.map((src, i) => (
-                files[i]?.type.startsWith("video/") ? (
-                  <div key={i} className="h-16 w-16 rounded-lg bg-black/40 flex items-center justify-center border border-white/10">
-                    <Video className="h-5 w-5 text-primary" />
-                  </div>
-                ) : (
-                  <img key={i} src={src} alt="" className="h-16 w-16 rounded-lg object-cover border border-white/10" />
-                )
-              ))}
-            </div>
-          )}
-        </div>
-        <Button type="submit" disabled={uploading || files.length === 0} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-          {uploading ? "Uploading…" : `Upload ${files.length > 0 ? files.length + " file" + (files.length > 1 ? "s" : "") : ""}`}
-        </Button>
-      </form>
-      <div className="rounded-3xl glass-card p-6">
-        <p className="font-serif text-xl mb-3">Your gallery</p>
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No media yet.</p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {items.map((m) => (
-              <div key={m.id} className="relative rounded-xl overflow-hidden border border-white/10 group">
-                {m.type === "photo" ? (
-                  <img src={m.url} alt="" className="aspect-square object-cover w-full" />
-                ) : (
-                  <div className="aspect-square bg-black/40 flex items-center justify-center">
-                    <Video className="h-8 w-8 text-primary" />
-                  </div>
-                )}
-                {(m.eventCategories ?? []).length > 0 && (
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-[10px] text-white truncate">
-                    {m.eventCategories[0]}
-                  </div>
-                )}
-                <button
-                  className="absolute top-1 right-1 bg-black/70 hover:bg-destructive/80 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition"
-                  onClick={() => apiDelete(`/api/partner/media/${m.id}`).then(load)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
   const [items, setItems] = useState<BlockedDate[]>([]);

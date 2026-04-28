@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentProps } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetEvent,
@@ -8,7 +8,6 @@ import {
   useGetMe,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,7 +69,6 @@ export function EventDetail() {
   const [ticketWomen, setTicketWomen] = useState(0);
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
-  const [selectedPubEvent, setSelectedPubEvent] = useState("");
   const [occasion, setOccasion] = useState("");
   const [pointsToUse, setPointsToUse] = useState(0);
 
@@ -124,34 +122,7 @@ export function EventDetail() {
   const selectedDayName = date ? DAY_ABBRS[new Date(`${date}T12:00:00`).getDay()] : "";
   const isClosedDay = !!(date && vendorOpenDays.length > 0 && !vendorOpenDays.includes(selectedDayName));
 
-  const localDateStr = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const manualBlockedSet = new Set([
-    ...Array.from(blockedDates),
-    ...partnerBlockedDates.map((r) => r.date),
-  ]);
-  const isDateDisabled = (d: Date): boolean => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    if (d < today) return true;
-    const ds = localDateStr(d);
-    if (manualBlockedSet.has(ds)) return true;
-    if (vendorOpenDays.length > 0 && !vendorOpenDays.includes(DAY_ABBRS[d.getDay()])) return true;
-    return false;
-  };
-  const calSelectedDate = date ? new Date(`${date}T12:00:00`) : undefined;
   const venueName = ev.vendor?.businessName ?? "This venue";
-  const CalDayButton = ({ day, modifiers, ...props }: ComponentProps<typeof CalendarDayButton>) => {
-    let title: string | undefined;
-    if (modifiers.disabled) {
-      const ds = localDateStr(day.date);
-      if (manualBlockedSet.has(ds)) {
-        title = "This date is unavailable — the venue has blocked it";
-      } else if (vendorOpenDays.length > 0 && !vendorOpenDays.includes(DAY_ABBRS[day.date.getDay()])) {
-        title = `${venueName} is closed on ${DAY_ABBRS[day.date.getDay()]}s`;
-      }
-    }
-    return <CalendarDayButton day={day} modifiers={modifiers} title={title} {...props} />;
-  };
 
   // Compute subtotal based on mode
   let subtotal = 0;
@@ -215,10 +186,7 @@ export function EventDetail() {
       toast({ title: "Add at least one ticket", variant: "destructive" });
       return;
     }
-    if (isPub && pubMode === "event" && !selectedPubEvent) {
-      toast({ title: "Pick an event from the dropdown", variant: "destructive" });
-      return;
-    }
+
     if (isPub && phone && !/^\d{10}$/.test(phone)) {
       toast({ title: "Invalid phone number", description: "Please enter a 10-digit mobile number.", variant: "destructive" });
       return;
@@ -244,7 +212,7 @@ export function EventDetail() {
           ? {
               pubMode,
               ticketWomen, ticketMen, ticketCouple,
-              selectedPubEvent: pubMode === "event" ? selectedPubEvent : "",
+              selectedPubEvent: "",
               notes: pubMode === "event" ? occasion : notes,
             }
           : {}),
@@ -497,21 +465,18 @@ export function EventDetail() {
 
             <div className="space-y-4">
               <div>
-                <Label>Date {date && <span className="text-muted-foreground font-normal">— {date}</span>}</Label>
-                <div className="mt-1 rounded-xl border border-white/10 bg-black/40 overflow-hidden">
-                  <Calendar
-                    mode="single"
-                    selected={calSelectedDate}
-                    onSelect={(d) => setDate(d ? localDateStr(d) : "")}
-                    disabled={isDateDisabled}
-                    className="[--cell-size:1.65rem] text-sm w-full"
-                    showOutsideDays={false}
-                    components={{ DayButton: CalDayButton }}
-                  />
-                </div>
+                <Label htmlFor="bdate">Date</Label>
+                <Input
+                  id="bdate"
+                  type="date"
+                  value={date}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="bg-black/40 border-white/10 mt-1"
+                />
                 {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
                   <p className="text-xs text-muted-foreground mt-1.5">
-                    Open: {vendorOpenDays.join(", ")} · Greyed dates are unavailable
+                    Open: {vendorOpenDays.join(", ")}
                   </p>
                 )}
               </div>
@@ -547,20 +512,6 @@ export function EventDetail() {
 
                   {pubMode === "event" && (
                     <>
-                      <div>
-                        <Label htmlFor="pevent">Pick an event</Label>
-                        <Select value={selectedPubEvent} onValueChange={setSelectedPubEvent}>
-                          <SelectTrigger id="pevent" className="bg-black/40 border-white/10 mt-1">
-                            <SelectValue placeholder="Select event…" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(ev.pubEventTypes ?? []).length === 0 && <SelectItem value="general">General booking</SelectItem>}
-                            {(ev.pubEventTypes ?? []).map((t: string) => (
-                              <SelectItem key={t} value={t}>{t}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
                       <div>
                         <Label htmlFor="occasion">Occasion</Label>
                         <Select value={occasion} onValueChange={setOccasion}>
