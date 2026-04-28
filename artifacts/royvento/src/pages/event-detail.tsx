@@ -470,7 +470,7 @@ export function EventDetail() {
                   id="bdate"
                   type="date"
                   value={date}
-                  min={new Date().toISOString().slice(0, 10)}
+                  min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()}
                   onChange={(e) => setDate(e.target.value)}
                   className="bg-black/40 border-white/10 mt-1"
                 />
