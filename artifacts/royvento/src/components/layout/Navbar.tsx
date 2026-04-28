@@ -371,6 +371,12 @@ export function Navbar() {
               </Link>
             </nav>
 
+            {/* Theme switcher */}
+            <div className="border-t border-border pt-3">
+              <p className="text-xs text-muted-foreground mb-2.5 font-medium uppercase tracking-wider">Theme</p>
+              <ThemeSwitcher />
+            </div>
+
             {/* Mobile auth — logged-out only */}
             {!user && (
               <div className="flex gap-3 pt-1">
