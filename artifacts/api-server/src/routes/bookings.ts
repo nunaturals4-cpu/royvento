@@ -1292,7 +1292,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
         toName: customer.name,
         bookingId: updated.id,
         eventTitle: evt.title,
-        vendorName: out?.vendorName ?? vendor.businessName,
+        vendorName: out?.vendorName ?? "this venue",
         checkedInAt: now,
       }).catch((err) => {
         console.error("Failed to send ticket-scanned email:", err);
