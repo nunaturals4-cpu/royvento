@@ -76,7 +76,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
   const confirmedBookings = await db
     .select({
       vendorId: bookingsTable.vendorId,
-      finalPrice: bookingsTable.finalPrice,
+      totalPrice: bookingsTable.totalPrice,
       ticketWomen: bookingsTable.ticketWomen,
       ticketMen: bookingsTable.ticketMen,
       ticketCouple: bookingsTable.ticketCouple,
@@ -103,14 +103,14 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
     totalMen += b.ticketMen;
     totalCouple += b.ticketCouple;
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
-    if (dailyMap.has(day)) dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
+    if (dailyMap.has(day)) dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.totalPrice));
     const pv = perVendorMap.get(b.vendorId);
     if (pv) {
       pv.bookingCount += 1;
       pv.ticketWomen += b.ticketWomen;
       pv.ticketMen += b.ticketMen;
       pv.ticketCouple += b.ticketCouple;
-      pv.revenue += Number(b.finalPrice);
+      pv.revenue += Number(b.totalPrice);
     } else {
       perVendorMap.set(b.vendorId, {
         vendorId: b.vendorId,
@@ -118,7 +118,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
         ticketWomen: b.ticketWomen,
         ticketMen: b.ticketMen,
         ticketCouple: b.ticketCouple,
-        revenue: Number(b.finalPrice),
+        revenue: Number(b.totalPrice),
       });
     }
   }
