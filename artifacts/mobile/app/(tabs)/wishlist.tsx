@@ -1,0 +1,164 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
+import { router } from "expo-router";
+import React from "react";
+import {
+  FlatList,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { EmptyState } from "@/components/EmptyState";
+import { EventCard } from "@/components/EventCard";
+import { useAuth } from "@/context/AuthContext";
+import { useColors } from "@/hooks/useColors";
+
+interface WishlistItem {
+  id: number;
+  eventId: number;
+  event?: {
+    id: number;
+    title: string;
+    imageUrl: string;
+    location: string;
+    price: string;
+    category: string;
+    type: string;
+  };
+}
+
+export default function WishlistScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const { data, isLoading, refetch } = useQuery<WishlistItem[]>({
+    queryKey: ["wishlist"],
+    queryFn: () => customFetch<WishlistItem[]>("/api/wishlist"),
+    enabled: !!user,
+  });
+
+  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+
+  if (!user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={[styles.header, { paddingTop: topPadding + 12, borderBottomColor: colors.border }]}>
+          <Text style={[styles.title, { color: colors.foreground }]}>Wishlist</Text>
+        </View>
+        <EmptyState
+          icon="heart-outline"
+          title="Sign in to see your wishlist"
+          subtitle="Save your favourite events and pubs"
+          action={{ label: "Sign In", onPress: () => router.push("/(auth)/login") }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View
+        style={[
+          styles.header,
+          { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.title, { color: colors.foreground }]}>Wishlist</Text>
+        {(data?.length ?? 0) > 0 ? (
+          <Text style={[styles.count, { color: colors.mutedForeground }]}>
+            {data!.length} saved
+          </Text>
+        ) : null}
+      </View>
+
+      {isLoading ? null : !data || data.length === 0 ? (
+        <EmptyState
+          icon="heart-outline"
+          title="Your wishlist is empty"
+          subtitle="Save events you love and come back to them anytime"
+          action={{ label: "Explore Events", onPress: () => router.push("/(tabs)/explore") }}
+        />
+      ) : (
+        <FlatList
+          data={data}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
+          showsVerticalScrollIndicator={false}
+          onRefresh={refetch}
+          refreshing={isLoading}
+          scrollEnabled={!!(data?.length)}
+          renderItem={({ item }) => {
+            const ev = item.event;
+            if (!ev) return null;
+            return (
+              <View style={{ position: "relative" }}>
+                <EventCard
+                  id={ev.id}
+                  title={ev.title}
+                  imageUrl={ev.imageUrl}
+                  location={ev.location}
+                  price={ev.price}
+                  category={ev.category}
+                  type={ev.type}
+                  compact
+                  style={{ width: "100%" }}
+                />
+                <TouchableOpacity
+                  style={[styles.removeBtn, { backgroundColor: colors.destructive }]}
+                  onPress={async () => {
+                    await customFetch(`/api/wishlist/${ev.id}`, { method: "DELETE" });
+                    qc.invalidateQueries({ queryKey: ["wishlist"] });
+                  }}
+                >
+                  <Text style={styles.removeBtnText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    paddingBottom: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.3,
+  },
+  count: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  list: {
+    padding: 20,
+    gap: 10,
+  },
+  removeBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  removeBtnText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+});

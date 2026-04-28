@@ -48,3 +48,9 @@ id = "aIZI8hKa6MCzNqmfr8kRT"
 uri = "file://artifacts/royvento/public/images/event-4.png"
 type = "image"
 title = "Event cover 4"
+
+[[generated]]
+id = "0btRwxZSvZOZmW26Pjua5"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"
