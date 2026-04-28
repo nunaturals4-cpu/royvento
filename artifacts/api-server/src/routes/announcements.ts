@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, announcementsTable, vendorsTable, eventsTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 
@@ -98,10 +98,19 @@ router.get("/events/:eventId/announcements", async (req, res) => {
     .limit(1);
   const ev = evRows[0];
   if (!ev) return res.status(404).json({ error: "Event not found" });
+  const today = new Date().toISOString().slice(0, 10);
   const rows = await db
     .select()
     .from(announcementsTable)
-    .where(eq(announcementsTable.vendorId, ev.vendorId))
+    .where(
+      and(
+        eq(announcementsTable.vendorId, ev.vendorId),
+        or(
+          eq(announcementsTable.announceDate, ""),
+          sql`${announcementsTable.announceDate} >= ${today}`,
+        ),
+      ),
+    )
     .orderBy(desc(announcementsTable.createdAt));
   return res.json(rows);
 });

@@ -71,6 +71,7 @@ export function EventDetail() {
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
   const [selectedPubEvent, setSelectedPubEvent] = useState("");
+  const [occasion, setOccasion] = useState("");
   const [pointsToUse, setPointsToUse] = useState(0);
 
   const createReview = useCreateReview();
@@ -244,6 +245,7 @@ export function EventDetail() {
               pubMode,
               ticketWomen, ticketMen, ticketCouple,
               selectedPubEvent: pubMode === "event" ? selectedPubEvent : "",
+              notes: pubMode === "event" ? occasion : notes,
             }
           : {}),
       });
@@ -502,7 +504,7 @@ export function EventDetail() {
                     selected={calSelectedDate}
                     onSelect={(d) => setDate(d ? localDateStr(d) : "")}
                     disabled={isDateDisabled}
-                    className="[--cell-size:1.9rem] w-full"
+                    className="[--cell-size:1.65rem] text-sm w-full"
                     showOutsideDays={false}
                     components={{ DayButton: CalDayButton }}
                   />
@@ -529,7 +531,7 @@ export function EventDetail() {
                       </label>
                       <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer ${pubMode === "event" ? "border-primary bg-primary/10" : "border-white/10"}`}>
                         <RadioGroupItem value="event" />
-                        <span className="text-sm">Book the event</span>
+                        <span className="text-sm">Group or corporate booking</span>
                       </label>
                     </RadioGroup>
                   </div>
@@ -560,8 +562,23 @@ export function EventDetail() {
                         </Select>
                       </div>
                       <div>
-                        <Label htmlFor="guests">Guests</Label>
-                        <Input id="guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
+                        <Label htmlFor="occasion">Occasion</Label>
+                        <Select value={occasion} onValueChange={setOccasion}>
+                          <SelectTrigger id="occasion" className="bg-black/40 border-white/10 mt-1">
+                            <SelectValue placeholder="Select occasion…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="farewell">Farewell</SelectItem>
+                            <SelectItem value="office-party">Office Party</SelectItem>
+                            <SelectItem value="casual-party">Casual Party</SelectItem>
+                            <SelectItem value="birthday">Birthday</SelectItem>
+                            <SelectItem value="others">Others</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="guests">Guests <span className="text-muted-foreground font-normal text-xs">(min 10)</span></Label>
+                        <Input id="guests" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
                       </div>
                     </>
                   )}
