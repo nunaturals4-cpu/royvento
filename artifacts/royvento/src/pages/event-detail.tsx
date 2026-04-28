@@ -219,7 +219,7 @@ export function EventDetail() {
             }
           : {}),
       });
-      if (result?.requiresPayment && result?.redirectUrl) {
+      if (result?.redirectUrl) {
         toast({ title: "Redirecting to payment…", description: "You will be taken to PhonePe to complete your payment." });
         window.location.href = result.redirectUrl;
         return;
