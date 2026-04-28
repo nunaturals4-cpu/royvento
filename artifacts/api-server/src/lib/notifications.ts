@@ -119,6 +119,44 @@ export interface BookingStatusNotification {
   status: string;
 }
 
+export interface CustomerCancelledNotification {
+  bookingId: number;
+  eventTitle: string;
+  vendorName: string;
+  vendorEmail: string;
+  userName: string;
+  userEmail: string;
+  bookingDate: string;
+  guests: number;
+  cancellationReason: string;
+}
+
+export async function sendCustomerCancelledBookingEmail(
+  b: CustomerCancelledNotification,
+): Promise<void> {
+  await deliver("Booking Cancelled by Customer (to partner)", {
+    to: b.vendorEmail,
+    toName: b.vendorName,
+    subject: `Booking #${b.bookingId} cancelled by customer: ${b.eventTitle}`,
+    body: [
+      `Hi ${b.vendorName},`,
+      ``,
+      `A customer has cancelled their booking. Here are the details:`,
+      ``,
+      `  • Event:   ${b.eventTitle}`,
+      `  • Client:  ${b.userName} <${b.userEmail}>`,
+      `  • Date:    ${fmtDate(b.bookingDate)}`,
+      `  • Guests:  ${b.guests}`,
+      ``,
+      `  Cancellation reason: "${b.cancellationReason}"`,
+      ``,
+      `The slot is now available again. Log in to your Royvento partner dashboard to view the full booking history.`,
+      ``,
+      `— Royvento`,
+    ].join("\n"),
+  });
+}
+
 export async function sendBookingStatusEmail(b: BookingStatusNotification): Promise<void> {
   const statusLine: Record<string, string> = {
     confirmed: `Great news — ${b.vendorName} has CONFIRMED your booking.`,

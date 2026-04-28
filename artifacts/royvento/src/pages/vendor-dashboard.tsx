@@ -860,6 +860,9 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
                   <p className="text-sm mt-1">
                     {b.bookingDate} · {b.guests} guests · {formatINR(b.finalPrice ?? b.totalPrice)}
                   </p>
+                  {b.status === "cancelled" && b.approvedBy === "customer" && (
+                    <p className="text-xs text-amber-400 mt-1 font-medium">Cancelled by customer</p>
+                  )}
                   {b.rejectionReason && (
                     <p className="text-xs text-red-400 mt-1">Reason: {b.rejectionReason}</p>
                   )}

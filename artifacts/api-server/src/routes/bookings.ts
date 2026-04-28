@@ -17,6 +17,7 @@ import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
 import {
   sendBookingCreatedEmails,
   sendBookingStatusEmail,
+  sendCustomerCancelledBookingEmail,
 } from "../lib/notifications";
 
 const EVENT_TYPES = [
@@ -672,6 +673,115 @@ router.patch(
         }
       } catch (err) {
         console.error("Failed to create notification:", err);
+      }
+    }
+
+    res.json(out);
+  },
+);
+
+// Customer cancels their own confirmed booking
+const CustomerCancelBody = z.object({
+  cancellationReason: z.string().trim().min(1, "Reason is required"),
+});
+
+router.patch(
+  "/bookings/:bookingId/cancel",
+  requireAuth(),
+  async (req, res) => {
+    const id = Number(req.params["bookingId"]);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const parsed = CustomerCancelBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "A cancellation reason is required." });
+      return;
+    }
+    const user = await loadUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const bRows = await db
+      .select()
+      .from(bookingsTable)
+      .where(and(eq(bookingsTable.id, id), eq(bookingsTable.userId, user.id)))
+      .limit(1);
+    const b = bRows[0];
+    if (!b) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (b.status !== "confirmed") {
+      res.status(400).json({ error: "Only confirmed bookings can be cancelled." });
+      return;
+    }
+    const reason = parsed.data.cancellationReason.trim();
+    const [updated] = await db
+      .update(bookingsTable)
+      .set({ status: "cancelled", approvedBy: "customer", rejectionReason: reason })
+      .where(eq(bookingsTable.id, id))
+      .returning();
+    if (!updated) {
+      res.status(500).json({ error: "Failed to cancel booking." });
+      return;
+    }
+
+    const [out] = await serializeBookings([updated]);
+
+    // Notify the vendor/partner
+    if (out) {
+      try {
+        const vRows = await db
+          .select()
+          .from(vendorsTable)
+          .where(eq(vendorsTable.id, b.vendorId))
+          .limit(1);
+        const vendor = vRows[0];
+        if (vendor) {
+          const [vendorUser] = await db
+            .select()
+            .from(usersTable)
+            .where(eq(usersTable.id, vendor.userId))
+            .limit(1);
+          const vendorEmail = vendorUser?.email ?? "";
+          if (vendorEmail) {
+            await sendCustomerCancelledBookingEmail({
+              bookingId: updated.id,
+              eventTitle: out.eventTitle,
+              vendorName: out.vendorName,
+              vendorEmail,
+              userName: out.userName,
+              userEmail: out.userEmail,
+              bookingDate: updated.bookingDate,
+              guests: updated.guests,
+              cancellationReason: reason,
+            });
+          }
+          // In-app notification for the vendor owner
+          if (vendorUser) {
+            await db.insert(notificationsTable).values({
+              userId: vendorUser.id,
+              title: "Booking cancelled by customer",
+              message: `${out.userName} cancelled their booking for "${out.eventTitle}" on ${updated.bookingDate}. Reason: ${reason}`,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to send partner cancellation notification:", err);
+      }
+
+      // In-app notification for the customer confirming the cancellation
+      try {
+        await db.insert(notificationsTable).values({
+          userId: user.id,
+          title: "Booking cancelled",
+          message: `Your booking for "${out.eventTitle}" has been cancelled as requested.`,
+        });
+      } catch (err) {
+        console.error("Failed to create customer cancellation notification:", err);
       }
     }
 

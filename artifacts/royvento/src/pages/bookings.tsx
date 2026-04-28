@@ -1,10 +1,20 @@
 import { Link } from "wouter";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useListMyBookings } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download } from "lucide-react";
-import { formatINR, formatINRExact } from "@/lib/api";
+import { formatINR, formatINRExact, apiPatch } from "@/lib/api";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "secondary",
@@ -14,7 +24,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 export function Bookings() {
-  const { data: bookings = [], isLoading } = useListMyBookings();
+  const { data: bookings = [], isLoading, refetch } = useListMyBookings();
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
@@ -34,16 +44,18 @@ export function Bookings() {
         </div>
       ) : (
         <div className="space-y-6">
-          {bookings.map((b: any) => <BookingCard key={b.id} b={b} />)}
+          {bookings.map((b: any) => <BookingCard key={b.id} b={b} onRefetch={refetch} />)}
         </div>
       )}
     </div>
   );
 }
 
-function BookingCard({ b }: { b: any }) {
+function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
   const isPubTicket = (b.eventType_ === "pub" || b.pubMode === "ticket") && b.pubMode === "ticket";
   const showTicket = isPubTicket && (b.status === "confirmed" || b.status === "completed");
+  const [cancelOpen, setCancelOpen] = useState(false);
+
   return (
     <div className="rounded-2xl glass-card overflow-hidden flex flex-col md:flex-row lift-3d">
       {b.eventImage && (
@@ -94,23 +106,112 @@ function BookingCard({ b }: { b: any }) {
             )}
             {b.status === "cancelled" && b.rejectionReason && (
               <div className="mt-2 rounded-lg border border-red-500/30 bg-red-900/20 px-3 py-2">
-                <p className="text-xs text-red-300 font-medium mb-0.5">Rejection reason</p>
+                <p className="text-xs text-red-300 font-medium mb-0.5">Cancellation reason</p>
                 <p className="text-xs text-red-200">{b.rejectionReason}</p>
               </div>
             )}
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Total</p>
-            <p className="font-serif text-3xl">{formatINRExact(b.finalPrice ?? b.totalPrice)}</p>
-            {b.finalPrice != null && b.finalPrice !== b.totalPrice && (
-              <p className="text-xs text-muted-foreground line-through">{formatINRExact(b.totalPrice)}</p>
+          <div className="text-right flex flex-col items-end gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="font-serif text-3xl">{formatINRExact(b.finalPrice ?? b.totalPrice)}</p>
+              {b.finalPrice != null && b.finalPrice !== b.totalPrice && (
+                <p className="text-xs text-muted-foreground line-through">{formatINRExact(b.totalPrice)}</p>
+              )}
+            </div>
+            {b.status === "confirmed" && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setCancelOpen(true)}
+                className="text-xs"
+              >
+                Cancel booking
+              </Button>
             )}
           </div>
         </div>
 
-        {showTicket && <PremiumTicket b={b} />}
+        {showTicket && !cancelOpen && <PremiumTicket b={b} />}
       </div>
+
+      <CancelBookingDialog
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        booking={b}
+        onCancelled={onRefetch}
+      />
     </div>
+  );
+}
+
+function CancelBookingDialog({
+  open,
+  onClose,
+  booking,
+  onCancelled,
+}: {
+  open: boolean;
+  onClose: () => void;
+  booking: any;
+  onCancelled: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleCancel = async () => {
+    if (!reason.trim()) {
+      toast({ title: "Please provide a cancellation reason.", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiPatch(`/api/bookings/${booking.id}/cancel`, { cancellationReason: reason.trim() });
+      toast({ title: "Booking cancelled", description: "Your booking has been cancelled." });
+      onCancelled();
+      onClose();
+      setReason("");
+    } catch (err: any) {
+      toast({
+        title: "Failed to cancel",
+        description: err?.message ?? "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cancel booking</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to cancel your booking for <strong>{booking.eventTitle}</strong> on {booking.bookingDate}?
+            The partner will be notified. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 py-2">
+          <label className="text-sm font-medium">Reason for cancellation</label>
+          <Textarea
+            placeholder="e.g. Plans have changed, wrong date selected…"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Keep booking
+          </Button>
+          <Button variant="destructive" onClick={handleCancel} disabled={loading || !reason.trim()}>
+            {loading ? "Cancelling…" : "Confirm cancellation"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
