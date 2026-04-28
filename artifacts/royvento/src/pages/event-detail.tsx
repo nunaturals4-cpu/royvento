@@ -71,6 +71,7 @@ export function EventDetail() {
   const [ticketCouple, setTicketCouple] = useState(0);
   const [occasion, setOccasion] = useState("");
   const [pointsToUse, setPointsToUse] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
 
   const createReview = useCreateReview();
   const qc = useQueryClient();
@@ -208,6 +209,7 @@ export function EventDetail() {
         personName,
         phone,
         pointsToUse: pointsApplied,
+        paymentMethod,
         ...(isPub
           ? {
               pubMode,
@@ -225,7 +227,12 @@ export function EventDetail() {
       toast({ title: "Booking confirmed!", description: "Your booking is confirmed. Check your dashboard for details." });
       setLocation("/dashboard/bookings");
     } catch (e: any) {
-      toast({ title: "Booking failed", description: e?.message ?? "Try again.", variant: "destructive" });
+      const errMsg: string = e?.message ?? "Try again.";
+      if (paymentMethod === "online" && errMsg.toLowerCase().includes("payment system not configured")) {
+        toast({ title: "Online payments not available", description: "Online payments are not set up yet — please choose Pay at Venue.", variant: "destructive" });
+      } else {
+        toast({ title: "Booking failed", description: errMsg, variant: "destructive" });
+      }
     } finally {
       setBooking(false);
     }
@@ -686,9 +693,41 @@ export function EventDetail() {
                   <span>{formatINRExact(finalTotal)}</span>
                 </div>
               </div>
+              {/* Payment method selector */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Payment Method</Label>
+                <RadioGroup
+                  value={paymentMethod}
+                  onValueChange={(v) => setPaymentMethod(v as "cod" | "online")}
+                  className="grid grid-cols-2 gap-2"
+                >
+                  <Label
+                    htmlFor="pay-cod"
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-3 cursor-pointer text-sm transition-colors ${paymentMethod === "cod" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}
+                  >
+                    <RadioGroupItem id="pay-cod" value="cod" className="sr-only" />
+                    <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "cod" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
+                    <span>Pay at Venue</span>
+                  </Label>
+                  <Label
+                    htmlFor="pay-online"
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-3 cursor-pointer text-sm transition-colors ${paymentMethod === "online" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}
+                  >
+                    <RadioGroupItem id="pay-online" value="online" className="sr-only" />
+                    <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "online" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
+                    <span>Pay Online</span>
+                  </Label>
+                </RadioGroup>
+                {paymentMethod === "cod" && (
+                  <p className="text-xs text-muted-foreground">Your booking is confirmed instantly. Pay at the venue on the day.</p>
+                )}
+                {paymentMethod === "online" && (
+                  <p className="text-xs text-muted-foreground">You will be redirected to PhonePe to pay securely online.</p>
+                )}
+              </div>
               <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12" size="lg" onClick={handleBook} disabled={booking}>
                 <CalIcon className="h-4 w-4 mr-2" />
-                {booking ? "Booking…" : "Request booking"}
+                {booking ? "Booking…" : paymentMethod === "cod" ? "Confirm Booking" : "Pay & Book"}
               </Button>
             </div>
           </div>
