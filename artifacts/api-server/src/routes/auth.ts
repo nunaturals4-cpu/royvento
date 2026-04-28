@@ -181,6 +181,7 @@ router.get("/auth/google/start", (req, res) => {
     secure: process.env["NODE_ENV"] === "production",
     sameSite: "lax",
     maxAge: 10 * 60 * 1000,
+    signed: true,
   });
 
   const params = new URLSearchParams({
@@ -203,8 +204,8 @@ router.get("/auth/google/callback", async (req, res) => {
     return;
   }
 
-  const cookies = (req as Request & { cookies?: Record<string, string> }).cookies as Record<string, string> | undefined;
-  const savedState = cookies?.["google_oauth_state"];
+  const signedCookies = (req as any).signedCookies as Record<string, string | false> | undefined;
+  const savedState = signedCookies?.["google_oauth_state"] || undefined;
 
   if (!state || !savedState || state !== savedState) {
     res.redirect("/?error=google_auth_failed");
