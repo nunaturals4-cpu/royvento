@@ -105,20 +105,34 @@ function ManagerInvitations() {
 
 function useAccessCheck() {
   const [accessStatus, setAccessStatus] = useState<"loading" | "allowed" | "denied">("loading");
+  const [managedVendors, setManagedVendors] = useState<{ id: number; businessName: string }[]>([]);
+
   useEffect(() => {
     const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
     if (!token) { setAccessStatus("denied"); return; }
-    // Decode role from JWT payload (no verification needed on client side — server verifies on every request)
+
+    // Decode role from JWT payload (no verification needed on client — server re-checks on every request)
+    let role = "user";
     try {
       const payload = JSON.parse(atob(token.split(".")[1]!));
-      if (payload.role === "vendor" || payload.role === "admin") { setAccessStatus("allowed"); return; }
+      role = typeof payload.role === "string" ? payload.role : "user";
     } catch { /* ignore */ }
-    // For non-vendor users check if they have accepted manager rows
-    apiGet<{ id: number }[]>("/api/manager/my-vendors").then((vendors) => {
-      setAccessStatus(vendors.length > 0 ? "allowed" : "denied");
-    }).catch(() => setAccessStatus("denied"));
+
+    // Always fetch managed venues regardless of role
+    apiGet<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then((vendors) => {
+      setManagedVendors(vendors);
+      if (role === "vendor" || role === "admin" || vendors.length > 0) {
+        setAccessStatus("allowed");
+      } else {
+        setAccessStatus("denied");
+      }
+    }).catch(() => {
+      // If API call fails, still allow vendors/admins
+      setAccessStatus(role === "vendor" || role === "admin" ? "allowed" : "denied");
+    });
   }, []);
-  return accessStatus;
+
+  return { accessStatus, managedVendors };
 }
 
 export function TicketScanner() {
@@ -126,7 +140,7 @@ export function TicketScanner() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const { toast } = useToast();
-  const accessStatus = useAccessCheck();
+  const { accessStatus, managedVendors } = useAccessCheck();
 
   const scan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,6 +216,15 @@ export function TicketScanner() {
           <ScanLine className="h-9 w-9 text-primary" /> Ticket scanner
         </h1>
         <p className="mt-2 text-muted-foreground">Type or paste a booking code (e.g. RV-000042) to validate entry at the door.</p>
+        {managedVendors.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {managedVendors.map((v) => (
+              <span key={v.id} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border border-primary/30 bg-primary/5 text-primary">
+                <Users className="h-3 w-3" /> Managing: {v.businessName}
+              </span>
+            ))}
+          </div>
+        )}
       </header>
 
       <form onSubmit={scan} className="rounded-3xl glass-card-strong p-8 space-y-4">

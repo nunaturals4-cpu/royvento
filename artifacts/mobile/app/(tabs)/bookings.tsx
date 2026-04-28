@@ -56,7 +56,7 @@ export default function BookingsScreen() {
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [invitations, setInvitations] = useState<ManagerInvitation[]>([]);
   const [actingInvId, setActingInvId] = useState<number | null>(null);
-  const [isManager, setIsManager] = useState(false);
+  const [managedVendors, setManagedVendors] = useState<{ id: number; businessName: string }[]>([]);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const appState = useRef(AppState.currentState);
 
@@ -65,7 +65,7 @@ export default function BookingsScreen() {
   useEffect(() => {
     if (!user) return;
     customFetch<ManagerInvitation[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
-    customFetch<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then((v) => setIsManager(v.length > 0)).catch(() => {});
+    customFetch<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then(setManagedVendors).catch(() => {});
   }, [user?.id]);
 
   const respondToInvitation = async (id: number, token: string, action: "accept" | "reject") => {
@@ -78,7 +78,8 @@ export default function BookingsScreen() {
       });
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
       if (action === "accept") {
-        setIsManager(true);
+        // Refresh managed vendors list after accepting
+        customFetch<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then(setManagedVendors).catch(() => {});
         Alert.alert("Invitation accepted!", "You can now scan tickets for this venue.");
       }
     } catch {
@@ -133,7 +134,7 @@ export default function BookingsScreen() {
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
-          {isManager && (
+          {managedVendors.length > 0 && (
             <TouchableOpacity
               style={[styles.scanBtn, { backgroundColor: colors.primary }]}
               onPress={() => router.push("/scanner" as never)}
@@ -168,6 +169,21 @@ export default function BookingsScreen() {
               </View>
             </View>
           </View>
+        ))}
+        {managedVendors.map((v) => (
+          <TouchableOpacity
+            key={v.id}
+            style={[styles.managedVenueRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push("/scanner" as never)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="shield-checkmark-outline" size={15} color={colors.primary} />
+            <Text style={[styles.managedVenueText, { color: colors.foreground }]} numberOfLines={1}>
+              Managing: {v.businessName}
+            </Text>
+            <Ionicons name="scan-outline" size={14} color={colors.primary} style={{ marginLeft: "auto" }} />
+            <Text style={{ fontSize: 11, color: colors.primary, marginLeft: 3 }}>Scan tickets</Text>
+          </TouchableOpacity>
         ))}
         <View style={[styles.tabs, { backgroundColor: colors.muted }]}>
           {(["upcoming", "past"] as const).map((t) => (
@@ -371,6 +387,8 @@ const styles = StyleSheet.create({
   invBtns: { flexDirection: "row", gap: 8, marginTop: 8 },
   invBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
   invBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  managedVenueRow: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, borderWidth: 1, marginTop: 6 },
+  managedVenueText: { fontSize: 13, fontFamily: "Inter_500Medium", flex: 1 },
   tabs: { flexDirection: "row", borderRadius: 10, padding: 3 },
   tabBtn: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: "center" },
   tabText: { fontSize: 12, fontFamily: "Inter_500Medium" },

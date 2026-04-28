@@ -1179,24 +1179,23 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // Resolve vendor: direct vendor profile first; fall back to accepted manager relationship
-  let vendor: { id: number; businessName: string; userId: number } | undefined;
+  // Collect all vendor IDs this user is allowed to scan for:
+  // 1. Their own vendor profile (if any)
+  // 2. All venues where they have an accepted manager relationship
+  const allowedVendorIds = new Set<number>();
+
   if (user.role === "vendor" || user.role === "admin") {
-    const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
-    vendor = vRows[0];
+    const vRows = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+    if (vRows[0]) allowedVendorIds.add(vRows[0].id);
   }
-  // If no direct vendor profile (even for vendor/admin roles), check manager rows
-  if (!vendor) {
-    const mgRows = await db.select().from(vendorManagersTable)
-      .where(and(eq(vendorManagersTable.managerId, user.id), eq(vendorManagersTable.status, "accepted")))
-      .limit(1);
-    const mgRow = mgRows[0];
-    if (mgRow) {
-      const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.id, mgRow.vendorId)).limit(1);
-      vendor = vRows[0];
-    }
-  }
-  if (!vendor) {
+
+  // Always check manager rows regardless of role (covers vendor users invited as managers elsewhere)
+  const mgRows = await db.select({ vendorId: vendorManagersTable.vendorId })
+    .from(vendorManagersTable)
+    .where(and(eq(vendorManagersTable.managerId, user.id), eq(vendorManagersTable.status, "accepted")));
+  for (const r of mgRows) allowedVendorIds.add(r.vendorId);
+
+  if (allowedVendorIds.size === 0) {
     res.status(403).json({ code: "FORBIDDEN", message: "No partner profile found." });
     return;
   }
@@ -1209,8 +1208,8 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // Verify the booking belongs to this partner's venue
-  if (b.vendorId !== vendor.id) {
+  // Verify the booking belongs to a venue this user may scan for
+  if (!allowedVendorIds.has(b.vendorId)) {
     res.status(403).json({ code: "WRONG_VENDOR", message: "This ticket belongs to a different partner's event." });
     return;
   }
