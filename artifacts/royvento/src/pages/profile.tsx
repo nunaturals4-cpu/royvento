@@ -134,7 +134,10 @@ export function Profile() {
 
           <div className="grid grid-cols-2 gap-4">
             <div><Label htmlFor="pname">Full name</Label><Input id="pname" value={name} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" /></div>
-            <div><Label htmlFor="pphone">Phone</Label><Input id="pphone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 …" className="bg-black/40 border-white/10" /></div>
+            <div>
+              <Label htmlFor="pphone">Phone <span className="text-muted-foreground font-normal text-xs">(used for WhatsApp confirmations)</span></Label>
+              <Input id="pphone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 …" className="bg-black/40 border-white/10" />
+            </div>
           </div>
           <div>
             <Label htmlFor="ppic">Profile picture</Label>

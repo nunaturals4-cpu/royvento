@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import twilio from "twilio";
 
 function getResendClient(): Resend | null {
   const key = process.env["RESEND_API_KEY"];
@@ -312,6 +313,85 @@ export async function sendCustomerCancelledBookingEmail(
       `— Royvento`,
     ].join("\n"),
   });
+}
+
+// ─── WhatsApp ─────────────────────────────────────────────────────────────────
+
+function getTwilioClient(): ReturnType<typeof twilio> | null {
+  const sid = process.env["TWILIO_ACCOUNT_SID"];
+  const token = process.env["TWILIO_AUTH_TOKEN"];
+  if (!sid || !token) return null;
+  return twilio(sid, token);
+}
+
+function getTwilioFrom(): string {
+  return process.env["TWILIO_WHATSAPP_FROM"] ?? "";
+}
+
+export async function sendWhatsAppBookingConfirmation(params: {
+  phone: string;
+  userName: string;
+  pubName: string;
+  bookingId: number;
+  bookingDate: string;
+  ticketWomen?: number;
+  ticketMen?: number;
+  ticketCouple?: number;
+  guests?: number;
+  totalPrice: number;
+  pubMode?: string;
+}): Promise<void> {
+  const client = getTwilioClient();
+  const from = getTwilioFrom();
+
+  if (!client || !from) {
+    console.log("[whatsapp] Twilio not configured — skipping WhatsApp message");
+    return;
+  }
+
+  // Normalize to E.164: strip all non-digit chars, then prepend '+'
+  // Accept numbers already in 'whatsapp:+...' format or raw digits.
+  const rawPhone = params.phone.replace(/^whatsapp:/i, "").trim();
+  const digits = rawPhone.replace(/\D/g, "");
+  if (digits.length < 7) {
+    console.log(`[whatsapp] Skipping send — phone "${params.phone}" could not be normalized to E.164`);
+    return;
+  }
+  const e164 = rawPhone.startsWith("+") ? `+${digits}` : `+${digits}`;
+  const to = `whatsapp:${e164}`;
+  const refCode = `#RV-${String(params.bookingId).padStart(6, "0")}`;
+  const dateStr = fmtDate(params.bookingDate);
+
+  let ticketSummary: string;
+  if (params.pubMode === "ticket") {
+    const parts: string[] = [];
+    if (params.ticketWomen) parts.push(`${params.ticketWomen} Ladies`);
+    if (params.ticketMen) parts.push(`${params.ticketMen} Gents`);
+    if (params.ticketCouple) parts.push(`${params.ticketCouple} Couple${params.ticketCouple > 1 ? "s" : ""}`);
+    ticketSummary = parts.join(" · ") || `${params.guests ?? 1} guest${(params.guests ?? 1) > 1 ? "s" : ""}`;
+  } else {
+    ticketSummary = `${params.guests ?? 1} guest${(params.guests ?? 1) > 1 ? "s" : ""}`;
+  }
+
+  const message = [
+    `Hi ${params.userName.split(" ")[0]}! 🎉`,
+    ``,
+    `Your booking at *${params.pubName}* is confirmed.`,
+    ``,
+    `📋 Ref: ${refCode}`,
+    `📅 Date: ${dateStr}`,
+    `🎟️ Tickets: ${ticketSummary}`,
+    `💰 Total: ${fmtINR(params.totalPrice)}`,
+    ``,
+    `See you there! — Royvento`,
+  ].join("\n");
+
+  try {
+    await client.messages.create({ from, to, body: message });
+    console.log(`[whatsapp] Sent booking confirmation to ${to}`);
+  } catch (err) {
+    console.error(`[whatsapp] Failed to send to ${to}:`, err);
+  }
 }
 
 export async function sendBookingStatusEmail(b: BookingStatusNotification): Promise<void> {

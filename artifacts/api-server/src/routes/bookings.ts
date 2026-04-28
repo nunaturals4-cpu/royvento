@@ -20,6 +20,7 @@ import {
   sendBookingStatusEmail,
   sendCustomerCancelledBookingEmail,
   sendTicketScannedEmail,
+  sendWhatsAppBookingConfirmation,
 } from "../lib/notifications";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
@@ -337,6 +338,27 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ticketMen: b.ticketMen || undefined,
       ticketCouple: b.ticketCouple || undefined,
     });
+
+    // Send WhatsApp confirmation using the customer's profile phone number only.
+    // The booking-time phone field is for on-site contact, not for messaging.
+    const whatsappPhone = user.phone;
+    if (whatsappPhone) {
+      sendWhatsAppBookingConfirmation({
+        phone: whatsappPhone,
+        userName: user.name,
+        pubName: vendorName,
+        bookingId: b.id,
+        bookingDate: b.bookingDate,
+        pubMode: b.pubMode || undefined,
+        ticketWomen: b.ticketWomen || undefined,
+        ticketMen: b.ticketMen || undefined,
+        ticketCouple: b.ticketCouple || undefined,
+        guests: b.guests,
+        totalPrice: Number(b.finalPrice),
+      }).catch((err) => {
+        console.error("[whatsapp] Booking confirmation fire-and-forget error:", err);
+      });
+    }
   } catch (err) {
     console.error("Failed to send booking notifications:", err);
   }
