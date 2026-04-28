@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import {
   useGetMyVendor,
@@ -1192,10 +1192,18 @@ function AnnouncementsPanel() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = () => apiGet<Announcement[]>("/api/partner/announcements").then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const url = imagePreview;
+    return () => {
+      if (url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [imagePreview]);
 
   const openNew = () => {
     setEditing(null);
@@ -1334,7 +1342,7 @@ function AnnouncementsPanel() {
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <label className="cursor-pointer px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                   <Upload className="h-3 w-3" /> Change
-                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleFileChange} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleFileChange} />
                 </label>
                 <button type="button" onClick={removeImage} className="px-3 py-1 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white border border-white/10">
                   Remove
