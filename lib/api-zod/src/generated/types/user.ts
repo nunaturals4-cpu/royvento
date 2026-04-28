@@ -12,5 +12,11 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  phone: string;
+  about: string;
+  profileImage: string;
+  referralCode: string;
+  referredBy?: number | null;
+  points: number;
   createdAt: string;
 }

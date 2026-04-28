@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AddToWishlistBody,
   AdminAnalytics,
   AuthResponse,
   Availability,
@@ -40,12 +41,15 @@ import type {
   SetAvailabilityBody,
   UpdateBookingStatusBody,
   UpdateEventBody,
+  UpdateMeBody,
   UpdateRoleBody,
   UpdateVendorBody,
   UploadUrlRequest,
   UploadUrlResponse,
   User,
   Vendor,
+  WishlistAddResponse,
+  WishlistItem,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -596,6 +600,92 @@ export function useListUsers<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Update the current user's profile
+ */
+export const getUpdateMeUrl = () => {
+  return `/api/users/me`;
+};
+
+export const updateMe = async (
+  updateMeBody: UpdateMeBody,
+  options?: RequestInit,
+): Promise<User> => {
+  return customFetch<User>(getUpdateMeUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateMeBody),
+  });
+};
+
+export const getUpdateMeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMe>>,
+    TError,
+    { data: BodyType<UpdateMeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMe>>,
+  TError,
+  { data: BodyType<UpdateMeBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMe"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMe>>,
+    { data: BodyType<UpdateMeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateMe(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMe>>
+>;
+export type UpdateMeMutationBody = BodyType<UpdateMeBody>;
+export type UpdateMeMutationError = ErrorType<void>;
+
+/**
+ * @summary Update the current user's profile
+ */
+export const useUpdateMe = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMe>>,
+    TError,
+    { data: BodyType<UpdateMeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMe>>,
+  TError,
+  { data: BodyType<UpdateMeBody> },
+  TContext
+> => {
+  return useMutation(getUpdateMeMutationOptions(options));
+};
 
 /**
  * @summary Update a user's role (admin only)
@@ -3101,3 +3191,248 @@ export function useGetAdminAnalytics<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get the current user's wishlist
+ */
+export const getGetWishlistUrl = () => {
+  return `/api/wishlist`;
+};
+
+export const getWishlist = async (
+  options?: RequestInit,
+): Promise<WishlistItem[]> => {
+  return customFetch<WishlistItem[]>(getGetWishlistUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetWishlistQueryKey = () => {
+  return [`/api/wishlist`] as const;
+};
+
+export const getGetWishlistQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWishlist>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getWishlist>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetWishlistQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWishlist>>> = ({
+    signal,
+  }) => getWishlist({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getWishlist>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetWishlistQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWishlist>>
+>;
+export type GetWishlistQueryError = ErrorType<void>;
+
+/**
+ * @summary Get the current user's wishlist
+ */
+
+export function useGetWishlist<
+  TData = Awaited<ReturnType<typeof getWishlist>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getWishlist>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetWishlistQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add an event to the wishlist
+ */
+export const getAddToWishlistUrl = () => {
+  return `/api/wishlist`;
+};
+
+export const addToWishlist = async (
+  addToWishlistBody: AddToWishlistBody,
+  options?: RequestInit,
+): Promise<WishlistAddResponse> => {
+  return customFetch<WishlistAddResponse>(getAddToWishlistUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addToWishlistBody),
+  });
+};
+
+export const getAddToWishlistMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addToWishlist>>,
+    TError,
+    { data: BodyType<AddToWishlistBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addToWishlist>>,
+  TError,
+  { data: BodyType<AddToWishlistBody> },
+  TContext
+> => {
+  const mutationKey = ["addToWishlist"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addToWishlist>>,
+    { data: BodyType<AddToWishlistBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return addToWishlist(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddToWishlistMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addToWishlist>>
+>;
+export type AddToWishlistMutationBody = BodyType<AddToWishlistBody>;
+export type AddToWishlistMutationError = ErrorType<void>;
+
+/**
+ * @summary Add an event to the wishlist
+ */
+export const useAddToWishlist = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addToWishlist>>,
+    TError,
+    { data: BodyType<AddToWishlistBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addToWishlist>>,
+  TError,
+  { data: BodyType<AddToWishlistBody> },
+  TContext
+> => {
+  return useMutation(getAddToWishlistMutationOptions(options));
+};
+
+/**
+ * @summary Remove an event from the wishlist
+ */
+export const getRemoveFromWishlistUrl = (eventId: number) => {
+  return `/api/wishlist/${eventId}`;
+};
+
+export const removeFromWishlist = async (
+  eventId: number,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getRemoveFromWishlistUrl(eventId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getRemoveFromWishlistMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeFromWishlist>>,
+    TError,
+    { eventId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeFromWishlist>>,
+  TError,
+  { eventId: number },
+  TContext
+> => {
+  const mutationKey = ["removeFromWishlist"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeFromWishlist>>,
+    { eventId: number }
+  > = (props) => {
+    const { eventId } = props ?? {};
+
+    return removeFromWishlist(eventId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveFromWishlistMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeFromWishlist>>
+>;
+
+export type RemoveFromWishlistMutationError = ErrorType<void>;
+
+/**
+ * @summary Remove an event from the wishlist
+ */
+export const useRemoveFromWishlist = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeFromWishlist>>,
+    TError,
+    { eventId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removeFromWishlist>>,
+  TError,
+  { eventId: number },
+  TContext
+> => {
+  return useMutation(getRemoveFromWishlistMutationOptions(options));
+};

@@ -1,5 +1,9 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { customFetch } from "@workspace/api-client-react";
+import {
+  getGetWishlistQueryKey,
+  useGetWishlist,
+  useRemoveFromWishlist,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -16,30 +20,22 @@ import { EventCard } from "@/components/EventCard";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-interface WishlistItem {
-  id: number;
-  eventId: number;
-  event?: {
-    id: number;
-    title: string;
-    imageUrl: string;
-    location: string;
-    price: string;
-    category: string;
-    type: string;
-  };
-}
-
 export default function WishlistScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery<WishlistItem[]>({
-    queryKey: ["wishlist"],
-    queryFn: () => customFetch<WishlistItem[]>("/api/wishlist"),
-    enabled: !!user,
+  const { data, isLoading, refetch } = useGetWishlist({
+    query: { enabled: !!user },
+  });
+
+  const removeMutation = useRemoveFromWishlist({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() });
+      },
+    },
   });
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -86,40 +82,32 @@ export default function WishlistScreen() {
       ) : (
         <FlatList
           data={data}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) => String(item.wishlistId)}
           contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
           showsVerticalScrollIndicator={false}
           onRefresh={refetch}
           refreshing={isLoading}
           scrollEnabled={!!(data?.length)}
-          renderItem={({ item }) => {
-            const ev = item.event;
-            if (!ev) return null;
-            return (
-              <View style={{ position: "relative" }}>
-                <EventCard
-                  id={ev.id}
-                  title={ev.title}
-                  imageUrl={ev.imageUrl}
-                  location={ev.location}
-                  price={ev.price}
-                  category={ev.category}
-                  type={ev.type}
-                  compact
-                  style={{ width: "100%" }}
-                />
-                <TouchableOpacity
-                  style={[styles.removeBtn, { backgroundColor: colors.destructive }]}
-                  onPress={async () => {
-                    await customFetch(`/api/wishlist/${ev.id}`, { method: "DELETE" });
-                    qc.invalidateQueries({ queryKey: ["wishlist"] });
-                  }}
-                >
-                  <Text style={styles.removeBtnText}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          }}
+          renderItem={({ item }) => (
+            <View style={{ position: "relative" }}>
+              <EventCard
+                id={item.id}
+                title={item.title}
+                imageUrl={item.imageUrl}
+                location={item.location}
+                price={item.price}
+                category={item.category}
+                compact
+                style={{ width: "100%" }}
+              />
+              <TouchableOpacity
+                style={[styles.removeBtn, { backgroundColor: colors.destructive }]}
+                onPress={() => removeMutation.mutate({ eventId: item.id })}
+              >
+                <Text style={styles.removeBtnText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         />
       )}
     </View>

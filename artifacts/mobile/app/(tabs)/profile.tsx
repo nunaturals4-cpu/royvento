@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { customFetch } from "@workspace/api-client-react";
+import { customFetch, useUpdateMe } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -43,7 +43,19 @@ export default function ProfileScreen() {
   const [editModal, setEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editPhone, setEditPhone] = useState(user?.phone ?? "");
-  const [saving, setSaving] = useState(false);
+
+  const updateMeMutation = useUpdateMe({
+    mutation: {
+      onSuccess: async (updated) => {
+        await updateUser({ name: updated.name, phone: updated.phone });
+        setEditModal(false);
+        Alert.alert("Saved", "Profile updated successfully");
+      },
+      onError: (err: Error) => {
+        Alert.alert("Error", err.message || "Failed to update profile");
+      },
+    },
+  });
 
   const referralQuery = useQuery<ReferralData>({
     queryKey: ["referral-me"],
@@ -57,25 +69,13 @@ export default function ProfileScreen() {
     enabled: !!user,
   });
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!editName.trim()) { Alert.alert("Name required"); return; }
-    setSaving(true);
-    try {
-      const phoneNormalized = editPhone.replace(/\D/g, "").slice(-10) || undefined;
-      const updated = await customFetch<{ id: number; name: string; email: string; role: string; phone?: string }>("/api/users/me", {
-        method: "PATCH",
-        body: JSON.stringify({ name: editName.trim(), ...(phoneNormalized !== undefined ? { phone: phoneNormalized } : {}) }),
-        headers: { "Content-Type": "application/json" },
-      });
-      await updateUser({ name: updated.name, phone: updated.phone });
-      setEditModal(false);
-      Alert.alert("Saved", "Profile updated successfully");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to update profile";
-      Alert.alert("Error", msg);
-    } finally {
-      setSaving(false);
-    }
+    const phoneNormalized = editPhone.replace(/\D/g, "").slice(-10) || undefined;
+    updateMeMutation.mutate({
+      name: editName.trim(),
+      ...(phoneNormalized !== undefined ? { phone: phoneNormalized } : {}),
+    });
   };
 
   if (!user) {
@@ -266,11 +266,11 @@ export default function ProfileScreen() {
               </View>
             ))}
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && { opacity: 0.7 }]}
+              style={[styles.saveBtn, { backgroundColor: colors.primary }, updateMeMutation.isPending && { opacity: 0.7 }]}
               onPress={handleSave}
-              disabled={saving}
+              disabled={updateMeMutation.isPending}
             >
-              {saving ? (
+              {updateMeMutation.isPending ? (
                 <ActivityIndicator color={colors.primaryForeground} />
               ) : (
                 <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>Save Changes</Text>

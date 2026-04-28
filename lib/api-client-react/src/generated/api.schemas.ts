@@ -26,6 +26,12 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  phone: string;
+  about: string;
+  profileImage: string;
+  referralCode: string;
+  referredBy?: number | null;
+  points: number;
   createdAt: string;
 }
 
@@ -55,6 +61,20 @@ export interface UpdateRoleBody {
   role: Role;
 }
 
+export interface UpdateMeBody {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name?: string;
+  /** @maxLength 50 */
+  phone?: string;
+  /** @maxLength 2000 */
+  about?: string;
+  /** @maxLength 2048 */
+  profileImage?: string;
+}
+
 export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
 
 export const VendorStatus = {
@@ -70,13 +90,9 @@ export interface Vendor {
   category: string;
   description: string;
   location: string;
-  city?: string;
-  state?: string;
-  country?: string;
   bannerImage: string;
   coverImageUrl: string;
   portfolioImages: string[];
-  openDays?: string[];
   status: VendorStatus;
   rating: number;
   reviewCount: number;
@@ -113,36 +129,20 @@ export interface Event {
   title: string;
   description: string;
   category: string;
-  type: string;
   location: string;
-  state: string;
-  city: string;
-  country: string;
   price: number;
-  startingPrice: number;
   capacity: number;
   imageUrl: string;
-  eventDate?: string | null;
-  featured: boolean;
-  popular: boolean;
-  pubMode: string;
-  priceWomen: number;
-  priceMen: number;
-  priceCouple: number;
-  pubEventTypes: string[];
   rating: number;
   reviewCount: number;
   vendorName: string;
-  partnerName: string;
   galleryImages: string[];
   galleryVideos: string[];
-  approvalStatus: string;
-  rejectionReason?: string | null;
   createdAt: string;
 }
 
 export type EventDetail = Event & {
-  vendor?: Vendor;
+  vendor: Vendor;
 };
 
 export interface CreateEventBody {
@@ -187,7 +187,6 @@ export interface Booking {
   guests: number;
   totalPrice: number;
   notes: string;
-  phone?: string;
   status: BookingStatus;
   createdAt: string;
   eventTitle: string;
@@ -203,7 +202,6 @@ export interface CreateBookingBody {
   bookingDate: string;
   guests: number;
   notes?: string;
-  phone?: string;
 }
 
 export interface UpdateBookingStatusBody {
@@ -285,6 +283,19 @@ export interface AdminAnalytics {
   bookingsByStatus: AdminAnalyticsBookingsByStatusItem[];
   recentBookings: Booking[];
   topVendors: AdminAnalyticsTopVendorsItem[];
+}
+
+export type WishlistItem = Event & {
+  wishlistId: number;
+};
+
+export interface AddToWishlistBody {
+  eventId: number;
+}
+
+export interface WishlistAddResponse {
+  ok: boolean;
+  id: number;
 }
 
 export interface UploadUrlRequest {

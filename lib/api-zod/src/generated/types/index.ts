@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./addToWishlistBody";
 export * from "./adminAnalytics";
 export * from "./adminAnalyticsBookingsByStatusItem";
 export * from "./adminAnalyticsTopVendorsItem";
@@ -34,6 +35,7 @@ export * from "./role";
 export * from "./setAvailabilityBody";
 export * from "./updateBookingStatusBody";
 export * from "./updateEventBody";
+export * from "./updateMeBody";
 export * from "./updateRoleBody";
 export * from "./updateVendorBody";
 export * from "./uploadUrlRequest";
@@ -41,3 +43,5 @@ export * from "./uploadUrlResponse";
 export * from "./user";
 export * from "./vendor";
 export * from "./vendorStatus";
+export * from "./wishlistAddResponse";
+export * from "./wishlistItem";

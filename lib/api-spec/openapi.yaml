@@ -18,6 +18,8 @@ tags:
   - name: reviews
   - name: availability
   - name: admin
+  - name: wishlist
+  - name: users
 
 paths:
   /storage/uploads/request-url:
@@ -133,6 +135,29 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/User"
+
+  /users/me:
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update the current user's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
 
   /users/{userId}/role:
     patch:
@@ -695,6 +720,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminAnalytics"
 
+  /wishlist:
+    get:
+      operationId: getWishlist
+      tags: [wishlist]
+      summary: Get the current user's wishlist
+      responses:
+        "200":
+          description: Wishlist items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WishlistItem"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: addToWishlist
+      tags: [wishlist]
+      summary: Add an event to the wishlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddToWishlistBody"
+      responses:
+        "200":
+          description: Added to wishlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistAddResponse"
+        "400":
+          description: Invalid body
+        "401":
+          description: Unauthorized
+
+  /wishlist/{eventId}:
+    delete:
+      operationId: removeFromWishlist
+      tags: [wishlist]
+      summary: Remove an event from the wishlist
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed from wishlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "401":
+          description: Unauthorized
+
 components:
   schemas:
     HealthStatus:
@@ -726,9 +810,22 @@ components:
           type: string
         role:
           $ref: "#/components/schemas/Role"
+        phone:
+          type: string
+        about:
+          type: string
+        profileImage:
+          type: string
+        referralCode:
+          type: string
+        referredBy:
+          type: integer
+          nullable: true
+        points:
+          type: integer
         createdAt:
           type: string
-      required: [id, email, name, role, createdAt]
+      required: [id, email, name, role, phone, about, profileImage, referralCode, points, createdAt]
 
     RegisterBody:
       type: object
@@ -777,6 +874,23 @@ components:
         role:
           $ref: "#/components/schemas/Role"
       required: [role]
+
+    UpdateMeBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 50
+        about:
+          type: string
+          maxLength: 2000
+        profileImage:
+          type: string
+          maxLength: 2048
 
     VendorStatus:
       type: string
@@ -1154,6 +1268,31 @@ components:
                 type: number
             required: [vendorId, businessName, bookingCount, revenue]
       required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, bookingsByStatus, recentBookings, topVendors]
+    WishlistItem:
+      allOf:
+        - $ref: "#/components/schemas/Event"
+        - type: object
+          properties:
+            wishlistId:
+              type: integer
+          required: [wishlistId]
+
+    AddToWishlistBody:
+      type: object
+      properties:
+        eventId:
+          type: integer
+      required: [eventId]
+
+    WishlistAddResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        id:
+          type: integer
+      required: [ok, id]
+
     UploadUrlRequest:
       type: object
       required: [name, size, contentType]

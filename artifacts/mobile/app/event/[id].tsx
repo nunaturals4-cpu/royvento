@@ -1,10 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  customFetch,
+  getGetWishlistQueryKey,
+  useAddToWishlist,
   useCreateBooking,
   useGetEvent,
+  useGetWishlist,
   useListEventReviews,
+  useRemoveFromWishlist,
 } from "@workspace/api-client-react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
@@ -72,22 +75,24 @@ export default function EventDetailScreen() {
 
   const bookingDate = bookingDateObj.toISOString().slice(0, 10);
 
-  const wishlistQuery = useQuery<{ eventId: number }[]>({
-    queryKey: ["wishlist"],
-    queryFn: () => customFetch("/api/wishlist"),
-    enabled: !!user,
+  const wishlistQuery = useGetWishlist({ query: { enabled: !!user } });
+  const isWishlisted = wishlistQuery.data?.some((w) => w.id === eventId) ?? false;
+
+  const addMutation = useAddToWishlist({
+    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }) },
   });
-  const isWishlisted = wishlistQuery.data?.some((w) => w.eventId === eventId) ?? false;
+  const removeMutation = useRemoveFromWishlist({
+    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }) },
+  });
 
   const toggleWishlist = async () => {
     if (!user) { router.push("/(auth)/login"); return; }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isWishlisted) {
-      await customFetch(`/api/wishlist/${eventId}`, { method: "DELETE" });
+      removeMutation.mutate({ eventId });
     } else {
-      await customFetch("/api/wishlist", { method: "POST", body: JSON.stringify({ eventId }), headers: { "Content-Type": "application/json" } });
+      addMutation.mutate({ eventId });
     }
-    qc.invalidateQueries({ queryKey: ["wishlist"] });
   };
 
   const bookingMutation = useCreateBooking({

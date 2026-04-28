@@ -55,6 +55,12 @@ export const RegisterResponse = zod.object({
     email: zod.string(),
     name: zod.string(),
     role: zod.enum(["user", "vendor", "admin"]),
+    phone: zod.string(),
+    about: zod.string(),
+    profileImage: zod.string(),
+    referralCode: zod.string(),
+    referredBy: zod.number().nullish(),
+    points: zod.number(),
     createdAt: zod.string(),
   }),
 });
@@ -74,6 +80,12 @@ export const LoginResponse = zod.object({
     email: zod.string(),
     name: zod.string(),
     role: zod.enum(["user", "vendor", "admin"]),
+    phone: zod.string(),
+    about: zod.string(),
+    profileImage: zod.string(),
+    referralCode: zod.string(),
+    referredBy: zod.number().nullish(),
+    points: zod.number(),
     createdAt: zod.string(),
   }),
 });
@@ -95,6 +107,12 @@ export const GetMeResponse = zod.object({
       email: zod.string(),
       name: zod.string(),
       role: zod.enum(["user", "vendor", "admin"]),
+      phone: zod.string(),
+      about: zod.string(),
+      profileImage: zod.string(),
+      referralCode: zod.string(),
+      referredBy: zod.number().nullish(),
+      points: zod.number(),
       createdAt: zod.string(),
     }),
     zod.null(),
@@ -109,9 +127,47 @@ export const ListUsersResponseItem = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["user", "vendor", "admin"]),
+  phone: zod.string(),
+  about: zod.string(),
+  profileImage: zod.string(),
+  referralCode: zod.string(),
+  referredBy: zod.number().nullish(),
+  points: zod.number(),
   createdAt: zod.string(),
 });
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
+
+/**
+ * @summary Update the current user's profile
+ */
+export const updateMeBodyNameMax = 255;
+
+export const updateMeBodyPhoneMax = 50;
+
+export const updateMeBodyAboutMax = 2000;
+
+export const updateMeBodyProfileImageMax = 2048;
+
+export const UpdateMeBody = zod.object({
+  name: zod.string().min(1).max(updateMeBodyNameMax).optional(),
+  phone: zod.string().max(updateMeBodyPhoneMax).optional(),
+  about: zod.string().max(updateMeBodyAboutMax).optional(),
+  profileImage: zod.string().max(updateMeBodyProfileImageMax).optional(),
+});
+
+export const UpdateMeResponse = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  name: zod.string(),
+  role: zod.enum(["user", "vendor", "admin"]),
+  phone: zod.string(),
+  about: zod.string(),
+  profileImage: zod.string(),
+  referralCode: zod.string(),
+  referredBy: zod.number().nullish(),
+  points: zod.number(),
+  createdAt: zod.string(),
+});
 
 /**
  * @summary Update a user's role (admin only)
@@ -129,6 +185,12 @@ export const UpdateUserRoleResponse = zod.object({
   email: zod.string(),
   name: zod.string(),
   role: zod.enum(["user", "vendor", "admin"]),
+  phone: zod.string(),
+  about: zod.string(),
+  profileImage: zod.string(),
+  referralCode: zod.string(),
+  referredBy: zod.number().nullish(),
+  points: zod.number(),
   createdAt: zod.string(),
 });
 
@@ -346,14 +408,6 @@ export const RejectVendorResponse = zod.object({
 export const ListEventsQueryParams = zod.object({
   category: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
-  type: zod.coerce.string().optional(),
-  city: zod.coerce.string().optional(),
-  state: zod.coerce.string().optional(),
-  country: zod.coerce.string().optional(),
-  minPrice: zod.coerce.string().optional(),
-  maxPrice: zod.coerce.string().optional(),
-  page: zod.coerce.number().int().min(1).optional(),
-  limit: zod.coerce.number().int().min(1).max(50).optional(),
 });
 
 export const ListEventsResponseItem = zod.object({
@@ -362,7 +416,6 @@ export const ListEventsResponseItem = zod.object({
   title: zod.string(),
   description: zod.string(),
   category: zod.string(),
-  type: zod.string(),
   location: zod.string(),
   price: zod.number(),
   capacity: zod.number(),
@@ -370,23 +423,11 @@ export const ListEventsResponseItem = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   vendorName: zod.string(),
-  city: zod.string().optional(),
-  state: zod.string().optional(),
-  country: zod.string().optional(),
   galleryImages: zod.array(zod.string()),
   galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
-
-export const ListEventsPaginatedResponse = zod.object({
-  data: zod.array(ListEventsResponseItem),
-  page: zod.number().int(),
-  limit: zod.number().int(),
-  hasMore: zod.boolean(),
-});
-
-export type ListEventsPaginatedResponse = zod.infer<typeof ListEventsPaginatedResponse>;
 
 /**
  * @summary Create an event (vendor only)
@@ -570,7 +611,6 @@ export const CreateBookingBody = zod.object({
   bookingDate: zod.string(),
   guests: zod.number(),
   notes: zod.string().optional(),
-  phone: zod.string().optional(),
 });
 
 export const CreateBookingResponse = zod.object({
@@ -852,4 +892,55 @@ export const GetAdminAnalyticsResponse = zod.object({
       revenue: zod.number(),
     }),
   ),
+});
+
+/**
+ * @summary Get the current user's wishlist
+ */
+export const GetWishlistResponseItem = zod
+  .object({
+    id: zod.number(),
+    vendorId: zod.number(),
+    title: zod.string(),
+    description: zod.string(),
+    category: zod.string(),
+    location: zod.string(),
+    price: zod.number(),
+    capacity: zod.number(),
+    imageUrl: zod.string(),
+    rating: zod.number(),
+    reviewCount: zod.number(),
+    vendorName: zod.string(),
+    galleryImages: zod.array(zod.string()),
+    galleryVideos: zod.array(zod.string()),
+    createdAt: zod.string(),
+  })
+  .and(
+    zod.object({
+      wishlistId: zod.number(),
+    }),
+  );
+export const GetWishlistResponse = zod.array(GetWishlistResponseItem);
+
+/**
+ * @summary Add an event to the wishlist
+ */
+export const AddToWishlistBody = zod.object({
+  eventId: zod.number(),
+});
+
+export const AddToWishlistResponse = zod.object({
+  ok: zod.boolean(),
+  id: zod.number(),
+});
+
+/**
+ * @summary Remove an event from the wishlist
+ */
+export const RemoveFromWishlistParams = zod.object({
+  eventId: zod.coerce.number(),
+});
+
+export const RemoveFromWishlistResponse = zod.object({
+  ok: zod.boolean(),
 });
