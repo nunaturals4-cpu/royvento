@@ -42,7 +42,7 @@ export default function ProfileScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [editModal, setEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
-  const [editPhone, setEditPhone] = useState("");
+  const [editPhone, setEditPhone] = useState(user?.phone ?? "");
   const [saving, setSaving] = useState(false);
 
   const referralQuery = useQuery<ReferralData>({
@@ -61,12 +61,13 @@ export default function ProfileScreen() {
     if (!editName.trim()) { Alert.alert("Name required"); return; }
     setSaving(true);
     try {
-      const updated = await customFetch<{ id: number; name: string; email: string; role: string }>("/api/users/me", {
+      const phoneNormalized = editPhone.replace(/\D/g, "").slice(-10) || undefined;
+      const updated = await customFetch<{ id: number; name: string; email: string; role: string; phone?: string }>("/api/users/me", {
         method: "PATCH",
-        body: JSON.stringify({ name: editName.trim(), phone: editPhone.trim() }),
+        body: JSON.stringify({ name: editName.trim(), ...(phoneNormalized !== undefined ? { phone: phoneNormalized } : {}) }),
         headers: { "Content-Type": "application/json" },
       });
-      await updateUser({ name: updated.name });
+      await updateUser({ name: updated.name, phone: updated.phone });
       setEditModal(false);
       Alert.alert("Saved", "Profile updated successfully");
     } catch (err: unknown) {
@@ -133,7 +134,7 @@ export default function ProfileScreen() {
           </View>
           <Pressable
             style={[styles.editAvatar, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => { setEditName(user.name); setEditModal(true); }}
+            onPress={() => { setEditName(user.name); setEditPhone(user.phone ?? ""); setEditModal(true); }}
           >
             <Ionicons name="pencil" size={12} color={colors.primary} />
           </Pressable>

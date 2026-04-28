@@ -114,7 +114,7 @@ export default function EventDetailScreen() {
         eventId,
         bookingDate,
         guests: parseInt(guests) || 1,
-        phone: phone.trim() || undefined,
+        phone: phone.replace(/\D/g, "").slice(-10) || undefined,
         notes: notes.trim() || undefined,
       },
     });
