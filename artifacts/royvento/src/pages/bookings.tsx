@@ -133,7 +133,7 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
                       </span>
                     </TooltipTrigger>
                     <TooltipContent side="left" className="max-w-56 text-center">
-                      Cancellations are not allowed within {CANCELLATION_CUTOFF_HOURS} hours of the event date.
+                      Cancellations are not allowed within 24 hours of the event date.
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
