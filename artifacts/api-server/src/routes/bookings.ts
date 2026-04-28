@@ -339,9 +339,8 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ticketCouple: b.ticketCouple || undefined,
     });
 
-    // Send WhatsApp confirmation using the customer's profile phone number only.
-    // The booking-time phone field is for on-site contact, not for messaging.
-    const whatsappPhone = user.phone;
+    // Send WhatsApp confirmation to the phone number entered at booking time.
+    const whatsappPhone = b.phone || user.phone;
     if (whatsappPhone) {
       sendWhatsAppBookingConfirmation({
         phone: whatsappPhone,
