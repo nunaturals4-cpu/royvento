@@ -360,7 +360,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   vendor: any; lockedType: "pub" | "event" | null; onCancel: () => void; onSaved: () => void;
 }) {
   const [category, setCategory] = useState(vendor.category);
-  const [type, setType] = useState<string>(lockedType ?? "event");
+  const [type, setType] = useState<string>(lockedType ?? "pub");
   const [description, setDescription] = useState("");
   const [city, setCity] = useState(vendor.city ?? "");
   const [stateF, setStateF] = useState(vendor.state ?? "");

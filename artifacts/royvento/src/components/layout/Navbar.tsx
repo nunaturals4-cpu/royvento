@@ -174,7 +174,7 @@ export function Navbar() {
             />
           </form>
 
-          <ThemeSwitcher />
+          <span className="hidden lg:contents"><ThemeSwitcher /></span>
 
           {user && (
             <div className="relative" ref={notifRef}>
@@ -317,10 +317,10 @@ export function Navbar() {
             </DropdownMenu>
           ) : (
             <>
-              <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
+              <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden lg:block">
                 Log in
               </Link>
-              <Link href="/register">
+              <Link href="/register" className="hidden lg:block">
                 <Button className="bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0">
                   Get started
                 </Button>
