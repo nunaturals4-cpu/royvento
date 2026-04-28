@@ -91,6 +91,31 @@ A full-stack event management marketplace for hosts and vendors.
 - `harvest@royvento.com` / `vendor123` (approved vendor)
 - `newvendor@royvento.com` / `vendor123` (pending vendor)
 
+## PhonePe payment integration
+
+Web bookings and subscriptions use PhonePe PG REST API (no SDK). The following environment secrets must be set for real payments:
+
+| Secret | Description |
+|--------|-------------|
+| `PHONEPE_MERCHANT_ID` | Merchant ID from PhonePe dashboard |
+| `PHONEPE_SALT_KEY` | Salt key from PhonePe dashboard |
+| `PHONEPE_SALT_INDEX` | Salt index (usually `1`) |
+| `PHONEPE_ENV` | `UAT` for sandbox, `PROD` for live payments |
+| `APP_URL` | Public URL of the app (e.g. `https://your-domain.com`). Falls back to `REPLIT_DEV_DOMAIN`. Required for PhonePe callback/webhook URLs to work. |
+
+When PhonePe secrets are absent for a non-zero amount, the API returns HTTP 503. To enable local development without credentials, also set:
+
+| Secret | Description |
+|--------|-------------|
+| `PAYMENT_BYPASS` | Set to `true` to auto-confirm bookings / activate subscriptions without charging (development only). A `console.warn` is emitted. **Remove before going live.** |
+
+PhonePe merchant dashboard: https://merchants.phonepe.com  
+PhonePe developer/sandbox portal: https://developer.phonepe.com
+
+DB migration for payments table: `lib/db/drizzle/0001_add_payments_table.sql`  
+Run on an existing DB: `pnpm --filter @workspace/db run migrate`  
+Generate new migration after schema changes: `pnpm --filter @workspace/db run generate`
+
 ## Common tasks
 - Regenerate API client: `pnpm --filter @workspace/api-spec run codegen`
 - Push DB schema: `pnpm --filter @workspace/db run push`

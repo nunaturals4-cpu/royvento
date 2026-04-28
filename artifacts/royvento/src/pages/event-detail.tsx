@@ -197,7 +197,7 @@ export function EventDetail() {
     }
     setBooking(true);
     try {
-      await apiPost("/api/bookings", {
+      const result = await apiPost<{ id?: number; status?: string; requiresPayment?: boolean; redirectUrl?: string; bookingId?: number }>("/api/bookings", {
         eventId: event.id,
         bookingDate: date,
         guests: isPub && pubMode === "ticket" ? (ticketWomen + ticketMen + ticketCouple * 2) : guests,
@@ -217,6 +217,11 @@ export function EventDetail() {
             }
           : {}),
       });
+      if (result?.requiresPayment && result?.redirectUrl) {
+        toast({ title: "Redirecting to payment…", description: "You will be taken to PhonePe to complete your payment." });
+        window.location.href = result.redirectUrl;
+        return;
+      }
       toast({ title: "Booking confirmed!", description: "Your booking is confirmed. Check your dashboard for details." });
       setLocation("/dashboard/bookings");
     } catch (e: any) {

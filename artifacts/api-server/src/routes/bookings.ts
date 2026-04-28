@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import crypto from "crypto";
 import {
   db,
   bookingsTable,
@@ -10,6 +11,7 @@ import {
   referralsTable,
   notificationsTable,
   partnerBlockedDatesTable,
+  paymentsTable,
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
 import { eq, desc, and, inArray } from "drizzle-orm";
@@ -23,6 +25,7 @@ import {
   sendTicketScannedEmail,
   sendWhatsAppBookingConfirmation,
 } from "../lib/notifications";
+import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
 const CANCELLATION_CUTOFF_HOURS = Number(process.env["CANCELLATION_CUTOFF_HOURS"] ?? 24);
@@ -219,7 +222,8 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     if (guestsCount === 0) guestsCount = 1;
   }
 
-  // Apply coupon
+  // Apply coupon — mark used immediately to prevent double-spend across concurrent pending bookings.
+  // Restored on payment failure.
   let discountAmount = 0;
   let validCode = "";
   if (parsed.data.couponCode) {
@@ -251,7 +255,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     discountAmount = Math.max(discountAmount, newUserDiscount);
   }
 
-  // Apply points (1 point = 1 INR)
+  // Deduct points immediately to prevent double-spend. Restored on payment failure.
   const pointsToUse = Math.min(parsed.data.pointsToUse || 0, user.points);
   const pointsCap = Math.max(0, totalPrice - discountAmount);
   const pointsUsed = Math.min(pointsToUse, pointsCap);
@@ -263,6 +267,26 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
 
   const finalPrice = Math.max(0, totalPrice - discountAmount - pointsUsed);
+
+  const usePhonePe = isPhonePeConfigured() && finalPrice > 0;
+  const hasPaymentBypass = process.env.PAYMENT_BYPASS === "true";
+
+  if (!usePhonePe && finalPrice > 0) {
+    if (!hasPaymentBypass) {
+      if (validCode) {
+        await db.update(couponsTable).set({ used: false }).where(and(eq(couponsTable.code, validCode), eq(couponsTable.userId, user.id)));
+      }
+      if (pointsUsed > 0) {
+        await db.update(usersTable).set({ points: user.points }).where(eq(usersTable.id, user.id));
+      }
+      return res.status(503).json({
+        error: "Payment system not configured. Set PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, and PHONEPE_ENV environment variables, or set PAYMENT_BYPASS=true for development.",
+      });
+    }
+    console.warn("[bookings] PAYMENT_BYPASS=true — auto-confirming booking without payment. Remove PAYMENT_BYPASS before going live.");
+  }
+
+  const bookingStatus = usePhonePe ? "payment_pending" : "confirmed";
 
   const [b] = await db
     .insert(bookingsTable)
@@ -279,7 +303,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       budgetRange: parsed.data.budgetRange ?? "",
       notes: parsed.data.notes ?? "",
       eventType: parsed.data.eventType ?? "other",
-      status: "confirmed",
+      status: bookingStatus,
       pubMode: parsed.data.pubMode || "",
       ticketWomen: parsed.data.ticketWomen || 0,
       ticketMen: parsed.data.ticketMen || 0,
@@ -288,13 +312,53 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       personName: parsed.data.personName || user.name,
       phone: parsed.data.phone ?? "",
       pointsUsed,
-      approvedBy: "auto",
+      approvedBy: usePhonePe ? "" : "auto",
     })
     .returning();
   if (!b) {
     res.status(500).json({ error: "Failed" });
     return;
   }
+
+  if (usePhonePe) {
+    const merchantTransactionId = `BK${b.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+    const appUrl = getAppUrl();
+    const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}`;
+    const webhookUrl = `${appUrl}/api/payments/webhook`;
+
+    await db.insert(paymentsTable).values({
+      merchantTransactionId,
+      bookingId: b.id,
+      amount: Math.round(finalPrice * 100),
+      status: "initiated",
+    });
+
+    try {
+      const phone = parsed.data.phone || user.phone;
+      const { redirectUrl } = await initiatePayment({
+        merchantTransactionId,
+        merchantUserId: `U${user.id}`,
+        amountPaise: Math.round(finalPrice * 100),
+        redirectUrl: callbackUrl,
+        callbackUrl: webhookUrl,
+        ...(phone ? { mobileNumber: phone } : {}),
+      });
+      res.json({ redirectUrl, bookingId: b.id, requiresPayment: true });
+    } catch (err) {
+      console.error("[bookings] PhonePe initiation failed:", err);
+      await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
+      await db.update(bookingsTable).set({ status: "cancelled", rejectionReason: "Payment initiation failed" }).where(eq(bookingsTable.id, b.id));
+      if (validCode) {
+        await db.update(couponsTable).set({ used: false }).where(and(eq(couponsTable.code, validCode), eq(couponsTable.userId, user.id)));
+      }
+      if (pointsUsed > 0) {
+        await db.update(usersTable).set({ points: user.points }).where(eq(usersTable.id, user.id));
+      }
+      res.status(502).json({ error: "Payment initiation failed. Please try again." });
+    }
+    return;
+  }
+
   await db
     .insert(availabilityTable)
     .values({ vendorId: evt.vendorId, date: dateStr, status: "booked" })
@@ -340,7 +404,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ticketCouple: b.ticketCouple || undefined,
     });
 
-    // Send WhatsApp confirmation to the phone number entered at booking time.
     const whatsappPhone = b.phone || user.phone;
     if (whatsappPhone) {
       sendWhatsAppBookingConfirmation({
@@ -363,7 +426,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     console.error("Failed to send booking notifications:", err);
   }
 
-  // Award referral points immediately (booking is auto-confirmed at creation)
   try {
     const priorPaid = await db
       .select()
@@ -420,7 +482,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     console.error("Failed to award referral points at booking creation:", err);
   }
 
-  // Create in-app notification for instant confirmation
   try {
     await db.insert(notificationsTable).values({
       userId: user.id,

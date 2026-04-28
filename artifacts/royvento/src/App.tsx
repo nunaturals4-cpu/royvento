@@ -32,6 +32,7 @@ import { BlogDetail } from "@/pages/blog-detail";
 import { Wishlist } from "@/pages/wishlist";
 import { ForgotPassword } from "@/pages/forgot-password";
 import { ResetPassword } from "@/pages/reset-password";
+import { PaymentResult } from "@/pages/payment-result";
 
 import { RequireAuth } from "@/components/RequireAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -78,6 +79,7 @@ function Router() {
           <Route path="/blogs/:slug" component={BlogDetail} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
+          <Route path="/payment-result" component={PaymentResult} />
 
           <Route path="/wishlist">
             {() => <RequireAuth><Wishlist /></RequireAuth>}

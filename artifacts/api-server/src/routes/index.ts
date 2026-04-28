@@ -23,6 +23,7 @@ import wishlistRouter from "./wishlist";
 import aiChatRouter from "./aiChat";
 import announcementsRouter from "./announcements";
 import storageRouter from "./storage";
+import paymentsRouter from "./payments";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(wishlistRouter);
 router.use(aiChatRouter);
 router.use(announcementsRouter);
 router.use(storageRouter);
+router.use(paymentsRouter);
 
 export default router;

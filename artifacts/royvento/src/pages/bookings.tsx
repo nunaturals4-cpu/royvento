@@ -19,6 +19,7 @@ import { formatINR, formatINRExact, apiPatch } from "@/lib/api";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "secondary",
+  payment_pending: "secondary",
   confirmed: "default",
   completed: "outline",
   cancelled: "destructive",
@@ -107,6 +108,9 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
             {b.notes && <p className="text-sm italic text-muted-foreground">"{b.notes}"</p>}
             {b.status === "pending" && (
               <p className="text-xs text-amber-400">Awaiting partner or admin approval.</p>
+            )}
+            {b.status === "payment_pending" && (
+              <p className="text-xs text-amber-400">Payment pending — complete your payment to confirm this booking.</p>
             )}
             {b.status === "cancelled" && b.rejectionReason && (
               <div className="mt-2 rounded-lg border border-red-500/30 bg-red-900/20 px-3 py-2">

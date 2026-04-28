@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Crown, Check, Sparkles, Calendar, Users, Sparkle } from "lucide-react";
+import { Crown, Check, Sparkles, Calendar, Users, Sparkle, CheckCircle, XCircle } from "lucide-react";
 import { apiGet, apiPost, formatINR } from "@/lib/api";
 
 interface Sub {
@@ -30,10 +30,21 @@ export function Subscription() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const paymentParam = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("payment")
+    : null;
+
   useEffect(() => {
     apiGet<PriceData>("/api/subscriptions/prices").then(setPrices).catch(() => {});
     if (user) apiGet<Sub | null>("/api/subscriptions/me").then(setActive).catch(() => {});
   }, [user]);
+
+  useEffect(() => {
+    if (paymentParam === "success") {
+      refetch();
+      apiGet<Sub | null>("/api/subscriptions/me").then(setActive).catch(() => {});
+    }
+  }, [paymentParam]);
 
   const subscribe = async (planType: "user" | "partner", planPeriod: "monthly" | "yearly") => {
     if (!user) {
@@ -50,8 +61,13 @@ export function Subscription() {
     }
     setLoading(true);
     try {
-      const sub = await apiPost<Sub>("/api/subscriptions", { planType, planPeriod });
-      setActive(sub);
+      const result = await apiPost<{ id?: number; status?: string; requiresPayment?: boolean; redirectUrl?: string } & Partial<Sub>>("/api/subscriptions", { planType, planPeriod });
+      if (result?.requiresPayment && result?.redirectUrl) {
+        toast({ title: "Redirecting to payment…", description: "You will be taken to PhonePe to complete your payment." });
+        window.location.href = result.redirectUrl;
+        return;
+      }
+      setActive(result as Sub);
       refetch();
       toast({
         title: "Subscription activated",
@@ -72,13 +88,32 @@ export function Subscription() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-16">
+      {paymentParam === "success" && (
+        <div className="max-w-3xl mx-auto mb-8 rounded-2xl border border-green-500/40 bg-green-900/20 p-5 flex items-center gap-4">
+          <CheckCircle className="h-6 w-6 text-green-400 shrink-0" />
+          <div>
+            <p className="font-medium text-green-200">Payment successful!</p>
+            <p className="text-sm text-green-300/80">Your subscription is now active. Enjoy Royvento Premium.</p>
+          </div>
+        </div>
+      )}
+      {paymentParam === "failed" && (
+        <div className="max-w-3xl mx-auto mb-8 rounded-2xl border border-red-500/40 bg-red-900/20 p-5 flex items-center gap-4">
+          <XCircle className="h-6 w-6 text-red-400 shrink-0" />
+          <div>
+            <p className="font-medium text-red-200">Payment failed</p>
+            <p className="text-sm text-red-300/80">Your payment could not be processed. No amount was charged. Please try again.</p>
+          </div>
+        </div>
+      )}
+
       <header className="max-w-3xl mx-auto text-center mb-14">
         <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-5">
           <Crown className="h-3.5 w-3.5" /> Royvento Premium
         </div>
         <h1 className="font-serif text-4xl md:text-6xl tracking-tight">A members club for hosts &amp; partners</h1>
         <p className="mt-5 text-white/60 leading-relaxed">
-          Demo pricing only — no real payment is processed.
+          Unlock premium features and exclusive benefits for events and venues.
         </p>
         {prices?.isNewUser && (
           <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary/15 border border-primary/40 px-4 py-2 text-sm text-primary">

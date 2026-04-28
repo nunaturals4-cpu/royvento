@@ -26,7 +26,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
 
   const revenueRow = await db
     .select({
-      total: sql<string>`coalesce(sum(${bookingsTable.totalPrice}), 0)::text`,
+      total: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
     })
     .from(bookingsTable)
     .where(
@@ -51,9 +51,10 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
     .select({
       vendorId: bookingsTable.vendorId,
       bookingCount: sql<number>`count(*)::int`,
-      revenue: sql<string>`coalesce(sum(${bookingsTable.totalPrice}), 0)::text`,
+      revenue: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
     })
     .from(bookingsTable)
+    .where(sql`${bookingsTable.status} IN ('confirmed', 'completed')`)
     .groupBy(bookingsTable.vendorId)
     .orderBy(desc(sql`count(*)`))
     .limit(5);
@@ -76,7 +77,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
   const confirmedBookings = await db
     .select({
       vendorId: bookingsTable.vendorId,
-      totalPrice: bookingsTable.totalPrice,
+      finalPrice: bookingsTable.finalPrice,
       ticketWomen: bookingsTable.ticketWomen,
       ticketMen: bookingsTable.ticketMen,
       ticketCouple: bookingsTable.ticketCouple,
@@ -103,14 +104,14 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
     totalMen += b.ticketMen;
     totalCouple += b.ticketCouple;
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
-    if (dailyMap.has(day)) dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.totalPrice));
+    if (dailyMap.has(day)) dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
     const pv = perVendorMap.get(b.vendorId);
     if (pv) {
       pv.bookingCount += 1;
       pv.ticketWomen += b.ticketWomen;
       pv.ticketMen += b.ticketMen;
       pv.ticketCouple += b.ticketCouple;
-      pv.revenue += Number(b.totalPrice);
+      pv.revenue += Number(b.finalPrice);
     } else {
       perVendorMap.set(b.vendorId, {
         vendorId: b.vendorId,
@@ -118,7 +119,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
         ticketWomen: b.ticketWomen,
         ticketMen: b.ticketMen,
         ticketCouple: b.ticketCouple,
-        revenue: Number(b.totalPrice),
+        revenue: Number(b.finalPrice),
       });
     }
   }

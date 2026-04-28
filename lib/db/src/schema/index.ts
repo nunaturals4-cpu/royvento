@@ -477,3 +477,25 @@ export const announcementsTable = pgTable(
 );
 
 export type Announcement = typeof announcementsTable.$inferSelect;
+
+export const paymentsTable = pgTable(
+  "payments",
+  {
+    id: serial("id").primaryKey(),
+    merchantTransactionId: varchar("merchant_transaction_id", { length: 64 }).notNull(),
+    bookingId: integer("booking_id"),
+    subscriptionId: integer("subscription_id"),
+    amount: integer("amount").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("initiated"),
+    phonepeTransactionId: varchar("phonepe_transaction_id", { length: 128 }).notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    merchantTxIdx: uniqueIndex("payments_merchant_tx_idx").on(t.merchantTransactionId),
+    bookingIdx: index("payments_booking_idx").on(t.bookingId),
+    subscriptionIdx: index("payments_subscription_idx").on(t.subscriptionId),
+  }),
+);
+
+export type Payment = typeof paymentsTable.$inferSelect;
