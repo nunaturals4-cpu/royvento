@@ -124,7 +124,13 @@ export function EventDetail() {
   const pointsApplied = Math.min(pointsToUse, pointsAvail);
   const finalTotal = Math.max(0, subtotal - discount - pointsApplied);
 
-  const startingAt = ev.startingPrice ?? ev.price;
+  const startingAt = (() => {
+    if (isPub) {
+      const tiers = [Number(ev.priceWomen), Number(ev.priceMen), Number(ev.priceCouple)].filter((n) => n > 0);
+      if (tiers.length > 0) return Math.min(...tiers);
+    }
+    return ev.startingPrice ?? ev.price ?? 0;
+  })();
 
   const validateCoupon = async () => {
     if (!me?.user) {
@@ -394,7 +400,7 @@ export function EventDetail() {
         <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Starting at</p>
-            <p className="font-serif text-5xl mt-1">{formatINR(startingAt)}</p>
+            <p className="font-serif text-5xl mt-1">{startingAt > 0 ? formatINR(startingAt) : "—"}</p>
             <p className="text-xs text-muted-foreground mb-5">
               {isPub ? "lowest entry price" : "per person · per event"}
             </p>

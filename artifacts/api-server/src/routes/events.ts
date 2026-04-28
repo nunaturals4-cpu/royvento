@@ -51,16 +51,10 @@ async function serializeEvents(rows: EventRow[]) {
   return rows.map((e) => {
     const v = vendorMap.get(e.vendorId);
     const r = ratings.get(e.id) ?? { rating: 0, reviewCount: 0 };
+    const tierPrices = [Number(e.priceWomen), Number(e.priceMen), Number(e.priceCouple)].filter((n) => n > 0);
     const startingAt =
       e.type === "pub"
-        ? Math.min(
-            ...[
-              Number(e.priceWomen),
-              Number(e.priceMen),
-              Number(e.priceCouple),
-              Number(e.price),
-            ].filter((n) => n > 0),
-          ) || Number(e.price)
+        ? (tierPrices.length > 0 ? Math.min(...tierPrices) : Number(e.price))
         : Number(e.price);
     return {
       id: e.id,

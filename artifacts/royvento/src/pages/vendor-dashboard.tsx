@@ -636,9 +636,13 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const tierArr = [priceWomen, priceMen, priceCouple].filter((n) => n > 0);
+      const recalcPrice = isPub
+        ? (tierArr.length > 0 ? Math.min(...tierArr) : price)
+        : price;
       await apiPatch(`/api/events/${event.id}`, {
         title, description, imageUrl, capacity,
-        price, galleryImages, galleryVideos,
+        price: recalcPrice, galleryImages, galleryVideos,
         ...(isPub ? { pubMode, priceWomen, priceMen, priceCouple, pubEventTypes } : {}),
       });
       toast({ title: "Updated" });
