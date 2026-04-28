@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  AppState,
   FlatList,
   Platform,
   Pressable,
@@ -18,13 +19,14 @@ import { EmptyState } from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type BookingStatus = "pending" | "confirmed" | "cancelled" | "completed";
+type BookingStatus = "pending" | "payment_pending" | "confirmed" | "cancelled" | "completed";
 
 const STATUS_META: Record<BookingStatus, { bg: string; text: string; label: string }> = {
-  pending:   { bg: "#f59e0b20", text: "#f59e0b", label: "Pending" },
-  confirmed: { bg: "#22c55e20", text: "#22c55e", label: "Confirmed" },
-  cancelled: { bg: "#ef444420", text: "#ef4444", label: "Cancelled" },
-  completed: { bg: "#6366f120", text: "#6366f1", label: "Completed" },
+  pending:         { bg: "#f59e0b20", text: "#f59e0b", label: "Pending" },
+  payment_pending: { bg: "#f97316" + "20", text: "#f97316", label: "Payment Pending" },
+  confirmed:       { bg: "#22c55e20", text: "#22c55e", label: "Confirmed" },
+  cancelled:       { bg: "#ef444420", text: "#ef4444", label: "Cancelled" },
+  completed:       { bg: "#6366f120", text: "#6366f1", label: "Completed" },
 };
 
 function formatDate(d: string) {
@@ -42,8 +44,19 @@ export default function BookingsScreen() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const appState = useRef(AppState.currentState);
 
   const { data, isLoading, refetch } = useListMyBookings({ query: { queryKey: getListMyBookingsQueryKey(), enabled: !!user } });
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (appState.current.match(/inactive|background/) && nextState === "active") {
+        refetch();
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
+  }, [refetch]);
 
   if (!user) {
     return (
@@ -200,8 +213,30 @@ export default function BookingsScreen() {
                   </View>
                 )}
 
-                {/* Expanded details for non-confirmed bookings */}
-                {isExpanded && status !== "confirmed" && (
+                {/* Payment pending — prompt user */}
+                {isExpanded && status === "payment_pending" && (
+                  <View style={[styles.expandedInfo, { borderTopColor: colors.border }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <Ionicons name="alert-circle-outline" size={16} color="#f97316" />
+                      <Text style={[styles.expandedText, { color: "#f97316", fontFamily: "Inter_600SemiBold" }]}>
+                        Payment not completed
+                      </Text>
+                    </View>
+                    <Text style={[styles.expandedText, { color: colors.mutedForeground }]}>
+                      Go back to the event and re-book to complete your payment, or contact support.
+                    </Text>
+                    <TouchableOpacity
+                      style={{ marginTop: 10, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5 }}
+                      onPress={() => router.push(`/event/${b.eventId}` as never)}
+                    >
+                      <Ionicons name="arrow-redo-outline" size={13} color={colors.primary} />
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.primary }}>Go to event</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Expanded details for other non-confirmed bookings */}
+                {isExpanded && status !== "confirmed" && status !== "payment_pending" && (
                   <View style={[styles.expandedInfo, { borderTopColor: colors.border }]}>
                     <Text style={[styles.expandedText, { color: colors.mutedForeground }]}>
                       Status: {meta.label}

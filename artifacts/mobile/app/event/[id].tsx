@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  customFetch,
   getGetWishlistQueryKey,
+  getListMyBookingsQueryKey,
   useAddToWishlist,
   useCreateBooking,
   useGetEvent,
@@ -12,8 +14,9 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +41,7 @@ interface EventVendor {
   location?: string;
   rating?: number;
   reviewCount?: number;
+  openDays?: string[];
 }
 
 interface EventWithVendor {
@@ -48,11 +52,49 @@ interface EventWithVendor {
   [key: string]: unknown;
 }
 
+interface DiscountInfo {
+  isNewUser: boolean;
+  daysLeft: number;
+  bookingDiscountPercent: number;
+  points: number;
+}
+
 function formatINR(v: number) {
   if (v >= 10000000) return `₹${(v / 10000000).toFixed(1)}Cr`;
   if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
   if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`;
   return `₹${Math.round(v)}`;
+}
+
+function TickerCounter({
+  label, value, price, onChange, color, mutedColor,
+}: {
+  label: string; value: number; price: number; onChange: (v: number) => void;
+  color: string; mutedColor: string;
+}) {
+  return (
+    <View style={styles.tickerRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.tickerLabel, { color }]}>{label}</Text>
+        <Text style={[styles.tickerPrice, { color: mutedColor }]}>{formatINR(price)} each</Text>
+      </View>
+      <View style={styles.tickerControls}>
+        <TouchableOpacity
+          style={[styles.tickerBtn, { borderColor: mutedColor }]}
+          onPress={() => onChange(Math.max(0, value - 1))}
+        >
+          <Ionicons name="remove" size={16} color={color} />
+        </TouchableOpacity>
+        <Text style={[styles.tickerValue, { color }]}>{value}</Text>
+        <TouchableOpacity
+          style={[styles.tickerBtn, { borderColor: mutedColor }]}
+          onPress={() => onChange(value + 1)}
+        >
+          <Ionicons name="add" size={16} color={color} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
 
 export default function EventDetailScreen() {
@@ -73,6 +115,18 @@ export default function EventDetailScreen() {
   const [notes, setNotes] = useState("");
   const [showBooking, setShowBooking] = useState(false);
 
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
+  const [couponInput, setCouponInput] = useState("");
+  const [couponState, setCouponState] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [pointsInput, setPointsInput] = useState("0");
+  const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
+
+  const [ticketWomen, setTicketWomen] = useState(0);
+  const [ticketMen, setTicketMen] = useState(0);
+  const [ticketCouple, setTicketCouple] = useState(0);
+
   const bookingDate = bookingDateObj.toISOString().slice(0, 10);
 
   const wishlistQuery = useGetWishlist({ query: { queryKey: getGetWishlistQueryKey(), enabled: !!user } });
@@ -85,6 +139,13 @@ export default function EventDetailScreen() {
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }) },
   });
 
+  useEffect(() => {
+    if (!user || !showBooking) return;
+    customFetch<DiscountInfo>("/api/users/me/discounts")
+      .then(setDiscountInfo)
+      .catch(() => {});
+  }, [user, showBooking]);
+
   const toggleWishlist = async () => {
     if (!user) { router.push("/(auth)/login"); return; }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -95,12 +156,66 @@ export default function EventDetailScreen() {
     }
   };
 
+  const handleValidateCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setCouponLoading(true);
+    setCouponError("");
+    setCouponState(null);
+    try {
+      const result = await customFetch<{ valid: boolean; discountPercent: number }>("/api/coupons/validate", {
+        method: "POST",
+        body: JSON.stringify({ code: couponInput.trim().toUpperCase() }),
+      });
+      if (result.valid) {
+        setCouponState({ code: couponInput.trim().toUpperCase(), discountPercent: result.discountPercent });
+      } else {
+        setCouponError("Coupon is not valid");
+      }
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setCouponError(err?.message ?? "Invalid coupon");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const isPub = (event as unknown as { type?: string })?.type === "pub";
+  const priceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
+  const priceMen = isPub ? parseFloat(String((event as unknown as { priceMen?: unknown })?.priceMen ?? 0)) : 0;
+  const priceCouple = isPub ? parseFloat(String((event as unknown as { priceCouple?: unknown })?.priceCouple ?? 0)) : 0;
+  const basePrice = parseFloat(String(event?.price ?? 0));
+
+  const subtotal = isPub
+    ? ticketWomen * priceWomen + ticketMen * priceMen + ticketCouple * priceCouple
+    : basePrice * (parseInt(guests) || 1);
+
+  const newUserPercent = discountInfo?.isNewUser && !couponState ? (discountInfo.bookingDiscountPercent || 0) : 0;
+  const couponPercent = couponState?.discountPercent ?? 0;
+  const discount = couponState
+    ? Math.round(subtotal * (couponPercent / 100))
+    : Math.round(subtotal * (newUserPercent / 100));
+  const pointsCap = Math.max(0, subtotal - discount);
+  const pointsAvail = Math.min(discountInfo?.points ?? 0, pointsCap);
+  const pointsApplied = Math.min(parseInt(pointsInput) || 0, pointsAvail);
+  const finalTotal = Math.max(0, subtotal - discount - pointsApplied);
+
   const bookingMutation = useCreateBooking({
     mutation: {
-      onSuccess: async () => {
+      onSuccess: async (data: unknown) => {
+        const d = data as { requiresPayment?: boolean; redirectUrl?: string } | undefined;
+        if (d?.requiresPayment && d?.redirectUrl) {
+          setShowBooking(false);
+          await Linking.openURL(d.redirectUrl);
+          return;
+        }
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setShowBooking(false);
-        Alert.alert("Booking Requested!", "Your booking request has been sent. The partner will confirm soon.");
+        qc.invalidateQueries({ queryKey: getListMyBookingsQueryKey() });
+        Alert.alert(
+          "Booking Confirmed!",
+          "Your booking is confirmed. View your ticket in the Bookings tab.",
+          [{ text: "View Bookings", onPress: () => router.push("/(tabs)/bookings") }, { text: "OK" }],
+        );
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -113,16 +228,32 @@ export default function EventDetailScreen() {
     if (!user) { router.push("/(auth)/login"); return; }
     const today = new Date().toISOString().slice(0, 10);
     if (bookingDate < today) { Alert.alert("Invalid Date", "Booking date must be today or in the future."); return; }
+    if (isPub && ticketWomen + ticketMen + ticketCouple === 0) {
+      Alert.alert("Add Tickets", "Please select at least one ticket to proceed.");
+      return;
+    }
 
-    bookingMutation.mutate({
-      data: {
-        eventId,
-        bookingDate,
-        guests: parseInt(guests) || 1,
-        phone: phone.replace(/\D/g, "").slice(-10) || undefined,
-        notes: notes.trim() || undefined,
-      },
-    });
+    const payload: Record<string, unknown> = {
+      eventId,
+      bookingDate,
+      phone: phone.replace(/\D/g, "").slice(-10) || undefined,
+      notes: notes.trim() || undefined,
+      couponCode: couponState?.code || undefined,
+      pointsToUse: pointsApplied || undefined,
+      paymentMethod,
+    };
+
+    if (isPub) {
+      payload.pubMode = "ticket";
+      payload.ticketWomen = ticketWomen;
+      payload.ticketMen = ticketMen;
+      payload.ticketCouple = ticketCouple;
+      payload.guests = ticketWomen + ticketMen + ticketCouple * 2;
+    } else {
+      payload.guests = parseInt(guests) || 1;
+    }
+
+    bookingMutation.mutate({ data: payload as unknown as Parameters<typeof bookingMutation.mutate>[0]["data"] });
   };
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -143,10 +274,11 @@ export default function EventDetailScreen() {
     );
   }
 
-  const price = parseFloat(String(event.price) || "0");
   const avgRating = reviews?.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : null;
+
+  const vendor = (event as unknown as EventWithVendor).vendor;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -154,44 +286,29 @@ export default function EventDetailScreen() {
         {/* Hero image */}
         <View style={styles.imageContainer}>
           {event.imageUrl ? (
-            <Image
-              source={{ uri: event.imageUrl }}
-              style={styles.heroImage}
-              contentFit="cover"
-            />
+            <Image source={{ uri: event.imageUrl }} style={styles.heroImage} contentFit="cover" />
           ) : (
             <View style={[styles.heroImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
               <Ionicons name="musical-notes" size={48} color={colors.mutedForeground} />
             </View>
           )}
-          {/* Back + Wishlist overlay */}
           <View style={[styles.overlay, { paddingTop: topPadding + 8 }]}>
-            <Pressable
-              onPress={() => router.back()}
-              style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}
-            >
+            <Pressable onPress={() => router.back()} style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
               <Ionicons name="arrow-back" size={20} color="#fff" />
             </Pressable>
-            <Pressable
-              onPress={toggleWishlist}
-              style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}
-            >
-              <Ionicons
-                name={isWishlisted ? "heart" : "heart-outline"}
-                size={20}
-                color={isWishlisted ? "#ef4444" : "#fff"}
-              />
+            <Pressable onPress={toggleWishlist} style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+              <Ionicons name={isWishlisted ? "heart" : "heart-outline"} size={20} color={isWishlisted ? "#ef4444" : "#fff"} />
             </Pressable>
           </View>
         </View>
 
         <View style={styles.content}>
-          {/* Category + type */}
+          {/* Category + type + rating */}
           <View style={styles.row}>
             <View style={[styles.catBadge, { backgroundColor: colors.primary }]}>
               <Text style={[styles.catText, { color: colors.primaryForeground }]}>{event.category}</Text>
             </View>
-            {event.type === "pub" && (
+            {isPub && (
               <View style={[styles.catBadge, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }]}>
                 <Text style={[styles.catText, { color: colors.mutedForeground }]}>Pub</Text>
               </View>
@@ -213,26 +330,24 @@ export default function EventDetailScreen() {
           </View>
 
           {/* Price */}
-          {price > 0 ? (
+          {basePrice > 0 && !isPub ? (
             <View style={[styles.priceRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Starting from</Text>
-              <Text style={[styles.priceValue, { color: colors.primary }]}>{formatINR(price)}</Text>
+              <Text style={[styles.priceValue, { color: colors.primary }]}>{formatINR(basePrice)}</Text>
             </View>
           ) : null}
 
           {/* Pub pricing */}
-          {event.type === "pub" && (parseFloat(String(event.priceWomen)) > 0 || parseFloat(String(event.priceMen)) > 0) ? (
+          {isPub && (priceWomen > 0 || priceMen > 0) ? (
             <View style={[styles.pubPricing, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               {[
-                { label: "Women", price: event.priceWomen },
-                { label: "Men", price: event.priceMen },
-                { label: "Couple", price: event.priceCouple },
-              ].filter((p) => parseFloat(String(p.price)) > 0).map((p) => (
-                <View key={p.label} style={styles.pubPriceItem}>
-                  <Text style={[styles.pubPriceLabel, { color: colors.mutedForeground }]}>{p.label}</Text>
-                  <Text style={[styles.pubPriceVal, { color: colors.foreground }]}>
-                    {formatINR(parseFloat(String(p.price)))}
-                  </Text>
+                { label: "Women", p: priceWomen },
+                { label: "Men", p: priceMen },
+                { label: "Couple", p: priceCouple },
+              ].filter((x) => x.p > 0).map((x) => (
+                <View key={x.label} style={styles.pubPriceItem}>
+                  <Text style={[styles.pubPriceLabel, { color: colors.mutedForeground }]}>{x.label}</Text>
+                  <Text style={[styles.pubPriceVal, { color: colors.foreground }]}>{formatINR(x.p)}</Text>
                 </View>
               ))}
             </View>
@@ -253,12 +368,7 @@ export default function EventDetailScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
                 <View style={styles.gallery}>
                   {(event.galleryImages ?? []).map((img, i) => (
-                    <Image
-                      key={i}
-                      source={{ uri: img }}
-                      style={[styles.galleryImg, { borderColor: colors.border }]}
-                      contentFit="cover"
-                    />
+                    <Image key={i} source={{ uri: img }} style={[styles.galleryImg, { borderColor: colors.border }]} contentFit="cover" />
                   ))}
                 </View>
               </ScrollView>
@@ -266,21 +376,17 @@ export default function EventDetailScreen() {
           ) : null}
 
           {/* Partner */}
-          {(event as unknown as EventWithVendor).vendor ? (
+          {vendor ? (
             <Pressable
               style={[styles.vendorRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => router.push(`/partner/${(event as unknown as EventWithVendor).vendor!.id}`)}
+              onPress={() => router.push(`/partner/${vendor.id}`)}
             >
               <View style={[styles.vendorAvatar, { backgroundColor: colors.muted }]}>
                 <Ionicons name="business-outline" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.vendorName, { color: colors.foreground }]}>
-                  {(event as unknown as EventWithVendor).vendor!.businessName}
-                </Text>
-                <Text style={[styles.vendorCat, { color: colors.mutedForeground }]}>
-                  {(event as unknown as EventWithVendor).vendor!.category}
-                </Text>
+                <Text style={[styles.vendorName, { color: colors.foreground }]}>{vendor.businessName}</Text>
+                <Text style={[styles.vendorCat, { color: colors.mutedForeground }]}>{vendor.category}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
             </Pressable>
@@ -297,42 +403,31 @@ export default function EventDetailScreen() {
                       <Ionicons name="person" size={14} color={colors.mutedForeground} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.reviewerName, { color: colors.foreground }]}>
-                        User #{r.userId}
-                      </Text>
+                      <Text style={[styles.reviewerName, { color: colors.foreground }]}>User #{r.userId}</Text>
                       <View style={styles.stars}>
                         {Array.from({ length: 5 }).map((_, i) => (
-                          <Ionicons
-                            key={i}
-                            name={i < r.rating ? "star" : "star-outline"}
-                            size={11}
-                            color={colors.primary}
-                          />
+                          <Ionicons key={i} name={i < r.rating ? "star" : "star-outline"} size={11} color={colors.primary} />
                         ))}
                       </View>
                     </View>
                   </View>
-                  {r.comment ? (
-                    <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text>
-                  ) : null}
+                  {r.comment ? <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text> : null}
                 </View>
               ))}
             </View>
           ) : null}
         </View>
 
-        {/* Booking form */}
+        {/* ─── Booking form ─── */}
         {showBooking ? (
           <View style={[styles.bookingForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Book This Event</Text>
 
-            {/* Open-days note from vendor */}
-            {event.vendor?.openDays && event.vendor.openDays.length > 0 ? (
+            {/* Open-days note */}
+            {vendor?.openDays && vendor.openDays.length > 0 ? (
               <View style={[styles.openDaysRow, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}>
                 <Ionicons name="calendar-outline" size={14} color={colors.primary} />
-                <Text style={[styles.openDaysText, { color: colors.primary }]}>
-                  Open: {event.vendor.openDays.join(", ")}
-                </Text>
+                <Text style={[styles.openDaysText, { color: colors.primary }]}>Open: {vendor.openDays.join(", ")}</Text>
               </View>
             ) : null}
 
@@ -354,7 +449,7 @@ export default function EventDetailScreen() {
                   display={Platform.OS === "android" ? "calendar" : "spinner"}
                   minimumDate={new Date()}
                   themeVariant="dark"
-                  onChange={(_event, selected) => {
+                  onChange={(_e, selected) => {
                     setShowDatePicker(false);
                     if (selected) setBookingDateObj(selected);
                   }}
@@ -362,18 +457,36 @@ export default function EventDetailScreen() {
               )}
             </View>
 
-            {/* Guests */}
-            <View style={styles.field}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Guests</Text>
-              <TextInput
-                style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-                value={guests}
-                onChangeText={setGuests}
-                placeholder="1"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="number-pad"
-              />
-            </View>
+            {/* Pub ticket counters OR guest count */}
+            {isPub ? (
+              <View style={[styles.pubTickets, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>Select Tickets</Text>
+                {priceWomen > 0 && (
+                  <TickerCounter label="Women" value={ticketWomen} price={priceWomen} onChange={setTicketWomen}
+                    color={colors.foreground} mutedColor={colors.mutedForeground} />
+                )}
+                {priceMen > 0 && (
+                  <TickerCounter label="Men" value={ticketMen} price={priceMen} onChange={setTicketMen}
+                    color={colors.foreground} mutedColor={colors.mutedForeground} />
+                )}
+                {priceCouple > 0 && (
+                  <TickerCounter label="Couple" value={ticketCouple} price={priceCouple} onChange={setTicketCouple}
+                    color={colors.foreground} mutedColor={colors.mutedForeground} />
+                )}
+              </View>
+            ) : (
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Guests</Text>
+                <TextInput
+                  style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                  value={guests}
+                  onChangeText={setGuests}
+                  placeholder="1"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                />
+              </View>
+            )}
 
             {/* Phone */}
             <View style={styles.field}>
@@ -388,6 +501,75 @@ export default function EventDetailScreen() {
               />
             </View>
 
+            {/* Coupon code */}
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Coupon Code</Text>
+              <View style={styles.couponRow}>
+                <TextInput
+                  style={[styles.fieldInput, styles.couponInput, { backgroundColor: colors.muted, borderColor: couponState ? "#22c55e" : colors.border, color: colors.foreground }]}
+                  value={couponInput}
+                  onChangeText={(t) => { setCouponInput(t); setCouponState(null); setCouponError(""); }}
+                  placeholder="Enter code"
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity
+                  style={[styles.couponBtn, { backgroundColor: colors.primary }, couponLoading && { opacity: 0.6 }]}
+                  onPress={handleValidateCoupon}
+                  disabled={couponLoading || !couponInput.trim()}
+                >
+                  {couponLoading ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <Text style={[styles.couponBtnText, { color: colors.primaryForeground }]}>Apply</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {couponState && (
+                <View style={styles.couponSuccess}>
+                  <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
+                  <Text style={[styles.couponSuccessText, { color: "#22c55e" }]}>{couponState.discountPercent}% off applied!</Text>
+                </View>
+              )}
+              {couponError ? <Text style={[styles.couponErrorText, { color: "#ef4444" }]}>{couponError}</Text> : null}
+            </View>
+
+            {/* Points redemption */}
+            {(discountInfo?.points ?? 0) > 0 ? (
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Loyalty Points</Text>
+                <View style={[styles.pointsBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <Ionicons name="diamond-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.pointsAvail, { color: colors.foreground }]}>
+                      {discountInfo!.points} points available (≈{formatINR(discountInfo!.points)})
+                    </Text>
+                  </View>
+                  <View style={styles.couponRow}>
+                    <TextInput
+                      style={[styles.fieldInput, styles.couponInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
+                      value={pointsInput}
+                      onChangeText={(t) => setPointsInput(t.replace(/\D/g, ""))}
+                      placeholder="0"
+                      placeholderTextColor={colors.mutedForeground}
+                      keyboardType="number-pad"
+                    />
+                    <TouchableOpacity
+                      style={[styles.couponBtn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }]}
+                      onPress={() => setPointsInput(String(pointsAvail))}
+                    >
+                      <Text style={[styles.couponBtnText, { color: colors.foreground }]}>Max</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {pointsApplied > 0 && (
+                    <Text style={[styles.couponSuccessText, { color: colors.primary, marginTop: 4 }]}>
+                      −{formatINR(pointsApplied)} deducted
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ) : null}
+
             {/* Notes */}
             <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Notes (optional)</Text>
@@ -401,6 +583,57 @@ export default function EventDetailScreen() {
                 numberOfLines={3}
               />
             </View>
+
+            {/* Payment method toggle */}
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Payment Method</Text>
+              <View style={[styles.payToggle, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                {(["cod", "online"] as const).map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.payOption, paymentMethod === m && { backgroundColor: colors.primary }]}
+                    onPress={() => setPaymentMethod(m)}
+                  >
+                    <Ionicons
+                      name={m === "cod" ? "cash-outline" : "card-outline"}
+                      size={14}
+                      color={paymentMethod === m ? colors.primaryForeground : colors.mutedForeground}
+                    />
+                    <Text style={[styles.payOptionText, { color: paymentMethod === m ? colors.primaryForeground : colors.mutedForeground }]}>
+                      {m === "cod" ? "Pay at Venue" : "Pay Online"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Price summary */}
+            {subtotal > 0 ? (
+              <View style={[styles.summary, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Subtotal</Text>
+                  <Text style={[styles.summaryVal, { color: colors.foreground }]}>{formatINR(subtotal)}</Text>
+                </View>
+                {discount > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: "#22c55e" }]}>
+                      {couponState ? `Coupon (${couponState.discountPercent}%)` : `New User (${newUserPercent}%)`}
+                    </Text>
+                    <Text style={[styles.summaryVal, { color: "#22c55e" }]}>−{formatINR(discount)}</Text>
+                  </View>
+                )}
+                {pointsApplied > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: colors.primary }]}>Points</Text>
+                    <Text style={[styles.summaryVal, { color: colors.primary }]}>−{formatINR(pointsApplied)}</Text>
+                  </View>
+                )}
+                <View style={[styles.summaryRow, styles.summaryTotal]}>
+                  <Text style={[styles.summaryLabel, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>Total</Text>
+                  <Text style={[styles.summaryVal, { color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 18 }]}>{formatINR(finalTotal)}</Text>
+                </View>
+              </View>
+            ) : null}
 
             <View style={styles.bookingButtons}>
               <TouchableOpacity
@@ -417,7 +650,9 @@ export default function EventDetailScreen() {
                 {bookingMutation.isPending ? (
                   <ActivityIndicator color={colors.primaryForeground} />
                 ) : (
-                  <Text style={[styles.submitBtnText, { color: colors.primaryForeground }]}>Confirm</Text>
+                  <Text style={[styles.submitBtnText, { color: colors.primaryForeground }]}>
+                    {paymentMethod === "online" ? "Pay & Confirm" : "Confirm"}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -429,16 +664,7 @@ export default function EventDetailScreen() {
 
       {/* Sticky book button */}
       {!showBooking ? (
-        <View
-          style={[
-            styles.stickyBar,
-            {
-              backgroundColor: colors.card,
-              borderTopColor: colors.border,
-              paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 12),
-            },
-          ]}
-        >
+        <View style={[styles.stickyBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 12) }]}>
           <TouchableOpacity
             style={[styles.bookBtn, { backgroundColor: colors.primary }]}
             onPress={() => {
@@ -459,17 +685,11 @@ const styles = StyleSheet.create({
   imageContainer: { position: "relative", height: 300 },
   heroImage: { width: "100%", height: 300 },
   overlay: {
-    position: "absolute",
-    top: 0, left: 0, right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    position: "absolute", top: 0, left: 0, right: 0,
+    flexDirection: "row", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingBottom: 16,
   },
-  circleBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: "center", justifyContent: "center",
-  },
+  circleBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   content: { padding: 20, gap: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   catBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
@@ -478,10 +698,7 @@ const styles = StyleSheet.create({
   ratingCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
   eventTitle: { fontSize: 24, fontFamily: "Inter_700Bold", letterSpacing: -0.4, lineHeight: 30 },
   location: { fontSize: 14, fontFamily: "Inter_400Regular", flex: 1 },
-  priceRow: {
-    borderRadius: 12, borderWidth: 1, padding: 14,
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-  },
+  priceRow: { borderRadius: 12, borderWidth: 1, padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   priceLabel: { fontSize: 12, fontFamily: "Inter_400Regular" },
   priceValue: { fontSize: 20, fontFamily: "Inter_700Bold" },
   pubPricing: { borderRadius: 12, borderWidth: 1, padding: 14, flexDirection: "row", gap: 20 },
@@ -492,10 +709,7 @@ const styles = StyleSheet.create({
   description: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
   gallery: { flexDirection: "row", paddingHorizontal: 20, gap: 10 },
   galleryImg: { width: 120, height: 90, borderRadius: 12, borderWidth: 1 },
-  vendorRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    borderRadius: 14, borderWidth: 1, padding: 14,
-  },
+  vendorRow: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
   vendorAvatar: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   vendorName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   vendorCat: { fontSize: 12, fontFamily: "Inter_400Regular" },
@@ -514,6 +728,30 @@ const styles = StyleSheet.create({
   datePickerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   openDaysRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   openDaysText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  pubTickets: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 12 },
+  tickerRow: { flexDirection: "row", alignItems: "center" },
+  tickerLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  tickerPrice: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  tickerControls: { flexDirection: "row", alignItems: "center", gap: 12 },
+  tickerBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  tickerValue: { fontSize: 16, fontFamily: "Inter_700Bold", minWidth: 24, textAlign: "center" },
+  couponRow: { flexDirection: "row", gap: 8 },
+  couponInput: { flex: 1 },
+  couponBtn: { borderRadius: 10, paddingHorizontal: 16, justifyContent: "center", alignItems: "center", minWidth: 60 },
+  couponBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  couponSuccess: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  couponSuccessText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  couponErrorText: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 4 },
+  pointsBox: { borderRadius: 12, borderWidth: 1, padding: 12 },
+  pointsAvail: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  payToggle: { flexDirection: "row", borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
+  payOption: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 9, paddingVertical: 10 },
+  payOptionText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  summary: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 10 },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  summaryLabel: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  summaryVal: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  summaryTotal: { borderTopWidth: 1, paddingTop: 10, marginTop: 2 },
   bookingButtons: { flexDirection: "row", gap: 10, marginTop: 4 },
   cancelBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
   cancelBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
