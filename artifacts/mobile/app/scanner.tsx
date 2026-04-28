@@ -131,12 +131,7 @@ export default function ScannerScreen() {
                   facing="back"
                   barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
                   onBarcodeScanned={({ data }) => {
-                    const match = data.match(/royvento:booking:(\d+):/);
-                    if (match?.[1]) {
-                      scanCode(`RV-${String(match[1]).padStart(6, "0")}`);
-                    } else {
-                      scanCode(data);
-                    }
+                    scanCode(data);
                   }}
                 >
                   <View style={styles.scanOverlay}>
@@ -160,7 +155,7 @@ export default function ScannerScreen() {
                 style={[styles.manualInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
                 value={manualCode}
                 onChangeText={setManualCode}
-                placeholder="RV-000042"
+                placeholder="BLCK-000042-F9"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -176,7 +171,7 @@ export default function ScannerScreen() {
               </TouchableOpacity>
             </View>
             <Text style={[styles.manualHint, { color: colors.mutedForeground }]}>
-              Format: RV-XXXXXX or just the number from the booking
+              Format: PREFIX-NNNNNN-XX or legacy RV-NNNNNN
             </Text>
           </View>
         )}

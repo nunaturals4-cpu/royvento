@@ -224,7 +224,7 @@ export default function BookingsScreen() {
             const status = (b.status ?? "pending") as BookingStatus;
             const meta = STATUS_META[status] ?? STATUS_META.pending;
             const isExpanded = expandedId === b.id;
-            const qrValue = `royvento:booking:${b.id}:${b.bookingDate}`;
+            const qrValue = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
 
             return (
               <Pressable
@@ -259,7 +259,7 @@ export default function BookingsScreen() {
                       {b.eventTitle ?? `Booking #${b.id}`}
                     </Text>
                     <Text style={[styles.bookingRef, { color: colors.mutedForeground }]}>
-                      Ref: RVT-{String(b.id).padStart(6, "0")}
+                      {b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`}
                     </Text>
                     <View style={styles.metaRow}>
                       <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
@@ -294,7 +294,7 @@ export default function BookingsScreen() {
                       <Text style={[styles.ticketTitle, { color: "#22c55e" }]}>Booking Confirmed</Text>
                     </View>
                     <Text style={[styles.ticketRef, { color: colors.mutedForeground }]}>
-                      Ref: RVT-{String(b.id).padStart(6, "0")}
+                      {qrValue}
                     </Text>
                     <View style={[styles.qrWrap, { backgroundColor: "#ffffff" }]}>
                       <QRCode value={qrValue} size={140} />

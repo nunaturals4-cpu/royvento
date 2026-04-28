@@ -15,6 +15,7 @@ import {
   vendorManagersTable,
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
+import { generateTicketCode, verifyTicketCode, generateTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateBookingStatusBody } from "@workspace/api-zod";
@@ -147,6 +148,7 @@ async function serializeBookings(rows: BookingRow[]) {
       partnerName: v?.businessName ?? "",
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
+      ticketCode: v ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" }) : `RV-${String(b.id).padStart(6, "0")}`,
       // True when the event is far enough away that self-service cancellation is permitted.
       // Interpreted as midnight (local server time) of the booking date to align with how
       // the cancel handler enforces the same check.
@@ -1167,13 +1169,26 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
   const code = rawCode.trim().toUpperCase();
-  // Accept RV-000042 or RV000042 or just the number
-  const match = code.match(/^(?:RV-?)?(\d+)$/);
-  if (!match || !match[1]) {
-    res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code format. Expected e.g. RV-000042." });
+
+  // Determine booking ID and whether this is a new-format code (needs checksum verification)
+  let bookingId: number;
+  let needsChecksumVerification = false;
+
+  // New format: PREFIX-NNNNNN-XX (e.g. BLCK-000042-F9)
+  const newFormatMatch = code.match(/^([A-Z]{2,8})-(\d{1,10})-([0-9A-F]{2})$/);
+  // Legacy format: RV-NNNNNN, RVNNNNNN, or plain number
+  const legacyMatch = code.match(/^(?:RV-?)?(\d+)$/);
+
+  if (newFormatMatch && newFormatMatch[2] && newFormatMatch[1] !== "RV") {
+    bookingId = parseInt(newFormatMatch[2], 10);
+    needsChecksumVerification = true;
+  } else if (legacyMatch && legacyMatch[1]) {
+    bookingId = parseInt(legacyMatch[1], 10);
+  } else {
+    res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code format. Expected e.g. BLCK-000042-F9 or RV-000042." });
     return;
   }
-  const bookingId = parseInt(match[1]!, 10);
+
   if (!Number.isFinite(bookingId) || bookingId <= 0) {
     res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code." });
     return;
@@ -1212,6 +1227,19 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   if (!allowedVendorIds.has(b.vendorId)) {
     res.status(403).json({ code: "WRONG_VENDOR", message: "This ticket belongs to a different partner's event." });
     return;
+  }
+
+  // For new-format codes, verify the HMAC checksum against the vendor's salt
+  if (needsChecksumVerification) {
+    const vRows = await db.select({ ticketSalt: vendorsTable.ticketSalt, ticketPrefix: vendorsTable.ticketPrefix })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, b.vendorId))
+      .limit(1);
+    const vendor = vRows[0];
+    if (!vendor || !vendor.ticketSalt || !verifyTicketCode(code, bookingId, { ticketSalt: vendor.ticketSalt })) {
+      res.status(400).json({ code: "INVALID_CODE", message: "Ticket code is invalid or has been tampered with." });
+      return;
+    }
   }
 
   // Status checks

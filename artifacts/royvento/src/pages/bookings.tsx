@@ -14,6 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download, AlertCircle } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatINR, formatINRExact, apiPatch } from "@/lib/api";
 
@@ -293,24 +294,36 @@ function PremiumTicket({ b }: { b: any }) {
         </div>
       </div>
       <div ref={ref} className="ticket rounded-2xl border border-red-500/40 bg-gradient-to-br from-red-950/60 to-black p-6">
-        <div className="row flex justify-between items-center">
-          <span className="brand text-xs tracking-[0.4em] uppercase text-red-300">ROYVENTO</span>
-          <span className="code text-xs font-mono text-red-300 bg-white/5 px-2 py-1 rounded">#RV-{String(b.id).padStart(6, "0")}</span>
-        </div>
-        <h1 className="font-serif text-3xl mt-2">{b.eventTitle}</h1>
-        <p className="text-xs text-muted-foreground">{b.vendorName}{b.eventCity ? ` · ${b.eventCity}` : ""}</p>
-        <div className="grid grid-cols-2 gap-4 mt-6">
-          <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Guest</p><p className="val text-lg mt-0.5">{b.personName || b.userName}</p></div>
-          <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Date</p><p className="val text-lg mt-0.5">{b.bookingDate}</p></div>
-          <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tickets</p>
-            <p className="val text-sm mt-0.5">
-              {b.ticketWomen ? `${b.ticketWomen}W ` : ""}
-              {b.ticketMen ? `${b.ticketMen}M ` : ""}
-              {b.ticketCouple ? `${b.ticketCouple}C` : ""}
-              <span className="text-muted-foreground"> · {total} guests</span>
-            </p>
+        <div className="row flex justify-between items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-center">
+              <span className="brand text-xs tracking-[0.4em] uppercase text-red-300">ROYVENTO</span>
+              <span className="code text-xs font-mono text-red-300 bg-white/5 px-2 py-1 rounded">{b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`}</span>
+            </div>
+            <h1 className="font-serif text-3xl mt-2">{b.eventTitle}</h1>
+            <p className="text-xs text-muted-foreground">{b.vendorName}{b.eventCity ? ` · ${b.eventCity}` : ""}</p>
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Guest</p><p className="val text-lg mt-0.5">{b.personName || b.userName}</p></div>
+              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Date</p><p className="val text-lg mt-0.5">{b.bookingDate}</p></div>
+              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tickets</p>
+                <p className="val text-sm mt-0.5">
+                  {b.ticketWomen ? `${b.ticketWomen}W ` : ""}
+                  {b.ticketMen ? `${b.ticketMen}M ` : ""}
+                  {b.ticketCouple ? `${b.ticketCouple}C` : ""}
+                  <span className="text-muted-foreground"> · {total} guests</span>
+                </p>
+              </div>
+              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Approved by</p><p className="val text-lg mt-0.5 capitalize">{b.approvedBy || "partner"}</p></div>
+            </div>
           </div>
-          <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Approved by</p><p className="val text-lg mt-0.5 capitalize">{b.approvedBy || "partner"}</p></div>
+          {b.ticketCode && (
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
+              <div className="bg-white p-2 rounded-lg">
+                <QRCodeSVG value={b.ticketCode} size={100} />
+              </div>
+              <p className="text-[10px] font-mono text-red-300 tracking-wider">{b.ticketCode}</p>
+            </div>
+          )}
         </div>
         <hr className="border-dashed border-white/15 my-5" />
         <div className="totals flex justify-between text-lg">

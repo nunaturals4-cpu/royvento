@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, type Role } from "../lib/auth";
 import { getVendorRatings, getVendorRating } from "../lib/aggregates";
+import { generateTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 
 const router: IRouter = Router();
 
@@ -137,6 +138,8 @@ router.post("/vendors/me", requireAuth(), async (req, res) => {
       bannerImage: parsed.data.bannerImage ?? "",
       portfolioImages: parsed.data.portfolioImages ?? [],
       status: "pending",
+      ticketPrefix: generateTicketPrefix(parsed.data.businessName),
+      ticketSalt: generateTicketSalt(),
     })
     .returning();
   if (!v) {
@@ -216,9 +219,15 @@ router.post(
       res.status(400).json({ error: "Invalid id" });
       return;
     }
+    const existing = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
+    const extra: Record<string, unknown> = { status: "approved" };
+    if (existing[0] && !existing[0].ticketPrefix) {
+      extra["ticketPrefix"] = generateTicketPrefix(existing[0].businessName);
+      extra["ticketSalt"] = generateTicketSalt();
+    }
     const [v] = await db
       .update(vendorsTable)
-      .set({ status: "approved" })
+      .set(extra)
       .where(eq(vendorsTable.id, id))
       .returning();
     if (!v) {
