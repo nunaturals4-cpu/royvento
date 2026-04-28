@@ -29,6 +29,7 @@ export const usersTable = pgTable(
     points: integer("points").notNull().default(0),
     resetToken: varchar("reset_token", { length: 255 }).notNull().default(""),
     resetTokenExpiry: timestamp("reset_token_expiry", { withTimezone: true }),
+    pushToken: text("push_token").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

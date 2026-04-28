@@ -11,6 +11,7 @@ import {
   notificationsTable,
   partnerBlockedDatesTable,
 } from "@workspace/db";
+import { sendExpoPushNotification } from "../lib/expoPush";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateBookingStatusBody } from "@workspace/api-zod";
@@ -741,6 +742,24 @@ router.patch(
             title: notifTitle,
             message: notifMessage,
           });
+
+          // Send Expo push notification to user's device if they have a token
+          const [bookingUser] = await db
+            .select({ pushToken: usersTable.pushToken })
+            .from(usersTable)
+            .where(eq(usersTable.id, b.userId))
+            .limit(1);
+          if (bookingUser?.pushToken) {
+            sendExpoPushNotification([
+              {
+                to: bookingUser.pushToken,
+                title: notifTitle,
+                body: notifMessage,
+                sound: "default",
+                data: { bookingId: b.id, screen: "bookings" },
+              },
+            ]).catch(() => {});
+          }
         }
       } catch (err) {
         console.error("Failed to create notification:", err);

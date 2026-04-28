@@ -6,11 +6,13 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { setBaseUrl } from "@workspace/api-client-react";
+import { setBaseUrl, customFetch } from "@workspace/api-client-react";
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -22,6 +24,53 @@ SplashScreen.preventAutoHideAsync();
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) {
   setBaseUrl(`https://${domain}`);
+}
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowAlert: true,
+  }),
+});
+
+export async function registerForPushNotifications(): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+
+  let token: string | null = null;
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") return null;
+
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
+
+    const tokenData = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+    token = tokenData.data;
+  } catch {
+    return null;
+  }
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#d4a017",
+    });
+  }
+
+  return token;
 }
 
 const queryClient = new QueryClient({
@@ -43,6 +92,39 @@ function AuthGate() {
       router.replace("/(tabs)");
     }
   }, [user, isLoading, segments]);
+
+  return null;
+}
+
+function NotificationHandler() {
+  const { user } = useAuth();
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
+
+  useEffect(() => {
+    if (!user || Platform.OS === "web") return;
+
+    registerForPushNotifications().then((token) => {
+      if (!token) return;
+      customFetch("/api/auth/push-token", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pushToken: token }),
+      }).catch(() => {});
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as Record<string, unknown>;
+        if (data?.screen === "bookings") {
+          router.push("/(tabs)/bookings" as never);
+        }
+      },
+    );
+
+    return () => {
+      responseListener.current?.remove();
+    };
+  }, [user]);
 
   return null;
 }
@@ -71,6 +153,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <StatusBar style="light" backgroundColor="#0e0d12" />
               <AuthGate />
+              <NotificationHandler />
               <Stack
                 screenOptions={{
                   headerShown: false,

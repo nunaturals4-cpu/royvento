@@ -504,4 +504,24 @@ router.post("/auth/google/mobile", async (req, res) => {
   }
 });
 
+const PushTokenBody = z.object({ pushToken: z.string().min(1) });
+
+router.put("/auth/push-token", async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const parsed = PushTokenBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "pushToken is required" });
+    return;
+  }
+  await db
+    .update(usersTable)
+    .set({ pushToken: parsed.data.pushToken })
+    .where(eq(usersTable.id, user.id));
+  res.json({ ok: true });
+});
+
 export default router;
