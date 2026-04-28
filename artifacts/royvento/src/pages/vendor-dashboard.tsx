@@ -162,9 +162,11 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
         onSuccess: async () => {
           try {
             await apiPatch("/api/partner/profile", { state: stateF, city, country, openDays });
-          } catch { /* silent */ }
-          toast({ title: "Profile updated" });
-          onSaved();
+            toast({ title: "Profile updated" });
+            onSaved();
+          } catch (err: any) {
+            toast({ title: "Location / schedule not saved", description: err?.message ?? "Please try again.", variant: "destructive" });
+          }
         },
         onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
       },
