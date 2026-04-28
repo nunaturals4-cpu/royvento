@@ -8,6 +8,7 @@ import {
   useGetMe,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -115,6 +116,18 @@ export function EventDetail() {
   const vendorOpenDays: string[] = (ev.vendor?.openDays ?? []) as string[];
   const selectedDayName = date ? DAY_ABBRS[new Date(`${date}T12:00:00`).getDay()] : "";
   const isClosedDay = !!(date && vendorOpenDays.length > 0 && !vendorOpenDays.includes(selectedDayName));
+
+  const localDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const isDateDisabled = (d: Date): boolean => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (d < today) return true;
+    const ds = localDateStr(d);
+    if (blockedDates.has(ds)) return true;
+    if (vendorOpenDays.length > 0 && !vendorOpenDays.includes(DAY_ABBRS[d.getDay()])) return true;
+    return false;
+  };
+  const calSelectedDate = date ? new Date(`${date}T12:00:00`) : undefined;
 
   // Compute subtotal based on mode
   let subtotal = 0;
@@ -459,21 +472,20 @@ export function EventDetail() {
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  min={new Date().toISOString().slice(0, 10)}
-                  className="bg-black/40 border-white/10 mt-1"
-                />
-                {date && blockedDates.has(date) && (
-                  <p className="text-xs text-destructive mt-1">That date is unavailable.</p>
-                )}
-                {isClosedDay && (
-                  <p className="text-xs text-destructive mt-1">
-                    {ev.vendor?.businessName ?? "This venue"} is closed on {selectedDayName}s. Please pick a different date.
+                <Label>Date {date && <span className="text-muted-foreground font-normal">— {date}</span>}</Label>
+                <div className="mt-1 rounded-xl border border-white/10 bg-black/40 overflow-hidden">
+                  <Calendar
+                    mode="single"
+                    selected={calSelectedDate}
+                    onSelect={(d) => setDate(d ? localDateStr(d) : "")}
+                    disabled={isDateDisabled}
+                    className="[--cell-size:1.9rem] w-full"
+                    showOutsideDays={false}
+                  />
+                </div>
+                {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Open: {vendorOpenDays.join(", ")} · Greyed dates are unavailable
                   </p>
                 )}
               </div>
