@@ -13,6 +13,7 @@ import {
   userToPublic,
   type Role,
 } from "../lib/auth";
+import { sendPasswordResetEmail, sendWelcomeEmail } from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -312,6 +313,10 @@ router.get("/auth/google/callback", async (req, res) => {
         return;
       }
       user = created;
+      // Send welcome email to newly created Google user (fire-and-forget)
+      sendWelcomeEmail({ to: user.email, toName: user.name }).catch((err) => {
+        console.error("Failed to send Google sign-up welcome email:", err);
+      });
     }
 
     const token = signToken({ userId: user.id, role: user.role as Role });
@@ -347,8 +352,16 @@ router.post("/auth/forgot-password", async (req, res) => {
     .update(usersTable)
     .set({ resetToken: token, resetTokenExpiry: expiry })
     .where(eq(usersTable.id, rows[0].id));
-  // In production this would send an email; for now we return the token for demo
-  res.json({ ok: true, token, message: "Reset token generated (demo mode — no email sent)." });
+  try {
+    await sendPasswordResetEmail({
+      to: rows[0].email,
+      toName: rows[0].name,
+      token,
+    });
+  } catch (err) {
+    console.error("Failed to send password reset email:", err);
+  }
+  res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
 });
 
 const ResetPasswordBody = z.object({

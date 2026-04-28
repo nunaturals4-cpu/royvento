@@ -12,18 +12,16 @@ export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await apiPost<{ ok: boolean; token?: string; message: string }>(
+      await apiPost<{ ok: boolean; message: string }>(
         "/api/auth/forgot-password",
         { email },
       );
       setSubmitted(true);
-      if (res.token) setResetToken(res.token);
     } catch (err: any) {
       toast({ title: "Error", description: err?.message, variant: "destructive" });
     } finally {
@@ -40,31 +38,11 @@ export function ForgotPassword() {
           <p className="text-muted-foreground text-sm leading-relaxed mb-6">
             If <strong>{email}</strong> is registered on Royvento, you will receive a password reset link shortly.
           </p>
-          {resetToken && (
-            <div className="bg-card border border-border rounded-xl p-4 mb-6 text-left">
-              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">Demo mode — reset token</p>
-              <code className="text-xs break-all text-primary">{resetToken}</code>
-              <p className="text-xs text-muted-foreground mt-2">
-                Use this token on the{" "}
-                <Link href={`/reset-password?token=${resetToken}`} className="text-primary hover:underline">
-                  reset password page
-                </Link>
-                .
-              </p>
-            </div>
-          )}
-          <div className="flex gap-3 justify-center">
-            <Link href="/login">
-              <Button variant="outline" className="gap-2">
-                <ArrowLeft className="h-4 w-4" /> Back to login
-              </Button>
-            </Link>
-            {resetToken && (
-              <Link href={`/reset-password?token=${resetToken}`}>
-                <Button className="bg-primary text-primary-foreground">Reset password</Button>
-              </Link>
-            )}
-          </div>
+          <Link href="/login">
+            <Button variant="outline" className="gap-2">
+              <ArrowLeft className="h-4 w-4" /> Back to login
+            </Button>
+          </Link>
         </div>
       </div>
     );

@@ -24,6 +24,7 @@
     "jsonwebtoken": "^9.0.3",
     "pino": "^9",
     "pino-http": "^10",
+    "resend": "^6.12.2",
     "zod": "catalog:"
   },
   "devDependencies": {

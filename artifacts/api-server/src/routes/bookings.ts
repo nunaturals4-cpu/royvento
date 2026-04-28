@@ -19,6 +19,7 @@ import {
   sendBookingCreatedEmails,
   sendBookingStatusEmail,
   sendCustomerCancelledBookingEmail,
+  sendTicketScannedEmail,
 } from "../lib/notifications";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
@@ -328,7 +329,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       userEmail: user.email,
       bookingDate: b.bookingDate,
       guests: b.guests,
-      totalPrice: Number(b.totalPrice),
+      totalPrice: Number(b.finalPrice),
       notes: b.notes || undefined,
       phone: b.phone || undefined,
       pubMode: b.pubMode || undefined,
@@ -1093,6 +1094,37 @@ router.post("/partner/scan-ticket", requireAuth(["vendor"]), async (req, res) =>
   }
 
   const [out] = await serializeBookings([updated]);
+
+  // Fire-and-forget ticket-scanned email to the customer
+  try {
+    const customerRows = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, updated.userId))
+      .limit(1);
+    const customer = customerRows[0];
+    const eRows = await db
+      .select()
+      .from(eventsTable)
+      .where(eq(eventsTable.id, updated.eventId))
+      .limit(1);
+    const evt = eRows[0];
+    if (customer && evt) {
+      sendTicketScannedEmail({
+        to: customer.email,
+        toName: customer.name,
+        bookingId: updated.id,
+        eventTitle: evt.title,
+        vendorName: out?.vendorName ?? vendor.businessName,
+        checkedInAt: now,
+      }).catch((err) => {
+        console.error("Failed to send ticket-scanned email:", err);
+      });
+    }
+  } catch (err) {
+    console.error("Failed to trigger ticket-scanned email:", err);
+  }
+
   res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ?? null });
 });
 

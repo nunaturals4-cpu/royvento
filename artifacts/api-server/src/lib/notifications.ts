@@ -1,3 +1,22 @@
+import { Resend } from "resend";
+
+function getResendClient(): Resend | null {
+  const key = process.env["RESEND_API_KEY"];
+  if (!key) return null;
+  return new Resend(key);
+}
+
+function getFromAddress(): string {
+  return process.env["RESEND_FROM_EMAIL"] ?? "Royvento <onboarding@resend.dev>";
+}
+
+function getAppUrl(): string {
+  if (process.env["APP_URL"]) return process.env["APP_URL"];
+  const domain = process.env["REPLIT_DEV_DOMAIN"];
+  if (domain) return `https://${domain}`;
+  return "http://localhost:3000";
+}
+
 type EmailPayload = {
   to: string;
   toName?: string;
@@ -25,11 +44,32 @@ function formatEmail(label: string, payload: EmailPayload): string {
 }
 
 async function deliver(label: string, payload: EmailPayload): Promise<void> {
-  // No real email provider configured. Print to server console so the
-  // notification is visible in the workflow logs. To enable real delivery,
-  // swap this body with a SendGrid / SMTP / Resend call.
-  // eslint-disable-next-line no-console
-  console.log(formatEmail(label, payload));
+  const client = getResendClient();
+
+  if (!client) {
+    // No Resend key configured — print to console so notifications are
+    // visible in workflow logs during development.
+    // eslint-disable-next-line no-console
+    console.log(formatEmail(label, payload));
+    return;
+  }
+
+  const toAddress = payload.toName
+    ? `${payload.toName} <${payload.to}>`
+    : payload.to;
+
+  const { error } = await client.emails.send({
+    from: getFromAddress(),
+    to: [toAddress],
+    subject: payload.subject,
+    text: payload.body,
+  });
+
+  if (error) {
+    console.error(`[notifications] Failed to send "${label}" to ${payload.to}:`, error);
+  } else {
+    console.log(`[notifications] Sent "${label}" to ${payload.to}`);
+  }
 }
 
 function fmtMoney(n: number): string {
@@ -37,7 +77,6 @@ function fmtMoney(n: number): string {
 }
 
 function fmtDate(iso: string): string {
-  // iso may be "2026-08-15"
   const d = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-US", {
@@ -52,6 +91,96 @@ function fmtDate(iso: string): string {
 function fmtINR(n: number): string {
   return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
+
+// ─── Forgot-password ────────────────────────────────────────────────────────
+
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  toName: string;
+  token: string;
+}): Promise<void> {
+  const resetUrl = `${getAppUrl()}/reset-password?token=${params.token}`;
+  await deliver("Password Reset", {
+    to: params.to,
+    toName: params.toName,
+    subject: "Reset your Royvento password",
+    body: [
+      `Hi ${params.toName.split(" ")[0]},`,
+      ``,
+      `We received a request to reset the password for your Royvento account.`,
+      ``,
+      `Click the link below to choose a new password (valid for 1 hour):`,
+      ``,
+      `  ${resetUrl}`,
+      ``,
+      `If you didn't request this, you can safely ignore this email — your password won't change.`,
+      ``,
+      `— The Royvento team`,
+    ].join("\n"),
+  });
+}
+
+// ─── Welcome email ───────────────────────────────────────────────────────────
+
+export async function sendWelcomeEmail(params: {
+  to: string;
+  toName: string;
+}): Promise<void> {
+  await deliver("Welcome", {
+    to: params.to,
+    toName: params.toName,
+    subject: "Welcome to Royvento!",
+    body: [
+      `Hi ${params.toName.split(" ")[0]},`,
+      ``,
+      `Welcome to Royvento! We're glad you're here.`,
+      ``,
+      `You can now browse and book events at top venues near you. Here's what you can do:`,
+      ``,
+      `  • Discover pubs, restaurants & event spaces`,
+      `  • Book your spot in seconds`,
+      `  • Earn loyalty points on every booking`,
+      ``,
+      `${getAppUrl()}`,
+      ``,
+      `See you soon!`,
+      ``,
+      `— The Royvento team`,
+    ].join("\n"),
+  });
+}
+
+// ─── Ticket scanned ──────────────────────────────────────────────────────────
+
+export async function sendTicketScannedEmail(params: {
+  to: string;
+  toName: string;
+  bookingId: number;
+  eventTitle: string;
+  vendorName: string;
+  checkedInAt: Date;
+}): Promise<void> {
+  const refCode = `#RV-${String(params.bookingId).padStart(6, "0")}`;
+  await deliver("Ticket Scanned", {
+    to: params.to,
+    toName: params.toName,
+    subject: `You're checked in — ${params.eventTitle}`,
+    body: [
+      `Hi ${params.toName.split(" ")[0]},`,
+      ``,
+      `Your ticket has been scanned and you're officially checked in. Enjoy the event!`,
+      ``,
+      `  Reference: ${refCode}`,
+      `  Event:     ${params.eventTitle}`,
+      `  Venue:     ${params.vendorName}`,
+      `  Checked in at: ${params.checkedInAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+      ``,
+      `— The Royvento team`,
+    ].join("\n"),
+  });
+}
+
+// ─── Booking emails ──────────────────────────────────────────────────────────
 
 export interface BookingNotification {
   bookingId: number;
