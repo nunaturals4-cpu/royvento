@@ -1211,9 +1211,9 @@ function AnnouncementsPanel() {
   };
 
   const applyFile = (file: File) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
     if (!allowed.includes(file.type)) {
-      toast({ title: "Only JPG, PNG, WebP or GIF images are allowed", variant: "destructive" });
+      toast({ title: "Only JPG, PNG or WebP images are allowed", variant: "destructive" });
       return;
     }
     if (file.size > 8 * 1024 * 1024) {
@@ -1334,7 +1334,7 @@ function AnnouncementsPanel() {
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <label className="cursor-pointer px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
                   <Upload className="h-3 w-3" /> Change
-                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={handleFileChange} />
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleFileChange} />
                 </label>
                 <button type="button" onClick={removeImage} className="px-3 py-1 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white border border-white/10">
                   Remove
@@ -1351,9 +1351,9 @@ function AnnouncementsPanel() {
             >
               <ImageIcon className="h-6 w-6 text-muted-foreground" />
               <span className="text-xs text-muted-foreground text-center leading-snug">
-                Click or drag &amp; drop<br />JPG, PNG, WebP or GIF · max 8 MB
+                Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB
               </span>
-              <input id="ann-img-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={handleFileChange} />
+              <input id="ann-img-input" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleFileChange} />
             </label>
           )}
           {imageFile && (
