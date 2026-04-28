@@ -1236,21 +1236,18 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     .limit(1);
   const scanVendor = vRows[0];
 
-  if (scanVendor?.ticketPrefix && scanVendor?.ticketSalt) {
-    // This vendor is on the new format — require the cryptographically-bound code
-    if (!needsChecksumVerification) {
-      res.status(400).json({ code: "INVALID_CODE", message: `Please use the vendor ticket code format (e.g. ${scanVendor.ticketPrefix}-000042-XX), not the legacy code.` });
+  if (needsChecksumVerification) {
+    // New-format code: verify prefix + checksum against this vendor's stored salt
+    if (!scanVendor?.ticketPrefix || !scanVendor?.ticketSalt) {
+      res.status(400).json({ code: "INVALID_CODE", message: "Cannot verify ticket code — vendor is not yet configured." });
       return;
     }
     if (!verifyTicketCode(code, bookingId, { ticketPrefix: scanVendor.ticketPrefix, ticketSalt: scanVendor.ticketSalt })) {
       res.status(400).json({ code: "INVALID_CODE", message: "Ticket code is invalid or has been tampered with." });
       return;
     }
-  } else if (needsChecksumVerification) {
-    // Vendor not yet initialized — new-format code submitted but we can't verify checksum
-    res.status(400).json({ code: "INVALID_CODE", message: "Cannot verify ticket code — vendor is not yet configured." });
-    return;
   }
+  // Legacy RV-* codes: always accepted for backwards compatibility (tickets issued before migration)
 
   // Status checks
   if (b.status === "pending") {

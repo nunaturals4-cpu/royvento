@@ -53,9 +53,9 @@ export async function generateUniqueTicketPrefix(
 ): Promise<string> {
   const base = baseTicketPrefix(businessName);
   if (!existingPrefixes.includes(base)) return base;
-  // Try numeric suffixes: BLCK2, BLCK3, ..., BLCK9
+  // Try numeric suffixes: BLCK2, BLCK3, ..., BLCK9 (keep full base, append digit)
   for (let i = 2; i <= 9; i++) {
-    const candidate = `${base.slice(0, 3)}${i}`;
+    const candidate = `${base}${i}`;
     if (!existingPrefixes.includes(candidate)) return candidate;
   }
   // Fallback: append random hex char
