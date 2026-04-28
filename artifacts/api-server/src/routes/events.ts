@@ -68,7 +68,7 @@ async function serializeEvents(rows: EventRow[]) {
       city: e.city,
       country: e.country,
       price: Number(e.price),
-      startingPrice: Number.isFinite(startingAt) ? startingAt : Number(e.price),
+      startingPrice: Number.isFinite(startingAt) ? startingAt : (Number(e.price) || 0),
       capacity: e.capacity,
       imageUrl: e.imageUrl,
       eventDate: e.eventDate,

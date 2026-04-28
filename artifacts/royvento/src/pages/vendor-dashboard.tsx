@@ -426,7 +426,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
     const body: any = {
       title: vendor.businessName, description, category,
       location: `${city}${stateF ? ", " + stateF : ""}`,
-      price: type === "pub" && enableTickets ? Math.min(...[priceWomen, priceMen, priceCouple].filter((n) => n > 0).concat([price || 0])) : price,
+      price: (() => { if (type !== "pub" || !enableTickets) return price; const t = [priceWomen, priceMen, priceCouple].filter((n) => n > 0); return t.length > 0 ? Math.min(...t) : (price || 0); })(),
       capacity, imageUrl,
       type, city, state: stateF, country,
       pubMode,
