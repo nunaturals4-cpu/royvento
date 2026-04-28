@@ -349,7 +349,7 @@ export async function sendWhatsAppBookingConfirmation(params: {
     return;
   }
 
-  // Normalize to E.164: strip all non-digit chars, then prepend '+'
+  // Normalize to E.164: strip all non-digit chars, then add country code.
   // Accept numbers already in 'whatsapp:+...' format or raw digits.
   const rawPhone = params.phone.replace(/^whatsapp:/i, "").trim();
   const digits = rawPhone.replace(/\D/g, "");
@@ -357,8 +357,19 @@ export async function sendWhatsAppBookingConfirmation(params: {
     console.log(`[whatsapp] Skipping send — phone "${params.phone}" could not be normalized to E.164`);
     return;
   }
-  const e164 = rawPhone.startsWith("+") ? `+${digits}` : `+${digits}`;
+  // 10-digit Indian mobile (no country code) → prepend 91
+  // 12-digit starting with 91 → already correct
+  // anything else with a + prefix → trust as-is
+  let e164: string;
+  if (digits.length === 10) {
+    e164 = `+91${digits}`;
+  } else if (rawPhone.startsWith("+")) {
+    e164 = `+${digits}`;
+  } else {
+    e164 = `+${digits}`;
+  }
   const to = `whatsapp:${e164}`;
+  console.log(`[whatsapp] Resolved to=${to} from raw="${params.phone}"`);
   const refCode = `#RV-${String(params.bookingId).padStart(6, "0")}`;
   const dateStr = fmtDate(params.bookingDate);
 
