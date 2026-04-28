@@ -509,6 +509,63 @@ router.get("/bookings/me", requireAuth(), async (req, res) => {
   res.json(await serializeBookings(rows));
 });
 
+router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const paramId = Array.isArray(req.params["id"]) ? req.params["id"][0] : (req.params["id"] ?? "");
+  const bookingId = parseInt(paramId, 10);
+  if (!bookingId || isNaN(bookingId)) { res.status(400).json({ error: "Invalid booking id" }); return; }
+
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.userId, user.id)))
+    .limit(1);
+
+  if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (booking.status !== "payment_pending") {
+    res.status(409).json({ error: `Booking is already ${booking.status}` });
+    return;
+  }
+  if (!isPhonePeConfigured()) {
+    res.status(503).json({ error: "Payment system not configured" });
+    return;
+  }
+
+  const finalPrice = parseFloat(String(booking.finalPrice ?? booking.totalPrice ?? 0));
+  if (finalPrice <= 0) { res.status(400).json({ error: "No payment required for this booking" }); return; }
+
+  const merchantTransactionId = `BK${booking.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+  const appUrl = getAppUrl();
+  const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}`;
+  const webhookUrl = `${appUrl}/api/payments/webhook`;
+
+  await db.insert(paymentsTable).values({
+    merchantTransactionId,
+    bookingId: booking.id,
+    amount: Math.round(finalPrice * 100),
+    status: "initiated",
+  });
+
+  try {
+    const { redirectUrl } = await initiatePayment({
+      merchantTransactionId,
+      merchantUserId: `U${user.id}`,
+      amountPaise: Math.round(finalPrice * 100),
+      redirectUrl: callbackUrl,
+      callbackUrl: webhookUrl,
+      ...(booking.phone ? { mobileNumber: booking.phone } : {}),
+    });
+    res.json({ redirectUrl, bookingId: booking.id, requiresPayment: true });
+  } catch (err) {
+    req.log.error({ err }, "[bookings] PhonePe retry initiation failed");
+    await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() })
+      .where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
+    res.status(502).json({ error: "Payment initiation failed — please try again" });
+  }
+});
+
 // Partner analytics — earnings summary, per-event breakdown, daily revenue
 router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const user = await loadUserFromRequest(req);

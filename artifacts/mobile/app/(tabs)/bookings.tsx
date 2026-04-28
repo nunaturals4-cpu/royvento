@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
+import { customFetch, useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
 import { Image } from "expo-image";
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   AppState,
   FlatList,
   Platform,
@@ -43,6 +45,7 @@ export default function BookingsScreen() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const appState = useRef(AppState.currentState);
 
@@ -213,7 +216,7 @@ export default function BookingsScreen() {
                   </View>
                 )}
 
-                {/* Payment pending — prompt user */}
+                {/* Payment pending — retry button */}
                 {isExpanded && status === "payment_pending" && (
                   <View style={[styles.expandedInfo, { borderTopColor: colors.border }]}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -223,14 +226,40 @@ export default function BookingsScreen() {
                       </Text>
                     </View>
                     <Text style={[styles.expandedText, { color: colors.mutedForeground }]}>
-                      Go back to the event and re-book to complete your payment, or contact support.
+                      Tap below to re-open the payment page and complete your booking.
                     </Text>
                     <TouchableOpacity
-                      style={{ marginTop: 10, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5 }}
-                      onPress={() => router.push(`/event/${b.eventId}` as never)}
+                      style={[styles.retryBtn, { backgroundColor: "#f97316" }, retryingId === b.id && { opacity: 0.7 }]}
+                      disabled={retryingId === b.id}
+                      onPress={async () => {
+                        setRetryingId(b.id);
+                        try {
+                          const result = await customFetch<{ redirectUrl?: string; error?: string }>(
+                            `/api/bookings/${b.id}/retry-payment`,
+                            { method: "POST" },
+                          );
+                          if (result?.redirectUrl) {
+                            await Linking.openURL(result.redirectUrl);
+                          } else {
+                            throw new Error(result?.error ?? "Could not initiate payment");
+                          }
+                        } catch (e: unknown) {
+                          const err = e as { message?: string };
+                          router.push(`/event/${b.eventId}` as never);
+                          console.warn("[retry-payment] fallback to event page:", err?.message);
+                        } finally {
+                          setRetryingId(null);
+                        }
+                      }}
                     >
-                      <Ionicons name="arrow-redo-outline" size={13} color={colors.primary} />
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.primary }}>Go to event</Text>
+                      {retryingId === b.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="card-outline" size={15} color="#fff" />
+                          <Text style={styles.retryBtnText}>Complete Payment</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
                 )}
@@ -285,4 +314,6 @@ const styles = StyleSheet.create({
   qrHint: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4 },
   expandedInfo: { borderTopWidth: 1, padding: 14, gap: 6 },
   expandedText: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  retryBtn: { marginTop: 10, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  retryBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
