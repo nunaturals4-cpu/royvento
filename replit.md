@@ -56,6 +56,23 @@ A full-stack event management marketplace for hosts and vendors.
 - "Ticket scanner" link button added to vendor dashboard tab bar (links out to scanner page)
 - Route added in App.tsx with RequireAuth role="vendor" guard
 
+## Manager system (Task #72, Apr 2026)
+- `vendor_managers` DB table: id, vendorId, invitedBy, invitedEmail, managerId, status (pending|accepted|rejected), token, createdAt
+- `artifacts/api-server/src/routes/managers.ts` — new router with:
+  - `GET /api/partner/managers` — list all managers for authenticated vendor
+  - `POST /api/partner/managers/invite` — invite a user by email (creates row with random token)
+  - `DELETE /api/partner/managers/:id` — remove a manager relationship
+  - `GET /api/manager/invitations` — list pending invitations for the current user (matched by email)
+  - `POST /api/manager/invitations/accept` — accept an invitation by token
+  - `POST /api/manager/invitations/reject` — decline an invitation by token
+  - `GET /api/manager/my-vendors` — list accepted vendor relationships for current user
+- `POST /api/partner/scan-ticket` upgraded: now accepts both vendor role AND any user with an accepted manager row (no longer vendor-only)
+- Web vendor dashboard now has a "Managers" tab (ManagersPanel) with invite-by-email form and manager table with status badges and remove button
+- Scanner page (`/dashboard/vendor/scanner`) now accessible to any authenticated user (manager or vendor); shows invitation accept/decline banners on load
+- Mobile bookings tab: shows pending invitation banners (accept/decline in-place); shows "Scan" button in header when user is a manager
+- Mobile vendor dashboard: new "Managers" tab (renderManagers) with invite form and manager list
+- New mobile screen `artifacts/mobile/app/scanner.tsx`: camera QR scanner (expo-camera 17.x) + manual code entry; decodes `royvento:booking:ID:DATE` format; shows rich result card
+
 ## Event approval workflow (Apr 2026)
 - `eventsTable` gains `approvalStatus varchar(20) default 'pending'` + `rejectionReason text` columns (db:push applied)
 - All public listing endpoints (`GET /events`, `GET /events/featured`, `GET /events/popular`) filter by `approvalStatus = 'approved'`

@@ -97,7 +97,7 @@ function Router() {
             {() => <RequireAuth role="vendor"><VendorDashboard /></RequireAuth>}
           </Route>
           <Route path="/dashboard/vendor/scanner">
-            {() => <RequireAuth role="vendor"><TicketScanner /></RequireAuth>}
+            {() => <RequireAuth><TicketScanner /></RequireAuth>}
           </Route>
           <Route path="/dashboard/bookings">
             {() => <RequireAuth><Bookings /></RequireAuth>}

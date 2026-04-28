@@ -14,6 +14,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,6 +40,13 @@ function formatDate(d: string) {
   }
 }
 
+interface ManagerInvitation {
+  id: number;
+  token: string;
+  vendorName: string;
+  createdAt: string;
+}
+
 export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -46,10 +54,39 @@ export default function BookingsScreen() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [invitations, setInvitations] = useState<ManagerInvitation[]>([]);
+  const [actingInvId, setActingInvId] = useState<number | null>(null);
+  const [isManager, setIsManager] = useState(false);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const appState = useRef(AppState.currentState);
 
   const { data, isLoading, refetch } = useListMyBookings({ query: { queryKey: getListMyBookingsQueryKey(), enabled: !!user } });
+
+  useEffect(() => {
+    if (!user) return;
+    customFetch<ManagerInvitation[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
+    customFetch<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then((v) => setIsManager(v.length > 0)).catch(() => {});
+  }, [user?.id]);
+
+  const respondToInvitation = async (id: number, token: string, action: "accept" | "reject") => {
+    setActingInvId(id);
+    try {
+      await customFetch(`/api/manager/invitations/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      setInvitations((prev) => prev.filter((inv) => inv.id !== id));
+      if (action === "accept") {
+        setIsManager(true);
+        Alert.alert("Invitation accepted!", "You can now scan tickets for this venue.");
+      }
+    } catch {
+      Alert.alert("Error", "Failed to respond to invitation.");
+    } finally {
+      setActingInvId(null);
+    }
+  };
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState) => {
@@ -94,7 +131,44 @@ export default function BookingsScreen() {
           { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border },
         ]}
       >
-        <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
+          {isManager && (
+            <TouchableOpacity
+              style={[styles.scanBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push("/scanner" as never)}
+            >
+              <Ionicons name="scan-outline" size={16} color={colors.primaryForeground} />
+              <Text style={[styles.scanBtnText, { color: colors.primaryForeground }]}>Scan</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {invitations.map((inv) => (
+          <View key={inv.id} style={[styles.invitationBanner, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "50" }]}>
+            <Ionicons name="notifications-outline" size={16} color={colors.primary} style={{ marginTop: 1 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.invTitle, { color: colors.foreground }]}>
+                {inv.vendorName} invited you as scanner manager
+              </Text>
+              <View style={styles.invBtns}>
+                <TouchableOpacity
+                  style={[styles.invBtn, { backgroundColor: colors.primary }, actingInvId === inv.id && { opacity: 0.7 }]}
+                  disabled={actingInvId === inv.id}
+                  onPress={() => respondToInvitation(inv.id, inv.token, "accept")}
+                >
+                  <Text style={[styles.invBtnText, { color: colors.primaryForeground }]}>Accept</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.invBtn, { borderWidth: 1, borderColor: colors.border }, actingInvId === inv.id && { opacity: 0.7 }]}
+                  disabled={actingInvId === inv.id}
+                  onPress={() => respondToInvitation(inv.id, inv.token, "reject")}
+                >
+                  <Text style={[styles.invBtnText, { color: colors.mutedForeground }]}>Decline</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        ))}
         <View style={[styles.tabs, { backgroundColor: colors.muted }]}>
           {(["upcoming", "past"] as const).map((t) => (
             <Pressable
@@ -290,6 +364,13 @@ export default function BookingsScreen() {
 const styles = StyleSheet.create({
   header: { paddingBottom: 14, paddingHorizontal: 20, borderBottomWidth: 1, gap: 12 },
   title: { fontSize: 24, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  scanBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  scanBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  invitationBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
+  invTitle: { fontSize: 13, fontFamily: "Inter_500Medium", lineHeight: 18 },
+  invBtns: { flexDirection: "row", gap: 8, marginTop: 8 },
+  invBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
+  invBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   tabs: { flexDirection: "row", borderRadius: 10, padding: 3 },
   tabBtn: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: "center" },
   tabText: { fontSize: 12, fontFamily: "Inter_500Medium" },

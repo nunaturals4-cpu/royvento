@@ -40,7 +40,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type DashTab = "bookings" | "events" | "profile" | "calendar";
+type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending:   { bg: "#f59e0b20", text: "#f59e0b" },
@@ -939,6 +939,102 @@ export default function VendorDashboardScreen() {
     );
   }
 
+  // ─── MANAGERS TAB ────────────────────────────────────────────────────────────
+  const [mgEmail, setMgEmail] = useState("");
+  const [mgInviting, setMgInviting] = useState(false);
+  const [mgList, setMgList] = useState<{ id: number; invitedEmail: string; status: string; manager: { name: string } | null }[]>([]);
+  const [mgLoading, setMgLoading] = useState(false);
+
+  const fetchMgList = useCallback(() => {
+    setMgLoading(true);
+    customFetch<{ id: number; invitedEmail: string; status: string; manager: { name: string } | null }[]>("/api/partner/managers")
+      .then(setMgList)
+      .catch(() => {})
+      .finally(() => setMgLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "managers") fetchMgList();
+  }, [activeTab]);
+
+  async function inviteManager() {
+    if (!mgEmail.trim()) return;
+    setMgInviting(true);
+    try {
+      await customFetch("/api/partner/managers/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: mgEmail.trim() }),
+      });
+      Alert.alert("Invitation sent!", `${mgEmail} has been invited as a scanner manager.`);
+      setMgEmail("");
+      fetchMgList();
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert("Error", err?.message ?? "Failed to send invitation.");
+    } finally {
+      setMgInviting(false);
+    }
+  }
+
+  async function removeManager(id: number) {
+    try {
+      await customFetch(`/api/partner/managers/${id}`, { method: "DELETE" });
+      setMgList((prev) => prev.filter((m) => m.id !== id));
+    } catch {
+      Alert.alert("Error", "Failed to remove manager.");
+    }
+  }
+
+  function renderManagers() {
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>INVITE A MANAGER</Text>
+        <Text style={[{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 12 }]}>
+          Managers can scan tickets at your venue. They cannot access bookings or settings.
+        </Text>
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
+          <TextInput
+            style={[styles.fieldInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }]}
+            value={mgEmail}
+            onChangeText={setMgEmail}
+            placeholder="manager@example.com"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={[{ backgroundColor: colors.primary, paddingHorizontal: 16, borderRadius: 10, alignItems: "center", justifyContent: "center" }, (mgInviting || !mgEmail.trim()) && { opacity: 0.5 }]}
+            disabled={mgInviting || !mgEmail.trim()}
+            onPress={inviteManager}
+          >
+            {mgInviting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Invite</Text>}
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>YOUR MANAGERS</Text>
+        {mgLoading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+        ) : mgList.length === 0 ? (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>No managers yet.</Text>
+        ) : (
+          mgList.map((m) => (
+            <View key={m.id} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 13 }}>{m.invitedEmail}</Text>
+                {m.manager && <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{m.manager.name}</Text>}
+                <Text style={{ color: m.status === "accepted" ? "#22c55e" : m.status === "rejected" ? "#ef4444" : "#f59e0b", fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2, textTransform: "capitalize" }}>{m.status}</Text>
+              </View>
+              <TouchableOpacity onPress={() => Alert.alert("Remove manager?", `Remove ${m.invitedEmail}?`, [{ text: "Cancel", style: "cancel" }, { text: "Remove", style: "destructive", onPress: () => removeManager(m.id) }])}>
+                <Ionicons name="trash-outline" size={16} color={colors.destructive} />
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    );
+  }
+
   // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -970,10 +1066,11 @@ export default function VendorDashboardScreen() {
         {/* Tab bar */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
           {([
-            { key: "bookings", icon: "ticket-outline", label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
-            { key: "events",   icon: "calendar-outline", label: "My Listings" },
-            { key: "profile",  icon: "person-outline", label: "Profile" },
-            { key: "calendar", icon: "calendar-clear-outline", label: "Calendar" },
+            { key: "bookings",  icon: "ticket-outline",          label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
+            { key: "events",    icon: "calendar-outline",         label: "My Listings" },
+            { key: "profile",   icon: "person-outline",           label: "Profile" },
+            { key: "calendar",  icon: "calendar-clear-outline",   label: "Calendar" },
+            { key: "managers",  icon: "people-outline",           label: "Managers" },
           ] as const).map((t) => (
             <TouchableOpacity
               key={t.key}
@@ -990,10 +1087,11 @@ export default function VendorDashboardScreen() {
       </View>
 
       {/* Content */}
-      {activeTab === "bookings" && renderBookings()}
-      {activeTab === "events"   && renderEvents()}
-      {activeTab === "profile"  && renderProfile()}
-      {activeTab === "calendar" && renderCalendar()}
+      {activeTab === "bookings"  && renderBookings()}
+      {activeTab === "events"    && renderEvents()}
+      {activeTab === "profile"   && renderProfile()}
+      {activeTab === "calendar"  && renderCalendar()}
+      {activeTab === "managers"  && renderManagers()}
 
       {/* ── Create Event Modal ── */}
       <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">

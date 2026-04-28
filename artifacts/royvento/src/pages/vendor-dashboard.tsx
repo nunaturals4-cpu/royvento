@@ -102,6 +102,9 @@ export function VendorDashboard() {
             <TabsTrigger value="leads">
               <Crown className="h-3.5 w-3.5 mr-1 text-primary" /> Leads
             </TabsTrigger>
+            <TabsTrigger value="managers">
+              <Users className="h-3.5 w-3.5 mr-1 text-primary" /> Managers
+            </TabsTrigger>
             <Link href="/dashboard/vendor/scanner">
               <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors">
                 <ScanLine className="h-3.5 w-3.5" /> Ticket scanner
@@ -117,6 +120,7 @@ export function VendorDashboard() {
           <TabsContent value="ads"><AdsPanel /></TabsContent>
           <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
           <TabsContent value="leads"><LeadsPanel isPremium={!!vendor.isPremium} /></TabsContent>
+          <TabsContent value="managers"><ManagersPanel /></TabsContent>
         </Tabs>
       )}
     </div>
@@ -1498,6 +1502,130 @@ function AnalyticsPanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface ManagerRow {
+  id: number;
+  invitedEmail: string;
+  status: string;
+  createdAt: string;
+  manager: { id: number; name: string; email: string } | null;
+}
+
+function ManagersPanel() {
+  const { toast } = useToast();
+  const [managers, setManagers] = useState<ManagerRow[]>([]);
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [inviting, setInviting] = useState(false);
+
+  const fetchManagers = () => {
+    setLoading(true);
+    apiGet<ManagerRow[]>("/api/partner/managers")
+      .then(setManagers)
+      .catch(() => toast({ title: "Failed to load managers", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchManagers(); }, []);
+
+  const invite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setInviting(true);
+    try {
+      await apiPost("/api/partner/managers/invite", { email: email.trim() });
+      toast({ title: "Invitation sent", description: `${email} will receive their access token.` });
+      setEmail("");
+      fetchManagers();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message ?? "Could not send invitation.", variant: "destructive" });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    try {
+      await apiDelete(`/api/partner/managers/${id}`);
+      toast({ title: "Manager removed" });
+      setManagers((prev) => prev.filter((m) => m.id !== id));
+    } catch {
+      toast({ title: "Failed to remove manager", variant: "destructive" });
+    }
+  };
+
+  const statusColor: Record<string, string> = {
+    pending: "text-amber-400",
+    accepted: "text-green-400",
+    rejected: "text-red-400",
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="rounded-3xl glass-card-strong p-6 md:p-8">
+        <h2 className="font-serif text-2xl mb-1">Invite a manager</h2>
+        <p className="text-sm text-muted-foreground mb-5">
+          Managers can scan tickets at your venue using the ticket scanner. They do not get access to your bookings, events, or settings.
+        </p>
+        <form onSubmit={invite} className="flex gap-3 max-w-md">
+          <Input
+            type="email"
+            placeholder="manager@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="bg-black/40 border-white/10"
+          />
+          <Button type="submit" disabled={inviting || !email.trim()} className="bg-primary hover:bg-primary/90 border-0 text-primary-foreground shrink-0">
+            {inviting ? "Sending…" : "Send invite"}
+          </Button>
+        </form>
+      </div>
+
+      <div className="rounded-3xl glass-card p-6 md:p-8">
+        <h2 className="font-serif text-2xl mb-4">Your managers</h2>
+        {loading ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : managers.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No managers yet. Invite someone above.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pb-3">Email</th>
+                  <th className="text-left py-2 pb-3">Name</th>
+                  <th className="text-left py-2 pb-3">Status</th>
+                  <th className="text-left py-2 pb-3">Invited</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {managers.map((m) => (
+                  <tr key={m.id} className="border-t border-white/5">
+                    <td className="py-3 font-mono text-xs">{m.invitedEmail}</td>
+                    <td className="py-3 text-muted-foreground">{m.manager?.name ?? "—"}</td>
+                    <td className={`py-3 capitalize font-medium ${statusColor[m.status] ?? "text-muted-foreground"}`}>{m.status}</td>
+                    <td className="py-3 text-muted-foreground">{new Date(m.createdAt).toLocaleDateString("en-IN")}</td>
+                    <td className="py-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remove(m.id)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

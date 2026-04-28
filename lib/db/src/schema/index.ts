@@ -478,6 +478,27 @@ export const announcementsTable = pgTable(
 
 export type Announcement = typeof announcementsTable.$inferSelect;
 
+export const vendorManagersTable = pgTable(
+  "vendor_managers",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull(),
+    invitedEmail: varchar("invited_email", { length: 255 }).notNull(),
+    invitedBy: integer("invited_by").notNull(),
+    managerId: integer("manager_id"),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    token: varchar("token", { length: 64 }).notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorEmailIdx: index("vm_vendor_email_idx").on(t.vendorId, t.invitedEmail),
+    tokenIdx: uniqueIndex("vm_token_idx").on(t.token),
+    managerIdx: index("vm_manager_idx").on(t.managerId),
+  }),
+);
+
+export type VendorManager = typeof vendorManagersTable.$inferSelect;
+
 export const paymentsTable = pgTable(
   "payments",
   {

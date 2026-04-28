@@ -12,6 +12,7 @@ import {
   notificationsTable,
   partnerBlockedDatesTable,
   paymentsTable,
+  vendorManagersTable,
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
 import { eq, desc, and, inArray } from "drizzle-orm";
@@ -1153,7 +1154,7 @@ router.patch(
 );
 
 // Partner ticket scanner
-router.post("/partner/scan-ticket", requireAuth(["vendor"]), async (req, res) => {
+router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" });
@@ -1178,9 +1179,22 @@ router.post("/partner/scan-ticket", requireAuth(["vendor"]), async (req, res) =>
     return;
   }
 
-  // Load partner's vendor profile
-  const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
-  const vendor = vRows[0];
+  // Resolve vendor: direct vendor profile OR accepted manager relationship
+  let vendor: { id: number; businessName: string; userId: number } | undefined;
+  if (user.role === "vendor" || user.role === "admin") {
+    const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+    vendor = vRows[0];
+  } else {
+    // Check if user is an accepted manager
+    const mgRows = await db.select().from(vendorManagersTable)
+      .where(and(eq(vendorManagersTable.managerId, user.id), eq(vendorManagersTable.status, "accepted")))
+      .limit(1);
+    const mgRow = mgRows[0];
+    if (mgRow) {
+      const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.id, mgRow.vendorId)).limit(1);
+      vendor = vRows[0];
+    }
+  }
   if (!vendor) {
     res.status(403).json({ code: "FORBIDDEN", message: "No partner profile found." });
     return;

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell } from "lucide-react";
+import { apiGet, apiPost } from "@/lib/api";
 
 interface BookingData {
   id: number;
@@ -46,6 +47,60 @@ function isScanSuccess(r: ScanResult): r is ScanSuccess {
 
 function isScanAlreadyUsed(r: ScanResult): r is ScanAlreadyUsed {
   return r.code === "ALREADY_CHECKED_IN";
+}
+
+interface Invitation {
+  id: number;
+  token: string;
+  vendorName: string;
+  createdAt: string;
+}
+
+function ManagerInvitations() {
+  const { toast } = useToast();
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [acting, setActing] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiGet<Invitation[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
+  }, []);
+
+  if (invitations.length === 0) return null;
+
+  const respond = async (id: number, token: string, action: "accept" | "reject") => {
+    setActing(id);
+    try {
+      await apiPost(`/api/manager/invitations/${action}`, { token });
+      toast({ title: action === "accept" ? "Invitation accepted! You can now scan tickets." : "Invitation declined." });
+      setInvitations((prev) => prev.filter((inv) => inv.id !== id));
+    } catch {
+      toast({ title: "Error", description: "Failed to respond to invitation.", variant: "destructive" });
+    } finally {
+      setActing(null);
+    }
+  };
+
+  return (
+    <div className="mb-8 space-y-3">
+      {invitations.map((inv) => (
+        <div key={inv.id} className="rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-primary shrink-0" />
+            <div>
+              <p className="font-medium text-sm">{inv.vendorName} invited you as a ticket scanner manager</p>
+              <p className="text-xs text-muted-foreground">Accepting grants you access to scan tickets for their venue.</p>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" disabled={acting === inv.id} onClick={() => respond(inv.id, inv.token, "accept")}
+              className="bg-primary hover:bg-primary/90 border-0 text-primary-foreground">Accept</Button>
+            <Button size="sm" variant="outline" disabled={acting === inv.id} onClick={() => respond(inv.id, inv.token, "reject")}
+              className="border-white/10 text-muted-foreground hover:text-foreground">Decline</Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function TicketScanner() {
@@ -103,6 +158,7 @@ export function TicketScanner() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
+      <ManagerInvitations />
       <header className="mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Partner tool</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3 flex items-center gap-3">
