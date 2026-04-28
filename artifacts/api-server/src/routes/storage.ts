@@ -78,17 +78,18 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 });
 
 /**
- * GET /storage/objects/*
+ * GET /storage/objects/uploads/*
  *
- * Serve uploaded object files (e.g. announcement images).
- * Intentionally public: announcement images are displayed on public pub profile pages
- * and must be viewable without authentication.
+ * Serve uploaded files stored under the "uploads" prefix (e.g. announcement images).
+ * Scoped to the uploads sub-directory only — other paths under PRIVATE_OBJECT_DIR
+ * are not exposed. Intentionally public: announcement images must be viewable
+ * on public pub profile pages without authentication.
  */
-router.get("/storage/objects/*path", async (req: Request, res: Response) => {
+router.get("/storage/objects/uploads/*path", async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
-    const objectPath = `/objects/${wildcardPath}`;
+    const objectPath = `/objects/uploads/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
     const response = await objectStorageService.downloadObject(objectFile);
