@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
+  LineChart, Line,
 } from "recharts";
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,6 +87,19 @@ function Analytics() {
   const { data, isLoading } = useGetAdminAnalytics();
   if (isLoading) return <p className="text-muted-foreground">Loading…</p>;
   if (!data) return null;
+
+  const adminData = data as typeof data & {
+    totalWomen?: number;
+    totalMen?: number;
+    totalCouple?: number;
+    dailyRevenue?: { date: string; revenue: number }[];
+    perVendor?: { vendorId: number; vendorName: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }[];
+  };
+
+  const hasTickets = ((adminData.totalWomen ?? 0) + (adminData.totalMen ?? 0) + (adminData.totalCouple ?? 0)) > 0;
+  const hasDailyRevenue = (adminData.dailyRevenue ?? []).some((d) => d.revenue > 0);
+  const dailyChartMax = Math.max(...(adminData.dailyRevenue ?? []).map((d) => d.revenue), 1);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -95,6 +109,90 @@ function Analytics() {
         <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
         <Stat icon={IndianRupee} label="Revenue" value={formatINR(data.totalRevenue)} />
       </div>
+
+      {/* Platform ticket breakdown */}
+      {hasTickets && (
+        <div className="space-y-3">
+          <h3 className="font-serif text-xl">Platform ticket breakdown</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
+                <span className="text-pink-400 text-base">♀</span>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
+                <p className="stat-number text-2xl text-pink-300">{adminData.totalWomen ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+              </div>
+            </div>
+            <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+                <span className="text-blue-400 text-base">♂</span>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
+                <p className="stat-number text-2xl text-blue-300">{adminData.totalMen ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+              </div>
+            </div>
+            <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
+                <span className="text-purple-400 text-base">⚭</span>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
+                <p className="stat-number text-2xl text-purple-300">{adminData.totalCouple ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Platform revenue — last 30 days */}
+      {hasDailyRevenue && (
+        <div className="rounded-2xl glass-card p-6">
+          <h3 className="font-serif text-xl mb-5">Platform revenue — last 30 days</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={adminData.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={(d: string) => {
+                  const dt = new Date(d);
+                  return `${dt.getDate()}/${dt.getMonth() + 1}`;
+                }}
+                interval={4}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={(v: number) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                width={48}
+                domain={[0, Math.ceil(dailyChartMax * 1.15)]}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "hsl(var(--card))",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "12px",
+                  fontSize: "12px",
+                }}
+                formatter={(v: number) => [formatINR(v), "Revenue"]}
+                labelFormatter={(label: string) => new Date(label).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              />
+              <Line
+                type="monotone"
+                dataKey="revenue"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 4, fill: "hsl(var(--primary))" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="rounded-2xl glass-card p-6">
@@ -126,6 +224,39 @@ function Analytics() {
           </div>
         </div>
       </div>
+
+      {/* Ticket sales by venue */}
+      {(adminData.perVendor ?? []).length > 0 && (
+        <div className="rounded-2xl glass-card p-6">
+          <h3 className="font-serif text-xl mb-4">Ticket sales by venue</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[520px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-4">Venue</th>
+                  <th className="text-right py-2 px-2">Bookings</th>
+                  <th className="text-right py-2 px-2 text-pink-300">Women</th>
+                  <th className="text-right py-2 px-2 text-blue-300">Men</th>
+                  <th className="text-right py-2 px-2 text-purple-300">Couples</th>
+                  <th className="text-right py-2 pl-2">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(adminData.perVendor ?? []).map((row) => (
+                  <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-3 pr-4 font-medium">{row.vendorName}</td>
+                    <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
+                    <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
+                    <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
+                    <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
+                    <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl glass-card p-6">
         <h3 className="font-serif text-xl mb-4">Recent bookings</h3>

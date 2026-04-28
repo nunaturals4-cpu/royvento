@@ -72,6 +72,66 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
       : [];
   const vMap = new Map(vendorRows.map((v) => [v.id, v]));
 
+  // Ticket breakdown + daily revenue + per-vendor breakdown
+  const confirmedBookings = await db
+    .select({
+      vendorId: bookingsTable.vendorId,
+      finalPrice: bookingsTable.finalPrice,
+      ticketWomen: bookingsTable.ticketWomen,
+      ticketMen: bookingsTable.ticketMen,
+      ticketCouple: bookingsTable.ticketCouple,
+      createdAt: bookingsTable.createdAt,
+    })
+    .from(bookingsTable)
+    .where(sql`${bookingsTable.status} IN ('confirmed', 'completed')`);
+
+  let totalWomen = 0;
+  let totalMen = 0;
+  let totalCouple = 0;
+  const dailyMap = new Map<string, number>();
+  const now2 = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now2.getTime() - i * 24 * 60 * 60 * 1000);
+    dailyMap.set(d.toISOString().slice(0, 10), 0);
+  }
+  const perVendorMap = new Map<number, {
+    vendorId: number; bookingCount: number;
+    ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
+  }>();
+  for (const b of confirmedBookings) {
+    totalWomen += b.ticketWomen;
+    totalMen += b.ticketMen;
+    totalCouple += b.ticketCouple;
+    const day = new Date(b.createdAt).toISOString().slice(0, 10);
+    if (dailyMap.has(day)) dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
+    const pv = perVendorMap.get(b.vendorId);
+    if (pv) {
+      pv.bookingCount += 1;
+      pv.ticketWomen += b.ticketWomen;
+      pv.ticketMen += b.ticketMen;
+      pv.ticketCouple += b.ticketCouple;
+      pv.revenue += Number(b.finalPrice);
+    } else {
+      perVendorMap.set(b.vendorId, {
+        vendorId: b.vendorId,
+        bookingCount: 1,
+        ticketWomen: b.ticketWomen,
+        ticketMen: b.ticketMen,
+        ticketCouple: b.ticketCouple,
+        revenue: Number(b.finalPrice),
+      });
+    }
+  }
+  const adminDailyRevenue = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, revenue]) => ({ date, revenue }));
+
+  const allVendors = await db.select().from(vendorsTable);
+  const allVMap = new Map(allVendors.map((v) => [v.id, v]));
+  const perVendor = Array.from(perVendorMap.values())
+    .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
+    .sort((a, b) => b.revenue - a.revenue);
+
   const { default: bookingsRouter } = await import("./bookings");
   void bookingsRouter;
 
@@ -149,6 +209,11 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
       bookingCount: t.bookingCount,
       revenue: Number(t.revenue),
     })),
+    totalWomen,
+    totalMen,
+    totalCouple,
+    dailyRevenue: adminDailyRevenue,
+    perVendor,
   });
 });
 

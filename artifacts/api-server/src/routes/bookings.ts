@@ -473,11 +473,19 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, revenue]) => ({ date, revenue }));
 
+  const perEventArr = Array.from(perEventMap.values());
+  const totalWomen = perEventArr.reduce((s, r) => s + r.ticketWomen, 0);
+  const totalMen = perEventArr.reduce((s, r) => s + r.ticketMen, 0);
+  const totalCouple = perEventArr.reduce((s, r) => s + r.ticketCouple, 0);
+
   res.json({
     totalEarnings: Math.round(totalEarnings),
     monthEarnings: Math.round(monthEarnings),
-    perEvent: Array.from(perEventMap.values()),
+    perEvent: perEventArr,
     dailyRevenue,
+    totalWomen,
+    totalMen,
+    totalCouple,
   });
 });
 

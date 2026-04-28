@@ -1141,6 +1141,9 @@ interface AnalyticsData {
     revenue: number;
   }[];
   dailyRevenue: { date: string; revenue: number }[];
+  totalWomen: number;
+  totalMen: number;
+  totalCouple: number;
 }
 
 function AnalyticsPanel() {
@@ -1167,6 +1170,7 @@ function AnalyticsPanel() {
 
   const chartMax = Math.max(...data.dailyRevenue.map((d) => d.revenue), 1);
   const monthName = new Date().toLocaleString("en-IN", { month: "long" });
+  const hasTickets = (data.totalWomen + data.totalMen + data.totalCouple) > 0;
 
   return (
     <div className="space-y-6">
@@ -1193,6 +1197,42 @@ function AnalyticsPanel() {
           </div>
         </div>
       </div>
+
+      {/* Ticket audience mix */}
+      {hasTickets && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
+              <span className="text-pink-400 text-base">♀</span>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
+              <p className="stat-number text-2xl text-pink-300">{data.totalWomen}</p>
+              <p className="text-xs text-muted-foreground mt-1">tickets total</p>
+            </div>
+          </div>
+          <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+              <span className="text-blue-400 text-base">♂</span>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
+              <p className="stat-number text-2xl text-blue-300">{data.totalMen}</p>
+              <p className="text-xs text-muted-foreground mt-1">tickets total</p>
+            </div>
+          </div>
+          <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
+              <span className="text-purple-400 text-base">⚭</span>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
+              <p className="stat-number text-2xl text-purple-300">{data.totalCouple}</p>
+              <p className="text-xs text-muted-foreground mt-1">tickets total</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!hasData && (
         <div className="rounded-3xl glass-card p-10 text-center">
