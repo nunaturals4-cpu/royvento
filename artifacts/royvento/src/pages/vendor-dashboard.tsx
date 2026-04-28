@@ -1540,8 +1540,9 @@ function ManagersPanel() {
       toast({ title: "Invitation sent", description: `${email} will receive their access token.` });
       setEmail("");
       fetchManagers();
-    } catch (err: any) {
-      toast({ title: "Failed", description: err?.message ?? "Could not send invitation.", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not send invitation.";
+      toast({ title: "Failed", description: msg, variant: "destructive" });
     } finally {
       setInviting(false);
     }

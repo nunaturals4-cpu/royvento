@@ -46,7 +46,7 @@ export function Profile() {
   const [sub, setSub] = useState<Sub | null>(null);
   const [referrals, setReferrals] = useState<ReferralData | null>(null);
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
-  const [invitations, setInvitations] = useState<{ id: number; token: string; vendorName: string; createdAt: string }[]>([]);
+  const [invitations, setInvitations] = useState<{ id: number; vendorName: string; createdAt: string }[]>([]);
   const [actingInv, setActingInv] = useState<number | null>(null);
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export function Profile() {
     apiGet<Sub | null>("/api/subscriptions/me").then(setSub).catch(() => {});
     apiGet<ReferralData>("/api/referrals/me").then(setReferrals).catch(() => {});
     apiGet<DiscountInfo>("/api/users/me/discounts").then(setDiscountInfo).catch(() => {});
-    apiGet<{ id: number; token: string; vendorName: string; createdAt: string }[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
+    apiGet<{ id: number; vendorName: string; createdAt: string }[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
   }, [user]);
 
   const handleProfileFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,10 +92,10 @@ export function Profile() {
     }
   };
 
-  const respondToInvitation = async (id: number, token: string, action: "accept" | "reject") => {
+  const respondToInvitation = async (id: number, action: "accept" | "reject") => {
     setActingInv(id);
     try {
-      await apiPost(`/api/manager/invitations/${action}`, { token });
+      await apiPost(`/api/manager/invitations/${id}/${action}`, {});
       toast({ title: action === "accept" ? "Invitation accepted! You can now scan tickets." : "Invitation declined." });
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
     } catch {
@@ -195,9 +195,9 @@ export function Profile() {
                     <p className="text-sm font-medium mb-0.5">{inv.vendorName}</p>
                     <p className="text-xs text-muted-foreground mb-3">Invited you as a ticket scanner manager</p>
                     <div className="flex gap-2">
-                      <Button size="sm" disabled={actingInv === inv.id} onClick={() => respondToInvitation(inv.id, inv.token, "accept")}
+                      <Button size="sm" disabled={actingInv === inv.id} onClick={() => respondToInvitation(inv.id, "accept")}
                         className="flex-1 bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs">Accept</Button>
-                      <Button size="sm" variant="outline" disabled={actingInv === inv.id} onClick={() => respondToInvitation(inv.id, inv.token, "reject")}
+                      <Button size="sm" variant="outline" disabled={actingInv === inv.id} onClick={() => respondToInvitation(inv.id, "reject")}
                         className="flex-1 border-white/10 text-muted-foreground text-xs">Decline</Button>
                     </div>
                   </div>

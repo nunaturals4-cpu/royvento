@@ -51,7 +51,6 @@ function isScanAlreadyUsed(r: ScanResult): r is ScanAlreadyUsed {
 
 interface Invitation {
   id: number;
-  token: string;
   vendorName: string;
   createdAt: string;
 }
@@ -67,10 +66,10 @@ function ManagerInvitations() {
 
   if (invitations.length === 0) return null;
 
-  const respond = async (id: number, token: string, action: "accept" | "reject") => {
+  const respond = async (id: number, action: "accept" | "reject") => {
     setActing(id);
     try {
-      await apiPost(`/api/manager/invitations/${action}`, { token });
+      await apiPost(`/api/manager/invitations/${id}/${action}`, {});
       toast({ title: action === "accept" ? "Invitation accepted! You can now scan tickets." : "Invitation declined." });
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
     } catch {
@@ -92,9 +91,9 @@ function ManagerInvitations() {
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button size="sm" disabled={acting === inv.id} onClick={() => respond(inv.id, inv.token, "accept")}
+            <Button size="sm" disabled={acting === inv.id} onClick={() => respond(inv.id, "accept")}
               className="bg-primary hover:bg-primary/90 border-0 text-primary-foreground">Accept</Button>
-            <Button size="sm" variant="outline" disabled={acting === inv.id} onClick={() => respond(inv.id, inv.token, "reject")}
+            <Button size="sm" variant="outline" disabled={acting === inv.id} onClick={() => respond(inv.id, "reject")}
               className="border-white/10 text-muted-foreground hover:text-foreground">Decline</Button>
           </div>
         </div>

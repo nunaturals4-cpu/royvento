@@ -42,7 +42,6 @@ function formatDate(d: string) {
 
 interface ManagerInvitation {
   id: number;
-  token: string;
   vendorName: string;
   createdAt: string;
 }
@@ -68,13 +67,13 @@ export default function BookingsScreen() {
     customFetch<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then(setManagedVendors).catch(() => {});
   }, [user?.id]);
 
-  const respondToInvitation = async (id: number, token: string, action: "accept" | "reject") => {
+  const respondToInvitation = async (id: number, action: "accept" | "reject") => {
     setActingInvId(id);
     try {
-      await customFetch(`/api/manager/invitations/${action}`, {
+      await customFetch(`/api/manager/invitations/${id}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({}),
       });
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
       if (action === "accept") {
@@ -155,14 +154,14 @@ export default function BookingsScreen() {
                 <TouchableOpacity
                   style={[styles.invBtn, { backgroundColor: colors.primary }, actingInvId === inv.id && { opacity: 0.7 }]}
                   disabled={actingInvId === inv.id}
-                  onPress={() => respondToInvitation(inv.id, inv.token, "accept")}
+                  onPress={() => respondToInvitation(inv.id, "accept")}
                 >
                   <Text style={[styles.invBtnText, { color: colors.primaryForeground }]}>Accept</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.invBtn, { borderWidth: 1, borderColor: colors.border }, actingInvId === inv.id && { opacity: 0.7 }]}
                   disabled={actingInvId === inv.id}
-                  onPress={() => respondToInvitation(inv.id, inv.token, "reject")}
+                  onPress={() => respondToInvitation(inv.id, "reject")}
                 >
                   <Text style={[styles.invBtnText, { color: colors.mutedForeground }]}>Decline</Text>
                 </TouchableOpacity>
