@@ -8,7 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, type Role } from "../lib/auth";
 import { getVendorRatings, getVendorRating } from "../lib/aggregates";
-import { generateTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
+import { generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 
 const router: IRouter = Router();
 
@@ -127,6 +127,8 @@ router.post("/vendors/me", requireAuth(), async (req, res) => {
     res.status(409).json({ error: "Vendor profile already exists" });
     return;
   }
+  const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
+  const ticketPrefix = await generateUniqueTicketPrefix(parsed.data.businessName, existingPrefixes);
   const [v] = await db
     .insert(vendorsTable)
     .values({
@@ -138,7 +140,7 @@ router.post("/vendors/me", requireAuth(), async (req, res) => {
       bannerImage: parsed.data.bannerImage ?? "",
       portfolioImages: parsed.data.portfolioImages ?? [],
       status: "pending",
-      ticketPrefix: generateTicketPrefix(parsed.data.businessName),
+      ticketPrefix,
       ticketSalt: generateTicketSalt(),
     })
     .returning();
@@ -222,7 +224,8 @@ router.post(
     const existing = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
     const extra: Record<string, unknown> = { status: "approved" };
     if (existing[0] && !existing[0].ticketPrefix) {
-      extra["ticketPrefix"] = generateTicketPrefix(existing[0].businessName);
+      const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
+      extra["ticketPrefix"] = await generateUniqueTicketPrefix(existing[0].businessName, existingPrefixes);
       extra["ticketSalt"] = generateTicketSalt();
     }
     const [v] = await db
