@@ -28,10 +28,10 @@ import { useColors } from "@/hooks/useColors";
 type DashTab = "bookings" | "events";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  pending: { bg: "#f59e0b20", text: "#f59e0b" },
-  approved: { bg: "#22c55e20", text: "#22c55e" },
-  rejected: { bg: "#ef444420", text: "#ef4444" },
-  cancelled: { bg: "#6b728020", text: "#9ca3af" },
+  pending:   { bg: "#f59e0b20", text: "#f59e0b" },
+  confirmed: { bg: "#22c55e20", text: "#22c55e" },
+  cancelled: { bg: "#ef444420", text: "#ef4444" },
+  completed: { bg: "#6366f120", text: "#6366f1" },
 };
 
 export default function VendorTabScreen() {
@@ -83,7 +83,7 @@ export default function VendorTabScreen() {
         <View style={styles.statsRow}>
           {[
             { icon: "hourglass-outline" as const, value: pending.length, label: "Pending" },
-            { icon: "checkmark-circle-outline" as const, value: all.filter((b) => b.status === "approved").length, label: "Approved" },
+            { icon: "checkmark-circle-outline" as const, value: all.filter((b) => b.status === "confirmed").length, label: "Confirmed" },
             { icon: "calendar-outline" as const, value: (events.data ?? []).length, label: "Events" },
           ].map((s) => (
             <View key={s.label} style={[styles.stat, { backgroundColor: colors.muted }]}>
@@ -157,7 +157,7 @@ export default function VendorTabScreen() {
                             {
                               text: "Reject",
                               style: "destructive",
-                              onPress: () => updateStatus.mutate({ bookingId: b.id, data: { status: "rejected" } }),
+                              onPress: () => updateStatus.mutate({ bookingId: b.id, data: { status: "cancelled", rejectionReason: "Declined by venue" } }),
                             },
                           ])
                         }
@@ -167,7 +167,7 @@ export default function VendorTabScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.approveBtn, { backgroundColor: "#22c55e" }]}
-                        onPress={() => updateStatus.mutate({ bookingId: b.id, data: { status: "approved" } })}
+                        onPress={() => updateStatus.mutate({ bookingId: b.id, data: { status: "confirmed" } })}
                       >
                         <Ionicons name="checkmark" size={14} color="#fff" />
                         <Text style={styles.approveBtnText}>Approve</Text>

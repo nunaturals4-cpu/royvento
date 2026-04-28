@@ -18,13 +18,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type BookingStatus = "pending" | "approved" | "rejected" | "cancelled";
+type BookingStatus = "pending" | "confirmed" | "cancelled" | "completed";
 
 const STATUS_META: Record<BookingStatus, { bg: string; text: string; label: string }> = {
-  pending: { bg: "#f59e0b20", text: "#f59e0b", label: "Pending" },
-  approved: { bg: "#22c55e20", text: "#22c55e", label: "Confirmed" },
-  rejected: { bg: "#ef444420", text: "#ef4444", label: "Rejected" },
-  cancelled: { bg: "#6b728020", text: "#9ca3af", label: "Cancelled" },
+  pending:   { bg: "#f59e0b20", text: "#f59e0b", label: "Pending" },
+  confirmed: { bg: "#22c55e20", text: "#22c55e", label: "Confirmed" },
+  cancelled: { bg: "#ef444420", text: "#ef4444", label: "Cancelled" },
+  completed: { bg: "#6366f120", text: "#6366f1", label: "Completed" },
 };
 
 function formatDate(d: string) {
@@ -63,10 +63,10 @@ export default function BookingsScreen() {
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = (data ?? []).filter(
-    (b) => b.bookingDate >= today && b.status !== "cancelled" && b.status !== "rejected"
+    (b) => b.bookingDate >= today && b.status !== "cancelled"
   );
   const past = (data ?? []).filter(
-    (b) => b.bookingDate < today || b.status === "cancelled" || b.status === "rejected"
+    (b) => b.bookingDate < today || b.status === "cancelled" || b.status === "completed"
   );
   const shown = tab === "upcoming" ? upcoming : past;
 
@@ -182,7 +182,7 @@ export default function BookingsScreen() {
                 </View>
 
                 {/* Confirmed ticket with QR code */}
-                {isExpanded && status === "approved" && (
+                {isExpanded && status === "confirmed" && (
                   <View style={[styles.ticket, { borderTopColor: colors.border, backgroundColor: colors.muted }]}>
                     <View style={styles.ticketHeader}>
                       <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
@@ -201,7 +201,7 @@ export default function BookingsScreen() {
                 )}
 
                 {/* Expanded details for non-confirmed bookings */}
-                {isExpanded && status !== "approved" && (
+                {isExpanded && status !== "confirmed" && (
                   <View style={[styles.expandedInfo, { borderTopColor: colors.border }]}>
                     <Text style={[styles.expandedText, { color: colors.mutedForeground }]}>
                       Status: {meta.label}
