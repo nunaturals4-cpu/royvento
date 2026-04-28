@@ -34,7 +34,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   cancelled: { bg: "#6b728020", text: "#9ca3af" },
 };
 
-export default function VendorDashboardScreen() {
+export default function VendorTabScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -54,14 +54,14 @@ export default function VendorDashboardScreen() {
     },
   });
 
-  if (!user || user.role !== "vendor") {
+  if (!user || (user.role !== "vendor" && user.role !== "admin")) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <EmptyState
           icon="business-outline"
-          title="Not a vendor"
-          subtitle="This area is only for approved partners"
-          action={{ label: "Go Back", onPress: () => router.back() }}
+          title="Partner area"
+          subtitle="Only approved partners can access this section"
+          action={{ label: "Go Home", onPress: () => router.push("/(tabs)") }}
         />
       </View>
     );
@@ -72,26 +72,18 @@ export default function VendorDashboardScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
       <View
         style={[
           styles.header,
           { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border },
         ]}
       >
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
-          </Pressable>
-          <Text style={[styles.title, { color: colors.foreground }]}>Partner Dashboard</Text>
-          <View style={{ width: 22 }} />
-        </View>
+        <Text style={[styles.title, { color: colors.foreground }]}>Partner Dashboard</Text>
 
-        {/* Stats row */}
         <View style={styles.statsRow}>
           {[
             { icon: "hourglass-outline" as const, value: pending.length, label: "Pending" },
-            { icon: "checkmark-circle-outline" as const, value: (all.filter((b) => b.status === "approved")).length, label: "Approved" },
+            { icon: "checkmark-circle-outline" as const, value: all.filter((b) => b.status === "approved").length, label: "Approved" },
             { icon: "calendar-outline" as const, value: (events.data ?? []).length, label: "Events" },
           ].map((s) => (
             <View key={s.label} style={[styles.stat, { backgroundColor: colors.muted }]}>
@@ -102,7 +94,6 @@ export default function VendorDashboardScreen() {
           ))}
         </View>
 
-        {/* Tabs */}
         <View style={[styles.tabs, { backgroundColor: colors.muted }]}>
           {(["bookings", "events"] as const).map((t) => (
             <Pressable
@@ -118,7 +109,6 @@ export default function VendorDashboardScreen() {
         </View>
       </View>
 
-      {/* Content */}
       {activeTab === "bookings" ? (
         bookings.isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
@@ -149,14 +139,14 @@ export default function VendorDashboardScreen() {
                       {b.phone ? (
                         <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{b.phone}</Text>
                       ) : null}
+                      {b.notes ? (
+                        <Text style={[styles.notes, { color: colors.mutedForeground }]}>{b.notes}</Text>
+                      ) : null}
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
                       <Text style={[styles.statusText, { color: statusStyle.text }]}>{b.status}</Text>
                     </View>
                   </View>
-                  {b.notes ? (
-                    <Text style={[styles.notes, { color: colors.mutedForeground }]}>{b.notes}</Text>
-                  ) : null}
                   {b.status === "pending" ? (
                     <View style={styles.actionRow}>
                       <TouchableOpacity
@@ -239,8 +229,7 @@ export default function VendorDashboardScreen() {
 
 const styles = StyleSheet.create({
   header: { paddingBottom: 14, paddingHorizontal: 20, borderBottomWidth: 1, gap: 14 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  title: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
   statsRow: { flexDirection: "row", gap: 10 },
   stat: { flex: 1, borderRadius: 12, padding: 12, alignItems: "center", gap: 4 },
   statValue: { fontSize: 20, fontFamily: "Inter_700Bold" },
@@ -253,7 +242,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: "row", gap: 10 },
   cardId: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   cardDate: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  notes: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  notes: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18, marginTop: 4 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignSelf: "flex-start" },
   statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
   actionRow: { flexDirection: "row", gap: 10, marginTop: 4 },

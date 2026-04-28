@@ -70,9 +70,13 @@ export interface Vendor {
   category: string;
   description: string;
   location: string;
+  city?: string;
+  state?: string;
+  country?: string;
   bannerImage: string;
   coverImageUrl: string;
   portfolioImages: string[];
+  openDays?: string[];
   status: VendorStatus;
   rating: number;
   reviewCount: number;
@@ -109,20 +113,36 @@ export interface Event {
   title: string;
   description: string;
   category: string;
+  type: string;
   location: string;
+  state: string;
+  city: string;
+  country: string;
   price: number;
+  startingPrice: number;
   capacity: number;
   imageUrl: string;
+  eventDate?: string | null;
+  featured: boolean;
+  popular: boolean;
+  pubMode: string;
+  priceWomen: number;
+  priceMen: number;
+  priceCouple: number;
+  pubEventTypes: string[];
   rating: number;
   reviewCount: number;
   vendorName: string;
+  partnerName: string;
   galleryImages: string[];
   galleryVideos: string[];
+  approvalStatus: string;
+  rejectionReason?: string | null;
   createdAt: string;
 }
 
 export type EventDetail = Event & {
-  vendor: Vendor;
+  vendor?: Vendor;
 };
 
 export interface CreateEventBody {
@@ -154,6 +174,8 @@ export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
 export const BookingStatus = {
   pending: "pending",
   confirmed: "confirmed",
+  approved: "approved",
+  rejected: "rejected",
   cancelled: "cancelled",
   completed: "completed",
 } as const;
@@ -167,6 +189,7 @@ export interface Booking {
   guests: number;
   totalPrice: number;
   notes: string;
+  phone?: string;
   status: BookingStatus;
   createdAt: string;
   eventTitle: string;

@@ -3,12 +3,13 @@ import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
-import { SymbolView } from "expo-symbols";
+import { SymbolView, type SFSymbol } from "expo-symbols";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout() {
+function NativeTabLayout({ isVendor }: { isVendor: boolean }) {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -27,6 +28,12 @@ function NativeTabLayout() {
         <Icon sf={{ default: "ticket", selected: "ticket.fill" }} />
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
+      {isVendor ? (
+        <NativeTabs.Trigger name="vendor">
+          <Icon sf={{ default: "building.2", selected: "building.2.fill" }} />
+          <Label>Partner</Label>
+        </NativeTabs.Trigger>
+      ) : null}
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
@@ -35,7 +42,7 @@ function NativeTabLayout() {
   );
 }
 
-function ClassicTabLayout() {
+function ClassicTabLayout({ isVendor }: { isVendor: boolean }) {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -43,6 +50,21 @@ function ClassicTabLayout() {
   const isWeb = Platform.OS === "web";
 
   const iconSize = 22;
+
+  function tabBarIcon(
+    focused: boolean,
+    color: string,
+    iosActive: SFSymbol,
+    iosInactive: SFSymbol,
+    androidActive: React.ComponentProps<typeof Ionicons>["name"],
+    androidInactive: React.ComponentProps<typeof Ionicons>["name"]
+  ) {
+    return isIOS ? (
+      <SymbolView name={focused ? iosActive : iosInactive} tintColor={color} size={iconSize} />
+    ) : (
+      <Ionicons name={focused ? androidActive : androidInactive} size={iconSize} color={color} />
+    );
+  }
 
   return (
     <Tabs
@@ -60,18 +82,9 @@ function ClassicTabLayout() {
         },
         tabBarBackground: () =>
           isIOS ? (
-            <BlurView
-              intensity={100}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
+            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
           ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.card },
-              ]}
-            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
           ) : null,
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
@@ -85,19 +98,7 @@ function ClassicTabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "house.fill" : "house"}
-                tintColor={color}
-                size={iconSize}
-              />
-            ) : (
-              <Ionicons
-                name={focused ? "home" : "home-outline"}
-                size={iconSize}
-                color={color}
-              />
-            ),
+            tabBarIcon(focused, color, "house.fill", "house", "home", "home-outline"),
         }}
       />
       <Tabs.Screen
@@ -105,19 +106,7 @@ function ClassicTabLayout() {
         options={{
           title: "Explore",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name="magnifyingglass"
-                tintColor={color}
-                size={iconSize}
-              />
-            ) : (
-              <Ionicons
-                name={focused ? "search" : "search-outline"}
-                size={iconSize}
-                color={color}
-              />
-            ),
+            tabBarIcon(focused, color, "magnifyingglass", "magnifyingglass", "search", "search-outline"),
         }}
       />
       <Tabs.Screen
@@ -125,19 +114,7 @@ function ClassicTabLayout() {
         options={{
           title: "Wishlist",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "heart.fill" : "heart"}
-                tintColor={color}
-                size={iconSize}
-              />
-            ) : (
-              <Ionicons
-                name={focused ? "heart" : "heart-outline"}
-                size={iconSize}
-                color={color}
-              />
-            ),
+            tabBarIcon(focused, color, "heart.fill", "heart", "heart", "heart-outline"),
         }}
       />
       <Tabs.Screen
@@ -145,19 +122,16 @@ function ClassicTabLayout() {
         options={{
           title: "Bookings",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "ticket.fill" : "ticket"}
-                tintColor={color}
-                size={iconSize}
-              />
-            ) : (
-              <Ionicons
-                name={focused ? "ticket" : "ticket-outline"}
-                size={iconSize}
-                color={color}
-              />
-            ),
+            tabBarIcon(focused, color, "ticket.fill", "ticket", "ticket", "ticket-outline"),
+        }}
+      />
+      <Tabs.Screen
+        name="vendor"
+        options={{
+          title: "Partner",
+          tabBarItemStyle: { display: isVendor ? "flex" : "none" },
+          tabBarIcon: ({ color, focused }) =>
+            tabBarIcon(focused, color, "building.2.fill", "building.2", "business", "business-outline"),
         }}
       />
       <Tabs.Screen
@@ -165,19 +139,7 @@ function ClassicTabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "person.fill" : "person"}
-                tintColor={color}
-                size={iconSize}
-              />
-            ) : (
-              <Ionicons
-                name={focused ? "person" : "person-outline"}
-                size={iconSize}
-                color={color}
-              />
-            ),
+            tabBarIcon(focused, color, "person.fill", "person", "person", "person-outline"),
         }}
       />
     </Tabs>
@@ -185,8 +147,11 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
+  const { user } = useAuth();
+  const isVendor = user?.role === "vendor" || user?.role === "admin";
+
   if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
+    return <NativeTabLayout isVendor={isVendor} />;
   }
-  return <ClassicTabLayout />;
+  return <ClassicTabLayout isVendor={isVendor} />;
 }

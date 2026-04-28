@@ -26,6 +26,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
+interface EventVendor {
+  id: number;
+  businessName: string;
+  category: string;
+  description?: string;
+  location?: string;
+  rating?: number;
+  reviewCount?: number;
+}
+
+interface EventWithVendor {
+  id: number;
+  vendor?: EventVendor;
+  vendorId?: number;
+  vendorName?: string;
+  [key: string]: unknown;
+}
+
 function formatINR(v: number) {
   if (v >= 10000000) return `₹${(v / 10000000).toFixed(1)}Cr`;
   if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
@@ -74,7 +92,7 @@ export default function EventDetailScreen() {
         setShowBooking(false);
         Alert.alert("Booking Requested!", "Your booking request has been sent. The partner will confirm soon.");
       },
-      onError: (err: any) => {
+      onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert("Booking Failed", err?.message ?? "Something went wrong");
       },
@@ -236,20 +254,20 @@ export default function EventDetailScreen() {
           ) : null}
 
           {/* Partner */}
-          {(event as any).vendor ? (
+          {(event as unknown as EventWithVendor).vendor ? (
             <Pressable
               style={[styles.vendorRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => router.push(`/partner/${(event as any).vendor.id}`)}
+              onPress={() => router.push(`/partner/${(event as unknown as EventWithVendor).vendor!.id}`)}
             >
               <View style={[styles.vendorAvatar, { backgroundColor: colors.muted }]}>
                 <Ionicons name="business-outline" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.vendorName, { color: colors.foreground }]}>
-                  {(event as any).vendor.businessName}
+                  {(event as unknown as EventWithVendor).vendor!.businessName}
                 </Text>
                 <Text style={[styles.vendorCat, { color: colors.mutedForeground }]}>
-                  {(event as any).vendor.category}
+                  {(event as unknown as EventWithVendor).vendor!.category}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />

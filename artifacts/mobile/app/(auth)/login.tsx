@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLogin } from "@workspace/api-client-react";
+import { customFetch, useLogin } from "@workspace/api-client-react";
+import * as AuthSession from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +23,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import type { AuthUser } from "@/context/AuthContext";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -28,15 +34,52 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(
+    googleClientId
+      ? {
+          webClientId: googleClientId,
+          redirectUri: AuthSession.makeRedirectUri(),
+        }
+      : ({} as Parameters<typeof Google.useIdTokenAuthRequest>[0])
+  );
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const idToken = (response.params as Record<string, string>)["id_token"];
+      if (!idToken) return;
+      setGoogleLoading(true);
+      customFetch<{ token: string; user: AuthUser }>("/api/auth/google/mobile", {
+        method: "POST",
+        body: JSON.stringify({ idToken }),
+        headers: { "Content-Type": "application/json" },
+      })
+        .then(async (data) => {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await login(data.token, data.user);
+          router.replace("/(tabs)");
+        })
+        .catch((err: Error) => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Alert.alert("Google Sign-In Failed", err.message);
+        })
+        .finally(() => setGoogleLoading(false));
+    } else if (response?.type === "error") {
+      Alert.alert("Google Sign-In Error", "Unable to sign in with Google. Please try email login.");
+    }
+  }, [response]);
 
   const loginMutation = useLogin({
     mutation: {
       onSuccess: async (data) => {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await login(data.token, data.user as any);
+        await login(data.token, data.user as AuthUser);
         router.replace("/(tabs)");
       },
-      onError: (err: any) => {
+      onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert("Login Failed", err?.message ?? "Invalid credentials");
       },
@@ -62,7 +105,7 @@ export default function LoginScreen() {
           styles.container,
           {
             paddingTop: insets.top + (Platform.OS === "web" ? 67 : 40),
-            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 40),
+            paddingBottom: insets.bottom + 40,
           },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -84,6 +127,34 @@ export default function LoginScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Sign In</Text>
+
+          {/* Google Sign-In */}
+          {!!googleClientId && (
+            <TouchableOpacity
+              style={[styles.googleBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
+              onPress={() => promptAsync()}
+              disabled={!request || googleLoading || loginMutation.isPending}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color={colors.foreground} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={18} color="#4285F4" />
+                  <Text style={[styles.googleBtnText, { color: colors.foreground }]}>
+                    Continue with Google
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {!!googleClientId && (
+            <View style={styles.dividerRow}>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            </View>
+          )}
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>Email</Text>
@@ -125,7 +196,11 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: colors.primary }, loginMutation.isPending && { opacity: 0.7 }]}
+            style={[
+              styles.btn,
+              { backgroundColor: colors.primary },
+              loginMutation.isPending && { opacity: 0.7 },
+            ]}
             onPress={handleLogin}
             disabled={loginMutation.isPending}
           >
@@ -151,87 +226,25 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 24,
-    gap: 24,
-  },
-  header: {
-    alignItems: "center",
-    gap: 8,
-  },
-  logoWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  brand: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
-  },
-  tagline: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 24,
-    gap: 16,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    marginBottom: 4,
-  },
-  field: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-  },
-  btn: {
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  btnText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  footerText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
-  link: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
+  container: { flexGrow: 1, padding: 24, gap: 24 },
+  header: { alignItems: "center", gap: 8 },
+  logoWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  brand: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
+  tagline: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  card: { borderRadius: 20, borderWidth: 1, padding: 24, gap: 16 },
+  cardTitle: { fontSize: 20, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  googleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderWidth: 1, borderRadius: 14, paddingVertical: 14 },
+  googleBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  divider: { flex: 1, height: 1 },
+  dividerText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  field: { gap: 6 },
+  label: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
+  inputWrap: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+  input: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
+  btn: { borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 4 },
+  btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  footer: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
+  footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  link: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });

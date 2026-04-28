@@ -394,4 +394,102 @@ router.post("/auth/reset-password", async (req, res) => {
   res.json({ ok: true, message: "Password reset successfully. You can now log in." });
 });
 
+const GoogleMobileBody = z.object({ idToken: z.string() });
+
+router.post("/auth/google/mobile", async (req, res) => {
+  const parsed = GoogleMobileBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "idToken required" });
+    return;
+  }
+
+  const { idToken } = parsed.data;
+
+  try {
+    const infoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+    );
+    if (!infoRes.ok) {
+      res.status(401).json({ error: "Invalid Google ID token" });
+      return;
+    }
+    const info = (await infoRes.json()) as {
+      sub: string;
+      email: string;
+      name?: string;
+      picture?: string;
+      email_verified?: string;
+    };
+
+    if (!info.email || !info.sub) {
+      res.status(401).json({ error: "Incomplete Google profile" });
+      return;
+    }
+
+    let userRows = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.googleId, info.sub))
+      .limit(1);
+    let user = userRows[0];
+
+    if (!user) {
+      const emailRows = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, info.email))
+        .limit(1);
+      if (emailRows[0]) {
+        await db
+          .update(usersTable)
+          .set({ googleId: info.sub })
+          .where(eq(usersTable.id, emailRows[0].id));
+        user = { ...emailRows[0], googleId: info.sub };
+      }
+    }
+
+    if (!user) {
+      let myCode = "";
+      for (let i = 0; i < 5; i++) {
+        const candidate = genReferralCode();
+        const taken = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.referralCode, candidate))
+          .limit(1);
+        if (!taken[0]) { myCode = candidate; break; }
+      }
+      if (!myCode) myCode = genReferralCode() + Date.now().toString(36).slice(-2).toUpperCase();
+
+      const [created] = await db
+        .insert(usersTable)
+        .values({
+          email: info.email,
+          passwordHash: "",
+          name: info.name || info.email.split("@")[0],
+          role: "user",
+          phone: "",
+          referralCode: myCode,
+          googleId: info.sub,
+          profileImage: info.picture ?? "",
+        })
+        .returning();
+
+      if (!created) {
+        res.status(500).json({ error: "Failed to create user" });
+        return;
+      }
+      user = created;
+      sendWelcomeEmail({ to: user.email, toName: user.name }).catch(() => {});
+    }
+
+    const token = signToken({ userId: user.id, role: user.role as Role });
+    setAuthCookie(res, token);
+    res.json({ token, user: userToPublic(user) });
+  } catch (err) {
+    console.error("Google mobile auth error:", err);
+    res.status(500).json({ error: "Google authentication failed" });
+  }
+});
+
 export default router;

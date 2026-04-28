@@ -34,10 +34,10 @@ export default function RegisterScreen() {
     mutation: {
       onSuccess: async (data) => {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await login(data.token, data.user as any);
+        await login(data.token, data.user as import("@/context/AuthContext").AuthUser);
         router.replace("/(tabs)");
       },
-      onError: (err: any) => {
+      onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert("Registration Failed", err?.message ?? "Something went wrong");
       },
