@@ -160,7 +160,7 @@ export default function ScannerScreen() {
                 style={[styles.manualInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
                 value={manualCode}
                 onChangeText={setManualCode}
-                placeholder="RVT-000042"
+                placeholder="RV-000042"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -176,7 +176,7 @@ export default function ScannerScreen() {
               </TouchableOpacity>
             </View>
             <Text style={[styles.manualHint, { color: colors.mutedForeground }]}>
-              Format: RVT-XXXXXX or just the number from the booking
+              Format: RV-XXXXXX or just the number from the booking
             </Text>
           </View>
         )}
