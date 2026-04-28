@@ -1179,13 +1179,14 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // Resolve vendor: direct vendor profile OR accepted manager relationship
+  // Resolve vendor: direct vendor profile first; fall back to accepted manager relationship
   let vendor: { id: number; businessName: string; userId: number } | undefined;
   if (user.role === "vendor" || user.role === "admin") {
     const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
     vendor = vRows[0];
-  } else {
-    // Check if user is an accepted manager
+  }
+  // If no direct vendor profile (even for vendor/admin roles), check manager rows
+  if (!vendor) {
     const mgRows = await db.select().from(vendorManagersTable)
       .where(and(eq(vendorManagersTable.managerId, user.id), eq(vendorManagersTable.status, "accepted")))
       .limit(1);

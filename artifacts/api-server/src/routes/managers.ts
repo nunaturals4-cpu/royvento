@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import crypto from "crypto";
-import { db, vendorManagersTable, vendorsTable, usersTable } from "@workspace/db";
+import { db, vendorManagersTable, vendorsTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
@@ -55,6 +55,14 @@ router.post("/partner/managers/invite", requireAuth(["vendor"]), async (req, res
 
   const email = parsed.data.email.toLowerCase().trim();
 
+  // The invited user must already have an account on Royvento
+  const inviteeRows = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (!inviteeRows[0]) {
+    res.status(404).json({ error: "No Royvento account found for that email. The person must sign up first." });
+    return;
+  }
+  const inviteeId = inviteeRows[0].id;
+
   const existing = await db.select().from(vendorManagersTable)
     .where(and(eq(vendorManagersTable.vendorId, vendor.id), eq(vendorManagersTable.invitedEmail, email)))
     .limit(1);
@@ -77,6 +85,17 @@ router.post("/partner/managers/invite", requireAuth(["vendor"]), async (req, res
       status: "pending",
       token,
     });
+  }
+
+  // Create in-app notification for the invited user
+  try {
+    await db.insert(notificationsTable).values({
+      userId: inviteeId,
+      title: "You've been invited as a scanner manager",
+      message: `${vendor.businessName} has invited you to scan tickets at their venue. Open the Ticket Scanner page to accept or decline.`,
+    });
+  } catch {
+    // Non-fatal: invitation is still created
   }
 
   res.json({ message: "Invitation sent.", token });
@@ -113,7 +132,7 @@ router.get("/manager/invitations", requireAuth(), async (req, res) => {
   const vendors = vendorIds.length > 0
     ? await db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName })
         .from(vendorsTable)
-        .where(eq(vendorsTable.id, vendorIds[0]!))
+        .where(inArray(vendorsTable.id, vendorIds))
     : [];
   const vMap = new Map(vendors.map((v) => [v.id, v]));
 

@@ -9,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiPatch, apiGet, fileToDataUrl } from "@/lib/api";
-import { CalendarCheck, Sparkles, Tag, Crown, Gift, Sparkle, Copy, Upload } from "lucide-react";
+import { apiPatch, apiGet, apiPost, fileToDataUrl } from "@/lib/api";
+import { CalendarCheck, Sparkles, Tag, Crown, Gift, Sparkle, Copy, Upload, Bell, ScanLine } from "lucide-react";
 
 interface VendorRequest {
   id: number;
@@ -46,6 +46,8 @@ export function Profile() {
   const [sub, setSub] = useState<Sub | null>(null);
   const [referrals, setReferrals] = useState<ReferralData | null>(null);
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
+  const [invitations, setInvitations] = useState<{ id: number; token: string; vendorName: string; createdAt: string }[]>([]);
+  const [actingInv, setActingInv] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -60,6 +62,7 @@ export function Profile() {
     apiGet<Sub | null>("/api/subscriptions/me").then(setSub).catch(() => {});
     apiGet<ReferralData>("/api/referrals/me").then(setReferrals).catch(() => {});
     apiGet<DiscountInfo>("/api/users/me/discounts").then(setDiscountInfo).catch(() => {});
+    apiGet<{ id: number; token: string; vendorName: string; createdAt: string }[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
   }, [user]);
 
   const handleProfileFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +89,19 @@ export function Profile() {
       toast({ title: "Referral link copied" });
     } catch {
       toast({ title: "Copy failed", description: url });
+    }
+  };
+
+  const respondToInvitation = async (id: number, token: string, action: "accept" | "reject") => {
+    setActingInv(id);
+    try {
+      await apiPost(`/api/manager/invitations/${action}`, { token });
+      toast({ title: action === "accept" ? "Invitation accepted! You can now scan tickets." : "Invitation declined." });
+      setInvitations((prev) => prev.filter((inv) => inv.id !== id));
+    } catch {
+      toast({ title: "Error", description: "Failed to respond to invitation.", variant: "destructive" });
+    } finally {
+      setActingInv(null);
     }
   };
 
@@ -167,6 +183,31 @@ export function Profile() {
         </form>
 
         <aside className="space-y-4">
+          {invitations.length > 0 && (
+            <div className="rounded-3xl glass-card-strong p-6 border border-primary/30 red-ring">
+              <div className="flex items-center gap-2 mb-3">
+                <Bell className="h-5 w-5 text-primary" />
+                <h2 className="font-serif text-lg">Scanner invitations</h2>
+              </div>
+              <div className="space-y-3">
+                {invitations.map((inv) => (
+                  <div key={inv.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                    <p className="text-sm font-medium mb-0.5">{inv.vendorName}</p>
+                    <p className="text-xs text-muted-foreground mb-3">Invited you as a ticket scanner manager</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" disabled={actingInv === inv.id} onClick={() => respondToInvitation(inv.id, inv.token, "accept")}
+                        className="flex-1 bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs">Accept</Button>
+                      <Button size="sm" variant="outline" disabled={actingInv === inv.id} onClick={() => respondToInvitation(inv.id, inv.token, "reject")}
+                        className="flex-1 border-white/10 text-muted-foreground text-xs">Decline</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button asChild variant="ghost" size="sm" className="mt-2 w-full text-xs text-muted-foreground">
+                <Link href="/dashboard/vendor/scanner"><ScanLine className="h-3 w-3 mr-1" />Open ticket scanner</Link>
+              </Button>
+            </div>
+          )}
           {discountInfo?.isNewUser && (
             <div className="rounded-3xl glass-card-strong p-6 red-ring border border-primary/30">
               <div className="flex items-center gap-2 mb-2">

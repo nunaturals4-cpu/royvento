@@ -103,11 +103,30 @@ function ManagerInvitations() {
   );
 }
 
+function useAccessCheck() {
+  const [accessStatus, setAccessStatus] = useState<"loading" | "allowed" | "denied">("loading");
+  useEffect(() => {
+    const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
+    if (!token) { setAccessStatus("denied"); return; }
+    // Decode role from JWT payload (no verification needed on client side — server verifies on every request)
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]!));
+      if (payload.role === "vendor" || payload.role === "admin") { setAccessStatus("allowed"); return; }
+    } catch { /* ignore */ }
+    // For non-vendor users check if they have accepted manager rows
+    apiGet<{ id: number }[]>("/api/manager/my-vendors").then((vendors) => {
+      setAccessStatus(vendors.length > 0 ? "allowed" : "denied");
+    }).catch(() => setAccessStatus("denied"));
+  }, []);
+  return accessStatus;
+}
+
 export function TicketScanner() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const { toast } = useToast();
+  const accessStatus = useAccessCheck();
 
   const scan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,6 +174,24 @@ export function TicketScanner() {
       setLoading(false);
     }
   };
+
+  if (accessStatus === "loading") {
+    return <div className="container mx-auto px-4 md:px-6 py-20 text-center text-muted-foreground">Checking access…</div>;
+  }
+
+  if (accessStatus === "denied") {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-20 max-w-xl text-center">
+        <ScanLine className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h2 className="font-serif text-2xl mb-2">Access restricted</h2>
+        <p className="text-muted-foreground mb-6">
+          This page is for venue partners and their scanner managers. If you received an invitation, please accept it from your profile.
+        </p>
+        <ManagerInvitations />
+        <a href="/dashboard/profile" className="inline-flex items-center gap-2 text-sm text-primary underline underline-offset-4">Go to profile to accept invitations</a>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
