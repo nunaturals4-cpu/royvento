@@ -5,6 +5,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setBaseUrl, customFetch } from "@workspace/api-client-react";
 import Constants from "expo-constants";
@@ -26,6 +27,8 @@ if (domain) {
   setBaseUrl(`https://${domain}`);
 }
 
+const PUSH_TOKEN_KEY = "@royvento/pushToken";
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -36,10 +39,14 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/**
+ * Request notification permission and obtain the Expo push token.
+ * Safe to call early — before any user is logged in.
+ * Returns null on web, when permission is denied, or on any error.
+ */
 export async function registerForPushNotifications(): Promise<string | null> {
   if (Platform.OS === "web") return null;
 
-  let token: string | null = null;
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
     let finalStatus = existing;
@@ -56,21 +63,46 @@ export async function registerForPushNotifications(): Promise<string | null> {
     const tokenData = projectId
       ? await Notifications.getExpoPushTokenAsync({ projectId })
       : await Notifications.getExpoPushTokenAsync();
-    token = tokenData.data;
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#d4a017",
+      });
+    }
+
+    return tokenData.data;
   } catch {
     return null;
   }
+}
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#d4a017",
-    });
+async function cachePushToken(token: string) {
+  try {
+    await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+  } catch {}
+}
+
+async function getCachedPushToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+  } catch {
+    return null;
   }
+}
 
-  return token;
+async function sendTokenToServer(token: string): Promise<void> {
+  try {
+    await customFetch("/api/auth/push-token", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pushToken: token }),
+    });
+  } catch (err) {
+    console.error("[PushToken] Failed to register push token with server:", err);
+  }
 }
 
 const queryClient = new QueryClient({
@@ -96,21 +128,31 @@ function AuthGate() {
   return null;
 }
 
+/**
+ * Handles push notification lifecycle:
+ * - Sends cached token to the server whenever a user becomes available (first login, re-login).
+ * - Navigates to the bookings tab when the user taps a booking notification.
+ */
 function NotificationHandler() {
   const { user } = useAuth();
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  const lastUserId = useRef<number | null>(null);
 
   useEffect(() => {
     if (!user || Platform.OS === "web") return;
+    // Only (re-)register if the user changed (e.g. different account logged in)
+    if (lastUserId.current === user.id) return;
+    lastUserId.current = user.id;
 
-    registerForPushNotifications().then((token) => {
-      if (!token) return;
-      customFetch("/api/auth/push-token", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pushToken: token }),
-      }).catch(() => {});
+    getCachedPushToken().then((cached) => {
+      if (cached) {
+        sendTokenToServer(cached);
+      }
     });
+  }, [user]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
@@ -124,7 +166,7 @@ function NotificationHandler() {
     return () => {
       responseListener.current?.remove();
     };
-  }, [user]);
+  }, []);
 
   return null;
 }
@@ -136,6 +178,16 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+
+  // Request notification permission on first launch — before any user session exists
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    registerForPushNotifications().then((token) => {
+      if (token) {
+        cachePushToken(token);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
