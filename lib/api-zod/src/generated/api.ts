@@ -346,6 +346,14 @@ export const RejectVendorResponse = zod.object({
 export const ListEventsQueryParams = zod.object({
   category: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
+  type: zod.coerce.string().optional(),
+  city: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  country: zod.coerce.string().optional(),
+  minPrice: zod.coerce.string().optional(),
+  maxPrice: zod.coerce.string().optional(),
+  page: zod.coerce.number().int().min(1).optional(),
+  limit: zod.coerce.number().int().min(1).max(50).optional(),
 });
 
 export const ListEventsResponseItem = zod.object({
@@ -354,6 +362,7 @@ export const ListEventsResponseItem = zod.object({
   title: zod.string(),
   description: zod.string(),
   category: zod.string(),
+  type: zod.string(),
   location: zod.string(),
   price: zod.number(),
   capacity: zod.number(),
@@ -361,11 +370,23 @@ export const ListEventsResponseItem = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   vendorName: zod.string(),
+  city: zod.string().optional(),
+  state: zod.string().optional(),
+  country: zod.string().optional(),
   galleryImages: zod.array(zod.string()),
   galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
+
+export const ListEventsPaginatedResponse = zod.object({
+  data: zod.array(ListEventsResponseItem),
+  page: zod.number().int(),
+  limit: zod.number().int(),
+  hasMore: zod.boolean(),
+});
+
+export type ListEventsPaginatedResponse = zod.infer<typeof ListEventsPaginatedResponse>;
 
 /**
  * @summary Create an event (vendor only)

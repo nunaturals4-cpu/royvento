@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
+import type { ListEventsPaginatedResponse } from "@workspace/api-zod";
 import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,24 +24,6 @@ import { useColors } from "@/hooks/useColors";
 const PAGE_SIZE = 20;
 const CATEGORIES = ["All", "Wedding", "Corporate", "Birthday", "Concert", "Pubs", "Festival"];
 const CITIES = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Pune", "Kolkata"];
-
-interface ApiEvent {
-  id: number;
-  title: string;
-  imageUrl: string;
-  location: string;
-  price: string | number;
-  category: string;
-  type: string;
-  city?: string;
-}
-
-interface PaginatedEventsResponse {
-  data: ApiEvent[];
-  page: number;
-  limit: number;
-  hasMore: boolean;
-}
 
 interface FilterState {
   city: string;
@@ -86,14 +69,14 @@ export default function ExploreScreen() {
     fetchNextPage,
     hasNextPage,
     refetch,
-  } = useInfiniteQuery<PaginatedEventsResponse>({
+  } = useInfiniteQuery<ListEventsPaginatedResponse>({
     queryKey: ["events-explore-infinite", baseParams],
     initialPageParam: 1,
     queryFn: ({ pageParam }) => {
       const qs = Object.entries({ ...baseParams, page: String(pageParam) })
         .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
         .join("&");
-      return customFetch<PaginatedEventsResponse>(`/api/events?${qs}`);
+      return customFetch<ListEventsPaginatedResponse>(`/api/events?${qs}`);
     },
     getNextPageParam: (lastPage) => {
       if (lastPage.hasMore) return lastPage.page + 1;

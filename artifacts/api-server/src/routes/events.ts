@@ -127,7 +127,7 @@ router.get("/events", async (req, res) => {
 
   const serialized = await serializeEvents(rows);
 
-  if (q["page"] !== undefined || q["limit"] !== undefined) {
+  if (q["page"] !== undefined) {
     res.json({ data: serialized, page, limit, hasMore: rows.length === limit });
   } else {
     res.json(serialized);
