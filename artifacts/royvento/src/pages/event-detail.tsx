@@ -185,7 +185,7 @@ export function EventDetail() {
             }
           : {}),
       });
-      toast({ title: "Booking requested!", description: "Your booking is pending partner confirmation." });
+      toast({ title: "Booking confirmed!", description: "Your booking is confirmed. Check your dashboard for details." });
       setLocation("/dashboard/bookings");
     } catch (e: any) {
       toast({ title: "Booking failed", description: e?.message ?? "Try again.", variant: "destructive" });

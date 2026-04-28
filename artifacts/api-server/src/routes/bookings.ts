@@ -240,7 +240,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       budgetRange: parsed.data.budgetRange ?? "",
       notes: parsed.data.notes ?? "",
       eventType: parsed.data.eventType ?? "other",
-      status: "pending",
+      status: "confirmed",
       pubMode: parsed.data.pubMode || "",
       ticketWomen: parsed.data.ticketWomen || 0,
       ticketMen: parsed.data.ticketMen || 0,
@@ -248,7 +248,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       selectedPubEvent: parsed.data.selectedPubEvent || "",
       personName: parsed.data.personName || user.name,
       pointsUsed,
-      approvedBy: "",
+      approvedBy: "auto",
     })
     .returning();
   if (!b) {
@@ -296,6 +296,74 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     });
   } catch (err) {
     console.error("Failed to send booking notifications:", err);
+  }
+
+  // Award referral points immediately (booking is auto-confirmed at creation)
+  try {
+    const priorPaid = await db
+      .select()
+      .from(bookingsTable)
+      .where(
+        and(
+          eq(bookingsTable.userId, user.id),
+          inArray(bookingsTable.status, ["confirmed", "completed"]),
+        ),
+      );
+    const otherPriorCount = priorPaid.filter((p) => p.id !== b.id).length;
+    if (otherPriorCount === 0) {
+      const refRows = await db
+        .select()
+        .from(referralsTable)
+        .where(
+          and(
+            eq(referralsTable.referredId, user.id),
+            eq(referralsTable.status, "pending"),
+          ),
+        )
+        .limit(1);
+      const ref = refRows[0];
+      if (ref) {
+        const [referrer] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, ref.referrerId))
+          .limit(1);
+        const [referred] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, user.id))
+          .limit(1);
+        if (referrer) {
+          await db
+            .update(usersTable)
+            .set({ points: (referrer.points || 0) + 50 })
+            .where(eq(usersTable.id, referrer.id));
+        }
+        if (referred) {
+          await db
+            .update(usersTable)
+            .set({ points: (referred.points || 0) + 50 })
+            .where(eq(usersTable.id, referred.id));
+        }
+        await db
+          .update(referralsTable)
+          .set({ status: "completed", pointsAwarded: 50, completedAt: new Date() })
+          .where(eq(referralsTable.id, ref.id));
+      }
+    }
+  } catch (err) {
+    console.error("Failed to award referral points at booking creation:", err);
+  }
+
+  // Create in-app notification for instant confirmation
+  try {
+    await db.insert(notificationsTable).values({
+      userId: user.id,
+      title: "Booking confirmed!",
+      message: `Your booking for "${out?.eventTitle ?? evt.title}" is confirmed. See you there!`,
+    });
+  } catch (err) {
+    console.error("Failed to create booking confirmation notification:", err);
   }
 
   res.json(out);
