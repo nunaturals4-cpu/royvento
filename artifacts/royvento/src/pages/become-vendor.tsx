@@ -3,17 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useToast } from "@/hooks/use-toast";
-import { apiPost, EVENT_CATEGORIES } from "@/lib/api";
+import { apiPost } from "@/lib/api";
 import { Sparkles, MapPin, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 
 export function BecomeVendor() {
   const { toast } = useToast();
   const [businessName, setBusinessName] = useState("");
-  const [category, setCategory] = useState("Wedding");
   const [reason, setReason] = useState("");
   const [country, setCountry] = useState("India");
   const [stateF, setStateF] = useState("");
@@ -27,7 +25,7 @@ export function BecomeVendor() {
     try {
       await apiPost("/api/vendor-requests", {
         businessName,
-        category,
+        category: "Pub",
         message: reason,
         country,
         state: stateF,
@@ -80,17 +78,6 @@ export function BecomeVendor() {
         <div>
           <Label htmlFor="bname">Business name</Label>
           <Input id="bname" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. The Royal Arms Pub" />
-        </div>
-        <div>
-          <Label htmlFor="bcat">Venue type</Label>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger id="bcat"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {EVENT_CATEGORIES.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />Where are you based?</Label>

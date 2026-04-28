@@ -119,7 +119,6 @@ export function VendorDashboard() {
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
-  const [coverImageUrl, setCover] = useState(vendor.coverImageUrl ?? "");
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [city, setCity] = useState(vendor.city ?? "");
   const [country, setCountry] = useState(vendor.country || "India");
@@ -139,7 +138,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       {
         onSuccess: async () => {
           try {
-            await apiPatch("/api/partner/profile", { state: stateF, city, country, coverImageUrl });
+            await apiPatch("/api/partner/profile", { state: stateF, city, country });
           } catch { /* silent */ }
           toast({ title: "Profile updated" });
           onSaved();
@@ -186,19 +185,6 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Cover photo <span className="text-muted-foreground text-[10px] ml-1">(full-width hero shown to visitors)</span></Label>
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={async (e) => {
-              const f = e.target.files?.[0]; if (!f) return;
-              try { setCover(await fileToDataUrl(f)); } catch { /* ignore */ }
-            }}
-            className="bg-black/40 border-white/10 mt-1"
-          />
-          {coverImageUrl && <img src={coverImageUrl} alt="" className="mt-2 rounded-xl max-h-24 w-full object-cover" />}
         </div>
         <div>
           <Label>Description <span className="text-muted-foreground text-xs">(min 300 characters)</span></Label>
@@ -459,22 +445,6 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
         <p className="font-serif text-lg">{vendor.businessName}</p>
       </div>
       <div className="grid md:grid-cols-2 gap-3">
-        <div>
-          <Label>Type</Label>
-          <Select value={type} onValueChange={setType} disabled={!!lockedType}>
-            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {EVENT_KIND.map((k) => <SelectItem key={k} value={k}>{k === "event" ? "Event" : "Pub / Lounge"}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Category</Label>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-            <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
         <div>
           <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
           <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />

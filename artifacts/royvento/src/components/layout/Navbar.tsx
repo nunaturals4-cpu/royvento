@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
-import { Crown, Search, Bell } from "lucide-react";
+import { Crown, Search, Bell, Menu, X as XIcon } from "lucide-react";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { apiGet, apiPatch } from "@/lib/api";
 
@@ -76,6 +76,7 @@ export function Navbar() {
   const logout = useLogout();
   const [, setLocation] = useLocation();
   const [q, setQ] = useState("");
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
@@ -163,7 +164,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
-          <form onSubmit={handleSearch} className="relative hidden md:block">
+          <form onSubmit={handleSearch} className="relative hidden lg:block">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               value={q}
@@ -238,6 +239,17 @@ export function Navbar() {
               )}
             </div>
           )}
+
+          {/* Hamburger — mobile/tablet only */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden h-9 w-9 rounded-full hover:bg-foreground/5"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          >
+            {mobileOpen ? <XIcon className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
 
           {user ? (
             <DropdownMenu>
@@ -317,6 +329,62 @@ export function Navbar() {
           )}
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="lg:hidden relative border-t border-border bg-background/95 backdrop-blur-xl">
+          <div className="container mx-auto px-4 py-4 space-y-4">
+            {/* Mobile search */}
+            <form onSubmit={(e) => { handleSearch(e); setMobileOpen(false); }} className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search pubs…"
+                className="h-10 w-full pl-9 bg-card/60 border-border focus:border-primary/40"
+              />
+            </form>
+
+            {/* Mobile nav links */}
+            <nav className="flex flex-col">
+              {[
+                { href: "/", label: "Home" },
+                { href: "/pubs", label: "Pubs" },
+                { href: "/blogs", label: "Blog" },
+                { href: "/contact", label: "Contact" },
+              ].map(({ href, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center py-3 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-border/40 last:border-0"
+                >
+                  {label}
+                </Link>
+              ))}
+              <Link
+                href="/subscription"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-1.5 py-3 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-border/40"
+              >
+                <Crown className="h-4 w-4 text-primary" /> Premium
+              </Link>
+            </nav>
+
+            {/* Mobile auth — logged-out only */}
+            {!user && (
+              <div className="flex gap-3 pt-1">
+                <Link href="/login" onClick={() => setMobileOpen(false)} className="flex-1">
+                  <Button variant="outline" className="w-full">Log in</Button>
+                </Link>
+                <Link href="/register" onClick={() => setMobileOpen(false)} className="flex-1">
+                  <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0">Get started</Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
