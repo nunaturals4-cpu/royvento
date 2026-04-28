@@ -9,6 +9,7 @@ import {
   couponsTable,
   referralsTable,
   notificationsTable,
+  partnerBlockedDatesTable,
 } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -174,6 +175,27 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     rawDate instanceof Date
       ? rawDate.toISOString().slice(0, 10)
       : String(rawDate).slice(0, 10);
+
+  // Validate against vendor operating schedule and manually blocked dates
+  const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const [vendorScheduleRows, blockedDateRows] = await Promise.all([
+    db.select().from(vendorsTable).where(eq(vendorsTable.id, evt.vendorId)).limit(1),
+    db.select().from(partnerBlockedDatesTable).where(
+      and(eq(partnerBlockedDatesTable.vendorId, evt.vendorId), eq(partnerBlockedDatesTable.date, dateStr))
+    ).limit(1),
+  ]);
+  const vendorSchedule = vendorScheduleRows[0];
+  if (blockedDateRows.length > 0) {
+    res.status(400).json({ error: "That date is unavailable — the venue has blocked it." });
+    return;
+  }
+  if (vendorSchedule && vendorSchedule.openDays && vendorSchedule.openDays.length > 0) {
+    const bookingDay = DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
+    if (!vendorSchedule.openDays.includes(bookingDay)) {
+      res.status(400).json({ error: `This pub is closed on ${bookingDay}s. Please choose an open day.` });
+      return;
+    }
+  }
 
   // Compute base total based on mode
   let totalPrice = 0;

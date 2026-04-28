@@ -128,15 +128,23 @@ export function VendorDashboard() {
   );
 }
 
+const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [city, setCity] = useState(vendor.city ?? "");
   const [country, setCountry] = useState(vendor.country || "India");
+  const [openDays, setOpenDays] = useState<string[]>(
+    Array.isArray(vendor.openDays) && vendor.openDays.length > 0 ? vendor.openDays : [...ALL_DAYS]
+  );
   const [descError, setDescError] = useState("");
   const update = useUpdateMyVendor();
   const { toast } = useToast();
+
+  const toggleDay = (day: string) =>
+    setOpenDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,13 +152,16 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       setDescError("Description must be at least 300 characters.");
       return;
     }
+    if (openDays.length === 0) {
+      toast({ title: "Select at least one open day", variant: "destructive" }); return;
+    }
     setDescError("");
     update.mutate(
       { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: async () => {
           try {
-            await apiPatch("/api/partner/profile", { state: stateF, city, country });
+            await apiPatch("/api/partner/profile", { state: stateF, city, country, openDays });
           } catch { /* silent */ }
           toast({ title: "Profile updated" });
           onSaved();
@@ -216,6 +227,29 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               {description.length} / 300
             </p>
           </div>
+        </div>
+        <div>
+          <Label className="mb-2 block">Operating days <span className="text-muted-foreground text-xs">(toggle open/closed)</span></Label>
+          <div className="flex flex-wrap gap-2">
+            {ALL_DAYS.map((day) => {
+              const isOpen = openDays.includes(day);
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleDay(day)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                    isOpen
+                      ? "bg-green-600/20 border-green-500/40 text-green-300"
+                      : "bg-white/5 border-white/10 text-muted-foreground"
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Green = open · Grey = closed. Customers won't be able to book on closed days.</p>
         </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}

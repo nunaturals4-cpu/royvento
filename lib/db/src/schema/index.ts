@@ -61,6 +61,7 @@ export const vendorsTable = pgTable(
     budgetMax: numeric("budget_max", { precision: 14, scale: 2 })
       .notNull()
       .default("0"),
+    openDays: text("open_days").array().notNull().default([]),
     isPremium: boolean("is_premium").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true })

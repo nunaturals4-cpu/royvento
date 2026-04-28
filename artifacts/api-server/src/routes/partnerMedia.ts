@@ -87,6 +87,8 @@ router.delete("/partner/media/:id", requireAuth(["vendor"]), async (req, res) =>
   return res.json({ ok: true });
 });
 
+const VALID_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
 const UpdatePartnerProfileBody = z.object({
   eventTypes: z.array(z.string()).optional(),
   budgetMin: z.number().nonnegative().optional(),
@@ -95,6 +97,7 @@ const UpdatePartnerProfileBody = z.object({
   city: z.string().optional(),
   country: z.string().optional(),
   coverImageUrl: z.string().optional(),
+  openDays: z.array(z.enum(VALID_DAYS)).optional(),
 });
 
 router.patch(
@@ -122,6 +125,8 @@ router.patch(
       updates["country"] = parsed.data.country;
     if (parsed.data.coverImageUrl !== undefined)
       updates["coverImageUrl"] = parsed.data.coverImageUrl;
+    if (parsed.data.openDays !== undefined)
+      updates["openDays"] = parsed.data.openDays;
     const [v] = await db
       .update(vendorsTable)
       .set(updates)

@@ -21,6 +21,7 @@ interface VendorRow {
   bannerImage: string;
   coverImageUrl: string;
   portfolioImages: string[];
+  openDays: string[];
   status: string;
   createdAt: Date;
 }
@@ -37,6 +38,7 @@ async function serializeVendor(v: VendorRow) {
     bannerImage: v.bannerImage,
     coverImageUrl: v.coverImageUrl ?? "",
     portfolioImages: v.portfolioImages,
+    openDays: v.openDays ?? [],
     status: v.status,
     rating: summary.rating,
     reviewCount: summary.reviewCount,
@@ -58,6 +60,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       bannerImage: v.bannerImage,
       coverImageUrl: v.coverImageUrl ?? "",
       portfolioImages: v.portfolioImages,
+      openDays: v.openDays ?? [],
       status: v.status,
       rating: r.rating,
       reviewCount: r.reviewCount,

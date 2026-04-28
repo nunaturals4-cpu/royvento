@@ -111,6 +111,11 @@ export function EventDetail() {
     availability.filter((a) => a.status !== "available").map((a) => a.date),
   );
 
+  const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const vendorOpenDays: string[] = (ev.vendor?.openDays ?? []) as string[];
+  const selectedDayName = date ? DAY_ABBRS[new Date(`${date}T12:00:00`).getDay()] : "";
+  const isClosedDay = !!(date && vendorOpenDays.length > 0 && !vendorOpenDays.includes(selectedDayName));
+
   // Compute subtotal based on mode
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
@@ -179,6 +184,10 @@ export function EventDetail() {
     }
     if (isPub && phone && !/^\d{10}$/.test(phone)) {
       toast({ title: "Invalid phone number", description: "Please enter a 10-digit mobile number.", variant: "destructive" });
+      return;
+    }
+    if (isClosedDay) {
+      toast({ title: `${ev.vendor?.businessName ?? "This venue"} is closed on ${selectedDayName}s`, description: "Please pick a date that falls on an open day.", variant: "destructive" });
       return;
     }
     setBooking(true);
@@ -461,6 +470,11 @@ export function EventDetail() {
                 />
                 {date && blockedDates.has(date) && (
                   <p className="text-xs text-destructive mt-1">That date is unavailable.</p>
+                )}
+                {isClosedDay && (
+                  <p className="text-xs text-destructive mt-1">
+                    {ev.vendor?.businessName ?? "This venue"} is closed on {selectedDayName}s. Please pick a different date.
+                  </p>
                 )}
               </div>
 
