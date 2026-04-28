@@ -133,7 +133,7 @@ export default function BookingsScreen() {
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
-          {(managedVendors.length > 0 || user.role === "vendor" || user.role === "admin") && (
+          {(managedVendors.length > 0 || user.role === "vendor") && (
             <TouchableOpacity
               style={[styles.scanBtn, { backgroundColor: colors.primary }]}
               onPress={() => router.push("/scanner" as never)}
