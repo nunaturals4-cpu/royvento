@@ -276,4 +276,104 @@ router.get("/admin/users", requireAuth(["admin"]), async (_req, res) => {
   );
 });
 
+// ── Admin vendor management ──────────────────────────────────────────────────
+
+router.get("/admin/vendors", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(vendorsTable)
+    .orderBy(desc(vendorsTable.createdAt));
+
+  if (rows.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const eventCounts = await db
+    .select({
+      vendorId: eventsTable.vendorId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(eventsTable)
+    .groupBy(eventsTable.vendorId);
+  const eCountMap = new Map(eventCounts.map((e) => [e.vendorId, e.count]));
+
+  const userIds = rows.map((v) => v.userId);
+  const users = await db
+    .select({ id: usersTable.id, email: usersTable.email })
+    .from(usersTable)
+    .where(sql`${usersTable.id} IN (${sql.join(userIds, sql`, `)})`);
+  const uMap = new Map(users.map((u) => [u.id, u.email]));
+
+  res.json(
+    rows.map((v) => ({
+      id: v.id,
+      userId: v.userId,
+      businessName: v.businessName,
+      category: v.category,
+      description: v.description,
+      location: v.location,
+      city: v.city,
+      state: v.state,
+      bannerImage: v.bannerImage,
+      status: v.status,
+      eventCount: eCountMap.get(v.id) ?? 0,
+      userEmail: uMap.get(v.userId) ?? "",
+      createdAt: v.createdAt.toISOString(),
+    })),
+  );
+});
+
+router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  const updates: Record<string, unknown> = {};
+
+  if (typeof body["businessName"] === "string" && body["businessName"].trim())
+    updates["businessName"] = body["businessName"].trim();
+  if (typeof body["description"] === "string")
+    updates["description"] = body["description"];
+  if (typeof body["category"] === "string" && body["category"].trim())
+    updates["category"] = body["category"].trim();
+  if (
+    typeof body["status"] === "string" &&
+    ["approved", "pending", "rejected"].includes(body["status"])
+  )
+    updates["status"] = body["status"];
+  if (typeof body["city"] === "string") updates["city"] = body["city"];
+  if (typeof body["state"] === "string") updates["state"] = body["state"];
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No valid fields to update" });
+    return;
+  }
+
+  const [v] = await db
+    .update(vendorsTable)
+    .set(updates)
+    .where(eq(vendorsTable.id, id))
+    .returning();
+
+  if (!v) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json({ ok: true, vendor: { id: v.id, businessName: v.businessName, status: v.status } });
+});
+
+router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  await db.delete(eventsTable).where(eq(eventsTable.vendorId, id));
+  await db.delete(vendorsTable).where(eq(vendorsTable.id, id));
+  res.json({ ok: true });
+});
+
 export default router;

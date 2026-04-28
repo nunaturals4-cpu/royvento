@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
-  Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle,
+  Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -39,7 +39,7 @@ export function AdminPanel() {
       <Tabs defaultValue="analytics" className="space-y-6">
         <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="vendors">Partner approvals</TabsTrigger>
+          <TabsTrigger value="vendors">Partners</TabsTrigger>
           <TabsTrigger value="requests">Partner requests</TabsTrigger>
           <TabsTrigger value="booking-requests">Booking Requests</TabsTrigger>
           <TabsTrigger value="event-approvals">Event Approvals</TabsTrigger>
@@ -52,7 +52,7 @@ export function AdminPanel() {
           <TabsTrigger value="blogs">Blogs</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics /></TabsContent>
-        <TabsContent value="vendors"><PendingVendors /></TabsContent>
+        <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
         <TabsContent value="requests"><VendorRequests /></TabsContent>
         <TabsContent value="booking-requests"><BookingRequestsAdmin /></TabsContent>
         <TabsContent value="event-approvals"><EventApprovalsAdmin /></TabsContent>
@@ -280,45 +280,215 @@ function BookingRequestsAdmin() {
   );
 }
 
-function PendingVendors() {
-  const { data: pending = [], refetch } = useListPendingVendors();
+interface AdminVendor {
+  id: number;
+  userId: number;
+  businessName: string;
+  category: string;
+  description: string;
+  location: string;
+  city: string;
+  state: string;
+  bannerImage: string;
+  status: string;
+  eventCount: number;
+  userEmail: string;
+  createdAt: string;
+}
+
+function statusColor(s: string) {
+  if (s === "approved") return "bg-green-500/20 text-green-300 border-green-500/30";
+  if (s === "rejected") return "bg-red-500/20 text-red-300 border-red-500/30";
+  return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+}
+
+function AllVendorsAdmin() {
+  const [vendors, setVendors] = useState<AdminVendor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<Partial<AdminVendor>>({});
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
   const approve = useApproveVendor();
   const reject = useRejectVendor();
-  const { toast } = useToast();
 
-  if (pending.length === 0) return <p className="text-muted-foreground">No partners awaiting approval.</p>;
+  const load = () => {
+    setLoading(true);
+    apiGet<AdminVendor[]>("/api/admin/vendors")
+      .then(setVendors)
+      .catch((e) => toast({ title: "Failed to load", description: e?.message, variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const startEdit = (v: AdminVendor) => {
+    setEditingId(v.id);
+    setEditForm({ businessName: v.businessName, description: v.description, category: v.category, status: v.status, city: v.city, state: v.state });
+  };
+
+  const saveEdit = async (id: number) => {
+    setSaving(true);
+    try {
+      await apiPatch(`/api/admin/vendors/${id}`, editForm);
+      toast({ title: "Partner updated" });
+      setEditingId(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed to save", description: e?.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (v: AdminVendor) => {
+    if (!confirm(`Delete "${v.businessName}" and all ${v.eventCount} of their listings? This cannot be undone.`)) return;
+    try {
+      await apiDelete(`/api/admin/vendors/${v.id}`);
+      toast({ title: "Partner deleted" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (vendors.length === 0) return <p className="text-muted-foreground">No partners found.</p>;
+
   return (
     <div className="space-y-4">
-      {pending.map((v) => (
-        <div key={v.id} className="rounded-2xl glass-card overflow-hidden flex flex-col md:flex-row">
-          {v.bannerImage && <div className="md:w-48 aspect-video md:aspect-auto bg-muted"><img src={v.bannerImage} alt="" className="h-full w-full object-cover" /></div>}
-          <div className="flex-1 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <Badge variant="outline" className="mb-2">{v.category}</Badge>
-              <p className="font-serif text-xl">{v.businessName}</p>
-              <p className="text-sm text-muted-foreground">{v.location}</p>
-              <p className="text-sm mt-2 max-w-xl text-muted-foreground">{v.description}</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() =>
-                  approve.mutate({ vendorId: v.id }, {
-                    onSuccess: () => { toast({ title: "Partner approved" }); refetch(); },
-                    onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
-                  })
-                }
-                className="bg-gradient-to-br from-red-600 to-red-800 border-0"
-              >Approve</Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  reject.mutate({ vendorId: v.id }, {
-                    onSuccess: () => { toast({ title: "Partner rejected" }); refetch(); },
-                  })
-                }
-              >Reject</Button>
+      <p className="text-sm text-muted-foreground">{vendors.length} partner{vendors.length !== 1 ? "s" : ""} total</p>
+      {vendors.map((v) => (
+        <div key={v.id} className="rounded-2xl glass-card overflow-hidden">
+          <div className="flex flex-col md:flex-row">
+            {v.bannerImage && (
+              <div className="md:w-40 aspect-video md:aspect-auto shrink-0 bg-muted">
+                <img src={v.bannerImage} alt="" className="h-full w-full object-cover" />
+              </div>
+            )}
+            <div className="flex-1 p-5 flex flex-col md:flex-row md:items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statusColor(v.status)}`}>{v.status}</span>
+                  <Badge variant="outline" className="text-xs">{v.category}</Badge>
+                </div>
+                <p className="font-serif text-lg leading-tight">{v.businessName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{v.userEmail}{v.city ? ` · ${v.city}` : ""}{v.state ? `, ${v.state}` : ""}</p>
+                <p className="text-xs text-muted-foreground mt-1">{v.eventCount} listing{v.eventCount !== 1 ? "s" : ""}</p>
+              </div>
+              <div className="flex gap-2 shrink-0 flex-wrap">
+                {v.status === "pending" && (
+                  <>
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs"
+                      onClick={() => approve.mutate({ vendorId: v.id }, {
+                        onSuccess: () => { toast({ title: "Approved" }); load(); },
+                        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+                      })}
+                    ><CheckCircle className="h-3.5 w-3.5 mr-1" />Approve</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs border-red-500/30 text-red-300"
+                      onClick={() => reject.mutate({ vendorId: v.id }, {
+                        onSuccess: () => { toast({ title: "Rejected" }); load(); },
+                      })}
+                    ><XCircle className="h-3.5 w-3.5 mr-1" />Reject</Button>
+                  </>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  onClick={() => editingId === v.id ? setEditingId(null) : startEdit(v)}
+                ><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs border-red-500/30 text-red-300 hover:bg-red-900/20"
+                  onClick={() => remove(v)}
+                ><Trash2 className="h-3.5 w-3.5 mr-1" />Delete</Button>
+              </div>
             </div>
           </div>
+
+          {editingId === v.id && (
+            <div className="border-t border-white/10 p-5 bg-black/20 space-y-4">
+              <p className="text-sm font-medium">Edit partner profile</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Business name</Label>
+                  <Input
+                    value={editForm.businessName ?? ""}
+                    onChange={(e) => setEditForm((f) => ({ ...f, businessName: e.target.value }))}
+                    className="bg-black/40 border-white/10 h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Category</Label>
+                  <Input
+                    value={editForm.category ?? ""}
+                    onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                    className="bg-black/40 border-white/10 h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">City</Label>
+                  <Input
+                    value={editForm.city ?? ""}
+                    onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
+                    className="bg-black/40 border-white/10 h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">State</Label>
+                  <Input
+                    value={editForm.state ?? ""}
+                    onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}
+                    className="bg-black/40 border-white/10 h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Status</Label>
+                  <Select
+                    value={editForm.status ?? "pending"}
+                    onValueChange={(val) => setEditForm((f) => ({ ...f, status: val }))}
+                  >
+                    <SelectTrigger className="bg-black/40 border-white/10 h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                  rows={3}
+                  value={editForm.description ?? ""}
+                  onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                  className="bg-black/40 border-white/10 text-sm"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => saveEdit(v.id)}
+                  className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs"
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => setEditingId(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
