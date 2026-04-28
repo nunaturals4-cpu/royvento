@@ -219,7 +219,12 @@ export default function EventDetailScreen() {
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Booking Failed", err?.message ?? "Something went wrong");
+        const msg = err?.message ?? "Something went wrong";
+        const isUnconfigured = msg.toLowerCase().includes("online payments are not set up") || msg.includes("PHONEPE_UNCONFIGURED");
+        Alert.alert(
+          isUnconfigured ? "Online Payments Not Available" : "Booking Failed",
+          isUnconfigured ? "Online payments are not set up yet — please choose Pay at Venue." : msg,
+        );
       },
     },
   });

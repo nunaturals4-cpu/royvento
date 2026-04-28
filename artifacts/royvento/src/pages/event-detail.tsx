@@ -229,9 +229,8 @@ export function EventDetail() {
     } catch (e: any) {
       const errMsg: string = e?.message ?? "Try again.";
       const isPhonePeUnconfigured = paymentMethod === "online" && (
-        errMsg.toLowerCase().includes("not configured") ||
-        errMsg.toLowerCase().includes("phonepe") ||
-        errMsg.toLowerCase().includes("payment system")
+        errMsg.includes("PHONEPE_UNCONFIGURED") ||
+        errMsg.toLowerCase().includes("online payments are not set up")
       );
       if (isPhonePeUnconfigured) {
         toast({ title: "Online payments not available", description: "Online payments are not set up yet — please choose Pay at Venue.", variant: "destructive" });

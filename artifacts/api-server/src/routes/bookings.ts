@@ -284,7 +284,8 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         await db.update(usersTable).set({ points: user.points }).where(eq(usersTable.id, user.id));
       }
       return res.status(503).json({
-        error: "Payment system not configured. Set PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, and PHONEPE_ENV environment variables, or set PAYMENT_BYPASS=true for development.",
+        error: "Online payments are not set up yet — please choose Pay at Venue.",
+        code: "PHONEPE_UNCONFIGURED",
       });
     }
     console.warn("[bookings] PAYMENT_BYPASS=true — auto-confirming booking without payment. Remove PAYMENT_BYPASS before going live.");
