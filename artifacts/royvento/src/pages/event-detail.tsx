@@ -228,7 +228,12 @@ export function EventDetail() {
       setLocation("/dashboard/bookings");
     } catch (e: any) {
       const errMsg: string = e?.message ?? "Try again.";
-      if (paymentMethod === "online" && errMsg.toLowerCase().includes("payment system not configured")) {
+      const isPhonePeUnconfigured = paymentMethod === "online" && (
+        errMsg.toLowerCase().includes("not configured") ||
+        errMsg.toLowerCase().includes("phonepe") ||
+        errMsg.toLowerCase().includes("payment system")
+      );
+      if (isPhonePeUnconfigured) {
         toast({ title: "Online payments not available", description: "Online payments are not set up yet — please choose Pay at Venue.", variant: "destructive" });
       } else {
         toast({ title: "Booking failed", description: errMsg, variant: "destructive" });
@@ -707,7 +712,7 @@ export function EventDetail() {
                   >
                     <RadioGroupItem id="pay-cod" value="cod" className="sr-only" />
                     <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "cod" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
-                    <span>Pay at Venue</span>
+                    <span>Pay at Venue (COD)</span>
                   </Label>
                   <Label
                     htmlFor="pay-online"
@@ -715,7 +720,7 @@ export function EventDetail() {
                   >
                     <RadioGroupItem id="pay-online" value="online" className="sr-only" />
                     <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "online" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
-                    <span>Pay Online</span>
+                    <span>Pay Online (PhonePe)</span>
                   </Label>
                 </RadioGroup>
                 {paymentMethod === "cod" && (
