@@ -58,8 +58,19 @@ export async function generateUniqueTicketPrefix(
     const candidate = `${base}${i}`;
     if (!existingPrefixes.includes(candidate)) return candidate;
   }
-  // Fallback: append random hex char
-  return `${base.slice(0, 3)}${crypto.randomBytes(1).toString("hex").slice(0, 1).toUpperCase()}`;
+  // Try letter suffixes: BLCKA, BLCKB, ..., BLCKZ
+  const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for (const ch of ALPHA) {
+    const candidate = `${base}${ch}`;
+    if (!existingPrefixes.includes(candidate)) return candidate;
+  }
+  // Last resort: random 5-char hex prefix (checked against existing)
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const candidate = crypto.randomBytes(3).toString("hex").slice(0, 5).toUpperCase();
+    if (!existingPrefixes.includes(candidate)) return candidate;
+  }
+  // Absolute fallback: timestamp-based (collision virtually impossible)
+  return `V${Date.now().toString(36).toUpperCase().slice(-4)}`;
 }
 
 export function generateTicketSalt(): string {

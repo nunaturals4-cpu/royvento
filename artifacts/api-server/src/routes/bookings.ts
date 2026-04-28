@@ -15,7 +15,7 @@ import {
   vendorManagersTable,
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
-import { generateTicketCode, verifyTicketCode } from "../lib/ticketCode";
+import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateBookingStatusBody } from "@workspace/api-zod";
@@ -1236,13 +1236,26 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     .limit(1);
   const scanVendor = vRows[0];
 
+  // Lazy backfill: if vendor has no prefix/salt yet, generate them now so all future codes are secure
+  let resolvedVendor = scanVendor;
+  if (scanVendor && (!scanVendor.ticketPrefix || !scanVendor.ticketSalt)) {
+    const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
+    const newPrefix = await generateUniqueTicketPrefix(
+      (await db.select({ name: vendorsTable.businessName }).from(vendorsTable).where(eq(vendorsTable.id, b.vendorId)).limit(1))[0]?.name ?? "VEND",
+      existingPrefixes,
+    );
+    const newSalt = generateTicketSalt();
+    await db.update(vendorsTable).set({ ticketPrefix: newPrefix, ticketSalt: newSalt }).where(eq(vendorsTable.id, b.vendorId));
+    resolvedVendor = { ticketPrefix: newPrefix, ticketSalt: newSalt };
+  }
+
   if (needsChecksumVerification) {
     // New-format code: verify prefix + checksum against this vendor's stored salt
-    if (!scanVendor?.ticketPrefix || !scanVendor?.ticketSalt) {
+    if (!resolvedVendor?.ticketPrefix || !resolvedVendor?.ticketSalt) {
       res.status(400).json({ code: "INVALID_CODE", message: "Cannot verify ticket code — vendor is not yet configured." });
       return;
     }
-    if (!verifyTicketCode(code, bookingId, { ticketPrefix: scanVendor.ticketPrefix, ticketSalt: scanVendor.ticketSalt })) {
+    if (!verifyTicketCode(code, bookingId, { ticketPrefix: resolvedVendor.ticketPrefix, ticketSalt: resolvedVendor.ticketSalt })) {
       res.status(400).json({ code: "INVALID_CODE", message: "Ticket code is invalid or has been tampered with." });
       return;
     }
