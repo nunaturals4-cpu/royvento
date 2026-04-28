@@ -37,3 +37,8 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+GOOGLE_CALLBACK_URL = "https://725bbd43-34b9-45b9-aa56-12ee26bbd42d-00-bmqv6hspojta.pike.replit.dev/api/auth/google/callback"

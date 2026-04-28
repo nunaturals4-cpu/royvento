@@ -2,6 +2,8 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import NotFound from "@/pages/not-found";
 
 import { Navbar } from "@/components/layout/Navbar";
@@ -36,9 +38,27 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 
 const queryClient = new QueryClient();
 
+function OAuthErrorHandler() {
+  const { toast } = useToast();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    if (!error) return;
+    if (error === "google_not_configured") {
+      toast({ title: "Google sign-in not configured", description: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable.", variant: "destructive" });
+    } else if (error === "google_auth_failed") {
+      toast({ title: "Google sign-in failed", description: "Something went wrong. Please try again or sign in with email.", variant: "destructive" });
+    }
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, "", cleanUrl);
+  }, []);
+  return null;
+}
+
 function Router() {
   return (
     <div className="flex flex-col min-h-[100dvh]">
+      <OAuthErrorHandler />
       <Navbar />
       <main className="flex-1">
         <Switch>

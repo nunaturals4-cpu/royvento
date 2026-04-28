@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable, referralsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { randomBytes } from "crypto";
 import {
   hashPassword,
   comparePassword,
@@ -149,6 +150,13 @@ router.get("/auth/me", async (req, res) => {
   res.json({ user });
 });
 
+function getGoogleCallbackUrl(): string {
+  if (process.env["GOOGLE_CALLBACK_URL"]) return process.env["GOOGLE_CALLBACK_URL"];
+  const domain = process.env["REPLIT_DEV_DOMAIN"];
+  if (domain) return `https://${domain}/api/auth/google/callback`;
+  return "http://localhost:3000/api/auth/google/callback";
+}
+
 router.get("/auth/google/status", async (_req, res) => {
   const enabled =
     !!process.env["GOOGLE_CLIENT_ID"] && !!process.env["GOOGLE_CLIENT_SECRET"];
@@ -160,15 +168,158 @@ router.get("/auth/google/status", async (_req, res) => {
   });
 });
 
-router.get("/auth/google/start", async (_req, res) => {
-  if (!process.env["GOOGLE_CLIENT_ID"]) {
-    return res
-      .status(503)
-      .json({ error: "Google sign-in not configured on this deployment." });
+router.get("/auth/google/start", (req, res) => {
+  const clientId = process.env["GOOGLE_CLIENT_ID"];
+  if (!clientId) {
+    res.redirect("/?error=google_not_configured");
+    return;
   }
-  return res.status(501).json({
-    error: "OAuth initiation not implemented in this demo.",
+
+  const state = randomBytes(16).toString("hex");
+  res.cookie("google_oauth_state", state, {
+    httpOnly: true,
+    secure: process.env["NODE_ENV"] === "production",
+    sameSite: "lax",
+    maxAge: 10 * 60 * 1000,
   });
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: getGoogleCallbackUrl(),
+    response_type: "code",
+    scope: "openid email profile",
+    state,
+    access_type: "online",
+  });
+
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+router.get("/auth/google/callback", async (req, res) => {
+  const { code, state, error } = req.query as Record<string, string>;
+
+  if (error || !code) {
+    res.redirect("/?error=google_auth_failed");
+    return;
+  }
+
+  const cookies = (req as Request & { cookies?: Record<string, string> }).cookies as Record<string, string> | undefined;
+  const savedState = cookies?.["google_oauth_state"];
+
+  if (!state || !savedState || state !== savedState) {
+    res.redirect("/?error=google_auth_failed");
+    return;
+  }
+
+  res.clearCookie("google_oauth_state");
+
+  const clientId = process.env["GOOGLE_CLIENT_ID"];
+  const clientSecret = process.env["GOOGLE_CLIENT_SECRET"];
+  if (!clientId || !clientSecret) {
+    res.redirect("/?error=google_not_configured");
+    return;
+  }
+
+  try {
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: getGoogleCallbackUrl(),
+        grant_type: "authorization_code",
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      console.error("Google token exchange failed:", await tokenRes.text());
+      res.redirect("/?error=google_auth_failed");
+      return;
+    }
+
+    const tokenData = (await tokenRes.json()) as { access_token: string };
+
+    const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    if (!profileRes.ok) {
+      res.redirect("/?error=google_auth_failed");
+      return;
+    }
+
+    const profile = (await profileRes.json()) as {
+      sub: string;
+      email: string;
+      name: string;
+      picture?: string;
+    };
+
+    let userRows = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.googleId, profile.sub))
+      .limit(1);
+    let user = userRows[0];
+
+    if (!user) {
+      const emailRows = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, profile.email))
+        .limit(1);
+      if (emailRows[0]) {
+        await db
+          .update(usersTable)
+          .set({ googleId: profile.sub })
+          .where(eq(usersTable.id, emailRows[0].id));
+        user = { ...emailRows[0], googleId: profile.sub };
+      }
+    }
+
+    if (!user) {
+      let myCode = "";
+      for (let i = 0; i < 5; i++) {
+        const candidate = genReferralCode();
+        const taken = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.referralCode, candidate))
+          .limit(1);
+        if (!taken[0]) { myCode = candidate; break; }
+      }
+      if (!myCode) myCode = genReferralCode() + Date.now().toString(36).slice(-2).toUpperCase();
+
+      const [created] = await db
+        .insert(usersTable)
+        .values({
+          email: profile.email,
+          passwordHash: "",
+          name: profile.name || profile.email.split("@")[0],
+          role: "user",
+          phone: "",
+          referralCode: myCode,
+          googleId: profile.sub,
+          profileImage: profile.picture ?? "",
+        })
+        .returning();
+
+      if (!created) {
+        res.redirect("/?error=google_auth_failed");
+        return;
+      }
+      user = created;
+    }
+
+    const token = signToken({ userId: user.id, role: user.role as Role });
+    setAuthCookie(res, token);
+    res.redirect("/");
+  } catch (err) {
+    console.error("Google OAuth callback error:", err);
+    res.redirect("/?error=google_auth_failed");
+  }
 });
 
 const ForgotPasswordBody = z.object({ email: z.string().email() });
