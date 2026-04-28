@@ -189,6 +189,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     res.status(400).json({ error: "That date is unavailable — the venue has blocked it." });
     return;
   }
+  // openDays=[]: no restriction (all days open). openDays non-empty: only listed days are open.
   if (vendorSchedule && vendorSchedule.openDays && vendorSchedule.openDays.length > 0) {
     const bookingDay = DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
     if (!vendorSchedule.openDays.includes(bookingDay)) {
