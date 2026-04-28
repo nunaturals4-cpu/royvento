@@ -20,6 +20,9 @@ import {
   sendCustomerCancelledBookingEmail,
 } from "../lib/notifications";
 
+/** How many hours before the event date customers are locked out of self-service cancellation. */
+const CANCELLATION_CUTOFF_HOURS = Number(process.env["CANCELLATION_CUTOFF_HOURS"] ?? 24);
+
 const EVENT_TYPES = [
   "wedding",
   "birthday",
@@ -132,6 +135,12 @@ async function serializeBookings(rows: BookingRow[]) {
       partnerName: v?.businessName ?? "",
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
+      // True when the event is far enough away that self-service cancellation is permitted.
+      // Interpreted as midnight (local server time) of the booking date to align with how
+      // the cancel handler enforces the same check.
+      cancellationAllowed: b.bookingDate
+        ? (new Date(`${b.bookingDate}T00:00:00`).getTime() - Date.now()) / (1000 * 60 * 60) >= CANCELLATION_CUTOFF_HOURS
+        : true,
     };
   });
 }
@@ -717,6 +726,17 @@ router.patch(
     if (b.status !== "confirmed") {
       res.status(400).json({ error: "Only confirmed bookings can be cancelled." });
       return;
+    }
+    // Block cancellations within CANCELLATION_CUTOFF_HOURS of the event date
+    if (b.bookingDate) {
+      const eventStart = new Date(`${b.bookingDate}T00:00:00`);
+      const hoursUntilEvent = (eventStart.getTime() - Date.now()) / (1000 * 60 * 60);
+      if (hoursUntilEvent < CANCELLATION_CUTOFF_HOURS) {
+        res.status(400).json({
+          error: `Cancellations are not allowed within ${CANCELLATION_CUTOFF_HOURS} hours of the event date. Please contact the partner directly if you need assistance.`,
+        });
+        return;
+      }
     }
     const reason = parsed.data.cancellationReason.trim();
     const [updated] = await db

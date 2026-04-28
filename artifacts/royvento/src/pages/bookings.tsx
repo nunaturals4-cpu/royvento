@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download } from "lucide-react";
+import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatINR, formatINRExact, apiPatch } from "@/lib/api";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -55,6 +56,8 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
   const isPubTicket = (b.eventType_ === "pub" || b.pubMode === "ticket") && b.pubMode === "ticket";
   const showTicket = isPubTicket && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
+  // cancellationAllowed is computed server-side; fall back to true so old API responses stay functional
+  const cancellationBlocked = b.cancellationAllowed === false;
 
   return (
     <div className="rounded-2xl glass-card overflow-hidden flex flex-col md:flex-row lift-3d">
@@ -120,14 +123,30 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
               )}
             </div>
             {b.status === "confirmed" && (
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => setCancelOpen(true)}
-                className="text-xs"
-              >
-                Cancel booking
-              </Button>
+              cancellationBlocked ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-not-allowed select-none border border-white/10 rounded-md px-3 py-1.5">
+                        <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
+                        Cancellation closed
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-56 text-center">
+                      Cancellations are not allowed within {CANCELLATION_CUTOFF_HOURS} hours of the event date.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setCancelOpen(true)}
+                  className="text-xs"
+                >
+                  Cancel booking
+                </Button>
+              )
             )}
           </div>
         </div>
