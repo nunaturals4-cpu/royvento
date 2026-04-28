@@ -735,6 +735,10 @@ router.patch(
       res.status(400).json({ error: "Only confirmed bookings can be cancelled." });
       return;
     }
+    if (b.checkedIn) {
+      res.status(400).json({ error: "Your ticket has already been scanned — this booking can no longer be cancelled." });
+      return;
+    }
     // Block cancellations within CANCELLATION_CUTOFF_HOURS of the event date
     if (b.bookingDate) {
       const eventStart = new Date(`${b.bookingDate}T00:00:00`);

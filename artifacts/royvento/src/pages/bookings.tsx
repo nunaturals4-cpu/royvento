@@ -58,6 +58,7 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   // cancellationAllowed is computed server-side; fall back to true so old API responses stay functional
   const cancellationBlocked = b.cancellationAllowed === false;
+  const checkedIn = b.checkedIn === true;
 
   return (
     <div className="rounded-2xl glass-card overflow-hidden flex flex-col md:flex-row lift-3d">
@@ -123,7 +124,21 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
               )}
             </div>
             {b.status === "confirmed" && (
-              cancellationBlocked ? (
+              checkedIn ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-not-allowed select-none border border-white/10 rounded-md px-3 py-1.5">
+                        <TicketIcon className="h-3.5 w-3.5 text-green-400" />
+                        Checked in
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-56 text-center">
+                      Your ticket has already been scanned — this booking can no longer be cancelled.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : cancellationBlocked ? (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -154,12 +169,14 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
         {showTicket && !cancelOpen && <PremiumTicket b={b} />}
       </div>
 
-      <CancelBookingDialog
-        open={cancelOpen}
-        onClose={() => setCancelOpen(false)}
-        booking={b}
-        onCancelled={onRefetch}
-      />
+      {!checkedIn && (
+        <CancelBookingDialog
+          open={cancelOpen}
+          onClose={() => setCancelOpen(false)}
+          booking={b}
+          onCancelled={onRefetch}
+        />
+      )}
     </div>
   );
 }
