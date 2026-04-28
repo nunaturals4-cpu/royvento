@@ -64,6 +64,17 @@ interface BlockedDate {
   source: string;
 }
 
+interface VendorEvent {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  location: string;
+  price: number;
+  capacity: number;
+  imageUrl: string;
+}
+
 // ─── Image upload helper ──────────────────────────────────────────────────────
 
 async function requestPresignedUrl(name: string, size: number, contentType: string) {
@@ -248,16 +259,16 @@ export default function VendorDashboardScreen() {
     },
   });
 
-  function openEditModal(event: any) {
+  function openEditModal(event: VendorEvent) {
     setEditForm({
-      title: event.title ?? "",
-      description: event.description ?? "",
-      category: event.category ?? EVENT_CATEGORIES[0]!,
-      location: event.location ?? "",
-      price: event.price !== undefined ? String(event.price) : "",
-      capacity: event.capacity !== undefined ? String(event.capacity) : "",
-      imageUrl: event.imageUrl ?? "",
-      imageUri: event.imageUrl ?? "",
+      title: event.title,
+      description: event.description,
+      category: event.category,
+      location: event.location,
+      price: String(event.price),
+      capacity: String(event.capacity),
+      imageUrl: event.imageUrl,
+      imageUri: event.imageUrl,
     });
     setShowEditCatPicker(false);
     setEditingEvent({ id: event.id });
@@ -295,7 +306,10 @@ export default function VendorDashboardScreen() {
 
   // ─── Delete event ────────────────────────────────────────────────────────────
   const deleteEventMut = useDeleteEvent({
-    mutation: { onSuccess: () => eventsQ.refetch() },
+    mutation: {
+      onSuccess: () => eventsQ.refetch(),
+      onError: () => Alert.alert("Error", "Failed to delete listing. Please try again."),
+    },
   });
 
   // ─── Profile tab ─────────────────────────────────────────────────────────────
