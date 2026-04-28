@@ -97,6 +97,7 @@ export default function WishlistScreen() {
                 location={item.location}
                 price={item.price}
                 category={item.category}
+                type={item.type}
                 compact
                 style={{ width: "100%" }}
               />
