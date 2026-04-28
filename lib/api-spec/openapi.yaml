@@ -347,7 +347,7 @@ paths:
     get:
       operationId: listEvents
       tags: [events]
-      summary: List events
+      summary: List events (supports optional pagination via page param)
       parameters:
         - name: category
           in: query
@@ -359,9 +359,49 @@ paths:
           required: false
           schema:
             type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: country
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: maxPrice
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
-          description: Events list
+          description: Events list (Event[] when no page param; ListEventsPaginatedResponse when page param provided)
           content:
             application/json:
               schema:
@@ -1290,6 +1330,21 @@ components:
                 type: number
             required: [vendorId, businessName, bookingCount, revenue]
       required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, bookingsByStatus, recentBookings, topVendors]
+    ListEventsPaginatedResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        page:
+          type: integer
+        limit:
+          type: integer
+        hasMore:
+          type: boolean
+      required: [data, page, limit, hasMore]
+
     WishlistItem:
       allOf:
         - $ref: "#/components/schemas/Event"

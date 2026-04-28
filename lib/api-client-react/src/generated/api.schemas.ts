@@ -295,6 +295,13 @@ export interface AdminAnalytics {
   topVendors: AdminAnalyticsTopVendorsItem[];
 }
 
+export interface ListEventsPaginatedResponse {
+  data: Event[];
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export type WishlistItem = Event & {
   wishlistId: number;
 };
@@ -330,4 +337,12 @@ export type ListVendorsParams = {
 export type ListEventsParams = {
   category?: string;
   search?: string;
+  type?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  page?: number;
+  limit?: number;
 };

@@ -427,11 +427,19 @@ export const RejectVendorResponse = zod.object({
 });
 
 /**
- * @summary List events
+ * @summary List events (supports optional pagination via page param)
  */
 export const ListEventsQueryParams = zod.object({
   category: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
+  type: zod.coerce.string().optional(),
+  city: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  country: zod.coerce.string().optional(),
+  minPrice: zod.coerce.string().optional(),
+  maxPrice: zod.coerce.string().optional(),
+  page: zod.coerce.number().optional(),
+  limit: zod.coerce.number().optional(),
 });
 
 export const ListEventsResponseItem = zod.object({

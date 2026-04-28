@@ -9,4 +9,12 @@
 export type ListEventsParams = {
   category?: string;
   search?: string;
+  type?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  page?: number;
+  limit?: number;
 };

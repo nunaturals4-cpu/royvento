@@ -1528,7 +1528,7 @@ export const useRejectVendor = <
 };
 
 /**
- * @summary List events
+ * @summary List events (supports optional pagination via page param)
  */
 export const getListEventsUrl = (params?: ListEventsParams) => {
   const normalizedParams = new URLSearchParams();
@@ -1595,7 +1595,7 @@ export type ListEventsQueryResult = NonNullable<
 export type ListEventsQueryError = ErrorType<unknown>;
 
 /**
- * @summary List events
+ * @summary List events (supports optional pagination via page param)
  */
 
 export function useListEvents<
