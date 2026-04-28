@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   useGetMyVendor,
@@ -1189,17 +1189,76 @@ function AnnouncementsPanel() {
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = () => apiGet<Announcement[]>("/api/partner/announcements").then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const openNew = () => {
     setEditing(null);
+    setImageFile(null);
+    setImagePreview("");
     setForm({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
   };
   const openEdit = (a: Announcement) => {
     setEditing(a);
+    setImageFile(null);
+    setImagePreview(a.imageUrl || "");
     setForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl });
+  };
+
+  const applyFile = (file: File) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      toast({ title: "Only JPG, PNG, WebP or GIF images are allowed", variant: "destructive" });
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast({ title: "Image must be under 8 MB", variant: "destructive" });
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) applyFile(file);
+    e.target.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) applyFile(file);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+    setForm((f) => ({ ...f, imageUrl: "" }));
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const res = await fetch("/api/storage/uploads/request-url", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+    });
+    if (!res.ok) throw new Error("Could not get upload URL");
+    const { uploadURL, objectPath } = await res.json();
+    const putRes = await fetch(uploadURL, {
+      method: "PUT",
+      body: file,
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+    });
+    if (!putRes.ok) throw new Error("Image upload failed");
+    return `/api/storage${objectPath}`;
   };
 
   const save = async () => {
@@ -1208,14 +1267,21 @@ function AnnouncementsPanel() {
     }
     setSaving(true);
     try {
+      let imageUrl = form.imageUrl;
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+      const payload = { ...form, imageUrl };
       if (editing) {
-        await apiPatch(`/api/partner/announcements/${editing.id}`, form);
+        await apiPatch(`/api/partner/announcements/${editing.id}`, payload);
         toast({ title: "Announcement updated" });
       } else {
-        await apiPost("/api/partner/announcements", form);
+        await apiPost("/api/partner/announcements", payload);
         toast({ title: "Announcement posted" });
       }
       setEditing(null);
+      setImageFile(null);
+      setImagePreview("");
       setForm({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
       load();
     } catch (e: any) {
@@ -1261,8 +1327,38 @@ function AnnouncementsPanel() {
           </div>
         </div>
         <div>
-          <Label htmlFor="ann-img">Image URL (optional)</Label>
-          <Input id="ann-img" value={form.imageUrl} onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))} placeholder="https://…" className="bg-black/40 border-white/10 mt-1" />
+          <Label>Image (optional)</Label>
+          {imagePreview ? (
+            <div className="mt-1 relative rounded-xl overflow-hidden group">
+              <img src={imagePreview} alt="Preview" className="w-full h-36 object-cover rounded-xl" />
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <label className="cursor-pointer px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
+                  <Upload className="h-3 w-3" /> Change
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={handleFileChange} />
+                </label>
+                <button type="button" onClick={removeImage} className="px-3 py-1 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white border border-white/10">
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label
+              htmlFor="ann-img-input"
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              className={`mt-1 flex flex-col items-center justify-center gap-2 h-28 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${dragOver ? "border-primary bg-primary/10" : "border-white/20 bg-black/20 hover:border-white/40"}`}
+            >
+              <ImageIcon className="h-6 w-6 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground text-center leading-snug">
+                Click or drag &amp; drop<br />JPG, PNG, WebP or GIF · max 8 MB
+              </span>
+              <input id="ann-img-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={handleFileChange} />
+            </label>
+          )}
+          {imageFile && (
+            <p className="text-xs text-muted-foreground mt-1 truncate">{imageFile.name}</p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button onClick={save} disabled={saving} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">

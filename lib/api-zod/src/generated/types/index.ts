@@ -36,6 +36,8 @@ export * from "./updateBookingStatusBody";
 export * from "./updateEventBody";
 export * from "./updateRoleBody";
 export * from "./updateVendorBody";
+export * from "./uploadUrlRequest";
+export * from "./uploadUrlResponse";
 export * from "./user";
 export * from "./vendor";
 export * from "./vendorStatus";

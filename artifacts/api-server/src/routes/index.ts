@@ -22,6 +22,7 @@ import adminBlogsRouter from "./adminBlogs";
 import wishlistRouter from "./wishlist";
 import aiChatRouter from "./aiChat";
 import announcementsRouter from "./announcements";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(adminBlogsRouter);
 router.use(wishlistRouter);
 router.use(aiChatRouter);
 router.use(announcementsRouter);
+router.use(storageRouter);
 
 export default router;

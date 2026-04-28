@@ -10,6 +10,7 @@ servers:
 tags:
   - name: health
   - name: auth
+  - name: storage
   - name: users
   - name: vendors
   - name: events
@@ -19,6 +20,28 @@ tags:
   - name: admin
 
 paths:
+  /storage/uploads/request-url:
+    post:
+      tags: [storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadUrlRequest'
+      responses:
+        '200':
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Server error
   /healthz:
     get:
       operationId: healthCheck
@@ -1131,3 +1154,27 @@ components:
                 type: number
             required: [vendorId, businessName, bookingCount, revenue]
       required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, bookingsByStatus, recentBookings, topVendors]
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/UploadUrlRequest'
