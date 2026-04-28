@@ -16,6 +16,7 @@ export * from "./availabilityStatus";
 export * from "./booking";
 export * from "./bookingStatus";
 export * from "./createBookingBody";
+export * from "./createBookingBodyPaymentMethod";
 export * from "./createEventBody";
 export * from "./createReviewBody";
 export * from "./createVendorBody";

@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateBookingBodyPaymentMethod } from "./createBookingBodyPaymentMethod";
 
 export interface CreateBookingBody {
   eventId: number;
@@ -12,4 +13,16 @@ export interface CreateBookingBody {
   guests: number;
   notes?: string;
   phone?: string;
+  /** cod = pay at venue (skip PhonePe even when configured); online = redirect to PhonePe */
+  paymentMethod?: CreateBookingBodyPaymentMethod;
+  couponCode?: string;
+  pointsToUse?: number;
+  budgetRange?: string;
+  eventType?: string;
+  personName?: string;
+  pubMode?: string;
+  ticketWomen?: number;
+  ticketMen?: number;
+  ticketCouple?: number;
+  selectedPubEvent?: string;
 }

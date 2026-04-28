@@ -206,12 +206,35 @@ export interface Booking {
   phone: string;
 }
 
+/**
+ * cod = pay at venue (skip PhonePe even when configured); online = redirect to PhonePe
+ */
+export type CreateBookingBodyPaymentMethod =
+  (typeof CreateBookingBodyPaymentMethod)[keyof typeof CreateBookingBodyPaymentMethod];
+
+export const CreateBookingBodyPaymentMethod = {
+  cod: "cod",
+  online: "online",
+} as const;
+
 export interface CreateBookingBody {
   eventId: number;
   bookingDate: string;
   guests: number;
   notes?: string;
   phone?: string;
+  /** cod = pay at venue (skip PhonePe even when configured); online = redirect to PhonePe */
+  paymentMethod?: CreateBookingBodyPaymentMethod;
+  couponCode?: string;
+  pointsToUse?: number;
+  budgetRange?: string;
+  eventType?: string;
+  personName?: string;
+  pubMode?: string;
+  ticketWomen?: number;
+  ticketMen?: number;
+  ticketCouple?: number;
+  selectedPubEvent?: string;
 }
 
 export interface UpdateBookingStatusBody {

@@ -677,6 +677,22 @@ export const CreateBookingBody = zod.object({
   guests: zod.number(),
   notes: zod.string().optional(),
   phone: zod.string().optional(),
+  paymentMethod: zod
+    .enum(["cod", "online"])
+    .optional()
+    .describe(
+      "cod = pay at venue (skip PhonePe even when configured); online = redirect to PhonePe",
+    ),
+  couponCode: zod.string().optional(),
+  pointsToUse: zod.number().optional(),
+  budgetRange: zod.string().optional(),
+  eventType: zod.string().optional(),
+  personName: zod.string().optional(),
+  pubMode: zod.string().optional(),
+  ticketWomen: zod.number().optional(),
+  ticketMen: zod.number().optional(),
+  ticketCouple: zod.number().optional(),
+  selectedPubEvent: zod.string().optional(),
 });
 
 export const CreateBookingResponse = zod.object({

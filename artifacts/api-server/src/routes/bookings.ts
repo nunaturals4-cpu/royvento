@@ -56,6 +56,7 @@ const CreateBookingBody = z.object({
   personName: z.string().optional().default(""),
   phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits").optional().default(""),
   pointsToUse: z.number().int().nonnegative().optional().default(0),
+  paymentMethod: z.enum(["cod", "online"]).optional().default("online"),
 });
 
 const router: IRouter = Router();
@@ -268,10 +269,13 @@ router.post("/bookings", requireAuth(), async (req, res) => {
 
   const finalPrice = Math.max(0, totalPrice - discountAmount - pointsUsed);
 
-  const usePhonePe = isPhonePeConfigured() && finalPrice > 0;
+  const wantsOnline = parsed.data.paymentMethod !== "cod";
+  const usePhonePe = wantsOnline && isPhonePeConfigured() && finalPrice > 0;
   const hasPaymentBypass = process.env.PAYMENT_BYPASS === "true";
 
-  if (!usePhonePe && finalPrice > 0) {
+  // Online payment requested but PhonePe not configured — reject unless bypass is on.
+  // COD bookings always confirm immediately (no gateway needed).
+  if (wantsOnline && !isPhonePeConfigured() && finalPrice > 0) {
     if (!hasPaymentBypass) {
       if (validCode) {
         await db.update(couponsTable).set({ used: false }).where(and(eq(couponsTable.code, validCode), eq(couponsTable.userId, user.id)));

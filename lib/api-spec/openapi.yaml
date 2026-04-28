@@ -1195,6 +1195,30 @@ components:
           type: string
         phone:
           type: string
+        paymentMethod:
+          type: string
+          enum: [cod, online]
+          description: "cod = pay at venue (skip PhonePe even when configured); online = redirect to PhonePe"
+        couponCode:
+          type: string
+        pointsToUse:
+          type: integer
+        budgetRange:
+          type: string
+        eventType:
+          type: string
+        personName:
+          type: string
+        pubMode:
+          type: string
+        ticketWomen:
+          type: integer
+        ticketMen:
+          type: integer
+        ticketCouple:
+          type: integer
+        selectedPubEvent:
+          type: string
       required: [eventId, bookingDate, guests]
 
     UpdateBookingStatusBody:
