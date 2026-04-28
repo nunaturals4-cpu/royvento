@@ -4,7 +4,7 @@ import {
   vendorsTable,
   eventsTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 async function ensureAdmin() {
@@ -85,10 +85,10 @@ async function ensureDemoPartner() {
       })
       .returning();
   } else {
-    // Ensure existing vendor is updated to Pubs category
+    // Ensure existing vendor is aligned: Pubs category, approved status
     await db
       .update(vendorsTable)
-      .set({ category: "Pubs", eventTypes: ["Pubs"] })
+      .set({ category: "Pubs", eventTypes: ["Pubs"], status: "approved" })
       .where(eq(vendorsTable.id, vendor.id));
   }
   return vendor!;
@@ -167,22 +167,27 @@ const DEMO_PUBS: Array<{
 ];
 
 async function ensureDemoEvents(vendorId: number) {
+  // Remove any non-pub events that may have been seeded previously for this vendor
+  await db
+    .delete(eventsTable)
+    .where(and(eq(eventsTable.vendorId, vendorId), ne(eventsTable.type, "pub")));
+
   for (const e of DEMO_PUBS) {
     const existing = await db
       .select()
       .from(eventsTable)
-      .where(eq(eventsTable.title, e.title))
+      .where(and(eq(eventsTable.vendorId, vendorId), eq(eventsTable.title, e.title)))
       .limit(1);
     if (existing[0]) {
-      // Keep existing data current: fix mode and prices if they're still zero/wrong
+      // Always normalise to ticket mode with current target prices
       await db
         .update(eventsTable)
         .set({
           category: "Pubs",
           pubMode: "ticket",
-          priceWomen: existing[0].priceWomen === "0" ? e.priceWomen : existing[0].priceWomen,
-          priceMen: existing[0].priceMen === "0" ? e.priceMen : existing[0].priceMen,
-          priceCouple: existing[0].priceCouple === "0" ? e.priceCouple : existing[0].priceCouple,
+          priceWomen: e.priceWomen,
+          priceMen: e.priceMen,
+          priceCouple: e.priceCouple,
           pubEventTypes: existing[0].pubEventTypes?.length
             ? existing[0].pubEventTypes
             : ["DJ Night", "Live Music", "Themed Party"],
