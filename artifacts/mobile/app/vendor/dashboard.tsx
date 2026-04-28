@@ -12,15 +12,18 @@ import {
   useListMyVendorEvents,
   useListVendorBookings,
   useUpdateBookingStatus,
+  useUpdateEvent,
   useUpdateMyVendor,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -61,6 +64,68 @@ interface BlockedDate {
   source: string;
 }
 
+// ─── Image upload helper ──────────────────────────────────────────────────────
+
+async function requestPresignedUrl(name: string, size: number, contentType: string) {
+  return customFetch<{ uploadURL: string; objectPath: string }>(
+    "/api/storage/uploads/request-url",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, size, contentType }),
+    },
+  );
+}
+
+async function uploadImageToStorage(localUri: string): Promise<string> {
+  const filename = localUri.split("/").pop() ?? "image.jpg";
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+  const mimeMap: Record<string, string> = {
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+  };
+  const contentType = mimeMap[ext] ?? "image/jpeg";
+
+  // Fetch the file as a blob
+  const fileRes = await fetch(localUri);
+  const blob = await fileRes.blob();
+  const size = blob.size || 1;
+
+  // Get presigned URL from our API
+  const { uploadURL, objectPath } = await requestPresignedUrl(filename, size, contentType);
+
+  // PUT the file directly to storage
+  await fetch(uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: blob,
+  });
+
+  // Construct the serving URL
+  const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
+}
+
+// ─── Event form state shape ───────────────────────────────────────────────────
+
+interface EventFormState {
+  title: string;
+  description: string;
+  category: string;
+  location: string;
+  price: string;
+  capacity: string;
+  imageUrl: string;
+  imageUri: string;  // local URI for preview before upload
+}
+
+const DEFAULT_EVENT_FORM: EventFormState = {
+  title: "", description: "", category: EVENT_CATEGORIES[0]!,
+  location: "", price: "", capacity: "", imageUrl: "", imageUri: "",
+};
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function VendorDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -70,7 +135,7 @@ export default function VendorDashboardScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const isVendorOrAdmin = user?.role === "vendor" || user?.role === "admin";
 
-  // ─── Data hooks ───────────────────────────────────────────
+  // ─── Data hooks ─────────────────────────────────────────────────────────────
   const vendorQuery = useGetMyVendor();
   const vendor = (vendorQuery.data as any)?.vendor ?? null;
 
@@ -89,41 +154,60 @@ export default function VendorDashboardScreen() {
     },
   });
 
-  // ─── Events tab ───────────────────────────────────────────
+  // ─── Create event ────────────────────────────────────────────────────────────
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<EventFormState>({ ...DEFAULT_EVENT_FORM });
+  const [showCreateCatPicker, setShowCreateCatPicker] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+
   const createEventMut = useCreateEvent({
     mutation: {
       onSuccess: () => {
         eventsQ.refetch();
         setShowCreateModal(false);
-        resetEventForm();
+        setCreateForm({ ...DEFAULT_EVENT_FORM });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
-    },
-  });
-  const deleteEventMut = useDeleteEvent({
-    mutation: {
-      onSuccess: () => eventsQ.refetch(),
+      onError: () => Alert.alert("Error", "Failed to create listing. Please try again."),
     },
   });
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [evTitle, setEvTitle] = useState("");
-  const [evDesc, setEvDesc] = useState("");
-  const [evCategory, setEvCategory] = useState(EVENT_CATEGORIES[0]!);
-  const [evLocation, setEvLocation] = useState("");
-  const [evPrice, setEvPrice] = useState("");
-  const [evCapacity, setEvCapacity] = useState("");
-  const [showCatPicker, setShowCatPicker] = useState(false);
+  async function pickEventImage(
+    setter: React.Dispatch<React.SetStateAction<EventFormState>>,
+  ) {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow photo access to add an image.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
 
-  function resetEventForm() {
-    setEvTitle(""); setEvDesc(""); setEvCategory(EVENT_CATEGORIES[0]!);
-    setEvLocation(""); setEvPrice(""); setEvCapacity("");
+    const asset = result.assets[0];
+    setter((prev) => ({ ...prev, imageUri: asset.uri, imageUrl: "" }));
+
+    setImageUploading(true);
+    try {
+      const url = await uploadImageToStorage(asset.uri);
+      setter((prev) => ({ ...prev, imageUrl: url }));
+    } catch (e) {
+      Alert.alert("Upload failed", "Could not upload image. You can still create the listing without one.");
+      setter((prev) => ({ ...prev, imageUri: "", imageUrl: "" }));
+    } finally {
+      setImageUploading(false);
+    }
   }
 
   function submitCreateEvent() {
-    const price = parseFloat(evPrice);
-    const capacity = parseInt(evCapacity, 10);
-    if (!evTitle.trim() || !evDesc.trim() || !evLocation.trim()) {
-      Alert.alert("Missing fields", "Please fill in all required fields.");
+    const price = parseFloat(createForm.price);
+    const capacity = parseInt(createForm.capacity, 10);
+    if (!createForm.title.trim() || !createForm.description.trim() || !createForm.location.trim()) {
+      Alert.alert("Missing fields", "Title, description and location are required.");
       return;
     }
     if (isNaN(price) || price < 0) {
@@ -136,17 +220,85 @@ export default function VendorDashboardScreen() {
     }
     createEventMut.mutate({
       data: {
-        title: evTitle.trim(),
-        description: evDesc.trim(),
-        category: evCategory,
-        location: evLocation.trim(),
+        title: createForm.title.trim(),
+        description: createForm.description.trim(),
+        category: createForm.category,
+        location: createForm.location.trim(),
         price,
         capacity,
+        ...(createForm.imageUrl ? { imageUrl: createForm.imageUrl } : {}),
       },
     });
   }
 
-  // ─── Profile tab ─────────────────────────────────────────
+  // ─── Edit event ──────────────────────────────────────────────────────────────
+  const [editingEvent, setEditingEvent] = useState<null | { id: number }>(null);
+  const [editForm, setEditForm] = useState<EventFormState>({ ...DEFAULT_EVENT_FORM });
+  const [showEditCatPicker, setShowEditCatPicker] = useState(false);
+  const [editImageUploading, setEditImageUploading] = useState(false);
+
+  const updateEventMut = useUpdateEvent({
+    mutation: {
+      onSuccess: () => {
+        eventsQ.refetch();
+        setEditingEvent(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      },
+      onError: () => Alert.alert("Error", "Failed to save changes. Please try again."),
+    },
+  });
+
+  function openEditModal(event: any) {
+    setEditForm({
+      title: event.title ?? "",
+      description: event.description ?? "",
+      category: event.category ?? EVENT_CATEGORIES[0]!,
+      location: event.location ?? "",
+      price: event.price !== undefined ? String(event.price) : "",
+      capacity: event.capacity !== undefined ? String(event.capacity) : "",
+      imageUrl: event.imageUrl ?? "",
+      imageUri: event.imageUrl ?? "",
+    });
+    setShowEditCatPicker(false);
+    setEditingEvent({ id: event.id });
+  }
+
+  function submitEditEvent() {
+    if (!editingEvent) return;
+    const price = parseFloat(editForm.price);
+    const capacity = parseInt(editForm.capacity, 10);
+    if (!editForm.title.trim() || !editForm.description.trim() || !editForm.location.trim()) {
+      Alert.alert("Missing fields", "Title, description and location are required.");
+      return;
+    }
+    if (isNaN(price) || price < 0) {
+      Alert.alert("Invalid price", "Please enter a valid price.");
+      return;
+    }
+    if (isNaN(capacity) || capacity < 1) {
+      Alert.alert("Invalid capacity", "Please enter a valid capacity.");
+      return;
+    }
+    updateEventMut.mutate({
+      eventId: editingEvent.id,
+      data: {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        category: editForm.category,
+        location: editForm.location.trim(),
+        price,
+        capacity,
+        imageUrl: editForm.imageUrl || undefined,
+      },
+    });
+  }
+
+  // ─── Delete event ────────────────────────────────────────────────────────────
+  const deleteEventMut = useDeleteEvent({
+    mutation: { onSuccess: () => eventsQ.refetch() },
+  });
+
+  // ─── Profile tab ─────────────────────────────────────────────────────────────
   const [profName, setProfName] = useState("");
   const [profDesc, setProfDesc] = useState("");
   const [profCity, setProfCity] = useState("");
@@ -213,7 +365,7 @@ export default function VendorDashboardScreen() {
     );
   }
 
-  // ─── Calendar tab ─────────────────────────────────────────
+  // ─── Calendar tab ─────────────────────────────────────────────────────────────
   const blockedDatesQ = useQuery<BlockedDate[]>({
     queryKey: ["blocked-dates-me"],
     queryFn: () => customFetch("/api/partner/blocked-dates/me"),
@@ -250,7 +402,7 @@ export default function VendorDashboardScreen() {
     setShowDatePicker(false);
   }
 
-  // ─── Guard ────────────────────────────────────────────────
+  // ─── Guard ───────────────────────────────────────────────────────────────────
   if (!user || (user.role !== "vendor" && user.role !== "admin")) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -267,7 +419,159 @@ export default function VendorDashboardScreen() {
   const pending = (bookingsQ.data ?? []).filter((b) => b.status === "pending");
   const allBookings = bookingsQ.data ?? [];
 
-  // ─── TAB RENDERERS ────────────────────────────────────────
+  // ─── Reusable event form ─────────────────────────────────────────────────────
+  function EventFormFields({
+    form,
+    setForm,
+    showCatPicker,
+    setShowCatPicker,
+    uploadingImage,
+    onPickImage,
+  }: {
+    form: EventFormState;
+    setForm: React.Dispatch<React.SetStateAction<EventFormState>>;
+    showCatPicker: boolean;
+    setShowCatPicker: (v: boolean) => void;
+    uploadingImage: boolean;
+    onPickImage: () => void;
+  }) {
+    return (
+      <>
+        {/* Image picker */}
+        <TouchableOpacity
+          style={[styles.imagePicker, { borderColor: colors.border, backgroundColor: colors.card }]}
+          onPress={onPickImage}
+          disabled={uploadingImage}
+        >
+          {form.imageUri || form.imageUrl ? (
+            <View style={styles.imagePreviewWrapper}>
+              <Image
+                source={{ uri: form.imageUri || form.imageUrl }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+              {uploadingImage && (
+                <View style={styles.imageOverlay}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.imageOverlayText}>Uploading…</Text>
+                </View>
+              )}
+              {!uploadingImage && (
+                <View style={[styles.imageChangeChip, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
+                  <Ionicons name="camera-outline" size={14} color="#fff" />
+                  <Text style={styles.imageChangeText}>Change</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.imagePickerEmpty}>
+              {uploadingImage ? (
+                <>
+                  <ActivityIndicator color={colors.primary} />
+                  <Text style={[styles.imagePickerHint, { color: colors.mutedForeground }]}>Uploading image…</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="image-outline" size={32} color={colors.mutedForeground} />
+                  <Text style={[styles.imagePickerHint, { color: colors.mutedForeground }]}>
+                    Tap to add a cover image
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Title *</Text>
+          <TextInput
+            style={[styles.fieldInput, { color: colors.foreground }]}
+            value={form.title}
+            onChangeText={(v) => setForm((p) => ({ ...p, title: v }))}
+            placeholder="Event or venue name"
+            placeholderTextColor={colors.mutedForeground}
+          />
+        </View>
+
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category</Text>
+          <TouchableOpacity
+            onPress={() => setShowCatPicker(!showCatPicker)}
+            style={styles.pickerRow}
+          >
+            <Text style={[styles.fieldInput, { color: colors.foreground }]}>{form.category}</Text>
+            <Ionicons name={showCatPicker ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
+
+        {showCatPicker ? (
+          <View style={[styles.catList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {EVENT_CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.catItem, { borderBottomColor: colors.border }]}
+                onPress={() => { setForm((p) => ({ ...p, category: c })); setShowCatPicker(false); }}
+              >
+                <Text style={{ color: c === form.category ? colors.primary : colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}>{c}</Text>
+                {c === form.category ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Description *</Text>
+          <TextInput
+            style={[styles.fieldInput, styles.textArea, { color: colors.foreground }]}
+            value={form.description}
+            onChangeText={(v) => setForm((p) => ({ ...p, description: v }))}
+            placeholder="Describe your event or venue…"
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Location / Venue Address *</Text>
+          <TextInput
+            style={[styles.fieldInput, { color: colors.foreground }]}
+            value={form.location}
+            onChangeText={(v) => setForm((p) => ({ ...p, location: v }))}
+            placeholder="e.g. Bandra, Mumbai"
+            placeholderTextColor={colors.mutedForeground}
+          />
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Price (₹)</Text>
+            <TextInput
+              style={[styles.fieldInput, { color: colors.foreground }]}
+              value={form.price}
+              onChangeText={(v) => setForm((p) => ({ ...p, price: v }))}
+              placeholder="0"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Capacity</Text>
+            <TextInput
+              style={[styles.fieldInput, { color: colors.foreground }]}
+              value={form.capacity}
+              onChangeText={(v) => setForm((p) => ({ ...p, capacity: v }))}
+              placeholder="50"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  // ─── TAB RENDERERS ────────────────────────────────────────────────────────────
 
   function renderBookings() {
     if (bookingsQ.isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
@@ -355,7 +659,7 @@ export default function VendorDashboardScreen() {
         ListHeaderComponent={
           <TouchableOpacity
             style={[styles.createBtn, { backgroundColor: colors.primary }]}
-            onPress={() => setShowCreateModal(true)}
+            onPress={() => { setCreateForm({ ...DEFAULT_EVENT_FORM }); setShowCreateCatPicker(false); setShowCreateModal(true); }}
           >
             <Ionicons name="add" size={18} color={colors.primaryForeground} />
             <Text style={[styles.createBtnText, { color: colors.primaryForeground }]}>New Listing</Text>
@@ -363,11 +667,14 @@ export default function VendorDashboardScreen() {
         }
         renderItem={({ item: e }) => (
           <View style={[styles.eventRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <TouchableOpacity style={styles.eventIcon} onPress={() => router.push(`/event/${e.id}`)}>
-              <View style={[styles.eventIconInner, { backgroundColor: colors.muted }]}>
+            {/* Thumbnail */}
+            {e.imageUrl ? (
+              <Image source={{ uri: e.imageUrl }} style={styles.eventThumb} resizeMode="cover" />
+            ) : (
+              <View style={[styles.eventThumb, styles.eventThumbEmpty, { backgroundColor: colors.muted }]}>
                 <Ionicons name="calendar" size={18} color={colors.primary} />
               </View>
-            </TouchableOpacity>
+            )}
             <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push(`/event/${e.id}`)}>
               <Text style={[styles.eventTitle, { color: colors.foreground }]} numberOfLines={1}>{e.title}</Text>
               <Text style={[styles.eventCat, { color: colors.mutedForeground }]}>{e.category}</Text>
@@ -377,8 +684,16 @@ export default function VendorDashboardScreen() {
                 {e.approvalStatus}
               </Text>
             </View>
+            {/* Edit button */}
             <TouchableOpacity
-              style={[styles.deleteBtn, { backgroundColor: colors.destructive + "20" }]}
+              style={[styles.actionBtn, { backgroundColor: colors.muted }]}
+              onPress={() => openEditModal(e)}
+            >
+              <Ionicons name="pencil-outline" size={15} color={colors.foreground} />
+            </TouchableOpacity>
+            {/* Delete button */}
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.destructive + "20" }]}
               onPress={() =>
                 Alert.alert("Delete Listing?", `"${e.title}" will be permanently removed.`, [
                   { text: "Cancel", style: "cancel" },
@@ -547,7 +862,7 @@ export default function VendorDashboardScreen() {
                     },
                   ])
                 }
-                style={[styles.deleteBtn, { backgroundColor: colors.destructive + "20" }]}
+                style={[styles.actionBtn, { backgroundColor: colors.destructive + "20" }]}
               >
                 <Ionicons name="trash-outline" size={15} color={colors.destructive} />
               </TouchableOpacity>
@@ -610,7 +925,7 @@ export default function VendorDashboardScreen() {
     );
   }
 
-  // ─── MAIN RENDER ──────────────────────────────────────────
+  // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
@@ -638,7 +953,7 @@ export default function VendorDashboardScreen() {
           ))}
         </View>
 
-        {/* Tabs */}
+        {/* Tab bar */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
           {([
             { key: "bookings", icon: "ticket-outline", label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
@@ -666,108 +981,92 @@ export default function VendorDashboardScreen() {
       {activeTab === "profile"  && renderProfile()}
       {activeTab === "calendar" && renderCalendar()}
 
-      {/* Create Event Modal */}
+      {/* ── Create Event Modal ── */}
       <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
-            <TouchableOpacity onPress={() => { setShowCreateModal(false); resetEventForm(); }}>
+            <TouchableOpacity onPress={() => { setShowCreateModal(false); setCreateForm({ ...DEFAULT_EVENT_FORM }); }}>
               <Ionicons name="close" size={22} color={colors.foreground} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>New Listing</Text>
-            <TouchableOpacity onPress={submitCreateEvent} disabled={createEventMut.isPending}>
+            <TouchableOpacity onPress={submitCreateEvent} disabled={createEventMut.isPending || imageUploading}>
               {createEventMut.isPending
                 ? <ActivityIndicator color={colors.primary} size="small" />
-                : <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Create</Text>
+                : <Text style={{ color: imageUploading ? colors.mutedForeground : colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                    {imageUploading ? "Uploading…" : "Create"}
+                  </Text>
               }
             </TouchableOpacity>
           </View>
 
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
             <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 80 }]}>
+              <EventFormFields
+                form={createForm}
+                setForm={setCreateForm}
+                showCatPicker={showCreateCatPicker}
+                setShowCatPicker={setShowCreateCatPicker}
+                uploadingImage={imageUploading}
+                onPickImage={() => pickEventImage(setCreateForm)}
+              />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
-              <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Title *</Text>
-                <TextInput
-                  style={[styles.fieldInput, { color: colors.foreground }]}
-                  value={evTitle}
-                  onChangeText={setEvTitle}
-                  placeholder="Event or venue name"
-                  placeholderTextColor={colors.mutedForeground}
-                />
-              </View>
+      {/* ── Edit Event Modal ── */}
+      <Modal visible={!!editingEvent} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+            <TouchableOpacity onPress={() => setEditingEvent(null)}>
+              <Ionicons name="close" size={22} color={colors.foreground} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Listing</Text>
+            <TouchableOpacity onPress={submitEditEvent} disabled={updateEventMut.isPending || editImageUploading}>
+              {updateEventMut.isPending
+                ? <ActivityIndicator color={colors.primary} size="small" />
+                : <Text style={{ color: editImageUploading ? colors.mutedForeground : colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                    {editImageUploading ? "Uploading…" : "Save"}
+                  </Text>
+              }
+            </TouchableOpacity>
+          </View>
 
-              <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category</Text>
-                <TouchableOpacity onPress={() => setShowCatPicker(true)} style={styles.pickerRow}>
-                  <Text style={[styles.fieldInput, { color: colors.foreground }]}>{evCategory}</Text>
-                  <Ionicons name="chevron-down" size={16} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              </View>
-
-              {showCatPicker ? (
-                <View style={[styles.catList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  {EVENT_CATEGORIES.map((c) => (
-                    <TouchableOpacity
-                      key={c}
-                      style={[styles.catItem, { borderBottomColor: colors.border }]}
-                      onPress={() => { setEvCategory(c); setShowCatPicker(false); }}
-                    >
-                      <Text style={[{ color: c === evCategory ? colors.primary : colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }]}>{c}</Text>
-                      {c === evCategory ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : null}
-
-              <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Description *</Text>
-                <TextInput
-                  style={[styles.fieldInput, styles.textArea, { color: colors.foreground }]}
-                  value={evDesc}
-                  onChangeText={setEvDesc}
-                  placeholder="Describe your event or venue…"
-                  placeholderTextColor={colors.mutedForeground}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Location / Venue Address *</Text>
-                <TextInput
-                  style={[styles.fieldInput, { color: colors.foreground }]}
-                  value={evLocation}
-                  onChangeText={setEvLocation}
-                  placeholder="e.g. Bandra, Mumbai"
-                  placeholderTextColor={colors.mutedForeground}
-                />
-              </View>
-
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Price (₹)</Text>
-                  <TextInput
-                    style={[styles.fieldInput, { color: colors.foreground }]}
-                    value={evPrice}
-                    onChangeText={setEvPrice}
-                    placeholder="0"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Capacity</Text>
-                  <TextInput
-                    style={[styles.fieldInput, { color: colors.foreground }]}
-                    value={evCapacity}
-                    onChangeText={setEvCapacity}
-                    placeholder="50"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 80 }]}>
+              <EventFormFields
+                form={editForm}
+                setForm={setEditForm}
+                showCatPicker={showEditCatPicker}
+                setShowCatPicker={setShowEditCatPicker}
+                uploadingImage={editImageUploading}
+                onPickImage={async () => {
+                  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                  if (status !== "granted") {
+                    Alert.alert("Permission needed", "Please allow photo access to add an image.");
+                    return;
+                  }
+                  const result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ["images"],
+                    allowsEditing: true,
+                    aspect: [16, 9],
+                    quality: 0.8,
+                  });
+                  if (result.canceled || !result.assets[0]) return;
+                  const asset = result.assets[0]!;
+                  setEditForm((p) => ({ ...p, imageUri: asset.uri, imageUrl: "" }));
+                  setEditImageUploading(true);
+                  try {
+                    const url = await uploadImageToStorage(asset.uri);
+                    setEditForm((p) => ({ ...p, imageUrl: url }));
+                  } catch {
+                    Alert.alert("Upload failed", "Could not upload image.");
+                    setEditForm((p) => ({ ...p, imageUri: "", imageUrl: "" }));
+                  } finally {
+                    setEditImageUploading(false);
+                  }
+                }}
+              />
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -812,12 +1111,12 @@ const styles = StyleSheet.create({
   rejectBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   approveBtn: { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 10, paddingVertical: 9 },
   approveBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  eventRow: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
-  eventIcon: { justifyContent: "center" },
-  eventIconInner: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  eventRow: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, padding: 12 },
+  eventThumb: { width: 48, height: 48, borderRadius: 10 },
+  eventThumbEmpty: { alignItems: "center", justifyContent: "center" },
   eventTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   eventCat: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  deleteBtn: { borderRadius: 8, padding: 8, alignItems: "center", justifyContent: "center" },
+  actionBtn: { borderRadius: 8, padding: 8, alignItems: "center", justifyContent: "center" },
   blockedRow: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
   blockedDate: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   blockedReason: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
@@ -832,4 +1131,13 @@ const styles = StyleSheet.create({
   pickerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   catList: { borderRadius: 14, borderWidth: 1, overflow: "hidden", marginTop: -8 },
   catItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1 },
+  imagePicker: { borderRadius: 14, borderWidth: 1, borderStyle: "dashed", overflow: "hidden", minHeight: 140 },
+  imagePickerEmpty: { alignItems: "center", justifyContent: "center", gap: 8, padding: 24, minHeight: 140 },
+  imagePickerHint: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
+  imagePreviewWrapper: { position: "relative" },
+  imagePreview: { width: "100%", height: 180 },
+  imageOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", gap: 8 },
+  imageOverlayText: { color: "#fff", fontFamily: "Inter_500Medium", fontSize: 13 },
+  imageChangeChip: { position: "absolute", bottom: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  imageChangeText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
 });
