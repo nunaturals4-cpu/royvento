@@ -6,6 +6,7 @@ import {
   useGetEvent,
   useListEventReviews,
 } from "@workspace/api-client-react";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
@@ -62,10 +63,14 @@ export default function EventDetailScreen() {
   const { data: event, isLoading } = useGetEvent(eventId);
   const { data: reviews } = useListEventReviews(eventId);
 
-  const [bookingDate, setBookingDate] = useState("");
+  const [bookingDateObj, setBookingDateObj] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [guests, setGuests] = useState("1");
+  const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [showBooking, setShowBooking] = useState(false);
+
+  const bookingDate = bookingDateObj.toISOString().slice(0, 10);
 
   const wishlistQuery = useQuery<{ eventId: number }[]>({
     queryKey: ["wishlist"],
@@ -101,14 +106,15 @@ export default function EventDetailScreen() {
 
   const handleBook = () => {
     if (!user) { router.push("/(auth)/login"); return; }
-    if (!bookingDate) { Alert.alert("Select a date", "Please pick a booking date e.g. 2025-12-31."); return; }
+    const today = new Date().toISOString().slice(0, 10);
+    if (bookingDate < today) { Alert.alert("Invalid Date", "Booking date must be today or in the future."); return; }
 
     bookingMutation.mutate({
       data: {
         eventId,
         bookingDate,
         guests: parseInt(guests) || 1,
-        notes: notes || undefined,
+        notes: [phone ? `Phone: ${phone}` : "", notes].filter(Boolean).join("\n") || undefined,
       },
     });
   };
@@ -314,23 +320,69 @@ export default function EventDetailScreen() {
           <View style={[styles.bookingForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Book This Event</Text>
 
-            {[
-              { label: "Date (YYYY-MM-DD)", value: bookingDate, set: setBookingDate, placeholder: "2025-12-31", keyboard: "default" as const },
-              { label: "Guests", value: guests, set: setGuests, placeholder: "1", keyboard: "number-pad" as const },
-            ].map((f) => (
-              <View key={f.label} style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
-                <TextInput
-                  style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-                  value={f.value}
-                  onChangeText={f.set}
-                  placeholder={f.placeholder}
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType={f.keyboard}
-                />
+            {/* Open-days note from vendor */}
+            {event.vendor?.openDays && event.vendor.openDays.length > 0 ? (
+              <View style={[styles.openDaysRow, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}>
+                <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+                <Text style={[styles.openDaysText, { color: colors.primary }]}>
+                  Open: {event.vendor.openDays.join(", ")}
+                </Text>
               </View>
-            ))}
+            ) : null}
 
+            {/* Date picker */}
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Booking Date</Text>
+              <TouchableOpacity
+                style={[styles.fieldInput, styles.datePickerBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
+                onPress={() => setShowDatePicker(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-clear-outline" size={16} color={colors.primary} />
+                <Text style={[styles.datePickerText, { color: colors.foreground }]}>{bookingDate}</Text>
+              </TouchableOpacity>
+              {(showDatePicker || Platform.OS === "ios") && (
+                <DateTimePicker
+                  value={bookingDateObj}
+                  mode="date"
+                  display={Platform.OS === "android" ? "calendar" : "spinner"}
+                  minimumDate={new Date()}
+                  themeVariant="dark"
+                  onChange={(_event, selected) => {
+                    setShowDatePicker(false);
+                    if (selected) setBookingDateObj(selected);
+                  }}
+                />
+              )}
+            </View>
+
+            {/* Guests */}
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Guests</Text>
+              <TextInput
+                style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                value={guests}
+                onChangeText={setGuests}
+                placeholder="1"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="number-pad"
+              />
+            </View>
+
+            {/* Phone */}
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Contact Phone</Text>
+              <TextInput
+                style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+91 98765 43210"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            {/* Notes */}
             <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Notes (optional)</Text>
               <TextInput
@@ -452,6 +504,10 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
   fieldInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, fontFamily: "Inter_400Regular" },
   fieldTextArea: { height: 80, textAlignVertical: "top" },
+  datePickerBtn: { flexDirection: "row", alignItems: "center", gap: 10 },
+  datePickerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  openDaysRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  openDaysText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   bookingButtons: { flexDirection: "row", gap: 10, marginTop: 4 },
   cancelBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
   cancelBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },

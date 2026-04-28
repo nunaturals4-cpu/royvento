@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
@@ -124,10 +126,35 @@ export default function BookingsScreen() {
                 style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setExpandedId(isExpanded ? null : b.id)}
               >
+                {/* Event Image Banner */}
+                {b.eventImage ? (
+                  <Image
+                    source={{ uri: b.eventImage }}
+                    style={styles.eventBanner}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={[styles.eventBanner, styles.eventBannerPlaceholder, { backgroundColor: colors.muted }]}>
+                    <Ionicons name="musical-notes" size={28} color={colors.mutedForeground} />
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.viewEventBtn}
+                  onPress={() => router.push(`/event/${b.eventId}` as never)}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="arrow-forward-outline" size={12} color={colors.primary} />
+                  <Text style={[styles.viewEventText, { color: colors.primary }]}>View Event</Text>
+                </TouchableOpacity>
+
                 <View style={styles.cardTop}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>
-                      Booking #{b.id}
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={2}>
+                      {b.eventTitle ?? `Booking #${b.id}`}
+                    </Text>
+                    <Text style={[styles.bookingRef, { color: colors.mutedForeground }]}>
+                      Ref: RVT-{String(b.id).padStart(6, "0")}
                     </Text>
                     <View style={styles.metaRow}>
                       <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
@@ -204,8 +231,13 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   list: { padding: 20, gap: 12 },
   card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
-  cardTop: { padding: 16, flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  cardTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", marginBottom: 6 },
+  eventBanner: { width: "100%", height: 120 },
+  eventBannerPlaceholder: { alignItems: "center", justifyContent: "center" },
+  viewEventBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 16, paddingVertical: 6 },
+  viewEventText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  cardTop: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4, flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  cardTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+  bookingRef: { fontSize: 11, fontFamily: "Inter_400Regular", marginBottom: 6, opacity: 0.7 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 2 },
   meta: { fontSize: 13, fontFamily: "Inter_400Regular" },
   statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },

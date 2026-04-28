@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
-import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,6 +20,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { EventCard } from "@/components/EventCard";
 import { useColors } from "@/hooks/useColors";
 
+const PAGE_SIZE = 20;
 const CATEGORIES = ["All", "Wedding", "Corporate", "Birthday", "Concert", "Pubs", "Festival"];
 const CITIES = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Pune", "Kolkata"];
 
@@ -33,6 +33,13 @@ interface ApiEvent {
   category: string;
   type: string;
   city?: string;
+}
+
+interface PaginatedEventsResponse {
+  data: ApiEvent[];
+  page: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 interface FilterState {
@@ -56,29 +63,51 @@ export default function ExploreScreen() {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER);
   const [draftFilter, setDraftFilter] = useState<FilterState>(EMPTY_FILTER);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const activeFilterCount = countActiveFilters(filters);
 
-  const queryParams = useMemo(() => {
+  const baseParams = useMemo(() => {
     const p: Record<string, string> = {};
-    if (search.trim()) p["search"] = search.trim();
+    if (debouncedSearch) p["search"] = debouncedSearch;
     if (activeCategory !== "All") p["category"] = activeCategory;
     if (filters.city) p["city"] = filters.city;
     if (filters.minPrice) p["minPrice"] = filters.minPrice;
     if (filters.maxPrice) p["maxPrice"] = filters.maxPrice;
+    p["limit"] = String(PAGE_SIZE);
     return p;
-  }, [search, activeCategory, filters]);
+  }, [debouncedSearch, activeCategory, filters]);
 
-  const { data, isLoading, refetch } = useQuery<ApiEvent[]>({
-    queryKey: ["events-explore", queryParams],
-    queryFn: () => {
-      const qs = Object.entries(queryParams)
+  const {
+    data: paginatedData,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+    refetch,
+  } = useInfiniteQuery<PaginatedEventsResponse>({
+    queryKey: ["events-explore-infinite", baseParams],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => {
+      const qs = Object.entries({ ...baseParams, page: String(pageParam) })
         .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
         .join("&");
-      return customFetch<ApiEvent[]>(`/api/events${qs ? `?${qs}` : ""}`);
+      return customFetch<PaginatedEventsResponse>(`/api/events?${qs}`);
     },
-    staleTime: 1000 * 60 * 2,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.hasMore) return lastPage.page + 1;
+      return undefined;
+    },
   });
+
+  const events = paginatedData?.pages.flatMap((p) => p.data) ?? [];
+
+  function handleSearchChange(text: string) {
+    setSearch(text);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => setDebouncedSearch(text), 400);
+  }
 
   function openFilter() {
     setDraftFilter(filters);
@@ -94,6 +123,12 @@ export default function ExploreScreen() {
     setDraftFilter(EMPTY_FILTER);
     setFilters(EMPTY_FILTER);
     setShowFilter(false);
+  }
+
+  function handleEndReached() {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
   }
 
   return (
@@ -121,14 +156,14 @@ export default function ExploreScreen() {
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
             value={search}
-            onChangeText={setSearch}
+            onChangeText={handleSearchChange}
             placeholder="Search events, venues, cities…"
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
           {search.length > 0 && Platform.OS !== "ios" ? (
-            <TouchableOpacity onPress={() => setSearch("")}>
+            <TouchableOpacity onPress={() => { setSearch(""); setDebouncedSearch(""); }}>
               <Ionicons name="close-circle" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ) : null}
@@ -194,25 +229,34 @@ export default function ExploreScreen() {
 
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
-      ) : !data || data.length === 0 ? (
+      ) : events.length === 0 ? (
         <EmptyState
           icon="search-outline"
           title="No events found"
           subtitle="Try different filters or search terms"
           action={{
             label: "Clear all filters",
-            onPress: () => { setSearch(""); setActiveCategory("All"); clearFilter(); },
+            onPress: () => { setSearch(""); setDebouncedSearch(""); setActiveCategory("All"); clearFilter(); },
           }}
         />
       ) : (
         <FlatList
-          data={data}
-          keyExtractor={(item) => String(item.id)}
+          data={events}
+          keyExtractor={(item, idx) => `${item.id}-${idx}`}
           contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
           showsVerticalScrollIndicator={false}
           onRefresh={refetch}
           refreshing={isLoading}
-          scrollEnabled={!!(data?.length)}
+          scrollEnabled
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+            ) : hasNextPage ? null : events.length > PAGE_SIZE ? (
+              <Text style={[styles.endText, { color: colors.mutedForeground }]}>All events loaded</Text>
+            ) : null
+          }
           renderItem={({ item }) => (
             <EventCard
               id={item.id}
@@ -298,7 +342,7 @@ export default function ExploreScreen() {
                 </View>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingTop: 8 }}>
-                {[["Budget", "0", "1000"], ["Mid-range", "1000", "5000"], ["Premium", "5000", "20000"]].map(([label, min, max]) => (
+                {([ ["Budget", "0", "1000"], ["Mid-range", "1000", "5000"], ["Premium", "5000", "20000"] ] as const).map(([label, min, max]) => (
                   <Pressable
                     key={label}
                     onPress={() => setDraftFilter((p) => ({ ...p, minPrice: min, maxPrice: max }))}
@@ -316,16 +360,10 @@ export default function ExploreScreen() {
             </View>
 
             <View style={styles.sheetActions}>
-              <TouchableOpacity
-                style={[styles.clearBtn, { borderColor: colors.border }]}
-                onPress={clearFilter}
-              >
+              <TouchableOpacity style={[styles.clearBtn, { borderColor: colors.border }]} onPress={clearFilter}>
                 <Text style={[styles.clearBtnText, { color: colors.mutedForeground }]}>Clear All</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.applyBtn, { backgroundColor: colors.primary }]}
-                onPress={applyFilter}
-              >
+              <TouchableOpacity style={[styles.applyBtn, { backgroundColor: colors.primary }]} onPress={applyFilter}>
                 <Text style={[styles.applyBtnText, { color: colors.primaryForeground }]}>Apply Filters</Text>
               </TouchableOpacity>
             </View>
@@ -352,6 +390,7 @@ const styles = StyleSheet.create({
   activePills: { gap: 8, paddingHorizontal: 20, paddingVertical: 8 },
   pill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4 },
   pillText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  endText: { textAlign: "center", fontSize: 12, fontFamily: "Inter_400Regular", paddingVertical: 12 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   filterSheet: { borderRadius: 24, borderWidth: 1, padding: 24, margin: 0, gap: 20, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: -8 },

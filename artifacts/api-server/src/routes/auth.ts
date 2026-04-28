@@ -419,11 +419,23 @@ router.post("/auth/google/mobile", async (req, res) => {
       name?: string;
       picture?: string;
       email_verified?: string;
+      aud?: string;
+      azp?: string;
     };
 
     if (!info.email || !info.sub) {
       res.status(401).json({ error: "Incomplete Google profile" });
       return;
+    }
+
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    if (googleClientId) {
+      const aud = info.aud ?? "";
+      const azp = info.azp ?? "";
+      if (aud !== googleClientId && azp !== googleClientId) {
+        res.status(401).json({ error: "Token audience mismatch" });
+        return;
+      }
     }
 
     let userRows = await db
