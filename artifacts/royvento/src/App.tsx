@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { AiChatWidget } from "@/components/AiChatWidget";
 
 // Pages
 import { Home } from "@/pages/home";
@@ -24,6 +25,11 @@ import { AdminPanel } from "@/pages/admin";
 import { Profile } from "@/pages/profile";
 import { BecomeVendor } from "@/pages/become-vendor";
 import { Subscription } from "@/pages/subscription";
+import { Blogs } from "@/pages/blogs";
+import { BlogDetail } from "@/pages/blog-detail";
+import { Wishlist } from "@/pages/wishlist";
+import { ForgotPassword } from "@/pages/forgot-password";
+import { ResetPassword } from "@/pages/reset-password";
 
 import { RequireAuth } from "@/components/RequireAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -48,7 +54,14 @@ function Router() {
           <Route path="/register" component={Register} />
           <Route path="/contact" component={Contact} />
           <Route path="/subscription" component={Subscription} />
+          <Route path="/blogs" component={Blogs} />
+          <Route path="/blogs/:slug" component={BlogDetail} />
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/reset-password" component={ResetPassword} />
 
+          <Route path="/wishlist">
+            {() => <RequireAuth><Wishlist /></RequireAuth>}
+          </Route>
           <Route path="/dashboard/profile">
             {() => <RequireAuth><Profile /></RequireAuth>}
           </Route>
@@ -75,6 +88,7 @@ function Router() {
         </Switch>
       </main>
       <Footer />
+      <AiChatWidget />
     </div>
   );
 }

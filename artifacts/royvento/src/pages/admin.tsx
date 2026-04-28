@@ -49,6 +49,7 @@ export function AdminPanel() {
           <TabsTrigger value="ads">Ads</TabsTrigger>
           <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="blogs">Blogs</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><PendingVendors /></TabsContent>
@@ -61,6 +62,7 @@ export function AdminPanel() {
         <TabsContent value="ads"><AdsAdmin /></TabsContent>
         <TabsContent value="messages"><Messages /></TabsContent>
         <TabsContent value="users"><UsersPanel /></TabsContent>
+        <TabsContent value="blogs"><BlogsAdmin /></TabsContent>
       </Tabs>
     </div>
   );
@@ -957,6 +959,167 @@ function Messages() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+interface BlogRow {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  imageUrl: string;
+  authorName: string;
+  tags: string[];
+  published: boolean;
+  createdAt: string;
+}
+
+function BlogsAdmin() {
+  const { toast } = useToast();
+  const [blogs, setBlogs] = useState<BlogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    title: "", slug: "", excerpt: "", content: "",
+    imageUrl: "", authorName: "Royvento Editorial", tags: "", published: true,
+  });
+  const [editing, setEditing] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const rows = await apiGet<BlogRow[]>("/api/admin/blogs");
+      setBlogs(rows);
+    } catch {
+      toast({ title: "Could not load blogs", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const body = {
+        ...form,
+        tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      };
+      if (editing != null) {
+        await apiPatch(`/api/admin/blogs/${editing}`, body);
+        toast({ title: "Blog updated" });
+      } else {
+        await apiPost("/api/admin/blogs", body);
+        toast({ title: "Blog created" });
+      }
+      setForm({ title: "", slug: "", excerpt: "", content: "", imageUrl: "", authorName: "Royvento Editorial", tags: "", published: true });
+      setEditing(null);
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const del = async (id: number) => {
+    if (!confirm("Delete this blog post?")) return;
+    await apiDelete(`/api/admin/blogs/${id}`);
+    toast({ title: "Deleted" });
+    load();
+  };
+
+  const startEdit = (b: BlogRow) => {
+    setEditing(b.id);
+    setForm({ title: b.title, slug: b.slug, excerpt: b.excerpt, content: b.content, imageUrl: b.imageUrl, authorName: b.authorName, tags: b.tags.join(", "), published: b.published });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <div className="space-y-8">
+      <form onSubmit={save} className="rounded-2xl glass-card p-6 space-y-4">
+        <h3 className="font-serif text-xl">{editing != null ? "Edit blog post" : "New blog post"}</h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label>Title</Label>
+            <Input required value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
+          </div>
+          <div>
+            <Label>Slug (URL)</Label>
+            <Input required value={form.slug} onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") }))} />
+          </div>
+        </div>
+        <div>
+          <Label>Excerpt</Label>
+          <Textarea rows={2} value={form.excerpt} onChange={(e) => setForm((p) => ({ ...p, excerpt: e.target.value }))} />
+        </div>
+        <div>
+          <Label>Content (HTML)</Label>
+          <Textarea rows={8} value={form.content} onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))} placeholder="<p>Article body…</p>" className="font-mono text-xs" />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label>Image URL</Label>
+            <Input value={form.imageUrl} onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))} placeholder="https://..." />
+          </div>
+          <div>
+            <Label>Author</Label>
+            <Input value={form.authorName} onChange={(e) => setForm((p) => ({ ...p, authorName: e.target.value }))} />
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label>Tags (comma-separated)</Label>
+            <Input value={form.tags} onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))} placeholder="Mumbai, Nightlife, Guide" />
+          </div>
+          <div className="flex items-center gap-3 mt-6">
+            <input type="checkbox" id="published" checked={form.published} onChange={(e) => setForm((p) => ({ ...p, published: e.target.checked }))} />
+            <Label htmlFor="published">Published</Label>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <Button type="submit" disabled={saving} className="bg-primary text-primary-foreground border-0">
+            {saving ? "Saving…" : editing != null ? "Update post" : "Create post"}
+          </Button>
+          {editing != null && (
+            <Button type="button" variant="outline" onClick={() => { setEditing(null); setForm({ title: "", slug: "", excerpt: "", content: "", imageUrl: "", authorName: "Royvento Editorial", tags: "", published: true }); }}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      </form>
+
+      {loading ? (
+        <p className="text-muted-foreground">Loading…</p>
+      ) : (
+        <div className="space-y-3">
+          {blogs.map((b) => (
+            <div key={b.id} className="rounded-2xl glass-card p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                {b.imageUrl && <img src={b.imageUrl} alt={b.title} className="w-16 h-12 rounded-lg object-cover shrink-0" />}
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{b.title}</p>
+                  <p className="text-xs text-muted-foreground">{b.slug} · {b.authorName}</p>
+                  <div className="flex gap-1 mt-1">
+                    {b.tags.slice(0, 3).map((t) => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{t}</span>)}
+                    {!b.published && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Draft</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" variant="outline" onClick={() => startEdit(b)}>Edit</Button>
+                <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => del(b.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

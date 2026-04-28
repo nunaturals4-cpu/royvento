@@ -133,7 +133,7 @@ export function Navbar() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const term = q.trim();
-    setLocation(term ? `/explore?search=${encodeURIComponent(term)}` : "/explore");
+    setLocation(term ? `/pubs?search=${encodeURIComponent(term)}` : "/pubs");
   };
 
   const unreadCount = notifs.filter((n) => !n.isRead).length;
@@ -153,8 +153,8 @@ export function Navbar() {
           </Link>
           <nav className="hidden lg:flex items-center gap-6 text-sm font-medium">
             <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-            <Link href="/explore" className="text-muted-foreground hover:text-foreground transition-colors">Event Explorer</Link>
             <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">Pubs</Link>
+            <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">Blog</Link>
             <Link href="/subscription" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
               <Crown className="h-3.5 w-3.5 text-primary" /> Premium
             </Link>
@@ -267,6 +267,9 @@ export function Navbar() {
                   <>
                     <DropdownMenuItem asChild>
                       <Link href="/dashboard/bookings" className="cursor-pointer w-full">My bookings</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/wishlist" className="cursor-pointer w-full">Wishlist</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/subscription" className="cursor-pointer w-full">Subscription</Link>

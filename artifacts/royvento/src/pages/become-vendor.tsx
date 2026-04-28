@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,11 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LocationSelect } from "@/components/LocationSelect";
 import { useToast } from "@/hooks/use-toast";
 import { apiPost, EVENT_CATEGORIES } from "@/lib/api";
-import { Sparkles, MapPin } from "lucide-react";
+import { Sparkles, MapPin, CheckCircle2 } from "lucide-react";
+import { Link } from "wouter";
 
 export function BecomeVendor() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState("Wedding");
   const [reason, setReason] = useState("");
@@ -20,6 +19,7 @@ export function BecomeVendor() {
   const [stateF, setStateF] = useState("");
   const [city, setCity] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,14 +33,38 @@ export function BecomeVendor() {
         state: stateF,
         city,
       });
-      toast({ title: "Request submitted", description: "An admin will review your application shortly." });
-      setLocation("/dashboard/profile");
+      setSubmitted(true);
     } catch (err: any) {
       toast({ title: "Could not submit", description: err?.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (submitted) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl flex flex-col items-center text-center">
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+          <CheckCircle2 className="h-10 w-10 text-primary" />
+        </div>
+        <h1 className="font-serif text-4xl tracking-tight mb-3">Application submitted!</h1>
+        <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
+          Thank you for applying to become a Royvento partner. Our team will review your application within <strong>1 working day</strong> and get in touch with you. Once approved, you'll be able to list your pub and manage bookings straight away.
+        </p>
+        <p className="text-sm text-muted-foreground mt-4">
+          Keep an eye on your notifications and email for updates.
+        </p>
+        <div className="flex gap-3 mt-8">
+          <Link href="/">
+            <Button variant="outline">Back to home</Button>
+          </Link>
+          <Link href="/dashboard/profile">
+            <Button className="bg-primary text-primary-foreground">Go to my profile</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
@@ -50,15 +74,15 @@ export function BecomeVendor() {
         <h1 className="font-serif text-4xl tracking-tight">Become a partner</h1>
       </div>
       <p className="mt-2 text-muted-foreground">
-        Tell us about your business. Once an admin approves your request, you'll be able to publish events and accept bookings.
+        Tell us about your pub. Once an admin approves your request, you'll be able to publish your listing and accept bookings.
       </p>
       <form onSubmit={submit} className="mt-10 rounded-3xl border bg-card p-8 space-y-5">
         <div>
           <Label htmlFor="bname">Business name</Label>
-          <Input id="bname" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Lumière Atelier" />
+          <Input id="bname" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. The Royal Arms Pub" />
         </div>
         <div>
-          <Label htmlFor="bcat">Primary category</Label>
+          <Label htmlFor="bcat">Venue type</Label>
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger id="bcat"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -80,8 +104,8 @@ export function BecomeVendor() {
           </div>
         </div>
         <div>
-          <Label htmlFor="breason">Why join Royvento?</Label>
-          <Textarea id="breason" rows={5} required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="A short note about your work, the events you produce, and why you'd like to be on Royvento." />
+          <Label htmlFor="breason">Tell us about your venue</Label>
+          <Textarea id="breason" rows={5} required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="A short description of your pub, the events you host, and why you'd like to be on Royvento." />
         </div>
         <Button type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Submit application"}</Button>
       </form>

@@ -17,6 +17,10 @@ import blockedDatesRouter from "./blockedDates";
 import adsRouter from "./ads";
 import referralsRouter from "./referrals";
 import notificationsRouter from "./notifications";
+import blogsRouter from "./blogs";
+import adminBlogsRouter from "./adminBlogs";
+import wishlistRouter from "./wishlist";
+import aiChatRouter from "./aiChat";
 
 const router: IRouter = Router();
 
@@ -38,5 +42,9 @@ router.use(blockedDatesRouter);
 router.use(adsRouter);
 router.use(referralsRouter);
 router.use(notificationsRouter);
+router.use(blogsRouter);
+router.use(adminBlogsRouter);
+router.use(wishlistRouter);
+router.use(aiChatRouter);
 
 export default router;

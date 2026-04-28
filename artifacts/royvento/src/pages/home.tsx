@@ -46,7 +46,7 @@ export function Home() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <img
-            src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=2400&q=80"
+            src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=2400&q=80"
             alt=""
             className="h-full w-full object-cover opacity-40"
           />
@@ -57,24 +57,24 @@ export function Home() {
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full glass-card px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-white/80 mb-8">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              India's premier event marketplace
+              India's premier pub booking platform
             </div>
             <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] tracking-tight">
-              Heirloom events,<br />
-              <span className="italic text-gradient-red">remarkable craft.</span>
+              India's best pubs,<br />
+              <span className="italic text-gradient-red">one booking away.</span>
             </h1>
             <p className="mt-6 text-lg md:text-xl text-white/70 max-w-2xl leading-relaxed">
-              From estate weddings and founder summits to harvest festivals — discover the most considered partners and experiences across India, in a single, premium destination.
+              Discover verified pubs and clubs across India's top cities. Book tickets for ladies nights, couple entry, stag passes, and table reservations — all in one place.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
-              <Link href="/explore">
+              <Link href="/pubs">
                 <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0 h-12 px-7">
-                  Explore events <ArrowRight className="h-4 w-4" />
+                  Browse pubs <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/pubs">
+              <Link href="/register">
                 <Button size="lg" variant="outline" className="h-12 px-7 border-white/20 hover:bg-white/5">
-                  Browse pubs
+                  Join for free
                 </Button>
               </Link>
             </div>
@@ -82,12 +82,12 @@ export function Home() {
             {/* Stats */}
             <div className="mt-14 grid grid-cols-3 gap-6 max-w-xl">
               <div>
-                <p className="stat-number text-3xl">500+</p>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Vetted partners</p>
+                <p className="stat-number text-3xl">200+</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Verified pubs</p>
               </div>
               <div>
-                <p className="stat-number text-3xl">12K</p>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Events booked</p>
+                <p className="stat-number text-3xl">15K</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Tickets booked</p>
               </div>
               <div>
                 <p className="stat-number text-3xl">4.9★</p>
@@ -102,9 +102,9 @@ export function Home() {
       <section className="container mx-auto px-4 md:px-6 py-24">
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { icon: Sparkles, title: "Curated, never crowded", body: "Every partner on Royvento is reviewed and approved by our team before they appear." },
-            { icon: Calendar, title: "Real-time availability", body: "See open dates instantly and book without the back-and-forth." },
-            { icon: ShieldCheck, title: "Verified reviews", body: "Reviews come from confirmed bookings — no astroturf, no surprises." },
+            { icon: ShieldCheck, title: "Verified pubs only", body: "Every pub on Royvento is reviewed and approved by our team. No fake listings, no surprises." },
+            { icon: PartyPopper, title: "All entry types covered", body: "Ladies night, couple entry, stag passes, table reservations — book any format in seconds." },
+            { icon: Sparkles, title: "Verified reviews", body: "Reviews come from confirmed bookings only — what you read is what you get." },
           ].map((f) => (
             <div key={f.title} className="rounded-3xl glass-card p-7 lift-3d">
               <div className="w-12 h-12 rounded-xl bg-primary/20 text-primary flex items-center justify-center mb-5 red-ring">

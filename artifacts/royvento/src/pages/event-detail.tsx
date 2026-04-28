@@ -14,9 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet } from "@/lib/api";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins } from "lucide-react";
+import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
@@ -60,6 +61,31 @@ export function EventDetail() {
   const [pointsToUse, setPointsToUse] = useState(0);
 
   const createReview = useCreateReview();
+  const qc = useQueryClient();
+
+  const { data: wishlistItems = [] } = useQuery<{ id: number }[]>({
+    queryKey: ["wishlist"],
+    queryFn: () => apiGet<{ id: number }[]>("/api/wishlist"),
+    enabled: !!me?.user,
+  });
+  const inWishlist = wishlistItems.some((w: any) => w.id === id);
+
+  const addToWishlist = useMutation({
+    mutationFn: () => apiPost("/api/wishlist", { eventId: id }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: "Added to wishlist" }); },
+    onError: () => toast({ title: "Could not add to wishlist", variant: "destructive" } as any),
+  });
+  const removeFromWishlist = useMutation({
+    mutationFn: () => apiDelete(`/api/wishlist/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: "Removed from wishlist" }); },
+  });
+
+  const { data: similarPubs = [] } = useQuery<any[]>({
+    queryKey: ["similar-pubs", id],
+    queryFn: () => apiGet<any[]>(`/api/events?type=pub&city=${encodeURIComponent((event as any)?.city ?? "")}&limit=4`),
+    enabled: !!(event as any)?.city,
+    select: (data) => data.filter((e: any) => e.id !== id).slice(0, 3),
+  });
 
   useEffect(() => {
     if (!me?.user) return;
@@ -207,10 +233,24 @@ export function EventDetail() {
               <Badge className="bg-primary border-0 text-primary-foreground">★ Popular</Badge>
             )}
           </div>
-          <h1 className="font-serif text-4xl md:text-7xl tracking-tight max-w-4xl">{event.title}</h1>
-          <p className="mt-3 text-white/70">
-            by <Link href={`/partners/${event.vendor?.id ?? ""}`} className="underline-offset-4 hover:underline text-white">{event.vendorName}</Link>
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="font-serif text-4xl md:text-7xl tracking-tight max-w-4xl">{event.title}</h1>
+              <p className="mt-3 text-white/70">
+                by <Link href={`/partners/${event.vendor?.id ?? ""}`} className="underline-offset-4 hover:underline text-white">{event.vendorName}</Link>
+              </p>
+            </div>
+            {me?.user && (
+              <button
+                onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()}
+                disabled={addToWishlist.isPending || removeFromWishlist.isPending}
+                aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                className="mt-2 shrink-0 p-2.5 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 transition-colors"
+              >
+                <Heart className={`h-6 w-6 transition-colors ${inWishlist ? "fill-primary text-primary" : "text-white"}`} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -277,11 +317,27 @@ export function EventDetail() {
               <p className="text-muted-foreground text-sm mt-4">No reviews yet — be the first.</p>
             ) : (
               <div className="space-y-4 mt-4">
-                {reviews.map((r) => (
+                {reviews.map((r: any) => (
                   <div key={r.id} className="rounded-xl glass-card p-5">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">{r.userName}</p>
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {r.userImage ? (
+                          <img src={r.userImage} alt={r.userName} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold shrink-0">
+                            {r.userName?.charAt(0)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{r.userName}</p>
+                          {r.verifiedBooking && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-green-400 font-medium">
+                              <BadgeCheck className="h-3 w-3" /> Verified booking
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
                         ))}
@@ -308,6 +364,31 @@ export function EventDetail() {
               </div>
             )}
           </section>
+
+          {similarPubs.length > 0 && (
+            <section>
+              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">Similar Pubs Nearby</h2>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {similarPubs.map((pub: any) => (
+                  <Link key={pub.id} href={`/events/${pub.id}`}>
+                    <div className="group rounded-2xl glass-card overflow-hidden border border-border hover:border-primary/30 transition-all cursor-pointer">
+                      {pub.imageUrl && (
+                        <div className="aspect-[4/3] overflow-hidden">
+                          <img src={pub.imageUrl} alt={pub.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <Badge variant="secondary" className="mb-1.5 text-xs">{pub.category}</Badge>
+                        <p className="font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">{pub.title}</p>
+                        {pub.city && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><MapPin className="h-3 w-3" />{pub.city}</p>}
+                        {pub.price != null && <p className="text-sm font-semibold text-primary mt-1">₹{Number(pub.price).toLocaleString("en-IN")}</p>}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">

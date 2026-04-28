@@ -27,6 +27,8 @@ export const usersTable = pgTable(
     referralCode: varchar("referral_code", { length: 32 }).notNull().default(""),
     referredBy: integer("referred_by"),
     points: integer("points").notNull().default(0),
+    resetToken: varchar("reset_token", { length: 255 }).notNull().default(""),
+    resetTokenExpiry: timestamp("reset_token_expiry", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -412,3 +414,44 @@ export const notificationsTable = pgTable(
 );
 
 export type Notification = typeof notificationsTable.$inferSelect;
+
+export const wishlistsTable = pgTable(
+  "wishlists",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    eventId: integer("event_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userEventIdx: uniqueIndex("wishlists_user_event_idx").on(t.userId, t.eventId),
+  }),
+);
+
+export type Wishlist = typeof wishlistsTable.$inferSelect;
+
+export const blogsTable = pgTable(
+  "blogs",
+  {
+    id: serial("id").primaryKey(),
+    title: varchar("title", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull(),
+    excerpt: text("excerpt").notNull().default(""),
+    content: text("content").notNull().default(""),
+    imageUrl: text("image_url").notNull().default(""),
+    authorName: varchar("author_name", { length: 255 }).notNull().default("Royvento Editorial"),
+    tags: text("tags").array().notNull().default([]),
+    published: boolean("published").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex("blogs_slug_idx").on(t.slug),
+    publishedIdx: index("blogs_published_idx").on(t.published),
+  }),
+);
+
+export type Blog = typeof blogsTable.$inferSelect;
