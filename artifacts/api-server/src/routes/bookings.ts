@@ -1174,8 +1174,8 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   let bookingId: number;
   let needsChecksumVerification = false;
 
-  // New format: PREFIX-NNNNNN-XX (e.g. BLCK-000042-F9)
-  const newFormatMatch = code.match(/^([A-Z]{2,8})-(\d{1,10})-([0-9A-F]{2})$/);
+  // New format: PREFIX-NNNNNN-XX (e.g. BLCK-000042-F9 or BLCK2-000042-F9 for deduped prefix)
+  const newFormatMatch = code.match(/^([A-Z][A-Z0-9]{1,7})-(\d{1,10})-([0-9A-F]{2})$/);
   // Legacy format: RV-NNNNNN, RVNNNNNN, or plain number
   const legacyMatch = code.match(/^(?:RV-?)?(\d+)$/);
 
