@@ -783,10 +783,10 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
       {pending.length > 0 && (
         <div>
           <h3 className="font-serif text-xl mb-1 flex items-center gap-2">
-            Pending requests
+            Manual review queue
             <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5">{pending.length}</span>
           </h3>
-          <p className="text-xs text-muted-foreground mb-3">These bookings were created before auto-approval was enabled. Approve or reject each one manually.</p>
+          <p className="text-xs text-muted-foreground mb-3">These are legacy bookings that weren't auto-approved. Approve or reject each one manually.</p>
           <div className="space-y-3">
             {pending.map((b) => (
               <div key={b.id} className="rounded-2xl glass-card overflow-hidden border border-amber-500/20">
