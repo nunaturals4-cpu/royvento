@@ -1,0 +1,37 @@
+What & Why
+Roy currently answers questions using generic knowledge (like a web search) instead of data from the actual Royvento database. Users get vague answers with no real pub links. This task rebuilds Roy so it:
+
+Answers based on real pub listings from the database
+Provides direct clickable profile links for every pub it mentions
+Detects the user's location on load and personalises the popular questions
+Looks and feels professional (like the reference image — avatar, subtitle, popular question chips)
+Greets new users by asking for their preferred city, then offers to help them buy tickets or book events
+Done looks like
+Opening Roy shows a professional widget: avatar, "Nightlife AI" subtitle, popular question chips
+Popular questions include "Best pubs in Kolkata", "Best pubs in Delhi", "Best pubs in Mumbai" and, when geolocation is granted, a dynamic chip like "Best pubs near me in [detected city]"
+Every pub Roy mentions is followed by a clickable "View & Book →" link that opens the correct /events/:id page
+Roy's answers are grounded in actual pubs stored in the database — not generic internet knowledge
+On first open, if no city preference is detected, Roy asks the user which city they want to explore
+The agent suggests whether the user wants to buy tickets or book a table, based on the pub's pubMode
+Out of scope
+Persistent chat history saved to the database
+Multi-city search in a single query (one city at a time)
+Changing the Google OAuth task (#13)
+Steps
+New backend endpoint: pub context lookup — Add GET /api/ai/pubs-context?city=<city> that queries the database for approved pubs in that city (returning id, title, city, price, priceWomen, priceMen, priceCouple, pubMode, description). This will be called by the chat handler to inject real data into the AI prompt.
+
+Upgrade the AI chat route — Update POST /api/ai/chat to accept an optional city field in the request body. Before calling OpenAI, query the database for approved pubs in that city and inject a structured list (with pub IDs and prices) into the system prompt. Update the system prompt so Roy knows to always include a /events/:id link when mentioning a specific pub, and to recommend buying a ticket vs. booking a table based on pubMode. Instruct Roy to answer only from the provided pub list, never from general internet knowledge.
+
+Frontend — professional widget redesign — Redesign AiChatWidget.tsx to match the professional style from the reference image: circular avatar (use a nightlife/cocktail icon with gradient background), "Roy" name, "✦ Nightlife AI" subtitle, a welcome message, and a row of tappable popular question chips below the welcome message. Keep the existing message bubble design and send button. Add a city field in the component state that is sent with every message to the backend.
+
+Frontend — geolocation and dynamic popular questions — On widget mount, call navigator.geolocation.getCurrentPosition and reverse-geocode with the free Open-Meteo / browser API (or simply use a free reverse-geocode endpoint) to get the user's city name. Use this city to insert a dynamic chip like "Best pubs near me in [City]" at the top of the popular questions list. Static chips: "Best pubs in Kolkata", "Best pubs in Delhi", "Best pubs in Mumbai", "Book a table tonight". When a chip is clicked, it prefills and sends that message automatically (and sets the city state if a city is detected).
+
+Frontend — clickable pub links in responses — After receiving Roy's reply, parse any occurrences of the pattern /events/[id] (which Roy will include in answers) and render them as actual anchor tags/buttons (e.g. "View & Book →") that navigate to the pub profile page using the router. This turns text responses into actionable booking flows.
+
+Opening greeting flow — When the widget opens for the first time, if no city is detected, Roy's first message asks "Welcome! Which city are you looking to explore tonight?" with quick-reply buttons for the top cities (Kolkata, Delhi, Mumbai, Bangalore, Hyderabad). When the user picks one, set the city state and proceed. If geolocation detected a city, skip straight to "Hi! Here are the best pubs in [City] tonight…" and show relevant pubs from the database.
+
+Relevant files
+artifacts/api-server/src/routes/aiChat.ts
+artifacts/api-server/src/routes/index.ts
+artifacts/royvento/src/components/AiChatWidget.tsx
+lib/db/src/schema/index.ts

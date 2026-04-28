@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageCircle, X, Send, Loader2, Bot } from "lucide-react";
+import { X, Send, Loader2, Sparkles, MapPin } from "lucide-react";
 import { apiPost } from "@/lib/api";
 
 interface Message {
@@ -9,23 +10,58 @@ interface Message {
   content: string;
 }
 
+const TOP_CITIES = ["Kolkata", "Delhi", "Mumbai", "Bangalore", "Hyderabad"];
+
+const STATIC_CHIPS = [
+  "Best pubs in Kolkata",
+  "Best pubs in Delhi",
+  "Best pubs in Mumbai",
+  "Book a table tonight",
+];
+
+function parseCity(text: string): string {
+  const lower = text.toLowerCase();
+  for (const city of TOP_CITIES) {
+    if (lower.includes(city.toLowerCase())) return city;
+  }
+  if (lower.includes("kolkata") || lower.includes("calcutta")) return "Kolkata";
+  if (lower.includes("delhi") || lower.includes("new delhi")) return "Delhi";
+  if (lower.includes("bombay") || lower.includes("mumbai")) return "Mumbai";
+  if (lower.includes("bangalore") || lower.includes("bengaluru")) return "Bangalore";
+  if (lower.includes("hyderabad") || lower.includes("hyd")) return "Hyderabad";
+  if (lower.includes("goa")) return "Goa";
+  if (lower.includes("pune")) return "Pune";
+  if (lower.includes("chennai") || lower.includes("madras")) return "Chennai";
+  return "";
+}
+
+function renderMessageContent(content: string) {
+  const parts = content.split(/(\[View & Book →\]\(\/events\/\d+\))/g);
+  return parts.map((part, i) => {
+    const match = part.match(/\[View & Book →\]\(\/events\/(\d+)\)/);
+    if (match) {
+      return (
+        <Link key={i} href={`/events/${match[1]}`}>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 mt-1 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors text-xs font-semibold cursor-pointer border border-primary/30">
+            View &amp; Book →
+          </span>
+        </Link>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 export function AiChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [city, setCity] = useState("");
+  const [detectedCity, setDetectedCity] = useState("");
+  const [awaitingCity, setAwaitingCity] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages([
-        {
-          role: "assistant",
-          content: "Hi! I'm Roy, your Royvento assistant. I can help you discover pubs, understand bookings, and explore nightlife across India. What would you like to know? 🍻",
-        },
-      ]);
-    }
-  }, [open]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -33,18 +69,81 @@ export function AiChatWidget() {
     }
   }, [messages, loading]);
 
-  const send = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput("");
+  useEffect(() => {
+    if (!open || initialized) return;
+    setInitialized(true);
+
+    navigator.geolocation?.getCurrentPosition(
+      async (pos) => {
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          const data = await r.json();
+          const raw =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.state_district ||
+            data.address?.state ||
+            "";
+          const found = parseCity(raw) || raw.split(",")[0].trim();
+          if (found) {
+            setDetectedCity(found);
+            setCity(found);
+            setMessages([
+              {
+                role: "assistant",
+                content: `Hi! I detected you're in **${found}** 📍\n\nHere's what I can help you with tonight — tap a question or type your own:`,
+              },
+            ]);
+          } else {
+            askForCity();
+          }
+        } catch {
+          askForCity();
+        }
+      },
+      () => askForCity()
+    );
+  }, [open]);
+
+  function askForCity() {
+    setAwaitingCity(true);
+    setMessages([
+      {
+        role: "assistant",
+        content: "Welcome to Royvento! 🍸 Which city are you looking to explore tonight?",
+      },
+    ]);
+  }
+
+  function pickCity(c: string) {
+    setCity(c);
+    setAwaitingCity(false);
+    const msg = `Best pubs in ${c}`;
+    sendMessage(msg, c);
+  }
+
+  const chips = detectedCity
+    ? [`Best pubs near me in ${detectedCity}`, ...STATIC_CHIPS.filter((c) => !c.includes(detectedCity))]
+    : STATIC_CHIPS;
+
+  async function sendMessage(text: string, overrideCity?: string) {
+    const activeCity = overrideCity ?? city;
     const userMsg: Message = { role: "user", content: text };
-    const history = messages.slice(-10);
+    const history = messages.slice(-8);
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
+
+    const detectedFromText = parseCity(text);
+    const finalCity = detectedFromText || activeCity;
+    if (detectedFromText && !city) setCity(detectedFromText);
+
     try {
       const res = await apiPost<{ reply: string }>("/api/ai/chat", {
         message: text,
+        city: finalCity,
         history,
       });
       setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
@@ -56,7 +155,34 @@ export function AiChatWidget() {
     } finally {
       setLoading(false);
     }
+  }
+
+  const send = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+
+    if (awaitingCity) {
+      const found = parseCity(text) || text.trim();
+      setCity(found);
+      setAwaitingCity(false);
+      sendMessage(`Best pubs in ${found}`, found);
+      return;
+    }
+
+    sendMessage(text);
   };
+
+  const handleChip = (chip: string) => {
+    if (loading) return;
+    const found = parseCity(chip);
+    if (found && !city) setCity(found);
+    setInput("");
+    sendMessage(chip, found || city);
+  };
+
+  const showChips = messages.length <= 1 && !loading;
 
   return (
     <>
@@ -65,83 +191,135 @@ export function AiChatWidget() {
         {!open && (
           <button
             onClick={() => setOpen(true)}
-            aria-label="Open AI chat"
-            className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center red-glow"
+            aria-label="Open Roy AI"
+            className="h-14 w-14 rounded-full shadow-xl active:scale-95 transition-all flex items-center justify-center red-glow"
+            style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}
           >
-            <MessageCircle className="h-6 w-6" />
+            <Sparkles className="h-6 w-6 text-white" />
           </button>
         )}
       </div>
 
-      {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-3xl glass-card-strong border border-border shadow-2xl flex flex-col overflow-hidden"
-          style={{ height: "500px" }}>
+        <div
+          className="fixed bottom-6 right-6 z-50 w-[370px] max-w-[calc(100vw-1.5rem)] rounded-3xl glass-card-strong border border-border shadow-2xl flex flex-col overflow-hidden"
+          style={{ height: "540px" }}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card/80">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <Bot className="h-4 w-4 text-primary" />
+          <div
+            className="flex items-center justify-between px-5 py-4 shrink-0"
+            style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center shrink-0 border-2 border-white/30">
+                <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-sm leading-none">Roy</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Royvento AI</p>
+                <p className="font-bold text-sm text-white leading-none">Roy</p>
+                <p className="text-[11px] text-white/80 mt-0.5">✦ Nightlife AI</p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-              onClick={() => setOpen(false)}
-              aria-label="Close chat"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {city && (
+                <span className="flex items-center gap-1 text-[10px] text-white/70 bg-white/10 rounded-full px-2 py-0.5">
+                  <MapPin className="h-2.5 w-2.5" />{city}
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-              >
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                {m.role === "assistant" && (
+                  <div className="h-6 w-6 rounded-full shrink-0 mr-2 mt-0.5 flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}>
+                    <Sparkles className="h-3 w-3 text-white" />
+                  </div>
+                )}
                 <div
-                  className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                  className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                     m.role === "user"
                       ? "bg-primary text-primary-foreground rounded-br-sm"
                       : "bg-card border border-border rounded-bl-sm text-foreground"
                   }`}
                 >
-                  {m.content}
+                  {m.role === "assistant"
+                    ? renderMessageContent(m.content)
+                    : m.content}
                 </div>
               </div>
             ))}
+
             {loading && (
-              <div className="flex justify-start">
+              <div className="flex justify-start items-end">
+                <div className="h-6 w-6 rounded-full shrink-0 mr-2 flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}>
+                  <Sparkles className="h-3 w-3 text-white" />
+                </div>
                 <div className="bg-card border border-border px-3.5 py-2.5 rounded-2xl rounded-bl-sm">
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               </div>
             )}
+
+            {/* City picker */}
+            {awaitingCity && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {TOP_CITIES.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => pickCity(c)}
+                    className="px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary/20 transition-colors"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Popular question chips */}
+            {showChips && !awaitingCity && (
+              <div className="flex flex-wrap gap-2 mt-1">
+                {chips.map((chip) => (
+                  <button
+                    key={chip}
+                    onClick={() => handleChip(chip)}
+                    className="px-3 py-1.5 rounded-full bg-card border border-border text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Input */}
-          <div className="px-4 pb-4 pt-3 border-t border-border">
+          <div className="px-4 pb-4 pt-3 border-t border-border shrink-0">
             <form onSubmit={send} className="flex gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about pubs, bookings…"
+                placeholder={awaitingCity ? "Type a city name…" : "Ask about pubs, pricing…"}
                 className="flex-1 h-10 bg-background border-border text-sm"
                 disabled={loading}
-                autoFocus
               />
               <Button
                 type="submit"
                 size="icon"
                 disabled={loading || !input.trim()}
-                className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shrink-0 border-0"
+                className="h-10 w-10 rounded-xl text-white shrink-0 border-0"
+                style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}
                 aria-label="Send"
               >
                 <Send className="h-4 w-4" />
