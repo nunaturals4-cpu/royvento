@@ -564,6 +564,29 @@ paths:
                 items:
                   $ref: "#/components/schemas/Booking"
 
+  /bookings/{bookingId}/ticket-code:
+    get:
+      operationId: getBookingTicketCode
+      tags: [bookings]
+      summary: Get the vendor-specific ticket code for a booking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ticket code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticketCode:
+                    type: string
+                required: [ticketCode]
+
   /bookings/{bookingId}/status:
     patch:
       operationId: updateBookingStatus
@@ -1180,6 +1203,9 @@ components:
           nullable: true
         phone:
           type: string
+        ticketCode:
+          type: string
+          description: Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)
       required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail, phone]
 
     CreateBookingBody:

@@ -1340,6 +1340,39 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ?? null });
 });
 
+router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const bookingId = Number(req.params["bookingId"]);
+  if (!Number.isFinite(bookingId) || bookingId <= 0) {
+    res.status(400).json({ error: "Invalid booking ID" });
+    return;
+  }
+  const bRows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+  const b = bRows[0];
+  if (!b) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+  // Only the booking owner or admin may fetch the ticket code
+  if (b.userId !== user.id && user.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const vRows = await db.select({ ticketPrefix: vendorsTable.ticketPrefix, ticketSalt: vendorsTable.ticketSalt })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.id, b.vendorId))
+    .limit(1);
+  const v = vRows[0];
+  const ticketCode = v
+    ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" })
+    : `RV-${String(b.id).padStart(6, "0")}`;
+  res.json({ ticketCode });
+});
+
 router.get("/admin/bookings", requireAuth(["admin"]), async (_req, res) => {
   const rows = await db
     .select()

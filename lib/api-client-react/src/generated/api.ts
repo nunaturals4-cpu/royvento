@@ -28,6 +28,7 @@ import type {
   CreateVendorBody,
   Event,
   EventDetail,
+  GetBookingTicketCode200,
   HealthStatus,
   ListEventsParams,
   ListVendorsParams,
@@ -2341,6 +2342,98 @@ export function useListVendorBookings<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListVendorBookingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the vendor-specific ticket code for a booking
+ */
+export const getGetBookingTicketCodeUrl = (bookingId: number) => {
+  return `/api/bookings/${bookingId}/ticket-code`;
+};
+
+export const getBookingTicketCode = async (
+  bookingId: number,
+  options?: RequestInit,
+): Promise<GetBookingTicketCode200> => {
+  return customFetch<GetBookingTicketCode200>(
+    getGetBookingTicketCodeUrl(bookingId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetBookingTicketCodeQueryKey = (bookingId: number) => {
+  return [`/api/bookings/${bookingId}/ticket-code`] as const;
+};
+
+export const getGetBookingTicketCodeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBookingTicketCode>>,
+  TError = ErrorType<unknown>,
+>(
+  bookingId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBookingTicketCode>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBookingTicketCodeQueryKey(bookingId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBookingTicketCode>>
+  > = ({ signal }) =>
+    getBookingTicketCode(bookingId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookingId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBookingTicketCode>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBookingTicketCodeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBookingTicketCode>>
+>;
+export type GetBookingTicketCodeQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the vendor-specific ticket code for a booking
+ */
+
+export function useGetBookingTicketCode<
+  TData = Awaited<ReturnType<typeof getBookingTicketCode>>,
+  TError = ErrorType<unknown>,
+>(
+  bookingId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBookingTicketCode>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBookingTicketCodeQueryOptions(bookingId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

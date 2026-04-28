@@ -204,6 +204,8 @@ export interface Booking {
   userEmail: string;
   rejectionReason?: string | null;
   phone: string;
+  /** Vendor-specific scannable ticket code (e.g. BLCK-000042-F9) */
+  ticketCode?: string;
 }
 
 /**
@@ -368,4 +370,8 @@ export type ListEventsParams = {
   maxPrice?: string;
   page?: number;
   limit?: number;
+};
+
+export type GetBookingTicketCode200 = {
+  ticketCode: string;
 };

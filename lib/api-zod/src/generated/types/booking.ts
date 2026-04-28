@@ -25,4 +25,6 @@ export interface Booking {
   userEmail: string;
   rejectionReason?: string | null;
   phone: string;
+  /** Vendor-specific scannable ticket code (e.g. BLCK-000042-F9) */
+  ticketCode?: string;
 }

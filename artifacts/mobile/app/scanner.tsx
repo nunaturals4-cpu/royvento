@@ -131,7 +131,13 @@ export default function ScannerScreen() {
                   facing="back"
                   barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
                   onBarcodeScanned={({ data }) => {
-                    scanCode(data);
+                    // Support legacy QR format: royvento:booking:<id>:<date>
+                    const legacy = data.match(/royvento:booking:(\d+):/);
+                    if (legacy?.[1]) {
+                      scanCode(`RV-${String(legacy[1]).padStart(6, "0")}`);
+                    } else {
+                      scanCode(data);
+                    }
                   }}
                 >
                   <View style={styles.scanOverlay}>

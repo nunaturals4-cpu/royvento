@@ -22,6 +22,7 @@ export * from "./createReviewBody";
 export * from "./createVendorBody";
 export * from "./event";
 export * from "./eventDetail";
+export * from "./getBookingTicketCode200";
 export * from "./healthStatus";
 export * from "./listEventsPaginatedResponse";
 export * from "./listEventsParams";

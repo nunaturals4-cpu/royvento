@@ -713,6 +713,10 @@ export const CreateBookingResponse = zod.object({
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
   phone: zod.string(),
+  ticketCode: zod
+    .string()
+    .optional()
+    .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
 });
 
 /**
@@ -736,6 +740,10 @@ export const ListMyBookingsResponseItem = zod.object({
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
   phone: zod.string(),
+  ticketCode: zod
+    .string()
+    .optional()
+    .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
 });
 export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 
@@ -760,10 +768,25 @@ export const ListVendorBookingsResponseItem = zod.object({
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
   phone: zod.string(),
+  ticketCode: zod
+    .string()
+    .optional()
+    .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
 });
 export const ListVendorBookingsResponse = zod.array(
   ListVendorBookingsResponseItem,
 );
+
+/**
+ * @summary Get the vendor-specific ticket code for a booking
+ */
+export const GetBookingTicketCodeParams = zod.object({
+  bookingId: zod.coerce.number(),
+});
+
+export const GetBookingTicketCodeResponse = zod.object({
+  ticketCode: zod.string(),
+});
 
 /**
  * @summary Update a booking status (vendor)
@@ -795,6 +818,10 @@ export const UpdateBookingStatusResponse = zod.object({
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
   phone: zod.string(),
+  ticketCode: zod
+    .string()
+    .optional()
+    .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
 });
 
 /**
@@ -969,6 +996,12 @@ export const GetAdminAnalyticsResponse = zod.object({
       userEmail: zod.string(),
       rejectionReason: zod.string().nullish(),
       phone: zod.string(),
+      ticketCode: zod
+        .string()
+        .optional()
+        .describe(
+          "Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)",
+        ),
     }),
   ),
   topVendors: zod.array(
