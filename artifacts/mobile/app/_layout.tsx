@@ -13,7 +13,7 @@ import * as Notifications from "expo-notifications";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -27,8 +27,6 @@ if (domain) {
   setBaseUrl(`https://${domain}`);
 }
 
-const PUSH_TOKEN_KEY = "@royvento/pushToken";
-
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -41,7 +39,7 @@ Notifications.setNotificationHandler({
 
 /**
  * Request notification permission and obtain the Expo push token.
- * Safe to call early — before any user is logged in.
+ * Safe to call before any user is logged in (first launch).
  * Returns null on web, when permission is denied, or on any error.
  */
 export async function registerForPushNotifications(): Promise<string | null> {
@@ -79,32 +77,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
-async function cachePushToken(token: string) {
-  try {
-    await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
-  } catch {}
-}
-
-async function getCachedPushToken(): Promise<string | null> {
-  try {
-    return await AsyncStorage.getItem(PUSH_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-async function sendTokenToServer(token: string): Promise<void> {
-  try {
-    await customFetch("/api/auth/push-token", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pushToken: token }),
-    });
-  } catch (err) {
-    console.error("[PushToken] Failed to register push token with server:", err);
-  }
-}
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 1000 * 60 * 2, retry: 1 },
@@ -128,28 +100,55 @@ function AuthGate() {
   return null;
 }
 
+interface NotificationHandlerProps {
+  /** Expo push token obtained at app startup (may be null if permission denied or still loading). */
+  pushToken: string | null;
+}
+
 /**
- * Handles push notification lifecycle:
- * - Sends cached token to the server whenever a user becomes available (first login, re-login).
- * - Navigates to the bookings tab when the user taps a booking notification.
+ * Registers the push token with the server whenever BOTH the user AND
+ * a valid push token are known. Handles three timing scenarios:
+ *   A) Token ready before user  — effect fires again when user loads
+ *   B) User ready before token  — effect fires again when token resolves
+ *   C) Both ready simultaneously — single effect run registers immediately
+ *
+ * Also handles notification tap navigation.
  */
-function NotificationHandler() {
+function NotificationHandler({ pushToken }: NotificationHandlerProps) {
   const { user } = useAuth();
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
-  const lastUserId = useRef<number | null>(null);
+  // In-memory guard to prevent double-fire within a single session
+  const pendingRef = useRef(false);
 
   useEffect(() => {
-    if (!user || Platform.OS === "web") return;
-    // Only (re-)register if the user changed (e.g. different account logged in)
-    if (lastUserId.current === user.id) return;
-    lastUserId.current = user.id;
+    if (!user || !pushToken || Platform.OS === "web") return;
+    if (pendingRef.current) return;
 
-    getCachedPushToken().then((cached) => {
-      if (cached) {
-        sendTokenToServer(cached);
+    const registeredKey = `@royvento/tokenRegistered/${user.id}/${pushToken}`;
+
+    async function maybeRegister() {
+      pendingRef.current = true;
+      try {
+        const already = await AsyncStorage.getItem(registeredKey);
+        if (already === "1") return; // already confirmed for this user+token pair
+
+        await customFetch("/api/auth/push-token", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pushToken }),
+        });
+        await AsyncStorage.setItem(registeredKey, "1");
+      } catch (err) {
+        console.error("[PushToken] Failed to register with server:", err);
+        // pendingRef stays true to avoid hammering on the same mount,
+        // but AsyncStorage key was not written, so next app launch retries.
+      } finally {
+        pendingRef.current = false;
       }
-    });
-  }, [user]);
+    }
+
+    maybeRegister();
+  }, [user, pushToken]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -179,12 +178,16 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
-  // Request notification permission on first launch — before any user session exists
+  // Push token lives in state so NotificationHandler re-runs when it resolves,
+  // even if the user was already logged in before the token was obtained.
+  const [pushToken, setPushToken] = useState<string | null>(null);
+
+  // Request notification permission on first launch — before any user is authenticated
   useEffect(() => {
     if (Platform.OS === "web") return;
     registerForPushNotifications().then((token) => {
       if (token) {
-        cachePushToken(token);
+        setPushToken(token);
       }
     });
   }, []);
@@ -205,7 +208,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <StatusBar style="light" backgroundColor="#0e0d12" />
               <AuthGate />
-              <NotificationHandler />
+              <NotificationHandler pushToken={pushToken} />
               <Stack
                 screenOptions={{
                   headerShown: false,
