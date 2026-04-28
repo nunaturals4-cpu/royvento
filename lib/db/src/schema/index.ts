@@ -152,6 +152,7 @@ export const bookingsTable = pgTable(
       .notNull()
       .default(""),
     personName: varchar("person_name", { length: 255 }).notNull().default(""),
+    phone: varchar("phone", { length: 20 }).notNull().default(""),
     pointsUsed: integer("points_used").notNull().default(0),
     approvedBy: varchar("approved_by", { length: 20 }).notNull().default(""),
     rejectionReason: text("rejection_reason"),
@@ -455,3 +456,22 @@ export const blogsTable = pgTable(
 );
 
 export type Blog = typeof blogsTable.$inferSelect;
+
+export const announcementsTable = pgTable(
+  "announcements",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    body: text("body").notNull().default(""),
+    announceDate: varchar("announce_date", { length: 20 }).notNull().default(""),
+    announceTime: varchar("announce_time", { length: 20 }).notNull().default(""),
+    imageUrl: text("image_url").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("announcements_vendor_idx").on(t.vendorId),
+  }),
+);
+
+export type Announcement = typeof announcementsTable.$inferSelect;

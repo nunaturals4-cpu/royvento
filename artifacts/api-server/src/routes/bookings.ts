@@ -47,6 +47,7 @@ const CreateBookingBody = z.object({
   ticketCouple: z.number().int().nonnegative().optional().default(0),
   selectedPubEvent: z.string().optional().default(""),
   personName: z.string().optional().default(""),
+  phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits").optional().default(""),
   pointsToUse: z.number().int().nonnegative().optional().default(0),
 });
 
@@ -73,6 +74,7 @@ interface BookingRow {
   ticketCouple: number;
   selectedPubEvent: string;
   personName: string;
+  phone: string;
   pointsUsed: number;
   approvedBy: string;
   rejectionReason: string | null;
@@ -119,6 +121,7 @@ async function serializeBookings(rows: BookingRow[]) {
       ticketCouple: b.ticketCouple,
       selectedPubEvent: b.selectedPubEvent,
       personName: b.personName || u?.name || "",
+      phone: b.phone ?? "",
       pointsUsed: b.pointsUsed,
       approvedBy: b.approvedBy,
       rejectionReason: b.rejectionReason ?? null,
@@ -257,6 +260,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ticketCouple: parsed.data.ticketCouple || 0,
       selectedPubEvent: parsed.data.selectedPubEvent || "",
       personName: parsed.data.personName || user.name,
+      phone: parsed.data.phone ?? "",
       pointsUsed,
       approvedBy: "auto",
     })
@@ -303,6 +307,11 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       guests: b.guests,
       totalPrice: Number(b.totalPrice),
       notes: b.notes || undefined,
+      phone: b.phone || undefined,
+      pubMode: b.pubMode || undefined,
+      ticketWomen: b.ticketWomen || undefined,
+      ticketMen: b.ticketMen || undefined,
+      ticketCouple: b.ticketCouple || undefined,
     });
   } catch (err) {
     console.error("Failed to send booking notifications:", err);

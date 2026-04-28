@@ -15,10 +15,10 @@ export function Vendors() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="max-w-2xl mb-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Vendors</p>
-        <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Browse our makers</h1>
+        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Partners</p>
+        <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Browse our partners</h1>
         <p className="mt-3 text-muted-foreground leading-relaxed">
-          Every vendor on Royvento has been reviewed and approved by our team. Real portfolios, real reviews, real availability.
+          Every partner on Royvento has been reviewed and approved by our team. Real portfolios, real reviews, real availability.
         </p>
       </header>
 

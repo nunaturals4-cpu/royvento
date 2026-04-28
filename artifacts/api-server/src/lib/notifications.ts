@@ -49,6 +49,10 @@ function fmtDate(iso: string): string {
   });
 }
 
+function fmtINR(n: number): string {
+  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+}
+
 export interface BookingNotification {
   bookingId: number;
   eventTitle: string;
@@ -60,48 +64,72 @@ export interface BookingNotification {
   guests: number;
   totalPrice: number;
   notes?: string;
+  phone?: string;
+  pubMode?: string;
+  ticketWomen?: number;
+  ticketMen?: number;
+  ticketCouple?: number;
 }
 
 export async function sendBookingCreatedEmails(b: BookingNotification): Promise<void> {
+  const isPubTicket = b.pubMode === "ticket";
+  const ticketLines = isPubTicket
+    ? [
+        ``,
+        `  Ticket breakdown:`,
+        ...[
+          b.ticketWomen ? `    ♀ Women:   ${b.ticketWomen} ticket${b.ticketWomen > 1 ? "s" : ""}` : "",
+          b.ticketMen ? `    ♂ Men:     ${b.ticketMen} ticket${b.ticketMen > 1 ? "s" : ""}` : "",
+          b.ticketCouple ? `    ⚭ Couples: ${b.ticketCouple} ticket${b.ticketCouple > 1 ? "s" : ""}` : "",
+        ].filter(Boolean),
+      ]
+    : [];
+
+  const refCode = `#RV-${String(b.bookingId).padStart(6, "0")}`;
+
   await Promise.all([
     deliver("Booking Confirmation (to user)", {
       to: b.userEmail,
       toName: b.userName,
-      subject: `Booking confirmed #${b.bookingId}: ${b.eventTitle}`,
+      subject: `Booking confirmed ${refCode}: ${b.eventTitle}`,
       body: [
         `Hi ${b.userName.split(" ")[0]},`,
         ``,
-        `Your booking is confirmed! We look forward to seeing you.`,
+        `Your booking is confirmed! Here are your details:`,
         ``,
-        `  • Event:   ${b.eventTitle}`,
-        `  • Venue:   ${b.vendorName}`,
-        `  • Date:    ${fmtDate(b.bookingDate)}`,
-        `  • Guests:  ${b.guests}`,
-        `  • Total:   ${fmtMoney(b.totalPrice)}`,
+        `  Reference: ${refCode}`,
+        `  Event:     ${b.eventTitle}`,
+        `  Venue:     ${b.vendorName}`,
+        `  Date:      ${fmtDate(b.bookingDate)}`,
+        `  Guests:    ${b.guests}`,
+        `  Total:     ${fmtINR(b.totalPrice)}`,
+        ...ticketLines,
+        ...(b.phone ? [``, `  Contact:   ${b.phone}`] : []),
         ...(b.notes ? [``, `Your note:`, `  "${b.notes}"`] : []),
         ``,
-        `Sign in to your Royvento account to view or manage your booking.`,
+        `Sign in to your Royvento account to view your ticket and QR code.`,
         ``,
         `— The Royvento team`,
       ].join("\n"),
     }),
-    deliver("New Confirmed Booking (to vendor)", {
+    deliver("New Confirmed Booking (to partner)", {
       to: b.vendorEmail,
       toName: b.vendorName,
-      subject: `New booking confirmed: ${b.eventTitle} on ${fmtDate(b.bookingDate)}`,
+      subject: `New booking ${refCode}: ${b.eventTitle} on ${fmtDate(b.bookingDate)}`,
       body: [
         `Hi ${b.vendorName},`,
         ``,
         `A new booking has been confirmed for your venue on Royvento.`,
         ``,
-        `  • Event:   ${b.eventTitle}`,
-        `  • Client:  ${b.userName} <${b.userEmail}>`,
-        `  • Date:    ${fmtDate(b.bookingDate)}`,
-        `  • Guests:  ${b.guests}`,
-        `  • Total:   ${fmtMoney(b.totalPrice)}`,
+        `  Reference: ${refCode}`,
+        `  Event:     ${b.eventTitle}`,
+        `  Client:    ${b.userName} <${b.userEmail}>`,
+        `  Date:      ${fmtDate(b.bookingDate)}`,
+        `  Guests:    ${b.guests}`,
+        `  Total:     ${fmtINR(b.totalPrice)}`,
+        ...ticketLines,
+        ...(b.phone ? [`  Phone:     ${b.phone}`] : []),
         ...(b.notes ? [``, `Client note:`, `  "${b.notes}"`] : []),
-        ``,
-        `You can cancel this booking (with a reason) from your vendor dashboard if needed.`,
         ``,
         `— Royvento`,
       ].join("\n"),

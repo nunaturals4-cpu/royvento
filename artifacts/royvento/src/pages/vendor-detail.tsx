@@ -16,7 +16,7 @@ export function VendorDetail() {
   const { data: allEvents = [] } = useListEvents();
 
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
-  if (!vendor) return <div className="container mx-auto px-4 py-20">Vendor not found.</div>;
+  if (!vendor) return <div className="container mx-auto px-4 py-20">Partner not found.</div>;
 
   const events = allEvents.filter((e) => e.vendorId === vendor.id);
 

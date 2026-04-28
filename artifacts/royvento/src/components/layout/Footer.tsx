@@ -19,15 +19,15 @@ export function Footer() {
           <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground">Discover</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li><Link href="/explore" className="hover:text-foreground">Explore Events</Link></li>
-            <li><Link href="/vendors" className="hover:text-foreground">Browse Vendors</Link></li>
+            <li><Link href="/vendors" className="hover:text-foreground">Browse Partners</Link></li>
             <li><Link href="/contact" className="hover:text-foreground">Contact</Link></li>
           </ul>
         </div>
         <div className="space-y-2">
-          <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground">For Vendors</h4>
+          <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground">For Partners</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><Link href="/register" className="hover:text-foreground">Become a Vendor</Link></li>
-            <li><Link href="/login" className="hover:text-foreground">Vendor Login</Link></li>
+            <li><Link href="/register" className="hover:text-foreground">Become a Partner</Link></li>
+            <li><Link href="/login" className="hover:text-foreground">Partner Login</Link></li>
           </ul>
         </div>
       </div>

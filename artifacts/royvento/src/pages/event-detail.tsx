@@ -33,11 +33,17 @@ export function EventDetail() {
     query: { enabled: !!event?.vendor?.id } as any,
   });
   const { data: me } = useGetMe({ query: { retry: false } as any });
+  const { data: announcements = [] } = useQuery<any[]>({
+    queryKey: ["event-announcements", id],
+    queryFn: () => apiGet(`/api/events/${id}/announcements`),
+    enabled: !!id,
+  });
 
   const [date, setDate] = useState("");
   const [guests, setGuests] = useState(1);
   const [notes, setNotes] = useState("");
   const [personName, setPersonName] = useState("");
+  const [phone, setPhone] = useState("");
   const [eventType, setEventType] = useState<string>("other");
   const [budget, setBudget] = useState<string>("any");
   const [couponInput, setCouponInput] = useState("");
@@ -171,6 +177,10 @@ export function EventDetail() {
       toast({ title: "Pick an event from the dropdown", variant: "destructive" });
       return;
     }
+    if (isPub && phone && !/^\d{10}$/.test(phone)) {
+      toast({ title: "Invalid phone number", description: "Please enter a 10-digit mobile number.", variant: "destructive" });
+      return;
+    }
     setBooking(true);
     try {
       await apiPost("/api/bookings", {
@@ -182,6 +192,7 @@ export function EventDetail() {
         budgetRange: budget === "any" ? "" : budget,
         couponCode: couponState?.valid ? couponState.code : "",
         personName,
+        phone,
         pointsToUse: pointsApplied,
         ...(isPub
           ? {
@@ -314,6 +325,31 @@ export function EventDetail() {
               <p className="text-xs uppercase tracking-wider text-primary mb-2">About the partner</p>
               <Link href={`/partners/${event.vendor.id}`} className="font-serif text-2xl hover:text-primary">{event.vendor.businessName}</Link>
               <p className="text-sm text-white/70 mt-2 leading-relaxed">{event.vendor.description}</p>
+            </section>
+          )}
+
+          {isPub && announcements.length > 0 && (
+            <section>
+              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">Announcements</h2>
+              <div className="space-y-4 mt-4">
+                {announcements.map((a: any) => (
+                  <div key={a.id} className="rounded-xl glass-card p-5 flex gap-4">
+                    {a.imageUrl && (
+                      <img src={a.imageUrl} alt={a.title} className="w-20 h-20 rounded-lg object-cover shrink-0" loading="lazy" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-base text-white">{a.title}</p>
+                      {a.announceDate && (
+                        <p className="text-xs text-primary mt-0.5">
+                          {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                          {a.announceTime && ` · ${a.announceTime}`}
+                        </p>
+                      )}
+                      {a.body && <p className="text-sm text-white/70 mt-1 leading-relaxed">{a.body}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 
@@ -483,6 +519,22 @@ export function EventDetail() {
                   <div>
                     <Label htmlFor="pname">Booking under name</Label>
                     <Input id="pname" value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="Name on the booking" className="bg-black/40 border-white/10 mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="pphone">Phone number</Label>
+                    <Input
+                      id="pphone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      placeholder="10-digit mobile number"
+                      className="bg-black/40 border-white/10 mt-1"
+                    />
+                    {phone.length > 0 && phone.length < 10 && (
+                      <p className="text-xs text-destructive mt-1">Enter a valid 10-digit number</p>
+                    )}
                   </div>
                 </>
               ) : (

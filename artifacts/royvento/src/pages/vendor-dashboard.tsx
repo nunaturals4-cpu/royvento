@@ -100,6 +100,9 @@ export function VendorDashboard() {
             {!hasPub && <TabsTrigger value="media">Media</TabsTrigger>}
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="ads">Ads</TabsTrigger>
+            <TabsTrigger value="announcements">
+              <Megaphone className="h-3.5 w-3.5 mr-1 text-primary" /> Announcements
+            </TabsTrigger>
             <TabsTrigger value="leads">
               <Crown className="h-3.5 w-3.5 mr-1 text-primary" /> Leads
             </TabsTrigger>
@@ -117,6 +120,7 @@ export function VendorDashboard() {
           {!hasPub && <TabsContent value="media"><MediaManager vendor={vendor} events={events} /></TabsContent>}
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
+          <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
           <TabsContent value="leads"><LeadsPanel isPremium={!!vendor.isPremium} /></TabsContent>
         </Tabs>
       )}
@@ -1123,6 +1127,145 @@ function AdsPanel() {
                   <span className="text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleDateString()}</span>
                 </div>
                 <p className="text-white/70">{a.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface Announcement {
+  id: number;
+  vendorId: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  imageUrl: string;
+  createdAt: string;
+}
+
+function AnnouncementsPanel() {
+  const { toast } = useToast();
+  const [items, setItems] = useState<Announcement[]>([]);
+  const [editing, setEditing] = useState<Announcement | null>(null);
+  const [form, setForm] = useState({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
+  const [saving, setSaving] = useState(false);
+
+  const load = () => apiGet<Announcement[]>("/api/partner/announcements").then(setItems).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  const openNew = () => {
+    setEditing(null);
+    setForm({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
+  };
+  const openEdit = (a: Announcement) => {
+    setEditing(a);
+    setForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl });
+  };
+
+  const save = async () => {
+    if (!form.title.trim()) {
+      toast({ title: "Title is required", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        await apiPatch(`/api/partner/announcements/${editing.id}`, form);
+        toast({ title: "Announcement updated" });
+      } else {
+        await apiPost("/api/partner/announcements", form);
+        toast({ title: "Announcement posted" });
+      }
+      setEditing(null);
+      setForm({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    try {
+      await apiDelete(`/api/partner/announcements/${id}`);
+      toast({ title: "Deleted" });
+      load();
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6">
+      <div className="rounded-3xl glass-card-strong p-6 space-y-4">
+        <p className="font-serif text-xl flex items-center gap-2">
+          <Megaphone className="h-5 w-5 text-primary" />
+          {editing ? "Edit announcement" : "New announcement"}
+        </p>
+        <div>
+          <Label htmlFor="ann-title">Title</Label>
+          <Input id="ann-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="What's happening?" className="bg-black/40 border-white/10 mt-1" />
+        </div>
+        <div>
+          <Label htmlFor="ann-body">Details</Label>
+          <Textarea id="ann-body" rows={4} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="More info…" className="bg-black/40 border-white/10 mt-1" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="ann-date">Date</Label>
+            <Input id="ann-date" type="date" value={form.announceDate} onChange={(e) => setForm((f) => ({ ...f, announceDate: e.target.value }))} className="bg-black/40 border-white/10 mt-1" />
+          </div>
+          <div>
+            <Label htmlFor="ann-time">Time</Label>
+            <Input id="ann-time" type="time" value={form.announceTime} onChange={(e) => setForm((f) => ({ ...f, announceTime: e.target.value }))} className="bg-black/40 border-white/10 mt-1" />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="ann-img">Image URL (optional)</Label>
+          <Input id="ann-img" value={form.imageUrl} onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))} placeholder="https://…" className="bg-black/40 border-white/10 mt-1" />
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={save} disabled={saving} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
+            {editing ? "Save changes" : "Post announcement"}
+          </Button>
+          {editing && (
+            <Button variant="outline" onClick={openNew} className="border-white/10">Cancel</Button>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-3xl glass-card p-6">
+        <p className="font-serif text-xl mb-3">Your announcements</p>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No announcements yet. Create one to notify your audience.</p>
+        ) : (
+          <div className="space-y-3">
+            {items.map((a) => (
+              <div key={a.id} className="rounded-xl border border-white/10 p-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-white truncate">{a.title}</p>
+                    {a.announceDate && (
+                      <p className="text-xs text-primary mt-0.5">
+                        {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        {a.announceTime && ` · ${a.announceTime}`}
+                      </p>
+                    )}
+                    {a.body && <p className="text-white/60 mt-1 line-clamp-2">{a.body}</p>}
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(a)} className="h-7 w-7 p-0">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => remove(a.id)} className="h-7 w-7 p-0 text-destructive hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

@@ -169,14 +169,12 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
         {showTicket && !cancelOpen && <PremiumTicket b={b} />}
       </div>
 
-      {!checkedIn && (
-        <CancelBookingDialog
-          open={cancelOpen}
-          onClose={() => setCancelOpen(false)}
-          booking={b}
-          onCancelled={onRefetch}
-        />
-      )}
+      <CancelBookingDialog
+        open={!checkedIn && cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        booking={b}
+        onCancelled={onRefetch}
+      />
     </div>
   );
 }
@@ -277,7 +275,7 @@ function PremiumTicket({ b }: { b: any }) {
     w.document.close();
   };
 
-  const total = b.ticketWomen + b.ticketMen + b.ticketCouple * 2;
+  const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
 
   return (
     <div className="border-t border-white/10 pt-5 mt-2">
