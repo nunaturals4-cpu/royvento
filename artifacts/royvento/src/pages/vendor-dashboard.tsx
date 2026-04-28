@@ -22,7 +22,11 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
+  TrendingUp, IndianRupee,
 } from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
 import {
   apiGet, apiPost, apiDelete, apiPatch,
   EVENT_CATEGORIES, INDIAN_STATES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
@@ -90,6 +94,9 @@ export function VendorDashboard() {
             <TabsTrigger value="overview">Profile</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="analytics">
+              <TrendingUp className="h-3.5 w-3.5 mr-1 text-primary" /> Analytics
+            </TabsTrigger>
             {!hasPub && <TabsTrigger value="media">Media</TabsTrigger>}
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="ads">Ads</TabsTrigger>
@@ -106,6 +113,7 @@ export function VendorDashboard() {
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
           <TabsContent value="bookings"><BookingsManager bookings={bookings} refetch={refetchBookings} /></TabsContent>
+          <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
           {!hasPub && <TabsContent value="media"><MediaManager vendor={vendor} events={events} /></TabsContent>}
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
@@ -1112,6 +1120,183 @@ function AdsPanel() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+interface AnalyticsData {
+  totalEarnings: number;
+  monthEarnings: number;
+  perEvent: {
+    eventId: number;
+    eventTitle: string;
+    bookingCount: number;
+    ticketWomen: number;
+    ticketMen: number;
+    ticketCouple: number;
+    revenue: number;
+  }[];
+  dailyRevenue: { date: string; revenue: number }[];
+}
+
+function AnalyticsPanel() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    apiGet<AnalyticsData>("/api/partner/analytics")
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <p className="text-muted-foreground py-8 text-center">Loading analytics…</p>;
+  }
+
+  if (!data) {
+    return <p className="text-muted-foreground py-8 text-center">Could not load analytics.</p>;
+  }
+
+  const hasData = data.totalEarnings > 0 || data.perEvent.length > 0;
+
+  const chartMax = Math.max(...data.dailyRevenue.map((d) => d.revenue), 1);
+  const monthName = new Date().toLocaleString("en-IN", { month: "long" });
+
+  return (
+    <div className="space-y-6">
+      {/* Earnings summary cards */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+            <IndianRupee className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total earnings</p>
+            <p className="stat-number text-3xl">{formatINR(data.totalEarnings)}</p>
+            <p className="text-xs text-muted-foreground mt-1">all confirmed bookings</p>
+          </div>
+        </div>
+        <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+            <TrendingUp className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">This month ({monthName})</p>
+            <p className="stat-number text-3xl">{formatINR(data.monthEarnings)}</p>
+            <p className="text-xs text-muted-foreground mt-1">month-to-date</p>
+          </div>
+        </div>
+      </div>
+
+      {!hasData && (
+        <div className="rounded-3xl glass-card p-10 text-center">
+          <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-40" />
+          <p className="font-serif text-2xl mb-2">No earnings yet</p>
+          <p className="text-muted-foreground text-sm">Analytics will appear here once you have confirmed bookings.</p>
+        </div>
+      )}
+
+      {/* Daily revenue chart */}
+      {data.dailyRevenue.some((d) => d.revenue > 0) && (
+        <div className="rounded-3xl glass-card-strong p-6">
+          <p className="font-serif text-xl mb-5">Revenue — last 30 days</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={data.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={(d) => {
+                  const dt = new Date(d);
+                  return `${dt.getDate()}/${dt.getMonth() + 1}`;
+                }}
+                interval={4}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={(v) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                width={48}
+                domain={[0, Math.ceil(chartMax * 1.15)]}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "hsl(var(--card))",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "12px",
+                  fontSize: "12px",
+                }}
+                formatter={(v: number) => [formatINR(v), "Revenue"]}
+                labelFormatter={(label) => new Date(label).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              />
+              <Line
+                type="monotone"
+                dataKey="revenue"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 4, fill: "hsl(var(--primary))" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Per-event breakdown table */}
+      {data.perEvent.length > 0 && (
+        <div className="rounded-3xl glass-card-strong p-6">
+          <p className="font-serif text-xl mb-4">Ticket breakdown by listing</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-4">Listing</th>
+                  <th className="text-right py-2 px-2">Bookings</th>
+                  <th className="text-right py-2 px-2">Women</th>
+                  <th className="text-right py-2 px-2">Men</th>
+                  <th className="text-right py-2 px-2">Couples</th>
+                  <th className="text-right py-2 pl-2">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.perEvent.map((row) => (
+                  <tr key={row.eventId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-3 pr-4 font-medium">{row.eventTitle}</td>
+                    <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
+                    <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
+                    <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
+                    <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
+                    <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {data.perEvent.length > 1 && (
+                <tfoot className="border-t border-white/15 text-xs text-muted-foreground">
+                  <tr>
+                    <td className="py-2 pr-4 font-semibold text-foreground">Total</td>
+                    <td className="text-right px-2 font-semibold text-foreground tabular-nums">
+                      {data.perEvent.reduce((s, r) => s + r.bookingCount, 0)}
+                    </td>
+                    <td className="text-right px-2 text-pink-300 tabular-nums">
+                      {data.perEvent.reduce((s, r) => s + r.ticketWomen, 0) || "—"}
+                    </td>
+                    <td className="text-right px-2 text-blue-300 tabular-nums">
+                      {data.perEvent.reduce((s, r) => s + r.ticketMen, 0) || "—"}
+                    </td>
+                    <td className="text-right px-2 text-purple-300 tabular-nums">
+                      {data.perEvent.reduce((s, r) => s + r.ticketCouple, 0) || "—"}
+                    </td>
+                    <td className="text-right pl-2 text-primary font-semibold tabular-nums">
+                      {formatINR(data.perEvent.reduce((s, r) => s + r.revenue, 0))}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

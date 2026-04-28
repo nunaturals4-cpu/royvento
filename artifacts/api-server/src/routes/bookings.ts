@@ -315,6 +315,95 @@ router.get("/bookings/me", requireAuth(), async (req, res) => {
   res.json(await serializeBookings(rows));
 });
 
+// Partner analytics — earnings summary, per-event breakdown, daily revenue
+router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  const vendor = vRows[0];
+  if (!vendor) { res.json({ totalEarnings: 0, monthEarnings: 0, perEvent: [], dailyRevenue: [] }); return; }
+
+  const allBookings = await db
+    .select()
+    .from(bookingsTable)
+    .where(
+      and(
+        eq(bookingsTable.vendorId, vendor.id),
+        inArray(bookingsTable.status, ["confirmed", "completed"]),
+      ),
+    );
+
+  // Summary figures
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  let totalEarnings = 0;
+  let monthEarnings = 0;
+  for (const b of allBookings) {
+    const fp = Number(b.finalPrice);
+    totalEarnings += fp;
+    if (new Date(b.createdAt) >= monthStart) monthEarnings += fp;
+  }
+
+  // Per-event breakdown
+  const eventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
+  const events = eventIds.length > 0
+    ? await db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds))
+    : [];
+  const eMap = new Map(events.map((e) => [e.id, e]));
+
+  const perEventMap = new Map<number, {
+    eventId: number; eventTitle: string;
+    bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
+  }>();
+  for (const b of allBookings) {
+    const existing = perEventMap.get(b.eventId);
+    if (existing) {
+      existing.bookingCount += 1;
+      existing.ticketWomen += b.ticketWomen;
+      existing.ticketMen += b.ticketMen;
+      existing.ticketCouple += b.ticketCouple;
+      existing.revenue += Number(b.finalPrice);
+    } else {
+      perEventMap.set(b.eventId, {
+        eventId: b.eventId,
+        eventTitle: eMap.get(b.eventId)?.title ?? `Event #${b.eventId}`,
+        bookingCount: 1,
+        ticketWomen: b.ticketWomen,
+        ticketMen: b.ticketMen,
+        ticketCouple: b.ticketCouple,
+        revenue: Number(b.finalPrice),
+      });
+    }
+  }
+
+  // Daily revenue — last 30 days
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const dailyMap = new Map<string, number>();
+  // Pre-fill all 30 days with zero
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const key = d.toISOString().slice(0, 10);
+    dailyMap.set(key, 0);
+  }
+  for (const b of allBookings) {
+    const day = new Date(b.createdAt).toISOString().slice(0, 10);
+    if (new Date(b.createdAt) >= thirtyDaysAgo) {
+      dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
+    }
+  }
+  const dailyRevenue = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, revenue]) => ({ date, revenue }));
+
+  res.json({
+    totalEarnings: Math.round(totalEarnings),
+    monthEarnings: Math.round(monthEarnings),
+    perEvent: Array.from(perEventMap.values()),
+    dailyRevenue,
+  });
+});
+
 router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) {
