@@ -114,7 +114,8 @@ export default function EventDetailScreen() {
         eventId,
         bookingDate,
         guests: parseInt(guests) || 1,
-        notes: [phone ? `Phone: ${phone}` : "", notes].filter(Boolean).join("\n") || undefined,
+        phone: phone.trim() || undefined,
+        notes: notes.trim() || undefined,
       },
     });
   };

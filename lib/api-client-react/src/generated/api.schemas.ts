@@ -203,6 +203,7 @@ export interface CreateBookingBody {
   bookingDate: string;
   guests: number;
   notes?: string;
+  phone?: string;
 }
 
 export interface UpdateBookingStatusBody {

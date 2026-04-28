@@ -113,24 +113,29 @@ router.get("/events", async (req, res) => {
     if (searchCond) conditions.push(searchCond);
   }
 
-  const page = Math.max(1, parseInt(q["page"] ?? "1", 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(q["limit"] ?? "20", 10) || 20));
-  const offset = (page - 1) * limit;
-
-  const rows = await db
-    .select()
-    .from(eventsTable)
-    .where(and(...conditions))
-    .orderBy(desc(eventsTable.createdAt))
-    .limit(limit)
-    .offset(offset);
-
-  const serialized = await serializeEvents(rows);
-
   if (q["page"] !== undefined) {
+    const page = Math.max(1, parseInt(q["page"], 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(q["limit"] ?? "20", 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const rows = await db
+      .select()
+      .from(eventsTable)
+      .where(and(...conditions))
+      .orderBy(desc(eventsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const serialized = await serializeEvents(rows);
     res.json({ data: serialized, page, limit, hasMore: rows.length === limit });
   } else {
-    res.json(serialized);
+    const rows = await db
+      .select()
+      .from(eventsTable)
+      .where(and(...conditions))
+      .orderBy(desc(eventsTable.createdAt));
+
+    res.json(await serializeEvents(rows));
   }
 });
 

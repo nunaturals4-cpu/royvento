@@ -570,6 +570,7 @@ export const CreateBookingBody = zod.object({
   bookingDate: zod.string(),
   guests: zod.number(),
   notes: zod.string().optional(),
+  phone: zod.string().optional(),
 });
 
 export const CreateBookingResponse = zod.object({
