@@ -22,7 +22,6 @@ import { EventCard } from "@/components/EventCard";
 import { useColors } from "@/hooks/useColors";
 
 const PAGE_SIZE = 20;
-const CATEGORIES = ["All", "Wedding", "Corporate", "Birthday", "Concert", "Pubs", "Festival"];
 const CITIES = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Pune", "Kolkata"];
 
 interface FilterState {
@@ -41,7 +40,6 @@ export default function ExploreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER);
   const [draftFilter, setDraftFilter] = useState<FilterState>(EMPTY_FILTER);
@@ -54,13 +52,12 @@ export default function ExploreScreen() {
   const baseParams = useMemo(() => {
     const p: Record<string, string> = {};
     if (debouncedSearch) p["search"] = debouncedSearch;
-    if (activeCategory !== "All") p["category"] = activeCategory;
     if (filters.city) p["city"] = filters.city;
     if (filters.minPrice) p["minPrice"] = filters.minPrice;
     if (filters.maxPrice) p["maxPrice"] = filters.maxPrice;
     p["limit"] = String(PAGE_SIZE);
     return p;
-  }, [debouncedSearch, activeCategory, filters]);
+  }, [debouncedSearch, filters]);
 
   const {
     data: paginatedData,
@@ -152,30 +149,6 @@ export default function ExploreScreen() {
           ) : null}
         </View>
 
-        <FlatList
-          horizontal
-          data={CATEGORIES}
-          keyExtractor={(f) => f}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-          scrollEnabled
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => setActiveCategory(item)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: activeCategory === item ? colors.primary : colors.muted,
-                  borderColor: activeCategory === item ? colors.primary : colors.border,
-                },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: activeCategory === item ? colors.primaryForeground : colors.mutedForeground }]}>
-                {item}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
       </View>
 
       {/* Active filter pills */}
@@ -219,7 +192,7 @@ export default function ExploreScreen() {
           subtitle="Try different filters or search terms"
           action={{
             label: "Clear all filters",
-            onPress: () => { setSearch(""); setDebouncedSearch(""); setActiveCategory("All"); clearFilter(); },
+            onPress: () => { setSearch(""); setDebouncedSearch(""); clearFilter(); },
           }}
         />
       ) : (

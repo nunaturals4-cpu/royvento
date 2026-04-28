@@ -7,7 +7,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { apiGet, BUDGET_RANGES, EVENT_CATEGORIES } from "@/lib/api";
+import { apiGet, BUDGET_RANGES } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useLocation } from "wouter";
 
@@ -28,8 +28,6 @@ interface PublicEvent {
   popular: boolean;
 }
 
-const CATEGORIES = ["All", ...EVENT_CATEGORIES] as const;
-
 export function Explore() {
   const [location] = useLocation();
   const initialSearch = (() => {
@@ -40,7 +38,6 @@ export function Explore() {
     } catch { return ""; }
   })();
   const [search, setSearch] = useState(initialSearch);
-  const [active, setActive] = useState<string>("All");
   const [minRating, setMinRating] = useState<string>("any");
   const [budget, setBudget] = useState<string>("any");
   const [country, setCountry] = useState<string>("");
@@ -51,7 +48,6 @@ export function Explore() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (active !== "All") params.set("category", active);
     if (search.trim()) params.set("search", search.trim());
     if (stateF) params.set("state", stateF);
     if (city) params.set("city", city);
@@ -74,10 +70,10 @@ export function Explore() {
       })
       .catch(() => setEvents([]))
       .finally(() => setLoading(false));
-  }, [active, search, budget, stateF, city, country, minRating]);
+  }, [search, budget, stateF, city, country, minRating]);
 
   const clear = () => {
-    setSearch(""); setActive("All"); setMinRating("any");
+    setSearch(""); setMinRating("any");
     setBudget("any"); setCountry(""); setStateF(""); setCity("");
   };
 
@@ -145,23 +141,6 @@ export function Explore() {
             }}
           />
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-10">
-        {CATEGORIES.map((c) => (
-          <Button
-            key={c}
-            variant={active === c ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActive(c)}
-            className={active === c
-              ? "rounded-full bg-primary text-primary-foreground border-0 red-glow"
-              : "rounded-full border-white/15 hover:bg-white/5"
-            }
-          >
-            {c}
-          </Button>
-        ))}
       </div>
 
       {loading ? (
