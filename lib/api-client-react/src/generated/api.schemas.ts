@@ -97,6 +97,9 @@ export interface Vendor {
   rating: number;
   reviewCount: number;
   createdAt: string;
+  openDays: string[];
+  city: string;
+  state: string;
 }
 
 export interface MyVendorResponse {
@@ -139,6 +142,11 @@ export interface Event {
   galleryImages: string[];
   galleryVideos: string[];
   createdAt: string;
+  type: string;
+  priceWomen: number;
+  priceMen: number;
+  priceCouple: number;
+  approvalStatus: string;
 }
 
 export type EventDetail = Event & {
@@ -195,6 +203,7 @@ export interface Booking {
   userName: string;
   userEmail: string;
   rejectionReason?: string | null;
+  phone: string;
 }
 
 export interface CreateBookingBody {
@@ -202,6 +211,7 @@ export interface CreateBookingBody {
   bookingDate: string;
   guests: number;
   notes?: string;
+  phone?: string;
 }
 
 export interface UpdateBookingStatusBody {

@@ -927,7 +927,15 @@ components:
           type: integer
         createdAt:
           type: string
-      required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt]
+        openDays:
+          type: array
+          items:
+            type: string
+        city:
+          type: string
+        state:
+          type: string
+      required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state]
 
     MyVendorResponse:
       type: object
@@ -1016,7 +1024,17 @@ components:
             type: string
         createdAt:
           type: string
-      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt]
+        type:
+          type: string
+        priceWomen:
+          type: number
+        priceMen:
+          type: number
+        priceCouple:
+          type: number
+        approvalStatus:
+          type: string
+      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus]
 
     EventDetail:
       allOf:
@@ -1120,7 +1138,9 @@ components:
         rejectionReason:
           type: string
           nullable: true
-      required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail]
+        phone:
+          type: string
+      required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail, phone]
 
     CreateBookingBody:
       type: object
@@ -1132,6 +1152,8 @@ components:
         guests:
           type: integer
         notes:
+          type: string
+        phone:
           type: string
       required: [eventId, bookingDate, guests]
 

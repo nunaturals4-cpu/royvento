@@ -21,4 +21,7 @@ export interface Vendor {
   rating: number;
   reviewCount: number;
   createdAt: string;
+  openDays: string[];
+  city: string;
+  state: string;
 }

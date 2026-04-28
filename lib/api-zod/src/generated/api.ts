@@ -226,6 +226,9 @@ export const ListVendorsResponseItem = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   createdAt: zod.string(),
+  openDays: zod.array(zod.string()),
+  city: zod.string(),
+  state: zod.string(),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 
@@ -248,6 +251,9 @@ export const GetMyVendorResponse = zod.object({
       rating: zod.number(),
       reviewCount: zod.number(),
       createdAt: zod.string(),
+      openDays: zod.array(zod.string()),
+      city: zod.string(),
+      state: zod.string(),
     }),
     zod.null(),
   ]),
@@ -280,6 +286,9 @@ export const CreateMyVendorResponse = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   createdAt: zod.string(),
+  openDays: zod.array(zod.string()),
+  city: zod.string(),
+  state: zod.string(),
 });
 
 /**
@@ -309,6 +318,9 @@ export const UpdateMyVendorResponse = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   createdAt: zod.string(),
+  openDays: zod.array(zod.string()),
+  city: zod.string(),
+  state: zod.string(),
 });
 
 /**
@@ -332,6 +344,9 @@ export const GetVendorResponse = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   createdAt: zod.string(),
+  openDays: zod.array(zod.string()),
+  city: zod.string(),
+  state: zod.string(),
 });
 
 /**
@@ -351,6 +366,9 @@ export const ListPendingVendorsResponseItem = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   createdAt: zod.string(),
+  openDays: zod.array(zod.string()),
+  city: zod.string(),
+  state: zod.string(),
 });
 export const ListPendingVendorsResponse = zod.array(
   ListPendingVendorsResponseItem,
@@ -377,6 +395,9 @@ export const ApproveVendorResponse = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   createdAt: zod.string(),
+  openDays: zod.array(zod.string()),
+  city: zod.string(),
+  state: zod.string(),
 });
 
 /**
@@ -400,6 +421,9 @@ export const RejectVendorResponse = zod.object({
   rating: zod.number(),
   reviewCount: zod.number(),
   createdAt: zod.string(),
+  openDays: zod.array(zod.string()),
+  city: zod.string(),
+  state: zod.string(),
 });
 
 /**
@@ -426,6 +450,11 @@ export const ListEventsResponseItem = zod.object({
   galleryImages: zod.array(zod.string()),
   galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
+  type: zod.string(),
+  priceWomen: zod.number(),
+  priceMen: zod.number(),
+  priceCouple: zod.number(),
+  approvalStatus: zod.string(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
 
@@ -460,6 +489,11 @@ export const CreateEventResponse = zod.object({
   galleryImages: zod.array(zod.string()),
   galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
+  type: zod.string(),
+  priceWomen: zod.number(),
+  priceMen: zod.number(),
+  priceCouple: zod.number(),
+  approvalStatus: zod.string(),
 });
 
 /**
@@ -481,6 +515,11 @@ export const ListFeaturedEventsResponseItem = zod.object({
   galleryImages: zod.array(zod.string()),
   galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
+  type: zod.string(),
+  priceWomen: zod.number(),
+  priceMen: zod.number(),
+  priceCouple: zod.number(),
+  approvalStatus: zod.string(),
 });
 export const ListFeaturedEventsResponse = zod.array(
   ListFeaturedEventsResponseItem,
@@ -510,6 +549,11 @@ export const GetEventResponse = zod
     galleryImages: zod.array(zod.string()),
     galleryVideos: zod.array(zod.string()),
     createdAt: zod.string(),
+    type: zod.string(),
+    priceWomen: zod.number(),
+    priceMen: zod.number(),
+    priceCouple: zod.number(),
+    approvalStatus: zod.string(),
   })
   .and(
     zod.object({
@@ -527,6 +571,9 @@ export const GetEventResponse = zod
         rating: zod.number(),
         reviewCount: zod.number(),
         createdAt: zod.string(),
+        openDays: zod.array(zod.string()),
+        city: zod.string(),
+        state: zod.string(),
       }),
     }),
   );
@@ -566,6 +613,11 @@ export const UpdateEventResponse = zod.object({
   galleryImages: zod.array(zod.string()),
   galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
+  type: zod.string(),
+  priceWomen: zod.number(),
+  priceMen: zod.number(),
+  priceCouple: zod.number(),
+  approvalStatus: zod.string(),
 });
 
 /**
@@ -598,6 +650,11 @@ export const ListMyVendorEventsResponseItem = zod.object({
   galleryImages: zod.array(zod.string()),
   galleryVideos: zod.array(zod.string()),
   createdAt: zod.string(),
+  type: zod.string(),
+  priceWomen: zod.number(),
+  priceMen: zod.number(),
+  priceCouple: zod.number(),
+  approvalStatus: zod.string(),
 });
 export const ListMyVendorEventsResponse = zod.array(
   ListMyVendorEventsResponseItem,
@@ -611,6 +668,7 @@ export const CreateBookingBody = zod.object({
   bookingDate: zod.string(),
   guests: zod.number(),
   notes: zod.string().optional(),
+  phone: zod.string().optional(),
 });
 
 export const CreateBookingResponse = zod.object({
@@ -630,6 +688,7 @@ export const CreateBookingResponse = zod.object({
   userName: zod.string(),
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
+  phone: zod.string(),
 });
 
 /**
@@ -652,6 +711,7 @@ export const ListMyBookingsResponseItem = zod.object({
   userName: zod.string(),
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
+  phone: zod.string(),
 });
 export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 
@@ -675,6 +735,7 @@ export const ListVendorBookingsResponseItem = zod.object({
   userName: zod.string(),
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
+  phone: zod.string(),
 });
 export const ListVendorBookingsResponse = zod.array(
   ListVendorBookingsResponseItem,
@@ -709,6 +770,7 @@ export const UpdateBookingStatusResponse = zod.object({
   userName: zod.string(),
   userEmail: zod.string(),
   rejectionReason: zod.string().nullish(),
+  phone: zod.string(),
 });
 
 /**
@@ -882,6 +944,7 @@ export const GetAdminAnalyticsResponse = zod.object({
       userName: zod.string(),
       userEmail: zod.string(),
       rejectionReason: zod.string().nullish(),
+      phone: zod.string(),
     }),
   ),
   topVendors: zod.array(
@@ -914,6 +977,11 @@ export const GetWishlistResponseItem = zod
     galleryImages: zod.array(zod.string()),
     galleryVideos: zod.array(zod.string()),
     createdAt: zod.string(),
+    type: zod.string(),
+    priceWomen: zod.number(),
+    priceMen: zod.number(),
+    priceCouple: zod.number(),
+    approvalStatus: zod.string(),
   })
   .and(
     zod.object({

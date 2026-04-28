@@ -22,4 +22,9 @@ export interface Event {
   galleryImages: string[];
   galleryVideos: string[];
   createdAt: string;
+  type: string;
+  priceWomen: number;
+  priceMen: number;
+  priceCouple: number;
+  approvalStatus: string;
 }

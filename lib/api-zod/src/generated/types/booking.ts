@@ -24,4 +24,5 @@ export interface Booking {
   userName: string;
   userEmail: string;
   rejectionReason?: string | null;
+  phone: string;
 }
