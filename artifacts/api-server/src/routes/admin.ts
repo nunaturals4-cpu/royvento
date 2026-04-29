@@ -724,13 +724,15 @@ router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
   const vMap = new Map(vendorRows.map((v) => [v.id, v]));
   const uMap = new Map(userRows.map((u) => [u.id, u]));
 
-  // Conversion: get the earliest confirmed/completed booking per (userId, vendorId).
-  // A lead "converted" only if that booking was created AFTER the specific profile view.
-  const firstBookings = userIds.length && vendorIds.length
+  // Conversion: fetch ALL confirmed/completed booking timestamps per (userId, vendorId).
+  // A view converts if ANY booking for that (userId, vendorId) was created AFTER this specific view.
+  // Using all timestamps (not just MIN) correctly handles repeat-booking users who had an
+  // earlier booking before the view and a later booking after.
+  const allBookings = userIds.length && vendorIds.length
     ? await db.select({
         userId: bookingsTable.userId,
         vendorId: bookingsTable.vendorId,
-        firstBookingAt: sql<string>`MIN(${bookingsTable.createdAt})::text`,
+        createdAt: bookingsTable.createdAt,
       })
         .from(bookingsTable)
         .where(and(
@@ -738,18 +740,21 @@ router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
           inArray(bookingsTable.vendorId, vendorIds),
           sql`${bookingsTable.status} IN ('confirmed','completed')`,
         ))
-        .groupBy(bookingsTable.userId, bookingsTable.vendorId)
     : [];
-  const firstBookingMap = new Map(
-    firstBookings.map((b) => [`${b.userId}:${b.vendorId}`, new Date(b.firstBookingAt)]),
-  );
+  // Group booking dates by (userId:vendorId) key
+  const bookingDatesMap = new Map<string, Date[]>();
+  for (const b of allBookings) {
+    const key = `${b.userId}:${b.vendorId}`;
+    if (!bookingDatesMap.has(key)) bookingDatesMap.set(key, []);
+    bookingDatesMap.get(key)!.push(b.createdAt);
+  }
 
   const leads = rows.map((r) => {
     const v = vMap.get(r.vendorId);
     const u = r.viewerUserId ? uMap.get(r.viewerUserId) : null;
-    const firstBooking = r.viewerUserId ? firstBookingMap.get(`${r.viewerUserId}:${r.vendorId}`) : undefined;
-    // Converted only if the first booking was created AFTER this specific profile view
-    const converted = firstBooking ? firstBooking > r.viewedAt : false;
+    // Converted if ANY booking for this (userId, vendorId) was created AFTER this view
+    const bookingDates = r.viewerUserId ? (bookingDatesMap.get(`${r.viewerUserId}:${r.vendorId}`) ?? []) : [];
+    const converted = bookingDates.some((d) => d > r.viewedAt);
     return {
       id: r.id,
       vendorId: r.vendorId,
@@ -813,12 +818,14 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
   const knownUserIds = Array.from(new Set(knownViewRecords.map((r) => r.viewerUserId).filter((x): x is number => x !== null)));
   const knownVendorIds = Array.from(new Set(knownViewRecords.map((r) => r.vendorId)));
 
-  // Get first confirmed/completed booking per (userId, vendorId)
-  const firstBookings = knownUserIds.length && knownVendorIds.length
+  // Fetch ALL confirmed/completed booking timestamps per (userId, vendorId) — same approach as
+  // /admin/leads: a view converts if ANY booking was created AFTER this specific view,
+  // correctly handling users who had an earlier booking before the view.
+  const allSummaryBookings = knownUserIds.length && knownVendorIds.length
     ? await db.select({
         userId: bookingsTable.userId,
         vendorId: bookingsTable.vendorId,
-        firstBookingAt: sql<string>`MIN(${bookingsTable.createdAt})::text`,
+        createdAt: bookingsTable.createdAt,
       })
         .from(bookingsTable)
         .where(and(
@@ -826,19 +833,21 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
           inArray(bookingsTable.vendorId, knownVendorIds),
           sql`${bookingsTable.status} IN ('confirmed','completed')`,
         ))
-        .groupBy(bookingsTable.userId, bookingsTable.vendorId)
     : [];
-  const firstBookingMap = new Map(
-    firstBookings.map((b) => [`${b.userId}:${b.vendorId}`, new Date(b.firstBookingAt)]),
-  );
+  const summaryBookingDatesMap = new Map<string, Date[]>();
+  for (const b of allSummaryBookings) {
+    const key = `${b.userId}:${b.vendorId}`;
+    if (!summaryBookingDatesMap.has(key)) summaryBookingDatesMap.set(key, []);
+    summaryBookingDatesMap.get(key)!.push(b.createdAt);
+  }
 
-  // Count conversions: a view converts when the first booking AFTER it exists
+  // Count conversions: a view converts when ANY confirmed/completed booking exists AFTER it
   let platformConversions = 0;
   const vendorConversionMap = new Map<number, number>();
   for (const view of knownViewRecords) {
     if (!view.viewerUserId) continue;
-    const firstBooking = firstBookingMap.get(`${view.viewerUserId}:${view.vendorId}`);
-    if (firstBooking && firstBooking > view.viewedAt) {
+    const bookingDates = summaryBookingDatesMap.get(`${view.viewerUserId}:${view.vendorId}`) ?? [];
+    if (bookingDates.some((d) => d > view.viewedAt)) {
       platformConversions++;
       vendorConversionMap.set(view.vendorId, (vendorConversionMap.get(view.vendorId) ?? 0) + 1);
     }

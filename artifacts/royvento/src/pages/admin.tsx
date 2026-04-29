@@ -1588,7 +1588,9 @@ function bookingStatusColor(status: string) {
 }
 
 function BookingReport() {
-  const [vendorId, setVendorId] = useState<string>("all");
+  const urlSearch = useSearch();
+  const initVendorId = new URLSearchParams(urlSearch).get("vendorId") ?? "all";
+  const [vendorId, setVendorId] = useState<string>(initVendorId);
   const [status, setStatus] = useState<string>("all");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -2225,7 +2227,7 @@ function CrmLeads() {
                             </Link>
                             {!isAnon && (
                               <Link
-                                href={`/admin?tab=booking-report`}
+                                href={`/admin?tab=booking-report&vendorId=${lead.vendorId}`}
                                 className="text-xs text-muted-foreground underline-offset-2 hover:underline whitespace-nowrap"
                                 onClick={(e) => e.stopPropagation()}
                               >
