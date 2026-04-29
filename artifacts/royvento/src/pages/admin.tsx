@@ -24,7 +24,7 @@ import {
   Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
-  Eye, UserCheck, UserX, TrendingUp, Filter,
+  Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -1471,6 +1471,57 @@ function BookingReport() {
   const [sortBy, setSortBy] = useState<string>("date");
   const [summaryOpen, setSummaryOpen] = useState(true);
 
+  type TopUser = { userId: number; name: string; email: string; phone: string; totalTickets: number; bookingCount: number };
+  type TopPub = { vendorId: number; businessName: string; city: string; totalTickets: number; bookingCount: number };
+  const [topUsers, setTopUsers] = useState<TopUser[]>([]);
+  const [topPubs, setTopPubs] = useState<TopPub[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [couponUserId, setCouponUserId] = useState<number | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState<string>("10");
+  const [couponSending, setCouponSending] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    setInsightsLoading(true);
+    const qs = new URLSearchParams();
+    if (startDate) qs.set("startDate", startDate);
+    if (endDate) qs.set("endDate", endDate);
+    if (vendorId !== "all") qs.set("partnerId", vendorId);
+    const q = qs.toString() ? `?${qs.toString()}` : "";
+    Promise.all([
+      apiGet<TopUser[]>(`/api/admin/booking-report/top-users${q}`),
+      apiGet<TopPub[]>(`/api/admin/booking-report/top-pubs${q}`),
+    ]).then(([u, p]) => {
+      if (!cancelled) { setTopUsers(u ?? []); setTopPubs(p ?? []); }
+    }).catch(() => { if (!cancelled) { setTopUsers([]); setTopPubs([]); } })
+      .finally(() => { if (!cancelled) setInsightsLoading(false); });
+    return () => { cancelled = true; };
+  }, [startDate, endDate, vendorId]);
+
+  async function handleSendCoupon(userId: number) {
+    const code = couponCode.trim().toUpperCase();
+    const discount = Number(couponDiscount);
+    if (!code || !discount || discount < 1 || discount > 100) {
+      toast({ title: "Invalid input", description: "Enter a code and discount between 1–100.", variant: "destructive" });
+      return;
+    }
+    setCouponSending(true);
+    try {
+      await apiPost(`/api/admin/users/${userId}/send-coupon`, { code, discount });
+      toast({ title: "Coupon sent", description: `${code} (${discount}% off) sent to user.` });
+      setCouponUserId(null);
+      setCouponCode("");
+      setCouponDiscount("10");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send coupon";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setCouponSending(false);
+    }
+  }
+
   // Debounce search
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 400);
@@ -1610,6 +1661,122 @@ function BookingReport() {
             <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={() => { setStartDate(""); setEndDate(""); }}>
               Clear dates
             </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Top 3 Users + Top 3 Pubs panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Top 3 Users */}
+        <div className="rounded-2xl glass-card p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Trophy className="h-4 w-4 text-yellow-400" />
+            <h3 className="text-sm font-semibold">Top 3 Bookers</h3>
+            <span className="text-xs text-muted-foreground ml-auto">by tickets booked</span>
+          </div>
+          {insightsLoading ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">Loading…</p>
+          ) : topUsers.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">No confirmed bookings in range.</p>
+          ) : (
+            <div className="space-y-2">
+              {topUsers.map((u, i) => (
+                <div key={u.userId} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <div className="flex items-start gap-3">
+                    <span className={`text-sm font-bold mt-0.5 w-5 shrink-0 ${i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-300" : "text-orange-400"}`}>
+                      #{i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{u.name || "Unknown"}</p>
+                      <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                      <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                        <span><span className="text-foreground font-semibold">{u.totalTickets}</span> tickets</span>
+                        <span><span className="text-foreground font-semibold">{u.bookingCount}</span> bookings</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 h-7 px-2 text-xs border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={() => {
+                        if (couponUserId === u.userId) { setCouponUserId(null); } else {
+                          setCouponUserId(u.userId); setCouponCode(""); setCouponDiscount("10");
+                        }
+                      }}
+                    >
+                      <Gift className="h-3 w-3 mr-1" />
+                      Coupon
+                    </Button>
+                  </div>
+                  {couponUserId === u.userId && (
+                    <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
+                      <p className="text-xs text-muted-foreground font-medium">Send coupon to {u.name}</p>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Code e.g. SAVE20"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          className="h-7 text-xs flex-1"
+                        />
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          placeholder="%"
+                          value={couponDiscount}
+                          onChange={(e) => setCouponDiscount(e.target.value)}
+                          className="h-7 text-xs w-16"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-7 px-3 text-xs"
+                          disabled={couponSending}
+                          onClick={() => handleSendCoupon(u.userId)}
+                        >
+                          {couponSending ? "…" : "Send"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Top 3 Pubs */}
+        <div className="rounded-2xl glass-card p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Trophy className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Top 3 Pubs / Clubs</h3>
+            <span className="text-xs text-muted-foreground ml-auto">by tickets sold</span>
+          </div>
+          {insightsLoading ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">Loading…</p>
+          ) : topPubs.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">No confirmed bookings in range.</p>
+          ) : (
+            <div className="space-y-2">
+              {topPubs.map((p, i) => (
+                <div
+                  key={p.vendorId}
+                  className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 flex items-start gap-3 cursor-pointer hover:border-primary/30 transition-colors"
+                  onClick={() => { setVendorId(String(p.vendorId)); setPage(1); }}
+                >
+                  <span className={`text-sm font-bold mt-0.5 w-5 shrink-0 ${i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-300" : "text-orange-400"}`}>
+                    #{i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{p.businessName}</p>
+                    {p.city && <p className="text-xs text-muted-foreground">{p.city}</p>}
+                    <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                      <span><span className="text-foreground font-semibold">{p.totalTickets}</span> tickets</span>
+                      <span><span className="text-foreground font-semibold">{p.bookingCount}</span> bookings</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

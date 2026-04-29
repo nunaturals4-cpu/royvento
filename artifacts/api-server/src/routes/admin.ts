@@ -7,6 +7,7 @@ import {
   usersTable,
   paymentsTable,
   profileViewsTable,
+  couponsTable,
 } from "@workspace/db";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -891,6 +892,130 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
     conversionRate,
     vendors,
   });
+});
+
+// ── Booking Report: top users & top pubs ──────────────────────────────────────
+
+function buildTopBookingConditions(
+  startDate?: string,
+  endDate?: string,
+  partnerId?: number | null,
+) {
+  const conds: ReturnType<typeof sql>[] = [
+    sql`${bookingsTable.status} IN ('confirmed', 'completed')`,
+  ];
+  if (startDate) conds.push(sql`${bookingsTable.createdAt} >= ${new Date(`${startDate}T00:00:00Z`)}`);
+  if (endDate) conds.push(sql`${bookingsTable.createdAt} <= ${new Date(`${endDate}T23:59:59Z`)}`);
+  if (partnerId && Number.isFinite(partnerId)) conds.push(sql`${bookingsTable.vendorId} = ${partnerId}`);
+  return conds;
+}
+
+router.get("/admin/booking-report/top-users", requireAuth(["admin"]), async (req, res) => {
+  const startDate = req.query["startDate"] as string | undefined;
+  const endDate = req.query["endDate"] as string | undefined;
+  const partnerId = req.query["partnerId"] ? Number(req.query["partnerId"]) : null;
+
+  const conds = buildTopBookingConditions(startDate, endDate, partnerId);
+
+  const rows = await db
+    .select({
+      userId: bookingsTable.userId,
+      totalTickets: sql<number>`(SUM(${bookingsTable.ticketWomen}) + SUM(${bookingsTable.ticketMen}) + SUM(${bookingsTable.ticketCouple}))::int`,
+      bookingCount: sql<number>`COUNT(*)::int`,
+    })
+    .from(bookingsTable)
+    .where(and(...conds))
+    .groupBy(bookingsTable.userId)
+    .orderBy(desc(sql`SUM(${bookingsTable.ticketWomen}) + SUM(${bookingsTable.ticketMen}) + SUM(${bookingsTable.ticketCouple})`))
+    .limit(3);
+
+  if (rows.length === 0) return res.json([]);
+
+  const users = await db.select().from(usersTable).where(inArray(usersTable.id, rows.map((r) => r.userId)));
+  const uMap = new Map(users.map((u) => [u.id, u]));
+
+  return res.json(rows.map((r) => ({
+    userId: r.userId,
+    name: uMap.get(r.userId)?.name ?? "",
+    email: uMap.get(r.userId)?.email ?? "",
+    phone: uMap.get(r.userId)?.phone ?? "",
+    totalTickets: r.totalTickets,
+    bookingCount: r.bookingCount,
+  })));
+});
+
+router.get("/admin/booking-report/top-pubs", requireAuth(["admin"]), async (req, res) => {
+  const startDate = req.query["startDate"] as string | undefined;
+  const endDate = req.query["endDate"] as string | undefined;
+  const partnerId = req.query["partnerId"] ? Number(req.query["partnerId"]) : null;
+
+  const conds = buildTopBookingConditions(startDate, endDate, partnerId);
+
+  const rows = await db
+    .select({
+      vendorId: bookingsTable.vendorId,
+      totalTickets: sql<number>`(SUM(${bookingsTable.ticketWomen}) + SUM(${bookingsTable.ticketMen}) + SUM(${bookingsTable.ticketCouple}))::int`,
+      bookingCount: sql<number>`COUNT(*)::int`,
+    })
+    .from(bookingsTable)
+    .where(and(...conds))
+    .groupBy(bookingsTable.vendorId)
+    .orderBy(desc(sql`SUM(${bookingsTable.ticketWomen}) + SUM(${bookingsTable.ticketMen}) + SUM(${bookingsTable.ticketCouple})`))
+    .limit(3);
+
+  if (rows.length === 0) return res.json([]);
+
+  const vendors = await db.select().from(vendorsTable).where(inArray(vendorsTable.id, rows.map((r) => r.vendorId)));
+  const vMap = new Map(vendors.map((v) => [v.id, v]));
+
+  return res.json(rows.map((r) => ({
+    vendorId: r.vendorId,
+    businessName: vMap.get(r.vendorId)?.businessName ?? `Partner #${r.vendorId}`,
+    city: vMap.get(r.vendorId)?.city ?? "",
+    totalTickets: r.totalTickets,
+    bookingCount: r.bookingCount,
+  })));
+});
+
+router.post("/admin/users/:userId/send-coupon", requireAuth(["admin"]), async (req, res) => {
+  const userId = Number(req.params["userId"]);
+  if (!Number.isFinite(userId)) {
+    res.status(400).json({ error: "Invalid userId" });
+    return;
+  }
+
+  const body = req.body as Record<string, unknown>;
+  const code = typeof body["code"] === "string" ? body["code"].trim().toUpperCase() : "";
+  const discount = typeof body["discount"] === "number" ? body["discount"] : Number(body["discount"]);
+
+  if (!code || !Number.isFinite(discount) || discount < 1 || discount > 100) {
+    res.status(400).json({ error: "Provide a valid code and discount (1–100)" });
+    return;
+  }
+
+  const [userRow] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!userRow) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const [existing] = await db.select({ id: couponsTable.id }).from(couponsTable).where(eq(couponsTable.code, code)).limit(1);
+  if (existing) {
+    res.status(409).json({ error: "Coupon code already exists" });
+    return;
+  }
+
+  const [c] = await db
+    .insert(couponsTable)
+    .values({
+      userId,
+      code,
+      discountPercent: Math.round(discount),
+      source: "admin_send",
+    })
+    .returning();
+
+  res.json(c);
 });
 
 export default router;
