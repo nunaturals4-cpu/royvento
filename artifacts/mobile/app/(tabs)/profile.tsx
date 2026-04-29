@@ -210,26 +210,28 @@ export default function ProfileScreen() {
           <View style={styles.quickRow}>
             <TouchableOpacity
               style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
-              onPress={() => router.push("/scanner")}
-            >
-              <Ionicons name="qr-code-outline" size={22} color={colors.primary} />
-              <Text style={[styles.quickLabel, { color: colors.primary }]}>Scan Ticket</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
               onPress={() => router.push("/vendor/dashboard")}
             >
               <Ionicons name="bar-chart-outline" size={22} color={colors.primary} />
               <Text style={[styles.quickLabel, { color: colors.primary }]}>Dashboard</Text>
             </TouchableOpacity>
             {user.role === "admin" && (
-              <TouchableOpacity
-                style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
-                onPress={() => router.push("/admin")}
-              >
-                <Ionicons name="shield-outline" size={22} color={colors.primary} />
-                <Text style={[styles.quickLabel, { color: colors.primary }]}>Admin Panel</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+                  onPress={() => router.push("/scanner")}
+                >
+                  <Ionicons name="qr-code-outline" size={22} color={colors.primary} />
+                  <Text style={[styles.quickLabel, { color: colors.primary }]}>Scan Ticket</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+                  onPress={() => router.push("/admin")}
+                >
+                  <Ionicons name="shield-outline" size={22} color={colors.primary} />
+                  <Text style={[styles.quickLabel, { color: colors.primary }]}>Admin Panel</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>

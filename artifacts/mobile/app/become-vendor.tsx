@@ -34,7 +34,7 @@ const CATEGORIES = [
 export default function BecomeVendorScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const [businessName, setBusinessName] = useState("");
@@ -49,37 +49,38 @@ export default function BecomeVendorScreen() {
       Alert.alert("Required", "Please enter your business name.");
       return;
     }
-    if (!city.trim()) {
-      Alert.alert("Required", "Please enter your city.");
-      return;
-    }
-    if (!state.trim()) {
-      Alert.alert("Required", "Please enter your state.");
-      return;
-    }
     setSubmitting(true);
     try {
-      await customFetch("/api/vendors/me", {
+      const message = [
+        description.trim(),
+        city.trim() ? `City: ${city.trim()}` : "",
+        state.trim() ? `State: ${state.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      await customFetch("/api/vendor-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessName: businessName.trim(),
           category,
-          description: description.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          location: `${city.trim()}, ${state.trim()}`,
+          message: message || "Partner application",
         }),
       });
-      await updateUser({ role: "vendor" });
       Alert.alert(
         "Application Submitted",
-        "Your partner application is under review. We'll notify you once approved.",
+        "Your partner application is under review. You'll be notified once an admin approves it. Your account will be upgraded then.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     } catch (e: unknown) {
       const err = e as { message?: string };
-      Alert.alert("Error", err?.message ?? "Failed to submit application.");
+      const msg = err?.message ?? "";
+      if (msg.includes("pending")) {
+        Alert.alert("Already Submitted", "You already have a pending partner application. Our team will review it shortly.");
+        router.back();
+      } else {
+        Alert.alert("Error", msg || "Failed to submit application. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
