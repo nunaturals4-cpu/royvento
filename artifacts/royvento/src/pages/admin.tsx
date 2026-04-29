@@ -174,9 +174,9 @@ function Analytics() {
       ) : !data ? null : (
       <>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Stat icon={Users} label="Users" value={String(data.totalUsers)} />
-        <Stat icon={Briefcase} label="Partners" value={String(data.totalVendors)} />
-        <Stat icon={Clock} label="Pending" value={String(data.pendingVendors)} />
+        <Stat icon={Users} label="New users" value={String(data.totalUsers)} />
+        <Stat icon={Briefcase} label="New partners" value={String(data.totalVendors)} />
+        <Stat icon={Clock} label="Pending approval" value={String(data.pendingVendors)} />
         <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
         <Stat icon={IndianRupee} label="Revenue" value={formatINR(data.totalRevenue)} />
       </div>
@@ -261,10 +261,10 @@ function Analytics() {
         </div>
       )}
 
-      {/* Platform daily revenue */}
+      {/* Platform daily revenue — always last 30 days ending at range end */}
       {hasDailyRevenue && (
         <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-5">Daily revenue — {presetLabel[preset]}</h3>
+          <h3 className="font-serif text-xl mb-5">Daily revenue — last 30 days</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={adminData.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />

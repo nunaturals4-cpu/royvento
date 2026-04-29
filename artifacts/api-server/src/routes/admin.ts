@@ -26,8 +26,18 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
 
   const [usersCount, vendorsCount, pendingCount, eventsCount, bookingsCount] =
     await Promise.all([
-      db.select({ c: sql<number>`count(*)::int` }).from(usersTable),
-      db.select({ c: sql<number>`count(*)::int` }).from(vendorsTable),
+      db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(usersTable)
+        .where(
+          sql`${usersTable.createdAt} >= ${rangeStart} AND ${usersTable.createdAt} <= ${rangeEnd}`,
+        ),
+      db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(vendorsTable)
+        .where(
+          sql`${vendorsTable.createdAt} >= ${rangeStart} AND ${vendorsTable.createdAt} <= ${rangeEnd}`,
+        ),
       db
         .select({ c: sql<number>`count(*)::int` })
         .from(vendorsTable)
@@ -130,13 +140,12 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   let totalWomen = 0;
   let totalMen = 0;
   let totalCouple = 0;
-  // Build daily map for the date range (cap at 90 days for readability)
+  // Daily chart: always last 30 days ending at rangeEnd
   const dailyMap = new Map<string, number>();
   const dayMs = 24 * 60 * 60 * 1000;
-  const rangeDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / dayMs);
-  const dailyCap = Math.min(rangeDays, 90);
-  const dailyStart = new Date(rangeEnd.getTime() - dailyCap * dayMs);
-  for (let i = dailyCap; i >= 0; i--) {
+  const dailyWindowDays = 30;
+  const dailyStart = new Date(rangeEnd.getTime() - dailyWindowDays * dayMs);
+  for (let i = dailyWindowDays; i >= 0; i--) {
     const d = new Date(rangeEnd.getTime() - i * dayMs);
     dailyMap.set(d.toISOString().slice(0, 10), 0);
   }
