@@ -238,7 +238,11 @@ router.post(
       return;
     }
     const existing = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
-    const extra: Record<string, unknown> = { status: "approved", approvedAt: new Date() };
+    const alreadyApproved = existing[0]?.status === "approved" && existing[0]?.approvedAt != null;
+    const extra: Record<string, unknown> = {
+      status: "approved",
+      ...(alreadyApproved ? {} : { approvedAt: new Date() }),
+    };
     if (existing[0] && !existing[0].ticketPrefix) {
       const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
       extra["ticketPrefix"] = await generateUniqueTicketPrefix(existing[0].businessName, existingPrefixes);

@@ -124,7 +124,7 @@ export function VendorDashboard() {
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
           <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
-          <TabsContent value="leads"><LeadsPanel isPremium={!!vendor.isPremium} /></TabsContent>
+          <TabsContent value="leads"><LeadsPanel /></TabsContent>
           <TabsContent value="managers"><ManagersPanel /></TabsContent>
         </Tabs>
       )}
@@ -1636,7 +1636,7 @@ function ManagersPanel() {
   );
 }
 
-function LeadsPanel({ isPremium }: { isPremium: boolean }) {
+function LeadsPanel() {
   const [data, setData] = useState<Lead | null>(null);
   useEffect(() => {
     apiGet<Lead>("/api/partner/leads/me").then(setData).catch(() => {});
