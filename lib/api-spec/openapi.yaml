@@ -786,6 +786,11 @@ paths:
           required: false
           schema:
             type: integer
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: integer
         - name: status
           in: query
           required: false

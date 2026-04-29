@@ -583,6 +583,7 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
   const offset = (pageNum - 1) * REPORT_PAGE_SIZE;
 
   const vendorIdParam = req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const userIdParam = req.query["userId"] ? Number(req.query["userId"]) : null;
   const statusParam = req.query["status"] as string | undefined;
   const startDateParam = req.query["startDate"] as string | undefined;
   const endDateParam = req.query["endDate"] as string | undefined;
@@ -594,6 +595,8 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
   const conditions: ReturnType<typeof sql>[] = [];
   if (vendorIdParam && Number.isFinite(vendorIdParam))
     conditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
+  if (userIdParam && Number.isFinite(userIdParam))
+    conditions.push(sql`${bookingsTable.userId} = ${userIdParam}`);
   if (statusParam && statusParam !== "all")
     conditions.push(sql`${bookingsTable.status} = ${statusParam}`);
   if (startDateParam)

@@ -1590,7 +1590,9 @@ function bookingStatusColor(status: string) {
 function BookingReport() {
   const urlSearch = useSearch();
   const initVendorId = new URLSearchParams(urlSearch).get("vendorId") ?? "all";
+  const initUserId = new URLSearchParams(urlSearch).get("userId") ?? "";
   const [vendorId, setVendorId] = useState<string>(initVendorId);
+  const [userId, setUserId] = useState<string>(initUserId);
   const [status, setStatus] = useState<string>("all");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -1609,6 +1611,7 @@ function BookingReport() {
 
   const params = {
     ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
+    ...(userId ? { userId: Number(userId) } : {}),
     ...(status !== "all" ? { status } : {}),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
@@ -1632,7 +1635,7 @@ function BookingReport() {
     : vendors;
 
   const resetFilters = () => {
-    setVendorId("all"); setStatus("all"); setStartDate(""); setEndDate("");
+    setVendorId("all"); setUserId(""); setStatus("all"); setStartDate(""); setEndDate("");
     setBookingType("all"); setSearch(""); setPage(1); setSortBy("date");
   };
 
@@ -1651,6 +1654,19 @@ function BookingReport() {
           Reset filters
         </Button>
       </div>
+
+      {/* Lead drilldown banner */}
+      {userId && (
+        <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 px-4 py-3 flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-blue-300">
+            <UserCheck className="h-4 w-4" />
+            <span>Showing bookings for lead user #{userId}{vendorId !== "all" && ` at partner #${vendorId}`}</span>
+          </div>
+          <button onClick={() => { setUserId(""); setPage(1); }} className="text-blue-400 hover:text-blue-200 underline text-xs">
+            Clear lead filter
+          </button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="rounded-2xl glass-card p-5 space-y-4">
@@ -2223,11 +2239,11 @@ function CrmLeads() {
                               className="text-xs text-primary underline-offset-2 hover:underline whitespace-nowrap"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              View profile
+                              View venue
                             </Link>
-                            {!isAnon && (
+                            {!isAnon && lead.viewerUserId && (
                               <Link
-                                href={`/admin?tab=booking-report&vendorId=${lead.vendorId}`}
+                                href={`/admin?tab=booking-report&userId=${lead.viewerUserId}&vendorId=${lead.vendorId}`}
                                 className="text-xs text-muted-foreground underline-offset-2 hover:underline whitespace-nowrap"
                                 onClick={(e) => e.stopPropagation()}
                               >

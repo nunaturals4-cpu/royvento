@@ -967,6 +967,7 @@ export const DeleteAvailabilityResponse = zod.object({
 export const GetAdminBookingsReportQueryParams = zod.object({
   page: zod.coerce.number().optional(),
   vendorId: zod.coerce.number().optional(),
+  userId: zod.coerce.number().optional(),
   status: zod.coerce.string().optional(),
   startDate: zod.coerce.string().optional(),
   endDate: zod.coerce.string().optional(),

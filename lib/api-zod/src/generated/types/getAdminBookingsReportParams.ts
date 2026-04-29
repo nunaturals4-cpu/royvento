@@ -9,6 +9,7 @@
 export type GetAdminBookingsReportParams = {
   page?: number;
   vendorId?: number;
+  userId?: number;
   status?: string;
   startDate?: string;
   endDate?: string;
