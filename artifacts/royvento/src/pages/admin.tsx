@@ -63,7 +63,6 @@ export function AdminPanel() {
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="vendors">Partners</TabsTrigger>
           <TabsTrigger value="requests">Partner requests</TabsTrigger>
-          <TabsTrigger value="booking-requests">Booking Requests</TabsTrigger>
           <TabsTrigger value="event-approvals">Event Approvals</TabsTrigger>
           <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
@@ -78,7 +77,6 @@ export function AdminPanel() {
         <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
         <TabsContent value="requests"><VendorRequests /></TabsContent>
-        <TabsContent value="booking-requests"><BookingRequestsAdmin /></TabsContent>
         <TabsContent value="event-approvals"><EventApprovalsAdmin /></TabsContent>
         <TabsContent value="events"><EventsAdmin /></TabsContent>
         <TabsContent value="subscriptions"><SubscriptionsAdmin /></TabsContent>
@@ -416,136 +414,6 @@ function Analytics() {
       </div>
       </>
       )}
-    </div>
-  );
-}
-
-interface AdminBooking {
-  id: number; eventId: number; userId: number; vendorId: number;
-  bookingDate: string; guests: number; totalPrice: number; finalPrice: number;
-  notes: string; status: string; eventTitle: string; eventImage: string;
-  vendorName: string; userName: string; userEmail: string;
-  pubMode: string; ticketWomen: number; ticketMen: number; ticketCouple: number;
-  rejectionReason: string | null;
-}
-
-function BookingRequestsAdmin() {
-  const [items, setItems] = useState<AdminBooking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [rejectingId, setRejectingId] = useState<number | null>(null);
-  const [reason, setReason] = useState("");
-  const { toast } = useToast();
-
-  const load = () => {
-    setLoading(true);
-    apiGet<AdminBooking[]>("/api/admin/bookings")
-      .then((rows) => setItems(rows.filter((b) => b.status === "pending")))
-      .catch((e) => toast({ title: "Failed to load", description: e?.message, variant: "destructive" }))
-      .finally(() => setLoading(false));
-  };
-  useEffect(() => { load(); }, []);
-
-  const approve = async (id: number) => {
-    try {
-      await apiPatch(`/api/admin/bookings/${id}/status`, { status: "confirmed" });
-      toast({ title: "Booking approved" });
-      load();
-    } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
-    }
-  };
-
-  const reject = async (id: number) => {
-    if (!reason.trim()) {
-      toast({ title: "Please enter a rejection reason", variant: "destructive" });
-      return;
-    }
-    try {
-      await apiPatch(`/api/admin/bookings/${id}/status`, { status: "cancelled", rejectionReason: reason.trim() });
-      toast({ title: "Booking rejected" });
-      setRejectingId(null);
-      setReason("");
-      load();
-    } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
-    }
-  };
-
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (items.length === 0)
-    return (
-      <div className="rounded-2xl glass-card p-10 text-center">
-        <CalendarCheck className="h-8 w-8 text-primary mx-auto mb-3" />
-        <p className="text-muted-foreground">No pending booking requests.</p>
-      </div>
-    );
-
-  return (
-    <div className="space-y-4">
-      {items.map((b) => (
-        <div key={b.id} className="rounded-2xl glass-card overflow-hidden">
-          <div className="p-5 flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div className="flex gap-4">
-              {b.eventImage && (
-                <img src={b.eventImage} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
-              )}
-              <div>
-                <p className="font-serif text-lg">{b.eventTitle}</p>
-                <p className="text-sm text-muted-foreground">{b.vendorName}</p>
-                <p className="text-sm mt-1">{b.userName} · {b.userEmail}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {b.bookingDate} · {b.guests} guests · {formatINR(b.finalPrice ?? b.totalPrice)}
-                </p>
-                {b.pubMode === "ticket" && (b.ticketWomen || b.ticketMen || b.ticketCouple) ? (
-                  <p className="text-xs text-muted-foreground">
-                    Tickets:{b.ticketWomen ? ` ${b.ticketWomen}W` : ""}{b.ticketMen ? ` ${b.ticketMen}M` : ""}{b.ticketCouple ? ` ${b.ticketCouple}C` : ""}
-                  </p>
-                ) : null}
-                {b.notes && <p className="text-sm italic text-muted-foreground mt-1">"{b.notes}"</p>}
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 shrink-0">
-              <div className="flex gap-2">
-                <Button onClick={() => approve(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5">
-                  <CheckCircle className="h-4 w-4" />Approve
-                </Button>
-                <Button
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => { setRejectingId(b.id); setReason(""); }}
-                >
-                  <XCircle className="h-4 w-4" />Reject
-                </Button>
-              </div>
-              <Link href={`/events/${b.eventId}`}>
-                <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground hover:text-foreground">
-                  View event details →
-                </Button>
-              </Link>
-            </div>
-          </div>
-          {rejectingId === b.id && (
-            <div className="border-t border-white/10 px-5 pb-5 pt-4 bg-black/20 space-y-3">
-              <p className="text-sm font-medium">Rejection reason (required)</p>
-              <Textarea
-                rows={2}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Enter reason for rejection…"
-                className="bg-black/40 border-white/10"
-              />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => reject(b.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0">
-                  Confirm rejection
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => { setRejectingId(null); setReason(""); }}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
