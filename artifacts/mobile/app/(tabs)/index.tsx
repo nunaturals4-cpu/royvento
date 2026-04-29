@@ -24,10 +24,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "@/components/EventCard";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
-
-const CATEGORIES = ["All", "Wedding", "Corporate", "Birthday", "Festival", "Concert", "Pubs"];
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -37,7 +36,6 @@ interface ChatMessage {
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [category, setCategory] = React.useState("All");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -46,15 +44,11 @@ export default function HomeScreen() {
 
   const featured = useListFeaturedEvents();
   const popular = useListEvents({ category: "Pubs" });
-  const allEvents = useListEvents({
-    category: category === "All" ? undefined : category,
-  });
 
   const isLoading = featured.isLoading && popular.isLoading;
   const onRefresh = () => {
     featured.refetch();
     popular.refetch();
-    allEvents.refetch();
   };
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -100,15 +94,10 @@ export default function HomeScreen() {
         style={[styles.hero, { paddingTop: topPadding + 20 }]}
       >
         <View style={styles.heroInner}>
-          <View>
-            <Text style={[styles.greeting, { color: colors.mutedForeground }]}>
-              Good evening
-            </Text>
-            <Text style={[styles.heroTitle, { color: colors.foreground }]}>
-              Discover{" "}
-              <Text style={{ color: colors.primary }}>Events</Text>
-            </Text>
-          </View>
+          <Text style={[styles.heroTitle, { color: colors.foreground }]}>
+            Discover{" "}
+            <Text style={{ color: colors.primary }}>Events</Text>
+          </Text>
           <Pressable
             onPress={() => router.push("/(tabs)/explore")}
             style={[styles.searchBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
@@ -118,62 +107,7 @@ export default function HomeScreen() {
         </View>
       </LinearGradient>
 
-      {/* Category chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-      >
-        {CATEGORIES.map((cat) => (
-          <Pressable
-            key={cat}
-            onPress={() => setCategory(cat)}
-            style={[
-              styles.chip,
-              {
-                backgroundColor: category === cat ? colors.primary : colors.muted,
-                borderColor: category === cat ? colors.primary : colors.border,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                { color: category === cat ? colors.primaryForeground : colors.mutedForeground },
-              ]}
-            >
-              {cat}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* Featured */}
-      {(featured.data?.length ?? 0) > 0 && (
-        <Section title="Featured Events" onSeeAll={() => router.push("/(tabs)/explore")}>
-          <FlatList
-            horizontal
-            data={featured.data}
-            keyExtractor={(item) => String(item.id)}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.row}
-            scrollEnabled={!!(featured.data?.length)}
-            renderItem={({ item }) => (
-              <EventCard
-                id={item.id}
-                title={item.title}
-                imageUrl={item.imageUrl}
-                location={item.location}
-                price={item.price}
-                category={item.category}
-                type={item.type}
-              />
-            )}
-          />
-        </Section>
-      )}
-
-      {/* Popular Pubs */}
+      {/* Popular Pubs — first */}
       {(popular.data?.length ?? 0) > 0 && (
         <Section title="Popular Pubs" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
           <FlatList
@@ -198,19 +132,18 @@ export default function HomeScreen() {
         </Section>
       )}
 
-      {/* All / Filtered events */}
-      <Section title={category === "All" ? "All Events" : category} icon="grid-outline">
-        {allEvents.isLoading ? (
-          <ActivityIndicator color={colors.primary} style={{ margin: 24 }} />
-        ) : (allEvents.data?.length ?? 0) === 0 ? (
-          <Text style={[styles.empty, { color: colors.mutedForeground }]}>
-            No events found
-          </Text>
-        ) : (
-          <View style={styles.grid}>
-            {allEvents.data!.map((item) => (
+      {/* Featured Events — second */}
+      {(featured.data?.length ?? 0) > 0 && (
+        <Section title="Featured Events" onSeeAll={() => router.push("/(tabs)/explore")}>
+          <FlatList
+            horizontal
+            data={featured.data}
+            keyExtractor={(item) => String(item.id)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            scrollEnabled={!!(featured.data?.length)}
+            renderItem={({ item }) => (
               <EventCard
-                key={item.id}
                 id={item.id}
                 title={item.title}
                 imageUrl={item.imageUrl}
@@ -218,14 +151,13 @@ export default function HomeScreen() {
                 price={item.price}
                 category={item.category}
                 type={item.type}
-                compact
-                style={{ width: "100%" }}
               />
-            ))}
-          </View>
-        )}
-      </Section>
+            )}
+          />
+        </Section>
+      )}
 
+      <MobileFooter />
       <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
     </ScrollView>
 
@@ -363,11 +295,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  greeting: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    marginBottom: 2,
-  },
   heroTitle: {
     fontSize: 28,
     fontFamily: "Inter_700Bold",
@@ -380,21 +307,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-  },
-  chips: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
   },
   section: {
     marginBottom: 8,
@@ -418,16 +330,6 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     paddingRight: 8,
     gap: 12,
-  },
-  grid: {
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  empty: {
-    textAlign: "center",
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    padding: 20,
   },
   fab: {
     position: "absolute",

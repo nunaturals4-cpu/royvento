@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "@/components/EventCard";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
@@ -195,6 +196,7 @@ export default function PartnerDetailScreen() {
         ) : null}
       </View>
 
+      <MobileFooter />
       <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
     </ScrollView>
   );

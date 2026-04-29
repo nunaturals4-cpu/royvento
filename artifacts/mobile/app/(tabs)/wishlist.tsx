@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { EventCard } from "@/components/EventCard";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -89,6 +90,7 @@ export default function WishlistScreen() {
           onRefresh={refetch}
           refreshing={isLoading}
           scrollEnabled={!!(data?.length)}
+          ListFooterComponent={<MobileFooter />}
           renderItem={({ item }) => (
             <View style={{ position: "relative" }}>
               <EventCard

@@ -30,6 +30,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -389,48 +390,6 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
-          {/* Partner */}
-          {vendor ? (
-            <Pressable
-              style={[styles.vendorRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => router.push(`/partner/${vendor.id}`)}
-            >
-              <View style={[styles.vendorAvatar, { backgroundColor: colors.muted }]}>
-                <Ionicons name="business-outline" size={20} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.vendorName, { color: colors.foreground }]}>{vendor.businessName}</Text>
-                <Text style={[styles.vendorCat, { color: colors.mutedForeground }]}>{vendor.category}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
-
-          {/* Reviews */}
-          {(reviews ?? []).length > 0 ? (
-            <View style={{ gap: 10 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
-              {reviews!.slice(0, 3).map((r) => (
-                <View key={r.id} style={[styles.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={styles.reviewHeader}>
-                    <View style={[styles.reviewAvatar, { backgroundColor: colors.muted }]}>
-                      <Ionicons name="person" size={14} color={colors.mutedForeground} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.reviewerName, { color: colors.foreground }]}>User #{r.userId}</Text>
-                      <View style={styles.stars}>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Ionicons key={i} name={i < r.rating ? "star" : "star-outline"} size={11} color={colors.primary} />
-                        ))}
-                      </View>
-                    </View>
-                  </View>
-                  {r.comment ? <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text> : null}
-                </View>
-              ))}
-            </View>
-          ) : null}
-
           {isPub && similarPubs.length > 0 ? (
             <View style={{ gap: 10 }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Similar Pubs Nearby</Text>
@@ -477,6 +436,8 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
         </View>
+
+        <MobileFooter />
 
         {/* ─── Booking form ─── */}
         {showBooking ? (

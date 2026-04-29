@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
@@ -103,6 +104,7 @@ export default function BlogsScreen() {
           data={blogs}
           keyExtractor={(b) => String(b.id)}
           contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }}
+          ListFooterComponent={<MobileFooter />}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <Pressable

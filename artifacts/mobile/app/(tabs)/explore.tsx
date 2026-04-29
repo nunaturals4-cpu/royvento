@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { EventCard } from "@/components/EventCard";
 import { LocationPicker } from "@/components/LocationPicker";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
@@ -243,11 +244,14 @@ export default function ExploreScreen() {
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.4}
           ListFooterComponent={
-            isFetchingNextPage ? (
-              <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
-            ) : hasNextPage ? null : events.length > PAGE_SIZE ? (
-              <Text style={[styles.endText, { color: colors.mutedForeground }]}>All events loaded</Text>
-            ) : null
+            <>
+              {isFetchingNextPage ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+              ) : hasNextPage ? null : events.length > PAGE_SIZE ? (
+                <Text style={[styles.endText, { color: colors.mutedForeground }]}>All events loaded</Text>
+              ) : null}
+              <MobileFooter />
+            </>
           }
           renderItem={({ item }) => (
             <EventCard

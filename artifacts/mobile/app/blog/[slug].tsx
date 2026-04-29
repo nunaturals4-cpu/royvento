@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
@@ -147,6 +148,8 @@ export default function BlogDetailScreen() {
       >
         <Text style={[styles.backLink, { color: colors.primary }]}>← Back to Blog</Text>
       </Pressable>
+
+      <MobileFooter />
     </ScrollView>
   );
 }

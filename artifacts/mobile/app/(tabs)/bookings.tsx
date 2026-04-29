@@ -19,6 +19,7 @@ import {
 import QRCode from "react-native-qrcode-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
+import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -221,6 +222,7 @@ export default function BookingsScreen() {
           onRefresh={refetch}
           refreshing={isLoading}
           scrollEnabled={!!(shown?.length)}
+          ListFooterComponent={<MobileFooter />}
           renderItem={({ item: b }) => {
             const status = (b.status ?? "pending") as BookingStatus;
             const meta = STATUS_META[status] ?? STATUS_META.pending;
