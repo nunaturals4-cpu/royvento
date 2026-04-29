@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "@/components/EventCard";
+import { MobileFooter } from "@/components/MobileFooter";
 import { useColors } from "@/hooks/useColors";
 
 const CITIES = ["All Cities", "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune", "Chennai", "Kolkata", "Goa"];
@@ -119,18 +120,22 @@ export default function PubsScreen() {
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : events.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="beer-outline" size={48} color={colors.mutedForeground} />
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Pubs Found</Text>
-          <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-            {search || city !== "All Cities" ? "Try different filters" : "Check back soon for new venues"}
-          </Text>
-        </View>
+        <>
+          <View style={styles.center}>
+            <Ionicons name="beer-outline" size={48} color={colors.mutedForeground} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Pubs Found</Text>
+            <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
+              {search || city !== "All Cities" ? "Try different filters" : "Check back soon for new venues"}
+            </Text>
+          </View>
+          <MobileFooter />
+        </>
       ) : (
         <FlatList
           data={events}
           keyExtractor={(e) => String(e.id)}
           contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: Platform.OS === "web" ? 80 : 120 }}
+          ListFooterComponent={<MobileFooter />}
           refreshControl={<RefreshControl refreshing={eventsQuery.isRefetching} onRefresh={() => eventsQuery.refetch()} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <EventCard
