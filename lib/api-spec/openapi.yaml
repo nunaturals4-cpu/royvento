@@ -1226,6 +1226,12 @@ components:
           type: array
           items:
             type: string
+        openTime:
+          type: string
+          nullable: true
+        closeTime:
+          type: string
+          nullable: true
         city:
           type: string
         state:

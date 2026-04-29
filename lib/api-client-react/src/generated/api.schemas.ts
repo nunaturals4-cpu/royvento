@@ -98,6 +98,8 @@ export interface Vendor {
   reviewCount: number;
   createdAt: string;
   openDays: string[];
+  openTime?: string | null;
+  closeTime?: string | null;
   city: string;
   state: string;
   country: string;

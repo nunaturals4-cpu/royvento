@@ -321,6 +321,12 @@ export default function VendorDashboardScreen() {
   const [profPhone, setProfPhone] = useState("");
   const [profLocation, setProfLocation] = useState({ country: "India", state: "", city: "" });
   const [profOpenDays, setProfOpenDays] = useState<string[]>([...ALL_DAYS]);
+  const [profOpenTime, setProfOpenTime] = useState("");
+  const [profCloseTime, setProfCloseTime] = useState("");
+  const [showOpenTimePicker, setShowOpenTimePicker] = useState(false);
+  const [showCloseTimePicker, setShowCloseTimePicker] = useState(false);
+  const [openTimeDate, setOpenTimeDate] = useState<Date>(() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d; });
+  const [closeTimeDate, setCloseTimeDate] = useState<Date>(() => { const d = new Date(); d.setHours(22, 0, 0, 0); return d; });
   const [profCatPickerOpen, setProfCatPickerOpen] = useState(false);
   const [profSaving, setProfSaving] = useState(false);
 
@@ -343,6 +349,20 @@ export default function VendorDashboardScreen() {
           ? vendor.openDays
           : [...ALL_DAYS],
       );
+      const ot = vendor.openTime ?? "";
+      const ct = vendor.closeTime ?? "";
+      setProfOpenTime(ot);
+      setProfCloseTime(ct);
+      if (ot) {
+        const [h, m] = ot.split(":").map(Number);
+        const d = new Date(); d.setHours(h ?? 9, m ?? 0, 0, 0);
+        setOpenTimeDate(d);
+      }
+      if (ct) {
+        const [h, m] = ct.split(":").map(Number);
+        const d = new Date(); d.setHours(h ?? 22, m ?? 0, 0, 0);
+        setCloseTimeDate(d);
+      }
     }
   }, [vendor?.id]);
 
@@ -374,6 +394,8 @@ export default function VendorDashboardScreen() {
           state: profLocation.state.trim(),
           country: profLocation.country.trim() || "India",
           openDays: profOpenDays.filter((d) => VALID_API_DAYS.includes(d)),
+          openTime: profOpenTime,
+          closeTime: profCloseTime,
         }),
       });
       if (profPhone.trim()) {
@@ -398,6 +420,20 @@ export default function VendorDashboardScreen() {
     setProfOpenDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
     );
+  }
+
+  function formatHHMM(date: Date): string {
+    const h = date.getHours().toString().padStart(2, "0");
+    const m = date.getMinutes().toString().padStart(2, "0");
+    return `${h}:${m}`;
+  }
+
+  function displayTime(timeStr: string): string {
+    if (!timeStr) return "Not set";
+    const [h, m] = timeStr.split(":").map(Number);
+    if (h === undefined || m === undefined || isNaN(h) || isNaN(m)) return "Not set";
+    const d = new Date(); d.setHours(h, m);
+    return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
   }
 
   // ─── Calendar tab ─────────────────────────────────────────────────────────────
@@ -836,6 +872,122 @@ export default function VendorDashboardScreen() {
               })}
             </View>
           </View>
+
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>OPENING HOURS</Text>
+          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.hoursRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Opens</Text>
+                <TouchableOpacity
+                  style={[styles.timeBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
+                  onPress={() => setShowOpenTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={15} color={colors.primary} />
+                  <Text style={[styles.timeBtnText, { color: profOpenTime ? colors.foreground : colors.mutedForeground }]}>
+                    {displayTime(profOpenTime)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Closes</Text>
+                <TouchableOpacity
+                  style={[styles.timeBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
+                  onPress={() => setShowCloseTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={15} color={colors.primary} />
+                  <Text style={[styles.timeBtnText, { color: profCloseTime ? colors.foreground : colors.mutedForeground }]}>
+                    {displayTime(profCloseTime)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {showOpenTimePicker && (
+            Platform.OS === "ios" ? (
+              <Modal transparent animationType="slide">
+                <View style={styles.datePickerModal}>
+                  <View style={[styles.datePickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.datePickerTitle, { color: colors.foreground }]}>Opening Time</Text>
+                    <DateTimePicker
+                      value={openTimeDate}
+                      mode="time"
+                      display="spinner"
+                      onChange={(_, d) => { if (d) setOpenTimeDate(d); }}
+                      themeVariant="dark"
+                    />
+                    <View style={styles.datePickerActions}>
+                      <TouchableOpacity
+                        style={[styles.datePickerCancel, { borderColor: colors.border }]}
+                        onPress={() => setShowOpenTimePicker(false)}
+                      >
+                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.datePickerConfirm, { backgroundColor: colors.primary }]}
+                        onPress={() => { setProfOpenTime(formatHHMM(openTimeDate)); setShowOpenTimePicker(false); }}
+                      >
+                        <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold" }}>Set Time</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            ) : (
+              <DateTimePicker
+                value={openTimeDate}
+                mode="time"
+                display="default"
+                onChange={(_, d) => {
+                  setShowOpenTimePicker(false);
+                  if (d) { setOpenTimeDate(d); setProfOpenTime(formatHHMM(d)); }
+                }}
+              />
+            )
+          )}
+
+          {showCloseTimePicker && (
+            Platform.OS === "ios" ? (
+              <Modal transparent animationType="slide">
+                <View style={styles.datePickerModal}>
+                  <View style={[styles.datePickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.datePickerTitle, { color: colors.foreground }]}>Closing Time</Text>
+                    <DateTimePicker
+                      value={closeTimeDate}
+                      mode="time"
+                      display="spinner"
+                      onChange={(_, d) => { if (d) setCloseTimeDate(d); }}
+                      themeVariant="dark"
+                    />
+                    <View style={styles.datePickerActions}>
+                      <TouchableOpacity
+                        style={[styles.datePickerCancel, { borderColor: colors.border }]}
+                        onPress={() => setShowCloseTimePicker(false)}
+                      >
+                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.datePickerConfirm, { backgroundColor: colors.primary }]}
+                        onPress={() => { setProfCloseTime(formatHHMM(closeTimeDate)); setShowCloseTimePicker(false); }}
+                      >
+                        <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold" }}>Set Time</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            ) : (
+              <DateTimePicker
+                value={closeTimeDate}
+                mode="time"
+                display="default"
+                onChange={(_, d) => {
+                  setShowCloseTimePicker(false);
+                  if (d) { setCloseTimeDate(d); setProfCloseTime(formatHHMM(d)); }
+                }}
+              />
+            )
+          )}
 
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>CONTACT INFO</Text>
 
@@ -1610,6 +1762,9 @@ const styles = StyleSheet.create({
   daysRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   dayChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
   dayText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  hoursRow: { flexDirection: "row", gap: 12 },
+  timeBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, marginTop: 4 },
+  timeBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   saveBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 },
   saveBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   createBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, marginBottom: 4 },
