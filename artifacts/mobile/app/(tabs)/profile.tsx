@@ -18,6 +18,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -123,7 +124,7 @@ export default function ProfileScreen() {
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : 100 }}
+      contentContainerStyle={{ paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }}
     >
       {/* Hero */}
       <LinearGradient
@@ -255,6 +256,9 @@ export default function ProfileScreen() {
       {/* Menu */}
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
+          (user.role === "vendor" || user.role === "admin")
+            ? { icon: "bar-chart-outline" as const, label: "Partner Dashboard", onPress: () => router.push("/vendor/dashboard") }
+            : { icon: "business-outline" as const, label: "Become a Partner", onPress: () => router.push("/become-vendor") },
           { icon: "ticket-outline" as const, label: "My Bookings", onPress: () => router.push("/(tabs)/bookings") },
           { icon: "heart-outline" as const, label: "Wishlist", onPress: () => router.push("/(tabs)/wishlist") },
           { icon: "search-outline" as const, label: "Explore Events", onPress: () => router.push("/(tabs)/explore") },

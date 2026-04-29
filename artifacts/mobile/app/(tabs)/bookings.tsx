@@ -19,6 +19,7 @@ import {
 import QRCode from "react-native-qrcode-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -216,7 +217,7 @@ export default function BookingsScreen() {
         <FlatList
           data={shown}
           keyExtractor={(b) => String(b.id)}
-          contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
+          contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
           onRefresh={refetch}
           refreshing={isLoading}
           scrollEnabled={!!(shown?.length)}

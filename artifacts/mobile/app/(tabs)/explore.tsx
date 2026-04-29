@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { EventCard } from "@/components/EventCard";
 import { LocationPicker } from "@/components/LocationPicker";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
 const PAGE_SIZE = 20;
@@ -234,7 +235,7 @@ export default function ExploreScreen() {
         <FlatList
           data={events}
           keyExtractor={(item, idx) => `${item.id}-${idx}`}
-          contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
+          contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
           showsVerticalScrollIndicator={false}
           onRefresh={refetch}
           refreshing={isLoading}

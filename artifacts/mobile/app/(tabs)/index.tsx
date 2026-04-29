@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "@/components/EventCard";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
 const CATEGORIES = ["All", "Wedding", "Corporate", "Birthday", "Festival", "Concert", "Pubs"];
@@ -225,12 +226,12 @@ export default function HomeScreen() {
         )}
       </Section>
 
-      <View style={{ height: Platform.OS === "web" ? 34 : 100 }} />
+      <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
     </ScrollView>
 
     {/* AI Chat FAB */}
     <TouchableOpacity
-      style={[styles.fab, { backgroundColor: colors.primary, bottom: Platform.OS === "web" ? 90 : 110 }]}
+      style={[styles.fab, { backgroundColor: colors.primary, bottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
       onPress={() => setChatOpen(true)}
     >
       <Ionicons name="chatbubble-ellipses" size={22} color={colors.primaryForeground} />
