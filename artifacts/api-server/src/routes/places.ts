@@ -3,7 +3,7 @@ import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
-router.get("/api/places/autocomplete", requireAuth, async (req, res) => {
+router.get("/api/places/autocomplete", requireAuth(["vendor", "admin"]), async (req, res) => {
   const q = String(req.query.q ?? "").trim();
   if (q.length < 3) {
     res.json([]);
