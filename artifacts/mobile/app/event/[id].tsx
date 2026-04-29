@@ -23,6 +23,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -159,6 +160,31 @@ export default function EventDetailScreen() {
     } else {
       addMutation.mutate({ data: { eventId } });
     }
+  };
+
+  const handleShare = async () => {
+    if (!event) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await Share.share({
+        title: event.title,
+        message: `Check out "${event.title}"${event.location ? ` at ${event.location}` : ""} on Royvento!\n\nhttps://royvento.app/events/${eventId}`,
+      });
+    } catch {
+      // share dismissed or failed — no-op
+    }
+  };
+
+  const handleOpenMaps = () => {
+    const query = encodeURIComponent(
+      [(event as unknown as { address?: string })?.address, event?.location, (event as unknown as { city?: string })?.city]
+        .filter(Boolean)
+        .join(", ") || "India",
+    );
+    const url = Platform.OS === "ios"
+      ? `maps://maps.apple.com/maps?q=${query}`
+      : `https://maps.google.com/?q=${query}`;
+    Linking.openURL(url).catch(() => Linking.openURL(`https://maps.google.com/?q=${query}`));
   };
 
   const handleValidateCoupon = async () => {
@@ -325,11 +351,35 @@ export default function EventDetailScreen() {
             <Pressable onPress={() => router.back()} style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
               <Ionicons name="arrow-back" size={20} color="#fff" />
             </Pressable>
-            <Pressable onPress={toggleWishlist} style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
-              <Ionicons name={isWishlisted ? "heart" : "heart-outline"} size={20} color={isWishlisted ? "#ef4444" : "#fff"} />
-            </Pressable>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <Pressable onPress={handleShare} style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+                <Ionicons name="share-outline" size={20} color="#fff" />
+              </Pressable>
+              <Pressable onPress={toggleWishlist} style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+                <Ionicons name={isWishlisted ? "heart" : "heart-outline"} size={20} color={isWishlisted ? "#ef4444" : "#fff"} />
+              </Pressable>
+            </View>
           </View>
         </View>
+
+        {/* Gallery strip — shown right below the hero, matching the web layout */}
+        {(event.galleryImages ?? []).length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.galleryStrip}
+            contentContainerStyle={styles.galleryStripContent}
+          >
+            {(event.galleryImages ?? []).map((img, i) => (
+              <Image
+                key={i}
+                source={{ uri: img }}
+                style={[styles.galleryStripImg, { borderColor: colors.border }]}
+                contentFit="cover"
+              />
+            ))}
+          </ScrollView>
+        ) : null}
 
         <View style={styles.content}>
           {/* Category + type + rating */}
@@ -353,10 +403,30 @@ export default function EventDetailScreen() {
 
           <Text style={[styles.eventTitle, { color: colors.foreground }]}>{event.title}</Text>
 
-          <View style={styles.row}>
-            <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
-            <Text style={[styles.location, { color: colors.mutedForeground }]}>{event.location || "India"}</Text>
-          </View>
+          <Pressable
+            onPress={handleOpenMaps}
+            style={[styles.locationCard, { backgroundColor: colors.muted, borderColor: colors.border }]}
+          >
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={[styles.locationIconBox, { backgroundColor: colors.primary + "20" }]}>
+                <Ionicons name="location" size={16} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.locationLabel, { color: colors.mutedForeground }]}>Location</Text>
+                <Text style={[styles.locationText, { color: colors.foreground }]} numberOfLines={2}>
+                  {[
+                    event.location,
+                    (event as unknown as { city?: string })?.city,
+                    (event as unknown as { state?: string })?.state,
+                  ].filter(Boolean).join(", ") || "India"}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Text style={{ fontSize: 11, color: colors.primary, fontFamily: "Inter_500Medium" }}>Open in Maps</Text>
+              <Ionicons name="open-outline" size={13} color={colors.primary} />
+            </View>
+          </Pressable>
 
           {/* Price */}
           {basePrice > 0 && !isPub ? (
@@ -387,20 +457,6 @@ export default function EventDetailScreen() {
             <View style={{ gap: 6 }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
               <Text style={[styles.description, { color: colors.mutedForeground }]}>{event.description}</Text>
-            </View>
-          ) : null}
-
-          {/* Gallery */}
-          {(event.galleryImages ?? []).length > 0 ? (
-            <View style={{ gap: 10 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Gallery</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
-                <View style={styles.gallery}>
-                  {(event.galleryImages ?? []).map((img, i) => (
-                    <Image key={i} source={{ uri: img }} style={[styles.galleryImg, { borderColor: colors.border }]} contentFit="cover" />
-                  ))}
-                </View>
-              </ScrollView>
             </View>
           ) : null}
 
@@ -797,6 +853,16 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
   imageContainer: { position: "relative", height: 300 },
   heroImage: { width: "100%", height: 300 },
+  galleryStrip: { marginTop: 2 },
+  galleryStripContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 10, flexDirection: "row" },
+  galleryStripImg: { width: 140, height: 96, borderRadius: 12, borderWidth: 1 },
+  locationCard: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    gap: 12, borderRadius: 14, borderWidth: 1, padding: 14,
+  },
+  locationIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  locationLabel: { fontSize: 10, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 },
+  locationText: { fontSize: 14, fontFamily: "Inter_500Medium", lineHeight: 19 },
   overlay: {
     position: "absolute", top: 0, left: 0, right: 0,
     flexDirection: "row", justifyContent: "space-between",
