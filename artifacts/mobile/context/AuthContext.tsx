@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -63,13 +64,23 @@ async function secureDelete(key: string): Promise<void> {
     try { localStorage.removeItem(key); } catch {}
     return;
   }
-  await SecureStore.deleteItemAsync(key);
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {
+  }
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode;
+  onAfterLogout?: () => void;
+}
+
+export function AuthProvider({ children, onAfterLogout }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const onAfterLogoutRef = useRef(onAfterLogout);
+  onAfterLogoutRef.current = onAfterLogout;
 
   useEffect(() => {
     secureGet(TOKEN_KEY)
@@ -99,9 +110,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await secureDelete(TOKEN_KEY);
-    setToken(null);
-    setUser(null);
+    try {
+      await secureDelete(TOKEN_KEY);
+    } finally {
+      setToken(null);
+      setUser(null);
+      onAfterLogoutRef.current?.();
+    }
   }, []);
 
   const updateUser = useCallback(async (patch: Partial<AuthUser>) => {

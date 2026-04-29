@@ -204,7 +204,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
+        <AuthProvider onAfterLogout={() => queryClient.clear()}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <StatusBar style="light" backgroundColor="#0e0d12" />
