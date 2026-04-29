@@ -54,6 +54,11 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const VALID_API_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+const DAY_FULL_NAMES: Record<string, string> = {
+  Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
+  Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+};
+
 const EVENT_CATEGORIES = [
   "Wedding", "Corporate", "Birthday", "Cultural", "Private",
   "Festival", "Concert", "Brand Activation", "Pubs",
@@ -969,7 +974,7 @@ export default function VendorDashboardScreen() {
             )}
           </View>
 
-          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>OPERATING DAYS &amp; HOURS</Text>
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8, marginBottom: 4 }]}>OPERATING HOURS</Text>
           {ALL_DAYS.map((day) => {
             const active = profOpenDays.includes(day);
             const dayErr = active ? (dayHoursErrors[day] ?? "") : "";
@@ -977,47 +982,92 @@ export default function VendorDashboardScreen() {
             const close = profDayTimes[day]?.close ?? "";
             const crossesMidnight = active && open && close && !dayErr && close < open;
             return (
-              <View key={day} style={[styles.field, { backgroundColor: active ? colors.card : colors.muted, borderColor: dayErr ? "#ef444480" : active ? colors.primary + "50" : colors.border, marginBottom: 6 }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                  <TouchableOpacity
-                    onPress={() => toggleDay(day)}
-                    style={[styles.dayChip, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border, marginBottom: 0, width: 44 }]}
-                  >
-                    <Text style={[styles.dayText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{day}</Text>
-                  </TouchableOpacity>
-                  {active ? (
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", gap: 8 }}>
-                        <TouchableOpacity
-                          style={[styles.timeBtn, { borderColor: dayErr ? "#ef4444" : colors.border, backgroundColor: colors.muted, flex: 1 }]}
-                          onPress={() => openDayTimePicker(day, "open")}
-                        >
-                          <Ionicons name="time-outline" size={14} color={dayErr ? "#ef4444" : colors.primary} />
-                          <Text style={[styles.timeBtnText, { color: open ? colors.foreground : colors.mutedForeground, fontSize: 12 }]}>
+              <View
+                key={day}
+                style={{
+                  marginBottom: 10,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: dayErr ? "#ef444450" : active ? colors.primary + "40" : colors.border,
+                  backgroundColor: active ? colors.card : colors.muted + "60",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Day header row — tap anywhere to toggle */}
+                <TouchableOpacity
+                  onPress={() => toggleDay(day)}
+                  activeOpacity={0.7}
+                  style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14 }}
+                >
+                  <View>
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 15, color: active ? colors.foreground : colors.mutedForeground }}>
+                      {DAY_FULL_NAMES[day]}
+                    </Text>
+                    {!active && (
+                      <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>Closed</Text>
+                    )}
+                  </View>
+                  {/* Toggle switch */}
+                  <View style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: active ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 3 }}>
+                    <View style={{
+                      width: 20, height: 20, borderRadius: 10,
+                      backgroundColor: "#fff",
+                      alignSelf: active ? "flex-end" : "flex-start",
+                      shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 3, elevation: 3,
+                    }} />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Time pickers — shown only when active */}
+                {active && (
+                  <View style={{ paddingHorizontal: 14, paddingBottom: 14, borderTopWidth: 1, borderTopColor: colors.border + "40" }}>
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                      {/* Opens at */}
+                      <TouchableOpacity
+                        style={{
+                          flex: 1, borderRadius: 10, borderWidth: 1,
+                          borderColor: dayErr ? "#ef4444" : colors.border,
+                          backgroundColor: colors.background,
+                          padding: 12,
+                        }}
+                        onPress={() => openDayTimePicker(day, "open")}
+                      >
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Opens at</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Ionicons name="time-outline" size={15} color={dayErr ? "#ef4444" : colors.primary} />
+                          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: open ? colors.foreground : colors.mutedForeground }}>
                             {displayTime(open)}
                           </Text>
-                        </TouchableOpacity>
-                        <Text style={{ color: colors.mutedForeground, alignSelf: "center", fontSize: 12 }}>–</Text>
-                        <TouchableOpacity
-                          style={[styles.timeBtn, { borderColor: dayErr ? "#ef4444" : colors.border, backgroundColor: colors.muted, flex: 1 }]}
-                          onPress={() => openDayTimePicker(day, "close")}
-                        >
-                          <Ionicons name="time-outline" size={14} color={dayErr ? "#ef4444" : colors.primary} />
-                          <Text style={[styles.timeBtnText, { color: close ? colors.foreground : colors.mutedForeground, fontSize: 12 }]}>
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Closes at */}
+                      <TouchableOpacity
+                        style={{
+                          flex: 1, borderRadius: 10, borderWidth: 1,
+                          borderColor: dayErr ? "#ef4444" : colors.border,
+                          backgroundColor: colors.background,
+                          padding: 12,
+                        }}
+                        onPress={() => openDayTimePicker(day, "close")}
+                      >
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Closes at</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Ionicons name="time-outline" size={15} color={dayErr ? "#ef4444" : colors.primary} />
+                          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: close ? colors.foreground : colors.mutedForeground }}>
                             {displayTime(close)}
                           </Text>
-                        </TouchableOpacity>
-                      </View>
-                      {dayErr ? (
-                        <Text style={{ fontSize: 11, color: "#ef4444", marginTop: 4, fontFamily: "Inter_400Regular" }}>{dayErr}</Text>
-                      ) : crossesMidnight ? (
-                        <Text style={{ fontSize: 11, color: "#f59e0b", marginTop: 4, fontFamily: "Inter_400Regular" }}>Crosses midnight</Text>
-                      ) : null}
+                        </View>
+                      </TouchableOpacity>
                     </View>
-                  ) : (
-                    <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic" }}>Closed</Text>
-                  )}
-                </View>
+
+                    {dayErr ? (
+                      <Text style={{ fontSize: 12, color: "#ef4444", fontFamily: "Inter_400Regular", marginTop: 8 }}>{dayErr}</Text>
+                    ) : crossesMidnight ? (
+                      <Text style={{ fontSize: 12, color: "#f59e0b", fontFamily: "Inter_400Regular", marginTop: 8 }}>↻ Overnight schedule — closes next day</Text>
+                    ) : null}
+                  </View>
+                )}
               </View>
             );
           })}

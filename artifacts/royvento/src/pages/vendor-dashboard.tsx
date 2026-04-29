@@ -22,7 +22,7 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
-  TrendingUp, IndianRupee,
+  TrendingUp, IndianRupee, Clock,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -133,6 +133,11 @@ export function VendorDashboard() {
 }
 
 const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+const DAY_FULL_NAMES: Record<string, string> = {
+  Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
+  Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+};
 
 type DayTimes = Record<string, { open: string; close: string }>;
 
@@ -346,54 +351,81 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           )}
         </div>
         <div>
-          <Label className="mb-2 block">Operating days &amp; hours <span className="text-muted-foreground text-xs">(click day to toggle · set times per open day)</span></Label>
-          <div className="space-y-2">
+          <Label className="mb-3 block text-sm font-medium">Operating hours</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {ALL_DAYS.map((day) => {
               const isOpen = openDays.includes(day);
+              const hasErr = !!dayHoursErrors[day];
+              const crossesMid = !hasErr && dayTimes[day]?.open && dayTimes[day]?.close &&
+                dayTimes[day]!.close < dayTimes[day]!.open;
               return (
-                <div key={day} className={`flex flex-col gap-1 rounded-lg border px-3 py-2 transition-colors ${isOpen ? (dayHoursErrors[day] ? "border-red-500/50 bg-red-600/5" : "border-green-500/30 bg-green-600/10") : "border-white/10 bg-white/5"}`}>
-                  <div className="flex items-center gap-3">
+                <div
+                  key={day}
+                  className={`rounded-xl border transition-all ${isOpen
+                    ? hasErr
+                      ? "border-red-500/40 bg-red-600/5"
+                      : "border-white/15 bg-white/[0.04]"
+                    : "border-white/8 bg-black/20"
+                  }`}
+                >
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div>
+                      <p className={`text-sm font-semibold leading-none ${isOpen ? "text-foreground" : "text-muted-foreground"}`}>
+                        {DAY_FULL_NAMES[day]}
+                      </p>
+                      {!isOpen && (
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Closed</p>
+                      )}
+                    </div>
                     <button
                       type="button"
+                      role="switch"
+                      aria-checked={isOpen}
                       onClick={() => toggleDay(day)}
-                      className={`w-12 text-sm font-medium shrink-0 rounded px-1.5 py-0.5 transition-colors ${isOpen ? "text-green-300" : "text-muted-foreground"}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isOpen ? "bg-primary" : "bg-white/20"}`}
                     >
-                      {day}
+                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition-transform ${isOpen ? "translate-x-4" : "translate-x-0"}`} />
                     </button>
-                    {isOpen ? (
-                      <>
-                        <Input
-                          type="time"
-                          value={dayTimes[day]?.open ?? ""}
-                          onChange={(e) => setDayTime(day, "open", e.target.value)}
-                          className={`bg-black/40 h-8 text-sm w-32 ${dayHoursErrors[day] ? "border-red-500" : "border-white/10"}`}
-                          title="Opening time"
-                        />
-                        <span className="text-muted-foreground text-xs">to</span>
-                        <Input
-                          type="time"
-                          value={dayTimes[day]?.close ?? ""}
-                          onChange={(e) => setDayTime(day, "close", e.target.value)}
-                          className={`bg-black/40 h-8 text-sm w-32 ${dayHoursErrors[day] ? "border-red-500" : "border-white/10"}`}
-                          title="Closing time"
-                        />
-                        {dayTimes[day]?.open && dayTimes[day]?.close && !dayHoursErrors[day] &&
-                          dayTimes[day]!.close < dayTimes[day]!.open && (
-                            <span className="text-xs text-amber-400">crosses midnight</span>
-                          )}
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">Closed</span>
-                    )}
                   </div>
-                  {dayHoursErrors[day] && (
-                    <p className="text-xs text-red-400 pl-14">{dayHoursErrors[day]}</p>
+                  {isOpen && (
+                    <div className="px-4 pb-4 pt-1 border-t border-white/8 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                            <Clock className="h-2.5 w-2.5" /> Opens
+                          </p>
+                          <Input
+                            type="time"
+                            value={dayTimes[day]?.open ?? ""}
+                            onChange={(e) => setDayTime(day, "open", e.target.value)}
+                            className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                            <Clock className="h-2.5 w-2.5" /> Closes
+                          </p>
+                          <Input
+                            type="time"
+                            value={dayTimes[day]?.close ?? ""}
+                            onChange={(e) => setDayTime(day, "close", e.target.value)}
+                            className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`}
+                          />
+                        </div>
+                      </div>
+                      {hasErr && (
+                        <p className="text-xs text-red-400">{dayHoursErrors[day]}</p>
+                      )}
+                      {crossesMid && (
+                        <p className="text-xs text-amber-400/90">↻ Overnight schedule — closes next day</p>
+                      )}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground mt-1.5">Click a day name to toggle open/closed. Set opening and closing times for each open day. If closing time is earlier than opening time it is treated as overnight (e.g. 10 pm – 2 am).</p>
+          <p className="text-xs text-muted-foreground mt-3">Toggle each day on or off. If closing time is earlier than opening time it is treated as an overnight schedule (e.g. 10 pm – 2 am).</p>
         </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}
