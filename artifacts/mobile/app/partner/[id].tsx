@@ -207,7 +207,7 @@ export default function PartnerDetailScreen() {
                         !times && { fontStyle: "italic" as const },
                       ]}>
                         {times
-                          ? `${fmt(times.open)} – ${fmt(times.close)}${isOvernight ? " +1" : ""}`
+                          ? `${fmt(times.open)} – ${fmt(times.close)}${isOvernight ? " (next day)" : ""}`
                           : "Closed"}
                       </Text>
                     </View>

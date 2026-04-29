@@ -123,7 +123,7 @@ export function VendorDetail() {
                       </span>
                       <span className={times ? (isToday ? "font-medium text-foreground" : "text-muted-foreground") : "text-muted-foreground/40 italic text-xs"}>
                         {times
-                          ? `${fmt(times.open)} – ${fmt(times.close)}${isOvernight ? " +1" : ""}`
+                          ? `${fmt(times.open)} – ${fmt(times.close)}${isOvernight ? " (next day)" : ""}`
                           : "Closed"}
                       </span>
                     </div>
