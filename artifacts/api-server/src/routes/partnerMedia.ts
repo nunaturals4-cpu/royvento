@@ -89,7 +89,7 @@ router.delete("/partner/media/:id", requireAuth(["vendor"]), async (req, res) =>
 
 const VALID_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-const HH_MM_RE = /^\d{2}:\d{2}$/;
+const HH_MM_RE = /^(0\d|1\d|2[0-3]):([0-5]\d)$/;
 
 const DayTimesSchema = z
   .object({

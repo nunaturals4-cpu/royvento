@@ -166,7 +166,16 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [descError, setDescError] = useState("");
-  const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>({});
+  const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>(() => {
+    const initial = parseDayHours(vendor.dayHours);
+    const errors: Record<string, string> = {};
+    for (const [day, times] of Object.entries(initial)) {
+      if (times.open && times.close && times.open === times.close) {
+        errors[day] = "Opening and closing time cannot be the same";
+      }
+    }
+    return errors;
+  });
   const update = useUpdateMyVendor();
   const { toast } = useToast();
 

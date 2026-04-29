@@ -362,6 +362,13 @@ export default function VendorDashboardScreen() {
           }
         }
         setProfDayTimes(times);
+        const initialErrors: Record<string, string> = {};
+        for (const [day, t] of Object.entries(times)) {
+          if (t.open && t.close && t.open === t.close) {
+            initialErrors[day] = "Opening and closing time cannot be the same";
+          }
+        }
+        setDayHoursErrors(initialErrors);
       }
       setProfAddress(vendor.address ?? "");
       setProfAddressQuery(vendor.address ?? "");
