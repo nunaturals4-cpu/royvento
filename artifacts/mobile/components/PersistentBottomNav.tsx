@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { usePathname, useRouter } from "expo-router";
+import { usePathname, useRouter, useSegments } from "expo-router";
 import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -51,9 +51,11 @@ export function PersistentBottomNav() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  const segments = useSegments();
 
-  const isAuth = pathname.startsWith("/(auth)") || pathname.startsWith("/login") || pathname.startsWith("/register");
-  if (isAuth) return null;
+  const isAuth = segments[0] === "(auth)";
+  const isTab = segments[0] === "(tabs)" || segments.length === 0 || pathname === "/";
+  if (isAuth || !isTab) return null;
 
   const bottomInset = Platform.OS === "web" ? 0 : insets.bottom;
   const totalHeight = BOTTOM_NAV_HEIGHT + bottomInset;
