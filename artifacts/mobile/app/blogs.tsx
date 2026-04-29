@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
 interface Blog {
@@ -101,7 +102,7 @@ export default function BlogsScreen() {
         <FlatList
           data={blogs}
           keyExtractor={(b) => String(b.id)}
-          contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: Platform.OS === "web" ? 60 : 100 }}
+          contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <Pressable

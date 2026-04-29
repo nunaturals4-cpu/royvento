@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "@/components/EventCard";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
 export default function PartnerDetailScreen() {
@@ -194,7 +195,7 @@ export default function PartnerDetailScreen() {
         ) : null}
       </View>
 
-      <View style={{ height: Platform.OS === "web" ? 34 : 80 }} />
+      <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
     </ScrollView>
   );
 }
