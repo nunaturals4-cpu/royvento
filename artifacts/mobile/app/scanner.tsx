@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
   ScrollView,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
@@ -42,15 +43,15 @@ export default function ScannerScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  const [mode, setMode] = useState<"camera" | "manual">("camera");
   const [manualCode, setManualCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const scanLock = useRef(false);
+  const manualInputRef = useRef<TextInput>(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
-  const scanCode = async (code: string) => {
+  const handleScan = async (code: string) => {
     if (scanLock.current || loading) return;
     const trimmed = code.trim();
     if (!trimmed) return;
@@ -79,116 +80,118 @@ export default function ScannerScreen() {
     scanLock.current = false;
   };
 
+  useEffect(() => {
+    if (result && result.code !== "OK" && result.code !== "ALREADY_CHECKED_IN") {
+      setTimeout(() => manualInputRef.current?.focus(), 100);
+    }
+  }, [result]);
+
   const resultColor = result?.code === "OK" ? "#22c55e"
     : result?.code === "ALREADY_CHECKED_IN" ? "#f97316"
     : "#ef4444";
 
+  const hasCameraPermission = permission?.granted;
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.foreground }]}>Ticket Scanner</Text>
-        <View style={styles.modeTabs}>
-          <Pressable
-            onPress={() => setMode("camera")}
-            style={[styles.modeTab, mode === "camera" && { backgroundColor: colors.primary }]}
-          >
-            <Ionicons name="camera-outline" size={16} color={mode === "camera" ? colors.primaryForeground : colors.mutedForeground} />
-            <Text style={[styles.modeTabText, { color: mode === "camera" ? colors.primaryForeground : colors.mutedForeground }]}>Camera</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setMode("manual")}
-            style={[styles.modeTab, mode === "manual" && { backgroundColor: colors.primary }]}
-          >
-            <Ionicons name="keypad-outline" size={16} color={mode === "manual" ? colors.primaryForeground : colors.mutedForeground} />
-            <Text style={[styles.modeTabText, { color: mode === "manual" ? colors.primaryForeground : colors.mutedForeground }]}>Manual</Text>
-          </Pressable>
-        </View>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-        {mode === "camera" ? (
-          <View style={styles.cameraSection}>
-            {!permission ? (
-              <View style={styles.permCenter}>
-                <ActivityIndicator color={colors.primary} />
-              </View>
-            ) : !permission.granted ? (
-              <View style={styles.permCenter}>
-                <Ionicons name="camera-off-outline" size={48} color={colors.mutedForeground} />
-                <Text style={[styles.permText, { color: colors.foreground }]}>Camera access needed</Text>
-                <Text style={[styles.permSub, { color: colors.mutedForeground }]}>Allow camera to scan QR codes from guest tickets.</Text>
-                <TouchableOpacity style={[styles.permBtn, { backgroundColor: colors.primary }]} onPress={requestPermission}>
-                  <Text style={[styles.permBtnText, { color: colors.primaryForeground }]}>Allow camera</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.cameraWrap}>
-                <CameraView
-                  style={styles.camera}
-                  facing="back"
-                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                  onBarcodeScanned={({ data }) => {
-                    // Support legacy QR format: royvento:booking:<id>:<date>
-                    const legacy = data.match(/royvento:booking:(\d+):/);
-                    if (legacy?.[1]) {
-                      scanCode(`RV-${String(legacy[1]).padStart(6, "0")}`);
-                    } else {
-                      scanCode(data);
-                    }
-                  }}
-                >
-                  <View style={styles.scanOverlay}>
-                    <View style={styles.scanFrame}>
-                      <View style={[styles.corner, styles.topLeft, { borderColor: colors.primary }]} />
-                      <View style={[styles.corner, styles.topRight, { borderColor: colors.primary }]} />
-                      <View style={[styles.corner, styles.bottomLeft, { borderColor: colors.primary }]} />
-                      <View style={[styles.corner, styles.bottomRight, { borderColor: colors.primary }]} />
-                    </View>
-                    <Text style={styles.scanHint}>Point camera at QR code</Text>
-                  </View>
-                </CameraView>
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.manualSection}>
-            <Text style={[styles.manualLabel, { color: colors.mutedForeground }]}>Enter ticket code</Text>
-            <View style={[styles.manualInputRow]}>
-              <TextInput
-                style={[styles.manualInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-                value={manualCode}
-                onChangeText={setManualCode}
-                placeholder="BLCK-000042-F9"
-                placeholderTextColor={colors.mutedForeground}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={() => scanCode(manualCode)}
-              />
-              <TouchableOpacity
-                style={[styles.manualBtn, { backgroundColor: colors.primary }, (loading || !manualCode.trim()) && { opacity: 0.5 }]}
-                disabled={loading || !manualCode.trim()}
-                onPress={() => scanCode(manualCode)}
-              >
-                {loading ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Ionicons name="checkmark" size={22} color={colors.primaryForeground} />}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        {/* Camera section — always shown at top */}
+        <View style={styles.cameraSection}>
+          {!permission ? (
+            <View style={styles.permCenter}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : !hasCameraPermission ? (
+            <View style={styles.permCenter}>
+              <Ionicons name="camera-off-outline" size={48} color={colors.mutedForeground} />
+              <Text style={[styles.permText, { color: colors.foreground }]}>Camera access needed</Text>
+              <Text style={[styles.permSub, { color: colors.mutedForeground }]}>Allow camera to scan QR codes from guest tickets.</Text>
+              <TouchableOpacity style={[styles.permBtn, { backgroundColor: colors.primary }]} onPress={requestPermission}>
+                <Text style={[styles.permBtnText, { color: colors.primaryForeground }]}>Allow camera</Text>
               </TouchableOpacity>
             </View>
-            <Text style={[styles.manualHint, { color: colors.mutedForeground }]}>
-              Format: PREFIX-NNNNNN-XX or legacy RV-NNNNNN
-            </Text>
-          </View>
-        )}
+          ) : (
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+              onBarcodeScanned={({ data }) => {
+                const legacy = data.match(/royvento:booking:(\d+):/);
+                if (legacy?.[1]) {
+                  handleScan(`RV-${String(legacy[1]).padStart(6, "0")}`);
+                } else {
+                  handleScan(data);
+                }
+              }}
+            >
+              <View style={styles.scanOverlay}>
+                <View style={styles.scanFrame}>
+                  <View style={[styles.corner, styles.topLeft, { borderColor: colors.primary }]} />
+                  <View style={[styles.corner, styles.topRight, { borderColor: colors.primary }]} />
+                  <View style={[styles.corner, styles.bottomLeft, { borderColor: colors.primary }]} />
+                  <View style={[styles.corner, styles.bottomRight, { borderColor: colors.primary }]} />
+                </View>
+                <Text style={styles.scanHint}>Point camera at QR code</Text>
+              </View>
+            </CameraView>
+          )}
+        </View>
 
-        {loading && !result && (
+        {/* Divider with label */}
+        <View style={[styles.dividerRow, { borderColor: colors.border }]}>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dividerLabel, { color: colors.mutedForeground, backgroundColor: colors.background }]}>or enter code manually</Text>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        </View>
+
+        {/* Manual code entry — always shown below camera */}
+        <View style={styles.manualSection}>
+          <Text style={[styles.manualLabel, { color: colors.mutedForeground }]}>Ticket code</Text>
+          <View style={styles.manualInputRow}>
+            <TextInput
+              ref={manualInputRef}
+              style={[styles.manualInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+              value={manualCode}
+              onChangeText={setManualCode}
+              placeholder="BLCK-000042-F9"
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={() => handleScan(manualCode)}
+            />
+            <TouchableOpacity
+              style={[styles.manualBtn, { backgroundColor: colors.primary }, (loading || !manualCode.trim()) && { opacity: 0.5 }]}
+              disabled={loading || !manualCode.trim()}
+              onPress={() => handleScan(manualCode)}
+            >
+              {loading
+                ? <ActivityIndicator size="small" color={colors.primaryForeground} />
+                : <Ionicons name="checkmark" size={22} color={colors.primaryForeground} />
+              }
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.manualHint, { color: colors.mutedForeground }]}>
+            Format: PREFIX-NNNNNN-XX  ·  Legacy: RV-NNNNNN
+          </Text>
+        </View>
+
+        {/* Loading indicator */}
+        {loading && (
           <View style={styles.loadingBanner}>
             <ActivityIndicator color={colors.primary} />
             <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Validating ticket…</Text>
           </View>
         )}
 
+        {/* Scan result card */}
         {result && (
           <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: resultColor + "60" }]}>
             <View style={styles.resultHeader}>
@@ -247,7 +250,9 @@ export default function ScannerScreen() {
                     )}
                   </View>
                 ) : (
-                  <Text style={[styles.bookingMeta, { color: colors.mutedForeground, marginTop: 4 }]}>{result.booking.guests} guest{result.booking.guests !== 1 ? "s" : ""}</Text>
+                  <Text style={[styles.bookingMeta, { color: colors.mutedForeground, marginTop: 4 }]}>
+                    {result.booking.guests} guest{result.booking.guests !== 1 ? "s" : ""}
+                  </Text>
                 )}
               </View>
             )}
@@ -257,43 +262,44 @@ export default function ScannerScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const CORNER_SIZE = 24;
 
 const styles = StyleSheet.create({
-  header: { paddingBottom: 14, paddingHorizontal: 20, borderBottomWidth: 1, gap: 12 },
+  header: { paddingBottom: 14, paddingHorizontal: 20, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", gap: 14 },
   backBtn: { flexDirection: "row", alignItems: "center" },
-  title: { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
-  modeTabs: { flexDirection: "row", borderRadius: 10, backgroundColor: "#1a1a1a", padding: 3, gap: 2 },
-  modeTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 7, borderRadius: 8 },
-  modeTabText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  cameraSection: { flex: 1, minHeight: 320 },
-  cameraWrap: { flex: 1, position: "relative" },
-  camera: { flex: 1, minHeight: 320 },
+  title: { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.3, flex: 1 },
+  cameraSection: { height: 280, backgroundColor: "#000", position: "relative" },
+  camera: { flex: 1 },
   scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
-  scanFrame: { width: 220, height: 220, position: "relative" },
+  scanFrame: { width: 200, height: 200, position: "relative" },
   corner: { position: "absolute", width: CORNER_SIZE, height: CORNER_SIZE, borderWidth: 3 },
   topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 4 },
   topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 4 },
   bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 4 },
   bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 4 },
-  scanHint: { position: "absolute", bottom: -36, color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
-  permCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12, minHeight: 300 },
-  permText: { fontSize: 18, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+  scanHint: { position: "absolute", bottom: -34, color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  permCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
+  permText: { fontSize: 16, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   permSub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
   permBtn: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   permBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  manualSection: { padding: 24, gap: 8 },
-  manualLabel: { fontSize: 13, fontFamily: "Inter_500Medium", marginBottom: 4 },
+  dividerRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, gap: 10 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerLabel: { fontSize: 11, fontFamily: "Inter_400Regular", paddingHorizontal: 6 },
+  manualSection: { paddingHorizontal: 20, paddingBottom: 4, gap: 8 },
+  manualLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
   manualInputRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  manualInput: { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 18, fontFamily: "Inter_400Regular", letterSpacing: 2 },
-  manualBtn: { width: 50, height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  manualHint: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  loadingBanner: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 24, paddingVertical: 12 },
+  manualInput: { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, fontSize: 17, fontFamily: "Inter_400Regular", letterSpacing: 2 },
+  manualBtn: { width: 52, height: 52, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  manualHint: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  loadingBanner: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 20, paddingVertical: 12 },
   loadingText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   resultCard: { margin: 16, borderRadius: 20, borderWidth: 1.5, overflow: "hidden" },
   resultHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16 },
