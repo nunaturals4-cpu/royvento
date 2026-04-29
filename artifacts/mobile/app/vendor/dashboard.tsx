@@ -38,6 +38,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { LocationPicker } from "@/components/LocationPicker";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -616,7 +617,7 @@ export default function VendorDashboardScreen() {
       <FlatList
         data={allBookings}
         keyExtractor={(b) => String(b.id)}
-        contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
         onRefresh={bookingsQ.refetch}
         refreshing={bookingsQ.isLoading}
         renderItem={({ item: b }) => {
@@ -687,7 +688,7 @@ export default function VendorDashboardScreen() {
         ListEmptyComponent={
           <EmptyState icon="calendar-outline" title="No listings yet" subtitle="Create your first event or pub listing" />
         }
-        contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
         onRefresh={eventsQ.refetch}
         refreshing={eventsQ.isLoading}
         ListHeaderComponent={

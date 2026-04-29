@@ -30,6 +30,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -718,12 +719,12 @@ export default function EventDetailScreen() {
           </View>
         ) : null}
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 120 }} />
       </ScrollView>
 
       {/* Sticky book button */}
       {!showBooking ? (
-        <View style={[styles.stickyBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 12) }]}>
+        <View style={[styles.stickyBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + (Platform.OS === "web" ? 34 : 12) }]}>
           <TouchableOpacity
             style={[styles.bookBtn, { backgroundColor: colors.primary }]}
             onPress={() => {

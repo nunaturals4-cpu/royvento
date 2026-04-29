@@ -54,8 +54,7 @@ export function PersistentBottomNav() {
   const segments = useSegments();
 
   const isAuth = segments[0] === "(auth)";
-  const isTab = segments[0] === "(tabs)" || segments.length === 0 || pathname === "/";
-  if (isAuth || !isTab) return null;
+  if (isAuth) return null;
 
   const bottomInset = Platform.OS === "web" ? 0 : insets.bottom;
   const totalHeight = BOTTOM_NAV_HEIGHT + bottomInset;

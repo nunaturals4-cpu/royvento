@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { LocationPicker } from "@/components/LocationPicker";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -89,7 +90,7 @@ export default function BecomeVendorScreen() {
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 60 }}
       >
         {/* Header */}
         <LinearGradient
