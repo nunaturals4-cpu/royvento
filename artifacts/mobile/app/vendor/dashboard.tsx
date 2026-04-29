@@ -140,7 +140,7 @@ const DEFAULT_EVENT_FORM: EventFormState = {
 export default function VendorDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<DashTab>("bookings");
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -315,10 +315,13 @@ export default function VendorDashboardScreen() {
   // ─── Profile tab ─────────────────────────────────────────────────────────────
   const [profName, setProfName] = useState("");
   const [profDesc, setProfDesc] = useState("");
+  const [profCategory, setProfCategory] = useState("");
+  const [profPhone, setProfPhone] = useState("");
   const [profCity, setProfCity] = useState("");
   const [profState, setProfState] = useState("");
   const [profCountry, setProfCountry] = useState("India");
   const [profOpenDays, setProfOpenDays] = useState<string[]>([...ALL_DAYS]);
+  const [profCatPickerOpen, setProfCatPickerOpen] = useState(false);
   const [profSaving, setProfSaving] = useState(false);
 
   const updateVendorMut = useUpdateMyVendor({
@@ -329,6 +332,7 @@ export default function VendorDashboardScreen() {
     if (vendor) {
       setProfName(vendor.businessName ?? "");
       setProfDesc(vendor.description ?? "");
+      setProfCategory(vendor.category ?? "");
       setProfCity(vendor.city ?? "");
       setProfState(vendor.state ?? "");
       setProfCountry(vendor.country || "India");
@@ -340,6 +344,10 @@ export default function VendorDashboardScreen() {
     }
   }, [vendor?.id]);
 
+  useEffect(() => {
+    if (user) setProfPhone(user.phone ?? "");
+  }, [user?.id]);
+
   async function saveProfile() {
     setProfSaving(true);
     try {
@@ -347,7 +355,7 @@ export default function VendorDashboardScreen() {
         data: {
           businessName: profName.trim(),
           description: profDesc.trim(),
-          category: vendor?.category ?? "Cultural",
+          category: profCategory || vendor?.category || "Cultural",
           location: `${profCity}${profState ? ", " + profState : ""}`,
           bannerImage: vendor?.bannerImage ?? "",
           portfolioImages: vendor?.portfolioImages ?? [],
@@ -363,6 +371,14 @@ export default function VendorDashboardScreen() {
           openDays: profOpenDays.filter((d) => VALID_API_DAYS.includes(d)),
         }),
       });
+      if (profPhone.trim()) {
+        await customFetch("/api/users/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: profPhone.trim() }),
+        });
+        await updateUser({ phone: profPhone.trim() });
+      }
       qc.invalidateQueries({ queryKey: getGetMyVendorQueryKey() });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Saved", "Your profile has been updated.");
@@ -745,6 +761,33 @@ export default function VendorDashboardScreen() {
           </View>
 
           <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Category *</Text>
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+              onPress={() => setProfCatPickerOpen((v) => !v)}
+            >
+              <Text style={[styles.fieldInput, { color: profCategory ? colors.foreground : colors.mutedForeground }]}>
+                {profCategory || "Select category"}
+              </Text>
+              <Ionicons name={profCatPickerOpen ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            {profCatPickerOpen && (
+              <View style={{ marginTop: 8, gap: 4 }}>
+                {EVENT_CATEGORIES.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    onPress={() => { setProfCategory(c); setProfCatPickerOpen(false); }}
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 }}
+                  >
+                    <Text style={{ color: c === profCategory ? colors.primary : colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}>{c}</Text>
+                    {c === profCategory ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Description</Text>
             <TextInput
               style={[styles.fieldInput, styles.textArea, { color: colors.foreground }]}
@@ -816,6 +859,21 @@ export default function VendorDashboardScreen() {
                 );
               })}
             </View>
+          </View>
+
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>CONTACT INFO</Text>
+
+          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Contact Phone</Text>
+            <TextInput
+              style={[styles.fieldInput, { color: colors.foreground }]}
+              value={profPhone}
+              onChangeText={setProfPhone}
+              placeholder="+91 98765 43210"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="phone-pad"
+              autoComplete="tel"
+            />
           </View>
 
           <TouchableOpacity

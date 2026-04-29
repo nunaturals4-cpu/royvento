@@ -28,6 +28,10 @@ function NativeTabLayout({ isVendor }: { isVendor: boolean }) {
         <Icon sf={{ default: "ticket", selected: "ticket.fill" }} />
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="wishlist">
+        <Icon sf={{ default: "heart", selected: "heart.fill" }} />
+        <Label>Wishlist</Label>
+      </NativeTabs.Trigger>
       {isVendor ? (
         <NativeTabs.Trigger name="vendor">
           <Icon sf={{ default: "building.2", selected: "building.2.fill" }} />
