@@ -20,6 +20,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -117,6 +118,7 @@ export default function EventDetailScreen() {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [showBooking, setShowBooking] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
   const [couponInput, setCouponInput] = useState("");
@@ -837,7 +839,7 @@ export default function EventDetailScreen() {
           <TouchableOpacity
             style={[styles.bookBtn, { backgroundColor: colors.primary }]}
             onPress={() => {
-              if (!user) { router.push("/(auth)/login"); return; }
+              if (!user) { setShowSignInModal(true); return; }
               setShowBooking(true);
             }}
           >
@@ -846,6 +848,54 @@ export default function EventDetailScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      {/* Sign-in prompt modal */}
+      <Modal
+        visible={showSignInModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSignInModal(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShowSignInModal(false)}
+        >
+          <Pressable
+            style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => {}}
+          >
+            <View style={[styles.modalIconWrap, { backgroundColor: colors.primary + "18" }]}>
+              <Ionicons name="ticket-outline" size={32} color={colors.primary} />
+            </View>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Sign in to complete your booking</Text>
+            <Text style={[styles.modalBody, { color: colors.mutedForeground }]}>
+              Create an account or sign in to book this event and manage your tickets.
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalPrimaryBtn, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setShowSignInModal(false);
+                router.push({ pathname: "/(auth)/login", params: { returnTo: `/event/${eventId}` } });
+              }}
+            >
+              <Ionicons name="log-in-outline" size={18} color={colors.primaryForeground} />
+              <Text style={[styles.modalPrimaryBtnText, { color: colors.primaryForeground }]}>Sign In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalSecondaryBtn, { borderColor: colors.border }]}
+              onPress={() => {
+                setShowSignInModal(false);
+                router.push({ pathname: "/(auth)/register", params: { returnTo: `/event/${eventId}` } });
+              }}
+            >
+              <Text style={[styles.modalSecondaryBtnText, { color: colors.foreground }]}>Create an Account</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowSignInModal(false)} style={{ marginTop: 4 }}>
+              <Text style={[styles.modalDismiss, { color: colors.mutedForeground }]}>Maybe later</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -951,4 +1001,14 @@ const styles = StyleSheet.create({
   similarPubName: { fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18 },
   similarPubCity: { fontSize: 11, fontFamily: "Inter_400Regular" },
   similarPubPrice: { fontSize: 13, fontFamily: "Inter_700Bold", marginTop: 4 },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 28, gap: 14, alignItems: "center" },
+  modalIconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center", letterSpacing: -0.3 },
+  modalBody: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21 },
+  modalPrimaryBtn: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 16, marginTop: 4 },
+  modalPrimaryBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  modalSecondaryBtn: { width: "100%", alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 14, paddingVertical: 14 },
+  modalSecondaryBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  modalDismiss: { fontSize: 13, fontFamily: "Inter_400Regular", paddingVertical: 8 },
 });

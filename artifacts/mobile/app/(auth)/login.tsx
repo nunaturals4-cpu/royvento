@@ -4,7 +4,7 @@ import * as AuthSession from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import {
@@ -31,6 +31,8 @@ export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") ? rawReturnTo : undefined;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -60,7 +62,7 @@ export default function LoginScreen() {
         .then(async (data) => {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           await login(data.token, data.user);
-          router.replace("/(tabs)");
+          router.replace(returnTo ? (returnTo as never) : "/(tabs)");
         })
         .catch((err: Error) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -77,7 +79,7 @@ export default function LoginScreen() {
       onSuccess: async (data) => {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         await login(data.token, data.user as AuthUser);
-        router.replace("/(tabs)");
+        router.replace(returnTo ? (returnTo as never) : "/(tabs)");
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -216,7 +218,7 @@ export default function LoginScreen() {
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
             Don't have an account?{" "}
           </Text>
-          <Pressable onPress={() => router.push("/(auth)/register")}>
+          <Pressable onPress={() => router.push(returnTo ? { pathname: "/(auth)/register", params: { returnTo } } : "/(auth)/register")}>
             <Text style={[styles.link, { color: colors.primary }]}>Sign Up</Text>
           </Pressable>
         </View>

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRegister } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -25,6 +25,8 @@ export default function RegisterScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") ? rawReturnTo : undefined;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +37,7 @@ export default function RegisterScreen() {
       onSuccess: async (data) => {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         await login(data.token, data.user as import("@/context/AuthContext").AuthUser);
-        router.replace("/(tabs)");
+        router.replace(returnTo ? (returnTo as never) : "/(tabs)");
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -148,7 +150,7 @@ export default function RegisterScreen() {
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
             Already have an account?{" "}
           </Text>
-          <Pressable onPress={() => router.push("/(auth)/login")}>
+          <Pressable onPress={() => router.push(returnTo ? { pathname: "/(auth)/login", params: { returnTo } } : "/(auth)/login")}>
             <Text style={[styles.link, { color: colors.primary }]}>Sign In</Text>
           </Pressable>
         </View>
