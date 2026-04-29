@@ -120,8 +120,8 @@ export function EventDetail() {
 
   const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const vendorOpenDays: string[] = (ev.vendor?.openDays ?? []) as string[];
-  const vendorDayHours = (ev.vendor as any)?.dayHours as Record<string, { open: string; close: string } | null> | null | undefined;
-  const vendorAddress: string = (ev.vendor as any)?.address ?? "";
+  const vendorDayHours = ev.vendor?.dayHours as Record<string, { open: string; close: string } | null> | null | undefined;
+  const vendorAddress: string = ev.vendor?.address ?? "";
 
   const formatHour = (t: string): string => {
     const [h, m] = t.split(":").map(Number);

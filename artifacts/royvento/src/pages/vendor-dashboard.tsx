@@ -143,7 +143,8 @@ function parseDayHours(raw: unknown): DayTimes {
   const out: DayTimes = {};
   for (const [day, val] of Object.entries(raw as Record<string, unknown>)) {
     if (val && typeof val === "object" && "open" in val && "close" in val) {
-      out[day] = { open: String((val as any).open), close: String((val as any).close) };
+      const entry = val as { open: unknown; close: unknown };
+      out[day] = { open: String(entry.open), close: String(entry.close) };
     }
   }
   return out;

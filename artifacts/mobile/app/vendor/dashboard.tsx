@@ -356,7 +356,8 @@ export default function VendorDashboardScreen() {
         const times: Record<string, { open: string; close: string }> = {};
         for (const [day, val] of Object.entries(dh as Record<string, unknown>)) {
           if (val && typeof val === "object" && "open" in val && "close" in val) {
-            times[day] = { open: String((val as any).open), close: String((val as any).close) };
+            const entry = val as { open: unknown; close: unknown };
+            times[day] = { open: String(entry.open), close: String(entry.close) };
           }
         }
         setProfDayTimes(times);
@@ -783,9 +784,12 @@ export default function VendorDashboardScreen() {
               <Text style={[styles.createBtnText, { color: colors.primaryForeground }]}>New Listing</Text>
             </TouchableOpacity>
           ) : (
-            <View style={[styles.createBtn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }]}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-              <Text style={[styles.createBtnText, { color: colors.mutedForeground }]}>Pub already registered</Text>
+            <View style={[styles.createBtn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                <Text style={[styles.createBtnText, { color: colors.foreground }]}>Pub already registered</Text>
+              </View>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", paddingLeft: 26 }}>Delete your existing pub to create a new listing.</Text>
             </View>
           )
         }
