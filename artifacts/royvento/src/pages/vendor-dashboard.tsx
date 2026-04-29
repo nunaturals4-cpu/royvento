@@ -55,7 +55,11 @@ interface Ad {
   id: number; status: string; message: string; createdAt: string;
 }
 interface Lead {
-  premium: boolean; views: any[]; message?: string;
+  premium: boolean;
+  crmTrialActive?: boolean;
+  crmTrialDaysRemaining?: number;
+  views: any[];
+  message?: string;
 }
 
 export function VendorDashboard() {
@@ -1637,22 +1641,25 @@ function LeadsPanel({ isPremium }: { isPremium: boolean }) {
     apiGet<Lead>("/api/partner/leads/me").then(setData).catch(() => {});
   }, []);
 
-  if (!isPremium) {
+  if (!data) return <p className="text-muted-foreground">Loading…</p>;
+
+  if (!data.premium) {
+    const trialExpired = !data.crmTrialActive && !isPremium;
     return (
       <div className="rounded-3xl glass-card-strong p-10 text-center red-ring">
         <Crown className="h-10 w-10 text-primary mx-auto mb-4" />
-        <p className="font-serif text-3xl mb-2">Leads &amp; CRM is a Premium feature</p>
-        <p className="text-muted-foreground mb-6">Subscribe to Partner Premium ({formatINR(999)}/mo) to unlock who's viewing your profile and conversion analytics.</p>
+        {trialExpired ? (
+          <>
+            <p className="font-serif text-3xl mb-2">Your 2-month free trial has ended</p>
+            <p className="text-muted-foreground mb-6">Upgrade to Partner Premium ({formatINR(999)}/mo) to keep your leads and CRM access.</p>
+          </>
+        ) : (
+          <>
+            <p className="font-serif text-3xl mb-2">Leads &amp; CRM is a Premium feature</p>
+            <p className="text-muted-foreground mb-6">Subscribe to Partner Premium ({formatINR(999)}/mo) to unlock who's viewing your profile and conversion analytics.</p>
+          </>
+        )}
         <a href="/subscription"><Button className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Upgrade to Premium</Button></a>
-      </div>
-    );
-  }
-
-  if (!data) return <p className="text-muted-foreground">Loading…</p>;
-  if (!data.premium) {
-    return (
-      <div className="rounded-3xl glass-card p-10 text-center">
-        <p className="font-serif text-2xl mb-2">{data.message ?? "Subscribe to Partner Premium"}</p>
       </div>
     );
   }
@@ -1663,6 +1670,15 @@ function LeadsPanel({ isPremium }: { isPremium: boolean }) {
 
   return (
     <div className="space-y-6">
+      {data.crmTrialActive && !isPremium && (
+        <div className="rounded-2xl border border-primary/40 bg-primary/10 px-5 py-4 flex items-center gap-3">
+          <Crown className="h-5 w-5 text-primary shrink-0" />
+          <p className="text-sm text-primary font-medium">
+            You have <span className="font-bold">{data.crmTrialDaysRemaining} day{data.crmTrialDaysRemaining === 1 ? "" : "s"}</span> of free CRM access remaining.{" "}
+            <a href="/subscription" className="underline underline-offset-2 hover:text-primary/80">Upgrade to keep it.</a>
+          </p>
+        </div>
+      )}
       <div className="grid md:grid-cols-3 gap-4">
         <div className="rounded-2xl glass-card p-5">
           <Eye className="h-5 w-5 text-primary mb-2" />

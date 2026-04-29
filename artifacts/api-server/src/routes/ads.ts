@@ -155,6 +155,8 @@ router.post("/partners/:vendorId/view", async (req, res) => {
   return res.json({ ok: true });
 });
 
+const CRM_TRIAL_DAYS = 60;
+
 router.get(
   "/partner/leads/me",
   requireAuth(["vendor"]),
@@ -162,14 +164,27 @@ router.get(
     const user = await loadUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     const vendor = await getMyVendor(user.id);
-    if (!vendor) return res.json({ premium: false, views: [] });
-    if (!vendor.isPremium) {
+    if (!vendor) return res.json({ premium: false, crmTrialActive: false, crmTrialDaysRemaining: 0, views: [] });
+
+    const daysSinceCreated =
+      (Date.now() - vendor.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    const crmTrialDaysRemaining = Math.max(
+      0,
+      Math.ceil(CRM_TRIAL_DAYS - daysSinceCreated),
+    );
+    const crmTrialActive = crmTrialDaysRemaining > 0;
+
+    if (!vendor.isPremium && !crmTrialActive) {
       return res.json({
         premium: false,
+        crmTrialActive: false,
+        crmTrialDaysRemaining: 0,
         views: [],
-        message: "Subscribe to Partner Premium to see leads.",
+        message:
+          "Your 2-month free CRM trial has ended. Upgrade to Partner Premium to keep your leads.",
       });
     }
+
     const rows = await db
       .select()
       .from(profileViewsTable)
@@ -180,12 +195,12 @@ router.get(
     const ids = Array.from(
       new Set(rows.map((r) => r.viewerUserId).filter((x): x is number => !!x)),
     );
-    const users = ids.length
-      ? await db.select().from(usersTable)
-      : [];
+    const users = ids.length ? await db.select().from(usersTable) : [];
     const uMap = new Map(users.map((u) => [u.id, u]));
     return res.json({
       premium: true,
+      crmTrialActive,
+      crmTrialDaysRemaining,
       views: rows.map((r) => {
         const u = r.viewerUserId ? uMap.get(r.viewerUserId) : null;
         return {
