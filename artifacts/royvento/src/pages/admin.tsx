@@ -12,6 +12,9 @@ import {
   useGetAdminLeadsSummary,
 } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1476,9 +1479,10 @@ function BookingReport() {
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const [topPubs, setTopPubs] = useState<TopPub[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
-  const [couponUserId, setCouponUserId] = useState<number | null>(null);
+  const [couponUser, setCouponUser] = useState<TopUser | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState<string>("10");
+  const [couponType, setCouponType] = useState<string>("general");
   const [couponSending, setCouponSending] = useState(false);
   const { toast } = useToast();
 
@@ -1500,7 +1504,8 @@ function BookingReport() {
     return () => { cancelled = true; };
   }, [startDate, endDate, vendorId]);
 
-  async function handleSendCoupon(userId: number) {
+  async function handleSendCoupon() {
+    if (!couponUser) return;
     const code = couponCode.trim().toUpperCase();
     const discount = Number(couponDiscount);
     if (!code || !discount || discount < 1 || discount > 100) {
@@ -1509,11 +1514,12 @@ function BookingReport() {
     }
     setCouponSending(true);
     try {
-      await apiPost(`/api/admin/users/${userId}/send-coupon`, { code, discount });
-      toast({ title: "Coupon sent", description: `${code} (${discount}% off) sent to user.` });
-      setCouponUserId(null);
+      await apiPost(`/api/admin/users/${couponUser.userId}/send-coupon`, { code, discount, type: couponType });
+      toast({ title: "Coupon sent", description: `${code} (${discount}% off) sent to ${couponUser.name}.` });
+      setCouponUser(null);
       setCouponCode("");
       setCouponDiscount("10");
+      setCouponType("general");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to send coupon";
       toast({ title: "Error", description: msg, variant: "destructive" });
@@ -1698,46 +1704,12 @@ function BookingReport() {
                       size="sm"
                       variant="outline"
                       className="shrink-0 h-7 px-2 text-xs border-primary/30 text-primary hover:bg-primary/10"
-                      onClick={() => {
-                        if (couponUserId === u.userId) { setCouponUserId(null); } else {
-                          setCouponUserId(u.userId); setCouponCode(""); setCouponDiscount("10");
-                        }
-                      }}
+                      onClick={() => { setCouponUser(u); setCouponCode(""); setCouponDiscount("10"); setCouponType("general"); }}
                     >
                       <Gift className="h-3 w-3 mr-1" />
                       Coupon
                     </Button>
                   </div>
-                  {couponUserId === u.userId && (
-                    <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
-                      <p className="text-xs text-muted-foreground font-medium">Send coupon to {u.name}</p>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Code e.g. SAVE20"
-                          value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                          className="h-7 text-xs flex-1"
-                        />
-                        <Input
-                          type="number"
-                          min={1}
-                          max={100}
-                          placeholder="%"
-                          value={couponDiscount}
-                          onChange={(e) => setCouponDiscount(e.target.value)}
-                          className="h-7 text-xs w-16"
-                        />
-                        <Button
-                          size="sm"
-                          className="h-7 px-3 text-xs"
-                          disabled={couponSending}
-                          onClick={() => handleSendCoupon(u.userId)}
-                        >
-                          {couponSending ? "…" : "Send"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -1780,6 +1752,69 @@ function BookingReport() {
           )}
         </div>
       </div>
+
+      {/* Send Coupon Dialog */}
+      <Dialog open={!!couponUser} onOpenChange={(open) => { if (!open) setCouponUser(null); }}>
+        <DialogContent className="sm:max-w-md bg-[#16151a] border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="h-4 w-4 text-primary" />
+              Send Coupon
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {couponUser ? `Sending coupon to ${couponUser.name} (${couponUser.email})` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Coupon Code</Label>
+              <Input
+                placeholder="e.g. SAVE20"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                className="h-9"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Discount %</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  placeholder="10"
+                  value={couponDiscount}
+                  onChange={(e) => setCouponDiscount(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Coupon Type</Label>
+                <Select value={couponType} onValueChange={setCouponType}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="event">Event</SelectItem>
+                    <SelectItem value="loyalty">Loyalty</SelectItem>
+                    <SelectItem value="referral">Referral</SelectItem>
+                    <SelectItem value="vip">VIP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button variant="ghost" size="sm" disabled={couponSending}>Cancel</Button>
+            </DialogClose>
+            <Button size="sm" disabled={couponSending} onClick={handleSendCoupon}>
+              {couponSending ? "Sending…" : "Send Coupon"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Partner summary cards */}
       {displayedSummary.length > 0 && (

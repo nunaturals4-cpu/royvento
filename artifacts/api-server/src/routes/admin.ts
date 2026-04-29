@@ -904,8 +904,8 @@ function buildTopBookingConditions(
   const conds: ReturnType<typeof sql>[] = [
     sql`${bookingsTable.status} IN ('confirmed', 'completed')`,
   ];
-  if (startDate) conds.push(sql`${bookingsTable.createdAt} >= ${new Date(`${startDate}T00:00:00Z`)}`);
-  if (endDate) conds.push(sql`${bookingsTable.createdAt} <= ${new Date(`${endDate}T23:59:59Z`)}`);
+  if (startDate) conds.push(sql`${bookingsTable.bookingDate} >= ${startDate}`);
+  if (endDate) conds.push(sql`${bookingsTable.bookingDate} <= ${endDate}`);
   if (partnerId && Number.isFinite(partnerId)) conds.push(sql`${bookingsTable.vendorId} = ${partnerId}`);
   return conds;
 }
@@ -977,6 +977,9 @@ router.get("/admin/booking-report/top-pubs", requireAuth(["admin"]), async (req,
   })));
 });
 
+const VALID_COUPON_TYPES = ["general", "event", "loyalty", "referral", "vip"] as const;
+type CouponType = (typeof VALID_COUPON_TYPES)[number];
+
 router.post("/admin/users/:userId/send-coupon", requireAuth(["admin"]), async (req, res) => {
   const userId = Number(req.params["userId"]);
   if (!Number.isFinite(userId)) {
@@ -987,6 +990,10 @@ router.post("/admin/users/:userId/send-coupon", requireAuth(["admin"]), async (r
   const body = req.body as Record<string, unknown>;
   const code = typeof body["code"] === "string" ? body["code"].trim().toUpperCase() : "";
   const discount = typeof body["discount"] === "number" ? body["discount"] : Number(body["discount"]);
+  const typeRaw = typeof body["type"] === "string" ? body["type"] : "general";
+  const couponType: CouponType = VALID_COUPON_TYPES.includes(typeRaw as CouponType)
+    ? (typeRaw as CouponType)
+    : "general";
 
   if (!code || !Number.isFinite(discount) || discount < 1 || discount > 100) {
     res.status(400).json({ error: "Provide a valid code and discount (1–100)" });
@@ -1011,7 +1018,7 @@ router.post("/admin/users/:userId/send-coupon", requireAuth(["admin"]), async (r
       userId,
       code,
       discountPercent: Math.round(discount),
-      source: "admin_send",
+      source: `admin_send_${couponType}`,
     })
     .returning();
 
