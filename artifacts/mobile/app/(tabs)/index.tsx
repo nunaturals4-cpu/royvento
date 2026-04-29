@@ -6,6 +6,7 @@ import {
 } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -33,6 +34,19 @@ interface ChatMessage {
   content: string;
 }
 
+interface RecentAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  imageUrl: string;
+  vendorId: number;
+  vendorName: string;
+  eventId: number;
+  eventTitle: string;
+}
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -44,6 +58,11 @@ export default function HomeScreen() {
 
   const featured = useListFeaturedEvents();
   const popular = useListEvents({ category: "Pubs" });
+  const { data: announcements } = useQuery<RecentAnnouncement[]>({
+    queryKey: ["announcements", "recent"],
+    queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/recent"),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const isLoading = featured.isLoading && popular.isLoading;
   const onRefresh = () => {
@@ -127,6 +146,49 @@ export default function HomeScreen() {
                 category="Pub"
                 type="pub"
               />
+            )}
+          />
+        </Section>
+      )}
+
+      {/* Announcements */}
+      {(announcements?.length ?? 0) > 0 && (
+        <Section title="What's On" icon="megaphone-outline">
+          <FlatList
+            horizontal
+            data={announcements}
+            keyExtractor={(item) => String(item.id)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => item.eventId ? router.push(`/event/${item.eventId}` as never) : undefined}
+              >
+                <View style={[styles.announcementBadge, { backgroundColor: colors.primary + "22" }]}>
+                  <Ionicons name="megaphone-outline" size={13} color={colors.primary} />
+                  <Text style={[styles.announcementVenue, { color: colors.primary }]} numberOfLines={1}>
+                    {item.vendorName}
+                  </Text>
+                </View>
+                <Text style={[styles.announcementTitle, { color: colors.foreground }]} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                {item.body ? (
+                  <Text style={[styles.announcementBody, { color: colors.mutedForeground }]} numberOfLines={2}>
+                    {item.body}
+                  </Text>
+                ) : null}
+                {item.announceDate ? (
+                  <View style={styles.announcementDateRow}>
+                    <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
+                    <Text style={[styles.announcementDate, { color: colors.mutedForeground }]}>
+                      {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      {item.announceTime ? `  ·  ${item.announceTime}` : ""}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
             )}
           />
         </Section>
@@ -367,4 +429,44 @@ const styles = StyleSheet.create({
   chatInput: { flexDirection: "row", alignItems: "flex-end", padding: 12, gap: 10, borderTopWidth: 1 },
   chatInputField: { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular", maxHeight: 100 },
   chatSendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  announcementCard: {
+    width: 220,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 6,
+  },
+  announcementBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: "flex-start",
+  },
+  announcementVenue: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+  announcementTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    lineHeight: 19,
+  },
+  announcementBody: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 17,
+  },
+  announcementDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  announcementDate: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+  },
 });

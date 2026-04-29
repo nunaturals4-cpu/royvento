@@ -88,6 +88,36 @@ router.delete("/partner/announcements/:id", requireAuth(["vendor"]), async (req,
   return res.json({ ok: true });
 });
 
+router.get("/announcements/recent", async (_req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await db.execute(sql`
+    SELECT
+      a.id,
+      a.title,
+      a.body,
+      a.announce_date AS "announceDate",
+      a.announce_time AS "announceTime",
+      a.image_url     AS "imageUrl",
+      a.vendor_id     AS "vendorId",
+      a.created_at    AS "createdAt",
+      v.business_name AS "vendorName",
+      COALESCE(
+        a.event_id,
+        (SELECT id FROM events WHERE vendor_id = a.vendor_id ORDER BY id DESC LIMIT 1)
+      ) AS "eventId",
+      COALESCE(
+        (SELECT title FROM events WHERE id = a.event_id),
+        (SELECT title FROM events WHERE vendor_id = a.vendor_id ORDER BY id DESC LIMIT 1)
+      ) AS "eventTitle"
+    FROM announcements a
+    JOIN vendors v ON v.id = a.vendor_id
+    WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+    ORDER BY a.created_at DESC
+    LIMIT 10
+  `);
+  return res.json(rows.rows);
+});
+
 router.get("/events/:eventId/announcements", async (req, res) => {
   const eventId = Number(req.params["eventId"]);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: "Invalid id" });

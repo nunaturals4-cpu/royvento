@@ -468,6 +468,7 @@ export const announcementsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     vendorId: integer("vendor_id").notNull(),
+    eventId: integer("event_id"),
     title: varchar("title", { length: 255 }).notNull(),
     body: text("body").notNull().default(""),
     announceDate: varchar("announce_date", { length: 20 }).notNull().default(""),

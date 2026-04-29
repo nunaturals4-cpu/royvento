@@ -221,6 +221,12 @@ export default function EventDetailScreen() {
     enabled: isPub && !!eventCity,
     select: (data) => data.filter((e: any) => e.id !== eventId).slice(0, 4),
   });
+  const { data: eventAnnouncements = [] } = useQuery<{ id: number; title: string; body: string; announceDate: string; announceTime: string; imageUrl: string }[]>({
+    queryKey: ["event-announcements", eventId],
+    queryFn: () => customFetch(`/api/events/${eventId}/announcements`),
+    enabled: !!eventId,
+  });
+
   const priceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
   const priceMen = isPub ? parseFloat(String((event as unknown as { priceMen?: unknown })?.priceMen ?? 0)) : 0;
   const priceCouple = isPub ? parseFloat(String((event as unknown as { priceCouple?: unknown })?.priceCouple ?? 0)) : 0;
@@ -459,6 +465,39 @@ export default function EventDetailScreen() {
             <View style={{ gap: 6 }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
               <Text style={[styles.description, { color: colors.mutedForeground }]}>{event.description}</Text>
+            </View>
+          ) : null}
+
+          {eventAnnouncements.length > 0 ? (
+            <View style={{ gap: 10 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Announcements</Text>
+              {eventAnnouncements.map((ann) => (
+                <View
+                  key={ann.id}
+                  style={[styles.announcementItem, { backgroundColor: colors.card, borderColor: colors.primary + "40" }]}
+                >
+                  <View style={styles.announcementItemHeader}>
+                    <View style={[styles.announcementItemIcon, { backgroundColor: colors.primary + "20" }]}>
+                      <Ionicons name="megaphone-outline" size={16} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.announcementItemTitle, { color: colors.foreground }]}>{ann.title}</Text>
+                      {ann.announceDate ? (
+                        <View style={styles.announcementItemDateRow}>
+                          <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
+                          <Text style={[styles.announcementItemDate, { color: colors.mutedForeground }]}>
+                            {new Date(ann.announceDate).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
+                            {ann.announceTime ? `  ·  ${ann.announceTime}` : ""}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  {ann.body ? (
+                    <Text style={[styles.announcementItemBody, { color: colors.mutedForeground }]}>{ann.body}</Text>
+                  ) : null}
+                </View>
+              ))}
             </View>
           ) : null}
 
@@ -1011,4 +1050,11 @@ const styles = StyleSheet.create({
   modalSecondaryBtn: { width: "100%", alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 14, paddingVertical: 14 },
   modalSecondaryBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
   modalDismiss: { fontSize: 13, fontFamily: "Inter_400Regular", paddingVertical: 8 },
+  announcementItem: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
+  announcementItemHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  announcementItemIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  announcementItemTitle: { fontSize: 14, fontFamily: "Inter_700Bold", lineHeight: 19, flexShrink: 1 },
+  announcementItemDateRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
+  announcementItemDate: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  announcementItemBody: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
 });
