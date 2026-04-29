@@ -8,6 +8,8 @@ import {
   Crown,
   Flame,
   PartyPopper,
+  Megaphone,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents } from "@workspace/api-client-react";
@@ -30,14 +32,27 @@ interface PublicEvent {
   popular: boolean;
 }
 
+interface Announcement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  vendorName: string;
+  eventId: number;
+  eventTitle: string;
+}
+
 export function Home() {
   const { data: featured = [] } = useListFeaturedEvents();
   const [popular, setPopular] = useState<PublicEvent[]>([]);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   useEffect(() => {
     apiGet<PublicEvent[]>("/api/events/popular").then(setPopular).catch(() => {});
     apiGet<PublicEvent[]>("/api/events?type=pub").then((r) => setPubs(r.slice(0, 6))).catch(() => {});
+    apiGet<Announcement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
   }, []);
 
   return (
@@ -133,6 +148,48 @@ export function Home() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {popular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} />)}
+          </div>
+        </section>
+      )}
+
+      {/* What's On — Announcements */}
+      {announcements.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-12">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
+                <Megaphone className="h-3.5 w-3.5" /> Fresh from the venues
+              </p>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">What's On</h2>
+            </div>
+          </div>
+          <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
+            {announcements.map((a) => (
+              <Link key={a.id} href={`/events/${a.eventId}`}>
+                <div className="glass-card rounded-2xl p-5 cursor-pointer hover:bg-white/5 transition-colors flex-shrink-0 w-72 md:w-auto">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-7 h-7 rounded-lg bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">
+                      <Megaphone className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-xs font-medium text-primary/90 uppercase tracking-wider truncate">{a.vendorName}</span>
+                  </div>
+                  <h3 className="font-serif text-lg leading-snug tracking-tight mb-2">{a.title}</h3>
+                  <p className="text-sm text-white/55 leading-relaxed line-clamp-2 mb-4">{a.body}</p>
+                  <div className="flex items-center gap-4 text-xs text-white/40">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                    {a.announceTime && (
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        {a.announceTime}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         </section>
       )}
