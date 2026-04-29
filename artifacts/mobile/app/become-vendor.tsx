@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LocationPicker } from "@/components/LocationPicker";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -40,8 +41,7 @@ export default function BecomeVendorScreen() {
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState("Pubs & Bars");
   const [description, setDescription] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
+  const [location, setLocation] = useState({ country: "India", state: "", city: "" });
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
@@ -53,8 +53,9 @@ export default function BecomeVendorScreen() {
     try {
       const message = [
         description.trim(),
-        city.trim() ? `City: ${city.trim()}` : "",
-        state.trim() ? `State: ${state.trim()}` : "",
+        location.city.trim() ? `City: ${location.city.trim()}` : "",
+        location.state.trim() ? `State: ${location.state.trim()}` : "",
+        location.country.trim() ? `Country: ${location.country.trim()}` : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -160,25 +161,8 @@ export default function BecomeVendorScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>City *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-              value={city}
-              onChangeText={setCity}
-              placeholder="e.g. Mumbai"
-              placeholderTextColor={colors.mutedForeground}
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>State *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-              value={state}
-              onChangeText={setState}
-              placeholder="e.g. Maharashtra"
-              placeholderTextColor={colors.mutedForeground}
-            />
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>Location</Text>
+            <LocationPicker value={location} onChange={setLocation} />
           </View>
 
           <View style={styles.field}>

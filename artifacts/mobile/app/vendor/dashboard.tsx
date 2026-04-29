@@ -37,6 +37,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
+import { LocationPicker } from "@/components/LocationPicker";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -317,9 +318,7 @@ export default function VendorDashboardScreen() {
   const [profDesc, setProfDesc] = useState("");
   const [profCategory, setProfCategory] = useState("");
   const [profPhone, setProfPhone] = useState("");
-  const [profCity, setProfCity] = useState("");
-  const [profState, setProfState] = useState("");
-  const [profCountry, setProfCountry] = useState("India");
+  const [profLocation, setProfLocation] = useState({ country: "India", state: "", city: "" });
   const [profOpenDays, setProfOpenDays] = useState<string[]>([...ALL_DAYS]);
   const [profCatPickerOpen, setProfCatPickerOpen] = useState(false);
   const [profSaving, setProfSaving] = useState(false);
@@ -333,9 +332,11 @@ export default function VendorDashboardScreen() {
       setProfName(vendor.businessName ?? "");
       setProfDesc(vendor.description ?? "");
       setProfCategory(vendor.category ?? "");
-      setProfCity(vendor.city ?? "");
-      setProfState(vendor.state ?? "");
-      setProfCountry(vendor.country || "India");
+      setProfLocation({
+        country: vendor.country || "India",
+        state: vendor.state ?? "",
+        city: vendor.city ?? "",
+      });
       setProfOpenDays(
         Array.isArray(vendor.openDays) && vendor.openDays.length > 0
           ? vendor.openDays
@@ -356,7 +357,7 @@ export default function VendorDashboardScreen() {
           businessName: profName.trim(),
           description: profDesc.trim(),
           category: profCategory || vendor?.category || "Cultural",
-          location: `${profCity}${profState ? ", " + profState : ""}`,
+          location: `${profLocation.city}${profLocation.state ? ", " + profLocation.state : ""}`,
           bannerImage: vendor?.bannerImage ?? "",
           portfolioImages: vendor?.portfolioImages ?? [],
         },
@@ -365,9 +366,9 @@ export default function VendorDashboardScreen() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          city: profCity.trim(),
-          state: profState.trim(),
-          country: profCountry.trim() || "India",
+          city: profLocation.city.trim(),
+          state: profLocation.state.trim(),
+          country: profLocation.country.trim() || "India",
           openDays: profOpenDays.filter((d) => VALID_API_DAYS.includes(d)),
         }),
       });
@@ -802,37 +803,8 @@ export default function VendorDashboardScreen() {
 
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>LOCATION</Text>
 
-          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>City</Text>
-            <TextInput
-              style={[styles.fieldInput, { color: colors.foreground }]}
-              value={profCity}
-              onChangeText={setProfCity}
-              placeholder="e.g. Mumbai"
-              placeholderTextColor={colors.mutedForeground}
-            />
-          </View>
-
-          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>State</Text>
-            <TextInput
-              style={[styles.fieldInput, { color: colors.foreground }]}
-              value={profState}
-              onChangeText={setProfState}
-              placeholder="e.g. Maharashtra"
-              placeholderTextColor={colors.mutedForeground}
-            />
-          </View>
-
-          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Country</Text>
-            <TextInput
-              style={[styles.fieldInput, { color: colors.foreground }]}
-              value={profCountry}
-              onChangeText={setProfCountry}
-              placeholder="India"
-              placeholderTextColor={colors.mutedForeground}
-            />
+          <View style={{ paddingHorizontal: 4, gap: 8 }}>
+            <LocationPicker value={profLocation} onChange={setProfLocation} />
           </View>
 
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>OPERATING DAYS</Text>

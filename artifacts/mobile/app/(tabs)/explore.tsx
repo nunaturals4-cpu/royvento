@@ -19,21 +19,23 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { EventCard } from "@/components/EventCard";
+import { LocationPicker } from "@/components/LocationPicker";
 import { useColors } from "@/hooks/useColors";
 
 const PAGE_SIZE = 20;
-const CITIES = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Pune", "Kolkata"];
 
 interface FilterState {
+  country: string;
+  state: string;
   city: string;
   minPrice: string;
   maxPrice: string;
 }
 
-const EMPTY_FILTER: FilterState = { city: "", minPrice: "", maxPrice: "" };
+const EMPTY_FILTER: FilterState = { country: "", state: "", city: "", minPrice: "", maxPrice: "" };
 
 function countActiveFilters(f: FilterState) {
-  return (f.city ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0);
+  return ((f.country || f.state || f.city) ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0);
 }
 
 export default function ExploreScreen() {
@@ -48,12 +50,16 @@ export default function ExploreScreen() {
   const [draftFilter, setDraftFilter] = useState<FilterState>(() =>
     params.city ? { ...EMPTY_FILTER, city: params.city } : EMPTY_FILTER
   );
+  const [draftLocation, setDraftLocation] = useState<{ country: string; state: string; city: string }>(() =>
+    params.city ? { country: "", state: "", city: params.city } : { country: "", state: "", city: "" }
+  );
   const [typeFilter, setTypeFilter] = useState<string>(() => params.type ?? "");
 
   useEffect(() => {
     const next = params.city ? { ...EMPTY_FILTER, city: params.city } : EMPTY_FILTER;
     setFilters(next);
     setDraftFilter(next);
+    setDraftLocation(params.city ? { country: "", state: "", city: params.city } : { country: "", state: "", city: "" });
     setTypeFilter(params.type ?? "");
   }, [params.city, params.type]);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -66,6 +72,8 @@ export default function ExploreScreen() {
     const p: Record<string, string> = {};
     if (debouncedSearch) p["search"] = debouncedSearch;
     if (filters.city) p["city"] = filters.city;
+    if (filters.state) p["state"] = filters.state;
+    if (filters.country) p["country"] = filters.country;
     if (filters.minPrice) p["minPrice"] = filters.minPrice;
     if (filters.maxPrice) p["maxPrice"] = filters.maxPrice;
     if (typeFilter) p["type"] = typeFilter;
@@ -105,16 +113,18 @@ export default function ExploreScreen() {
 
   function openFilter() {
     setDraftFilter(filters);
+    setDraftLocation({ country: filters.country, state: filters.state, city: filters.city });
     setShowFilter(true);
   }
 
   function applyFilter() {
-    setFilters(draftFilter);
+    setFilters({ ...draftFilter, country: draftLocation.country, state: draftLocation.state, city: draftLocation.city });
     setShowFilter(false);
   }
 
   function clearFilter() {
     setDraftFilter(EMPTY_FILTER);
+    setDraftLocation({ country: "", state: "", city: "" });
     setFilters(EMPTY_FILTER);
     setTypeFilter("");
     setShowFilter(false);
@@ -182,10 +192,12 @@ export default function ExploreScreen() {
               </Text>
             </View>
           ) : null}
-          {filters.city ? (
+          {(filters.city || filters.state || filters.country) ? (
             <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
               <Ionicons name="location-outline" size={12} color={colors.primary} />
-              <Text style={[styles.pillText, { color: colors.primary }]}>{filters.city}</Text>
+              <Text style={[styles.pillText, { color: colors.primary }]}>
+                {filters.city || filters.state || filters.country}
+              </Text>
             </View>
           ) : null}
           {filters.minPrice || filters.maxPrice ? (
@@ -267,30 +279,10 @@ export default function ExploreScreen() {
               </Pressable>
             </View>
 
-            {/* City */}
+            {/* Location */}
             <View style={styles.sheetSection}>
-              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>City</Text>
-              <TextInput
-                style={[styles.sheetInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-                value={draftFilter.city}
-                onChangeText={(v) => setDraftFilter((p) => ({ ...p, city: v }))}
-                placeholder="e.g. Mumbai"
-                placeholderTextColor={colors.mutedForeground}
-              />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingTop: 8 }}>
-                {CITIES.map((c) => (
-                  <Pressable
-                    key={c}
-                    onPress={() => setDraftFilter((p) => ({ ...p, city: p.city === c ? "" : c }))}
-                    style={[styles.chip, {
-                      backgroundColor: draftFilter.city === c ? colors.primary : colors.muted,
-                      borderColor: draftFilter.city === c ? colors.primary : colors.border,
-                    }]}
-                  >
-                    <Text style={[styles.chipText, { color: draftFilter.city === c ? colors.primaryForeground : colors.mutedForeground }]}>{c}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Location</Text>
+              <LocationPicker value={draftLocation} onChange={setDraftLocation} />
             </View>
 
             {/* Price Range */}

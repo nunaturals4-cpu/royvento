@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
+import { LocationSelect } from "@/components/LocationSelect";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
@@ -430,6 +431,7 @@ interface AdminVendor {
   location: string;
   city: string;
   state: string;
+  country: string;
   bannerImage: string;
   status: string;
   eventCount: number;
@@ -464,7 +466,7 @@ function AllVendorsAdmin() {
 
   const startEdit = (v: AdminVendor) => {
     setEditingId(v.id);
-    setEditForm({ businessName: v.businessName, description: v.description, category: v.category, status: v.status, city: v.city, state: v.state });
+    setEditForm({ businessName: v.businessName, description: v.description, category: v.category, status: v.status, city: v.city, state: v.state, country: v.country });
   };
 
   const saveEdit = async (id: number) => {
@@ -573,20 +575,14 @@ function AllVendorsAdmin() {
                     className="bg-black/40 border-white/10 h-9 text-sm"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">City</Label>
-                  <Input
-                    value={editForm.city ?? ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
-                    className="bg-black/40 border-white/10 h-9 text-sm"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">State</Label>
-                  <Input
-                    value={editForm.state ?? ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}
-                    className="bg-black/40 border-white/10 h-9 text-sm"
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">Location</Label>
+                  <LocationSelect
+                    country={editForm.country ?? ""}
+                    state={editForm.state ?? ""}
+                    city={editForm.city ?? ""}
+                    onChange={(loc) => setEditForm((f) => ({ ...f, country: loc.country, state: loc.state, city: loc.city }))}
+                    className="[&>button]:bg-black/40 [&>button]:border-white/10"
                   />
                 </div>
                 <div className="space-y-1.5">

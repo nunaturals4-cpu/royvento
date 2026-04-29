@@ -457,6 +457,7 @@ router.get("/admin/vendors", requireAuth(["admin"]), async (_req, res) => {
       location: v.location,
       city: v.city,
       state: v.state,
+      country: v.country,
       bannerImage: v.bannerImage,
       status: v.status,
       eventCount: eCountMap.get(v.id) ?? 0,
@@ -488,6 +489,7 @@ router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
     updates["status"] = body["status"];
   if (typeof body["city"] === "string") updates["city"] = body["city"];
   if (typeof body["state"] === "string") updates["state"] = body["state"];
+  if (typeof body["country"] === "string") updates["country"] = body["country"];
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No valid fields to update" });
