@@ -11,7 +11,19 @@ import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
-router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
+router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
+  // Parse optional date range; defaults: last 12 months
+  const now = new Date();
+  const defaultStart = new Date(now);
+  defaultStart.setFullYear(defaultStart.getFullYear() - 1);
+  defaultStart.setDate(1);
+  defaultStart.setHours(0, 0, 0, 0);
+
+  const startDateStr = req.query["startDate"] as string | undefined;
+  const endDateStr = req.query["endDate"] as string | undefined;
+  const rangeStart: Date = startDateStr ? new Date(`${startDateStr}T00:00:00Z`) : defaultStart;
+  const rangeEnd: Date = endDateStr ? new Date(`${endDateStr}T23:59:59Z`) : now;
+
   const [usersCount, vendorsCount, pendingCount, eventsCount, bookingsCount] =
     await Promise.all([
       db.select({ c: sql<number>`count(*)::int` }).from(usersTable),
@@ -21,7 +33,12 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
         .from(vendorsTable)
         .where(eq(vendorsTable.status, "pending")),
       db.select({ c: sql<number>`count(*)::int` }).from(eventsTable),
-      db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable),
+      db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(bookingsTable)
+        .where(
+          sql`${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+        ),
     ]);
 
   const revenueRow = await db
@@ -30,7 +47,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
     })
     .from(bookingsTable)
     .where(
-      sql`${bookingsTable.status} IN ('confirmed', 'completed')`,
+      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
     );
 
   const statusCounts = await db
@@ -39,6 +56,9 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
       count: sql<number>`count(*)::int`,
     })
     .from(bookingsTable)
+    .where(
+      sql`${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+    )
     .groupBy(bookingsTable.status);
 
   const recent = await db
@@ -54,7 +74,9 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
       revenue: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
     })
     .from(bookingsTable)
-    .where(sql`${bookingsTable.status} IN ('confirmed', 'completed')`)
+    .where(
+      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+    )
     .groupBy(bookingsTable.vendorId)
     .orderBy(desc(sql`count(*)`))
     .limit(5);
@@ -73,7 +95,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
       : [];
   const vMap = new Map(vendorRows.map((v) => [v.id, v]));
 
-  // Ticket breakdown + daily revenue + per-vendor breakdown
+  // Ticket breakdown + daily revenue + per-vendor breakdown (all filtered by date range)
   const confirmedBookings = await db
     .select({
       vendorId: bookingsTable.vendorId,
@@ -84,15 +106,38 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
       createdAt: bookingsTable.createdAt,
     })
     .from(bookingsTable)
-    .where(sql`${bookingsTable.status} IN ('confirmed', 'completed')`);
+    .where(
+      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+    );
+
+  // Monthly revenue aggregation via SQL
+  const monthlyRevenueRows = await db
+    .select({
+      month: sql<string>`to_char(date_trunc('month', ${bookingsTable.createdAt}), 'YYYY-MM')`,
+      revenue: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
+    })
+    .from(bookingsTable)
+    .where(
+      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+    )
+    .groupBy(sql`date_trunc('month', ${bookingsTable.createdAt})`)
+    .orderBy(sql`date_trunc('month', ${bookingsTable.createdAt})`);
+  const monthlyRevenue = monthlyRevenueRows.map((r) => ({
+    month: r.month,
+    revenue: Number(r.revenue),
+  }));
 
   let totalWomen = 0;
   let totalMen = 0;
   let totalCouple = 0;
+  // Build daily map for the date range (cap at 90 days for readability)
   const dailyMap = new Map<string, number>();
-  const now2 = new Date();
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now2.getTime() - i * 24 * 60 * 60 * 1000);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const rangeDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / dayMs);
+  const dailyCap = Math.min(rangeDays, 90);
+  const dailyStart = new Date(rangeEnd.getTime() - dailyCap * dayMs);
+  for (let i = dailyCap; i >= 0; i--) {
+    const d = new Date(rangeEnd.getTime() - i * dayMs);
     dailyMap.set(d.toISOString().slice(0, 10), 0);
   }
   const perVendorMap = new Map<number, {
@@ -104,7 +149,9 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
     totalMen += b.ticketMen;
     totalCouple += b.ticketCouple;
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
-    if (dailyMap.has(day)) dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
+    if (new Date(b.createdAt) >= dailyStart && dailyMap.has(day)) {
+      dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
+    }
     const pv = perVendorMap.get(b.vendorId);
     if (pv) {
       pv.bookingCount += 1;
@@ -214,6 +261,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (_req, res) => {
     totalMen,
     totalCouple,
     dailyRevenue: adminDailyRevenue,
+    monthlyRevenue,
     perVendor,
   });
 });

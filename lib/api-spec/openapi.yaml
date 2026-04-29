@@ -775,6 +775,19 @@ paths:
       operationId: getAdminAnalytics
       tags: [admin]
       summary: Platform analytics
+      parameters:
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            description: ISO date string (YYYY-MM-DD) for range start
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            description: ISO date string (YYYY-MM-DD) for range end
       responses:
         "200":
           description: Analytics
@@ -1379,7 +1392,18 @@ components:
               revenue:
                 type: number
             required: [vendorId, businessName, bookingCount, revenue]
-      required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, bookingsByStatus, recentBookings, topVendors]
+        monthlyRevenue:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+                description: "Month in YYYY-MM format"
+              revenue:
+                type: number
+            required: [month, revenue]
+      required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, bookingsByStatus, recentBookings, topVendors, monthlyRevenue]
     ListEventsPaginatedResponse:
       type: object
       properties:

@@ -9,6 +9,7 @@
 export * from "./addToWishlistBody";
 export * from "./adminAnalytics";
 export * from "./adminAnalyticsBookingsByStatusItem";
+export * from "./adminAnalyticsMonthlyRevenueItem";
 export * from "./adminAnalyticsTopVendorsItem";
 export * from "./authResponse";
 export * from "./availability";
@@ -22,6 +23,7 @@ export * from "./createReviewBody";
 export * from "./createVendorBody";
 export * from "./event";
 export * from "./eventDetail";
+export * from "./getAdminAnalyticsParams";
 export * from "./getBookingTicketCode200";
 export * from "./healthStatus";
 export * from "./listEventsPaginatedResponse";

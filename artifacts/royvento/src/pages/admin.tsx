@@ -83,25 +83,96 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
   );
 }
 
-function Analytics() {
-  const { data, isLoading } = useGetAdminAnalytics();
-  if (isLoading) return <p className="text-muted-foreground">Loading…</p>;
-  if (!data) return null;
+type AnalyticsPreset = "30d" | "90d" | "12m" | "custom";
 
-  const adminData = data as typeof data & {
+function toDateStr(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function Analytics() {
+  const [preset, setPreset] = useState<AnalyticsPreset>("12m");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
+  const now = new Date();
+  const computedRange = (() => {
+    if (preset === "30d") return { startDate: toDateStr(new Date(now.getTime() - 30 * 86400000)), endDate: toDateStr(now) };
+    if (preset === "90d") return { startDate: toDateStr(new Date(now.getTime() - 90 * 86400000)), endDate: toDateStr(now) };
+    if (preset === "12m") {
+      const s = new Date(now); s.setFullYear(s.getFullYear() - 1); s.setDate(1);
+      return { startDate: toDateStr(s), endDate: toDateStr(now) };
+    }
+    return {
+      startDate: customStart || undefined,
+      endDate: customEnd || undefined,
+    };
+  })();
+
+  const { data, isLoading } = useGetAdminAnalytics(computedRange);
+
+  const adminData = (data ?? {}) as typeof data & {
     totalWomen?: number;
     totalMen?: number;
     totalCouple?: number;
     dailyRevenue?: { date: string; revenue: number }[];
+    monthlyRevenue?: { month: string; revenue: number }[];
     perVendor?: { vendorId: number; vendorName: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }[];
   };
 
   const hasTickets = ((adminData.totalWomen ?? 0) + (adminData.totalMen ?? 0) + (adminData.totalCouple ?? 0)) > 0;
   const hasDailyRevenue = (adminData.dailyRevenue ?? []).some((d) => d.revenue > 0);
   const dailyChartMax = Math.max(...(adminData.dailyRevenue ?? []).map((d) => d.revenue), 1);
+  const hasMonthlyRevenue = (adminData.monthlyRevenue ?? []).some((m) => m.revenue > 0);
+  const monthlyChartMax = Math.max(...(adminData.monthlyRevenue ?? []).map((m) => m.revenue), 1);
+
+  const presetLabel: Record<AnalyticsPreset, string> = {
+    "30d": "Last 30 days",
+    "90d": "Last 90 days",
+    "12m": "Last 12 months",
+    "custom": "Custom range",
+  };
 
   return (
     <div className="space-y-6">
+      {/* Date range filter */}
+      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Time range</Label>
+          <Select value={preset} onValueChange={(v) => setPreset(v as AnalyticsPreset)}>
+            <SelectTrigger className="w-44">
+              <SelectValue>{presetLabel[preset]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="12m">Last 12 months</SelectItem>
+              <SelectItem value="custom">Custom range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {preset === "custom" && (
+          <>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">From</Label>
+              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-40" max={customEnd || toDateStr(now)} />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">To</Label>
+              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-40" min={customStart} max={toDateStr(now)} />
+            </div>
+          </>
+        )}
+        {(preset !== "12m" || customStart || customEnd) && (
+          <Button variant="outline" size="sm" onClick={() => { setPreset("12m"); setCustomStart(""); setCustomEnd(""); }}>
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading…</p>
+      ) : !data ? null : (
+      <>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Stat icon={Users} label="Users" value={String(data.totalUsers)} />
         <Stat icon={Briefcase} label="Partners" value={String(data.totalVendors)} />
@@ -149,10 +220,51 @@ function Analytics() {
         </div>
       )}
 
-      {/* Platform revenue — last 30 days */}
+      {/* Monthly revenue bar chart */}
+      {hasMonthlyRevenue && (
+        <div className="rounded-2xl glass-card p-6">
+          <h3 className="font-serif text-xl mb-5">Monthly revenue — {presetLabel[preset]}</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={adminData.monthlyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={(m: string) => {
+                  const [y, mo] = m.split("-");
+                  const d = new Date(Number(y), Number(mo) - 1, 1);
+                  return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+                }}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={(v: number) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                width={48}
+                domain={[0, Math.ceil(monthlyChartMax * 1.15)]}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "hsl(var(--card))",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "12px",
+                  fontSize: "12px",
+                }}
+                formatter={(v: number) => [formatINR(v), "Revenue"]}
+                labelFormatter={(label: string) => {
+                  const [y, mo] = label.split("-");
+                  return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+                }}
+              />
+              <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Platform daily revenue */}
       {hasDailyRevenue && (
         <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-5">Platform revenue — last 30 days</h3>
+          <h3 className="font-serif text-xl mb-5">Daily revenue — {presetLabel[preset]}</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={adminData.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
@@ -277,6 +389,8 @@ function Analytics() {
           ))}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

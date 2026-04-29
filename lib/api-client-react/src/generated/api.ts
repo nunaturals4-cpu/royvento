@@ -28,6 +28,7 @@ import type {
   CreateVendorBody,
   Event,
   EventDetail,
+  GetAdminAnalyticsParams,
   GetBookingTicketCode200,
   HealthStatus,
   ListEventsParams,
@@ -3213,41 +3214,60 @@ export const useDeleteAvailability = <
 /**
  * @summary Platform analytics
  */
-export const getGetAdminAnalyticsUrl = () => {
-  return `/api/admin/analytics`;
+export const getGetAdminAnalyticsUrl = (params?: GetAdminAnalyticsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/analytics?${stringifiedParams}`
+    : `/api/admin/analytics`;
 };
 
 export const getAdminAnalytics = async (
+  params?: GetAdminAnalyticsParams,
   options?: RequestInit,
 ): Promise<AdminAnalytics> => {
-  return customFetch<AdminAnalytics>(getGetAdminAnalyticsUrl(), {
+  return customFetch<AdminAnalytics>(getGetAdminAnalyticsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetAdminAnalyticsQueryKey = () => {
-  return [`/api/admin/analytics`] as const;
+export const getGetAdminAnalyticsQueryKey = (
+  params?: GetAdminAnalyticsParams,
+) => {
+  return [`/api/admin/analytics`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetAdminAnalyticsQueryOptions = <
   TData = Awaited<ReturnType<typeof getAdminAnalytics>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminAnalytics>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: GetAdminAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminAnalyticsQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminAnalyticsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getAdminAnalytics>>
-  > = ({ signal }) => getAdminAnalytics({ signal, ...requestOptions });
+  > = ({ signal }) => getAdminAnalytics(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getAdminAnalytics>>,
@@ -3268,15 +3288,18 @@ export type GetAdminAnalyticsQueryError = ErrorType<unknown>;
 export function useGetAdminAnalytics<
   TData = Awaited<ReturnType<typeof getAdminAnalytics>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminAnalytics>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminAnalyticsQueryOptions(options);
+>(
+  params?: GetAdminAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminAnalyticsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

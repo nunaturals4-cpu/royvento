@@ -964,6 +964,11 @@ export const DeleteAvailabilityResponse = zod.object({
 /**
  * @summary Platform analytics
  */
+export const GetAdminAnalyticsQueryParams = zod.object({
+  startDate: zod.coerce.string().optional(),
+  endDate: zod.coerce.string().optional(),
+});
+
 export const GetAdminAnalyticsResponse = zod.object({
   totalUsers: zod.number(),
   totalVendors: zod.number(),
@@ -1009,6 +1014,12 @@ export const GetAdminAnalyticsResponse = zod.object({
       vendorId: zod.number(),
       businessName: zod.string(),
       bookingCount: zod.number(),
+      revenue: zod.number(),
+    }),
+  ),
+  monthlyRevenue: zod.array(
+    zod.object({
+      month: zod.string().describe("Month in YYYY-MM format"),
       revenue: zod.number(),
     }),
   ),

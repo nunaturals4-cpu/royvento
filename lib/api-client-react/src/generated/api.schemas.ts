@@ -308,6 +308,12 @@ export type AdminAnalyticsTopVendorsItem = {
   revenue: number;
 };
 
+export type AdminAnalyticsMonthlyRevenueItem = {
+  /** Month in YYYY-MM format */
+  month: string;
+  revenue: number;
+};
+
 export interface AdminAnalytics {
   totalUsers: number;
   totalVendors: number;
@@ -318,6 +324,7 @@ export interface AdminAnalytics {
   bookingsByStatus: AdminAnalyticsBookingsByStatusItem[];
   recentBookings: Booking[];
   topVendors: AdminAnalyticsTopVendorsItem[];
+  monthlyRevenue: AdminAnalyticsMonthlyRevenueItem[];
 }
 
 export interface ListEventsPaginatedResponse {
@@ -374,4 +381,15 @@ export type ListEventsParams = {
 
 export type GetBookingTicketCode200 = {
   ticketCode: string;
+};
+
+export type GetAdminAnalyticsParams = {
+  /**
+   * ISO date string (YYYY-MM-DD) for range start
+   */
+  startDate?: string;
+  /**
+   * ISO date string (YYYY-MM-DD) for range end
+   */
+  endDate?: string;
 };

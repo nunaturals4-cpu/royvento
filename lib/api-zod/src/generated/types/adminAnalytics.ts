@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminAnalyticsBookingsByStatusItem } from "./adminAnalyticsBookingsByStatusItem";
+import type { AdminAnalyticsMonthlyRevenueItem } from "./adminAnalyticsMonthlyRevenueItem";
 import type { AdminAnalyticsTopVendorsItem } from "./adminAnalyticsTopVendorsItem";
 import type { Booking } from "./booking";
 
@@ -19,4 +20,5 @@ export interface AdminAnalytics {
   bookingsByStatus: AdminAnalyticsBookingsByStatusItem[];
   recentBookings: Booking[];
   topVendors: AdminAnalyticsTopVendorsItem[];
+  monthlyRevenue: AdminAnalyticsMonthlyRevenueItem[];
 }
