@@ -6,8 +6,9 @@ import {
   vendorsTable,
   usersTable,
   paymentsTable,
+  profileViewsTable,
 } from "@workspace/db";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
 
@@ -672,6 +673,179 @@ router.get("/admin/bookings/partner-summary", requireAuth(["admin"]), async (_re
       checkedInCount: r.checkedInCount,
     })),
   );
+});
+
+// ── Admin CRM & Leads ────────────────────────────────────────────────────────
+
+router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
+  const page = Math.max(1, Number(req.query["page"]) || 1);
+  const PAGE_SIZE = 50;
+  const offset = (page - 1) * PAGE_SIZE;
+
+  const vendorIdParam = req.query["vendorId"] ? Number(req.query["vendorId"]) : undefined;
+  const startDateStr = req.query["startDate"] as string | undefined;
+  const endDateStr = req.query["endDate"] as string | undefined;
+  const knownOnly = req.query["knownOnly"] === "true";
+
+  const conditions: ReturnType<typeof and>[] = [];
+  if (vendorIdParam) conditions.push(eq(profileViewsTable.vendorId, vendorIdParam));
+  if (knownOnly) conditions.push(isNotNull(profileViewsTable.viewerUserId));
+  if (startDateStr) conditions.push(gte(profileViewsTable.viewedAt, new Date(`${startDateStr}T00:00:00Z`)));
+  if (endDateStr) conditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59Z`)));
+
+  const where = conditions.length ? and(...conditions) : undefined;
+
+  const [totalRow, rows] = await Promise.all([
+    db.select({ c: sql<number>`count(*)::int` }).from(profileViewsTable).where(where),
+    db.select().from(profileViewsTable).where(where)
+      .orderBy(desc(profileViewsTable.viewedAt))
+      .limit(PAGE_SIZE)
+      .offset(offset),
+  ]);
+
+  const total = totalRow[0]?.c ?? 0;
+
+  const vendorIds = Array.from(new Set(rows.map((r) => r.vendorId)));
+  const userIds = Array.from(new Set(rows.map((r) => r.viewerUserId).filter((x): x is number => x !== null)));
+
+  const [vendorRows, userRows] = await Promise.all([
+    vendorIds.length
+      ? db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city })
+          .from(vendorsTable).where(inArray(vendorsTable.id, vendorIds))
+      : Promise.resolve([]),
+    userIds.length
+      ? db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+          .from(usersTable).where(inArray(usersTable.id, userIds))
+      : Promise.resolve([]),
+  ]);
+
+  const vMap = new Map(vendorRows.map((v) => [v.id, v]));
+  const uMap = new Map(userRows.map((u) => [u.id, u]));
+
+  // Check conversions: a known lead has a confirmed/completed booking at same vendor
+  const conversionPairs = userIds.length && vendorIds.length
+    ? await db.select({ userId: bookingsTable.userId, vendorId: bookingsTable.vendorId })
+        .from(bookingsTable)
+        .where(and(
+          inArray(bookingsTable.userId, userIds),
+          inArray(bookingsTable.vendorId, vendorIds),
+          sql`${bookingsTable.status} IN ('confirmed','completed')`,
+        ))
+    : [];
+  const conversionSet = new Set(conversionPairs.map((c) => `${c.userId}:${c.vendorId}`));
+
+  const leads = rows.map((r) => {
+    const v = vMap.get(r.vendorId);
+    const u = r.viewerUserId ? uMap.get(r.viewerUserId) : null;
+    const converted = r.viewerUserId ? conversionSet.has(`${r.viewerUserId}:${r.vendorId}`) : false;
+    return {
+      id: r.id,
+      vendorId: r.vendorId,
+      vendorName: v?.businessName ?? `Partner #${r.vendorId}`,
+      vendorCity: v?.city ?? "",
+      viewerUserId: r.viewerUserId,
+      viewerName: u?.name ?? r.viewerName ?? "",
+      viewerEmail: u?.email ?? r.viewerEmail ?? "",
+      viewedAt: r.viewedAt.toISOString(),
+      converted,
+    };
+  });
+
+  res.json({ leads, total, page, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) });
+});
+
+router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
+  const startDateStr = req.query["startDate"] as string | undefined;
+  const endDateStr = req.query["endDate"] as string | undefined;
+
+  const dateConditions: ReturnType<typeof and>[] = [];
+  if (startDateStr) dateConditions.push(gte(profileViewsTable.viewedAt, new Date(`${startDateStr}T00:00:00Z`)));
+  if (endDateStr) dateConditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59Z`)));
+  const where = dateConditions.length ? and(...dateConditions) : undefined;
+
+  const [allViews, perVendorRows] = await Promise.all([
+    db.select({
+      totalViews: sql<number>`count(*)::int`,
+      knownLeads: sql<number>`count(${profileViewsTable.viewerUserId})::int`,
+    }).from(profileViewsTable).where(where),
+    db.select({
+      vendorId: profileViewsTable.vendorId,
+      totalViews: sql<number>`count(*)::int`,
+      knownLeads: sql<number>`count(${profileViewsTable.viewerUserId})::int`,
+    })
+    .from(profileViewsTable)
+    .where(where)
+    .groupBy(profileViewsTable.vendorId)
+    .orderBy(desc(sql`count(*)`)),
+  ]);
+
+  const totals = allViews[0] ?? { totalViews: 0, knownLeads: 0 };
+  const totalViews = totals.totalViews;
+  const knownLeads = totals.knownLeads;
+  const anonymousVisitors = totalViews - knownLeads;
+
+  // Known user IDs across all views (for conversion count)
+  const knownViewRows = knownLeads > 0
+    ? await db.select({ viewerUserId: profileViewsTable.viewerUserId, vendorId: profileViewsTable.vendorId })
+        .from(profileViewsTable)
+        .where(where ? and(where, isNotNull(profileViewsTable.viewerUserId)) : isNotNull(profileViewsTable.viewerUserId))
+    : [];
+
+  const knownPairs = new Set(knownViewRows.map((r) => `${r.viewerUserId}:${r.vendorId}`));
+  const knownUserIds = Array.from(new Set(knownViewRows.map((r) => r.viewerUserId).filter((x): x is number => x !== null)));
+  const knownVendorIds = Array.from(new Set(knownViewRows.map((r) => r.vendorId)));
+
+  const conversionPairs = knownUserIds.length && knownVendorIds.length
+    ? await db.select({ userId: bookingsTable.userId, vendorId: bookingsTable.vendorId })
+        .from(bookingsTable)
+        .where(and(
+          inArray(bookingsTable.userId, knownUserIds),
+          inArray(bookingsTable.vendorId, knownVendorIds),
+          sql`${bookingsTable.status} IN ('confirmed','completed')`,
+        ))
+    : [];
+  const conversionSet = new Set(conversionPairs.map((c) => `${c.userId}:${c.vendorId}`));
+
+  // Count conversions by matching (viewerUserId:vendorId) pairs that exist in conversionSet
+  let platformConversions = 0;
+  for (const pair of knownPairs) {
+    if (conversionSet.has(pair)) platformConversions++;
+  }
+
+  const vendorIds = perVendorRows.map((r) => r.vendorId);
+  const vendorRows = vendorIds.length
+    ? await db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city })
+        .from(vendorsTable).where(inArray(vendorsTable.id, vendorIds))
+    : [];
+  const vMap = new Map(vendorRows.map((v) => [v.id, v]));
+
+  const vendors = perVendorRows.map((row) => {
+    const v = vMap.get(row.vendorId);
+    const knownForVendor = knownViewRows.filter((r) => r.vendorId === row.vendorId);
+    let conversions = 0;
+    for (const r of knownForVendor) {
+      if (r.viewerUserId && conversionSet.has(`${r.viewerUserId}:${row.vendorId}`)) conversions++;
+    }
+    return {
+      vendorId: row.vendorId,
+      vendorName: v?.businessName ?? `Partner #${row.vendorId}`,
+      vendorCity: v?.city ?? "",
+      totalViews: row.totalViews,
+      knownLeads: row.knownLeads,
+      anonymousVisitors: row.totalViews - row.knownLeads,
+      conversions,
+      conversionRate: row.knownLeads > 0 ? Math.round((conversions / row.knownLeads) * 100) : 0,
+    };
+  });
+
+  res.json({
+    totalViews,
+    knownLeads,
+    anonymousVisitors,
+    conversions: platformConversions,
+    conversionRate: knownLeads > 0 ? Math.round((platformConversions / knownLeads) * 100) : 0,
+    vendors,
+  });
 });
 
 export default router;

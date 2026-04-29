@@ -8,6 +8,8 @@ import {
   useDeleteUser,
   useGetAdminBookingsReport,
   useGetAdminBookingsPartnerSummary,
+  useGetAdminLeads,
+  useGetAdminLeadsSummary,
 } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +24,7 @@ import {
   Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
+  Eye, UserCheck, UserX, TrendingUp, Filter,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -55,6 +58,7 @@ export function AdminPanel() {
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="blogs">Blogs</TabsTrigger>
           <TabsTrigger value="booking-report">Booking Report</TabsTrigger>
+          <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
@@ -69,6 +73,7 @@ export function AdminPanel() {
         <TabsContent value="users"><UsersPanel /></TabsContent>
         <TabsContent value="blogs"><BlogsAdmin /></TabsContent>
         <TabsContent value="booking-report"><BookingReport /></TabsContent>
+        <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
       </Tabs>
     </div>
   );
@@ -1915,6 +1920,320 @@ function BookingReport() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── CRM & Leads ──────────────────────────────────────────────────────────────
+
+type CrmPreset = "7d" | "30d" | "90d" | "custom";
+
+function CrmLeads() {
+  const [preset, setPreset] = useState<CrmPreset>("30d");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [vendorFilter, setVendorFilter] = useState<string>("");
+  const [knownOnly, setKnownOnly] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const now = new Date();
+  const computedRange = (() => {
+    if (preset === "7d") return { startDate: toDateStr(new Date(now.getTime() - 7 * 86400000)), endDate: toDateStr(now) };
+    if (preset === "30d") return { startDate: toDateStr(new Date(now.getTime() - 30 * 86400000)), endDate: toDateStr(now) };
+    if (preset === "90d") return { startDate: toDateStr(new Date(now.getTime() - 90 * 86400000)), endDate: toDateStr(now) };
+    return { startDate: customStart || undefined, endDate: customEnd || undefined };
+  })();
+
+  const leadsParams = {
+    page,
+    ...(vendorFilter ? { vendorId: Number(vendorFilter) } : {}),
+    ...(knownOnly ? { knownOnly: "true" } : {}),
+    ...computedRange,
+  };
+
+  const summaryParams = { ...computedRange };
+
+  const { data: leadsData, isLoading: leadsLoading } = useGetAdminLeads(leadsParams);
+  const { data: summary, isLoading: summaryLoading } = useGetAdminLeadsSummary(summaryParams);
+
+  const leads = leadsData?.leads ?? [];
+  const totalPages = leadsData?.totalPages ?? 1;
+  const total = leadsData?.total ?? 0;
+
+  const vendors = summary?.vendors ?? [];
+
+  const presetLabel: Record<CrmPreset, string> = {
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "90d": "Last 90 days",
+    "custom": "Custom range",
+  };
+
+  function handleVendorLeaderClick(vid: number) {
+    setVendorFilter(vid === Number(vendorFilter) ? "" : String(vid));
+    setPage(1);
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Filter bar */}
+      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Time range</Label>
+          <Select value={preset} onValueChange={(v) => { setPreset(v as CrmPreset); setPage(1); }}>
+            <SelectTrigger className="w-40">
+              <SelectValue>{presetLabel[preset]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="custom">Custom range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {preset === "custom" && (
+          <>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">From</Label>
+              <Input type="date" value={customStart} onChange={(e) => { setCustomStart(e.target.value); setPage(1); }} className="w-40" max={customEnd || toDateStr(now)} />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">To</Label>
+              <Input type="date" value={customEnd} onChange={(e) => { setCustomEnd(e.target.value); setPage(1); }} className="w-40" min={customStart} max={toDateStr(now)} />
+            </div>
+          </>
+        )}
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Partner</Label>
+          <Select value={vendorFilter || "_all"} onValueChange={(v) => { setVendorFilter(v === "_all" ? "" : v); setPage(1); }}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="All partners" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">All partners</SelectItem>
+              {vendors.map((v) => (
+                <SelectItem key={v.vendorId} value={String(v.vendorId)}>{v.vendorName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2 pb-0.5">
+          <button
+            onClick={() => { setKnownOnly((k) => !k); setPage(1); }}
+            className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${knownOnly ? "border-primary text-primary bg-primary/10" : "border-white/15 text-muted-foreground hover:border-white/30"}`}
+          >
+            <Filter className="h-3 w-3" />
+            Known leads only
+          </button>
+        </div>
+        {(vendorFilter || knownOnly) && (
+          <Button variant="outline" size="sm" onClick={() => { setVendorFilter(""); setKnownOnly(false); setPage(1); }}>
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      {/* KPI cards */}
+      {summaryLoading ? (
+        <p className="text-muted-foreground">Loading summary…</p>
+      ) : summary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="rounded-2xl glass-card p-5 lift-3d">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">Total views</span>
+              <div className="w-9 h-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+                <Eye className="h-4 w-4" />
+              </div>
+            </div>
+            <p className="stat-number text-3xl">{summary.totalViews.toLocaleString()}</p>
+          </div>
+          <div className="rounded-2xl glass-card p-5 lift-3d">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">Known leads</span>
+              <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                <UserCheck className="h-4 w-4" />
+              </div>
+            </div>
+            <p className="stat-number text-3xl text-blue-300">{summary.knownLeads.toLocaleString()}</p>
+          </div>
+          <div className="rounded-2xl glass-card p-5 lift-3d">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">Anonymous</span>
+              <div className="w-9 h-9 rounded-lg bg-white/5 text-muted-foreground flex items-center justify-center">
+                <UserX className="h-4 w-4" />
+              </div>
+            </div>
+            <p className="stat-number text-3xl">{summary.anonymousVisitors.toLocaleString()}</p>
+          </div>
+          <div className="rounded-2xl glass-card p-5 lift-3d">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">Conversion rate</span>
+              <div className="w-9 h-9 rounded-lg bg-green-500/15 text-green-400 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4" />
+              </div>
+            </div>
+            <p className="stat-number text-3xl text-green-300">{summary.conversionRate}%</p>
+            <p className="text-xs text-muted-foreground mt-1">{summary.conversions} bookings from leads</p>
+          </div>
+        </div>
+      )}
+
+      {/* Partner leaderboard */}
+      {!summaryLoading && vendors.length > 0 && (
+        <div className="rounded-2xl glass-card p-6">
+          <h3 className="font-serif text-xl mb-4">Per-partner breakdown</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-4">Venue</th>
+                  <th className="text-left py-2 pr-4">City</th>
+                  <th className="text-right py-2 px-2">Total Views</th>
+                  <th className="text-right py-2 px-2 text-blue-300">Known Leads</th>
+                  <th className="text-right py-2 px-2">Anonymous</th>
+                  <th className="text-right py-2 px-2 text-green-300">Conversions</th>
+                  <th className="text-right py-2 pl-2 text-green-300">Conv. Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendors.map((v) => (
+                  <tr
+                    key={v.vendorId}
+                    onClick={() => handleVendorLeaderClick(v.vendorId)}
+                    className={`border-t border-white/5 cursor-pointer transition-colors ${Number(vendorFilter) === v.vendorId ? "bg-primary/10" : "hover:bg-white/5"}`}
+                  >
+                    <td className="py-3 pr-4 font-medium">{v.vendorName}</td>
+                    <td className="py-3 pr-4 text-muted-foreground">{v.vendorCity || "—"}</td>
+                    <td className="text-right px-2 tabular-nums">{v.totalViews}</td>
+                    <td className="text-right px-2 tabular-nums text-blue-300">{v.knownLeads || "—"}</td>
+                    <td className="text-right px-2 tabular-nums text-muted-foreground">{v.anonymousVisitors || "—"}</td>
+                    <td className="text-right px-2 tabular-nums text-green-300">{v.conversions || "—"}</td>
+                    <td className="text-right pl-2 tabular-nums font-medium text-green-400">
+                      {v.knownLeads > 0 ? `${v.conversionRate}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {vendorFilter && (
+            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+              <Filter className="h-3 w-3" /> Showing leads for selected partner only.{" "}
+              <button className="underline" onClick={() => { setVendorFilter(""); setPage(1); }}>Clear</button>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Leads table */}
+      <div className="rounded-2xl glass-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+          <h3 className="font-serif text-xl">Profile view log</h3>
+          {!leadsLoading && (
+            <span className="text-xs text-muted-foreground">{total.toLocaleString()} records</span>
+          )}
+        </div>
+        {leadsLoading ? (
+          <p className="text-muted-foreground p-6">Loading leads…</p>
+        ) : leads.length === 0 ? (
+          <div className="p-10 text-center">
+            <Eye className="h-8 w-8 text-primary mx-auto mb-3" />
+            <p className="text-muted-foreground">No profile views found for this period.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[700px]">
+                <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                  <tr>
+                    <th className="text-left py-3 px-6">Visitor</th>
+                    <th className="text-left py-3 px-3">Venue</th>
+                    <th className="text-left py-3 px-3">City</th>
+                    <th className="text-left py-3 px-3">Visit time</th>
+                    <th className="text-center py-3 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map((lead) => {
+                    const isAnon = !lead.viewerUserId;
+                    return (
+                      <tr key={lead.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 px-6">
+                          {isAnon ? (
+                            <span className="text-muted-foreground italic">Anonymous visitor</span>
+                          ) : (
+                            <div>
+                              <p className="font-medium">{lead.viewerName || "—"}</p>
+                              {lead.viewerEmail && (
+                                <p className="text-xs text-muted-foreground">{lead.viewerEmail}</p>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 font-medium">{lead.vendorName}</td>
+                        <td className="py-3 px-3 text-muted-foreground">{lead.vendorCity || "—"}</td>
+                        <td className="py-3 px-3 text-muted-foreground tabular-nums text-xs">
+                          {new Date(lead.viewedAt).toLocaleString("en-IN", {
+                            day: "2-digit", month: "short", year: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          {lead.converted ? (
+                            <Badge className="bg-green-600/20 text-green-300 border-green-600/30 hover:bg-green-600/30">Booked</Badge>
+                          ) : isAnon ? (
+                            <Badge variant="secondary" className="text-muted-foreground">Anonymous</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground border-white/20">Lead</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="text-xs"
+                >
+                  ← Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                    const p = totalPages <= 7 ? i + 1 : page <= 4 ? i + 1 : page >= totalPages - 3 ? totalPages - 6 + i : page - 3 + i;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`w-7 h-7 text-xs rounded ${p === page ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-white/10 text-muted-foreground"}`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="text-xs"
+                >
+                  Next →
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

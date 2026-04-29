@@ -407,6 +407,45 @@ export interface AdminPartnerSummary {
   checkedInCount: number;
 }
 
+export interface AdminLeadRow {
+  id: number;
+  vendorId: number;
+  vendorName: string;
+  vendorCity: string;
+  viewerUserId?: number | null;
+  viewerName: string;
+  viewerEmail: string;
+  viewedAt: string;
+  converted: boolean;
+}
+
+export interface AdminLeadsResponse {
+  leads: AdminLeadRow[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface AdminLeadVendorSummary {
+  vendorId: number;
+  vendorName: string;
+  vendorCity: string;
+  totalViews: number;
+  knownLeads: number;
+  anonymousVisitors: number;
+  conversions: number;
+  conversionRate: number;
+}
+
+export interface AdminLeadsSummary {
+  totalViews: number;
+  knownLeads: number;
+  anonymousVisitors: number;
+  conversions: number;
+  conversionRate: number;
+  vendors: AdminLeadVendorSummary[];
+}
+
 export type ListVendorsParams = {
   category?: string;
 };
@@ -438,6 +477,19 @@ export type GetAdminBookingsReportParams = {
   search?: string;
   sortBy?: string;
   bookingType?: string;
+};
+
+export type GetAdminLeadsParams = {
+  page?: number;
+  vendorId?: number;
+  startDate?: string;
+  endDate?: string;
+  knownOnly?: string;
+};
+
+export type GetAdminLeadsSummaryParams = {
+  startDate?: string;
+  endDate?: string;
 };
 
 export type GetAdminAnalyticsParams = {

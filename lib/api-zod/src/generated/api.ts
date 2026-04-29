@@ -1028,6 +1028,64 @@ export const GetAdminBookingsPartnerSummaryResponse = zod.array(
 );
 
 /**
+ * @summary Paginated CRM leads (profile views) with conversion flag (admin)
+ */
+export const GetAdminLeadsQueryParams = zod.object({
+  page: zod.coerce.number().optional(),
+  vendorId: zod.coerce.number().optional(),
+  startDate: zod.coerce.string().optional(),
+  endDate: zod.coerce.string().optional(),
+  knownOnly: zod.coerce.string().optional(),
+});
+
+export const GetAdminLeadsResponse = zod.object({
+  leads: zod.array(
+    zod.object({
+      id: zod.number(),
+      vendorId: zod.number(),
+      vendorName: zod.string(),
+      vendorCity: zod.string(),
+      viewerUserId: zod.number().nullish(),
+      viewerName: zod.string(),
+      viewerEmail: zod.string(),
+      viewedAt: zod.string(),
+      converted: zod.boolean(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  totalPages: zod.number(),
+});
+
+/**
+ * @summary CRM leads summary with platform totals and per-vendor breakdown (admin)
+ */
+export const GetAdminLeadsSummaryQueryParams = zod.object({
+  startDate: zod.coerce.string().optional(),
+  endDate: zod.coerce.string().optional(),
+});
+
+export const GetAdminLeadsSummaryResponse = zod.object({
+  totalViews: zod.number(),
+  knownLeads: zod.number(),
+  anonymousVisitors: zod.number(),
+  conversions: zod.number(),
+  conversionRate: zod.number(),
+  vendors: zod.array(
+    zod.object({
+      vendorId: zod.number(),
+      vendorName: zod.string(),
+      vendorCity: zod.string(),
+      totalViews: zod.number(),
+      knownLeads: zod.number(),
+      anonymousVisitors: zod.number(),
+      conversions: zod.number(),
+      conversionRate: zod.number(),
+    }),
+  ),
+});
+
+/**
  * @summary Platform analytics
  */
 export const GetAdminAnalyticsQueryParams = zod.object({

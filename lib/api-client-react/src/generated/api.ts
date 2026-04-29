@@ -20,6 +20,8 @@ import type {
   AddToWishlistBody,
   AdminAnalytics,
   AdminBookingReportResponse,
+  AdminLeadsResponse,
+  AdminLeadsSummary,
   AdminPartnerSummary,
   AuthResponse,
   Availability,
@@ -32,6 +34,8 @@ import type {
   EventDetail,
   GetAdminAnalyticsParams,
   GetAdminBookingsReportParams,
+  GetAdminLeadsParams,
+  GetAdminLeadsSummaryParams,
   GetBookingTicketCode200,
   HealthStatus,
   ListEventsParams,
@@ -3389,6 +3393,200 @@ export function useGetAdminBookingsPartnerSummary<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetAdminBookingsPartnerSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Paginated CRM leads (profile views) with conversion flag (admin)
+ */
+export const getGetAdminLeadsUrl = (params?: GetAdminLeadsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/leads?${stringifiedParams}`
+    : `/api/admin/leads`;
+};
+
+export const getAdminLeads = async (
+  params?: GetAdminLeadsParams,
+  options?: RequestInit,
+): Promise<AdminLeadsResponse> => {
+  return customFetch<AdminLeadsResponse>(getGetAdminLeadsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminLeadsQueryKey = (params?: GetAdminLeadsParams) => {
+  return [`/api/admin/leads`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAdminLeadsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminLeads>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminLeadsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLeads>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminLeadsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminLeads>>> = ({
+    signal,
+  }) => getAdminLeads(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminLeads>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminLeadsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminLeads>>
+>;
+export type GetAdminLeadsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Paginated CRM leads (profile views) with conversion flag (admin)
+ */
+
+export function useGetAdminLeads<
+  TData = Awaited<ReturnType<typeof getAdminLeads>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminLeadsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLeads>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminLeadsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary CRM leads summary with platform totals and per-vendor breakdown (admin)
+ */
+export const getGetAdminLeadsSummaryUrl = (
+  params?: GetAdminLeadsSummaryParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/leads/summary?${stringifiedParams}`
+    : `/api/admin/leads/summary`;
+};
+
+export const getAdminLeadsSummary = async (
+  params?: GetAdminLeadsSummaryParams,
+  options?: RequestInit,
+): Promise<AdminLeadsSummary> => {
+  return customFetch<AdminLeadsSummary>(getGetAdminLeadsSummaryUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminLeadsSummaryQueryKey = (
+  params?: GetAdminLeadsSummaryParams,
+) => {
+  return [`/api/admin/leads/summary`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAdminLeadsSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminLeadsSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminLeadsSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLeadsSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminLeadsSummaryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminLeadsSummary>>
+  > = ({ signal }) =>
+    getAdminLeadsSummary(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminLeadsSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminLeadsSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminLeadsSummary>>
+>;
+export type GetAdminLeadsSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary CRM leads summary with platform totals and per-vendor breakdown (admin)
+ */
+
+export function useGetAdminLeadsSummary<
+  TData = Awaited<ReturnType<typeof getAdminLeadsSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminLeadsSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLeadsSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminLeadsSummaryQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
