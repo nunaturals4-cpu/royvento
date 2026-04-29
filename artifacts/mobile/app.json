@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Royvento Mobile",
-    "slug": "mobile",
+    "name": "Royvento",
+    "slug": "royvento",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "royvento",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -14,9 +14,12 @@
       "backgroundColor": "#0e0d12"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.royvento.app"
     },
-    "android": {},
+    "android": {
+      "package": "com.royvento.app"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
