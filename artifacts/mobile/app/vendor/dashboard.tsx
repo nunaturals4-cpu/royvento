@@ -1040,6 +1040,7 @@ export default function VendorDashboardScreen() {
     totalEarnings: number; monthEarnings: number;
     totalWomen: number; totalMen: number; totalCouple: number;
     perEvent: { eventId: number; eventTitle: string; bookingCount: number; revenue: number }[];
+    dailyRevenue: { date: string; revenue: number }[];
   };
   const [analyticsData, setAnalyticsData] = useState<AnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -1080,18 +1081,51 @@ export default function VendorDashboardScreen() {
             </View>
           ))}
         </View>
+        {(a?.dailyRevenue ?? []).length > 0 && (() => {
+          const daily = (a?.dailyRevenue ?? []).slice(-14);
+          const max = Math.max(...daily.map((d) => d.revenue), 1);
+          return (
+            <>
+              <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DAILY REVENUE (LAST 14 DAYS)</Text>
+              <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 12 }]}>
+                <View style={{ flexDirection: "row", alignItems: "flex-end", height: 60, gap: 3 }}>
+                  {daily.map((d) => (
+                    <View key={d.date} style={{ flex: 1, alignItems: "center" }}>
+                      <View style={{ width: "80%", height: Math.max(4, Math.round((d.revenue / max) * 56)), backgroundColor: d.revenue > 0 ? colors.primary : colors.muted, borderRadius: 3 }} />
+                    </View>
+                  ))}
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[0]?.date?.slice(5) ?? ""}</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[daily.length - 1]?.date?.slice(5) ?? ""}</Text>
+                </View>
+              </View>
+            </>
+          );
+        })()}
         {(a?.perEvent ?? []).length > 0 && (
           <>
-            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>PER-EVENT BREAKDOWN</Text>
-            {(a?.perEvent ?? []).map((e) => (
-              <View key={e.eventId} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "center" }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }} numberOfLines={1}>{e.eventTitle}</Text>
-                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>{e.bookingCount} booking{e.bookingCount !== 1 ? "s" : ""}</Text>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>TOP EVENTS BY REVENUE</Text>
+            {(a?.perEvent ?? []).slice(0, 5).map((e, idx) => {
+              const maxRev = Math.max(...(a?.perEvent ?? []).map((x) => x.revenue), 1);
+              return (
+                <View key={e.eventId} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 4 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={[{ width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", marginRight: 8 }, { backgroundColor: colors.primary + "20" }]}>
+                      <Text style={{ color: colors.primary, fontSize: 11, fontFamily: "Inter_700Bold" }}>{idx + 1}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }} numberOfLines={1}>{e.eventTitle}</Text>
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{e.bookingCount} booking{e.bookingCount !== 1 ? "s" : ""}</Text>
+                    </View>
+                    <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 15 }}>₹{e.revenue.toLocaleString("en-IN")}</Text>
+                  </View>
+                  <View style={{ height: 4, backgroundColor: colors.muted, borderRadius: 2 }}>
+                    <View style={{ height: 4, width: `${(e.revenue / maxRev) * 100}%`, backgroundColor: colors.primary, borderRadius: 2 }} />
+                  </View>
                 </View>
-                <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 15 }}>₹{e.revenue.toLocaleString("en-IN")}</Text>
-              </View>
-            ))}
+              );
+            })}
           </>
         )}
       </ScrollView>

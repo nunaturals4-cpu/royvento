@@ -5,27 +5,26 @@ import {
   useGetAdminBookingsReport,
   useGetAdminLeadsSummary,
 } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 
-type AdminTab = "analytics" | "events" | "vendors" | "users";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users";
 
 interface AdminVendor {
   id: number;
@@ -50,9 +49,20 @@ interface AdminEvent {
   title: string;
   city: string;
   status: string;
+  approvalStatus: string;
   vendorId: number;
+  partnerName?: string;
   createdAt: string;
-  isApproved?: boolean;
+}
+
+interface AdminBooking {
+  id: number;
+  guestName: string;
+  eventTitle: string;
+  status: string;
+  finalPrice: number;
+  createdAt: string;
+  ticketCode: string;
 }
 
 export default function AdminPanelScreen() {
@@ -64,7 +74,7 @@ export default function AdminPanelScreen() {
   // ─── ANALYTICS ─────────────────────────────────────────────────────────────
   const analyticsQ = useGetAdminAnalytics({}, { query: { enabled: activeTab === "analytics" } });
   const leadsQ = useGetAdminLeadsSummary({}, { query: { enabled: activeTab === "analytics" } });
-  const bookingsQ = useGetAdminBookingsReport({}, { query: { enabled: activeTab === "analytics" } });
+  const bookingsReportQ = useGetAdminBookingsReport({}, { query: { enabled: activeTab === "analytics" } });
 
   // ─── VENDORS ────────────────────────────────────────────────────────────────
   const [vendors, setVendors] = useState<AdminVendor[]>([]);
@@ -93,6 +103,7 @@ export default function AdminPanelScreen() {
   // ─── EVENTS ─────────────────────────────────────────────────────────────────
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [eventLoading, setEventLoading] = useState(false);
+  const [eventFilter, setEventFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
   const fetchEvents = useCallback(() => {
     setEventLoading(true);
@@ -102,29 +113,59 @@ export default function AdminPanelScreen() {
       .finally(() => setEventLoading(false));
   }, []);
 
+  // ─── BOOKINGS ───────────────────────────────────────────────────────────────
+  const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+
+  const fetchBookings = useCallback(() => {
+    setBookingLoading(true);
+    customFetch<AdminBooking[]>("/api/admin/bookings")
+      .then(setBookings)
+      .catch(() => {})
+      .finally(() => setBookingLoading(false));
+  }, []);
+
   useEffect(() => {
     if (activeTab === "vendors") fetchVendors();
     if (activeTab === "users") fetchUsers();
     if (activeTab === "events") fetchEvents();
+    if (activeTab === "bookings") fetchBookings();
   }, [activeTab]);
 
+  // ─── VENDOR ACTIONS ─────────────────────────────────────────────────────────
   async function approveVendor(id: number) {
     try {
       await customFetch(`/api/vendors/${id}/approve`, { method: "POST" });
-      Alert.alert("Approved", "Vendor has been approved.");
+      Alert.alert("Approved", "Partner has been approved.");
       fetchVendors();
     } catch {
-      Alert.alert("Error", "Failed to approve vendor.");
+      Alert.alert("Error", "Failed to approve partner.");
     }
   }
 
   async function rejectVendor(id: number) {
     try {
       await customFetch(`/api/vendors/${id}/reject`, { method: "POST" });
-      Alert.alert("Rejected", "Vendor application rejected.");
+      Alert.alert("Rejected", "Partner application rejected.");
       fetchVendors();
     } catch {
-      Alert.alert("Error", "Failed to reject vendor.");
+      Alert.alert("Error", "Failed to reject partner.");
+    }
+  }
+
+  // ─── EVENT ACTIONS ──────────────────────────────────────────────────────────
+  async function moderateEvent(id: number, approvalStatus: "approved" | "rejected", rejectionReason?: string) {
+    try {
+      await customFetch(`/api/admin/events/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalStatus, ...(rejectionReason ? { rejectionReason } : {}) }),
+      });
+      fetchEvents();
+    } catch {
+      Alert.alert("Error", "Failed to update event.");
     }
   }
 
@@ -137,28 +178,65 @@ export default function AdminPanelScreen() {
     }
   }
 
+  // ─── BOOKING ACTIONS ────────────────────────────────────────────────────────
+  async function approveBooking(id: number) {
+    try {
+      await customFetch(`/api/admin/bookings/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "confirmed" }),
+      });
+      fetchBookings();
+    } catch {
+      Alert.alert("Error", "Failed to approve booking.");
+    }
+  }
+
+  async function rejectBooking(id: number, reason: string) {
+    if (!reason.trim()) {
+      Alert.alert("Reason required", "Please enter a rejection reason.");
+      return;
+    }
+    try {
+      await customFetch(`/api/admin/bookings/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled", rejectionReason: reason.trim() }),
+      });
+      setRejectingId(null);
+      setRejectReason("");
+      fetchBookings();
+    } catch {
+      Alert.alert("Error", "Failed to reject booking.");
+    }
+  }
+
   // ─── RENDER ANALYTICS ───────────────────────────────────────────────────────
   function renderAnalytics() {
     const a = analyticsQ.data as Record<string, unknown> | undefined;
     const ls = leadsQ.data as Record<string, unknown> | undefined;
+    const br = bookingsReportQ.data as Record<string, unknown> | undefined;
     if (analyticsQ.isLoading) {
       return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
     }
     const kpis = [
-      { label: "Total Users", value: a?.["usersCount"] ?? "—", icon: "people-outline" as const, color: "#3b82f6" },
-      { label: "Partners", value: a?.["vendorsCount"] ?? "—", icon: "business-outline" as const, color: colors.primary },
-      { label: "Pending Vendors", value: a?.["pendingVendorsCount"] ?? "—", icon: "hourglass-outline" as const, color: "#f59e0b" },
-      { label: "Events", value: a?.["eventsCount"] ?? "—", icon: "calendar-outline" as const, color: "#22c55e" },
-      { label: "Total Bookings", value: a?.["bookingsCount"] ?? "—", icon: "ticket-outline" as const, color: "#8b5cf6" },
-      { label: "Revenue (₹)", value: a?.["totalRevenue"] ? `₹${Number(a["totalRevenue"]).toLocaleString("en-IN")}` : "—", icon: "cash-outline" as const, color: colors.primary },
+      { label: "Total Users", value: a?.["totalUsers"] ?? "—", icon: "people-outline" as const, color: "#3b82f6" },
+      { label: "Partners", value: a?.["totalVendors"] ?? "—", icon: "business-outline" as const, color: colors.primary },
+      { label: "Pending Partners", value: a?.["pendingVendors"] ?? "—", icon: "hourglass-outline" as const, color: "#f59e0b" },
+      { label: "Events", value: a?.["totalEvents"] ?? "—", icon: "calendar-outline" as const, color: "#22c55e" },
+      { label: "Total Bookings", value: a?.["totalBookings"] ?? "—", icon: "ticket-outline" as const, color: "#8b5cf6" },
+      { label: "Revenue", value: a?.["totalRevenue"] ? `₹${Number(a["totalRevenue"]).toLocaleString("en-IN")}` : "—", icon: "cash-outline" as const, color: colors.primary },
     ];
 
+    const bsByStatus = (br?.["bookingsByStatus"] as Array<{ status: string; count: number }> | undefined) ?? [];
     const leadKpis = ls
       ? [
           { label: "Total Leads", value: (ls as Record<string, unknown>)["totalLeads"] ?? 0, icon: "person-add-outline" as const },
           { label: "Converted", value: (ls as Record<string, unknown>)["convertedLeads"] ?? 0, icon: "checkmark-circle-outline" as const },
         ]
       : [];
+
+    const monthlyRevenue = (a?.["monthlyRevenue"] as Array<{ month: string; revenue: number }> | undefined) ?? [];
 
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
@@ -174,6 +252,53 @@ export default function AdminPanelScreen() {
             </View>
           ))}
         </View>
+
+        {bsByStatus.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>BOOKINGS BY STATUS</Text>
+            <View style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 8 }]}>
+              {bsByStatus.map((b) => {
+                const pct = bsByStatus.reduce((s, x) => s + x.count, 0) > 0
+                  ? (b.count / bsByStatus.reduce((s, x) => s + x.count, 0)) * 100
+                  : 0;
+                const statusColor = b.status === "confirmed" ? "#22c55e" : b.status === "pending" ? "#f59e0b" : b.status === "cancelled" ? "#ef4444" : colors.mutedForeground;
+                return (
+                  <View key={b.status} style={{ gap: 4 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: statusColor, fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "capitalize" }}>{b.status}</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular" }}>{b.count}</Text>
+                    </View>
+                    <View style={{ height: 4, backgroundColor: colors.muted, borderRadius: 2 }}>
+                      <View style={{ height: 4, width: `${pct}%`, backgroundColor: statusColor, borderRadius: 2 }} />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {monthlyRevenue.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>MONTHLY REVENUE TREND</Text>
+            <View style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0 }]}>
+              {(() => {
+                const max = Math.max(...monthlyRevenue.map((m) => m.revenue), 1);
+                return monthlyRevenue.slice(-6).map((m) => (
+                  <View key={m.month} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 5 }}>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_400Regular", width: 50 }}>{m.month.slice(0, 7)}</Text>
+                    <View style={{ flex: 1, height: 14, backgroundColor: colors.muted, borderRadius: 4 }}>
+                      <View style={{ height: 14, width: `${(m.revenue / max) * 100}%`, backgroundColor: colors.primary, borderRadius: 4 }} />
+                    </View>
+                    <Text style={{ color: colors.foreground, fontSize: 11, fontFamily: "Inter_600SemiBold", width: 70, textAlign: "right" }}>
+                      ₹{Number(m.revenue).toLocaleString("en-IN")}
+                    </Text>
+                  </View>
+                ));
+              })()}
+            </View>
+          </>
+        )}
 
         {leadKpis.length > 0 && (
           <>
@@ -191,6 +316,94 @@ export default function AdminPanelScreen() {
             </View>
           </>
         )}
+      </ScrollView>
+    );
+  }
+
+  // ─── RENDER BOOKINGS ─────────────────────────────────────────────────────────
+  function renderBookings() {
+    const pending = bookings.filter((b) => b.status === "pending" || b.status === "payment_pending");
+    const others = bookings.filter((b) => b.status !== "pending" && b.status !== "payment_pending");
+
+    function statusColor(s: string) {
+      if (s === "confirmed" || s === "completed") return "#22c55e";
+      if (s === "pending" || s === "payment_pending") return "#f59e0b";
+      if (s === "cancelled") return "#ef4444";
+      return colors.mutedForeground;
+    }
+
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={bookingLoading} onRefresh={fetchBookings} tintColor={colors.primary} />}>
+        {bookingLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+
+        {rejectingId !== null && (
+          <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: "#ef444440" }]}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 8 }}>
+              Rejection Reason (required)
+            </Text>
+            <TextInput
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              placeholder="Enter reason for cancellation..."
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted }]}
+              multiline
+            />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+              <TouchableOpacity style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444" }]} onPress={() => rejectBooking(rejectingId, rejectReason)}>
+                <Text style={{ color: "#ef4444", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Confirm Rejection</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtnWide, { backgroundColor: colors.muted, borderColor: colors.border }]} onPress={() => { setRejectingId(null); setRejectReason(""); }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {pending.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: "#f59e0b" }]}>PENDING APPROVAL ({pending.length})</Text>
+            {pending.map((b) => (
+              <View key={b.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]}>{b.guestName}</Text>
+                    <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{b.eventTitle}</Text>
+                    <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{b.ticketCode} · ₹{Number(b.finalPrice).toLocaleString("en-IN")}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: "#22c55e20", borderColor: "#22c55e" }]}
+                      onPress={() => Alert.alert("Approve?", `Approve booking for ${b.guestName}?`, [{ text: "Cancel", style: "cancel" }, { text: "Approve", onPress: () => approveBooking(b.id) }])}
+                    >
+                      <Ionicons name="checkmark" size={14} color="#22c55e" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: "#ef444420", borderColor: "#ef4444" }]}
+                      onPress={() => { setRejectingId(b.id); setRejectReason(""); }}
+                    >
+                      <Ionicons name="close" size={14} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pending.length > 0 ? 20 : 0 }]}>ALL BOOKINGS ({others.length})</Text>
+        {others.map((b) => (
+          <View key={b.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{b.guestName}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{b.eventTitle} · {b.ticketCode}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end", gap: 4 }}>
+              <Text style={{ color: statusColor(b.status), fontSize: 11, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{b.status}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_400Regular" }}>₹{Number(b.finalPrice).toLocaleString("en-IN")}</Text>
+            </View>
+          </View>
+        ))}
       </ScrollView>
     );
   }
@@ -220,17 +433,17 @@ export default function AdminPanelScreen() {
                     <Ionicons name="checkmark" size={14} color="#22c55e" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: colors.destructive + "20", borderColor: colors.destructive }]}
+                    style={[styles.actionBtn, { backgroundColor: "#ef444420", borderColor: "#ef4444" }]}
                     onPress={() => Alert.alert("Reject?", `Reject ${v.businessName}?`, [{ text: "Cancel", style: "cancel" }, { text: "Reject", style: "destructive", onPress: () => rejectVendor(v.id) }])}
                   >
-                    <Ionicons name="close" size={14} color={colors.destructive} />
+                    <Ionicons name="close" size={14} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
               </View>
             ))}
           </>
         )}
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>ALL PARTNERS ({approved.length})</Text>
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pending.length > 0 ? 20 : 0 }]}>ALL PARTNERS ({approved.length})</Text>
         {approved.map((v) => (
           <View key={v.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flex: 1 }}>
@@ -277,21 +490,75 @@ export default function AdminPanelScreen() {
 
   // ─── RENDER EVENTS ──────────────────────────────────────────────────────────
   function renderEvents() {
+    const filtered = eventFilter === "all" ? events : events.filter((e) => e.approvalStatus === eventFilter);
+
+    function approvalColor(s: string) {
+      if (s === "approved") return "#22c55e";
+      if (s === "pending") return "#f59e0b";
+      if (s === "rejected") return "#ef4444";
+      return colors.mutedForeground;
+    }
+
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={eventLoading} onRefresh={fetchEvents} tintColor={colors.primary} />}>
         {eventLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>ALL EVENTS ({events.length})</Text>
-        {events.map((e) => (
-          <View key={e.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{e.title}</Text>
-              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{e.city} · #{e.vendorId}</Text>
-            </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
+          {(["all", "pending", "approved", "rejected"] as const).map((f) => (
             <TouchableOpacity
-              onPress={() => Alert.alert("Delete Event?", `Delete "${e.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteEvent(e.id) }])}
+              key={f}
+              onPress={() => setEventFilter(f)}
+              style={[styles.filterChip, { backgroundColor: eventFilter === f ? colors.primary : colors.muted, borderColor: eventFilter === f ? colors.primary : colors.border }]}
             >
-              <Ionicons name="trash-outline" size={16} color={colors.destructive} />
+              <Text style={{ color: eventFilter === f ? colors.primaryForeground : colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "capitalize" }}>{f}</Text>
             </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>EVENTS ({filtered.length})</Text>
+        {filtered.map((e) => (
+          <View key={e.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{e.title}</Text>
+                <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{e.city}{e.partnerName ? ` · ${e.partnerName}` : ""}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end", gap: 4 }}>
+                <View style={[styles.roleBadge, { backgroundColor: approvalColor(e.approvalStatus) + "20", borderColor: approvalColor(e.approvalStatus) }]}>
+                  <Text style={{ color: approvalColor(e.approvalStatus), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{e.approvalStatus}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {e.approvalStatus === "pending" && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.actionBtnWide, { backgroundColor: "#22c55e20", borderColor: "#22c55e", flex: 1 }]}
+                    onPress={() => Alert.alert("Approve Event?", `Approve "${e.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Approve", onPress: () => moderateEvent(e.id, "approved") }])}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={14} color="#22c55e" />
+                    <Text style={{ color: "#22c55e", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444", flex: 1 }]}
+                    onPress={() => Alert.prompt(
+                      "Reject Event",
+                      `Reason for rejecting "${e.title}":`,
+                      (reason) => { if (reason) moderateEvent(e.id, "rejected", reason); }
+                    )}
+                  >
+                    <Ionicons name="close-circle-outline" size={14} color="#ef4444" />
+                    <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Reject</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#ef444410", borderColor: "#ef444440" }]}
+                onPress={() => Alert.alert("Delete Event?", `Delete "${e.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteEvent(e.id) }])}
+              >
+                <Ionicons name="trash-outline" size={14} color={colors.destructive} />
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -300,6 +567,7 @@ export default function AdminPanelScreen() {
 
   const TABS = [
     { key: "analytics" as AdminTab, icon: "bar-chart-outline" as const, label: "Analytics" },
+    { key: "bookings" as AdminTab, icon: "ticket-outline" as const, label: "Bookings" },
     { key: "vendors" as AdminTab, icon: "business-outline" as const, label: "Partners" },
     { key: "users" as AdminTab, icon: "people-outline" as const, label: "Users" },
     { key: "events" as AdminTab, icon: "calendar-outline" as const, label: "Events" },
@@ -307,7 +575,6 @@ export default function AdminPanelScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
       <LinearGradient
         colors={[colors.card, colors.background]}
         style={[styles.header, { paddingTop: topPadding + 12 }]}
@@ -339,8 +606,8 @@ export default function AdminPanelScreen() {
         </ScrollView>
       </LinearGradient>
 
-      {/* Content */}
       {activeTab === "analytics" && renderAnalytics()}
+      {activeTab === "bookings" && renderBookings()}
       {activeTab === "vendors" && renderVendors()}
       {activeTab === "users" && renderUsers()}
       {activeTab === "events" && renderEvents()}
@@ -368,7 +635,11 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   itemSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   actionBtn: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  actionBtnWide: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
   premiumBadge: { flexDirection: "row", alignItems: "center", gap: 3, borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
   userAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   roleBadge: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
+  filterChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  rejectBox: { borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 10 },
+  reasonInput: { borderWidth: 1, borderRadius: 10, padding: 10, minHeight: 60, textAlignVertical: "top", fontSize: 13, fontFamily: "Inter_400Regular" },
 });
