@@ -20,6 +20,7 @@ import type {
   AddToWishlistBody,
   AdminAnalytics,
   AdminBookingReportResponse,
+  AdminEvent,
   AdminLeadsResponse,
   AdminLeadsSummary,
   AdminPartnerSummary,
@@ -45,6 +46,7 @@ import type {
   MyVendorResponse,
   Notification,
   Ok,
+  PatchAdminEventBody,
   RegisterBody,
   Review,
   SetAvailabilityBody,
@@ -3216,6 +3218,252 @@ export const useDeleteAvailability = <
   TContext
 > => {
   return useMutation(getDeleteAvailabilityMutationOptions(options));
+};
+
+/**
+ * @summary List all events with popular-since tracking (admin)
+ */
+export const getGetAdminEventsUrl = () => {
+  return `/api/admin/events`;
+};
+
+export const getAdminEvents = async (
+  options?: RequestInit,
+): Promise<AdminEvent[]> => {
+  return customFetch<AdminEvent[]>(getGetAdminEventsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminEventsQueryKey = () => {
+  return [`/api/admin/events`] as const;
+};
+
+export const getGetAdminEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminEvents>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminEvents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminEventsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminEvents>>> = ({
+    signal,
+  }) => getAdminEvents({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminEvents>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminEvents>>
+>;
+export type GetAdminEventsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all events with popular-since tracking (admin)
+ */
+
+export function useGetAdminEvents<
+  TData = Awaited<ReturnType<typeof getAdminEvents>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminEvents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminEventsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Toggle popular/featured/approvalStatus on an event (admin)
+ */
+export const getPatchAdminEventUrl = (eventId: number) => {
+  return `/api/admin/events/${eventId}`;
+};
+
+export const patchAdminEvent = async (
+  eventId: number,
+  patchAdminEventBody: PatchAdminEventBody,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getPatchAdminEventUrl(eventId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(patchAdminEventBody),
+  });
+};
+
+export const getPatchAdminEventMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchAdminEvent>>,
+    TError,
+    { eventId: number; data: BodyType<PatchAdminEventBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof patchAdminEvent>>,
+  TError,
+  { eventId: number; data: BodyType<PatchAdminEventBody> },
+  TContext
+> => {
+  const mutationKey = ["patchAdminEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof patchAdminEvent>>,
+    { eventId: number; data: BodyType<PatchAdminEventBody> }
+  > = (props) => {
+    const { eventId, data } = props ?? {};
+
+    return patchAdminEvent(eventId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PatchAdminEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchAdminEvent>>
+>;
+export type PatchAdminEventMutationBody = BodyType<PatchAdminEventBody>;
+export type PatchAdminEventMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Toggle popular/featured/approvalStatus on an event (admin)
+ */
+export const usePatchAdminEvent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchAdminEvent>>,
+    TError,
+    { eventId: number; data: BodyType<PatchAdminEventBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof patchAdminEvent>>,
+  TError,
+  { eventId: number; data: BodyType<PatchAdminEventBody> },
+  TContext
+> => {
+  return useMutation(getPatchAdminEventMutationOptions(options));
+};
+
+/**
+ * @summary Delete an event (admin)
+ */
+export const getDeleteAdminEventUrl = (eventId: number) => {
+  return `/api/admin/events/${eventId}`;
+};
+
+export const deleteAdminEvent = async (
+  eventId: number,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getDeleteAdminEventUrl(eventId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteAdminEventMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminEvent>>,
+    TError,
+    { eventId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAdminEvent>>,
+  TError,
+  { eventId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteAdminEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAdminEvent>>,
+    { eventId: number }
+  > = (props) => {
+    const { eventId } = props ?? {};
+
+    return deleteAdminEvent(eventId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAdminEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAdminEvent>>
+>;
+
+export type DeleteAdminEventMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete an event (admin)
+ */
+export const useDeleteAdminEvent = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminEvent>>,
+    TError,
+    { eventId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAdminEvent>>,
+  TError,
+  { eventId: number },
+  TContext
+> => {
+  return useMutation(getDeleteAdminEventMutationOptions(options));
 };
 
 /**

@@ -962,6 +962,56 @@ export const DeleteAvailabilityResponse = zod.object({
 });
 
 /**
+ * @summary List all events with popular-since tracking (admin)
+ */
+export const GetAdminEventsResponseItem = zod.object({
+  id: zod.number().optional(),
+  vendorId: zod.number().optional(),
+  title: zod.string().optional(),
+  type: zod.string().optional(),
+  category: zod.string().optional(),
+  city: zod.string().optional(),
+  state: zod.string().optional(),
+  price: zod.number().optional(),
+  imageUrl: zod.string().optional(),
+  popular: zod.boolean().optional(),
+  popularSince: zod.coerce.date().nullish(),
+  approvalStatus: zod.string().optional(),
+  partnerName: zod.string().optional(),
+  createdAt: zod.coerce.date().optional(),
+});
+export const GetAdminEventsResponse = zod.array(GetAdminEventsResponseItem);
+
+/**
+ * @summary Toggle popular/featured/approvalStatus on an event (admin)
+ */
+export const PatchAdminEventParams = zod.object({
+  eventId: zod.coerce.number(),
+});
+
+export const PatchAdminEventBody = zod.object({
+  popular: zod.boolean().optional(),
+  featured: zod.boolean().optional(),
+  approvalStatus: zod.string().optional(),
+  rejectionReason: zod.string().nullish(),
+});
+
+export const PatchAdminEventResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Delete an event (admin)
+ */
+export const DeleteAdminEventParams = zod.object({
+  eventId: zod.coerce.number(),
+});
+
+export const DeleteAdminEventResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
  * @summary Paginated, filterable booking report (admin)
  */
 export const GetAdminBookingsReportQueryParams = zod.object({

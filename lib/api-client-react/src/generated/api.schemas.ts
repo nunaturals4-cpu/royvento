@@ -362,6 +362,30 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+export interface AdminEvent {
+  id?: number;
+  vendorId?: number;
+  title?: string;
+  type?: string;
+  category?: string;
+  city?: string;
+  state?: string;
+  price?: number;
+  imageUrl?: string;
+  popular?: boolean;
+  popularSince?: string | null;
+  approvalStatus?: string;
+  partnerName?: string;
+  createdAt?: string;
+}
+
+export interface PatchAdminEventBody {
+  popular?: boolean;
+  featured?: boolean;
+  approvalStatus?: string;
+  rejectionReason?: string | null;
+}
+
 export interface AdminBookingRow {
   id: number;
   vendorId: number;
