@@ -329,12 +329,25 @@ router.get("/payments/booking-callback", async (req, res) => {
  * UX redirect after user returns from PhonePe. On success: activates subscription.
  * On non-success: redirects user without touching DB state.
  */
+const ALLOWED_CALLBACK_SCHEMES = new Set(["royvento"]);
+
 router.get("/payments/subscription-callback", async (req, res) => {
   const merchantTransactionId = req.query["merchantTransactionId"] as string | undefined;
+  const rawScheme = req.query["callbackScheme"] as string | undefined;
+  const callbackScheme = rawScheme && ALLOWED_CALLBACK_SCHEMES.has(rawScheme) ? rawScheme : undefined;
   const appUrl = getAppUrl();
 
+  function buildRedirectUrl(status: "success" | "failed", extra?: string): string {
+    if (callbackScheme) {
+      const base = `${callbackScheme}://subscription?payment=${status}`;
+      return extra ? `${base}&${extra}` : base;
+    }
+    const base = `${appUrl}/subscription?payment=${status}`;
+    return extra ? `${base}&${extra}` : base;
+  }
+
   if (!merchantTransactionId) {
-    return res.redirect(`${appUrl}/subscription?payment=failed`);
+    return res.redirect(buildRedirectUrl("failed"));
   }
 
   const [payment] = await db
@@ -344,8 +357,8 @@ router.get("/payments/subscription-callback", async (req, res) => {
     .limit(1);
 
   if (!payment || !payment.subscriptionId) {
-    console.warn(`[payments] subscription-callback: no payment record for ${merchantTransactionId}`);
-    return res.redirect(`${appUrl}/subscription?payment=failed`);
+    req.log.warn(`[payments] subscription-callback: no payment record for ${merchantTransactionId}`);
+    return res.redirect(buildRedirectUrl("failed"));
   }
 
   const subscriptionId = payment.subscriptionId;
@@ -355,13 +368,13 @@ router.get("/payments/subscription-callback", async (req, res) => {
 
     if (result.success) {
       await activateSubscriptionAfterPayment(subscriptionId, result.transactionId);
-      return res.redirect(`${appUrl}/subscription?payment=success`);
+      return res.redirect(buildRedirectUrl("success"));
     }
 
-    return res.redirect(`${appUrl}/subscription?payment=failed&code=${encodeURIComponent(result.code)}`);
+    return res.redirect(buildRedirectUrl("failed", `code=${encodeURIComponent(result.code)}`));
   } catch (err) {
-    console.error("[payments] subscription-callback error:", err);
-    return res.redirect(`${appUrl}/subscription?payment=failed`);
+    req.log.error({ err }, "[payments] subscription-callback error");
+    return res.redirect(buildRedirectUrl("failed"));
   }
 });
 

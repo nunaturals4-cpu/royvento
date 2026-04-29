@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
+import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -103,13 +104,39 @@ export default function SubscriptionScreen() {
     }
     setLoading(true);
     try {
-      await customFetch("/api/subscriptions", {
-        method: "POST",
-        body: JSON.stringify({ planType, planPeriod: "monthly" }),
-        headers: { "Content-Type": "application/json" },
-      });
-      activeQuery.refetch();
-      Alert.alert("Subscription activated", "Welcome to Royvento Premium!");
+      const result = await customFetch<{ requiresPayment?: boolean; redirectUrl?: string } | Record<string, unknown>>(
+        "/api/subscriptions",
+        {
+          method: "POST",
+          body: JSON.stringify({ planType, planPeriod: "monthly", callbackScheme: "royvento" }),
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (result && typeof result === "object" && "requiresPayment" in result && result.requiresPayment && result.redirectUrl) {
+        const browserResult = await WebBrowser.openAuthSessionAsync(
+          result.redirectUrl as string,
+          "royvento://"
+        );
+
+        const { data: refreshedSub } = await activeQuery.refetch();
+
+        if (browserResult.type === "success") {
+          const url = browserResult.url;
+          if (url.includes("payment=success")) {
+            Alert.alert("Subscription activated", "Welcome to Royvento Premium!");
+          } else {
+            Alert.alert("Payment incomplete", "Your payment was not completed. Please try again.");
+          }
+        } else if (browserResult.type === "cancel" || browserResult.type === "dismiss") {
+          if (!refreshedSub) {
+            Alert.alert("Payment cancelled", "You closed the payment screen before completing.");
+          }
+        }
+      } else {
+        await activeQuery.refetch();
+        Alert.alert("Subscription activated", "Welcome to Royvento Premium!");
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unable to activate subscription";
       Alert.alert("Failed", message);

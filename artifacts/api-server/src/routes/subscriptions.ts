@@ -19,9 +19,12 @@ const PLAN_PRICES = {
   partner: { monthly: 999, yearly: 9999 },
 } as const;
 
+const ALLOWED_CALLBACK_SCHEMES = ["royvento"] as const;
+
 const SubscribeBody = z.object({
   planType: z.enum(["user", "partner"]),
   planPeriod: z.enum(["monthly", "yearly"]),
+  callbackScheme: z.enum(ALLOWED_CALLBACK_SCHEMES).optional(),
 });
 
 function expiresFor(period: "monthly" | "yearly"): Date {
@@ -54,7 +57,7 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = SubscribeBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
-  const { planType, planPeriod } = parsed.data;
+  const { planType, planPeriod, callbackScheme } = parsed.data;
   let price = PLAN_PRICES[planType][planPeriod];
   if (isNewUser(user.createdAt)) {
     price = Math.round(price * 0.5);
@@ -112,7 +115,7 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
 
   const merchantTransactionId = `SUB${sub.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
   const appUrl = getAppUrl();
-  const callbackUrl = `${appUrl}/api/payments/subscription-callback?merchantTransactionId=${merchantTransactionId}`;
+  const callbackUrl = `${appUrl}/api/payments/subscription-callback?merchantTransactionId=${merchantTransactionId}${callbackScheme ? `&callbackScheme=${encodeURIComponent(callbackScheme)}` : ""}`;
   const webhookUrl = `${appUrl}/api/payments/webhook`;
 
   await db.insert(paymentsTable).values({
