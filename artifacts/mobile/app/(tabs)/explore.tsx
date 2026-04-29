@@ -142,7 +142,7 @@ export default function ExploreScreen() {
         style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}
       >
         <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Explore</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>Pub & Nightlife</Text>
           <TouchableOpacity
             onPress={openFilter}
             style={[styles.filterBtn, { backgroundColor: activeFilterCount > 0 ? colors.primary : colors.muted, borderColor: colors.border }]}

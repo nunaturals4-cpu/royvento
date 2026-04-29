@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { PersistentBottomNav } from "@/components/PersistentBottomNav";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -209,6 +210,7 @@ export default function RootLayout() {
               <StatusBar style="light" backgroundColor="#0e0d12" />
               <AuthGate />
               <NotificationHandler pushToken={pushToken} />
+              <PersistentBottomNav />
               <Stack
                 screenOptions={{
                   headerShown: false,

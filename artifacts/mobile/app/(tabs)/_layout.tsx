@@ -9,7 +9,7 @@ import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout({ isVendor }: { isVendor: boolean }) {
+function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -17,27 +17,13 @@ function NativeTabLayout({ isVendor }: { isVendor: boolean }) {
         <Label>Home</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="explore">
-        <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
-        <Label>Explore</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="pubs">
         <Icon sf={{ default: "wineglass", selected: "wineglass.fill" }} />
-        <Label>Pubs</Label>
+        <Label>Pub</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="bookings">
         <Icon sf={{ default: "ticket", selected: "ticket.fill" }} />
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="wishlist">
-        <Icon sf={{ default: "heart", selected: "heart.fill" }} />
-        <Label>Wishlist</Label>
-      </NativeTabs.Trigger>
-      {isVendor ? (
-        <NativeTabs.Trigger name="vendor">
-          <Icon sf={{ default: "building.2", selected: "building.2.fill" }} />
-          <Label>Partner</Label>
-        </NativeTabs.Trigger>
-      ) : null}
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
@@ -46,10 +32,9 @@ function NativeTabLayout({ isVendor }: { isVendor: boolean }) {
   );
 }
 
-function ClassicTabLayout({ isVendor }: { isVendor: boolean }) {
+function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
 
@@ -76,25 +61,7 @@ function ClassicTabLayout({ isVendor }: { isVendor: boolean }) {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.card,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          elevation: 0,
-          ...(isWeb ? { height: 67 } : {}),
-        },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
-          ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
-          ) : null,
-        tabBarLabelStyle: {
-          fontFamily: "Inter_500Medium",
-          fontSize: 10,
-          marginBottom: isWeb ? 0 : 2,
-        },
+        tabBarStyle: { display: "none" },
       }}
     >
       <Tabs.Screen
@@ -108,15 +75,16 @@ function ClassicTabLayout({ isVendor }: { isVendor: boolean }) {
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Explore",
+          title: "Pub",
           tabBarIcon: ({ color, focused }) =>
-            tabBarIcon(focused, color, "magnifyingglass", "magnifyingglass", "search", "search-outline"),
+            tabBarIcon(focused, color, "wineglass.fill", "wineglass", "beer", "beer-outline"),
         }}
       />
       <Tabs.Screen
         name="pubs"
         options={{
           title: "Pubs",
+          tabBarItemStyle: { display: "none" },
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "wineglass.fill", "wineglass", "beer", "beer-outline"),
         }}
@@ -142,7 +110,7 @@ function ClassicTabLayout({ isVendor }: { isVendor: boolean }) {
         name="vendor"
         options={{
           title: "Partner",
-          tabBarItemStyle: { display: isVendor ? "flex" : "none" },
+          tabBarItemStyle: { display: "none" },
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "building.2.fill", "building.2", "business", "business-outline"),
         }}
@@ -160,11 +128,8 @@ function ClassicTabLayout({ isVendor }: { isVendor: boolean }) {
 }
 
 export default function TabLayout() {
-  const { user } = useAuth();
-  const isVendor = user?.role === "vendor" || user?.role === "admin";
-
   if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout isVendor={isVendor} />;
+    return <NativeTabLayout />;
   }
-  return <ClassicTabLayout isVendor={isVendor} />;
+  return <ClassicTabLayout />;
 }
