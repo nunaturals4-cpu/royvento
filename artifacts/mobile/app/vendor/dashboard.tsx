@@ -324,7 +324,7 @@ export default function VendorDashboardScreen() {
   const [profDayTimes, setProfDayTimes] = useState<Record<string, { open: string; close: string }>>({});
   const [profAddress, setProfAddress] = useState("");
   const [profAddressQuery, setProfAddressQuery] = useState("");
-  const [addrSuggestions, setAddrSuggestions] = useState<{ place_id: string; description: string }[]>([]);
+  const [addrSuggestions, setAddrSuggestions] = useState<{ place_id: string; description: string; types: string[] }[]>([]);
   const [showAddrSugg, setShowAddrSugg] = useState(false);
   const addrDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeDayPicker, setActiveDayPicker] = useState<{ day: string; field: "open" | "close" } | null>(null);
@@ -462,7 +462,7 @@ export default function VendorDashboardScreen() {
     if (q.trim().length < 3) { setAddrSuggestions([]); setShowAddrSugg(false); return; }
     addrDebounceRef.current = setTimeout(async () => {
       try {
-        const data: { place_id: string; description: string }[] = await customFetch(
+        const data: { place_id: string; description: string; types: string[] }[] = await customFetch(
           `/api/places/autocomplete?q=${encodeURIComponent(q)}`
         );
         setAddrSuggestions(data);
@@ -945,15 +945,26 @@ export default function VendorDashboardScreen() {
             />
             {showAddrSugg && addrSuggestions.length > 0 && (
               <View style={{ marginTop: 4, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}>
-                {addrSuggestions.map((s) => (
-                  <TouchableOpacity
-                    key={s.place_id}
-                    style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.muted }}
-                    onPress={() => { setProfAddress(s.description); setProfAddressQuery(s.description); setAddrSuggestions([]); setShowAddrSugg(false); }}
-                  >
-                    <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular" }} numberOfLines={2}>{s.description}</Text>
-                  </TouchableOpacity>
-                ))}
+                {addrSuggestions.map((s) => {
+                  const isEstablishment = s.types.some((t) =>
+                    ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
+                  );
+                  return (
+                    <TouchableOpacity
+                      key={s.place_id}
+                      style={{ paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.muted, flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+                      onPress={() => { setProfAddress(s.description); setProfAddressQuery(s.description); setAddrSuggestions([]); setShowAddrSugg(false); }}
+                    >
+                      <Ionicons
+                        name={isEstablishment ? "business-outline" : "location-outline"}
+                        size={14}
+                        color={colors.mutedForeground}
+                        style={{ marginTop: 1 }}
+                      />
+                      <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 }} numberOfLines={2}>{s.description}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </View>

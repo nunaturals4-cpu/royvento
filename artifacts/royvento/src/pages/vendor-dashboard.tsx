@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
-  Megaphone, Crown, Users, Eye, MapPin, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
+  Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee,
 } from "lucide-react";
 import {
@@ -136,7 +136,7 @@ const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 type DayTimes = Record<string, { open: string; close: string }>;
 
-interface PlacesSuggestion { place_id: string; description: string; }
+interface PlacesSuggestion { place_id: string; description: string; types: string[]; }
 
 function parseDayHours(raw: unknown): DayTimes {
   if (!raw || typeof raw !== "object") return {};
@@ -324,17 +324,24 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           />
           {showSugg && suggestions.length > 0 && (
             <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-card border border-white/10 shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-              {suggestions.map((s) => (
-                <li key={s.place_id}>
-                  <button
-                    type="button"
-                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug"
-                    onMouseDown={() => selectSuggestion(s)}
-                  >
-                    {s.description}
-                  </button>
-                </li>
-              ))}
+              {suggestions.map((s) => {
+                const isEstablishment = s.types.some((t) =>
+                  ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
+                );
+                const Icon = isEstablishment ? Building2 : MapPin;
+                return (
+                  <li key={s.place_id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug flex items-start gap-2.5"
+                      onMouseDown={() => selectSuggestion(s)}
+                    >
+                      <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                      <span>{s.description}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

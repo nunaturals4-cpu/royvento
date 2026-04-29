@@ -21,7 +21,6 @@ router.get("/api/places/autocomplete", requireAuth(["vendor", "admin"]), async (
     url.searchParams.set("key", apiKey);
     url.searchParams.set("components", "country:in");
     url.searchParams.set("language", "en");
-    url.searchParams.set("types", "geocode");
     const response = await fetch(url.toString());
     if (!response.ok) {
       req.log.error({ status: response.status }, "Google Places API error");
@@ -30,7 +29,7 @@ router.get("/api/places/autocomplete", requireAuth(["vendor", "admin"]), async (
     }
     const data = (await response.json()) as {
       status: string;
-      predictions: { place_id: string; description: string }[];
+      predictions: { place_id: string; description: string; types?: string[] }[];
     };
     if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
       req.log.error({ googleStatus: data.status }, "Google Places API non-OK status");
@@ -40,6 +39,7 @@ router.get("/api/places/autocomplete", requireAuth(["vendor", "admin"]), async (
     const results = (data.predictions ?? []).map((p) => ({
       place_id: p.place_id,
       description: p.description,
+      types: p.types ?? [],
     }));
     res.json(results);
   } catch (err) {
