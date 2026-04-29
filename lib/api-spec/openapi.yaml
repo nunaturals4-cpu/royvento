@@ -875,6 +875,11 @@ paths:
           required: false
           schema:
             type: string
+        - name: anonymousOnly
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Leads list
@@ -1761,6 +1766,8 @@ components:
       properties:
         totalViews:
           type: integer
+        allTimeTotalViews:
+          type: integer
         knownLeads:
           type: integer
         anonymousVisitors:
@@ -1773,4 +1780,4 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminLeadVendorSummary"
-      required: [totalViews, knownLeads, anonymousVisitors, conversions, conversionRate, vendors]
+      required: [totalViews, allTimeTotalViews, knownLeads, anonymousVisitors, conversions, conversionRate, vendors]

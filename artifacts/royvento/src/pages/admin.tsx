@@ -32,10 +32,25 @@ import {
 } from "recharts";
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { apiGet, apiPost, apiDelete, apiPatch, formatINR } from "@/lib/api";
 
 export function AdminPanel() {
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const urlTab = new URLSearchParams(search).get("tab") ?? "analytics";
+  const [activeTab, setActiveTab] = useState(urlTab);
+
+  useEffect(() => {
+    const t = new URLSearchParams(search).get("tab");
+    if (t && t !== activeTab) setActiveTab(t);
+  }, [search]);
+
+  const handleTabChange = (t: string) => {
+    setActiveTab(t);
+    navigate(`/admin?tab=${t}`, { replace: true });
+  };
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="mb-10">
@@ -43,7 +58,7 @@ export function AdminPanel() {
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">Royvento control room</h1>
       </header>
 
-      <Tabs defaultValue="analytics" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="vendors">Partners</TabsTrigger>
@@ -1927,13 +1942,14 @@ function BookingReport() {
 // ── CRM & Leads ──────────────────────────────────────────────────────────────
 
 type CrmPreset = "7d" | "30d" | "90d" | "custom";
+type LeadType = "all" | "known" | "anonymous";
 
 function CrmLeads() {
   const [preset, setPreset] = useState<CrmPreset>("30d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [vendorFilter, setVendorFilter] = useState<string>("");
-  const [knownOnly, setKnownOnly] = useState(false);
+  const [leadType, setLeadType] = useState<LeadType>("all");
   const [page, setPage] = useState(1);
 
   const now = new Date();
@@ -1947,7 +1963,8 @@ function CrmLeads() {
   const leadsParams = {
     page,
     ...(vendorFilter ? { vendorId: Number(vendorFilter) } : {}),
-    ...(knownOnly ? { knownOnly: "true" } : {}),
+    ...(leadType === "known" ? { knownOnly: "true" } : {}),
+    ...(leadType === "anonymous" ? { anonymousOnly: "true" } : {}),
     ...computedRange,
   };
 
@@ -1959,7 +1976,6 @@ function CrmLeads() {
   const leads = leadsData?.leads ?? [];
   const totalPages = leadsData?.totalPages ?? 1;
   const total = leadsData?.total ?? 0;
-
   const vendors = summary?.vendors ?? [];
 
   const presetLabel: Record<CrmPreset, string> = {
@@ -2018,17 +2034,21 @@ function CrmLeads() {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2 pb-0.5">
-          <button
-            onClick={() => { setKnownOnly((k) => !k); setPage(1); }}
-            className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${knownOnly ? "border-primary text-primary bg-primary/10" : "border-white/15 text-muted-foreground hover:border-white/30"}`}
-          >
-            <Filter className="h-3 w-3" />
-            Known leads only
-          </button>
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Lead type</Label>
+          <Select value={leadType} onValueChange={(v) => { setLeadType(v as LeadType); setPage(1); }}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All leads</SelectItem>
+              <SelectItem value="known">Known leads</SelectItem>
+              <SelectItem value="anonymous">Anonymous visitors</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        {(vendorFilter || knownOnly) && (
-          <Button variant="outline" size="sm" onClick={() => { setVendorFilter(""); setKnownOnly(false); setPage(1); }}>
+        {(vendorFilter || leadType !== "all") && (
+          <Button variant="outline" size="sm" onClick={() => { setVendorFilter(""); setLeadType("all"); setPage(1); }}>
             Clear filters
           </Button>
         )}
@@ -2038,15 +2058,25 @@ function CrmLeads() {
       {summaryLoading ? (
         <p className="text-muted-foreground">Loading summary…</p>
       ) : summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="rounded-2xl glass-card p-5 lift-3d">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">Total views</span>
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">All-time views</span>
               <div className="w-9 h-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
                 <Eye className="h-4 w-4" />
               </div>
             </div>
+            <p className="stat-number text-3xl">{summary.allTimeTotalViews.toLocaleString()}</p>
+          </div>
+          <div className="rounded-2xl glass-card p-5 lift-3d">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground">Period views</span>
+              <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <Eye className="h-4 w-4" />
+              </div>
+            </div>
             <p className="stat-number text-3xl">{summary.totalViews.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">{presetLabel[preset]}</p>
           </div>
           <div className="rounded-2xl glass-card p-5 lift-3d">
             <div className="flex items-center justify-between mb-3">
@@ -2074,7 +2104,7 @@ function CrmLeads() {
               </div>
             </div>
             <p className="stat-number text-3xl text-green-300">{summary.conversionRate}%</p>
-            <p className="text-xs text-muted-foreground mt-1">{summary.conversions} bookings from leads</p>
+            <p className="text-xs text-muted-foreground mt-1">{summary.conversions} views → bookings</p>
           </div>
         </div>
       )}
@@ -2082,7 +2112,8 @@ function CrmLeads() {
       {/* Partner leaderboard */}
       {!summaryLoading && vendors.length > 0 && (
         <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-4">Per-partner breakdown</h3>
+          <h3 className="font-serif text-xl mb-1">Per-partner breakdown</h3>
+          <p className="text-xs text-muted-foreground mb-4">Click a row to filter the leads table to that partner.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[600px]">
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
@@ -2092,7 +2123,7 @@ function CrmLeads() {
                   <th className="text-right py-2 px-2">Total Views</th>
                   <th className="text-right py-2 px-2 text-blue-300">Known Leads</th>
                   <th className="text-right py-2 px-2">Anonymous</th>
-                  <th className="text-right py-2 px-2 text-green-300">Conversions</th>
+                  <th className="text-right py-2 px-2 text-green-300">Bookings from leads</th>
                   <th className="text-right py-2 pl-2 text-green-300">Conv. Rate</th>
                 </tr>
               </thead>
@@ -2110,19 +2141,13 @@ function CrmLeads() {
                     <td className="text-right px-2 tabular-nums text-muted-foreground">{v.anonymousVisitors || "—"}</td>
                     <td className="text-right px-2 tabular-nums text-green-300">{v.conversions || "—"}</td>
                     <td className="text-right pl-2 tabular-nums font-medium text-green-400">
-                      {v.knownLeads > 0 ? `${v.conversionRate}%` : "—"}
+                      {v.totalViews > 0 ? `${v.conversionRate}%` : "—"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {vendorFilter && (
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-              <Filter className="h-3 w-3" /> Showing leads for selected partner only.{" "}
-              <button className="underline" onClick={() => { setVendorFilter(""); setPage(1); }}>Clear</button>
-            </p>
-          )}
         </div>
       )}
 
@@ -2144,14 +2169,15 @@ function CrmLeads() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[700px]">
+              <table className="w-full text-sm min-w-[820px]">
                 <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
                   <tr>
                     <th className="text-left py-3 px-6">Visitor</th>
-                    <th className="text-left py-3 px-3">Venue</th>
+                    <th className="text-left py-3 px-3">Venue visited</th>
                     <th className="text-left py-3 px-3">City</th>
                     <th className="text-left py-3 px-3">Visit time</th>
                     <th className="text-center py-3 px-3">Status</th>
+                    <th className="text-center py-3 px-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2187,6 +2213,26 @@ function CrmLeads() {
                           ) : (
                             <Badge variant="outline" className="text-muted-foreground border-white/20">Lead</Badge>
                           )}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Link
+                              href={`/partners/${lead.vendorId}`}
+                              className="text-xs text-primary underline-offset-2 hover:underline whitespace-nowrap"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              View profile
+                            </Link>
+                            {!isAnon && (
+                              <Link
+                                href={`/admin?tab=booking-report`}
+                                className="text-xs text-muted-foreground underline-offset-2 hover:underline whitespace-nowrap"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View bookings
+                              </Link>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

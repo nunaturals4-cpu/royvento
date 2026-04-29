@@ -9,6 +9,7 @@ import type { AdminLeadVendorSummary } from "./adminLeadVendorSummary";
 
 export interface AdminLeadsSummary {
   totalViews: number;
+  allTimeTotalViews: number;
   knownLeads: number;
   anonymousVisitors: number;
   conversions: number;

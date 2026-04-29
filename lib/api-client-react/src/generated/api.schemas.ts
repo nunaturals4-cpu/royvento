@@ -439,6 +439,7 @@ export interface AdminLeadVendorSummary {
 
 export interface AdminLeadsSummary {
   totalViews: number;
+  allTimeTotalViews: number;
   knownLeads: number;
   anonymousVisitors: number;
   conversions: number;
@@ -485,6 +486,7 @@ export type GetAdminLeadsParams = {
   startDate?: string;
   endDate?: string;
   knownOnly?: string;
+  anonymousOnly?: string;
 };
 
 export type GetAdminLeadsSummaryParams = {

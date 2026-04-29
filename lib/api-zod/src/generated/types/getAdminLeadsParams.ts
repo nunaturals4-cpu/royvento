@@ -12,4 +12,5 @@ export type GetAdminLeadsParams = {
   startDate?: string;
   endDate?: string;
   knownOnly?: string;
+  anonymousOnly?: string;
 };

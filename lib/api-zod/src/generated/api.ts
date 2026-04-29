@@ -1036,6 +1036,7 @@ export const GetAdminLeadsQueryParams = zod.object({
   startDate: zod.coerce.string().optional(),
   endDate: zod.coerce.string().optional(),
   knownOnly: zod.coerce.string().optional(),
+  anonymousOnly: zod.coerce.string().optional(),
 });
 
 export const GetAdminLeadsResponse = zod.object({
@@ -1067,6 +1068,7 @@ export const GetAdminLeadsSummaryQueryParams = zod.object({
 
 export const GetAdminLeadsSummaryResponse = zod.object({
   totalViews: zod.number(),
+  allTimeTotalViews: zod.number(),
   knownLeads: zod.number(),
   anonymousVisitors: zod.number(),
   conversions: zod.number(),

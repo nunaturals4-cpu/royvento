@@ -686,10 +686,12 @@ router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
   const startDateStr = req.query["startDate"] as string | undefined;
   const endDateStr = req.query["endDate"] as string | undefined;
   const knownOnly = req.query["knownOnly"] === "true";
+  const anonymousOnly = req.query["anonymousOnly"] === "true";
 
   const conditions: ReturnType<typeof and>[] = [];
   if (vendorIdParam) conditions.push(eq(profileViewsTable.vendorId, vendorIdParam));
   if (knownOnly) conditions.push(isNotNull(profileViewsTable.viewerUserId));
+  if (anonymousOnly) conditions.push(isNull(profileViewsTable.viewerUserId));
   if (startDateStr) conditions.push(gte(profileViewsTable.viewedAt, new Date(`${startDateStr}T00:00:00Z`)));
   if (endDateStr) conditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59Z`)));
 
@@ -722,22 +724,32 @@ router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
   const vMap = new Map(vendorRows.map((v) => [v.id, v]));
   const uMap = new Map(userRows.map((u) => [u.id, u]));
 
-  // Check conversions: a known lead has a confirmed/completed booking at same vendor
-  const conversionPairs = userIds.length && vendorIds.length
-    ? await db.select({ userId: bookingsTable.userId, vendorId: bookingsTable.vendorId })
+  // Conversion: get the earliest confirmed/completed booking per (userId, vendorId).
+  // A lead "converted" only if that booking was created AFTER the specific profile view.
+  const firstBookings = userIds.length && vendorIds.length
+    ? await db.select({
+        userId: bookingsTable.userId,
+        vendorId: bookingsTable.vendorId,
+        firstBookingAt: sql<string>`MIN(${bookingsTable.createdAt})::text`,
+      })
         .from(bookingsTable)
         .where(and(
           inArray(bookingsTable.userId, userIds),
           inArray(bookingsTable.vendorId, vendorIds),
           sql`${bookingsTable.status} IN ('confirmed','completed')`,
         ))
+        .groupBy(bookingsTable.userId, bookingsTable.vendorId)
     : [];
-  const conversionSet = new Set(conversionPairs.map((c) => `${c.userId}:${c.vendorId}`));
+  const firstBookingMap = new Map(
+    firstBookings.map((b) => [`${b.userId}:${b.vendorId}`, new Date(b.firstBookingAt)]),
+  );
 
   const leads = rows.map((r) => {
     const v = vMap.get(r.vendorId);
     const u = r.viewerUserId ? uMap.get(r.viewerUserId) : null;
-    const converted = r.viewerUserId ? conversionSet.has(`${r.viewerUserId}:${r.vendorId}`) : false;
+    const firstBooking = r.viewerUserId ? firstBookingMap.get(`${r.viewerUserId}:${r.vendorId}`) : undefined;
+    // Converted only if the first booking was created AFTER this specific profile view
+    const converted = firstBooking ? firstBooking > r.viewedAt : false;
     return {
       id: r.id,
       vendorId: r.vendorId,
@@ -763,11 +775,13 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
   if (endDateStr) dateConditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59Z`)));
   const where = dateConditions.length ? and(...dateConditions) : undefined;
 
-  const [allViews, perVendorRows] = await Promise.all([
+  const [allViewsResult, allTimeTotalRow, perVendorRows] = await Promise.all([
     db.select({
       totalViews: sql<number>`count(*)::int`,
       knownLeads: sql<number>`count(${profileViewsTable.viewerUserId})::int`,
     }).from(profileViewsTable).where(where),
+    // All-time total views (no date filter)
+    db.select({ c: sql<number>`count(*)::int` }).from(profileViewsTable),
     db.select({
       vendorId: profileViewsTable.vendorId,
       totalViews: sql<number>`count(*)::int`,
@@ -779,38 +793,59 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
     .orderBy(desc(sql`count(*)`)),
   ]);
 
-  const totals = allViews[0] ?? { totalViews: 0, knownLeads: 0 };
+  const totals = allViewsResult[0] ?? { totalViews: 0, knownLeads: 0 };
   const totalViews = totals.totalViews;
   const knownLeads = totals.knownLeads;
   const anonymousVisitors = totalViews - knownLeads;
+  const allTimeTotalViews = allTimeTotalRow[0]?.c ?? 0;
 
-  // Known user IDs across all views (for conversion count)
-  const knownViewRows = knownLeads > 0
-    ? await db.select({ viewerUserId: profileViewsTable.viewerUserId, vendorId: profileViewsTable.vendorId })
+  // Fetch all known profile view records with timestamps for accurate conversion timing
+  const knownViewRecords = knownLeads > 0
+    ? await db.select({
+        viewerUserId: profileViewsTable.viewerUserId,
+        vendorId: profileViewsTable.vendorId,
+        viewedAt: profileViewsTable.viewedAt,
+      })
         .from(profileViewsTable)
         .where(where ? and(where, isNotNull(profileViewsTable.viewerUserId)) : isNotNull(profileViewsTable.viewerUserId))
     : [];
 
-  const knownPairs = new Set(knownViewRows.map((r) => `${r.viewerUserId}:${r.vendorId}`));
-  const knownUserIds = Array.from(new Set(knownViewRows.map((r) => r.viewerUserId).filter((x): x is number => x !== null)));
-  const knownVendorIds = Array.from(new Set(knownViewRows.map((r) => r.vendorId)));
+  const knownUserIds = Array.from(new Set(knownViewRecords.map((r) => r.viewerUserId).filter((x): x is number => x !== null)));
+  const knownVendorIds = Array.from(new Set(knownViewRecords.map((r) => r.vendorId)));
 
-  const conversionPairs = knownUserIds.length && knownVendorIds.length
-    ? await db.select({ userId: bookingsTable.userId, vendorId: bookingsTable.vendorId })
+  // Get first confirmed/completed booking per (userId, vendorId)
+  const firstBookings = knownUserIds.length && knownVendorIds.length
+    ? await db.select({
+        userId: bookingsTable.userId,
+        vendorId: bookingsTable.vendorId,
+        firstBookingAt: sql<string>`MIN(${bookingsTable.createdAt})::text`,
+      })
         .from(bookingsTable)
         .where(and(
           inArray(bookingsTable.userId, knownUserIds),
           inArray(bookingsTable.vendorId, knownVendorIds),
           sql`${bookingsTable.status} IN ('confirmed','completed')`,
         ))
+        .groupBy(bookingsTable.userId, bookingsTable.vendorId)
     : [];
-  const conversionSet = new Set(conversionPairs.map((c) => `${c.userId}:${c.vendorId}`));
+  const firstBookingMap = new Map(
+    firstBookings.map((b) => [`${b.userId}:${b.vendorId}`, new Date(b.firstBookingAt)]),
+  );
 
-  // Count conversions by matching (viewerUserId:vendorId) pairs that exist in conversionSet
+  // Count conversions: a view converts when the first booking AFTER it exists
   let platformConversions = 0;
-  for (const pair of knownPairs) {
-    if (conversionSet.has(pair)) platformConversions++;
+  const vendorConversionMap = new Map<number, number>();
+  for (const view of knownViewRecords) {
+    if (!view.viewerUserId) continue;
+    const firstBooking = firstBookingMap.get(`${view.viewerUserId}:${view.vendorId}`);
+    if (firstBooking && firstBooking > view.viewedAt) {
+      platformConversions++;
+      vendorConversionMap.set(view.vendorId, (vendorConversionMap.get(view.vendorId) ?? 0) + 1);
+    }
   }
+
+  // Conversion rate: conversions / totalViews (views → bookings funnel)
+  const conversionRate = totalViews > 0 ? Math.round((platformConversions / totalViews) * 100) : 0;
 
   const vendorIds = perVendorRows.map((r) => r.vendorId);
   const vendorRows = vendorIds.length
@@ -821,11 +856,7 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
 
   const vendors = perVendorRows.map((row) => {
     const v = vMap.get(row.vendorId);
-    const knownForVendor = knownViewRows.filter((r) => r.vendorId === row.vendorId);
-    let conversions = 0;
-    for (const r of knownForVendor) {
-      if (r.viewerUserId && conversionSet.has(`${r.viewerUserId}:${row.vendorId}`)) conversions++;
-    }
+    const conversions = vendorConversionMap.get(row.vendorId) ?? 0;
     return {
       vendorId: row.vendorId,
       vendorName: v?.businessName ?? `Partner #${row.vendorId}`,
@@ -834,16 +865,18 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
       knownLeads: row.knownLeads,
       anonymousVisitors: row.totalViews - row.knownLeads,
       conversions,
-      conversionRate: row.knownLeads > 0 ? Math.round((conversions / row.knownLeads) * 100) : 0,
+      // Conversion rate per vendor: conversions / totalViews for that vendor
+      conversionRate: row.totalViews > 0 ? Math.round((conversions / row.totalViews) * 100) : 0,
     };
   });
 
   res.json({
     totalViews,
+    allTimeTotalViews,
     knownLeads,
     anonymousVisitors,
     conversions: platformConversions,
-    conversionRate: knownLeads > 0 ? Math.round((platformConversions / knownLeads) * 100) : 0,
+    conversionRate,
     vendors,
   });
 });
