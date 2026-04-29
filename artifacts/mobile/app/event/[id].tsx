@@ -46,6 +46,16 @@ interface EventVendor {
   rating?: number;
   reviewCount?: number;
   openDays?: string[];
+  address?: string | null;
+  dayHours?: Record<string, { open: string; close: string } | null> | null;
+}
+
+function fmtTime(t: string): string {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  if (h === undefined || isNaN(h)) return "";
+  const d = new Date(); d.setHours(h, m ?? 0);
+  return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).replace(":00", "");
 }
 
 interface EventWithVendor {
@@ -179,7 +189,7 @@ export default function EventDetailScreen() {
 
   const handleOpenMaps = () => {
     const query = encodeURIComponent(
-      [(event as unknown as { address?: string })?.address, event?.location, (event as unknown as { city?: string })?.city]
+      [vendor?.address, (event as unknown as { address?: string })?.address, event?.location, (event as unknown as { city?: string })?.city]
         .filter(Boolean)
         .join(", ") || "India",
     );
@@ -422,11 +432,13 @@ export default function EventDetailScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.locationLabel, { color: colors.mutedForeground }]}>Location</Text>
                 <Text style={[styles.locationText, { color: colors.foreground }]} numberOfLines={2}>
-                  {[
-                    event.location,
-                    (event as unknown as { city?: string })?.city,
-                    (event as unknown as { state?: string })?.state,
-                  ].filter(Boolean).join(", ") || "India"}
+                  {vendor?.address ||
+                    [
+                      event.location,
+                      (event as unknown as { city?: string })?.city,
+                      (event as unknown as { state?: string })?.state,
+                    ].filter(Boolean).join(", ") ||
+                    "India"}
                 </Text>
               </View>
             </View>
@@ -465,6 +477,43 @@ export default function EventDetailScreen() {
             <View style={{ gap: 6 }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
               <Text style={[styles.description, { color: colors.mutedForeground }]}>{event.description}</Text>
+            </View>
+          ) : null}
+
+          {/* Day hours (pub) */}
+          {vendor?.dayHours && Object.keys(vendor.dayHours).length > 0 ? (
+            <View style={{ gap: 8 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Opening Hours</Text>
+              <View style={[{ borderRadius: 12, borderWidth: 1, overflow: "hidden", borderColor: colors.border }]}>
+                {Object.entries(vendor.dayHours).map(([day, times], i) => (
+                  <View
+                    key={day}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      backgroundColor: i % 2 === 0 ? colors.card : colors.muted,
+                      borderBottomWidth: i < Object.keys(vendor!.dayHours!).length - 1 ? 1 : 0,
+                      borderBottomColor: colors.border,
+                    }}
+                  >
+                    <Text style={{ width: 40, fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{day}</Text>
+                    {times ? (
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                        {fmtTime(times.open)} – {fmtTime(times.close)}
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, fontStyle: "italic" }}>Closed</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : vendor?.openDays && vendor.openDays.length > 0 ? (
+            <View style={{ gap: 6 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Opening Days</Text>
+              <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.openDays.join(", ")}</Text>
             </View>
           ) : null}
 

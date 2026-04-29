@@ -1226,11 +1226,11 @@ components:
           type: array
           items:
             type: string
-        openTime:
+        address:
           type: string
           nullable: true
-        closeTime:
-          type: string
+        dayHours:
+          type: object
           nullable: true
         city:
           type: string

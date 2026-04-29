@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   useGetMyVendor,
@@ -134,6 +134,21 @@ export function VendorDashboard() {
 
 const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
+type DayTimes = Record<string, { open: string; close: string }>;
+
+interface NominatimResult { place_id: number; display_name: string; }
+
+function parseDayHours(raw: unknown): DayTimes {
+  if (!raw || typeof raw !== "object") return {};
+  const out: DayTimes = {};
+  for (const [day, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (val && typeof val === "object" && "open" in val && "close" in val) {
+      out[day] = { open: String((val as any).open), close: String((val as any).close) };
+    }
+  }
+  return out;
+}
+
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
@@ -143,14 +158,42 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [openDays, setOpenDays] = useState<string[]>(
     Array.isArray(vendor.openDays) && vendor.openDays.length > 0 ? vendor.openDays : [...ALL_DAYS]
   );
-  const [openTime, setOpenTime] = useState<string>(vendor.openTime ?? "");
-  const [closeTime, setCloseTime] = useState<string>(vendor.closeTime ?? "");
+  const [dayTimes, setDayTimes] = useState<DayTimes>(() => parseDayHours(vendor.dayHours));
+  const [address, setAddress] = useState<string>(vendor.address ?? "");
+  const [addressQuery, setAddressQuery] = useState<string>(vendor.address ?? "");
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [showSugg, setShowSugg] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [descError, setDescError] = useState("");
   const update = useUpdateMyVendor();
   const { toast } = useToast();
 
+  const searchAddress = (q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.trim().length < 3) { setSuggestions([]); setShowSugg(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&countrycodes=in&limit=6&addressdetails=0`;
+        const res = await fetch(url, { headers: { "Accept-Language": "en" } });
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+        setShowSugg(data.length > 0);
+      } catch { setSuggestions([]); }
+    }, 400);
+  };
+
+  const selectSuggestion = (s: NominatimResult) => {
+    setAddress(s.display_name);
+    setAddressQuery(s.display_name);
+    setSuggestions([]);
+    setShowSugg(false);
+  };
+
   const toggleDay = (day: string) =>
     setOpenDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+
+  const setDayTime = (day: string, field: "open" | "close", val: string) =>
+    setDayTimes((prev) => ({ ...prev, [day]: { open: prev[day]?.open ?? "", close: prev[day]?.close ?? "", [field]: val } }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,15 +205,17 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       toast({ title: "Select at least one open day", variant: "destructive" }); return;
     }
     setDescError("");
+    const dayHoursPayload: DayTimes = {};
+    for (const day of openDays) {
+      dayHoursPayload[day] = { open: dayTimes[day]?.open ?? "", close: dayTimes[day]?.close ?? "" };
+    }
     update.mutate(
       { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, country, state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: async () => {
           try {
             await apiPatch("/api/partner/profile", {
-              state: stateF, city, country, openDays,
-              openTime: openTime,
-              closeTime: closeTime,
+              state: stateF, city, country, address, openDays, dayHours: dayHoursPayload,
             });
             toast({ title: "Profile updated" });
             onSaved();
@@ -240,38 +285,73 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             </p>
           </div>
         </div>
+        <div className="relative">
+          <Label className="mb-1 block">Venue address <span className="text-muted-foreground text-xs">(optional — for map link)</span></Label>
+          <Input
+            value={addressQuery}
+            onChange={(e) => { setAddressQuery(e.target.value); setAddress(e.target.value); searchAddress(e.target.value); }}
+            onBlur={() => setTimeout(() => setShowSugg(false), 200)}
+            onFocus={() => { if (suggestions.length > 0) setShowSugg(true); }}
+            placeholder="Start typing your venue address…"
+            className="bg-black/40 border-white/10"
+            autoComplete="off"
+          />
+          {showSugg && suggestions.length > 0 && (
+            <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-card border border-white/10 shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+              {suggestions.map((s) => (
+                <li key={s.place_id}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug"
+                    onMouseDown={() => selectSuggestion(s)}
+                  >
+                    {s.display_name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div>
-          <Label className="mb-2 block">Operating days <span className="text-muted-foreground text-xs">(toggle open/closed)</span></Label>
-          <div className="flex flex-wrap gap-2">
+          <Label className="mb-2 block">Operating days &amp; hours <span className="text-muted-foreground text-xs">(click day to toggle · set times per open day)</span></Label>
+          <div className="space-y-2">
             {ALL_DAYS.map((day) => {
               const isOpen = openDays.includes(day);
               return (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => toggleDay(day)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                    isOpen
-                      ? "bg-green-600/20 border-green-500/40 text-green-300"
-                      : "bg-white/5 border-white/10 text-muted-foreground"
-                  }`}
-                >
-                  {day}
-                </button>
+                <div key={day} className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors ${isOpen ? "border-green-500/30 bg-green-600/10" : "border-white/10 bg-white/5"}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleDay(day)}
+                    className={`w-12 text-sm font-medium shrink-0 rounded px-1.5 py-0.5 transition-colors ${isOpen ? "text-green-300" : "text-muted-foreground"}`}
+                  >
+                    {day}
+                  </button>
+                  {isOpen ? (
+                    <>
+                      <Input
+                        type="time"
+                        value={dayTimes[day]?.open ?? ""}
+                        onChange={(e) => setDayTime(day, "open", e.target.value)}
+                        className="bg-black/40 border-white/10 h-8 text-sm w-32"
+                        title="Opening time"
+                      />
+                      <span className="text-muted-foreground text-xs">to</span>
+                      <Input
+                        type="time"
+                        value={dayTimes[day]?.close ?? ""}
+                        onChange={(e) => setDayTime(day, "close", e.target.value)}
+                        className="bg-black/40 border-white/10 h-8 text-sm w-32"
+                        title="Closing time"
+                      />
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">Closed</span>
+                  )}
+                </div>
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">Green = open · Grey = closed. Customers won't be able to book on closed days.</p>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Opening time <span className="text-muted-foreground text-xs">(optional)</span></Label>
-            <Input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
-          </div>
-          <div>
-            <Label>Closing time <span className="text-muted-foreground text-xs">(optional)</span></Label>
-            <Input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
-          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">Click a day name to toggle open/closed. Set opening and closing times for each open day.</p>
         </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}

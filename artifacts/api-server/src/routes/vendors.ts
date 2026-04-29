@@ -24,14 +24,22 @@ interface VendorRow {
   country?: string | null;
   state?: string | null;
   city?: string | null;
+  address?: string | null;
   bannerImage: string;
   coverImageUrl: string;
   portfolioImages: string[];
   openDays: string[];
+  dayHours?: string | null;
   status: string;
   isPremium?: boolean;
   approvedAt?: Date | null;
   createdAt: Date;
+}
+
+function parseDayHours(raw: string | null | undefined): Record<string, { open: string; close: string } | null> | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as Record<string, { open: string; close: string } | null>; }
+  catch { return null; }
 }
 
 function computeCrmTrial(v: VendorRow) {
@@ -58,8 +66,8 @@ async function serializeVendor(v: VendorRow) {
     coverImageUrl: v.coverImageUrl ?? "",
     portfolioImages: v.portfolioImages,
     openDays: v.openDays ?? [],
-    openTime: v.openTime ?? null,
-    closeTime: v.closeTime ?? null,
+    address: v.address ?? null,
+    dayHours: parseDayHours(v.dayHours),
     status: v.status,
     isPremium: v.isPremium ?? false,
     approvedAt: v.approvedAt?.toISOString() ?? null,
@@ -89,8 +97,8 @@ async function serializeVendorList(rows: VendorRow[]) {
       coverImageUrl: v.coverImageUrl ?? "",
       portfolioImages: v.portfolioImages,
       openDays: v.openDays ?? [],
-      openTime: v.openTime ?? null,
-      closeTime: v.closeTime ?? null,
+      address: v.address ?? null,
+      dayHours: parseDayHours(v.dayHours),
       status: v.status,
       rating: r.rating,
       reviewCount: r.reviewCount,

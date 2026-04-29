@@ -83,6 +83,8 @@ export const VendorStatus = {
   rejected: "rejected",
 } as const;
 
+export type VendorDayHours = { [key: string]: unknown } | null;
+
 export interface Vendor {
   id: number;
   userId: number;
@@ -98,8 +100,8 @@ export interface Vendor {
   reviewCount: number;
   createdAt: string;
   openDays: string[];
-  openTime?: string | null;
-  closeTime?: string | null;
+  address?: string | null;
+  dayHours?: VendorDayHours;
   city: string;
   state: string;
   country: string;

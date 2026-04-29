@@ -120,9 +120,8 @@ export function EventDetail() {
 
   const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const vendorOpenDays: string[] = (ev.vendor?.openDays ?? []) as string[];
-  const vendorOpenTime: string = (ev.vendor?.openTime ?? "") as string;
-  const vendorCloseTime: string = (ev.vendor?.closeTime ?? "") as string;
-  const hasHours = !!(vendorOpenTime && vendorCloseTime);
+  const vendorDayHours = (ev.vendor as any)?.dayHours as Record<string, { open: string; close: string } | null> | null | undefined;
+  const vendorAddress: string = (ev.vendor as any)?.address ?? "";
 
   const formatHour = (t: string): string => {
     const [h, m] = t.split(":").map(Number);
@@ -265,9 +264,10 @@ export function EventDetail() {
     );
   };
 
-  const loc = (event as any).city
+  const cityState = (event as any).city
     ? `${(event as any).city}${(event as any).state ? ", " + (event as any).state : ""}`
     : event.location;
+  const loc = vendorAddress || cityState;
 
   const vendorCover = ev.vendor?.coverImageUrl;
 
@@ -371,14 +371,28 @@ export function EventDetail() {
             </div>
             <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Up to {event.capacity} guests</div>
             <div className="flex items-center gap-2"><Star className="h-4 w-4 fill-primary text-primary" />{event.rating > 0 ? `${event.rating.toFixed(1)} (${event.reviewCount})` : "New"}</div>
-            {isPub && ((vendorOpenDays.length > 0 && vendorOpenDays.length < 7) || hasHours) && (
+            {isPub && vendorOpenDays.length > 0 && (
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
-                <span>
-                  {vendorOpenDays.length > 0 && vendorOpenDays.length < 7
-                    ? `Open ${[...vendorOpenDays].sort((a, b) => DAY_ABBRS.indexOf(a) - DAY_ABBRS.indexOf(b)).join(", ")}`
-                    : "Open daily"}
-                  {hasHours && ` · ${formatHour(vendorOpenTime)} – ${formatHour(vendorCloseTime)}`}
+                <span className="leading-snug">
+                  {(() => {
+                    const sortedDays = [...vendorOpenDays].sort((a, b) => DAY_ABBRS.indexOf(a) - DAY_ABBRS.indexOf(b));
+                    if (vendorDayHours) {
+                      const parts = sortedDays
+                        .map((day) => {
+                          const times = vendorDayHours[day];
+                          if (times?.open && times?.close) {
+                            return `${day} ${formatHour(times.open)}–${formatHour(times.close)}`;
+                          }
+                          return day;
+                        })
+                        .join(" · ");
+                      return parts;
+                    }
+                    return vendorOpenDays.length < 7
+                      ? `Open ${sortedDays.join(", ")}`
+                      : "Open daily";
+                  })()}
                 </span>
               </div>
             )}

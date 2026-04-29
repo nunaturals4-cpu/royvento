@@ -239,8 +239,8 @@ router.get("/events/:eventId", async (req, res) => {
           coverImageUrl: v.coverImageUrl ?? "",
           portfolioImages: v.portfolioImages,
           openDays: v.openDays ?? [],
-          openTime: v.openTime ?? null,
-          closeTime: v.closeTime ?? null,
+          address: v.address ?? null,
+          dayHours: v.dayHours ? (() => { try { return JSON.parse(v.dayHours!); } catch { return null; } })() : null,
           status: v.status,
           rating: rating.rating,
           reviewCount: rating.reviewCount,
@@ -299,6 +299,13 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       res.status(400).json({
         error:
           "Your profile is set up for pubs. You can't mix other event types in the same profile.",
+      });
+      return;
+    }
+    if (newType === "pub" && hasPub) {
+      res.status(400).json({
+        error:
+          "You already have a pub listing. Delete it before creating a new one.",
       });
       return;
     }

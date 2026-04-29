@@ -89,6 +89,8 @@ router.delete("/partner/media/:id", requireAuth(["vendor"]), async (req, res) =>
 
 const VALID_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
+const DayTimesSchema = z.object({ open: z.string().max(10), close: z.string().max(10) }).nullable();
+
 const UpdatePartnerProfileBody = z.object({
   eventTypes: z.array(z.string()).optional(),
   budgetMin: z.number().nonnegative().optional(),
@@ -96,10 +98,10 @@ const UpdatePartnerProfileBody = z.object({
   state: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
+  address: z.string().max(500).optional(),
   coverImageUrl: z.string().optional(),
   openDays: z.array(z.enum(VALID_DAYS)).optional(),
-  openTime: z.string().max(10).optional(),
-  closeTime: z.string().max(10).optional(),
+  dayHours: z.record(DayTimesSchema).optional(),
 });
 
 router.patch(
@@ -127,12 +129,12 @@ router.patch(
       updates["country"] = parsed.data.country;
     if (parsed.data.coverImageUrl !== undefined)
       updates["coverImageUrl"] = parsed.data.coverImageUrl;
+    if (parsed.data.address !== undefined)
+      updates["address"] = parsed.data.address || null;
     if (parsed.data.openDays !== undefined)
       updates["openDays"] = parsed.data.openDays;
-    if (parsed.data.openTime !== undefined)
-      updates["openTime"] = parsed.data.openTime || null;
-    if (parsed.data.closeTime !== undefined)
-      updates["closeTime"] = parsed.data.closeTime || null;
+    if (parsed.data.dayHours !== undefined)
+      updates["dayHours"] = parsed.data.dayHours !== null ? JSON.stringify(parsed.data.dayHours) : null;
     const [v] = await db
       .update(vendorsTable)
       .set(updates)

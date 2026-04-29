@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { VendorDayHours } from "./vendorDayHours";
 import type { VendorStatus } from "./vendorStatus";
 
 export interface Vendor {
@@ -22,8 +23,8 @@ export interface Vendor {
   reviewCount: number;
   createdAt: string;
   openDays: string[];
-  openTime?: string | null;
-  closeTime?: string | null;
+  address?: string | null;
+  dayHours?: VendorDayHours;
   city: string;
   state: string;
   country: string;
