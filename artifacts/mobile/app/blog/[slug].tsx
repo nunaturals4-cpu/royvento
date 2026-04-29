@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import RenderHtml, { MixedStyleDeclaration } from "react-native-render-html";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
@@ -33,64 +34,12 @@ interface Blog {
   createdAt: string;
 }
 
-function decodeEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#\d+;/g, "");
-}
-
-function stripInlineTags(html: string): string {
-  return decodeEntities(html.replace(/<[^>]+>/g, "")).trim();
-}
-
-type BlockType = "h1" | "h2" | "h3" | "p" | "li" | "blockquote" | "text";
-
-interface HtmlBlock {
-  type: BlockType;
-  text: string;
-}
-
-function parseHtmlBlocks(html: string): HtmlBlock[] {
-  const blocks: HtmlBlock[] = [];
-
-  const br = html.replace(/<br\s*\/?>/gi, "\n");
-
-  const blockRegex =
-    /<(h1|h2|h3|p|li|blockquote)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/gi;
-  let match: RegExpExecArray | null;
-  let hasBlocks = false;
-
-  while ((match = blockRegex.exec(br)) !== null) {
-    hasBlocks = true;
-    const tag = match[1].toLowerCase() as BlockType;
-    const text = stripInlineTags(match[2]);
-    if (text) blocks.push({ type: tag, text });
-  }
-
-  if (!hasBlocks) {
-    const plain = stripInlineTags(br);
-    if (plain) {
-      plain
-        .split(/\n+/)
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .forEach((line) => {
-          const isH = line.startsWith("# ") || line.startsWith("## ");
-          blocks.push({
-            type: isH ? (line.startsWith("# ") ? "h1" : "h2") : "p",
-            text: line.replace(/^#{1,2}\s/, ""),
-          });
-        });
-    }
-  }
-
-  return blocks;
-}
+const SYSTEM_FONTS = [
+  "Inter_400Regular",
+  "Inter_500Medium",
+  "Inter_600SemiBold",
+  "Inter_700Bold",
+];
 
 export default function BlogDetailScreen() {
   const colors = useColors();
@@ -139,8 +88,79 @@ export default function BlogDetailScreen() {
     );
   }
 
-  const blocks = parseHtmlBlocks(blog.content);
   const heroHeight = Math.round((width / 16) * 7);
+  const contentWidth = width - 48;
+
+  const tagsStyles: Record<string, MixedStyleDeclaration> = {
+    body: {
+      backgroundColor: "transparent",
+      color: colors.mutedForeground,
+      fontFamily: "Inter_400Regular",
+      fontSize: 15,
+    } as MixedStyleDeclaration,
+    p: {
+      color: colors.mutedForeground,
+      fontFamily: "Inter_400Regular",
+      fontSize: 15,
+      lineHeight: 26,
+      marginTop: 0,
+      marginBottom: 14,
+    } as MixedStyleDeclaration,
+    h1: {
+      color: colors.foreground,
+      fontFamily: "Inter_700Bold",
+      fontSize: 24,
+      lineHeight: 32,
+      marginTop: 16,
+      marginBottom: 8,
+    } as MixedStyleDeclaration,
+    h2: {
+      color: colors.foreground,
+      fontFamily: "Inter_700Bold",
+      fontSize: 20,
+      lineHeight: 28,
+      marginTop: 14,
+      marginBottom: 6,
+    } as MixedStyleDeclaration,
+    h3: {
+      color: colors.foreground,
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 17,
+      lineHeight: 24,
+      marginTop: 12,
+      marginBottom: 4,
+    } as MixedStyleDeclaration,
+    strong: {
+      color: colors.foreground,
+      fontFamily: "Inter_700Bold",
+    } as MixedStyleDeclaration,
+    em: {
+      fontStyle: "italic",
+    } as MixedStyleDeclaration,
+    a: {
+      color: colors.primary,
+      textDecorationLine: "underline",
+    } as MixedStyleDeclaration,
+    li: {
+      color: colors.mutedForeground,
+      fontFamily: "Inter_400Regular",
+      fontSize: 15,
+      lineHeight: 26,
+    } as MixedStyleDeclaration,
+    ul: { marginBottom: 14 } as MixedStyleDeclaration,
+    ol: { marginBottom: 14 } as MixedStyleDeclaration,
+    blockquote: {
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+      paddingLeft: 14,
+      marginLeft: 0,
+      marginBottom: 14,
+      backgroundColor: colors.muted,
+      paddingVertical: 8,
+      paddingRight: 10,
+    } as MixedStyleDeclaration,
+    img: { borderRadius: 10 } as MixedStyleDeclaration,
+  };
 
   return (
     <ScrollView
@@ -160,7 +180,6 @@ export default function BlogDetailScreen() {
             colors={["transparent", colors.background]}
             style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: heroHeight * 0.55 }}
           />
-          {/* Back button overlaid on image */}
           <Pressable
             style={[styles.backBtn, { position: "absolute", top: topPadding + 10, left: 16 }]}
             onPress={() => router.back()}
@@ -172,7 +191,7 @@ export default function BlogDetailScreen() {
         </View>
       ) : null}
 
-      {/* Header / cover */}
+      {/* Header */}
       <View style={[styles.cover, blog.imageUrl ? { paddingTop: 12 } : { paddingTop: topPadding + 16 }]}>
         {!blog.imageUrl && (
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
@@ -207,46 +226,23 @@ export default function BlogDetailScreen() {
         )}
       </View>
 
-      {/* Divider */}
+      {/* Separator */}
       <View style={[styles.headerDivider, { borderBottomColor: colors.border }]} />
 
-      {/* Content rendered from HTML */}
+      {/* HTML content */}
       <View style={styles.content}>
-        {blocks.map((block, idx) => {
-          if (block.type === "h1") {
-            return (
-              <Text key={idx} style={[styles.h1, { color: colors.foreground }]}>{block.text}</Text>
-            );
-          }
-          if (block.type === "h2") {
-            return (
-              <Text key={idx} style={[styles.h2, { color: colors.foreground }]}>{block.text}</Text>
-            );
-          }
-          if (block.type === "h3") {
-            return (
-              <Text key={idx} style={[styles.h3, { color: colors.foreground }]}>{block.text}</Text>
-            );
-          }
-          if (block.type === "li") {
-            return (
-              <View key={idx} style={styles.liRow}>
-                <Text style={[styles.liBullet, { color: colors.primary }]}>•</Text>
-                <Text style={[styles.li, { color: colors.mutedForeground }]}>{block.text}</Text>
-              </View>
-            );
-          }
-          if (block.type === "blockquote") {
-            return (
-              <View key={idx} style={[styles.blockquote, { borderLeftColor: colors.primary, backgroundColor: colors.muted }]}>
-                <Text style={[styles.blockquoteText, { color: colors.mutedForeground }]}>{block.text}</Text>
-              </View>
-            );
-          }
-          return (
-            <Text key={idx} style={[styles.para, { color: colors.mutedForeground }]}>{block.text}</Text>
-          );
-        })}
+        <RenderHtml
+          contentWidth={contentWidth}
+          source={{ html: blog.content }}
+          tagsStyles={tagsStyles}
+          baseStyle={{
+            color: colors.mutedForeground,
+            fontFamily: "Inter_400Regular",
+            fontSize: 15,
+          }}
+          systemFonts={SYSTEM_FONTS}
+          enableExperimentalMarginCollapsing
+        />
       </View>
 
       {/* Footer */}
@@ -271,17 +267,8 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   excerpt: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 23, fontStyle: "italic" },
   headerDivider: { borderBottomWidth: 1, marginHorizontal: 24, marginBottom: 20 },
-  content: { paddingHorizontal: 24, gap: 14 },
-  h1: { fontSize: 24, fontFamily: "Inter_700Bold", lineHeight: 32, marginTop: 12 },
-  h2: { fontSize: 20, fontFamily: "Inter_700Bold", lineHeight: 28, marginTop: 10 },
-  h3: { fontSize: 17, fontFamily: "Inter_600SemiBold", lineHeight: 24, marginTop: 8 },
-  para: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 26 },
-  liRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
-  liBullet: { fontSize: 16, lineHeight: 26, fontFamily: "Inter_700Bold" },
-  li: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 26 },
-  blockquote: { borderLeftWidth: 3, paddingLeft: 14, paddingVertical: 8, paddingRight: 10, borderRadius: 4 },
-  blockquoteText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22, fontStyle: "italic" },
-  divider: { borderTopWidth: 1, marginHorizontal: 24, marginTop: 32 },
+  content: { paddingHorizontal: 24 },
+  divider: { borderTopWidth: 1, marginHorizontal: 24, marginTop: 24 },
   backLink: { fontSize: 14, fontFamily: "Inter_500Medium" },
   backBtnFull: { marginTop: 20, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12 },
 });

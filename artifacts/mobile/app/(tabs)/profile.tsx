@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { customFetch, useUpdateMe } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -22,6 +22,7 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useLogout } from "@/hooks/useLogout";
 
 interface ReferralData {
   code: string;
@@ -40,8 +41,8 @@ interface Coupon {
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout, updateUser } = useAuth();
-  const queryClient = useQueryClient();
+  const { user, updateUser } = useAuth();
+  const handleLogout = useLogout();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [editModal, setEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
@@ -271,18 +272,7 @@ export default function ProfileScreen() {
             onPress: () =>
               Alert.alert("Sign Out", "Are you sure?", [
                 { text: "Cancel", style: "cancel" },
-                {
-                  text: "Sign Out",
-                  style: "destructive",
-                  onPress: () => {
-                    logout()
-                      .then(() => { queryClient.clear(); })
-                      .catch(() => {
-                        queryClient.clear();
-                        Alert.alert("Error", "Sign out failed. Please try again.");
-                      });
-                  },
-                },
+                { text: "Sign Out", style: "destructive", onPress: handleLogout },
               ]),
             tint: colors.destructive,
           },
@@ -383,7 +373,6 @@ const styles = StyleSheet.create({
   couponCode: { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 1 },
   couponDetail: { fontSize: 12, fontFamily: "Inter_400Regular" },
   quickActions: { margin: 20, marginBottom: 0, borderRadius: 18, borderWidth: 1, padding: 16, gap: 12 },
-  sectionTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   quickRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
   quickBtn: { flex: 1, minWidth: 90, borderWidth: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 6 },
   quickLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textAlign: "center" },

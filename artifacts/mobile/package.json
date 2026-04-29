@@ -62,6 +62,7 @@
     "expo-camera": "^17.0.10",
     "expo-notifications": "~0.32.17",
     "expo-secure-store": "^15.0.8",
-    "react-native-qrcode-svg": "^6.3.21"
+    "react-native-qrcode-svg": "^6.3.21",
+    "react-native-render-html": "^6.3.4"
   }
 }
