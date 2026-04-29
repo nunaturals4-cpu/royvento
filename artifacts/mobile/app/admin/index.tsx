@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 
 type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content";
 
@@ -110,6 +111,7 @@ export default function AdminPanelScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
 
   // ─── ANALYTICS ─────────────────────────────────────────────────────────────
@@ -883,6 +885,22 @@ export default function AdminPanelScreen() {
     { key: "coupons" as AdminTab, icon: "pricetag-outline" as const, label: "Coupons" },
     { key: "content" as AdminTab, icon: "newspaper-outline" as const, label: "Content" },
   ];
+
+  if (!user || user.role !== "admin") {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center", gap: 16, padding: 32 }}>
+        <Ionicons name="lock-closed-outline" size={48} color={colors.mutedForeground} />
+        <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18, textAlign: "center" }}>Admin Access Only</Text>
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>This area is restricted to administrators.</Text>
+        <TouchableOpacity
+          style={{ borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28, backgroundColor: colors.primary, marginTop: 8 }}
+          onPress={() => router.replace("/(tabs)/profile")}
+        >
+          <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
