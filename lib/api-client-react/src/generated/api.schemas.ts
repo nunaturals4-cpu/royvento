@@ -380,6 +380,7 @@ export interface AdminBookingRow {
   totalPrice: number;
   discountAmount: number;
   finalPrice: number;
+  paymentMethod: string;
   status: string;
   notes: string;
   ticketCode: string;
@@ -436,6 +437,7 @@ export type GetAdminBookingsReportParams = {
   pubMode?: string;
   search?: string;
   sortBy?: string;
+  bookingType?: string;
 };
 
 export type GetAdminAnalyticsParams = {

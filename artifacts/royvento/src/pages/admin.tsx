@@ -1547,7 +1547,11 @@ function BlogsAdmin() {
 // ── Booking Report ────────────────────────────────────────────────────────────
 
 const BOOKING_STATUSES = ["all", "confirmed", "pending", "payment_pending", "cancelled", "completed"];
-const PUB_MODES = ["all", "free_entry", "ticket", "table", "bottle"];
+const BOOKING_TYPES = [
+  { value: "all", label: "All types" },
+  { value: "pub", label: "Pub tickets (ticket / table / bottle)" },
+  { value: "group", label: "Group booking (free entry)" },
+];
 const SORT_OPTIONS = [
   { value: "date", label: "Booking date" },
   { value: "price", label: "Final price" },
@@ -1568,7 +1572,7 @@ function BookingReport() {
   const [status, setStatus] = useState<string>("all");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [pubMode, setPubMode] = useState<string>("all");
+  const [bookingType, setBookingType] = useState<string>("all");
   const [search, setSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [page, setPage] = useState<number>(1);
@@ -1586,7 +1590,7 @@ function BookingReport() {
     ...(status !== "all" ? { status } : {}),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
-    ...(pubMode !== "all" ? { pubMode } : {}),
+    ...(bookingType !== "all" ? { bookingType } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     page,
     sortBy,
@@ -1607,7 +1611,7 @@ function BookingReport() {
 
   const resetFilters = () => {
     setVendorId("all"); setStatus("all"); setStartDate(""); setEndDate("");
-    setPubMode("all"); setSearch(""); setPage(1); setSortBy("date");
+    setBookingType("all"); setSearch(""); setPage(1); setSortBy("date");
   };
 
   return (
@@ -1665,14 +1669,14 @@ function BookingReport() {
             </SelectContent>
           </Select>
 
-          {/* Pub mode */}
-          <Select value={pubMode} onValueChange={(v) => { setPubMode(v); setPage(1); }}>
+          {/* Booking type */}
+          <Select value={bookingType} onValueChange={(v) => { setBookingType(v); setPage(1); }}>
             <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="All modes" />
+              <SelectValue placeholder="All types" />
             </SelectTrigger>
             <SelectContent>
-              {PUB_MODES.map((m) => (
-                <SelectItem key={m} value={m}>{m === "all" ? "All modes" : m.replace("_", " ")}</SelectItem>
+              {BOOKING_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -1750,12 +1754,12 @@ function BookingReport() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Checked in</p>
+                        <p className="text-muted-foreground">Check-in rate</p>
                         <p className="font-semibold">
                           {v.checkedInCount}
-                          {totalTickets > 0 && (
+                          {v.bookingCount > 0 && (
                             <span className="text-muted-foreground font-normal ml-1">
-                              / {totalTickets}
+                              / {v.bookingCount} ({Math.round(v.checkedInCount / v.bookingCount * 100)}%)
                             </span>
                           )}
                         </p>
@@ -1803,6 +1807,7 @@ function BookingReport() {
                       {sortBy === "price" ? <SortDesc className="h-3 w-3" /> : <SortAsc className="h-3 w-3" />}
                     </button>
                   </th>
+                  <th className="px-4 py-3 text-left">Payment</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Ticket code</th>
                   <th className="px-4 py-3 text-left">Check-in</th>
@@ -1842,6 +1847,9 @@ function BookingReport() {
                       {b.discountAmount > 0 && (
                         <p className="text-xs text-muted-foreground line-through">{formatINR(b.totalPrice)}</p>
                       )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-xs text-muted-foreground">{b.paymentMethod}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${bookingStatusColor(b.status)}`}>

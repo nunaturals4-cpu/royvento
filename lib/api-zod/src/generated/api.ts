@@ -973,6 +973,7 @@ export const GetAdminBookingsReportQueryParams = zod.object({
   pubMode: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
   sortBy: zod.coerce.string().optional(),
+  bookingType: zod.coerce.string().optional(),
 });
 
 export const GetAdminBookingsReportResponse = zod.object({
@@ -995,6 +996,7 @@ export const GetAdminBookingsReportResponse = zod.object({
       totalPrice: zod.number(),
       discountAmount: zod.number(),
       finalPrice: zod.number(),
+      paymentMethod: zod.string(),
       status: zod.string(),
       notes: zod.string(),
       ticketCode: zod.string(),

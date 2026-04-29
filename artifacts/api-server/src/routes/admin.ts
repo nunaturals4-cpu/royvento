@@ -5,6 +5,7 @@ import {
   eventsTable,
   vendorsTable,
   usersTable,
+  paymentsTable,
 } from "@workspace/db";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -520,21 +521,33 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
   const eventIds = [...new Set(rows.map((r) => r.eventId))];
   const userIds = [...new Set(rows.map((r) => r.userId))];
   const vendorIds = [...new Set(rows.map((r) => r.vendorId))];
-  const [events, users, vendors] = await Promise.all([
+  const bookingIds = rows.map((r) => r.id);
+  const [events, users, vendors, payments] = await Promise.all([
     db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)),
     db.select().from(usersTable).where(inArray(usersTable.id, userIds)),
     db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
+    db.select({ bookingId: paymentsTable.bookingId, phonepeTransactionId: paymentsTable.phonepeTransactionId, status: paymentsTable.status })
+      .from(paymentsTable)
+      .where(inArray(paymentsTable.bookingId, bookingIds)),
   ]);
   const eMap = new Map(events.map((e) => [e.id, e]));
   const uMap = new Map(users.map((u) => [u.id, u]));
   const vMap = new Map(vendors.map((v) => [v.id, v]));
+  const payMap = new Map(payments.filter((p) => p.bookingId != null).map((p) => [p.bookingId!, p]));
   return rows.map((b) => {
     const e = eMap.get(b.eventId);
     const u = uMap.get(b.userId);
     const v = vMap.get(b.vendorId);
+    const pay = payMap.get(b.id);
     const ticketCode = v
       ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" })
       : `RV-${String(b.id).padStart(6, "0")}`;
+    let paymentMethod: string;
+    if (pay) {
+      paymentMethod = pay.phonepeTransactionId ? "PhonePe" : "Online";
+    } else {
+      paymentMethod = Number(b.finalPrice) === 0 ? "Free" : "COD";
+    }
     return {
       id: b.id,
       vendorId: b.vendorId,
@@ -553,6 +566,7 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
       totalPrice: Number(b.totalPrice),
       discountAmount: Number(b.discountAmount),
       finalPrice: Number(b.finalPrice),
+      paymentMethod,
       status: b.status,
       notes: b.notes,
       ticketCode,
@@ -572,6 +586,7 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
   const startDateParam = req.query["startDate"] as string | undefined;
   const endDateParam = req.query["endDate"] as string | undefined;
   const pubModeParam = req.query["pubMode"] as string | undefined;
+  const bookingTypeParam = req.query["bookingType"] as string | undefined;
   const searchParam = (req.query["search"] as string | undefined)?.trim().toLowerCase();
   const sortBy = req.query["sortBy"] as string | undefined;
 
@@ -586,6 +601,10 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
     conditions.push(sql`${bookingsTable.createdAt} <= ${new Date(`${endDateParam}T23:59:59Z`)}`);
   if (pubModeParam && pubModeParam !== "all")
     conditions.push(sql`${bookingsTable.pubMode} = ${pubModeParam}`);
+  if (bookingTypeParam === "pub")
+    conditions.push(sql`${bookingsTable.pubMode} IN ('ticket', 'table', 'bottle')`);
+  else if (bookingTypeParam === "group")
+    conditions.push(sql`${bookingsTable.pubMode} = 'free_entry'`);
 
   if (searchParam) {
     const likeStr = `%${searchParam}%`;

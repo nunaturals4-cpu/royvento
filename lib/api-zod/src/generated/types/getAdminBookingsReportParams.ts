@@ -15,4 +15,5 @@ export type GetAdminBookingsReportParams = {
   pubMode?: string;
   search?: string;
   sortBy?: string;
+  bookingType?: string;
 };

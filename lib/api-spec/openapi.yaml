@@ -816,6 +816,11 @@ paths:
           required: false
           schema:
             type: string
+        - name: bookingType
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Booking report
@@ -1575,6 +1580,8 @@ components:
           type: number
         finalPrice:
           type: number
+        paymentMethod:
+          type: string
         status:
           type: string
         notes:
@@ -1588,7 +1595,7 @@ components:
           nullable: true
         createdAt:
           type: string
-      required: [id, vendorId, vendorName, eventId, eventTitle, userId, userName, userEmail, bookingDate, guests, pubMode, ticketWomen, ticketMen, ticketCouple, totalPrice, discountAmount, finalPrice, status, notes, ticketCode, checkedIn, createdAt]
+      required: [id, vendorId, vendorName, eventId, eventTitle, userId, userName, userEmail, bookingDate, guests, pubMode, ticketWomen, ticketMen, ticketCouple, totalPrice, discountAmount, finalPrice, paymentMethod, status, notes, ticketCode, checkedIn, createdAt]
 
     AdminBookingReportResponse:
       type: object
