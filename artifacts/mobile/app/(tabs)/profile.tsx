@@ -203,12 +203,62 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
+      {/* Quick Actions (vendor/admin) */}
+      {(user.role === "vendor" || user.role === "admin") && (
+        <View style={[styles.quickActions, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
+          <View style={styles.quickRow}>
+            <TouchableOpacity
+              style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+              onPress={() => router.push("/scanner")}
+            >
+              <Ionicons name="qr-code-outline" size={22} color={colors.primary} />
+              <Text style={[styles.quickLabel, { color: colors.primary }]}>Scan Ticket</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+              onPress={() => router.push("/vendor/dashboard")}
+            >
+              <Ionicons name="bar-chart-outline" size={22} color={colors.primary} />
+              <Text style={[styles.quickLabel, { color: colors.primary }]}>Dashboard</Text>
+            </TouchableOpacity>
+            {user.role === "admin" && (
+              <TouchableOpacity
+                style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+                onPress={() => router.push("/admin")}
+              >
+                <Ionicons name="shield-outline" size={22} color={colors.primary} />
+                <Text style={[styles.quickLabel, { color: colors.primary }]}>Admin Panel</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Become Vendor CTA */}
+      {user.role === "user" && (
+        <TouchableOpacity
+          style={[styles.becomeVendorCard, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}
+          onPress={() => router.push("/become-vendor")}
+        >
+          <View style={[styles.becomeVendorIcon, { backgroundColor: colors.primary + "20" }]}>
+            <Ionicons name="business-outline" size={24} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.becomeVendorTitle, { color: colors.foreground }]}>List Your Venue</Text>
+            <Text style={[styles.becomeVendorSub, { color: colors.mutedForeground }]}>Apply to become a Royvento partner</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+
       {/* Menu */}
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
           { icon: "ticket-outline" as const, label: "My Bookings", onPress: () => router.push("/(tabs)/bookings") },
           { icon: "heart-outline" as const, label: "Wishlist", onPress: () => router.push("/(tabs)/wishlist") },
           { icon: "search-outline" as const, label: "Explore Events", onPress: () => router.push("/(tabs)/explore") },
+          { icon: "newspaper-outline" as const, label: "Blog & Stories", onPress: () => router.push("/blogs") },
           {
             icon: "log-out-outline" as const,
             label: "Sign Out",
@@ -313,6 +363,15 @@ const styles = StyleSheet.create({
   couponTag: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   couponCode: { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 1 },
   couponDetail: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  quickActions: { margin: 20, marginBottom: 0, borderRadius: 18, borderWidth: 1, padding: 16, gap: 12 },
+  sectionTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  quickRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  quickBtn: { flex: 1, minWidth: 90, borderWidth: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 6 },
+  quickLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textAlign: "center" },
+  becomeVendorCard: { margin: 20, marginBottom: 0, borderRadius: 16, borderWidth: 1.5, padding: 16, flexDirection: "row", alignItems: "center", gap: 12 },
+  becomeVendorIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  becomeVendorTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  becomeVendorSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   menuCard: { margin: 20, borderRadius: 18, borderWidth: 1, overflow: "hidden" },
   menuItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   menuIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },

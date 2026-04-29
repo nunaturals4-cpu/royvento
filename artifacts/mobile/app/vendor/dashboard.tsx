@@ -40,7 +40,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers";
+type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending:   { bg: "#f59e0b20", text: "#f59e0b" },
@@ -1035,6 +1035,330 @@ export default function VendorDashboardScreen() {
     );
   }
 
+  // ─── ANALYTICS TAB ───────────────────────────────────────────────────────────
+  type AnalyticsResult = {
+    totalEarnings: number; monthEarnings: number;
+    totalWomen: number; totalMen: number; totalCouple: number;
+    perEvent: { eventId: number; eventTitle: string; bookingCount: number; revenue: number }[];
+  };
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsResult | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  const fetchAnalytics = useCallback(() => {
+    setAnalyticsLoading(true);
+    customFetch<AnalyticsResult>("/api/partner/analytics")
+      .then((d) => setAnalyticsData(d))
+      .catch(() => {})
+      .finally(() => setAnalyticsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "analytics") fetchAnalytics();
+  }, [activeTab]);
+
+  function renderAnalytics() {
+    if (analyticsLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+    const a = analyticsData;
+    const kpis = [
+      { label: "Total Revenue", value: `₹${(a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "cash-outline" as const, color: colors.primary },
+      { label: "This Month", value: `₹${(a?.monthEarnings ?? 0).toLocaleString("en-IN")}`, icon: "trending-up-outline" as const, color: "#22c55e" },
+      { label: "Women Tickets", value: String(a?.totalWomen ?? 0), icon: "person-outline" as const, color: "#ec4899" },
+      { label: "Men Tickets", value: String(a?.totalMen ?? 0), icon: "person-outline" as const, color: "#3b82f6" },
+      { label: "Couple Tickets", value: String(a?.totalCouple ?? 0), icon: "people-outline" as const, color: "#8b5cf6" },
+    ];
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>REVENUE OVERVIEW</Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+          {kpis.map((k) => (
+            <View key={k.label} style={[{ width: "47%", borderRadius: 14, borderWidth: 1, padding: 14, gap: 6, alignItems: "center" }, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }, { backgroundColor: k.color + "20" }]}>
+                <Ionicons name={k.icon} size={18} color={k.color} />
+              </View>
+              <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: colors.foreground }}>{k.value}</Text>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" }}>{k.label}</Text>
+            </View>
+          ))}
+        </View>
+        {(a?.perEvent ?? []).length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>PER-EVENT BREAKDOWN</Text>
+            {(a?.perEvent ?? []).map((e) => (
+              <View key={e.eventId} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "center" }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }} numberOfLines={1}>{e.eventTitle}</Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>{e.bookingCount} booking{e.bookingCount !== 1 ? "s" : ""}</Text>
+                </View>
+                <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 15 }}>₹{e.revenue.toLocaleString("en-IN")}</Text>
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    );
+  }
+
+  // ─── ANNOUNCEMENTS TAB ───────────────────────────────────────────────────────
+  interface Announcement {
+    id: number;
+    title: string;
+    body: string;
+    announceDate: string;
+    announceTime: string;
+    imageUrl: string;
+    createdAt: string;
+  }
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annLoading, setAnnLoading] = useState(false);
+  const [showAnnModal, setShowAnnModal] = useState(false);
+  const [annForm, setAnnForm] = useState({ title: "", body: "", announceDate: "", announceTime: "" });
+  const [annSubmitting, setAnnSubmitting] = useState(false);
+  const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
+
+  const fetchAnnouncements = useCallback(() => {
+    setAnnLoading(true);
+    customFetch<Announcement[]>("/api/partner/announcements")
+      .then(setAnnouncements)
+      .catch(() => {})
+      .finally(() => setAnnLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "announcements") fetchAnnouncements();
+  }, [activeTab]);
+
+  async function submitAnnouncement() {
+    if (!annForm.title.trim()) { Alert.alert("Title required"); return; }
+    setAnnSubmitting(true);
+    try {
+      if (editingAnn) {
+        await customFetch(`/api/partner/announcements/${editingAnn.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(annForm),
+        });
+      } else {
+        await customFetch("/api/partner/announcements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(annForm),
+        });
+      }
+      setShowAnnModal(false);
+      setEditingAnn(null);
+      setAnnForm({ title: "", body: "", announceDate: "", announceTime: "" });
+      fetchAnnouncements();
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert("Error", err?.message ?? "Failed to save announcement.");
+    } finally {
+      setAnnSubmitting(false);
+    }
+  }
+
+  async function deleteAnnouncement(id: number) {
+    try {
+      await customFetch(`/api/partner/announcements/${id}`, { method: "DELETE" });
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    } catch {
+      Alert.alert("Error", "Failed to delete announcement.");
+    }
+  }
+
+  function renderAnnouncements() {
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        <TouchableOpacity
+          style={[styles.createBtn, { backgroundColor: colors.primary }]}
+          onPress={() => { setEditingAnn(null); setAnnForm({ title: "", body: "", announceDate: "", announceTime: "" }); setShowAnnModal(true); }}
+        >
+          <Ionicons name="add" size={18} color={colors.primaryForeground} />
+          <Text style={[styles.createBtnText, { color: colors.primaryForeground }]}>New Announcement</Text>
+        </TouchableOpacity>
+        {annLoading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+        ) : announcements.length === 0 ? (
+          <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
+            <Ionicons name="megaphone-outline" size={40} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
+              No announcements yet. Create one to notify your customers.
+            </Text>
+          </View>
+        ) : (
+          announcements.map((a) => (
+            <View key={a.id} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14, flex: 1 }}>{a.title}</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity onPress={() => { setEditingAnn(a); setAnnForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime }); setShowAnnModal(true); }}>
+                    <Ionicons name="pencil-outline" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => Alert.alert("Delete?", `Delete "${a.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteAnnouncement(a.id) }])}>
+                    <Ionicons name="trash-outline" size={16} color={colors.destructive} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {a.body ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 2 }} numberOfLines={2}>{a.body}</Text> : null}
+              {a.announceDate ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                  <Ionicons name="calendar-outline" size={12} color={colors.mutedForeground} />
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{a.announceDate}{a.announceTime ? ` at ${a.announceTime}` : ""}</Text>
+                </View>
+              ) : null}
+            </View>
+          ))
+        )}
+
+        {/* Announcement Modal */}
+        <Modal visible={showAnnModal} animationType="slide" presentationStyle="pageSheet">
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+              <TouchableOpacity onPress={() => { setShowAnnModal(false); setEditingAnn(null); }}>
+                <Ionicons name="close" size={22} color={colors.foreground} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>{editingAnn ? "Edit Announcement" : "New Announcement"}</Text>
+              <TouchableOpacity onPress={submitAnnouncement} disabled={annSubmitting}>
+                {annSubmitting ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 80 }]}>
+              {[
+                { label: "Title *", key: "title" as const, placeholder: "Announcement title", multi: false },
+                { label: "Message", key: "body" as const, placeholder: "Tell your customers about this...", multi: true },
+                { label: "Date (YYYY-MM-DD)", key: "announceDate" as const, placeholder: "e.g. 2025-12-31", multi: false },
+                { label: "Time", key: "announceTime" as const, placeholder: "e.g. 20:00", multi: false },
+              ].map((f) => (
+                <View key={f.key} style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
+                  <TextInput
+                    style={[styles.fieldInput, f.multi && styles.textArea, { backgroundColor: colors.muted, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }]}
+                    value={annForm[f.key]}
+                    onChangeText={(v) => setAnnForm((p) => ({ ...p, [f.key]: v }))}
+                    placeholder={f.placeholder}
+                    placeholderTextColor={colors.mutedForeground}
+                    multiline={f.multi}
+                    numberOfLines={f.multi ? 4 : 1}
+                    textAlignVertical={f.multi ? "top" : "center"}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </Modal>
+      </ScrollView>
+    );
+  }
+
+  // ─── LEADS TAB ────────────────────────────────────────────────────────────────
+  interface LeadEntry {
+    userId: number;
+    userName: string;
+    userEmail: string;
+    leadType: string;
+    eventTitle: string;
+    viewedAt: string;
+  }
+  type LeadsResult = {
+    premium: boolean; crmAccessGranted: boolean; crmTrialActive: boolean; crmTrialDaysRemaining: number; views: LeadEntry[];
+  };
+  const [leadsData, setLeadsData] = useState<LeadsResult | null>(null);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+
+  const fetchLeads = useCallback(() => {
+    setLeadsLoading(true);
+    customFetch<LeadsResult>("/api/partner/leads/me")
+      .then((d) => setLeadsData(d))
+      .catch(() => {})
+      .finally(() => setLeadsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "leads") fetchLeads();
+  }, [activeTab]);
+
+  function renderLeads() {
+    if (leadsLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+    if (!leadsData?.crmAccessGranted) {
+      return (
+        <ScrollView contentContainerStyle={[styles.list, { alignItems: "center", paddingTop: 40 }]}>
+          <View style={{ alignItems: "center", gap: 16, padding: 24, maxWidth: 320 }}>
+            <View style={[{ width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" }, { backgroundColor: colors.primary + "20" }]}>
+              <Ionicons name="lock-closed-outline" size={32} color={colors.primary} />
+            </View>
+            <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: colors.foreground, textAlign: "center" }}>CRM Leads</Text>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center", lineHeight: 21 }}>
+              Unlock customer leads & visitor analytics with Partner Premium. See who viewed your venue and convert them into bookings.
+            </Text>
+            <View style={[{ borderRadius: 14, padding: 16, gap: 8, width: "100%", borderWidth: 1 }, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {[
+                "View contact details of people who visited your page",
+                "Track repeat visitors vs new leads",
+                "See which events drive the most interest",
+                "Export leads to CSV",
+              ].map((f) => (
+                <View key={f} style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={{ marginTop: 1 }} />
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>{f}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[{ borderRadius: 14, paddingVertical: 14, paddingHorizontal: 40, flexDirection: "row", gap: 8, alignItems: "center" }, { backgroundColor: colors.primary }]}
+              onPress={() => Alert.alert("Upgrade to Premium", "Contact our team at partners@royvento.com to upgrade your account.")}
+            >
+              <Ionicons name="star-outline" size={16} color={colors.primaryForeground} />
+              <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Upgrade to Premium</Text>
+            </TouchableOpacity>
+            {leadsData?.crmTrialActive && (
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" }}>
+                Trial active · {leadsData.crmTrialDaysRemaining} days remaining
+              </Text>
+            )}
+          </View>
+        </ScrollView>
+      );
+    }
+
+    const views = leadsData?.views ?? [];
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        {leadsData?.crmTrialActive && (
+          <View style={[{ borderRadius: 12, padding: 12, flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 4, borderWidth: 1 }, { backgroundColor: "#f59e0b18", borderColor: "#f59e0b40" }]}>
+            <Ionicons name="time-outline" size={16} color="#f59e0b" />
+            <Text style={{ color: "#f59e0b", fontFamily: "Inter_500Medium", fontSize: 13, flex: 1 }}>
+              Free trial active · {leadsData.crmTrialDaysRemaining} days remaining
+            </Text>
+          </View>
+        )}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>RECENT LEADS ({views.length})</Text>
+        {views.length === 0 ? (
+          <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
+            <Ionicons name="person-add-outline" size={40} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
+              No leads yet. Leads appear when users view your venue page.
+            </Text>
+          </View>
+        ) : (
+          views.map((lead, i) => (
+            <View key={i} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+              <View style={[{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" }, { backgroundColor: colors.primary + "20" }]}>
+                <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 13 }}>{lead.userName.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{lead.userName}</Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{lead.userEmail}</Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 1 }}>{lead.eventTitle}</Text>
+              </View>
+              <View style={[{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 }, lead.leadType === "booking" ? { backgroundColor: "#22c55e18", borderColor: "#22c55e40" } : { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Text style={{ color: lead.leadType === "booking" ? "#22c55e" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{lead.leadType}</Text>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    );
+  }
+
   // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -1066,11 +1390,14 @@ export default function VendorDashboardScreen() {
         {/* Tab bar */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
           {([
-            { key: "bookings",  icon: "ticket-outline",          label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
-            { key: "events",    icon: "calendar-outline",         label: "My Listings" },
-            { key: "profile",   icon: "person-outline",           label: "Profile" },
-            { key: "calendar",  icon: "calendar-clear-outline",   label: "Calendar" },
-            { key: "managers",  icon: "people-outline",           label: "Managers" },
+            { key: "bookings",      icon: "ticket-outline",          label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
+            { key: "events",        icon: "calendar-outline",         label: "My Listings" },
+            { key: "analytics",     icon: "bar-chart-outline",        label: "Analytics" },
+            { key: "announcements", icon: "megaphone-outline",        label: "Announcements" },
+            { key: "leads",         icon: "people-outline",           label: "Leads" },
+            { key: "profile",       icon: "person-outline",           label: "Profile" },
+            { key: "calendar",      icon: "calendar-clear-outline",   label: "Calendar" },
+            { key: "managers",      icon: "person-add-outline",       label: "Managers" },
           ] as const).map((t) => (
             <TouchableOpacity
               key={t.key}
@@ -1087,11 +1414,14 @@ export default function VendorDashboardScreen() {
       </View>
 
       {/* Content */}
-      {activeTab === "bookings"  && renderBookings()}
-      {activeTab === "events"    && renderEvents()}
-      {activeTab === "profile"   && renderProfile()}
-      {activeTab === "calendar"  && renderCalendar()}
-      {activeTab === "managers"  && renderManagers()}
+      {activeTab === "bookings"       && renderBookings()}
+      {activeTab === "events"         && renderEvents()}
+      {activeTab === "analytics"      && renderAnalytics()}
+      {activeTab === "announcements"  && renderAnnouncements()}
+      {activeTab === "leads"          && renderLeads()}
+      {activeTab === "profile"        && renderProfile()}
+      {activeTab === "calendar"       && renderCalendar()}
+      {activeTab === "managers"       && renderManagers()}
 
       {/* ── Create Event Modal ── */}
       <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">

@@ -20,9 +20,9 @@ function NativeTabLayout({ isVendor }: { isVendor: boolean }) {
         <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
         <Label>Explore</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="wishlist">
-        <Icon sf={{ default: "heart", selected: "heart.fill" }} />
-        <Label>Wishlist</Label>
+      <NativeTabs.Trigger name="pubs">
+        <Icon sf={{ default: "wineglass", selected: "wineglass.fill" }} />
+        <Label>Pubs</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="bookings">
         <Icon sf={{ default: "ticket", selected: "ticket.fill" }} />
@@ -110,9 +110,18 @@ function ClassicTabLayout({ isVendor }: { isVendor: boolean }) {
         }}
       />
       <Tabs.Screen
+        name="pubs"
+        options={{
+          title: "Pubs",
+          tabBarIcon: ({ color, focused }) =>
+            tabBarIcon(focused, color, "wineglass.fill", "wineglass", "beer", "beer-outline"),
+        }}
+      />
+      <Tabs.Screen
         name="wishlist"
         options={{
           title: "Wishlist",
+          tabBarItemStyle: { display: "none" },
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "heart.fill", "heart", "heart", "heart-outline"),
         }}

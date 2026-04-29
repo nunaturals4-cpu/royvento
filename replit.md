@@ -133,6 +133,17 @@ DB migration for payments table: `lib/db/drizzle/0001_add_payments_table.sql`
 Run on an existing DB: `pnpm --filter @workspace/db run migrate`  
 Generate new migration after schema changes: `pnpm --filter @workspace/db run generate`
 
+## Mobile app feature parity (Task #96, Apr 2026)
+Full feature parity with web app. New screens and features in `artifacts/mobile/`:
+
+- **Pubs tab** (`app/(tabs)/pubs.tsx`): dedicated Pubs & Nightlife discovery tab in bottom nav (replaces hidden Wishlist tab in nav; Wishlist accessible from Profile menu). City and pub-mode filters.
+- **Become a Vendor screen** (`app/become-vendor.tsx`): apply as a partner — businessName, category, description, location form; posts to `POST /api/vendors/me`.
+- **Blogs** (`app/blogs.tsx`, `app/blog/[slug].tsx`): list published blogs from `/api/blogs`, detail view with paragraph + heading rendering.
+- **AI Chat floating button**: "Roy" nightlife assistant FAB on Home tab; opens modal with message history, quick suggestion chips; posts to `POST /api/ai/chat`.
+- **Profile tab additions**: Quick Actions card (Scan Ticket, Dashboard) for vendors/admins; Admin Panel button for admins; "List Your Venue" CTA banner for plain users; Blog & Stories menu item.
+- **Vendor dashboard new tabs**: Analytics (revenue KPIs + per-event breakdown via `/api/partner/analytics`), Announcements (CRUD `/api/partner/announcements`), Leads (premium gate or lead list via `/api/partner/leads/me`).
+- **Admin panel screen** (`app/admin/index.tsx`): analytics KPIs, partner management (approve/reject), user list, event management with delete.
+
 ## Common tasks
 - Regenerate API client: `pnpm --filter @workspace/api-spec run codegen`
 - Push DB schema: `pnpm --filter @workspace/db run push`
