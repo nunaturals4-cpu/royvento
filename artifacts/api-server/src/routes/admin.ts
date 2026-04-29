@@ -143,7 +143,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   // Daily chart: always last 30 days ending at rangeEnd
   const dailyMap = new Map<string, number>();
   const dayMs = 24 * 60 * 60 * 1000;
-  const dailyWindowDays = 30;
+  const dailyWindowDays = 29; // 0..29 = exactly 30 data points
   const dailyStart = new Date(rangeEnd.getTime() - dailyWindowDays * dayMs);
   for (let i = dailyWindowDays; i >= 0; i--) {
     const d = new Date(rangeEnd.getTime() - i * dayMs);
