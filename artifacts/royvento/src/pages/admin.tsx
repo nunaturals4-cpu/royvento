@@ -1726,7 +1726,6 @@ function BookingReport() {
           {summaryOpen && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4 border-t border-white/5">
               {displayedSummary.map((v) => {
-                const totalTickets = v.ticketWomen + v.ticketMen + v.ticketCouple * 2;
                 return (
                   <div
                     key={v.vendorId}
