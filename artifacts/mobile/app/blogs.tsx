@@ -90,15 +90,18 @@ export default function BlogsScreen() {
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : blogs.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="newspaper-outline" size={48} color={colors.mutedForeground} />
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-            {search ? "No articles found" : "No Blogs Yet"}
-          </Text>
-          <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-            {search ? "Try a different search" : "Check back soon for nightlife guides"}
-          </Text>
-        </View>
+        <>
+          <View style={styles.center}>
+            <Ionicons name="newspaper-outline" size={48} color={colors.mutedForeground} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              {search ? "No articles found" : "No Blogs Yet"}
+            </Text>
+            <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
+              {search ? "Try a different search" : "Check back soon for nightlife guides"}
+            </Text>
+          </View>
+          <MobileFooter />
+        </>
       ) : (
         <FlatList
           data={blogs}

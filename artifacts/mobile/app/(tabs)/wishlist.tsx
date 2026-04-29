@@ -75,12 +75,15 @@ export default function WishlistScreen() {
       </View>
 
       {isLoading ? null : !data || data.length === 0 ? (
-        <EmptyState
-          icon="heart-outline"
-          title="Your wishlist is empty"
-          subtitle="Save events you love and come back to them anytime"
-          action={{ label: "Explore Events", onPress: () => router.push("/(tabs)/explore") }}
-        />
+        <>
+          <EmptyState
+            icon="heart-outline"
+            title="Your wishlist is empty"
+            subtitle="Save events you love and come back to them anytime"
+            action={{ label: "Explore Events", onPress: () => router.push("/(tabs)/explore") }}
+          />
+          <MobileFooter />
+        </>
       ) : (
         <FlatList
           data={data}

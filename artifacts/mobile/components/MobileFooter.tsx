@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 
 export function MobileFooter() {
@@ -27,8 +27,11 @@ export function MobileFooter() {
           <Pressable onPress={() => router.push("/(tabs)/explore")}>
             <Text style={[styles.link, { color: colors.mutedForeground }]}>Explore Events</Text>
           </Pressable>
-          <Pressable onPress={() => router.push("/blogs" as never)}>
-            <Text style={[styles.link, { color: colors.mutedForeground }]}>Blog & Stories</Text>
+          <Pressable onPress={() => router.push("/(tabs)/pubs" as never)}>
+            <Text style={[styles.link, { color: colors.mutedForeground }]}>Browse Partners</Text>
+          </Pressable>
+          <Pressable onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/contact`)}>
+            <Text style={[styles.link, { color: colors.mutedForeground }]}>Contact</Text>
           </Pressable>
         </View>
         <View style={styles.linkCol}>
@@ -36,8 +39,8 @@ export function MobileFooter() {
           <Pressable onPress={() => router.push("/become-vendor" as never)}>
             <Text style={[styles.link, { color: colors.mutedForeground }]}>Become a Partner</Text>
           </Pressable>
-          <Pressable onPress={() => router.push("/(auth)/login" as never)}>
-            <Text style={[styles.link, { color: colors.mutedForeground }]}>Partner Login</Text>
+          <Pressable onPress={() => router.push("/vendor/dashboard" as never)}>
+            <Text style={[styles.link, { color: colors.mutedForeground }]}>Partner Dashboard</Text>
           </Pressable>
         </View>
       </View>

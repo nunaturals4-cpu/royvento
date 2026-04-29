@@ -204,16 +204,19 @@ export default function BookingsScreen() {
       </View>
 
       {shown.length === 0 ? (
-        <EmptyState
-          icon="ticket-outline"
-          title={tab === "upcoming" ? "No upcoming bookings" : "No past bookings"}
-          subtitle={tab === "upcoming" ? "Book an event to get started" : "Your past bookings will appear here"}
-          action={
-            tab === "upcoming"
-              ? { label: "Explore Events", onPress: () => router.push("/(tabs)/explore") }
-              : undefined
-          }
-        />
+        <>
+          <EmptyState
+            icon="ticket-outline"
+            title={tab === "upcoming" ? "No upcoming bookings" : "No past bookings"}
+            subtitle={tab === "upcoming" ? "Book an event to get started" : "Your past bookings will appear here"}
+            action={
+              tab === "upcoming"
+                ? { label: "Explore Events", onPress: () => router.push("/(tabs)/explore") }
+                : undefined
+            }
+          />
+          <MobileFooter />
+        </>
       ) : (
         <FlatList
           data={shown}

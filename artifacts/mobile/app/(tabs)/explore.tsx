@@ -223,15 +223,18 @@ export default function ExploreScreen() {
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
       ) : events.length === 0 ? (
-        <EmptyState
-          icon="search-outline"
-          title="No events found"
-          subtitle="Try different filters or search terms"
-          action={{
-            label: "Clear all filters",
-            onPress: () => { setSearch(""); setDebouncedSearch(""); clearFilter(); },
-          }}
-        />
+        <>
+          <EmptyState
+            icon="search-outline"
+            title="No events found"
+            subtitle="Try different filters or search terms"
+            action={{
+              label: "Clear all filters",
+              onPress: () => { setSearch(""); setDebouncedSearch(""); clearFilter(); },
+            }}
+          />
+          <MobileFooter />
+        </>
       ) : (
         <FlatList
           data={events}
