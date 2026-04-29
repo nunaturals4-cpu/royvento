@@ -37,6 +37,17 @@ interface AdminVendor {
   createdAt: string;
 }
 
+interface VendorRequest {
+  id: number;
+  userId: number;
+  businessName: string;
+  category: string;
+  message: string;
+  status: string;
+  createdAt: string;
+  user?: { name: string; email: string; phone: string };
+}
+
 interface AdminUser {
   id: number;
   name: string;
@@ -119,17 +130,39 @@ export default function AdminPanelScreen() {
   const leadsQ = useGetAdminLeadsSummary({}, { query: { enabled: activeTab === "analytics" } });
   const bookingsReportQ = useGetAdminBookingsReport({}, { query: { enabled: activeTab === "analytics" } });
 
-  // ─── VENDORS ────────────────────────────────────────────────────────────────
+  // ─── VENDORS & VENDOR REQUESTS ──────────────────────────────────────────────
   const [vendors, setVendors] = useState<AdminVendor[]>([]);
+  const [vendorRequests, setVendorRequests] = useState<VendorRequest[]>([]);
   const [vendorLoading, setVendorLoading] = useState(false);
 
   const fetchVendors = useCallback(() => {
     setVendorLoading(true);
-    customFetch<AdminVendor[]>("/api/admin/vendors")
-      .then(setVendors)
+    Promise.all([
+      customFetch<AdminVendor[]>("/api/admin/vendors"),
+      customFetch<VendorRequest[]>("/api/admin/vendor-requests"),
+    ])
+      .then(([v, vr]) => { setVendors(v); setVendorRequests(vr); })
       .catch(() => {})
       .finally(() => setVendorLoading(false));
   }, []);
+
+  async function approveVendorRequest(id: number) {
+    try {
+      await customFetch(`/api/admin/vendor-requests/${id}/approve`, { method: "POST" });
+      fetchVendors();
+    } catch {
+      Alert.alert("Error", "Failed to approve application.");
+    }
+  }
+
+  async function rejectVendorRequest(id: number) {
+    try {
+      await customFetch(`/api/admin/vendor-requests/${id}/reject`, { method: "POST" });
+      fetchVendors();
+    } catch {
+      Alert.alert("Error", "Failed to reject application.");
+    }
+  }
 
   // ─── USERS ──────────────────────────────────────────────────────────────────
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -506,41 +539,49 @@ export default function AdminPanelScreen() {
 
   // ─── RENDER VENDORS ─────────────────────────────────────────────────────────
   function renderVendors() {
-    const pending = vendors.filter((v) => v.status === "pending");
-    const approved = vendors.filter((v) => v.status === "approved");
+    const pendingRequests = vendorRequests.filter((r) => r.status === "pending");
+    const approvedVendors = vendors.filter((v) => v.status === "approved");
 
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={vendorLoading} onRefresh={fetchVendors} tintColor={colors.primary} />}>
         {vendorLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
-        {pending.length > 0 && (
+
+        {pendingRequests.length > 0 && (
           <>
-            <Text style={[styles.sectionHeader, { color: "#f59e0b" }]}>PENDING APPROVAL ({pending.length})</Text>
-            {pending.map((v) => (
-              <View key={v.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: "#f59e0b40" }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.itemTitle, { color: colors.foreground }]}>{v.businessName}</Text>
-                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{v.category} · {v.location}</Text>
+            <Text style={[styles.sectionHeader, { color: "#f59e0b" }]}>PENDING APPLICATIONS ({pendingRequests.length})</Text>
+            {pendingRequests.map((r) => (
+              <View key={r.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]}>{r.businessName}</Text>
+                    <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.category}{r.user?.name ? ` · ${r.user.name}` : ""}</Text>
+                    {r.user?.email ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.user.email}</Text> : null}
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: "#22c55e20", borderColor: "#22c55e" }]}
+                      onPress={() => Alert.alert("Approve?", `Approve "${r.businessName}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Approve", onPress: () => approveVendorRequest(r.id) }])}
+                    >
+                      <Ionicons name="checkmark" size={14} color="#22c55e" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: "#ef444420", borderColor: "#ef4444" }]}
+                      onPress={() => Alert.alert("Reject?", `Reject "${r.businessName}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Reject", style: "destructive", onPress: () => rejectVendorRequest(r.id) }])}
+                    >
+                      <Ionicons name="close" size={14} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#22c55e20", borderColor: "#22c55e" }]}
-                    onPress={() => Alert.alert("Approve?", `Approve ${v.businessName}?`, [{ text: "Cancel", style: "cancel" }, { text: "Approve", onPress: () => approveVendor(v.id) }])}
-                  >
-                    <Ionicons name="checkmark" size={14} color="#22c55e" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#ef444420", borderColor: "#ef4444" }]}
-                    onPress={() => Alert.alert("Reject?", `Reject ${v.businessName}?`, [{ text: "Cancel", style: "cancel" }, { text: "Reject", style: "destructive", onPress: () => rejectVendor(v.id) }])}
-                  >
-                    <Ionicons name="close" size={14} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
+                {r.message ? (
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }} numberOfLines={2}>{r.message}</Text>
+                ) : null}
               </View>
             ))}
           </>
         )}
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pending.length > 0 ? 20 : 0 }]}>ALL PARTNERS ({approved.length})</Text>
-        {approved.map((v) => (
+
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pendingRequests.length > 0 ? 20 : 0 }]}>APPROVED PARTNERS ({approvedVendors.length})</Text>
+        {approvedVendors.map((v) => (
           <View key={v.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.itemTitle, { color: colors.foreground }]}>{v.businessName}</Text>
