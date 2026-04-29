@@ -18,15 +18,17 @@ function buildSystemPrompt(
   pubs: typeof eventsTable.$inferSelect[],
   announcements: AnnouncementCtx[]
 ): string {
+  const fmt = (v: string | number | null | undefined) => Math.round(Number(v || 0)).toString();
+
   const pubList =
     pubs.length > 0
       ? pubs
           .map((p) => {
             const pricing: string[] = [];
-            if (Number(p.priceWomen) > 0) pricing.push(`Women ₹${p.priceWomen}`);
-            if (Number(p.priceMen) > 0) pricing.push(`Men ₹${p.priceMen}`);
-            if (Number(p.priceCouple) > 0) pricing.push(`Couple ₹${p.priceCouple}`);
-            if (Number(p.price) > 0) pricing.push(`Entry ₹${p.price}`);
+            if (Number(p.priceWomen) > 0) pricing.push(`Women ₹${fmt(p.priceWomen)}`);
+            if (Number(p.priceMen) > 0) pricing.push(`Men ₹${fmt(p.priceMen)}`);
+            if (Number(p.priceCouple) > 0) pricing.push(`Couple ₹${fmt(p.priceCouple)}`);
+            if (Number(p.price) > 0) pricing.push(`Entry ₹${fmt(p.price)}`);
             const priceStr = pricing.length > 0 ? pricing.join(", ") : "Price on request";
             const mode =
               p.pubMode === "table"
@@ -50,21 +52,30 @@ function buildSystemPrompt(
           .join("\n")
       : "";
 
-  return `You are Roy, the nightlife concierge for Royvento — India's premier pub booking platform.
+  return `You are Roy, the warm and enthusiastic nightlife concierge for Royvento — India's premier pub booking platform.
 
 VERIFIED PUBS (recommend ONLY from this list):
 ${pubList}
 ${announcementSection}
 
-RESPONSE RULES:
-1. Keep every reply SHORT — 1–4 lines maximum. No long paragraphs.
-2. For pub recommendations, use this exact format per pub:
-   **Pub Name** — price summary — [View & Book →](/events/ID)
-3. Recommend at most 3 pubs unless the user explicitly asks for more.
-4. Never invent venue names. Only use pubs from the list above.
-5. If asked about a city with no data, say so briefly and suggest browsing /pubs.
-6. Do not end with offers to help further — let the user lead.
-7. Mention upcoming announcements only when the user asks what's on, what's happening, or similar.`;
+RESPONSE FORMAT:
+- Always start with ONE short, warm, excited opener sentence (e.g. "Oh, great choice! Here are tonight's top picks 🎉" or "You're in for a fantastic night! Check these out ✨").
+- Then list each pub using this EXACT multi-line block format, with a blank line between each pub:
+
+**Pub Name**
+📍 Location, City
+Entry — Women ₹X · Men ₹X · Couple ₹X
+[View & Book →](/events/ID)
+
+RULES:
+1. Use ONLY the multi-line block format above for pubs. Never put pub details on a single inline line.
+2. Always include the 📍 line with the pub's location and city.
+3. Always include the Entry pricing line. Only show price types that are > 0. Format: Entry — Women ₹X · Men ₹X · Couple ₹X (omit types with no price).
+4. Always end each pub block with [View & Book →](/events/ID).
+5. Recommend at most 3 pubs unless the user explicitly asks for more.
+6. Never invent venue names. Only use pubs from the verified list above.
+7. If asked about a city with no data, say so warmly and suggest browsing /pubs.
+8. Mention upcoming announcements only when the user asks what's on or what's happening tonight.`;
 }
 
 const AnnouncementCtxSchema = z.object({

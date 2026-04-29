@@ -46,21 +46,56 @@ function parseCity(text: string): string {
   return "";
 }
 
+function PubCard({ block }: { block: string }) {
+  const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+  const nameLine = lines.find((l) => l.startsWith("**"));
+  const name = nameLine ? nameLine.replace(/\*\*/g, "").trim() : "";
+  const locationLine = lines.find((l) => l.startsWith("📍"));
+  const entryLine = lines.find((l) => l.toLowerCase().startsWith("entry"));
+  const linkMatch = block.match(/\[View & Book →\]\(\/events\/(\d+)\)/);
+
+  return (
+    <div className="mt-2 rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+      <div className="px-3 pt-3 pb-2 space-y-1">
+        <p className="text-sm font-semibold text-white leading-snug">{name}</p>
+        {locationLine && (
+          <p className="text-xs text-white/50">{locationLine}</p>
+        )}
+        {entryLine && (
+          <p className="text-xs text-primary/90 font-medium mt-0.5">{entryLine}</p>
+        )}
+      </div>
+      {linkMatch && (
+        <div className="px-3 pb-3">
+          <Link href={`/events/${linkMatch[1]}`}>
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors text-xs font-semibold cursor-pointer border border-primary/30">
+              View &amp; Book →
+            </span>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function renderMessageContent(content: string) {
-  const parts = content.split(/(\[View & Book →\]\(\/events\/\d+\))/g);
-  return parts.map((part, i) => {
-    const match = part.match(/\[View & Book →\]\(\/events\/(\d+)\)/);
-    if (match) {
-      return (
-        <Link key={i} href={`/events/${match[1]}`}>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 mt-1 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors text-xs font-semibold cursor-pointer border border-primary/30">
-            View &amp; Book →
-          </span>
-        </Link>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
+  const paragraphs = content.split(/\n{2,}/);
+  return (
+    <>
+      {paragraphs.map((para, i) => {
+        const trimmed = para.trim();
+        if (!trimmed) return null;
+        if (/^\*\*[^*]+\*\*/.test(trimmed)) {
+          return <PubCard key={i} block={trimmed} />;
+        }
+        return (
+          <p key={i} className={i > 0 ? "mt-2 text-sm" : "text-sm"}>
+            {trimmed}
+          </p>
+        );
+      })}
+    </>
+  );
 }
 
 export function AiChatWidget() {
