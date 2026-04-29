@@ -24,11 +24,18 @@ const TABS: Tab[] = [
     matchPaths: ["/(tabs)", "/(tabs)/index", "/", "/index"],
   },
   {
-    label: "Pub",
+    label: "Pubs",
     icon: "beer-outline",
     iconFocused: "beer",
     route: "/(tabs)/explore",
     matchPaths: ["/(tabs)/explore", "/explore"],
+  },
+  {
+    label: "Wishlist",
+    icon: "heart-outline",
+    iconFocused: "heart",
+    route: "/(tabs)/wishlist",
+    matchPaths: ["/(tabs)/wishlist", "/wishlist"],
   },
   {
     label: "Bookings",

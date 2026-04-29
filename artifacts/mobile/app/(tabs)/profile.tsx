@@ -266,6 +266,8 @@ export default function ProfileScreen() {
           { icon: "heart-outline" as const, label: "Wishlist", onPress: () => router.push("/(tabs)/wishlist") },
           { icon: "search-outline" as const, label: "Explore Events", onPress: () => router.push("/(tabs)/explore") },
           { icon: "newspaper-outline" as const, label: "Blog & Stories", onPress: () => router.push("/blogs") },
+          { icon: "star-outline" as const, label: "Subscription / Premium", onPress: () => router.push("/subscription") },
+          { icon: "help-circle-outline" as const, label: "Contact Support", onPress: () => router.push("/contact") },
           {
             icon: "log-out-outline" as const,
             label: "Sign Out",

@@ -23,6 +23,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { WebFormWrapper } from "@/components/WebFormWrapper";
 import type { AuthUser } from "@/context/AuthContext";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -158,60 +159,71 @@ export default function LoginScreen() {
             </View>
           )}
 
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>Email</Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-              <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
-              <TextInput
-                style={[styles.input, { color: colors.foreground }]}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>Password</Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
-              <TextInput
-                style={[styles.input, { color: colors.foreground }]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor={colors.mutedForeground}
-                secureTextEntry={!showPassword}
-              />
-              <Pressable onPress={() => setShowPassword(!showPassword)}>
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={16}
-                  color={colors.mutedForeground}
+          <WebFormWrapper onSubmit={handleLogin}>
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>Email</Text>
+              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  returnKeyType="next"
                 />
-              </Pressable>
+              </View>
             </View>
-          </View>
 
-          <TouchableOpacity
-            style={[
-              styles.btn,
-              { backgroundColor: colors.primary },
-              loginMutation.isPending && { opacity: 0.7 },
-            ]}
-            onPress={handleLogin}
-            disabled={loginMutation.isPending}
-          >
-            {loginMutation.isPending ? (
-              <ActivityIndicator color={colors.primaryForeground} />
-            ) : (
-              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Sign In</Text>
-            )}
-          </TouchableOpacity>
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>Password</Text>
+              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.mutedForeground}
+                  secureTextEntry={!showPassword}
+                  autoComplete="current-password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                />
+                <Pressable onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={16}
+                    color={colors.mutedForeground}
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.btn,
+                { backgroundColor: colors.primary },
+                loginMutation.isPending && { opacity: 0.7 },
+              ]}
+              onPress={handleLogin}
+              disabled={loginMutation.isPending}
+            >
+              {loginMutation.isPending ? (
+                <ActivityIndicator color={colors.primaryForeground} />
+              ) : (
+                <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Sign In</Text>
+              )}
+            </TouchableOpacity>
+
+            <Pressable style={styles.forgotWrap} onPress={() => router.push("/(auth)/forgot-password")}>
+              <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot password?</Text>
+            </Pressable>
+          </WebFormWrapper>
         </View>
 
         <View style={styles.footer}>
@@ -246,6 +258,8 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
   btn: { borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 4 },
   btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  forgotWrap: { alignItems: "center", paddingVertical: 4 },
+  forgotText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   footer: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
   footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   link: { fontSize: 14, fontFamily: "Inter_600SemiBold" },

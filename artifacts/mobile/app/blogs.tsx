@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -25,12 +26,11 @@ interface Blog {
   id: number;
   title: string;
   slug: string;
-  excerpt: string | null;
+  excerpt: string;
   content: string;
-  imageUrl: string | null;
-  category: string | null;
-  author: string | null;
-  publishedAt: string | null;
+  imageUrl: string;
+  authorName: string;
+  tags: string[];
   createdAt: string;
 }
 
@@ -39,18 +39,26 @@ export default function BlogsScreen() {
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
 
   const { data, isLoading, refetch, isRefetching } = useQuery<Blog[]>({
     queryKey: ["blogs"],
     queryFn: () => customFetch<Blog[]>("/api/blogs"),
   });
 
-  const blogs = (data ?? []).filter((b) =>
-    !search.trim() ||
-    b.title.toLowerCase().includes(search.toLowerCase()) ||
-    (b.excerpt ?? "").toLowerCase().includes(search.toLowerCase()) ||
-    (b.category ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  const allTags = Array.from(
+    new Set((data ?? []).flatMap((b) => b.tags ?? []).filter(Boolean))
+  ).sort();
+
+  const blogs = (data ?? []).filter((b) => {
+    const matchesSearch =
+      !search.trim() ||
+      b.title.toLowerCase().includes(search.toLowerCase()) ||
+      (b.excerpt ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (b.tags ?? []).some((t) => t.toLowerCase().includes(search.toLowerCase()));
+    const matchesTag = !selectedCategory || (b.tags ?? []).includes(selectedCategory);
+    return matchesSearch && matchesTag;
+  });
 
   function formatDate(d: string) {
     return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -84,6 +92,36 @@ export default function BlogsScreen() {
             </Pressable>
           )}
         </View>
+
+        {allTags.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <Pressable
+              onPress={() => setSelectedCategory("")}
+              style={[styles.categoryChip, {
+                backgroundColor: !selectedCategory ? colors.primary : colors.muted,
+                borderColor: !selectedCategory ? colors.primary : colors.border,
+              }]}
+            >
+              <Text style={[styles.categoryChipText, { color: !selectedCategory ? colors.primaryForeground : colors.mutedForeground }]}>
+                All
+              </Text>
+            </Pressable>
+            {allTags.map((tag) => (
+              <Pressable
+                key={tag}
+                onPress={() => setSelectedCategory(selectedCategory === tag ? "" : tag)}
+                style={[styles.categoryChip, {
+                  backgroundColor: selectedCategory === tag ? colors.primary : colors.muted,
+                  borderColor: selectedCategory === tag ? colors.primary : colors.border,
+                }]}
+              >
+                <Text style={[styles.categoryChipText, { color: selectedCategory === tag ? colors.primaryForeground : colors.mutedForeground }]}>
+                  {tag}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
       </LinearGradient>
 
       {isLoading ? (
@@ -130,24 +168,24 @@ export default function BlogsScreen() {
                 </LinearGradient>
               )}
               <View style={styles.cardBody}>
-                {item.category && (
-                  <Text style={[styles.category, { color: colors.primary }]}>{item.category.toUpperCase()}</Text>
+                {(item.tags ?? []).length > 0 && (
+                  <Text style={[styles.category, { color: colors.primary }]}>{item.tags[0].toUpperCase()}</Text>
                 )}
                 <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={2}>{item.title}</Text>
-                {item.excerpt && (
+                {item.excerpt ? (
                   <Text style={[styles.excerpt, { color: colors.mutedForeground }]} numberOfLines={2}>{item.excerpt}</Text>
-                )}
+                ) : null}
                 <View style={styles.meta}>
-                  {item.author && (
+                  {item.authorName ? (
                     <View style={styles.metaItem}>
                       <Ionicons name="person-outline" size={11} color={colors.mutedForeground} />
-                      <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{item.author}</Text>
+                      <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{item.authorName}</Text>
                     </View>
-                  )}
+                  ) : null}
                   <View style={styles.metaItem}>
                     <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
                     <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                      {formatDate(item.publishedAt ?? item.createdAt)}
+                      {formatDate(item.createdAt)}
                     </Text>
                   </View>
                 </View>
@@ -167,6 +205,9 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, fontFamily: "Inter_400Regular" },
   searchBar: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
+  chipRow: { gap: 8, paddingVertical: 4 },
+  categoryChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  categoryChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
   emptySub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },

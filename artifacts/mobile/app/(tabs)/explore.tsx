@@ -32,12 +32,13 @@ interface FilterState {
   city: string;
   minPrice: string;
   maxPrice: string;
+  minRating: string;
 }
 
-const EMPTY_FILTER: FilterState = { country: "", state: "", city: "", minPrice: "", maxPrice: "" };
+const EMPTY_FILTER: FilterState = { country: "", state: "", city: "", minPrice: "", maxPrice: "", minRating: "" };
 
 function countActiveFilters(f: FilterState) {
-  return ((f.country || f.state || f.city) ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0);
+  return ((f.country || f.state || f.city) ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0) + (f.minRating ? 1 : 0);
 }
 
 export default function ExploreScreen() {
@@ -78,6 +79,7 @@ export default function ExploreScreen() {
     if (filters.country) p["country"] = filters.country;
     if (filters.minPrice) p["minPrice"] = filters.minPrice;
     if (filters.maxPrice) p["maxPrice"] = filters.maxPrice;
+    if (filters.minRating) p["minRating"] = filters.minRating;
     if (typeFilter) p["type"] = typeFilter;
     p["limit"] = String(PAGE_SIZE);
     return p;
@@ -105,7 +107,10 @@ export default function ExploreScreen() {
     },
   });
 
-  const events = paginatedData?.pages.flatMap((p) => p.data) ?? [];
+  const minRatingNum = filters.minRating ? parseFloat(filters.minRating) : 0;
+  const events = (paginatedData?.pages.flatMap((p) => p.data) ?? []).filter(
+    (item) => !minRatingNum || (item.rating ?? 0) >= minRatingNum
+  );
 
   function handleSearchChange(text: string) {
     setSearch(text);
@@ -207,6 +212,14 @@ export default function ExploreScreen() {
               <Ionicons name="pricetag-outline" size={12} color={colors.primary} />
               <Text style={[styles.pillText, { color: colors.primary }]}>
                 ₹{filters.minPrice || "0"} – {filters.maxPrice ? `₹${filters.maxPrice}` : "any"}
+              </Text>
+            </View>
+          ) : null}
+          {filters.minRating ? (
+            <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
+              <Ionicons name="star" size={12} color={colors.primary} />
+              <Text style={[styles.pillText, { color: colors.primary }]}>
+                {filters.minRating}+ stars
               </Text>
             </View>
           ) : null}
@@ -335,6 +348,34 @@ export default function ExploreScreen() {
                     }]}>{label}</Text>
                   </Pressable>
                 ))}
+              </ScrollView>
+            </View>
+
+            {/* Minimum Rating */}
+            <View style={styles.sheetSection}>
+              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Minimum Rating</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {(["Any", "3", "3.5", "4", "4.5"] as const).map((val) => {
+                  const active = val === "Any" ? !draftFilter.minRating : draftFilter.minRating === val;
+                  return (
+                    <Pressable
+                      key={val}
+                      onPress={() => setDraftFilter((p) => ({ ...p, minRating: val === "Any" ? "" : val }))}
+                      style={[styles.chip, {
+                        backgroundColor: active ? colors.primary : colors.muted,
+                        borderColor: active ? colors.primary : colors.border,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                      }]}
+                    >
+                      {val !== "Any" && <Ionicons name="star" size={11} color={active ? colors.primaryForeground : colors.mutedForeground} />}
+                      <Text style={[styles.chipText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>
+                        {val === "Any" ? "Any" : `${val}+`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             </View>
 

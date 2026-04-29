@@ -1,0 +1,149 @@
+import { Ionicons } from "@expo/vector-icons";
+import { customFetch } from "@workspace/api-client-react";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColors } from "@/hooks/useColors";
+
+export default function ForgotPasswordScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function handleSubmit() {
+    if (!email.trim()) {
+      Alert.alert("Error", "Please enter your email address");
+      return;
+    }
+    setLoading(true);
+    try {
+      await customFetch("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim() }),
+        headers: { "Content-Type": "application/json" },
+      });
+      setSent(true);
+    } catch {
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 40), paddingBottom: insets.bottom + 40 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        </Pressable>
+
+        <View style={styles.header}>
+          <LinearGradient
+            colors={[colors.primary, colors.goldLight ?? "#e8c050"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.iconWrap}
+          >
+            <Ionicons name="key-outline" size={28} color={colors.primaryForeground} />
+          </LinearGradient>
+          <Text style={[styles.title, { color: colors.foreground }]}>Reset Password</Text>
+          <Text style={[styles.sub, { color: colors.mutedForeground }]}>
+            Enter your email and we'll send a reset link
+          </Text>
+        </View>
+
+        {sent ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.successIcon, { backgroundColor: colors.primary + "20" }]}>
+              <Ionicons name="checkmark-circle-outline" size={40} color={colors.primary} />
+            </View>
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>Check your inbox</Text>
+            <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
+              If an account exists for {email.trim()}, you'll receive a password reset link shortly.
+            </Text>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: colors.primary }]}
+              onPress={() => router.back()}
+            >
+              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Back to Sign In</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>Email Address</Text>
+              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: colors.primary }, loading && { opacity: 0.7 }]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.primaryForeground} />
+              ) : (
+                <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Send Reset Link</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flexGrow: 1, padding: 24, gap: 24 },
+  backBtn: { padding: 4, alignSelf: "flex-start" },
+  header: { alignItems: "center", gap: 10 },
+  iconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  title: { fontSize: 26, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  sub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+  card: { borderRadius: 20, borderWidth: 1, padding: 24, gap: 16 },
+  field: { gap: 6 },
+  label: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
+  inputWrap: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+  input: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
+  btn: { borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 4 },
+  btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  successIcon: { alignItems: "center", justifyContent: "center", width: 72, height: 72, borderRadius: 36, alignSelf: "center" },
+  successTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
+  successSub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21 },
+});

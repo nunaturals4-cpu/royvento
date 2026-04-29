@@ -47,7 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Pub",
+          title: "Pubs",
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "wineglass.fill", "wineglass", "beer", "beer-outline"),
         }}
@@ -65,7 +65,6 @@ export default function TabLayout() {
         name="wishlist"
         options={{
           title: "Wishlist",
-          tabBarItemStyle: { display: "none" },
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "heart.fill", "heart", "heart", "heart-outline"),
         }}
