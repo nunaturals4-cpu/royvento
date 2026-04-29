@@ -6,7 +6,6 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -82,7 +81,8 @@ export default function ScannerScreen() {
 
   useEffect(() => {
     if (result && result.code !== "OK" && result.code !== "ALREADY_CHECKED_IN") {
-      setTimeout(() => manualInputRef.current?.focus(), 100);
+      const t = setTimeout(() => manualInputRef.current?.focus(), 100);
+      return () => clearTimeout(t);
     }
   }, [result]);
 
