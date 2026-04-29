@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Calendar,
@@ -43,17 +43,53 @@ interface Announcement {
   eventTitle: string;
 }
 
+function cityMatch(eventCity: string, userCity: string): boolean {
+  return eventCity.toLowerCase().includes(userCity.toLowerCase());
+}
+
+function sortCityFirst<T extends { city: string }>(items: T[], userCity: string): T[] {
+  if (!userCity) return items;
+  return [
+    ...items.filter((e) => cityMatch(e.city, userCity)),
+    ...items.filter((e) => !cityMatch(e.city, userCity)),
+  ];
+}
+
 export function Home() {
   const { data: featured = [] } = useListFeaturedEvents();
   const [popular, setPopular] = useState<PublicEvent[]>([]);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [userCity, setUserCity] = useState("");
 
   useEffect(() => {
     apiGet<PublicEvent[]>("/api/events/popular").then(setPopular).catch(() => {});
     apiGet<PublicEvent[]>("/api/events?type=pub").then((r) => setPubs(r.slice(0, 6))).catch(() => {});
     apiGet<Announcement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
+
+    navigator.geolocation?.getCurrentPosition(
+      async (pos) => {
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          const data = await r.json();
+          const raw =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.state_district ||
+            data.address?.state ||
+            "";
+          if (raw) setUserCity(raw.split(",")[0].trim());
+        } catch {}
+      },
+      () => {}
+    );
   }, []);
+
+  const sortedPopular = useMemo(() => sortCityFirst(popular, userCity), [popular, userCity]);
+  const sortedPubs = useMemo(() => sortCityFirst(pubs, userCity), [pubs, userCity]);
 
   return (
     <div>
@@ -147,7 +183,7 @@ export function Home() {
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {popular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} />)}
+            {sortedPopular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} />)}
           </div>
         </section>
       )}
@@ -213,7 +249,7 @@ export function Home() {
       </section>
 
       {/* Pubs */}
-      {pubs.length > 0 && (
+      {sortedPubs.length > 0 && (
         <section className="container mx-auto px-4 md:px-6 py-16">
           <div className="flex items-end justify-between mb-8">
             <div>
@@ -227,7 +263,7 @@ export function Home() {
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pubs.map((e) => <EventCard key={e.id} event={e} />)}
+            {sortedPubs.map((e) => <EventCard key={e.id} event={e} />)}
           </div>
         </section>
       )}

@@ -6,7 +6,18 @@ import { z } from "zod";
 
 const router: IRouter = Router();
 
-function buildSystemPrompt(pubs: typeof eventsTable.$inferSelect[]): string {
+interface AnnouncementCtx {
+  title: string;
+  vendorName: string;
+  announceDate: string;
+  announceTime: string;
+  eventId: number;
+}
+
+function buildSystemPrompt(
+  pubs: typeof eventsTable.$inferSelect[],
+  announcements: AnnouncementCtx[]
+): string {
   const pubList =
     pubs.length > 0
       ? pubs
@@ -17,26 +28,52 @@ function buildSystemPrompt(pubs: typeof eventsTable.$inferSelect[]): string {
             if (Number(p.priceCouple) > 0) pricing.push(`Couple ₹${p.priceCouple}`);
             if (Number(p.price) > 0) pricing.push(`Entry ₹${p.price}`);
             const priceStr = pricing.length > 0 ? pricing.join(", ") : "Price on request";
-            const mode = p.pubMode === "table" ? "table reservation" : p.pubMode === "ticket" ? "ticket booking" : "ticket/table";
-            return `- ${p.title} (ID: ${p.id}, City: ${p.city}, Mode: ${mode}, ${priceStr}) — ${(p.description || "").slice(0, 120)}`;
+            const mode =
+              p.pubMode === "table"
+                ? "table reservation"
+                : p.pubMode === "ticket"
+                ? "ticket booking"
+                : "ticket/table";
+            return `- ${p.title} (ID: ${p.id}, City: ${p.city}, Mode: ${mode}, ${priceStr})`;
           })
           .join("\n")
       : "No verified pubs currently listed for this city.";
 
-  return `You are Roy, the Nightlife AI assistant for Royvento — India's premier pub booking platform.
+  const announcementSection =
+    announcements.length > 0
+      ? `\nUPCOMING ANNOUNCEMENTS (mention these when the user asks what's on or what's happening):\n` +
+        announcements
+          .map(
+            (a) =>
+              `- "${a.title}" at ${a.vendorName} on ${a.announceDate}${a.announceTime ? " at " + a.announceTime : ""} — [View & Book →](/events/${a.eventId})`
+          )
+          .join("\n")
+      : "";
 
-REAL PUB DATA for this city (use ONLY these pubs when recommending venues):
+  return `You are Roy, the nightlife concierge for Royvento — India's premier pub booking platform.
+
+VERIFIED PUBS (recommend ONLY from this list):
 ${pubList}
+${announcementSection}
 
-YOUR RULES:
-1. Recommend ONLY pubs from the list above. Never invent venue names.
-2. For every pub you mention, include a clickable link like: [View & Book →](/events/ID) — replace ID with the actual pub ID.
-3. If the pub's mode is "table reservation", suggest booking a table. If "ticket booking", suggest buying tickets. If both, let the user choose.
-4. Keep answers concise, warm, and nightlife-focused. Use short paragraphs.
-5. If the user asks about a city with no data, apologise and suggest browsing /pubs for the full list.
-6. Always end responses with an offer to help with bookings or answer follow-up questions.
-7. Format pricing clearly (e.g. "Ladies Night — Women ₹500, Men ₹800").`;
+RESPONSE RULES:
+1. Keep every reply SHORT — 1–4 lines maximum. No long paragraphs.
+2. For pub recommendations, use this exact format per pub:
+   **Pub Name** — price summary — [View & Book →](/events/ID)
+3. Recommend at most 3 pubs unless the user explicitly asks for more.
+4. Never invent venue names. Only use pubs from the list above.
+5. If asked about a city with no data, say so briefly and suggest browsing /pubs.
+6. Do not end with offers to help further — let the user lead.
+7. Mention upcoming announcements only when the user asks what's on, what's happening, or similar.`;
 }
+
+const AnnouncementCtxSchema = z.object({
+  title: z.string(),
+  vendorName: z.string(),
+  announceDate: z.string(),
+  announceTime: z.string().optional().default(""),
+  eventId: z.number(),
+});
 
 const ChatBody = z.object({
   message: z.string().min(1).max(2000),
@@ -45,6 +82,7 @@ const ChatBody = z.object({
     .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() }))
     .optional()
     .default([]),
+  announcements: z.array(AnnouncementCtxSchema).optional().default([]),
 });
 
 router.get("/ai/pubs-context", async (req, res) => {
@@ -76,7 +114,7 @@ router.post("/ai/chat", async (req, res) => {
     res.status(400).json({ error: "Invalid request" });
     return;
   }
-  const { message, city, history } = parsed.data;
+  const { message, city, history, announcements } = parsed.data;
 
   let pubs: typeof eventsTable.$inferSelect[] = [];
   if (city.trim()) {
@@ -96,7 +134,7 @@ router.post("/ai/chat", async (req, res) => {
     }
   }
 
-  const systemPrompt = buildSystemPrompt(pubs);
+  const systemPrompt = buildSystemPrompt(pubs, announcements);
 
   try {
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
@@ -108,10 +146,11 @@ router.post("/ai/chat", async (req, res) => {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.1",
       messages,
-      max_completion_tokens: 600,
+      max_completion_tokens: 350,
     });
 
-    const reply = completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
+    const reply =
+      completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
     res.json({ reply });
   } catch (err: any) {
     res.status(500).json({ error: "AI service unavailable", details: err?.message });

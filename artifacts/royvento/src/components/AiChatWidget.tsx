@@ -3,11 +3,19 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Send, Loader2, Sparkles, MapPin } from "lucide-react";
-import { apiPost } from "@/lib/api";
+import { apiPost, apiGet } from "@/lib/api";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface AnnouncementCtx {
+  title: string;
+  vendorName: string;
+  announceDate: string;
+  announceTime: string;
+  eventId: number;
 }
 
 const TOP_CITIES = ["Kolkata", "Delhi", "Mumbai", "Bangalore", "Hyderabad"];
@@ -18,6 +26,9 @@ const STATIC_CHIPS = [
   "Best pubs in Mumbai",
   "Book a table tonight",
 ];
+
+const WELCOME_MSG =
+  "Welcome to Royvento — your guide to India's best pubs and nightlife. Ask me anything or pick a topic below.";
 
 function parseCity(text: string): string {
   const lower = text.toLowerCase();
@@ -54,13 +65,16 @@ function renderMessageContent(content: string) {
 
 export function AiChatWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    { role: "assistant", content: WELCOME_MSG },
+  ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [city, setCity] = useState("");
   const [detectedCity, setDetectedCity] = useState("");
   const [awaitingCity, setAwaitingCity] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const [announcements, setAnnouncements] = useState<AnnouncementCtx[]>([]);
+  const [locationInit, setLocationInit] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,8 +84,8 @@ export function AiChatWidget() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!open || initialized) return;
-    setInitialized(true);
+    if (!open || locationInit) return;
+    setLocationInit(true);
 
     navigator.geolocation?.getCurrentPosition(
       async (pos) => {
@@ -91,38 +105,28 @@ export function AiChatWidget() {
           if (found) {
             setDetectedCity(found);
             setCity(found);
-            setMessages([
-              {
-                role: "assistant",
-                content: `Hi! I detected you're in **${found}** 📍\n\nHere's what I can help you with tonight — tap a question or type your own:`,
-              },
-            ]);
-          } else {
-            askForCity();
+            apiGet<AnnouncementCtx[]>("/api/announcements/recent")
+              .then(setAnnouncements)
+              .catch(() => {});
           }
         } catch {
-          askForCity();
+          // silently ignore — welcome message already shown
         }
       },
-      () => askForCity()
+      () => {
+        // permission denied — show city picker on first interaction
+      }
     );
   }, [open]);
 
   function askForCity() {
     setAwaitingCity(true);
-    setMessages([
-      {
-        role: "assistant",
-        content: "Welcome to Royvento! 🍸 Which city are you looking to explore tonight?",
-      },
-    ]);
   }
 
   function pickCity(c: string) {
     setCity(c);
     setAwaitingCity(false);
-    const msg = `Best pubs in ${c}`;
-    sendMessage(msg, c);
+    sendMessage(`Best pubs in ${c}`, c);
   }
 
   const chips = detectedCity
@@ -145,12 +149,13 @@ export function AiChatWidget() {
         message: text,
         city: finalCity,
         history,
+        announcements,
       });
       setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I'm having trouble connecting right now. Please try again in a moment." },
+        { role: "assistant", content: "Sorry, I'm having trouble connecting right now. Please try again." },
       ]);
     } finally {
       setLoading(false);
@@ -168,6 +173,11 @@ export function AiChatWidget() {
       setCity(found);
       setAwaitingCity(false);
       sendMessage(`Best pubs in ${found}`, found);
+      return;
+    }
+
+    if (!city) {
+      askForCity();
       return;
     }
 
@@ -242,8 +252,10 @@ export function AiChatWidget() {
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 {m.role === "assistant" && (
-                  <div className="h-6 w-6 rounded-full shrink-0 mr-2 mt-0.5 flex items-center justify-center"
-                    style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}>
+                  <div
+                    className="h-6 w-6 rounded-full shrink-0 mr-2 mt-0.5 flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}
+                  >
                     <Sparkles className="h-3 w-3 text-white" />
                   </div>
                 )}
@@ -254,17 +266,17 @@ export function AiChatWidget() {
                       : "bg-card border border-border rounded-bl-sm text-foreground"
                   }`}
                 >
-                  {m.role === "assistant"
-                    ? renderMessageContent(m.content)
-                    : m.content}
+                  {m.role === "assistant" ? renderMessageContent(m.content) : m.content}
                 </div>
               </div>
             ))}
 
             {loading && (
               <div className="flex justify-start items-end">
-                <div className="h-6 w-6 rounded-full shrink-0 mr-2 flex items-center justify-center"
-                  style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}>
+                <div
+                  className="h-6 w-6 rounded-full shrink-0 mr-2 flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #e11d48 0%, #9333ea 100%)" }}
+                >
                   <Sparkles className="h-3 w-3 text-white" />
                 </div>
                 <div className="bg-card border border-border px-3.5 py-2.5 rounded-2xl rounded-bl-sm">
@@ -273,9 +285,10 @@ export function AiChatWidget() {
               </div>
             )}
 
-            {/* City picker */}
+            {/* City picker — shown when city unknown */}
             {awaitingCity && (
               <div className="flex flex-wrap gap-2 mt-2">
+                <p className="w-full text-xs text-muted-foreground mb-1">Which city are you in?</p>
                 {TOP_CITIES.map((c) => (
                   <button
                     key={c}
@@ -288,7 +301,7 @@ export function AiChatWidget() {
               </div>
             )}
 
-            {/* Popular question chips */}
+            {/* Quick-start chips */}
             {showChips && !awaitingCity && (
               <div className="flex flex-wrap gap-2 mt-1">
                 {chips.map((chip) => (
@@ -310,7 +323,7 @@ export function AiChatWidget() {
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={awaitingCity ? "Type a city name…" : "Ask about pubs, pricing…"}
+                placeholder={awaitingCity ? "Type a city name…" : "Ask about pubs, events, pricing…"}
                 className="flex-1 h-10 bg-background border-border text-sm"
                 disabled={loading}
               />
