@@ -10,6 +10,7 @@ import React from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -113,6 +114,21 @@ export default function PartnerDetailScreen() {
               {[vendor.city, vendor.state].filter(Boolean).join(", ") || vendor.location || "India"}
             </Text>
           </View>
+
+          {vendor.address ? (
+            <Pressable
+              style={styles.row}
+              onPress={() => {
+                const encoded = encodeURIComponent(vendor.address!);
+                Linking.openURL(`https://maps.google.com/?q=${encoded}`);
+              }}
+            >
+              <Ionicons name="navigate-outline" size={14} color={colors.primary} />
+              <Text style={[styles.location, { color: colors.primary, textDecorationLine: "underline" }]}>
+                {vendor.address}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {/* About */}
@@ -120,6 +136,43 @@ export default function PartnerDetailScreen() {
           <View style={{ gap: 6 }}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
             <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.description}</Text>
+          </View>
+        ) : null}
+
+        {/* Hours */}
+        {vendor.dayHours ? (() => {
+          const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+          const hours = vendor.dayHours as Record<string, { open: string; close: string } | null>;
+          const entries = dayOrder.filter((d) => d in hours);
+          if (entries.length === 0) return null;
+          return (
+            <View style={{ gap: 10 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hours</Text>
+              <View style={[styles.hoursCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {entries.map((day, i) => {
+                  const times = hours[day];
+                  return (
+                    <View
+                      key={day}
+                      style={[
+                        styles.hoursRow,
+                        i < entries.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                      ]}
+                    >
+                      <Text style={[styles.hoursDay, { color: colors.foreground }]}>{day}</Text>
+                      <Text style={[styles.hoursTime, { color: colors.mutedForeground }]}>
+                        {times ? `${times.open} – ${times.close}` : "Closed"}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })() : (vendor.openDays ?? []).length > 0 ? (
+          <View style={{ gap: 6 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Open Days</Text>
+            <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.openDays!.join(", ")}</Text>
           </View>
         ) : null}
 
@@ -220,4 +273,8 @@ const styles = StyleSheet.create({
   reviewAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   reviewerName: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   reviewComment: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  hoursCard: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
+  hoursRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10 },
+  hoursDay: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  hoursTime: { fontSize: 14, fontFamily: "Inter_400Regular" },
 });

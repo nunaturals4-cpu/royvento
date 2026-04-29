@@ -6,7 +6,7 @@ import {
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { EventCard } from "@/components/EventCard";
-import { Star, MapPin } from "lucide-react";
+import { Star, MapPin, Navigation, Clock } from "lucide-react";
 
 export function VendorDetail() {
   const params = useParams();
@@ -38,6 +38,17 @@ export function VendorDetail() {
           <h1 className="font-serif text-4xl md:text-6xl tracking-tight">{vendor.businessName}</h1>
           <div className="flex flex-wrap gap-5 mt-3 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />{vendor.location}</span>
+            {vendor.address && (
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(vendor.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-primary hover:underline"
+              >
+                <Navigation className="h-4 w-4" />
+                {vendor.address}
+              </a>
+            )}
             <span className="flex items-center gap-1.5">
               <Star className="h-4 w-4 fill-primary text-primary" />
               {vendor.rating > 0 ? `${vendor.rating.toFixed(1)} (${vendor.reviewCount} reviews)` : "Newly listed"}
@@ -51,6 +62,42 @@ export function VendorDetail() {
           <h2 className="font-serif text-2xl mb-3">About</h2>
           <p className="text-muted-foreground leading-relaxed max-w-3xl">{vendor.description}</p>
         </section>
+
+        {vendor.dayHours ? (() => {
+          const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+          const hours = vendor.dayHours as Record<string, { open: string; close: string } | null>;
+          const entries = dayOrder.filter((d) => d in hours);
+          if (entries.length === 0) return null;
+          return (
+            <section>
+              <h2 className="font-serif text-2xl mb-5 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Hours
+              </h2>
+              <div className="rounded-xl border divide-y max-w-sm">
+                {entries.map((day) => {
+                  const times = hours[day];
+                  return (
+                    <div key={day} className="flex justify-between items-center px-4 py-2.5 text-sm">
+                      <span className="font-medium">{day}</span>
+                      <span className="text-muted-foreground">
+                        {times ? `${times.open} – ${times.close}` : "Closed"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })() : vendor.openDays && vendor.openDays.length > 0 ? (
+          <section>
+            <h2 className="font-serif text-2xl mb-3 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              Open Days
+            </h2>
+            <p className="text-muted-foreground">{vendor.openDays.join(", ")}</p>
+          </section>
+        ) : null}
 
         {vendor.portfolioImages.length > 0 && (
           <section>
