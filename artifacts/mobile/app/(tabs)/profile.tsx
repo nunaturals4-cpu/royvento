@@ -257,7 +257,7 @@ export default function ProfileScreen() {
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
           (user.role === "vendor" || user.role === "admin")
-            ? { icon: "bar-chart-outline" as const, label: "Partner Dashboard", onPress: () => router.push("/vendor/dashboard") }
+            ? { icon: "business-outline" as const, label: "Partner Dashboard", onPress: () => router.push("/vendor/dashboard") }
             : { icon: "business-outline" as const, label: "Become a Partner", onPress: () => router.push("/become-vendor") },
           { icon: "ticket-outline" as const, label: "My Bookings", onPress: () => router.push("/(tabs)/bookings") },
           { icon: "heart-outline" as const, label: "Wishlist", onPress: () => router.push("/(tabs)/wishlist") },

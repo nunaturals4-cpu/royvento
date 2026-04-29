@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { EventCard } from "@/components/EventCard";
+import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -83,7 +84,7 @@ export default function WishlistScreen() {
         <FlatList
           data={data}
           keyExtractor={(item) => String(item.wishlistId)}
-          contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 100 }]}
+          contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
           showsVerticalScrollIndicator={false}
           onRefresh={refetch}
           refreshing={isLoading}
