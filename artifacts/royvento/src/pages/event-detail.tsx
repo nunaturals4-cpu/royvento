@@ -338,26 +338,18 @@ export function EventDetail() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 md:px-6 py-12 grid lg:grid-cols-[1.7fr_1fr] gap-10">
+      <div className="container mx-auto px-4 md:px-6 pt-12">
+        <section className="pb-10">
+          <h2 className="font-serif text-3xl mb-3 accent-underline inline-block">About this event</h2>
+          <p className="text-white/70 leading-relaxed whitespace-pre-line mt-4">{event.description}</p>
+        </section>
+        <div className="grid lg:grid-cols-[1.7fr_1fr] gap-10 pb-12">
         <div className="space-y-10">
           <div className="flex flex-wrap gap-6 text-sm">
             <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />{loc}</div>
             <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Up to {event.capacity} guests</div>
             <div className="flex items-center gap-2"><Star className="h-4 w-4 fill-primary text-primary" />{event.rating > 0 ? `${event.rating.toFixed(1)} (${event.reviewCount})` : "New"}</div>
           </div>
-
-          <section>
-            <h2 className="font-serif text-3xl mb-3 accent-underline inline-block">About this event</h2>
-            <p className="text-white/70 leading-relaxed whitespace-pre-line mt-4">{event.description}</p>
-          </section>
-
-          {event.vendor && (
-            <section className="rounded-2xl glass-card p-6 lift-3d">
-              <p className="text-xs uppercase tracking-wider text-primary mb-2">About the partner</p>
-              <Link href={`/partners/${event.vendor.id}`} className="font-serif text-2xl hover:text-primary">{event.vendor.businessName}</Link>
-              <p className="text-sm text-white/70 mt-2 leading-relaxed">{event.vendor.description}</p>
-            </section>
-          )}
 
           {isPub && announcements.length > 0 && (
             <section>
@@ -464,7 +456,7 @@ export function EventDetail() {
           )}
         </div>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start space-y-4">
+        <aside className="lg:sticky lg:top-24 lg:self-start space-y-4 order-first lg:order-none">
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Starting at</p>
             <p className="font-serif text-5xl mt-1">{startingAt > 0 ? formatINR(startingAt) : "—"}</p>
@@ -759,6 +751,7 @@ export function EventDetail() {
             </div>
           )}
         </aside>
+        </div>
       </div>
     </div>
   );

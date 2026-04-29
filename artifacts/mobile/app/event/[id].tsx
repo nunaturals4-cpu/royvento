@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   customFetch,
   getGetWishlistQueryKey,
@@ -180,6 +180,14 @@ export default function EventDetailScreen() {
   };
 
   const isPub = (event as unknown as { type?: string })?.type === "pub";
+  const eventCity = (event as unknown as { city?: string })?.city;
+
+  const { data: similarPubs = [] } = useQuery<any[]>({
+    queryKey: ["similar-pubs-mobile", eventId, eventCity],
+    queryFn: () => customFetch<any[]>(`/api/events?type=pub&city=${encodeURIComponent(eventCity ?? "")}&limit=5`),
+    enabled: isPub && !!eventCity,
+    select: (data) => data.filter((e: any) => e.id !== eventId).slice(0, 4),
+  });
   const priceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
   const priceMen = isPub ? parseFloat(String((event as unknown as { priceMen?: unknown })?.priceMen ?? 0)) : 0;
   const priceCouple = isPub ? parseFloat(String((event as unknown as { priceCouple?: unknown })?.priceCouple ?? 0)) : 0;
@@ -419,6 +427,43 @@ export default function EventDetailScreen() {
                   {r.comment ? <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text> : null}
                 </View>
               ))}
+            </View>
+          ) : null}
+
+          {isPub && similarPubs.length > 0 ? (
+            <View style={{ gap: 10 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Similar Pubs Nearby</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
+                <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 12 }}>
+                  {similarPubs.map((pub: any) => (
+                    <Pressable
+                      key={pub.id}
+                      onPress={() => router.push(`/event/${pub.id}` as never)}
+                      style={[styles.similarPubCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    >
+                      {pub.imageUrl ? (
+                        <Image source={{ uri: pub.imageUrl }} style={styles.similarPubImage} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.similarPubImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
+                          <Ionicons name="wine-outline" size={24} color={colors.mutedForeground} />
+                        </View>
+                      )}
+                      <View style={styles.similarPubInfo}>
+                        <Text style={[styles.similarPubName, { color: colors.foreground }]} numberOfLines={2}>{pub.title}</Text>
+                        {pub.city ? (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                            <Ionicons name="location-outline" size={10} color={colors.mutedForeground} />
+                            <Text style={[styles.similarPubCity, { color: colors.mutedForeground }]}>{pub.city}</Text>
+                          </View>
+                        ) : null}
+                        {pub.price != null && Number(pub.price) > 0 ? (
+                          <Text style={[styles.similarPubPrice, { color: colors.primary }]}>{formatINR(Number(pub.price))}</Text>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
           ) : null}
         </View>
@@ -765,4 +810,10 @@ const styles = StyleSheet.create({
   stickyBar: { borderTopWidth: 1, padding: 16 },
   bookBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 16 },
   bookBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  similarPubCard: { width: 160, borderRadius: 14, borderWidth: 1, overflow: "hidden" },
+  similarPubImage: { width: "100%", height: 100 },
+  similarPubInfo: { padding: 10, gap: 2 },
+  similarPubName: { fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18 },
+  similarPubCity: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  similarPubPrice: { fontSize: 13, fontFamily: "Inter_700Bold", marginTop: 4 },
 });
