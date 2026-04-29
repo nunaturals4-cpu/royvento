@@ -374,7 +374,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
                         {DAY_FULL_NAMES[day]}
                       </p>
                       {!isOpen && (
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Closed</p>
+                        <span className="inline-flex items-center mt-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Closed</span>
                       )}
                     </div>
                     <button
