@@ -18,11 +18,6 @@ import { EventCard } from "@/components/EventCard";
 import { useColors } from "@/hooks/useColors";
 
 const CITIES = ["All Cities", "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune", "Chennai", "Kolkata", "Goa"];
-const PUB_MODES = [
-  { label: "All", value: undefined },
-  { label: "Tickets", value: "ticket" },
-  { label: "Table", value: "table" },
-];
 const PRICE_RANGES = [
   { label: "Any Price", min: undefined, max: undefined },
   { label: "Free", min: 0, max: 0 },
@@ -38,7 +33,6 @@ export default function PubsScreen() {
 
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("All Cities");
-  const [pubMode, setPubMode] = useState<string | undefined>(undefined);
   const [priceRangeIdx, setPriceRangeIdx] = useState(0);
 
   const priceRange = PRICE_RANGES[priceRangeIdx];
@@ -51,9 +45,7 @@ export default function PubsScreen() {
   });
 
   const events = (eventsQuery.data ?? []).filter((e) => {
-    const matchSearch = !search.trim() || e.title.toLowerCase().includes(search.toLowerCase()) || (e.location ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchMode = !pubMode || (e as Record<string, unknown>)["pubMode"] === pubMode;
-    return matchSearch && matchMode;
+    return !search.trim() || e.title.toLowerCase().includes(search.toLowerCase()) || (e.location ?? "").toLowerCase().includes(search.toLowerCase());
   });
 
   return (
@@ -83,19 +75,6 @@ export default function PubsScreen() {
               <Ionicons name="close-circle" size={16} color={colors.mutedForeground} />
             </Pressable>
           )}
-        </View>
-
-        {/* Pub Mode Filter */}
-        <View style={styles.pillRow}>
-          {PUB_MODES.map((m) => (
-            <Pressable
-              key={m.label}
-              onPress={() => setPubMode(m.value)}
-              style={[styles.pill, { backgroundColor: pubMode === m.value ? colors.primary : colors.muted, borderColor: pubMode === m.value ? colors.primary : colors.border }]}
-            >
-              <Text style={[styles.pillText, { color: pubMode === m.value ? colors.primaryForeground : colors.mutedForeground }]}>{m.label}</Text>
-            </Pressable>
-          ))}
         </View>
 
         {/* Price Range Filter */}
