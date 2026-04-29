@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { Eye, EyeOff } from "lucide-react";
 import { apiGet } from "@/lib/api";
 
 export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [, setLocation] = useLocation();
   const login = useLogin();
   const { toast } = useToast();
@@ -74,14 +76,32 @@ export function Login() {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+            <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
               <Label htmlFor="password">Password</Label>
               <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
             </div>
-            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+            <div className="relative mt-1">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="bg-black/40 border-white/10 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <Button type="submit" className="w-full h-11 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0" disabled={login.isPending}>
             {login.isPending ? "Signing in…" : "Sign in"}

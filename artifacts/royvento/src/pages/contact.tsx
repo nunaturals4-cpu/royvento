@@ -40,8 +40,8 @@ export function Contact() {
         </p>
         <div className="mt-10 space-y-5 text-sm">
           <div className="flex items-start gap-3"><Mail className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">hello@royvento.com</p><p className="text-muted-foreground">We respond within 24 hours.</p></div></div>
-          <div className="flex items-start gap-3"><Phone className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">+1 (415) 555-0142</p><p className="text-muted-foreground">Mon–Fri, 9am–6pm PT</p></div></div>
-          <div className="flex items-start gap-3"><MapPin className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">San Francisco</p><p className="text-muted-foreground">Studio by appointment.</p></div></div>
+          <div className="flex items-start gap-3"><Phone className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">+91 98300 00000</p><p className="text-muted-foreground">Mon–Sat, 10am–7pm IST</p></div></div>
+          <div className="flex items-start gap-3"><MapPin className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">Kolkata, West Bengal</p><p className="text-muted-foreground">India</p></div></div>
         </div>
       </div>
       <form onSubmit={submit} className="rounded-3xl border bg-card p-8 space-y-4">

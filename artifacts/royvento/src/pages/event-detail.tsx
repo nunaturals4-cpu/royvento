@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -346,7 +346,18 @@ export function EventDetail() {
         <div className="grid lg:grid-cols-[1.7fr_1fr] gap-10 pb-12">
         <div className="space-y-10">
           <div className="flex flex-wrap gap-6 text-sm">
-            <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />{loc}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <MapPin className="h-4 w-4 text-primary" />
+              <span>{loc}</span>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ev.title} ${loc}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary border border-primary/30 rounded-full px-2 py-0.5 transition-colors"
+              >
+                <ExternalLink className="h-3 w-3" /> Open in Maps
+              </a>
+            </div>
             <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Up to {event.capacity} guests</div>
             <div className="flex items-center gap-2"><Star className="h-4 w-4 fill-primary text-primary" />{event.rating > 0 ? `${event.rating.toFixed(1)} (${event.reviewCount})` : "New"}</div>
           </div>
@@ -470,9 +481,33 @@ export function EventDetail() {
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Starting at</p>
             <p className="font-serif text-5xl mt-1">{startingAt > 0 ? formatINR(startingAt) : "—"}</p>
-            <p className="text-xs text-muted-foreground mb-5">
+            <p className="text-xs text-muted-foreground mb-3">
               {isPub ? "lowest entry price" : "per person · per event"}
             </p>
+
+            {isPub && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0) && (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-5 space-y-2">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Entry prices</p>
+                {Number(ev.priceWomen) > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-white/70">Women</span>
+                    <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceWomen))}</span>
+                  </div>
+                )}
+                {Number(ev.priceMen) > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-white/70">Men</span>
+                    <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceMen))}</span>
+                  </div>
+                )}
+                {Number(ev.priceCouple) > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-white/70">Couple</span>
+                    <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceCouple))}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {discountInfo?.isNewUser && (
               <div className="mb-4 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs flex items-center gap-2 text-primary">
