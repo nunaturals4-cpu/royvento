@@ -21,7 +21,7 @@ router.get("/api/places/autocomplete", requireAuth, async (req, res) => {
     url.searchParams.set("key", apiKey);
     url.searchParams.set("components", "country:in");
     url.searchParams.set("language", "en");
-    url.searchParams.set("types", "establishment|geocode");
+    url.searchParams.set("types", "geocode");
     const response = await fetch(url.toString());
     if (!response.ok) {
       req.log.error({ status: response.status }, "Google Places API error");
