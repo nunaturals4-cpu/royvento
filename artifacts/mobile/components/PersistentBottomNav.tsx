@@ -21,28 +21,28 @@ const TABS: Tab[] = [
     icon: "home-outline",
     iconFocused: "home",
     route: "/(tabs)",
-    matchPaths: ["/(tabs)", "/(tabs)/index", "/"],
+    matchPaths: ["/(tabs)", "/(tabs)/index", "/", "/index"],
   },
   {
     label: "Pub",
     icon: "beer-outline",
     iconFocused: "beer",
     route: "/(tabs)/explore",
-    matchPaths: ["/(tabs)/explore"],
+    matchPaths: ["/(tabs)/explore", "/explore"],
   },
   {
     label: "Bookings",
     icon: "ticket-outline",
     iconFocused: "ticket",
     route: "/(tabs)/bookings",
-    matchPaths: ["/(tabs)/bookings"],
+    matchPaths: ["/(tabs)/bookings", "/bookings"],
   },
   {
     label: "Profile",
     icon: "person-outline",
     iconFocused: "person",
     route: "/(tabs)/profile",
-    matchPaths: ["/(tabs)/profile"],
+    matchPaths: ["/(tabs)/profile", "/profile"],
   },
 ];
 
