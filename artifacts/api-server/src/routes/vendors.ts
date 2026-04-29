@@ -12,6 +12,8 @@ import { generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCod
 
 const router: IRouter = Router();
 
+const CRM_TRIAL_DAYS = 60;
+
 interface VendorRow {
   id: number;
   userId: number;
@@ -24,11 +26,21 @@ interface VendorRow {
   portfolioImages: string[];
   openDays: string[];
   status: string;
+  isPremium?: boolean;
+  approvedAt?: Date | null;
   createdAt: Date;
+}
+
+function computeCrmTrial(v: VendorRow) {
+  const trialStart = v.approvedAt ?? v.createdAt;
+  const days = (Date.now() - trialStart.getTime()) / (1000 * 60 * 60 * 24);
+  const crmTrialDaysRemaining = Math.max(0, Math.ceil(CRM_TRIAL_DAYS - days));
+  return { crmTrialDaysRemaining, crmTrialActive: crmTrialDaysRemaining > 0 };
 }
 
 async function serializeVendor(v: VendorRow) {
   const summary = await getVendorRating(v.id);
+  const { crmTrialDaysRemaining, crmTrialActive } = computeCrmTrial(v);
   return {
     id: v.id,
     userId: v.userId,
@@ -41,9 +53,13 @@ async function serializeVendor(v: VendorRow) {
     portfolioImages: v.portfolioImages,
     openDays: v.openDays ?? [],
     status: v.status,
+    isPremium: v.isPremium ?? false,
+    approvedAt: v.approvedAt?.toISOString() ?? null,
     rating: summary.rating,
     reviewCount: summary.reviewCount,
     createdAt: v.createdAt.toISOString(),
+    crmTrialActive,
+    crmTrialDaysRemaining,
   };
 }
 
@@ -222,7 +238,7 @@ router.post(
       return;
     }
     const existing = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
-    const extra: Record<string, unknown> = { status: "approved" };
+    const extra: Record<string, unknown> = { status: "approved", approvedAt: new Date() };
     if (existing[0] && !existing[0].ticketPrefix) {
       const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
       extra["ticketPrefix"] = await generateUniqueTicketPrefix(existing[0].businessName, existingPrefixes);

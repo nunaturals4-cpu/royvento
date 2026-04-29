@@ -56,6 +56,7 @@ interface Ad {
 }
 interface Lead {
   premium: boolean;
+  crmAccessGranted?: boolean;
   crmTrialActive?: boolean;
   crmTrialDaysRemaining?: number;
   views: any[];
@@ -1643,8 +1644,8 @@ function LeadsPanel({ isPremium }: { isPremium: boolean }) {
 
   if (!data) return <p className="text-muted-foreground">Loading…</p>;
 
-  if (!data.premium) {
-    const trialExpired = !data.crmTrialActive && !isPremium;
+  if (!data.crmAccessGranted) {
+    const trialExpired = !data.crmTrialActive && !data.premium;
     return (
       <div className="rounded-3xl glass-card-strong p-10 text-center red-ring">
         <Crown className="h-10 w-10 text-primary mx-auto mb-4" />
@@ -1670,7 +1671,7 @@ function LeadsPanel({ isPremium }: { isPremium: boolean }) {
 
   return (
     <div className="space-y-6">
-      {data.crmTrialActive && !isPremium && (
+      {data.crmTrialActive && !data.premium && (
         <div className="rounded-2xl border border-primary/40 bg-primary/10 px-5 py-4 flex items-center gap-3">
           <Crown className="h-5 w-5 text-primary shrink-0" />
           <p className="text-sm text-primary font-medium">

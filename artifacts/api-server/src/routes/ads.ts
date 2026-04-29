@@ -164,19 +164,31 @@ router.get(
     const user = await loadUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     const vendor = await getMyVendor(user.id);
-    if (!vendor) return res.json({ premium: false, crmTrialActive: false, crmTrialDaysRemaining: 0, views: [] });
-
-    const daysSinceCreated =
-      (Date.now() - vendor.createdAt.getTime()) / (1000 * 60 * 60 * 24);
-    const crmTrialDaysRemaining = Math.max(
-      0,
-      Math.ceil(CRM_TRIAL_DAYS - daysSinceCreated),
-    );
-    const crmTrialActive = crmTrialDaysRemaining > 0;
-
-    if (!vendor.isPremium && !crmTrialActive) {
+    if (!vendor) {
       return res.json({
         premium: false,
+        crmAccessGranted: false,
+        crmTrialActive: false,
+        crmTrialDaysRemaining: 0,
+        views: [],
+      });
+    }
+
+    // Trial starts from approvedAt (set when admin approves), falling back to createdAt
+    const trialStart = vendor.approvedAt ?? vendor.createdAt;
+    const daysSinceTrialStart =
+      (Date.now() - trialStart.getTime()) / (1000 * 60 * 60 * 24);
+    const crmTrialDaysRemaining = Math.max(
+      0,
+      Math.ceil(CRM_TRIAL_DAYS - daysSinceTrialStart),
+    );
+    const crmTrialActive = crmTrialDaysRemaining > 0;
+    const crmAccessGranted = vendor.isPremium || crmTrialActive;
+
+    if (!crmAccessGranted) {
+      return res.json({
+        premium: vendor.isPremium,
+        crmAccessGranted: false,
         crmTrialActive: false,
         crmTrialDaysRemaining: 0,
         views: [],
@@ -198,7 +210,8 @@ router.get(
     const users = ids.length ? await db.select().from(usersTable) : [];
     const uMap = new Map(users.map((u) => [u.id, u]));
     return res.json({
-      premium: true,
+      premium: vendor.isPremium,
+      crmAccessGranted: true,
       crmTrialActive,
       crmTrialDaysRemaining,
       views: rows.map((r) => {

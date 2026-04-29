@@ -65,6 +65,7 @@ export const vendorsTable = pgTable(
     openDays: text("open_days").array().notNull().default([]),
     isPremium: boolean("is_premium").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     ticketPrefix: varchar("ticket_prefix", { length: 8 }).notNull().default(""),
     ticketSalt: varchar("ticket_salt", { length: 32 }).notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true })
