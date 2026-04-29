@@ -1285,12 +1285,11 @@ export default function VendorDashboardScreen() {
 
   // ─── LEADS TAB ────────────────────────────────────────────────────────────────
   interface LeadEntry {
-    userId: number;
-    userName: string;
-    userEmail: string;
-    leadType: string;
-    eventTitle: string;
-    viewedAt: string;
+    viewerUserId?: number;
+    viewerName?: string;
+    viewerEmail?: string;
+    viewedAt?: string;
+    converted?: boolean;
   }
   type LeadsResult = {
     premium: boolean; crmAccessGranted: boolean; crmTrialActive: boolean; crmTrialDaysRemaining: number; views: LeadEntry[];
@@ -1373,21 +1372,27 @@ export default function VendorDashboardScreen() {
             </Text>
           </View>
         ) : (
-          views.map((lead, i) => (
-            <View key={i} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-              <View style={[{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" }, { backgroundColor: colors.primary + "20" }]}>
-                <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 13 }}>{lead.userName.charAt(0).toUpperCase()}</Text>
+          views.map((lead, i) => {
+            const name = lead.viewerName ?? "Anonymous";
+            const email = lead.viewerEmail ?? "";
+            const initial = name.length > 0 ? name.charAt(0).toUpperCase() : "?";
+            const converted = lead.converted ?? false;
+            return (
+              <View key={i} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                <View style={[{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" }, { backgroundColor: colors.primary + "20" }]}>
+                  <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 13 }}>{initial}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{name}</Text>
+                  {email ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{email}</Text> : null}
+                  {lead.viewedAt ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 1 }}>{new Date(lead.viewedAt).toLocaleDateString("en-IN")}</Text> : null}
+                </View>
+                <View style={[{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 }, converted ? { backgroundColor: "#22c55e18", borderColor: "#22c55e40" } : { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                  <Text style={{ color: converted ? "#22c55e" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{converted ? "Converted" : "View"}</Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{lead.userName}</Text>
-                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{lead.userEmail}</Text>
-                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 1 }}>{lead.eventTitle}</Text>
-              </View>
-              <View style={[{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 }, lead.leadType === "booking" ? { backgroundColor: "#22c55e18", borderColor: "#22c55e40" } : { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Text style={{ color: lead.leadType === "booking" ? "#22c55e" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{lead.leadType}</Text>
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     );

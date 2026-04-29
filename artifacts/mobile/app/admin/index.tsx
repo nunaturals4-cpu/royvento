@@ -145,6 +145,8 @@ export default function AdminPanelScreen() {
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [eventLoading, setEventLoading] = useState(false);
   const [eventFilter, setEventFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [eventRejectingId, setEventRejectingId] = useState<number | null>(null);
+  const [eventRejectReason, setEventRejectReason] = useState("");
 
   const fetchEvents = useCallback(() => {
     setEventLoading(true);
@@ -595,6 +597,41 @@ export default function AdminPanelScreen() {
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={eventLoading} onRefresh={fetchEvents} tintColor={colors.primary} />}>
         {eventLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
 
+        {eventRejectingId !== null && (
+          <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: "#ef444440" }]}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 8 }}>
+              Rejection Reason (required)
+            </Text>
+            <TextInput
+              value={eventRejectReason}
+              onChangeText={setEventRejectReason}
+              placeholder="Enter reason for rejecting this event..."
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted }]}
+              multiline
+            />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444" }]}
+                onPress={() => {
+                  if (!eventRejectReason.trim()) { Alert.alert("Required", "Please enter a rejection reason."); return; }
+                  moderateEvent(eventRejectingId, "rejected", eventRejectReason.trim());
+                  setEventRejectingId(null);
+                  setEventRejectReason("");
+                }}
+              >
+                <Text style={{ color: "#ef4444", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Confirm Rejection</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: colors.muted, borderColor: colors.border }]}
+                onPress={() => { setEventRejectingId(null); setEventRejectReason(""); }}
+              >
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} contentContainerStyle={{ gap: 8 }}>
           {(["all", "pending", "approved", "rejected"] as const).map((f) => (
             <TouchableOpacity
@@ -633,11 +670,7 @@ export default function AdminPanelScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444", flex: 1 }]}
-                    onPress={() => Alert.prompt(
-                      "Reject Event",
-                      `Reason for rejecting "${e.title}":`,
-                      (reason) => { if (reason) moderateEvent(e.id, "rejected", reason); }
-                    )}
+                    onPress={() => { setEventRejectingId(e.id); setEventRejectReason(""); }}
                   >
                     <Ionicons name="close-circle-outline" size={14} color="#ef4444" />
                     <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Reject</Text>
@@ -720,7 +753,7 @@ export default function AdminPanelScreen() {
   // ─── AD ACTIONS ─────────────────────────────────────────────────────────────
   async function approveAd(id: number) {
     try {
-      await customFetch(`/api/admin/ads/${id}/approve`, { method: "PATCH" });
+      await customFetch(`/api/admin/ads/${id}/approve`, { method: "POST" });
       fetchAds();
     } catch {
       Alert.alert("Error", "Failed to approve ad.");
@@ -729,7 +762,7 @@ export default function AdminPanelScreen() {
 
   async function rejectAd(id: number) {
     try {
-      await customFetch(`/api/admin/ads/${id}/reject`, { method: "PATCH" });
+      await customFetch(`/api/admin/ads/${id}/reject`, { method: "POST" });
       fetchAds();
     } catch {
       Alert.alert("Error", "Failed to reject ad.");
