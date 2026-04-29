@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,7 +16,7 @@ export function MobileFooter() {
         <Text style={[styles.brandName, { color: colors.primary }]}>Royvento</Text>
       </View>
       <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-        Heirloom-quality events — where remarkable hosts find remarkable craft.
+        Heirloom-quality events. From estate weddings to founder summits and harvest festivals — Royvento is where remarkable hosts find remarkable craft.
       </Text>
 
       {/* Links */}
@@ -39,8 +38,8 @@ export function MobileFooter() {
           <Pressable onPress={() => router.push("/become-vendor" as never)}>
             <Text style={[styles.link, { color: colors.mutedForeground }]}>Become a Partner</Text>
           </Pressable>
-          <Pressable onPress={() => router.push("/vendor/dashboard" as never)}>
-            <Text style={[styles.link, { color: colors.mutedForeground }]}>Partner Dashboard</Text>
+          <Pressable onPress={() => router.push("/(auth)/login" as never)}>
+            <Text style={[styles.link, { color: colors.mutedForeground }]}>Partner Login</Text>
           </Pressable>
         </View>
       </View>
@@ -48,13 +47,6 @@ export function MobileFooter() {
       {/* Divider + copyright */}
       <View style={[styles.divider, { borderTopColor: colors.border }]} />
       <View style={styles.bottom}>
-        <View style={styles.socialRow}>
-          {(["logo-instagram", "logo-twitter", "logo-facebook"] as const).map((icon) => (
-            <View key={icon} style={[styles.socialIcon, { backgroundColor: colors.muted }]}>
-              <Ionicons name={icon} size={15} color={colors.mutedForeground} />
-            </View>
-          ))}
-        </View>
         <Text style={[styles.copy, { color: colors.mutedForeground }]}>
           © {new Date().getFullYear()} Royvento. Crafted with care.
         </Text>
@@ -100,6 +92,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     lineHeight: 18,
+    maxWidth: 360,
   },
   linksRow: {
     flexDirection: "row",
@@ -126,20 +119,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bottom: {
-    gap: 6,
+    gap: 4,
     marginTop: 4,
-  },
-  socialRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 4,
-  },
-  socialIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
   },
   copy: {
     fontSize: 11,

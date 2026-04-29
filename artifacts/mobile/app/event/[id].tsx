@@ -437,8 +437,6 @@ export default function EventDetailScreen() {
           ) : null}
         </View>
 
-        <MobileFooter />
-
         {/* ─── Booking form ─── */}
         {showBooking ? (
           <View style={[styles.bookingForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -680,6 +678,7 @@ export default function EventDetailScreen() {
           </View>
         ) : null}
 
+        <MobileFooter />
         <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 120 }} />
       </ScrollView>
 
