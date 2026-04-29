@@ -169,8 +169,8 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           try {
             await apiPatch("/api/partner/profile", {
               state: stateF, city, country, openDays,
-              openTime: openTime || undefined,
-              closeTime: closeTime || undefined,
+              openTime: openTime,
+              closeTime: closeTime,
             });
             toast({ title: "Profile updated" });
             onSaved();
