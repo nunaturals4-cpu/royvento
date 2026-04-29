@@ -133,6 +133,8 @@ export function VendorDashboard() {
 }
 
 const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
+const WEEKEND_DAYS = ["Sat", "Sun"] as const;
 
 const DAY_FULL_NAMES: Record<string, string> = {
   Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
@@ -229,6 +231,28 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       const err = checkDayError(open, close);
       setDayHoursErrors((e) => ({ ...e, [day]: err }));
       return updated;
+    });
+  };
+
+  const copyHours = (sourceDay: string, targets: readonly string[]) => {
+    const src = dayTimes[sourceDay];
+    if (!src?.open && !src?.close) return;
+    setDayTimes((prev) => {
+      const next = { ...prev };
+      for (const d of targets) {
+        if (d !== sourceDay && openDays.includes(d)) {
+          next[d] = { open: src.open ?? "", close: src.close ?? "" };
+        }
+      }
+      return next;
+    });
+    setDayHoursErrors((prev) => {
+      const next = { ...prev };
+      const err = checkDayError(src.open ?? "", src.close ?? "");
+      for (const d of targets) {
+        if (d !== sourceDay && openDays.includes(d)) next[d] = err;
+      }
+      return next;
     });
   };
 
@@ -429,6 +453,41 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
                       {crossesMid && (
                         <p className="text-xs text-amber-400/90">↻ Overnight schedule — closes next day</p>
                       )}
+                      {(dayTimes[day]?.open || dayTimes[day]?.close) && (() => {
+                        const otherOpenDays = openDays.filter((d) => d !== day);
+                        const weekdayTargets = (WEEKDAYS as readonly string[]).filter((d) => d !== day && openDays.includes(d));
+                        const weekendTargets = (WEEKEND_DAYS as readonly string[]).filter((d) => d !== day && openDays.includes(d));
+                        if (otherOpenDays.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => copyHours(day, ALL_DAYS)}
+                              className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
+                            >
+                              Copy to all days
+                            </button>
+                            {weekdayTargets.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => copyHours(day, WEEKDAYS)}
+                                className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
+                              >
+                                Copy to weekdays
+                              </button>
+                            )}
+                            {weekendTargets.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => copyHours(day, WEEKEND_DAYS)}
+                                className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
+                              >
+                                Copy to weekends
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

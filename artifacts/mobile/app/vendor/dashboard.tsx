@@ -53,6 +53,8 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const VALID_API_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const WEEKEND_DAYS = ["Sat", "Sun"];
 
 const DAY_FULL_NAMES: Record<string, string> = {
   Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday",
@@ -446,6 +448,28 @@ export default function VendorDashboardScreen() {
     setProfOpenDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
     );
+  }
+
+  function copyHours(sourceDay: string, targets: string[]) {
+    const src = profDayTimes[sourceDay];
+    if (!src?.open && !src?.close) return;
+    setProfDayTimes((prev) => {
+      const next = { ...prev };
+      for (const d of targets) {
+        if (d !== sourceDay && profOpenDays.includes(d)) {
+          next[d] = { open: src.open ?? "", close: src.close ?? "" };
+        }
+      }
+      return next;
+    });
+    setDayHoursErrors((prev) => {
+      const next = { ...prev };
+      const err = checkDayError(src.open ?? "", src.close ?? "");
+      for (const d of targets) {
+        if (d !== sourceDay && profOpenDays.includes(d)) next[d] = err;
+      }
+      return next;
+    });
   }
 
   function formatHHMM(date: Date): string {
@@ -1066,6 +1090,29 @@ export default function VendorDashboardScreen() {
                     ) : crossesMidnight ? (
                       <Text style={{ fontSize: 12, color: "#f59e0b", fontFamily: "Inter_400Regular", marginTop: 8 }}>↻ Overnight schedule — closes next day</Text>
                     ) : null}
+                    {(open || close) && (() => {
+                      const otherOpen = profOpenDays.filter((d) => d !== day);
+                      const wdTargets = WEEKDAYS.filter((d) => d !== day && profOpenDays.includes(d));
+                      const weTargets = WEEKEND_DAYS.filter((d) => d !== day && profOpenDays.includes(d));
+                      if (otherOpen.length === 0) return null;
+                      return (
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
+                          <TouchableOpacity onPress={() => copyHours(day, ALL_DAYS)}>
+                            <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to all days</Text>
+                          </TouchableOpacity>
+                          {wdTargets.length > 0 && (
+                            <TouchableOpacity onPress={() => copyHours(day, WEEKDAYS)}>
+                              <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to weekdays</Text>
+                            </TouchableOpacity>
+                          )}
+                          {weTargets.length > 0 && (
+                            <TouchableOpacity onPress={() => copyHours(day, WEEKEND_DAYS)}>
+                              <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to weekends</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      );
+                    })()}
                   </View>
                 )}
               </View>
