@@ -310,6 +310,7 @@ router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
       price: Number(e.price),
       imageUrl: e.imageUrl,
       popular: e.popular,
+      popularSince: e.popularSince ? e.popularSince.toISOString() : null,
       approvalStatus: e.approvalStatus,
       partnerName: vMap.get(e.vendorId)?.businessName ?? "",
       createdAt: e.createdAt.toISOString(),
@@ -355,7 +356,10 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
   const body = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
 
-  if (typeof body["popular"] === "boolean") updates["popular"] = body["popular"];
+  if (typeof body["popular"] === "boolean") {
+    updates["popular"] = body["popular"];
+    updates["popularSince"] = body["popular"] ? new Date() : null;
+  }
   if (typeof body["featured"] === "boolean") updates["featured"] = body["featured"];
   if (typeof body["approvalStatus"] === "string") {
     const status = body["approvalStatus"];

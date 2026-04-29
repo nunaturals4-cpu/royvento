@@ -114,6 +114,7 @@ export const eventsTable = pgTable(
       .notNull()
       .default("pending"),
     rejectionReason: text("rejection_reason"),
+    popularSince: timestamp("popular_since", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

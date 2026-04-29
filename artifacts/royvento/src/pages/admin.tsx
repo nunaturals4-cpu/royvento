@@ -648,6 +648,7 @@ interface AdminEvent {
   state: string;
   isPublished: boolean;
   popular: boolean;
+  popularSince: string | null;
   approvalStatus: string;
   imageUrl: string;
 }
@@ -793,9 +794,21 @@ function EventApprovalsAdmin() {
   );
 }
 
+function popularDays(popularSince: string | null): string {
+  if (!popularSince) return "—";
+  const ms = Date.now() - new Date(popularSince).getTime();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  return `${days}d`;
+}
+
 function EventsAdmin() {
   const [items, setItems] = useState<AdminEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterType, setFilterType] = useState("all");
+  const [filterPartner, setFilterPartner] = useState("all");
   const { toast } = useToast();
 
   const load = () => {
@@ -826,52 +839,115 @@ function EventsAdmin() {
     }
   };
 
+  const uniqueTypes = Array.from(new Set(items.map((e) => e.type).filter(Boolean))).sort();
+  const uniquePartners = Array.from(new Set(items.map((e) => e.partnerName).filter(Boolean))).sort();
+
+  const filtered = items.filter((e) => {
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      if (!e.title.toLowerCase().includes(q) && !e.partnerName.toLowerCase().includes(q)) return false;
+    }
+    if (filterStatus !== "all" && e.approvalStatus !== filterStatus) return false;
+    if (filterType !== "all" && e.type !== filterType) return false;
+    if (filterPartner !== "all" && e.partnerName !== filterPartner) return false;
+    return true;
+  });
+
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (items.length === 0) return <p className="text-muted-foreground">No events yet.</p>;
+
   return (
-    <div className="rounded-2xl glass-card overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
-          <tr>
-            <th className="text-left p-3">Title</th>
-            <th className="text-left p-3">Partner</th>
-            <th className="text-left p-3">Type</th>
-            <th className="text-left p-3">Location</th>
-            <th className="text-right p-3">Price</th>
-            <th className="text-center p-3">Status</th>
-            <th className="text-center p-3">Popular</th>
-            <th className="text-right p-3"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((e) => (
-            <tr key={e.id} className="border-t border-white/5">
-              <td className="p-3 font-medium">{e.title}</td>
-              <td className="p-3 text-muted-foreground">{e.partnerName}</td>
-              <td className="p-3"><Badge variant="outline">{e.type}</Badge></td>
-              <td className="p-3 text-muted-foreground">{e.city}{e.state ? `, ${e.state}` : ""}</td>
-              <td className="p-3 text-right">{formatINR(e.price)}</td>
-              <td className="p-3 text-center">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  e.approvalStatus === "approved" ? "bg-green-500/20 text-green-300" :
-                  e.approvalStatus === "rejected" ? "bg-red-500/20 text-red-300" :
-                  "bg-amber-500/20 text-amber-300"
-                }`}>{e.approvalStatus}</span>
-              </td>
-              <td className="p-3 text-center">
-                <button onClick={() => togglePopular(e)} className={`text-xs px-2 py-1 rounded ${e.popular ? "bg-red-600/30 text-red-200" : "bg-white/5 text-white/40"}`}>
-                  ★ {e.popular ? "Yes" : "No"}
-                </button>
-              </td>
-              <td className="p-3 text-right">
-                <Button size="sm" variant="ghost" onClick={() => remove(e.id, e.title)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(ev) => setSearch(ev.target.value)}
+            placeholder="Search title or partner…"
+            className="pl-8 h-8 text-sm bg-white/5 border-white/10"
+          />
+        </div>
+        <select
+          value={filterStatus}
+          onChange={(ev) => setFilterStatus(ev.target.value)}
+          className="h-8 text-sm rounded-md bg-white/5 border border-white/10 px-2 text-foreground"
+        >
+          <option value="all">All statuses</option>
+          <option value="approved">Approved</option>
+          <option value="pending">Pending</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select
+          value={filterType}
+          onChange={(ev) => setFilterType(ev.target.value)}
+          className="h-8 text-sm rounded-md bg-white/5 border border-white/10 px-2 text-foreground"
+        >
+          <option value="all">All types</option>
+          {uniqueTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select
+          value={filterPartner}
+          onChange={(ev) => setFilterPartner(ev.target.value)}
+          className="h-8 text-sm rounded-md bg-white/5 border border-white/10 px-2 text-foreground max-w-[180px]"
+        >
+          <option value="all">All partners</option>
+          {uniquePartners.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} / {items.length}</span>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No events match the current filters.</p>
+      ) : (
+        <div className="rounded-2xl glass-card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">Title</th>
+                <th className="text-left p-3">Partner</th>
+                <th className="text-left p-3">Type</th>
+                <th className="text-left p-3">Location</th>
+                <th className="text-right p-3">Price</th>
+                <th className="text-center p-3">Status</th>
+                <th className="text-center p-3">Popular Since</th>
+                <th className="text-right p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((e) => (
+                <tr key={e.id} className="border-t border-white/5">
+                  <td className="p-3 font-medium">{e.title}</td>
+                  <td className="p-3 text-muted-foreground">{e.partnerName}</td>
+                  <td className="p-3"><Badge variant="outline">{e.type}</Badge></td>
+                  <td className="p-3 text-muted-foreground">{e.city}{e.state ? `, ${e.state}` : ""}</td>
+                  <td className="p-3 text-right">{formatINR(e.price)}</td>
+                  <td className="p-3 text-center">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      e.approvalStatus === "approved" ? "bg-green-500/20 text-green-300" :
+                      e.approvalStatus === "rejected" ? "bg-red-500/20 text-red-300" :
+                      "bg-amber-500/20 text-amber-300"
+                    }`}>{e.approvalStatus}</span>
+                  </td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => togglePopular(e)}
+                      title={e.popular && e.popularSince ? `Popular since ${new Date(e.popularSince).toLocaleDateString()}` : "Mark as popular"}
+                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.popular ? "bg-amber-600/30 text-amber-200" : "bg-white/5 text-white/40"}`}
+                    >
+                      ★ {popularDays(e.popular ? e.popularSince : null)}
+                    </button>
+                  </td>
+                  <td className="p-3 text-right">
+                    <Button size="sm" variant="ghost" onClick={() => remove(e.id, e.title)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
