@@ -63,6 +63,8 @@ export const vendorsTable = pgTable(
       .notNull()
       .default("0"),
     openDays: text("open_days").array().notNull().default([]),
+    openTime: varchar("open_time", { length: 10 }),
+    closeTime: varchar("close_time", { length: 10 }),
     isPremium: boolean("is_premium").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),

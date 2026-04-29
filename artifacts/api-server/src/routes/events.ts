@@ -239,6 +239,8 @@ router.get("/events/:eventId", async (req, res) => {
           coverImageUrl: v.coverImageUrl ?? "",
           portfolioImages: v.portfolioImages,
           openDays: v.openDays ?? [],
+          openTime: v.openTime ?? null,
+          closeTime: v.closeTime ?? null,
           status: v.status,
           rating: rating.rating,
           reviewCount: rating.reviewCount,

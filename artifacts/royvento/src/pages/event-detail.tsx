@@ -120,6 +120,17 @@ export function EventDetail() {
 
   const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const vendorOpenDays: string[] = (ev.vendor?.openDays ?? []) as string[];
+  const vendorOpenTime: string = (ev.vendor?.openTime ?? "") as string;
+  const vendorCloseTime: string = (ev.vendor?.closeTime ?? "") as string;
+  const hasHours = !!(vendorOpenTime && vendorCloseTime);
+
+  const formatHour = (t: string): string => {
+    const [h, m] = t.split(":").map(Number);
+    if (isNaN(h)) return t;
+    const period = h >= 12 ? "pm" : "am";
+    const hour = h % 12 || 12;
+    return m ? `${hour}:${String(m).padStart(2, "0")}${period}` : `${hour}${period}`;
+  };
   const selectedDayName = date ? DAY_ABBRS[new Date(`${date}T12:00:00`).getDay()] : "";
   const isClosedDay = !!(date && vendorOpenDays.length > 0 && !vendorOpenDays.includes(selectedDayName));
 
@@ -360,10 +371,15 @@ export function EventDetail() {
             </div>
             <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Up to {event.capacity} guests</div>
             <div className="flex items-center gap-2"><Star className="h-4 w-4 fill-primary text-primary" />{event.rating > 0 ? `${event.rating.toFixed(1)} (${event.reviewCount})` : "New"}</div>
-            {isPub && vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
+            {isPub && ((vendorOpenDays.length > 0 && vendorOpenDays.length < 7) || hasHours) && (
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
-                <span>Open {[...vendorOpenDays].sort((a, b) => DAY_ABBRS.indexOf(a) - DAY_ABBRS.indexOf(b)).join(", ")}</span>
+                <span>
+                  {vendorOpenDays.length > 0 && vendorOpenDays.length < 7
+                    ? `Open ${[...vendorOpenDays].sort((a, b) => DAY_ABBRS.indexOf(a) - DAY_ABBRS.indexOf(b)).join(", ")}`
+                    : "Open daily"}
+                  {hasHours && ` · ${formatHour(vendorOpenTime)} – ${formatHour(vendorCloseTime)}`}
+                </span>
               </div>
             )}
           </div>

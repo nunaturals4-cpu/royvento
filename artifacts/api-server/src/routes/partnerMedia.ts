@@ -98,6 +98,8 @@ const UpdatePartnerProfileBody = z.object({
   country: z.string().optional(),
   coverImageUrl: z.string().optional(),
   openDays: z.array(z.enum(VALID_DAYS)).optional(),
+  openTime: z.string().max(10).optional(),
+  closeTime: z.string().max(10).optional(),
 });
 
 router.patch(
@@ -127,6 +129,10 @@ router.patch(
       updates["coverImageUrl"] = parsed.data.coverImageUrl;
     if (parsed.data.openDays !== undefined)
       updates["openDays"] = parsed.data.openDays;
+    if (parsed.data.openTime !== undefined)
+      updates["openTime"] = parsed.data.openTime || null;
+    if (parsed.data.closeTime !== undefined)
+      updates["closeTime"] = parsed.data.closeTime || null;
     const [v] = await db
       .update(vendorsTable)
       .set(updates)

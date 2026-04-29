@@ -143,6 +143,8 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [openDays, setOpenDays] = useState<string[]>(
     Array.isArray(vendor.openDays) && vendor.openDays.length > 0 ? vendor.openDays : [...ALL_DAYS]
   );
+  const [openTime, setOpenTime] = useState<string>(vendor.openTime ?? "");
+  const [closeTime, setCloseTime] = useState<string>(vendor.closeTime ?? "");
   const [descError, setDescError] = useState("");
   const update = useUpdateMyVendor();
   const { toast } = useToast();
@@ -165,7 +167,11 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       {
         onSuccess: async () => {
           try {
-            await apiPatch("/api/partner/profile", { state: stateF, city, country, openDays });
+            await apiPatch("/api/partner/profile", {
+              state: stateF, city, country, openDays,
+              openTime: openTime || undefined,
+              closeTime: closeTime || undefined,
+            });
             toast({ title: "Profile updated" });
             onSaved();
           } catch (err: any) {
@@ -256,6 +262,16 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             })}
           </div>
           <p className="text-xs text-muted-foreground mt-1">Green = open · Grey = closed. Customers won't be able to book on closed days.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Opening time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+          </div>
+          <div>
+            <Label>Closing time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+          </div>
         </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}
