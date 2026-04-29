@@ -141,27 +141,74 @@ export default function PartnerDetailScreen() {
 
         {/* Hours */}
         {vendor.dayHours ? (() => {
-          const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+          const DAY_FULL: Record<string, string> = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
+          const DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
           const hours = vendor.dayHours as Record<string, { open: string; close: string } | null>;
-          const entries = dayOrder.filter((d) => d in hours);
-          if (entries.length === 0) return null;
+          if (!DAY_ORDER.some((d) => d in hours)) return null;
+
+          const fmt = (hhmm: string) => {
+            const [h, m] = hhmm.split(":").map(Number);
+            const suffix = h < 12 ? "AM" : "PM";
+            const hr = h % 12 || 12;
+            return `${hr}:${String(m).padStart(2, "0")} ${suffix}`;
+          };
+          const toMin = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+
+          const todayKey = (["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const)[new Date().getDay()];
+          const todayTimes = hours[todayKey];
+          const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+          let isOpenNow = false;
+          if (todayTimes) {
+            const openMin = toMin(todayTimes.open);
+            const closeMin = toMin(todayTimes.close);
+            isOpenNow = closeMin < openMin
+              ? nowMin >= openMin || nowMin < closeMin
+              : nowMin >= openMin && nowMin < closeMin;
+          }
+
           return (
             <View style={{ gap: 10 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hours</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hours</Text>
+                <View style={[styles.openBadge, isOpenNow ? styles.openBadgeOpen : styles.openBadgeClosed]}>
+                  {isOpenNow && <View style={styles.openDot} />}
+                  <Text style={[styles.openBadgeText, { color: isOpenNow ? "#22c55e" : "#ef4444" }]}>
+                    {isOpenNow ? "Open now" : "Closed now"}
+                  </Text>
+                </View>
+              </View>
               <View style={[styles.hoursCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {entries.map((day, i) => {
-                  const times = hours[day];
+                {DAY_ORDER.map((day, i) => {
+                  const times = hours[day] ?? null;
+                  const isToday = day === todayKey;
+                  const isOvernight = times ? toMin(times.close) < toMin(times.open) : false;
                   return (
                     <View
                       key={day}
                       style={[
                         styles.hoursRow,
-                        i < entries.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                        i < DAY_ORDER.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                        isToday && { backgroundColor: colors.primary + "12" },
                       ]}
                     >
-                      <Text style={[styles.hoursDay, { color: colors.foreground }]}>{day}</Text>
-                      <Text style={[styles.hoursTime, { color: colors.mutedForeground }]}>
-                        {times ? `${times.open} – ${times.close}` : "Closed"}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={[styles.hoursDay, { color: isToday ? colors.primary : colors.foreground }]}>
+                          {DAY_FULL[day]}
+                        </Text>
+                        {isToday && (
+                          <View style={[styles.todayPill, { backgroundColor: colors.primary + "25" }]}>
+                            <Text style={[styles.todayPillText, { color: colors.primary }]}>today</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[
+                        styles.hoursTime,
+                        { color: times ? (isToday ? colors.foreground : colors.mutedForeground) : colors.mutedForeground + "60" },
+                        !times && { fontStyle: "italic" as const },
+                      ]}>
+                        {times
+                          ? `${fmt(times.open)} – ${fmt(times.close)}${isOvernight ? " +1" : ""}`
+                          : "Closed"}
                       </Text>
                     </View>
                   );
@@ -274,7 +321,14 @@ const styles = StyleSheet.create({
   reviewerName: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   reviewComment: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   hoursCard: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
-  hoursRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10 },
+  hoursRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 14, paddingVertical: 11 },
   hoursDay: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  hoursTime: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  hoursTime: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  openBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  openBadgeOpen: { backgroundColor: "#22c55e18" },
+  openBadgeClosed: { backgroundColor: "#ef444415" },
+  openBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  openDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22c55e" },
+  todayPill: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
+  todayPillText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.3 },
 });

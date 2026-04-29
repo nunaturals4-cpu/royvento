@@ -64,24 +64,67 @@ export function VendorDetail() {
         </section>
 
         {vendor.dayHours ? (() => {
-          const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+          const DAY_FULL: Record<string, string> = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
+          const DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
           const hours = vendor.dayHours as Record<string, { open: string; close: string } | null>;
-          const entries = dayOrder.filter((d) => d in hours);
-          if (entries.length === 0) return null;
+          if (!DAY_ORDER.some((d) => d in hours)) return null;
+
+          const fmt = (hhmm: string) => {
+            const [h, m] = hhmm.split(":").map(Number);
+            const suffix = h < 12 ? "AM" : "PM";
+            const hr = h % 12 || 12;
+            return `${hr}:${String(m).padStart(2, "0")} ${suffix}`;
+          };
+          const toMin = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+
+          const todayKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date().getDay()];
+          const todayTimes = hours[todayKey];
+          const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+          let isOpenNow = false;
+          if (todayTimes) {
+            const openMin = toMin(todayTimes.open);
+            const closeMin = toMin(todayTimes.close);
+            isOpenNow = closeMin < openMin
+              ? nowMin >= openMin || nowMin < closeMin
+              : nowMin >= openMin && nowMin < closeMin;
+          }
+
           return (
             <section>
-              <h2 className="font-serif text-2xl mb-5 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                Hours
-              </h2>
-              <div className="rounded-xl border divide-y max-w-sm">
-                {entries.map((day) => {
-                  const times = hours[day];
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-serif text-2xl flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" />
+                  Hours
+                </h2>
+                {isOpenNow ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                    Open now
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
+                    Closed now
+                  </span>
+                )}
+              </div>
+              <div className="rounded-xl border overflow-hidden max-w-sm">
+                {DAY_ORDER.map((day, i) => {
+                  const times = hours[day] ?? null;
+                  const isToday = day === todayKey;
+                  const isOvernight = times ? toMin(times.close) < toMin(times.open) : false;
                   return (
-                    <div key={day} className="flex justify-between items-center px-4 py-2.5 text-sm">
-                      <span className="font-medium">{day}</span>
-                      <span className="text-muted-foreground">
-                        {times ? `${times.open} – ${times.close}` : "Closed"}
+                    <div
+                      key={day}
+                      className={`flex justify-between items-center px-4 py-3 text-sm${i > 0 ? " border-t" : ""}${isToday ? " bg-primary/5" : ""}`}
+                    >
+                      <span className={`font-medium${isToday ? " text-primary" : ""}`}>
+                        {DAY_FULL[day]}
+                        {isToday && <span className="ml-2 text-[10px] font-normal text-primary/60 uppercase tracking-wide">today</span>}
+                      </span>
+                      <span className={times ? (isToday ? "font-medium text-foreground" : "text-muted-foreground") : "text-muted-foreground/40 italic text-xs"}>
+                        {times
+                          ? `${fmt(times.open)} – ${fmt(times.close)}${isOvernight ? " +1" : ""}`
+                          : "Closed"}
                       </span>
                     </div>
                   );
