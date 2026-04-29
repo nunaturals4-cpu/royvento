@@ -596,9 +596,9 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
   if (statusParam && statusParam !== "all")
     conditions.push(sql`${bookingsTable.status} = ${statusParam}`);
   if (startDateParam)
-    conditions.push(sql`${bookingsTable.createdAt} >= ${new Date(`${startDateParam}T00:00:00Z`)}`);
+    conditions.push(sql`${bookingsTable.bookingDate} >= ${startDateParam}`);
   if (endDateParam)
-    conditions.push(sql`${bookingsTable.createdAt} <= ${new Date(`${endDateParam}T23:59:59Z`)}`);
+    conditions.push(sql`${bookingsTable.bookingDate} <= ${endDateParam}`);
   if (pubModeParam && pubModeParam !== "all")
     conditions.push(sql`${bookingsTable.pubMode} = ${pubModeParam}`);
   if (bookingTypeParam === "pub")
