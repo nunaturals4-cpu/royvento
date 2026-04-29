@@ -464,6 +464,15 @@ export default function EventDetailScreen() {
                   ))}
                 </View>
               </ScrollView>
+              {eventCity ? (
+                <Pressable
+                  onPress={() => router.push(`/(tabs)/explore?city=${encodeURIComponent(eventCity)}&type=pub` as never)}
+                  style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4 }}
+                >
+                  <Text style={{ fontSize: 13, color: colors.primary }}>See all in {eventCity}</Text>
+                  <Ionicons name="arrow-forward" size={13} color={colors.primary} />
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
         </View>

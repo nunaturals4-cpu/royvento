@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearch } from "wouter";
 import { EventCard } from "@/components/EventCard";
 import { Input } from "@/components/ui/input";
 import { Search, Wine } from "lucide-react";
@@ -24,12 +25,18 @@ interface PublicEvent {
 }
 
 export function Pubs() {
+  const searchStr = useSearch();
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("");
   const [stateF, setStateF] = useState("");
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState(() => new URLSearchParams(searchStr).get("city") ?? "");
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cityParam = new URLSearchParams(searchStr).get("city") ?? "";
+    setCity(cityParam);
+  }, [searchStr]);
 
   useEffect(() => {
     const params = new URLSearchParams({ type: "pub" });

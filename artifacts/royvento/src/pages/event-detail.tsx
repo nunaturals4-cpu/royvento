@@ -452,6 +452,16 @@ export function EventDetail() {
                   </Link>
                 ))}
               </div>
+              {isPub && (event as any)?.city && (
+                <div className="mt-5 text-right">
+                  <Link
+                    href={`/pubs?city=${encodeURIComponent((event as any).city)}`}
+                    className="text-sm text-primary hover:underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
+                  >
+                    See all pubs in {(event as any).city} →
+                  </Link>
+                </div>
+              )}
             </section>
           )}
         </div>

@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { customFetch, type ListEventsPaginatedResponse } from "@workspace/api-client-react";
-import React, { useMemo, useRef, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -38,15 +39,28 @@ function countActiveFilters(f: FilterState) {
 export default function ExploreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ city?: string; type?: string }>();
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
-  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER);
-  const [draftFilter, setDraftFilter] = useState<FilterState>(EMPTY_FILTER);
+  const [filters, setFilters] = useState<FilterState>(() =>
+    params.city ? { ...EMPTY_FILTER, city: params.city } : EMPTY_FILTER
+  );
+  const [draftFilter, setDraftFilter] = useState<FilterState>(() =>
+    params.city ? { ...EMPTY_FILTER, city: params.city } : EMPTY_FILTER
+  );
+  const [typeFilter, setTypeFilter] = useState<string>(() => params.type ?? "");
+
+  useEffect(() => {
+    const next = params.city ? { ...EMPTY_FILTER, city: params.city } : EMPTY_FILTER;
+    setFilters(next);
+    setDraftFilter(next);
+    setTypeFilter(params.type ?? "");
+  }, [params.city, params.type]);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const activeFilterCount = countActiveFilters(filters);
+  const activeFilterCount = countActiveFilters(filters) + (typeFilter ? 1 : 0);
 
   const baseParams = useMemo(() => {
     const p: Record<string, string> = {};
@@ -54,9 +68,10 @@ export default function ExploreScreen() {
     if (filters.city) p["city"] = filters.city;
     if (filters.minPrice) p["minPrice"] = filters.minPrice;
     if (filters.maxPrice) p["maxPrice"] = filters.maxPrice;
+    if (typeFilter) p["type"] = typeFilter;
     p["limit"] = String(PAGE_SIZE);
     return p;
-  }, [debouncedSearch, filters]);
+  }, [debouncedSearch, filters, typeFilter]);
 
   const {
     data: paginatedData,
@@ -101,6 +116,7 @@ export default function ExploreScreen() {
   function clearFilter() {
     setDraftFilter(EMPTY_FILTER);
     setFilters(EMPTY_FILTER);
+    setTypeFilter("");
     setShowFilter(false);
   }
 
@@ -158,6 +174,14 @@ export default function ExploreScreen() {
           style={{ maxHeight: 44 }}
           contentContainerStyle={styles.activePills}
         >
+          {typeFilter ? (
+            <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
+              <Ionicons name="wine-outline" size={12} color={colors.primary} />
+              <Text style={[styles.pillText, { color: colors.primary }]}>
+                {typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1)}s only
+              </Text>
+            </View>
+          ) : null}
           {filters.city ? (
             <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
               <Ionicons name="location-outline" size={12} color={colors.primary} />
