@@ -1707,7 +1707,7 @@ function BookingReport() {
                       onClick={() => { setCouponUser(u); setCouponCode(""); setCouponDiscount("10"); setCouponType("general"); }}
                     >
                       <Gift className="h-3 w-3 mr-1" />
-                      Coupon
+                      Send Coupon
                     </Button>
                   </div>
                 </div>
