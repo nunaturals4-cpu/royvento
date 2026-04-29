@@ -388,7 +388,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground mt-1.5">Click a day name to toggle open/closed. Set opening and closing times for each open day.</p>
+          <p className="text-xs text-muted-foreground mt-1.5">Click a day name to toggle open/closed. Set opening and closing times for each open day. If closing time is earlier than opening time it is treated as overnight (e.g. 10 pm – 2 am).</p>
         </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}
