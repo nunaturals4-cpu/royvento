@@ -12,7 +12,7 @@ export function useLogout() {
     } catch {
       Alert.alert("Error", "Sign out encountered an issue. You have been signed out.");
     } finally {
-      router.replace("/(tabs)/profile" as never);
+      router.replace("/(auth)/login");
     }
   }, [logout]);
 }
