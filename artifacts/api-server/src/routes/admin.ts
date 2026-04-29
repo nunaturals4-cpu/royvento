@@ -602,9 +602,9 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
   if (pubModeParam && pubModeParam !== "all")
     conditions.push(sql`${bookingsTable.pubMode} = ${pubModeParam}`);
   if (bookingTypeParam === "pub")
-    conditions.push(sql`${bookingsTable.pubMode} IN ('ticket', 'table', 'bottle')`);
+    conditions.push(sql`${bookingsTable.pubMode} = 'ticket'`);
   else if (bookingTypeParam === "group")
-    conditions.push(sql`${bookingsTable.pubMode} = 'free_entry'`);
+    conditions.push(sql`${bookingsTable.pubMode} IN ('event', '')`);
 
   if (searchParam) {
     const likeStr = `%${searchParam}%`;

@@ -1549,8 +1549,8 @@ function BlogsAdmin() {
 const BOOKING_STATUSES = ["all", "confirmed", "pending", "payment_pending", "cancelled", "completed"];
 const BOOKING_TYPES = [
   { value: "all", label: "All types" },
-  { value: "pub", label: "Pub tickets (ticket / table / bottle)" },
-  { value: "group", label: "Group booking (free entry)" },
+  { value: "pub", label: "Pub tickets (W / M / Couple)" },
+  { value: "group", label: "Event / group bookings (guests)" },
 ];
 const SORT_OPTIONS = [
   { value: "date", label: "Booking date" },
