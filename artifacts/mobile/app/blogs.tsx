@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -115,9 +116,11 @@ export default function BlogsScreen() {
               onPress={() => router.push({ pathname: "/blog/[slug]", params: { slug: item.slug } })}
             >
               {item.imageUrl ? (
-                <View style={[styles.imagePlaceholder, { backgroundColor: colors.muted }]}>
-                  <Ionicons name="image-outline" size={28} color={colors.mutedForeground} />
-                </View>
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.imagePlaceholder}
+                  contentFit="cover"
+                />
               ) : (
                 <LinearGradient
                   colors={[colors.primary + "40", colors.card]}

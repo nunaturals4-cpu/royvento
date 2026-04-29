@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch, useUpdateMe } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -41,6 +41,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, logout, updateUser } = useAuth();
+  const queryClient = useQueryClient();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [editModal, setEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
@@ -270,7 +271,18 @@ export default function ProfileScreen() {
             onPress: () =>
               Alert.alert("Sign Out", "Are you sure?", [
                 { text: "Cancel", style: "cancel" },
-                { text: "Sign Out", style: "destructive", onPress: logout },
+                {
+                  text: "Sign Out",
+                  style: "destructive",
+                  onPress: () => {
+                    logout()
+                      .then(() => { queryClient.clear(); })
+                      .catch(() => {
+                        queryClient.clear();
+                        Alert.alert("Error", "Sign out failed. Please try again.");
+                      });
+                  },
+                },
               ]),
             tint: colors.destructive,
           },
