@@ -1,5 +1,6 @@
 import { Link } from "wouter";
-import { useRef, useState } from "react";
+import { useState } from "react";
+import QRCode from "qrcode";
 import { useListMyBookings } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -255,28 +256,104 @@ function CancelBookingDialog({
 }
 
 function PremiumTicket({ b }: { b: any }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const printTicket = () => {
-    const node = ref.current;
-    if (!node) return;
+  const printTicket = async () => {
+    const esc = (v: unknown): string =>
+      String(v ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
+
     const w = window.open("", "_blank", "width=720,height=900");
     if (!w) return;
-    w.document.write(`<!doctype html><html><head><title>Royvento Ticket #${b.id}</title>
+
+    let qrSvgHtml = "";
+    try {
+      const svgString = await QRCode.toString(ticketCode, {
+        type: "svg",
+        margin: 1,
+        color: { dark: "#000000", light: "#ffffff" },
+        width: 120,
+      });
+      qrSvgHtml = `
+        <div class="qr-wrap">
+          ${svgString}
+          <p class="qr-code">${esc(ticketCode)}</p>
+        </div>`;
+    } catch (_) {
+      qrSvgHtml = `<div class="qr-wrap"><p class="qr-code">${esc(ticketCode)}</p></div>`;
+    }
+
+    const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+    const ticketBreakdown = [
+      b.ticketWomen ? `${b.ticketWomen}\u00d7 Women` : "",
+      b.ticketMen ? `${b.ticketMen}\u00d7 Men` : "",
+      b.ticketCouple ? `${b.ticketCouple}\u00d7 Couple` : "",
+    ].filter(Boolean).map(esc).join(" &middot; ");
+    w.document.write(`<!doctype html><html><head><title>Royvento Ticket #${esc(b.id)}</title>
       <style>
+        *{box-sizing:border-box;}
         body{margin:0;font-family:Georgia,serif;background:#0a0a0a;color:#fff;padding:24px;}
         .ticket{background:linear-gradient(135deg,#1a0a0a 0%,#350f0f 100%);border:1px solid rgba(255,80,80,.4);border-radius:24px;padding:32px;max-width:640px;margin:0 auto;box-shadow:0 30px 60px rgba(220,38,38,.3);}
-        .row{display:flex;justify-content:space-between;align-items:center;gap:16px;}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;}
+        .header-info{flex:1;min-width:0;}
         .brand{font-size:13px;letter-spacing:.4em;text-transform:uppercase;color:#fca5a5;}
-        h1{font-size:36px;margin:8px 0 0;font-family:'Playfair Display',Georgia,serif;}
-        .code{font-family:ui-monospace,Menlo,monospace;font-size:14px;color:#fca5a5;background:rgba(255,255,255,.05);padding:6px 10px;border-radius:8px;}
-        .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
-        .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#9ca3af;}
-        .val{font-size:18px;margin-top:2px;}
-        hr{border:none;border-top:1px dashed rgba(255,255,255,.15);margin:24px 0;}
-        .totals{display:flex;justify-content:space-between;font-size:20px;}
-        .small{font-size:12px;color:#9ca3af;text-align:center;margin-top:24px;}
-        @media print { body{background:#fff;color:#000;} .ticket{background:#fff;color:#000;border-color:#400;} .lbl,.small{color:#666;} .brand,.code{color:#900;} }
-      </style></head><body>${node.outerHTML}<script>window.onload=()=>window.print();</script></body></html>`);
+        .top-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+        .code{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#fca5a5;background:rgba(255,255,255,.08);padding:4px 10px;border-radius:8px;}
+        h1{font-size:30px;margin:8px 0 2px;font-family:'Playfair Display',Georgia,serif;font-weight:normal;}
+        .venue{font-size:12px;color:#9ca3af;margin:0;}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;}
+        .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#9ca3af;margin:0;}
+        .val{font-size:17px;margin:2px 0 0;}
+        .val-sm{font-size:14px;margin:2px 0 0;color:#e5e7eb;}
+        hr{border:none;border-top:1px dashed rgba(255,255,255,.15);margin:20px 0;}
+        .totals{display:flex;justify-content:space-between;font-size:18px;align-items:center;}
+        .totals-lbl{color:#9ca3af;}
+        .totals-val{font-size:22px;font-family:'Playfair Display',Georgia,serif;}
+        .small{font-size:11px;color:#9ca3af;text-align:center;margin-top:20px;}
+        .qr-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;background:#fff;border-radius:12px;padding:10px;flex-shrink:0;}
+        .qr-wrap svg{display:block;width:110px;height:110px;}
+        .qr-code{font-family:ui-monospace,Menlo,monospace;font-size:9px;color:#1a0a0a;margin:0;letter-spacing:.08em;text-align:center;}
+        @media print{
+          body{background:#fff;color:#000;padding:0;}
+          .ticket{background:#fff;color:#000;border:2px solid #c00;box-shadow:none;border-radius:16px;padding:24px;}
+          .brand,.code,.qr-code{color:#900;}
+          .venue,.lbl,.totals-lbl,.small{color:#555;}
+          hr{border-top-color:#ccc;}
+          .qr-wrap{background:#fff;border:1px solid #ddd;}
+          h1,.val,.val-sm,.totals-val{color:#000;}
+        }
+      </style></head><body>
+      <div class="ticket">
+        <div class="header">
+          <div class="header-info">
+            <div class="top-row">
+              <span class="brand">ROYVENTO</span>
+              <span class="code">${esc(ticketCode)}</span>
+            </div>
+            <h1>${esc(b.eventTitle)}</h1>
+            <p class="venue">${esc(b.vendorName)}${b.eventCity ? ` &middot; ${esc(b.eventCity)}` : ""}</p>
+            <div class="grid">
+              <div><p class="lbl">Guest</p><p class="val">${esc(b.personName || b.userName)}</p></div>
+              <div><p class="lbl">Date</p><p class="val">${esc(b.bookingDate)}</p></div>
+              <div><p class="lbl">Tickets</p><p class="val-sm">${ticketBreakdown || "&mdash;"}<br><span style="color:#9ca3af;font-size:12px;">${total} guest${total !== 1 ? "s" : ""}</span></p></div>
+              <div><p class="lbl">Approved by</p><p class="val" style="text-transform:capitalize;">${esc(b.approvedBy || "partner")}</p></div>
+            </div>
+          </div>
+          ${qrSvgHtml}
+        </div>
+        <hr/>
+        <div class="totals">
+          <span class="totals-lbl">Amount paid</span>
+          <span class="totals-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</span>
+        </div>
+        <p class="small">Present this ticket at the entrance. Non-transferable.</p>
+      </div>
+      <script>window.onload=()=>window.print();</script>
+      </body></html>`);
     w.document.close();
   };
 
@@ -293,7 +370,7 @@ function PremiumTicket({ b }: { b: any }) {
           <Button size="sm" onClick={printTicket} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5"><Download className="h-3.5 w-3.5" />Download PDF</Button>
         </div>
       </div>
-      <div ref={ref} className="ticket rounded-2xl border border-red-500/40 bg-gradient-to-br from-red-950/60 to-black p-6">
+      <div className="ticket rounded-2xl border border-red-500/40 bg-gradient-to-br from-red-950/60 to-black p-6">
         <div className="row flex justify-between items-start gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-center">
