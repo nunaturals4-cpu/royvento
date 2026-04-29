@@ -363,7 +363,7 @@ export function EventDetail() {
             {isPub && vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
-                <span>Open {vendorOpenDays.join(", ")}</span>
+                <span>Open {[...vendorOpenDays].sort((a, b) => DAY_ABBRS.indexOf(a) - DAY_ABBRS.indexOf(b)).join(", ")}</span>
               </div>
             )}
           </div>
