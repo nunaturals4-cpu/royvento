@@ -38,8 +38,8 @@ export function MobileFooter() {
           <Pressable onPress={() => router.push("/become-vendor" as never)}>
             <Text style={[styles.link, { color: colors.mutedForeground }]}>Become a Partner</Text>
           </Pressable>
-          <Pressable onPress={() => router.push("/(auth)/login" as never)}>
-            <Text style={[styles.link, { color: colors.mutedForeground }]}>Partner Login</Text>
+          <Pressable onPress={() => router.push("/vendor/dashboard" as never)}>
+            <Text style={[styles.link, { color: colors.mutedForeground }]}>Partner Dashboard</Text>
           </Pressable>
         </View>
       </View>
