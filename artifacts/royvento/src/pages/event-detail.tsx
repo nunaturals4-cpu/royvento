@@ -350,7 +350,7 @@ export function EventDetail() {
               <MapPin className="h-4 w-4 text-primary" />
               <span>{loc}</span>
               <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ev.title} ${loc}`)}`}
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venueName} ${loc}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary border border-primary/30 rounded-full px-2 py-0.5 transition-colors"
