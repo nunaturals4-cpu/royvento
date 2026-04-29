@@ -132,22 +132,33 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     )
     .groupBy(sql`date_trunc('month', ${bookingsTable.createdAt})`)
     .orderBy(sql`date_trunc('month', ${bookingsTable.createdAt})`);
-  const monthlyRevenue = monthlyRevenueRows.map((r) => ({
-    month: r.month,
-    revenue: Number(r.revenue),
-  }));
+  // Build full continuous monthly buckets for the range (zero-fill missing months)
+  const monthlyMap = new Map<string, number>();
+  const mCursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+  const mEnd = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1);
+  while (mCursor <= mEnd) {
+    const key = `${mCursor.getFullYear()}-${String(mCursor.getMonth() + 1).padStart(2, "0")}`;
+    monthlyMap.set(key, 0);
+    mCursor.setMonth(mCursor.getMonth() + 1);
+  }
+  for (const r of monthlyRevenueRows) {
+    monthlyMap.set(r.month, Number(r.revenue));
+  }
+  const monthlyRevenue = Array.from(monthlyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, revenue]) => ({ month, revenue }));
 
   let totalWomen = 0;
   let totalMen = 0;
   let totalCouple = 0;
-  // Daily chart: always last 30 days ending at rangeEnd
-  const dailyMap = new Map<string, number>();
+  // Daily chart: last 30 days clamped to [rangeStart, rangeEnd]
   const dayMs = 24 * 60 * 60 * 1000;
-  const dailyWindowDays = 29; // 0..29 = exactly 30 data points
-  const dailyStart = new Date(rangeEnd.getTime() - dailyWindowDays * dayMs);
-  for (let i = dailyWindowDays; i >= 0; i--) {
-    const d = new Date(rangeEnd.getTime() - i * dayMs);
-    dailyMap.set(d.toISOString().slice(0, 10), 0);
+  const dailyMap = new Map<string, number>();
+  const dailyStart = new Date(Math.max(rangeStart.getTime(), rangeEnd.getTime() - 29 * dayMs));
+  const dCursor = new Date(dailyStart);
+  while (dCursor <= rangeEnd) {
+    dailyMap.set(dCursor.toISOString().slice(0, 10), 0);
+    dCursor.setTime(dCursor.getTime() + dayMs);
   }
   const perVendorMap = new Map<number, {
     vendorId: number; bookingCount: number;

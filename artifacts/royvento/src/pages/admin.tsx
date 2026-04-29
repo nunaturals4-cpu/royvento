@@ -220,8 +220,8 @@ function Analytics() {
         </div>
       )}
 
-      {/* Monthly revenue bar chart */}
-      {hasMonthlyRevenue && (
+      {/* Monthly revenue bar chart — always shown when data is loaded */}
+      {(adminData.monthlyRevenue ?? []).length > 0 && (
         <div className="rounded-2xl glass-card p-6">
           <h3 className="font-serif text-xl mb-5">Monthly revenue — {presetLabel[preset]}</h3>
           <ResponsiveContainer width="100%" height={220}>
