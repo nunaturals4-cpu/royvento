@@ -6,8 +6,9 @@ import {
   vendorsTable,
   usersTable,
 } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
+import { generateTicketCode } from "../lib/ticketCode";
 
 const router: IRouter = Router();
 
@@ -508,6 +509,150 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
   await db.delete(eventsTable).where(eq(eventsTable.vendorId, id));
   await db.delete(vendorsTable).where(eq(vendorsTable.id, id));
   res.json({ ok: true });
+});
+
+// ── Admin booking report ──────────────────────────────────────────────────────
+
+const REPORT_PAGE_SIZE = 50;
+
+async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
+  if (rows.length === 0) return [];
+  const eventIds = [...new Set(rows.map((r) => r.eventId))];
+  const userIds = [...new Set(rows.map((r) => r.userId))];
+  const vendorIds = [...new Set(rows.map((r) => r.vendorId))];
+  const [events, users, vendors] = await Promise.all([
+    db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)),
+    db.select().from(usersTable).where(inArray(usersTable.id, userIds)),
+    db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
+  ]);
+  const eMap = new Map(events.map((e) => [e.id, e]));
+  const uMap = new Map(users.map((u) => [u.id, u]));
+  const vMap = new Map(vendors.map((v) => [v.id, v]));
+  return rows.map((b) => {
+    const e = eMap.get(b.eventId);
+    const u = uMap.get(b.userId);
+    const v = vMap.get(b.vendorId);
+    const ticketCode = v
+      ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" })
+      : `RV-${String(b.id).padStart(6, "0")}`;
+    return {
+      id: b.id,
+      vendorId: b.vendorId,
+      vendorName: v?.businessName ?? "",
+      eventId: b.eventId,
+      eventTitle: e?.title ?? "",
+      userId: b.userId,
+      userName: u?.name ?? "",
+      userEmail: u?.email ?? "",
+      bookingDate: b.bookingDate,
+      guests: b.guests,
+      pubMode: b.pubMode,
+      ticketWomen: b.ticketWomen,
+      ticketMen: b.ticketMen,
+      ticketCouple: b.ticketCouple,
+      totalPrice: Number(b.totalPrice),
+      discountAmount: Number(b.discountAmount),
+      finalPrice: Number(b.finalPrice),
+      status: b.status,
+      notes: b.notes,
+      ticketCode,
+      checkedIn: b.checkedIn,
+      checkedInAt: b.checkedInAt?.toISOString() ?? null,
+      createdAt: b.createdAt.toISOString(),
+    };
+  });
+}
+
+router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) => {
+  const pageNum = Math.max(1, parseInt(req.query["page"] as string) || 1);
+  const offset = (pageNum - 1) * REPORT_PAGE_SIZE;
+
+  const vendorIdParam = req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const statusParam = req.query["status"] as string | undefined;
+  const startDateParam = req.query["startDate"] as string | undefined;
+  const endDateParam = req.query["endDate"] as string | undefined;
+  const pubModeParam = req.query["pubMode"] as string | undefined;
+  const searchParam = (req.query["search"] as string | undefined)?.trim().toLowerCase();
+  const sortBy = req.query["sortBy"] as string | undefined;
+
+  const conditions: ReturnType<typeof sql>[] = [];
+  if (vendorIdParam && Number.isFinite(vendorIdParam))
+    conditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
+  if (statusParam && statusParam !== "all")
+    conditions.push(sql`${bookingsTable.status} = ${statusParam}`);
+  if (startDateParam)
+    conditions.push(sql`${bookingsTable.createdAt} >= ${new Date(`${startDateParam}T00:00:00Z`)}`);
+  if (endDateParam)
+    conditions.push(sql`${bookingsTable.createdAt} <= ${new Date(`${endDateParam}T23:59:59Z`)}`);
+  if (pubModeParam && pubModeParam !== "all")
+    conditions.push(sql`${bookingsTable.pubMode} = ${pubModeParam}`);
+
+  if (searchParam) {
+    const likeStr = `%${searchParam}%`;
+    const matchingUsers = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(sql`lower(${usersTable.name}) LIKE ${likeStr} OR lower(${usersTable.email}) LIKE ${likeStr}`);
+    if (matchingUsers.length === 0) {
+      res.json({ bookings: [], total: 0, page: pageNum, totalPages: 0 });
+      return;
+    }
+    conditions.push(inArray(bookingsTable.userId, matchingUsers.map((u) => u.id)));
+  }
+
+  const whereSQL = conditions.length > 0 ? sql.join(conditions, sql` AND `) : undefined;
+  const orderSQL = sortBy === "price" ? desc(bookingsTable.finalPrice) : desc(bookingsTable.createdAt);
+
+  const [countRow, rows] = await Promise.all([
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(whereSQL),
+    db.select().from(bookingsTable).where(whereSQL).orderBy(orderSQL).limit(REPORT_PAGE_SIZE).offset(offset),
+  ]);
+
+  const total = countRow[0]?.c ?? 0;
+  const totalPages = Math.ceil(total / REPORT_PAGE_SIZE);
+  const bookings = await enrichBookingRows(rows);
+
+  res.json({ bookings, total, page: pageNum, totalPages });
+});
+
+router.get("/admin/bookings/partner-summary", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select({
+      vendorId: bookingsTable.vendorId,
+      bookingCount: sql<number>`count(*)::int`,
+      ticketWomen: sql<number>`coalesce(sum(${bookingsTable.ticketWomen}), 0)::int`,
+      ticketMen: sql<number>`coalesce(sum(${bookingsTable.ticketMen}), 0)::int`,
+      ticketCouple: sql<number>`coalesce(sum(${bookingsTable.ticketCouple}), 0)::int`,
+      revenue: sql<string>`coalesce(sum(case when ${bookingsTable.status} IN ('confirmed','completed') then ${bookingsTable.finalPrice} else 0 end), 0)::text`,
+      checkedInCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} then 1 else 0 end), 0)::int`,
+    })
+    .from(bookingsTable)
+    .groupBy(bookingsTable.vendorId)
+    .orderBy(desc(sql`count(*)`));
+
+  if (rows.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const vendors = await db
+    .select({ id: vendorsTable.id, businessName: vendorsTable.businessName })
+    .from(vendorsTable)
+    .where(inArray(vendorsTable.id, rows.map((r) => r.vendorId)));
+  const vMap = new Map(vendors.map((v) => [v.id, v.businessName]));
+
+  res.json(
+    rows.map((r) => ({
+      vendorId: r.vendorId,
+      vendorName: vMap.get(r.vendorId) ?? `Partner #${r.vendorId}`,
+      bookingCount: r.bookingCount,
+      ticketWomen: r.ticketWomen,
+      ticketMen: r.ticketMen,
+      ticketCouple: r.ticketCouple,
+      revenue: Number(r.revenue),
+      checkedInCount: r.checkedInCount,
+    })),
+  );
 });
 
 export default router;

@@ -19,6 +19,8 @@ import type {
 import type {
   AddToWishlistBody,
   AdminAnalytics,
+  AdminBookingReportResponse,
+  AdminPartnerSummary,
   AuthResponse,
   Availability,
   Booking,
@@ -29,6 +31,7 @@ import type {
   Event,
   EventDetail,
   GetAdminAnalyticsParams,
+  GetAdminBookingsReportParams,
   GetBookingTicketCode200,
   HealthStatus,
   ListEventsParams,
@@ -3210,6 +3213,189 @@ export const useDeleteAvailability = <
 > => {
   return useMutation(getDeleteAvailabilityMutationOptions(options));
 };
+
+/**
+ * @summary Paginated, filterable booking report (admin)
+ */
+export const getGetAdminBookingsReportUrl = (
+  params?: GetAdminBookingsReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/bookings/report?${stringifiedParams}`
+    : `/api/admin/bookings/report`;
+};
+
+export const getAdminBookingsReport = async (
+  params?: GetAdminBookingsReportParams,
+  options?: RequestInit,
+): Promise<AdminBookingReportResponse> => {
+  return customFetch<AdminBookingReportResponse>(
+    getGetAdminBookingsReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAdminBookingsReportQueryKey = (
+  params?: GetAdminBookingsReportParams,
+) => {
+  return [`/api/admin/bookings/report`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAdminBookingsReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminBookingsReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminBookingsReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminBookingsReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminBookingsReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminBookingsReport>>
+  > = ({ signal }) =>
+    getAdminBookingsReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminBookingsReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminBookingsReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminBookingsReport>>
+>;
+export type GetAdminBookingsReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Paginated, filterable booking report (admin)
+ */
+
+export function useGetAdminBookingsReport<
+  TData = Awaited<ReturnType<typeof getAdminBookingsReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminBookingsReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminBookingsReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminBookingsReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Per-partner booking aggregates (admin)
+ */
+export const getGetAdminBookingsPartnerSummaryUrl = () => {
+  return `/api/admin/bookings/partner-summary`;
+};
+
+export const getAdminBookingsPartnerSummary = async (
+  options?: RequestInit,
+): Promise<AdminPartnerSummary[]> => {
+  return customFetch<AdminPartnerSummary[]>(
+    getGetAdminBookingsPartnerSummaryUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAdminBookingsPartnerSummaryQueryKey = () => {
+  return [`/api/admin/bookings/partner-summary`] as const;
+};
+
+export const getGetAdminBookingsPartnerSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminBookingsPartnerSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminBookingsPartnerSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminBookingsPartnerSummaryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminBookingsPartnerSummary>>
+  > = ({ signal }) =>
+    getAdminBookingsPartnerSummary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminBookingsPartnerSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminBookingsPartnerSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminBookingsPartnerSummary>>
+>;
+export type GetAdminBookingsPartnerSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Per-partner booking aggregates (admin)
+ */
+
+export function useGetAdminBookingsPartnerSummary<
+  TData = Awaited<ReturnType<typeof getAdminBookingsPartnerSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminBookingsPartnerSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminBookingsPartnerSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Platform analytics

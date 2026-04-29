@@ -6,6 +6,8 @@ import {
   useListUsers,
   useUpdateUserRole,
   useDeleteUser,
+  useGetAdminBookingsReport,
+  useGetAdminBookingsPartnerSummary,
 } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
+  ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -51,6 +54,7 @@ export function AdminPanel() {
           <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="blogs">Blogs</TabsTrigger>
+          <TabsTrigger value="booking-report">Booking Report</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
@@ -64,6 +68,7 @@ export function AdminPanel() {
         <TabsContent value="messages"><Messages /></TabsContent>
         <TabsContent value="users"><UsersPanel /></TabsContent>
         <TabsContent value="blogs"><BlogsAdmin /></TabsContent>
+        <TabsContent value="booking-report"><BookingReport /></TabsContent>
       </Tabs>
     </div>
   );
@@ -1533,6 +1538,374 @@ function BlogsAdmin() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Booking Report ────────────────────────────────────────────────────────────
+
+const BOOKING_STATUSES = ["all", "confirmed", "pending", "payment_pending", "cancelled", "completed"];
+const PUB_MODES = ["all", "free_entry", "ticket", "table", "bottle"];
+const SORT_OPTIONS = [
+  { value: "date", label: "Booking date" },
+  { value: "price", label: "Final price" },
+];
+
+function bookingStatusColor(status: string) {
+  switch (status) {
+    case "confirmed": return "bg-green-600/20 text-green-400";
+    case "completed": return "bg-blue-600/20 text-blue-400";
+    case "cancelled": return "bg-red-600/20 text-red-400";
+    case "payment_pending": return "bg-yellow-600/20 text-yellow-400";
+    default: return "bg-muted text-muted-foreground";
+  }
+}
+
+function BookingReport() {
+  const [vendorId, setVendorId] = useState<string>("all");
+  const [status, setStatus] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [pubMode, setPubMode] = useState<string>("all");
+  const [search, setSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
+  const [sortBy, setSortBy] = useState<string>("date");
+  const [summaryOpen, setSummaryOpen] = useState(true);
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const params = {
+    ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
+    ...(status !== "all" ? { status } : {}),
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+    ...(pubMode !== "all" ? { pubMode } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    page,
+    sortBy,
+  };
+
+  const { data: report, isLoading } = useGetAdminBookingsReport(params);
+  const { data: partnerSummary } = useGetAdminBookingsPartnerSummary();
+
+  const vendors = partnerSummary ?? [];
+  const bookings = report?.bookings ?? [];
+  const total = report?.total ?? 0;
+  const totalPages = report?.totalPages ?? 0;
+
+  // Filtered summary cards: show selected vendor or all
+  const displayedSummary = vendorId !== "all"
+    ? vendors.filter((v) => v.vendorId === Number(vendorId))
+    : vendors;
+
+  const resetFilters = () => {
+    setVendorId("all"); setStatus("all"); setStartDate(""); setEndDate("");
+    setPubMode("all"); setSearch(""); setPage(1); setSortBy("date");
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <FileText className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Ticket Sales Report</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">Per-partner breakdown with filters and pagination</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={resetFilters} className="text-muted-foreground hover:text-foreground">
+          Reset filters
+        </Button>
+      </div>
+
+      {/* Filter bar */}
+      <div className="rounded-2xl glass-card p-5 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          {/* Search */}
+          <div className="relative xl:col-span-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search customer name or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-9 text-sm"
+            />
+          </div>
+
+          {/* Partner */}
+          <Select value={vendorId} onValueChange={(v) => { setVendorId(v); setPage(1); }}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="All partners" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All partners</SelectItem>
+              {vendors.map((v) => (
+                <SelectItem key={v.vendorId} value={String(v.vendorId)}>{v.vendorName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Status */}
+          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              {BOOKING_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>{s === "all" ? "All statuses" : s.replace("_", " ")}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Pub mode */}
+          <Select value={pubMode} onValueChange={(v) => { setPubMode(v); setPage(1); }}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="All modes" />
+            </SelectTrigger>
+            <SelectContent>
+              {PUB_MODES.map((m) => (
+                <SelectItem key={m} value={m}>{m === "all" ? "All modes" : m.replace("_", " ")}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Sort */}
+          <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(1); }}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>Sort: {o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date range */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <Label className="text-xs text-muted-foreground w-8">From</Label>
+          <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="h-8 text-sm w-40" />
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="h-8 text-sm w-40" />
+          {(startDate || endDate) && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={() => { setStartDate(""); setEndDate(""); }}>
+              Clear dates
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Partner summary cards */}
+      {displayedSummary.length > 0 && (
+        <div className="rounded-2xl glass-card overflow-hidden">
+          <button
+            onClick={() => setSummaryOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-5 py-3 text-sm font-medium hover:bg-white/5 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <IndianRupee className="h-4 w-4 text-primary" />
+              Partner Summary
+              <span className="text-xs text-muted-foreground ml-1">({displayedSummary.length} partner{displayedSummary.length !== 1 ? "s" : ""})</span>
+            </span>
+            {summaryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {summaryOpen && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4 border-t border-white/5">
+              {displayedSummary.map((v) => {
+                const totalTickets = v.ticketWomen + v.ticketMen + v.ticketCouple * 2;
+                return (
+                  <div
+                    key={v.vendorId}
+                    className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4 cursor-pointer hover:border-primary/30 transition-colors"
+                    onClick={() => { setVendorId(String(v.vendorId)); setPage(1); }}
+                  >
+                    <p className="font-medium text-sm truncate mb-3">{v.vendorName}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Bookings</p>
+                        <p className="font-semibold text-foreground">{v.bookingCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Revenue</p>
+                        <p className="font-semibold text-primary">{formatINR(v.revenue)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Tickets</p>
+                        <p className="font-semibold">
+                          <span className="text-pink-400">{v.ticketWomen}W</span>
+                          {" · "}
+                          <span className="text-blue-400">{v.ticketMen}M</span>
+                          {" · "}
+                          <span className="text-purple-400">{v.ticketCouple}C</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Checked in</p>
+                        <p className="font-semibold">
+                          {v.checkedInCount}
+                          {totalTickets > 0 && (
+                            <span className="text-muted-foreground font-normal ml-1">
+                              / {totalTickets}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Results count */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>{total > 0 ? `${total} booking${total !== 1 ? "s" : ""} found` : "No bookings found"}</span>
+        {totalPages > 1 && <span>Page {page} of {totalPages}</span>}
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">Loading…</div>
+      ) : bookings.length === 0 ? (
+        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">
+          No bookings match the selected filters.
+        </div>
+      ) : (
+        <div className="rounded-2xl glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left">#</th>
+                  <th className="px-4 py-3 text-left">Partner · Event</th>
+                  <th className="px-4 py-3 text-left">Customer</th>
+                  <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Mode</th>
+                  <th className="px-4 py-3 text-right">Tickets</th>
+                  <th className="px-4 py-3 text-right">
+                    <button
+                      className="flex items-center gap-1 ml-auto hover:text-foreground transition-colors"
+                      onClick={() => { setSortBy(sortBy === "price" ? "date" : "price"); setPage(1); }}
+                    >
+                      Price
+                      {sortBy === "price" ? <SortDesc className="h-3 w-3" /> : <SortAsc className="h-3 w-3" />}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Ticket code</th>
+                  <th className="px-4 py-3 text-left">Check-in</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {bookings.map((b) => (
+                  <tr key={b.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-3 text-muted-foreground">{b.id}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium truncate max-w-[180px]">{b.vendorName}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[180px]">{b.eventTitle}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="truncate max-w-[140px]">{b.userName}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[140px]">{b.userEmail}</p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      {b.bookingDate
+                        ? new Date(b.bookingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                        : "—"}
+                      <p className="text-xs">{new Date(b.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs capitalize">{b.pubMode?.replace("_", " ")}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-xs">
+                      {b.ticketWomen > 0 && <span className="text-pink-400 mr-1">{b.ticketWomen}W</span>}
+                      {b.ticketMen > 0 && <span className="text-blue-400 mr-1">{b.ticketMen}M</span>}
+                      {b.ticketCouple > 0 && <span className="text-purple-400">{b.ticketCouple}C</span>}
+                      {b.ticketWomen === 0 && b.ticketMen === 0 && b.ticketCouple === 0 && (
+                        <span className="text-muted-foreground">{b.guests}g</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <span className="font-medium text-primary">{formatINR(b.finalPrice)}</span>
+                      {b.discountAmount > 0 && (
+                        <p className="text-xs text-muted-foreground line-through">{formatINR(b.totalPrice)}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${bookingStatusColor(b.status)}`}>
+                        {b.status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs text-muted-foreground">{b.ticketCode}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {b.checkedIn ? (
+                        <span className="flex items-center gap-1 text-green-400 text-xs">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          {b.checkedInAt
+                            ? new Date(b.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+                            : "Yes"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="text-xs"
+              >
+                ← Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  const p = totalPages <= 7 ? i + 1 : page <= 4 ? i + 1 : page >= totalPages - 3 ? totalPages - 6 + i : page - 3 + i;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-7 h-7 text-xs rounded ${p === page ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-white/10 text-muted-foreground"}`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="text-xs"
+              >
+                Next →
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

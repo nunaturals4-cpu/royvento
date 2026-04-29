@@ -962,6 +962,70 @@ export const DeleteAvailabilityResponse = zod.object({
 });
 
 /**
+ * @summary Paginated, filterable booking report (admin)
+ */
+export const GetAdminBookingsReportQueryParams = zod.object({
+  page: zod.coerce.number().optional(),
+  vendorId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+  startDate: zod.coerce.string().optional(),
+  endDate: zod.coerce.string().optional(),
+  pubMode: zod.coerce.string().optional(),
+  search: zod.coerce.string().optional(),
+  sortBy: zod.coerce.string().optional(),
+});
+
+export const GetAdminBookingsReportResponse = zod.object({
+  bookings: zod.array(
+    zod.object({
+      id: zod.number(),
+      vendorId: zod.number(),
+      vendorName: zod.string(),
+      eventId: zod.number(),
+      eventTitle: zod.string(),
+      userId: zod.number(),
+      userName: zod.string(),
+      userEmail: zod.string(),
+      bookingDate: zod.string(),
+      guests: zod.number(),
+      pubMode: zod.string(),
+      ticketWomen: zod.number(),
+      ticketMen: zod.number(),
+      ticketCouple: zod.number(),
+      totalPrice: zod.number(),
+      discountAmount: zod.number(),
+      finalPrice: zod.number(),
+      status: zod.string(),
+      notes: zod.string(),
+      ticketCode: zod.string(),
+      checkedIn: zod.boolean(),
+      checkedInAt: zod.string().nullish(),
+      createdAt: zod.string(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  totalPages: zod.number(),
+});
+
+/**
+ * @summary Per-partner booking aggregates (admin)
+ */
+export const GetAdminBookingsPartnerSummaryResponseItem = zod.object({
+  vendorId: zod.number(),
+  vendorName: zod.string(),
+  bookingCount: zod.number(),
+  ticketWomen: zod.number(),
+  ticketMen: zod.number(),
+  ticketCouple: zod.number(),
+  revenue: zod.number(),
+  checkedInCount: zod.number(),
+});
+export const GetAdminBookingsPartnerSummaryResponse = zod.array(
+  GetAdminBookingsPartnerSummaryResponseItem,
+);
+
+/**
  * @summary Platform analytics
  */
 export const GetAdminAnalyticsQueryParams = zod.object({

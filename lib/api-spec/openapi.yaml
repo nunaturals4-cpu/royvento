@@ -770,6 +770,75 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
+  /admin/bookings/report:
+    get:
+      operationId: getAdminBookingsReport
+      tags: [admin]
+      summary: Paginated, filterable booking report (admin)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: vendorId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: pubMode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Booking report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBookingReportResponse"
+
+  /admin/bookings/partner-summary:
+    get:
+      operationId: getAdminBookingsPartnerSummary
+      tags: [admin]
+      summary: Per-partner booking aggregates (admin)
+      responses:
+        "200":
+          description: Partner summary list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminPartnerSummary"
+
   /admin/analytics:
     get:
       operationId: getAdminAnalytics
@@ -1468,3 +1537,91 @@ components:
           type: string
         metadata:
           $ref: '#/components/schemas/UploadUrlRequest'
+
+    AdminBookingRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        eventId:
+          type: integer
+        eventTitle:
+          type: string
+        userId:
+          type: integer
+        userName:
+          type: string
+        userEmail:
+          type: string
+        bookingDate:
+          type: string
+        guests:
+          type: integer
+        pubMode:
+          type: string
+        ticketWomen:
+          type: integer
+        ticketMen:
+          type: integer
+        ticketCouple:
+          type: integer
+        totalPrice:
+          type: number
+        discountAmount:
+          type: number
+        finalPrice:
+          type: number
+        status:
+          type: string
+        notes:
+          type: string
+        ticketCode:
+          type: string
+        checkedIn:
+          type: boolean
+        checkedInAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, vendorId, vendorName, eventId, eventTitle, userId, userName, userEmail, bookingDate, guests, pubMode, ticketWomen, ticketMen, ticketCouple, totalPrice, discountAmount, finalPrice, status, notes, ticketCode, checkedIn, createdAt]
+
+    AdminBookingReportResponse:
+      type: object
+      properties:
+        bookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminBookingRow"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [bookings, total, page, totalPages]
+
+    AdminPartnerSummary:
+      type: object
+      properties:
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        bookingCount:
+          type: integer
+        ticketWomen:
+          type: integer
+        ticketMen:
+          type: integer
+        ticketCouple:
+          type: integer
+        revenue:
+          type: number
+        checkedInCount:
+          type: integer
+      required: [vendorId, vendorName, bookingCount, ticketWomen, ticketMen, ticketCouple, revenue, checkedInCount]

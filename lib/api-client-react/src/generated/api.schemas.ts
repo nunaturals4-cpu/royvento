@@ -362,6 +362,50 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+export interface AdminBookingRow {
+  id: number;
+  vendorId: number;
+  vendorName: string;
+  eventId: number;
+  eventTitle: string;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  bookingDate: string;
+  guests: number;
+  pubMode: string;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  totalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+  status: string;
+  notes: string;
+  ticketCode: string;
+  checkedIn: boolean;
+  checkedInAt?: string | null;
+  createdAt: string;
+}
+
+export interface AdminBookingReportResponse {
+  bookings: AdminBookingRow[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface AdminPartnerSummary {
+  vendorId: number;
+  vendorName: string;
+  bookingCount: number;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  revenue: number;
+  checkedInCount: number;
+}
+
 export type ListVendorsParams = {
   category?: string;
 };
@@ -381,6 +425,17 @@ export type ListEventsParams = {
 
 export type GetBookingTicketCode200 = {
   ticketCode: string;
+};
+
+export type GetAdminBookingsReportParams = {
+  page?: number;
+  vendorId?: number;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  pubMode?: string;
+  search?: string;
+  sortBy?: string;
 };
 
 export type GetAdminAnalyticsParams = {
