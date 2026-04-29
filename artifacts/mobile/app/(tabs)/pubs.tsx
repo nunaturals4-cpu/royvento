@@ -23,6 +23,13 @@ const PUB_MODES = [
   { label: "Tickets", value: "ticket" },
   { label: "Table", value: "table" },
 ];
+const PRICE_RANGES = [
+  { label: "Any Price", min: undefined, max: undefined },
+  { label: "Free", min: 0, max: 0 },
+  { label: "Under ₹500", min: undefined, max: 500 },
+  { label: "₹500–₹1500", min: 500, max: 1500 },
+  { label: "₹1500+", min: 1500, max: undefined },
+];
 
 export default function PubsScreen() {
   const colors = useColors();
@@ -32,10 +39,15 @@ export default function PubsScreen() {
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("All Cities");
   const [pubMode, setPubMode] = useState<string | undefined>(undefined);
+  const [priceRangeIdx, setPriceRangeIdx] = useState(0);
+
+  const priceRange = PRICE_RANGES[priceRangeIdx];
 
   const eventsQuery = useListEvents({
     category: "Pubs",
     city: city !== "All Cities" ? city : undefined,
+    minPrice: priceRange.min !== undefined ? String(priceRange.min) : undefined,
+    maxPrice: priceRange.max !== undefined ? String(priceRange.max) : undefined,
   });
 
   const events = (eventsQuery.data ?? []).filter((e) => {
@@ -85,6 +97,24 @@ export default function PubsScreen() {
             </Pressable>
           ))}
         </View>
+
+        {/* Price Range Filter */}
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={PRICE_RANGES}
+          keyExtractor={(_, i) => String(i)}
+          contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+          renderItem={({ item, index }) => (
+            <Pressable
+              onPress={() => setPriceRangeIdx(index)}
+              style={[styles.pill, { backgroundColor: priceRangeIdx === index ? "#22c55e" : colors.muted, borderColor: priceRangeIdx === index ? "#22c55e" : colors.border }]}
+            >
+              <Ionicons name="cash-outline" size={12} color={priceRangeIdx === index ? "#fff" : colors.mutedForeground} />
+              <Text style={[styles.pillText, { color: priceRangeIdx === index ? "#fff" : colors.mutedForeground }]}>{item.label}</Text>
+            </Pressable>
+          )}
+        />
 
         {/* City scroll */}
         <FlatList
@@ -144,7 +174,7 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
   pillRow: { flexDirection: "row", gap: 8 },
-  pill: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  pill: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 5 },
   pillText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   cityChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
   cityText: { fontSize: 12, fontFamily: "Inter_500Medium" },

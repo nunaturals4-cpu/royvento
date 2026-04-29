@@ -40,7 +40,8 @@ export default function BecomeVendorScreen() {
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState("Pubs & Bars");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
@@ -48,8 +49,12 @@ export default function BecomeVendorScreen() {
       Alert.alert("Required", "Please enter your business name.");
       return;
     }
-    if (!location.trim()) {
-      Alert.alert("Required", "Please enter your location.");
+    if (!city.trim()) {
+      Alert.alert("Required", "Please enter your city.");
+      return;
+    }
+    if (!state.trim()) {
+      Alert.alert("Required", "Please enter your state.");
       return;
     }
     setSubmitting(true);
@@ -61,7 +66,9 @@ export default function BecomeVendorScreen() {
           businessName: businessName.trim(),
           category,
           description: description.trim(),
-          location: location.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          location: `${city.trim()}, ${state.trim()}`,
         }),
       });
       await updateUser({ role: "vendor" });
@@ -152,12 +159,23 @@ export default function BecomeVendorScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>Location *</Text>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>City *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-              value={location}
-              onChangeText={setLocation}
-              placeholder="e.g. Bandra West, Mumbai"
+              value={city}
+              onChangeText={setCity}
+              placeholder="e.g. Mumbai"
+              placeholderTextColor={colors.mutedForeground}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>State *</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+              value={state}
+              onChangeText={setState}
+              placeholder="e.g. Maharashtra"
               placeholderTextColor={colors.mutedForeground}
             />
           </View>

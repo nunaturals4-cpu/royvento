@@ -24,7 +24,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content";
 
 interface AdminVendor {
   id: number;
@@ -63,6 +63,47 @@ interface AdminBooking {
   finalPrice: number;
   createdAt: string;
   ticketCode: string;
+}
+
+interface AdminSubscription {
+  id: number;
+  userName: string;
+  userEmail: string;
+  planType: string;
+  planPeriod: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+interface AdminCoupon {
+  id: number;
+  code: string;
+  discountPct: number;
+  used: boolean;
+  userName?: string;
+  userEmail?: string;
+  createdAt: string;
+  expiresAt?: string;
+}
+
+interface AdminAd {
+  id: number;
+  vendorName: string;
+  title: string;
+  status: string;
+  budget: number;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+}
+
+interface AdminBlog {
+  id: number;
+  title: string;
+  slug: string;
+  published: boolean;
+  createdAt: string;
 }
 
 export default function AdminPanelScreen() {
@@ -127,11 +168,62 @@ export default function AdminPanelScreen() {
       .finally(() => setBookingLoading(false));
   }, []);
 
+  // ─── SUBSCRIPTIONS ──────────────────────────────────────────────────────────
+  const [subscriptions, setSubscriptions] = useState<AdminSubscription[]>([]);
+  const [subLoading, setSubLoading] = useState(false);
+
+  const fetchSubscriptions = useCallback(() => {
+    setSubLoading(true);
+    customFetch<AdminSubscription[]>("/api/admin/subscriptions")
+      .then(setSubscriptions)
+      .catch(() => {})
+      .finally(() => setSubLoading(false));
+  }, []);
+
+  // ─── COUPONS ────────────────────────────────────────────────────────────────
+  const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  const fetchCoupons = useCallback(() => {
+    setCouponLoading(true);
+    customFetch<AdminCoupon[]>("/api/admin/coupons")
+      .then(setCoupons)
+      .catch(() => {})
+      .finally(() => setCouponLoading(false));
+  }, []);
+
+  // ─── ADS ────────────────────────────────────────────────────────────────────
+  const [ads, setAds] = useState<AdminAd[]>([]);
+  const [adsLoading, setAdsLoading] = useState(false);
+
+  const fetchAds = useCallback(() => {
+    setAdsLoading(true);
+    customFetch<AdminAd[]>("/api/admin/ads")
+      .then(setAds)
+      .catch(() => {})
+      .finally(() => setAdsLoading(false));
+  }, []);
+
+  // ─── BLOGS ──────────────────────────────────────────────────────────────────
+  const [blogs, setBlogs] = useState<AdminBlog[]>([]);
+  const [blogLoading, setBlogLoading] = useState(false);
+
+  const fetchBlogs = useCallback(() => {
+    setBlogLoading(true);
+    customFetch<AdminBlog[]>("/api/admin/blogs")
+      .then(setBlogs)
+      .catch(() => {})
+      .finally(() => setBlogLoading(false));
+  }, []);
+
   useEffect(() => {
     if (activeTab === "vendors") fetchVendors();
     if (activeTab === "users") fetchUsers();
     if (activeTab === "events") fetchEvents();
     if (activeTab === "bookings") fetchBookings();
+    if (activeTab === "subscriptions") fetchSubscriptions();
+    if (activeTab === "coupons") fetchCoupons();
+    if (activeTab === "content") { fetchAds(); fetchBlogs(); }
   }, [activeTab]);
 
   // ─── VENDOR ACTIONS ─────────────────────────────────────────────────────────
@@ -565,12 +657,198 @@ export default function AdminPanelScreen() {
     );
   }
 
+  // ─── RENDER SUBSCRIPTIONS ────────────────────────────────────────────────────
+  function renderSubscriptions() {
+    function subStatusColor(s: string) {
+      if (s === "active") return "#22c55e";
+      if (s === "expired" || s === "cancelled") return "#ef4444";
+      return colors.mutedForeground;
+    }
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={subLoading} onRefresh={fetchSubscriptions} tintColor={colors.primary} />}>
+        {subLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>ALL SUBSCRIPTIONS ({subscriptions.length})</Text>
+        {subscriptions.length === 0 && !subLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 20 }}>No subscriptions found</Text>
+        )}
+        {subscriptions.map((s) => (
+          <View key={s.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{s.userName}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{s.userEmail}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{s.planType} · {s.planPeriod}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end", gap: 4 }}>
+              <View style={[styles.roleBadge, { backgroundColor: subStatusColor(s.status) + "20", borderColor: subStatusColor(s.status) }]}>
+                <Text style={{ color: subStatusColor(s.status), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{s.status}</Text>
+              </View>
+              <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>Exp: {new Date(s.expiresAt).toLocaleDateString("en-IN")}</Text>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+
+  // ─── RENDER COUPONS ──────────────────────────────────────────────────────────
+  function renderCoupons() {
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={couponLoading} onRefresh={fetchCoupons} tintColor={colors.primary} />}>
+        {couponLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>ALL COUPONS ({coupons.length})</Text>
+        {coupons.length === 0 && !couponLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 20 }}>No coupons found</Text>
+        )}
+        {coupons.map((c) => (
+          <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: c.used ? colors.border : colors.primary + "30" }]}>
+            <View style={[styles.kpiIcon, { backgroundColor: colors.primary + "20" }]}>
+              <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{c.code}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{c.discountPct}% off{c.userEmail ? ` · ${c.userEmail}` : ""}</Text>
+            </View>
+            <View style={[styles.roleBadge, { backgroundColor: c.used ? colors.muted : "#22c55e20", borderColor: c.used ? colors.border : "#22c55e" }]}>
+              <Text style={{ color: c.used ? colors.mutedForeground : "#22c55e", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{c.used ? "Used" : "Active"}</Text>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+
+  // ─── AD ACTIONS ─────────────────────────────────────────────────────────────
+  async function approveAd(id: number) {
+    try {
+      await customFetch(`/api/admin/ads/${id}/approve`, { method: "PATCH" });
+      fetchAds();
+    } catch {
+      Alert.alert("Error", "Failed to approve ad.");
+    }
+  }
+
+  async function rejectAd(id: number) {
+    try {
+      await customFetch(`/api/admin/ads/${id}/reject`, { method: "PATCH" });
+      fetchAds();
+    } catch {
+      Alert.alert("Error", "Failed to reject ad.");
+    }
+  }
+
+  async function toggleBlogPublished(id: number, published: boolean) {
+    try {
+      await customFetch(`/api/admin/blogs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: !published }),
+      });
+      fetchBlogs();
+    } catch {
+      Alert.alert("Error", "Failed to update blog.");
+    }
+  }
+
+  async function deleteBlog(id: number) {
+    try {
+      await customFetch(`/api/admin/blogs/${id}`, { method: "DELETE" });
+      setBlogs((prev) => prev.filter((b) => b.id !== id));
+    } catch {
+      Alert.alert("Error", "Failed to delete blog.");
+    }
+  }
+
+  // ─── RENDER CONTENT (ADS + BLOGS) ───────────────────────────────────────────
+  function renderContent() {
+    const pendingAds = ads.filter((a) => a.status === "pending");
+    const otherAds = ads.filter((a) => a.status !== "pending");
+
+    function adStatusColor(s: string) {
+      if (s === "approved" || s === "active") return "#22c55e";
+      if (s === "rejected") return "#ef4444";
+      if (s === "pending") return "#f59e0b";
+      return colors.mutedForeground;
+    }
+
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={adsLoading || blogLoading} onRefresh={() => { fetchAds(); fetchBlogs(); }} tintColor={colors.primary} />}>
+        {/* ADS SECTION */}
+        {pendingAds.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: "#f59e0b" }]}>ADS PENDING REVIEW ({pendingAds.length})</Text>
+            {pendingAds.map((a) => (
+              <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]}>{a.title}</Text>
+                    <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.vendorName} · ₹{Number(a.budget).toLocaleString("en-IN")} budget</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity style={[styles.actionBtnWide, { backgroundColor: "#22c55e20", borderColor: "#22c55e", flex: 1 }]} onPress={() => approveAd(a.id)}>
+                    <Ionicons name="checkmark-circle-outline" size={14} color="#22c55e" />
+                    <Text style={{ color: "#22c55e", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444", flex: 1 }]} onPress={() => rejectAd(a.id)}>
+                    <Ionicons name="close-circle-outline" size={14} color="#ef4444" />
+                    <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pendingAds.length > 0 ? 16 : 0 }]}>ALL ADS ({otherAds.length})</Text>
+        {otherAds.map((a) => (
+          <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{a.title}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.vendorName}</Text>
+            </View>
+            <View style={[styles.roleBadge, { backgroundColor: adStatusColor(a.status) + "20", borderColor: adStatusColor(a.status) }]}>
+              <Text style={{ color: adStatusColor(a.status), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{a.status}</Text>
+            </View>
+          </View>
+        ))}
+
+        {/* BLOGS SECTION */}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>BLOGS ({blogs.length})</Text>
+        {blogs.length === 0 && !blogLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" }}>No blogs found</Text>
+        )}
+        {blogs.map((b) => (
+          <View key={b.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: b.published ? colors.primary + "30" : colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{b.title}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{b.slug}</Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+              <TouchableOpacity
+                onPress={() => Alert.alert(b.published ? "Unpublish?" : "Publish?", `${b.published ? "Hide" : "Publish"} "${b.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Confirm", onPress: () => toggleBlogPublished(b.id, b.published) }])}
+              >
+                <Ionicons name={b.published ? "eye-outline" : "eye-off-outline"} size={18} color={b.published ? "#22c55e" : colors.mutedForeground} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => Alert.alert("Delete Blog?", `Delete "${b.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteBlog(b.id) }])}
+              >
+                <Ionicons name="trash-outline" size={16} color={colors.destructive} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+
   const TABS = [
     { key: "analytics" as AdminTab, icon: "bar-chart-outline" as const, label: "Analytics" },
     { key: "bookings" as AdminTab, icon: "ticket-outline" as const, label: "Bookings" },
     { key: "vendors" as AdminTab, icon: "business-outline" as const, label: "Partners" },
     { key: "users" as AdminTab, icon: "people-outline" as const, label: "Users" },
     { key: "events" as AdminTab, icon: "calendar-outline" as const, label: "Events" },
+    { key: "subscriptions" as AdminTab, icon: "card-outline" as const, label: "Subs" },
+    { key: "coupons" as AdminTab, icon: "pricetag-outline" as const, label: "Coupons" },
+    { key: "content" as AdminTab, icon: "newspaper-outline" as const, label: "Content" },
   ];
 
   return (
@@ -611,6 +889,9 @@ export default function AdminPanelScreen() {
       {activeTab === "vendors" && renderVendors()}
       {activeTab === "users" && renderUsers()}
       {activeTab === "events" && renderEvents()}
+      {activeTab === "subscriptions" && renderSubscriptions()}
+      {activeTab === "coupons" && renderCoupons()}
+      {activeTab === "content" && renderContent()}
     </View>
   );
 }
