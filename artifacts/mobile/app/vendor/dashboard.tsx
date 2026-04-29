@@ -324,7 +324,7 @@ export default function VendorDashboardScreen() {
   const [profDayTimes, setProfDayTimes] = useState<Record<string, { open: string; close: string }>>({});
   const [profAddress, setProfAddress] = useState("");
   const [profAddressQuery, setProfAddressQuery] = useState("");
-  const [addrSuggestions, setAddrSuggestions] = useState<{ place_id: number; display_name: string }[]>([]);
+  const [addrSuggestions, setAddrSuggestions] = useState<{ place_id: string; description: string }[]>([]);
   const [showAddrSugg, setShowAddrSugg] = useState(false);
   const addrDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeDayPicker, setActiveDayPicker] = useState<{ day: string; field: "open" | "close" } | null>(null);
@@ -462,9 +462,9 @@ export default function VendorDashboardScreen() {
     if (q.trim().length < 3) { setAddrSuggestions([]); setShowAddrSugg(false); return; }
     addrDebounceRef.current = setTimeout(async () => {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&countrycodes=in&limit=6&addressdetails=0`;
-        const res = await fetch(url, { headers: { "Accept-Language": "en" } });
-        const data: { place_id: number; display_name: string }[] = await res.json();
+        const data: { place_id: string; description: string }[] = await customFetch(
+          `/api/places/autocomplete?q=${encodeURIComponent(q)}`
+        );
         setAddrSuggestions(data);
         setShowAddrSugg(data.length > 0);
       } catch { setAddrSuggestions([]); }
@@ -949,9 +949,9 @@ export default function VendorDashboardScreen() {
                   <TouchableOpacity
                     key={s.place_id}
                     style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.muted }}
-                    onPress={() => { setProfAddress(s.display_name); setProfAddressQuery(s.display_name); setAddrSuggestions([]); setShowAddrSugg(false); }}
+                    onPress={() => { setProfAddress(s.description); setProfAddressQuery(s.description); setAddrSuggestions([]); setShowAddrSugg(false); }}
                   >
-                    <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular" }} numberOfLines={2}>{s.display_name}</Text>
+                    <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular" }} numberOfLines={2}>{s.description}</Text>
                   </TouchableOpacity>
                 ))}
               </View>

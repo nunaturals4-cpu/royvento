@@ -25,6 +25,7 @@ import announcementsRouter from "./announcements";
 import storageRouter from "./storage";
 import paymentsRouter from "./payments";
 import managersRouter from "./managers";
+import placesRouter from "./places";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use(announcementsRouter);
 router.use(storageRouter);
 router.use(paymentsRouter);
 router.use(managersRouter);
+router.use(placesRouter);
 
 export default router;

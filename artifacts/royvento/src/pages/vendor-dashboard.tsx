@@ -136,7 +136,7 @@ const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 type DayTimes = Record<string, { open: string; close: string }>;
 
-interface NominatimResult { place_id: number; display_name: string; }
+interface PlacesSuggestion { place_id: string; description: string; }
 
 function parseDayHours(raw: unknown): DayTimes {
   if (!raw || typeof raw !== "object") return {};
@@ -162,7 +162,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [dayTimes, setDayTimes] = useState<DayTimes>(() => parseDayHours(vendor.dayHours));
   const [address, setAddress] = useState<string>(vendor.address ?? "");
   const [addressQuery, setAddressQuery] = useState<string>(vendor.address ?? "");
-  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [suggestions, setSuggestions] = useState<PlacesSuggestion[]>([]);
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [descError, setDescError] = useState("");
@@ -190,18 +190,16 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     if (q.trim().length < 3) { setSuggestions([]); setShowSugg(false); return; }
     debounceRef.current = setTimeout(async () => {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&countrycodes=in&limit=6&addressdetails=0`;
-        const res = await fetch(url, { headers: { "Accept-Language": "en" } });
-        const data: NominatimResult[] = await res.json();
+        const data: PlacesSuggestion[] = await apiGet(`/api/places/autocomplete?q=${encodeURIComponent(q)}`);
         setSuggestions(data);
         setShowSugg(data.length > 0);
       } catch { setSuggestions([]); }
     }, 400);
   };
 
-  const selectSuggestion = (s: NominatimResult) => {
-    setAddress(s.display_name);
-    setAddressQuery(s.display_name);
+  const selectSuggestion = (s: PlacesSuggestion) => {
+    setAddress(s.description);
+    setAddressQuery(s.description);
     setSuggestions([]);
     setShowSugg(false);
   };
@@ -333,7 +331,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
                     className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug"
                     onMouseDown={() => selectSuggestion(s)}
                   >
-                    {s.display_name}
+                    {s.description}
                   </button>
                 </li>
               ))}
