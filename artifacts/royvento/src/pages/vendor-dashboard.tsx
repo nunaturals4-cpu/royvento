@@ -161,7 +161,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     }
     setDescError("");
     update.mutate(
-      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
+      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, country, state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: async () => {
           try {

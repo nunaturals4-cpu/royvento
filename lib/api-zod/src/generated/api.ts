@@ -232,6 +232,7 @@ export const ListVendorsResponseItem = zod.object({
   openDays: zod.array(zod.string()),
   city: zod.string(),
   state: zod.string(),
+  country: zod.string(),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 
@@ -257,6 +258,7 @@ export const GetMyVendorResponse = zod.object({
       openDays: zod.array(zod.string()),
       city: zod.string(),
       state: zod.string(),
+      country: zod.string(),
     }),
     zod.null(),
   ]),
@@ -270,6 +272,9 @@ export const CreateMyVendorBody = zod.object({
   category: zod.string(),
   description: zod.string(),
   location: zod.string(),
+  country: zod.string().optional(),
+  state: zod.string().optional(),
+  city: zod.string().optional(),
   bannerImage: zod.string().optional(),
   coverImageUrl: zod.string().optional(),
   portfolioImages: zod.array(zod.string()).optional(),
@@ -292,6 +297,7 @@ export const CreateMyVendorResponse = zod.object({
   openDays: zod.array(zod.string()),
   city: zod.string(),
   state: zod.string(),
+  country: zod.string(),
 });
 
 /**
@@ -302,6 +308,9 @@ export const UpdateMyVendorBody = zod.object({
   category: zod.string().optional(),
   description: zod.string().optional(),
   location: zod.string().optional(),
+  country: zod.string().optional(),
+  state: zod.string().optional(),
+  city: zod.string().optional(),
   bannerImage: zod.string().optional(),
   coverImageUrl: zod.string().optional(),
   portfolioImages: zod.array(zod.string()).optional(),
@@ -324,6 +333,7 @@ export const UpdateMyVendorResponse = zod.object({
   openDays: zod.array(zod.string()),
   city: zod.string(),
   state: zod.string(),
+  country: zod.string(),
 });
 
 /**
@@ -350,6 +360,7 @@ export const GetVendorResponse = zod.object({
   openDays: zod.array(zod.string()),
   city: zod.string(),
   state: zod.string(),
+  country: zod.string(),
 });
 
 /**
@@ -372,6 +383,7 @@ export const ListPendingVendorsResponseItem = zod.object({
   openDays: zod.array(zod.string()),
   city: zod.string(),
   state: zod.string(),
+  country: zod.string(),
 });
 export const ListPendingVendorsResponse = zod.array(
   ListPendingVendorsResponseItem,
@@ -401,6 +413,7 @@ export const ApproveVendorResponse = zod.object({
   openDays: zod.array(zod.string()),
   city: zod.string(),
   state: zod.string(),
+  country: zod.string(),
 });
 
 /**
@@ -427,6 +440,7 @@ export const RejectVendorResponse = zod.object({
   openDays: zod.array(zod.string()),
   city: zod.string(),
   state: zod.string(),
+  country: zod.string(),
 });
 
 /**
@@ -585,6 +599,7 @@ export const GetEventResponse = zod
         openDays: zod.array(zod.string()),
         city: zod.string(),
         state: zod.string(),
+        country: zod.string(),
       }),
     }),
   );

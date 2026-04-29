@@ -100,6 +100,7 @@ export interface Vendor {
   openDays: string[];
   city: string;
   state: string;
+  country: string;
 }
 
 export interface MyVendorResponse {
@@ -111,6 +112,9 @@ export interface CreateVendorBody {
   category: string;
   description: string;
   location: string;
+  country?: string;
+  state?: string;
+  city?: string;
   bannerImage?: string;
   coverImageUrl?: string;
   portfolioImages?: string[];
@@ -121,6 +125,9 @@ export interface UpdateVendorBody {
   category?: string;
   description?: string;
   location?: string;
+  country?: string;
+  state?: string;
+  city?: string;
   bannerImage?: string;
   coverImageUrl?: string;
   portfolioImages?: string[];

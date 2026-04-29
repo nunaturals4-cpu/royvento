@@ -51,21 +51,16 @@ export default function BecomeVendorScreen() {
     }
     setSubmitting(true);
     try {
-      const message = [
-        description.trim(),
-        location.city.trim() ? `City: ${location.city.trim()}` : "",
-        location.state.trim() ? `State: ${location.state.trim()}` : "",
-        location.country.trim() ? `Country: ${location.country.trim()}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
       await customFetch("/api/vendor-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessName: businessName.trim(),
           category,
-          message: message || "Partner application",
+          message: description.trim() || "Partner application",
+          country: location.country.trim() || "India",
+          state: location.state.trim(),
+          city: location.city.trim(),
         }),
       });
       Alert.alert(

@@ -21,6 +21,9 @@ interface VendorRow {
   category: string;
   description: string;
   location: string;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
   bannerImage: string;
   coverImageUrl: string;
   portfolioImages: string[];
@@ -48,6 +51,9 @@ async function serializeVendor(v: VendorRow) {
     category: v.category,
     description: v.description,
     location: v.location,
+    country: v.country ?? "",
+    state: v.state ?? "",
+    city: v.city ?? "",
     bannerImage: v.bannerImage,
     coverImageUrl: v.coverImageUrl ?? "",
     portfolioImages: v.portfolioImages,
@@ -74,6 +80,9 @@ async function serializeVendorList(rows: VendorRow[]) {
       category: v.category,
       description: v.description,
       location: v.location,
+      country: v.country ?? "",
+      state: v.state ?? "",
+      city: v.city ?? "",
       bannerImage: v.bannerImage,
       coverImageUrl: v.coverImageUrl ?? "",
       portfolioImages: v.portfolioImages,
@@ -156,6 +165,9 @@ router.post("/vendors/me", requireAuth(), async (req, res) => {
       category: parsed.data.category,
       description: parsed.data.description ?? "",
       location: parsed.data.location ?? "",
+      country: parsed.data.country ?? "",
+      state: parsed.data.state ?? "",
+      city: parsed.data.city ?? "",
       bannerImage: parsed.data.bannerImage ?? "",
       portfolioImages: parsed.data.portfolioImages ?? [],
       status: "pending",
@@ -193,6 +205,9 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     "category",
     "description",
     "location",
+    "country",
+    "state",
+    "city",
     "bannerImage",
     "coverImageUrl",
     "portfolioImages",

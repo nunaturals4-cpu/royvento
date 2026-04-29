@@ -24,4 +24,5 @@ export interface Vendor {
   openDays: string[];
   city: string;
   state: string;
+  country: string;
 }

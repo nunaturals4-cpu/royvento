@@ -15,6 +15,9 @@ const CreateBody = z.object({
   businessName: z.string().min(1).max(255),
   category: z.string().min(1).max(100),
   message: z.string().max(2000).optional().default(""),
+  country: z.string().max(100).optional().default(""),
+  state: z.string().max(100).optional().default(""),
+  city: z.string().max(100).optional().default(""),
 });
 
 async function joinUser(rows: { userId: number }[]) {
@@ -57,13 +60,16 @@ router.post("/vendor-requests", requireAuth(), async (req, res) => {
     res.status(409).json({ error: "You already have a pending request" });
     return;
   }
+  const locationParts = [parsed.data.city, parsed.data.state, parsed.data.country].filter(Boolean);
+  const locationLine = locationParts.length > 0 ? `Location: ${locationParts.join(", ")}` : "";
+  const fullMessage = [parsed.data.message, locationLine].filter(Boolean).join("\n");
   const [created] = await db
     .insert(vendorRequestsTable)
     .values({
       userId: user.id,
       businessName: parsed.data.businessName,
       category: parsed.data.category,
-      message: parsed.data.message ?? "",
+      message: fullMessage,
       status: "pending",
     })
     .returning();

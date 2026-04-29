@@ -1230,7 +1230,9 @@ components:
           type: string
         state:
           type: string
-      required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state]
+        country:
+          type: string
+      required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state, country]
 
     MyVendorResponse:
       type: object
@@ -1252,6 +1254,12 @@ components:
           type: string
         location:
           type: string
+        country:
+          type: string
+        state:
+          type: string
+        city:
+          type: string
         bannerImage:
           type: string
         coverImageUrl:
@@ -1272,6 +1280,12 @@ components:
         description:
           type: string
         location:
+          type: string
+        country:
+          type: string
+        state:
+          type: string
+        city:
           type: string
         bannerImage:
           type: string
