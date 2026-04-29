@@ -202,11 +202,21 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     }, 400);
   };
 
-  const selectSuggestion = (s: PlacesSuggestion) => {
+  const selectSuggestion = async (s: PlacesSuggestion) => {
     setAddress(s.description);
     setAddressQuery(s.description);
     setSuggestions([]);
     setShowSugg(false);
+    try {
+      const details = await apiGet<{ address: string | null; city: string | null; state: string | null; country: string | null }>(
+        `/api/places/details?place_id=${encodeURIComponent(s.place_id)}`
+      );
+      if (details.city) setCity(details.city);
+      if (details.state) setStateF(details.state);
+      if (details.country) setCountry(details.country);
+    } catch {
+      // silently ignore — address is already set, partner can fill city/state manually
+    }
   };
 
   const toggleDay = (day: string) =>
