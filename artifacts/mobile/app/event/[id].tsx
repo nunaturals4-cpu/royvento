@@ -128,6 +128,9 @@ export default function EventDetailScreen() {
   const [ticketWomen, setTicketWomen] = useState(0);
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
+  const [pubMode, setPubMode] = useState<"ticket" | "event">("ticket");
+  const [occasion, setOccasion] = useState("farewell");
+  const [personName, setPersonName] = useState("");
 
   const bookingDate = bookingDateObj.toISOString().slice(0, 10);
 
@@ -243,8 +246,12 @@ export default function EventDetailScreen() {
     if (!user) { router.push("/(auth)/login"); return; }
     const today = new Date().toISOString().slice(0, 10);
     if (bookingDate < today) { Alert.alert("Invalid Date", "Booking date must be today or in the future."); return; }
-    if (isPub && ticketWomen + ticketMen + ticketCouple === 0) {
+    if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
       Alert.alert("Add Tickets", "Please select at least one ticket to proceed.");
+      return;
+    }
+    if (isPub && pubMode === "event" && (!parseInt(guests) || parseInt(guests) < 10)) {
+      Alert.alert("Minimum Guests", "Group bookings require at least 10 guests.");
       return;
     }
 
@@ -259,11 +266,18 @@ export default function EventDetailScreen() {
     };
 
     if (isPub) {
-      payload.pubMode = "ticket";
-      payload.ticketWomen = ticketWomen;
-      payload.ticketMen = ticketMen;
-      payload.ticketCouple = ticketCouple;
-      payload.guests = ticketWomen + ticketMen + ticketCouple * 2;
+      payload.pubMode = pubMode;
+      payload.personName = personName.trim() || undefined;
+      if (pubMode === "ticket") {
+        payload.ticketWomen = ticketWomen;
+        payload.ticketMen = ticketMen;
+        payload.ticketCouple = ticketCouple;
+        payload.guests = ticketWomen + ticketMen + ticketCouple * 2;
+      } else {
+        payload.guests = parseInt(guests) || 10;
+        payload.notes = occasion;
+        payload.selectedPubEvent = "";
+      }
     } else {
       payload.guests = parseInt(guests) || 1;
     }
@@ -476,23 +490,102 @@ export default function EventDetailScreen() {
               )}
             </View>
 
-            {/* Pub ticket counters OR guest count */}
+            {/* Pub booking type + conditional fields OR guest count */}
             {isPub ? (
-              <View style={[styles.pubTickets, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>Select Tickets</Text>
-                {priceWomen > 0 && (
-                  <TickerCounter label="Women" value={ticketWomen} price={priceWomen} onChange={setTicketWomen}
-                    color={colors.foreground} mutedColor={colors.mutedForeground} />
+              <>
+                {/* Booking type toggle */}
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Booking type</Text>
+                  <View style={styles.modeRow}>
+                    {(["ticket", "event"] as const).map((m) => (
+                      <Pressable
+                        key={m}
+                        onPress={() => setPubMode(m)}
+                        style={[
+                          styles.modeBtn,
+                          { borderColor: pubMode === m ? colors.primary : colors.border, backgroundColor: pubMode === m ? colors.primary + "18" : colors.muted },
+                        ]}
+                      >
+                        <Ionicons
+                          name={m === "ticket" ? "ticket-outline" : "people-outline"}
+                          size={14}
+                          color={pubMode === m ? colors.primary : colors.mutedForeground}
+                        />
+                        <Text style={[styles.modeBtnText, { color: pubMode === m ? colors.primary : colors.mutedForeground }]}>
+                          {m === "ticket" ? "Buy tickets" : "Group / corporate"}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Ticket counters — ticket mode */}
+                {pubMode === "ticket" && (
+                  <View style={[styles.pubTickets, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>Ticket counts</Text>
+                    {priceWomen > 0 && (
+                      <TickerCounter label="Women" value={ticketWomen} price={priceWomen} onChange={setTicketWomen}
+                        color={colors.foreground} mutedColor={colors.mutedForeground} />
+                    )}
+                    {priceMen > 0 && (
+                      <TickerCounter label="Men" value={ticketMen} price={priceMen} onChange={setTicketMen}
+                        color={colors.foreground} mutedColor={colors.mutedForeground} />
+                    )}
+                    {priceCouple > 0 && (
+                      <TickerCounter label="Couple" value={ticketCouple} price={priceCouple} onChange={setTicketCouple}
+                        color={colors.foreground} mutedColor={colors.mutedForeground} />
+                    )}
+                  </View>
                 )}
-                {priceMen > 0 && (
-                  <TickerCounter label="Men" value={ticketMen} price={priceMen} onChange={setTicketMen}
-                    color={colors.foreground} mutedColor={colors.mutedForeground} />
+
+                {/* Occasion + guests — event mode */}
+                {pubMode === "event" && (
+                  <>
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Occasion</Text>
+                      <View style={styles.occasionGrid}>
+                        {(["farewell", "office-party", "casual-party", "birthday", "others"] as const).map((occ) => (
+                          <Pressable
+                            key={occ}
+                            onPress={() => setOccasion(occ)}
+                            style={[
+                              styles.occasionChip,
+                              { borderColor: occasion === occ ? colors.primary : colors.border, backgroundColor: occasion === occ ? colors.primary + "18" : colors.muted },
+                            ]}
+                          >
+                            <Text style={[styles.occasionChipText, { color: occasion === occ ? colors.primary : colors.mutedForeground }]}>
+                              {occ === "office-party" ? "Office Party" : occ === "casual-party" ? "Casual Party" : occ.charAt(0).toUpperCase() + occ.slice(1)}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Guests <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular" }}>(min 10)</Text></Text>
+                      <TextInput
+                        style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                        value={guests}
+                        onChangeText={setGuests}
+                        placeholder="10"
+                        placeholderTextColor={colors.mutedForeground}
+                        keyboardType="number-pad"
+                      />
+                    </View>
+                  </>
                 )}
-                {priceCouple > 0 && (
-                  <TickerCounter label="Couple" value={ticketCouple} price={priceCouple} onChange={setTicketCouple}
-                    color={colors.foreground} mutedColor={colors.mutedForeground} />
-                )}
-              </View>
+
+                {/* Booking under name */}
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Booking under name</Text>
+                  <TextInput
+                    style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                    value={personName}
+                    onChangeText={setPersonName}
+                    placeholder="Name on the booking"
+                    placeholderTextColor={colors.mutedForeground}
+                  />
+                </View>
+              </>
             ) : (
               <View style={styles.field}>
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Guests</Text>
@@ -749,6 +842,12 @@ const styles = StyleSheet.create({
   openDaysRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   openDaysText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   pubTickets: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 12 },
+  modeRow: { flexDirection: "row", gap: 8, marginTop: 6 },
+  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 8 },
+  modeBtnText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  occasionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  occasionChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
+  occasionChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   tickerRow: { flexDirection: "row", alignItems: "center" },
   tickerLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   tickerPrice: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
