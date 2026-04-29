@@ -8,4 +8,7 @@
 
 export type ListVendorsParams = {
   category?: string;
+  country?: string;
+  state?: string;
+  city?: string;
 };

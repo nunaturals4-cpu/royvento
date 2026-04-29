@@ -473,6 +473,9 @@ export interface AdminLeadsSummary {
 
 export type ListVendorsParams = {
   category?: string;
+  country?: string;
+  state?: string;
+  city?: string;
 };
 
 export type ListEventsParams = {

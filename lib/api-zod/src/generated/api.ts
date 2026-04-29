@@ -210,6 +210,9 @@ export const DeleteUserResponse = zod.object({
  */
 export const ListVendorsQueryParams = zod.object({
   category: zod.coerce.string().optional(),
+  country: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  city: zod.coerce.string().optional(),
 });
 
 export const ListVendorsResponseItem = zod.object({

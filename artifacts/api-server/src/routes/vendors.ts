@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, vendorsTable, usersTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, ilike } from "drizzle-orm";
 import {
   CreateMyVendorBody,
   UpdateMyVendorBody,
@@ -88,9 +88,12 @@ async function serializeVendorList(rows: VendorRow[]) {
 
 router.get("/vendors", async (req, res) => {
   const parsed = ListVendorsQueryParams.safeParse(req.query);
-  const category = parsed.success ? parsed.data.category : undefined;
+  const filters = parsed.success ? parsed.data : {};
   const conditions = [eq(vendorsTable.status, "approved")];
-  if (category) conditions.push(eq(vendorsTable.category, category));
+  if (filters.category) conditions.push(eq(vendorsTable.category, filters.category));
+  if (filters.country) conditions.push(ilike(vendorsTable.country, `%${filters.country}%`));
+  if (filters.state) conditions.push(ilike(vendorsTable.state, `%${filters.state}%`));
+  if (filters.city) conditions.push(ilike(vendorsTable.city, `%${filters.city}%`));
   const rows = await db
     .select()
     .from(vendorsTable)
