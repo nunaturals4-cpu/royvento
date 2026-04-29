@@ -44,7 +44,7 @@ export default function PubsScreen() {
   const priceRange = PRICE_RANGES[priceRangeIdx];
 
   const eventsQuery = useListEvents({
-    category: "Pubs",
+    type: "pub",
     city: city !== "All Cities" ? city : undefined,
     minPrice: priceRange.min !== undefined ? String(priceRange.min) : undefined,
     maxPrice: priceRange.max !== undefined ? String(priceRange.max) : undefined,

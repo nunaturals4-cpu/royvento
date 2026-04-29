@@ -91,7 +91,7 @@ interface AdminSubscription {
 interface AdminCoupon {
   id: number;
   code: string;
-  discountPct: number;
+  discountPercent: number;
   used: boolean;
   userName?: string;
   userEmail?: string;
@@ -101,12 +101,10 @@ interface AdminCoupon {
 
 interface AdminAd {
   id: number;
+  vendorId: number;
   vendorName: string;
-  title: string;
+  message: string;
   status: string;
-  budget: number;
-  startDate: string;
-  endDate: string;
   createdAt: string;
 }
 
@@ -782,7 +780,7 @@ export default function AdminPanelScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.itemTitle, { color: colors.foreground }]}>{c.code}</Text>
-              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{c.discountPct}% off{c.userEmail ? ` · ${c.userEmail}` : ""}</Text>
+              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{c.discountPercent}% off{c.userEmail ? ` · ${c.userEmail}` : ""}</Text>
             </View>
             <View style={[styles.roleBadge, { backgroundColor: c.used ? colors.muted : "#22c55e20", borderColor: c.used ? colors.border : "#22c55e" }]}>
               <Text style={{ color: c.used ? colors.mutedForeground : "#22c55e", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{c.used ? "Used" : "Active"}</Text>
@@ -856,8 +854,8 @@ export default function AdminPanelScreen() {
               <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8 }]}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemTitle, { color: colors.foreground }]}>{a.title}</Text>
-                    <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.vendorName} · ₹{Number(a.budget).toLocaleString("en-IN")} budget</Text>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]}>{a.vendorName || `Ad #${a.id}`}</Text>
+                    {a.message ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]} numberOfLines={2}>{a.message}</Text> : null}
                   </View>
                 </View>
                 <View style={{ flexDirection: "row", gap: 8 }}>
@@ -878,8 +876,8 @@ export default function AdminPanelScreen() {
         {otherAds.map((a) => (
           <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{a.title}</Text>
-              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.vendorName}</Text>
+              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{a.vendorName || `Ad #${a.id}`}</Text>
+              {a.message ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]} numberOfLines={1}>{a.message}</Text> : null}
             </View>
             <View style={[styles.roleBadge, { backgroundColor: adStatusColor(a.status) + "20", borderColor: adStatusColor(a.status) }]}>
               <Text style={{ color: adStatusColor(a.status), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{a.status}</Text>
