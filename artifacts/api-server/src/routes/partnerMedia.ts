@@ -89,7 +89,18 @@ router.delete("/partner/media/:id", requireAuth(["vendor"]), async (req, res) =>
 
 const VALID_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-const DayTimesSchema = z.object({ open: z.string().max(10), close: z.string().max(10) }).nullable();
+const HH_MM_RE = /^\d{2}:\d{2}$/;
+
+const DayTimesSchema = z
+  .object({
+    open: z.string().max(10).refine((v) => !v || HH_MM_RE.test(v), { message: "Time must be HH:MM" }),
+    close: z.string().max(10).refine((v) => !v || HH_MM_RE.test(v), { message: "Time must be HH:MM" }),
+  })
+  .refine((t) => {
+    if (!t.open || !t.close) return true;
+    return t.open !== t.close;
+  }, { message: "Opening and closing time cannot be the same" })
+  .nullable();
 
 const UpdatePartnerProfileBody = z.object({
   eventTypes: z.array(z.string()).optional(),

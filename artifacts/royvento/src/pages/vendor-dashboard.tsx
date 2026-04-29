@@ -166,8 +166,15 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [descError, setDescError] = useState("");
+  const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>({});
   const update = useUpdateMyVendor();
   const { toast } = useToast();
+
+  const checkDayError = (open: string, close: string): string => {
+    if (!open || !close) return "";
+    if (open === close) return "Opening and closing time cannot be the same";
+    return "";
+  };
 
   const searchAddress = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -193,8 +200,15 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const toggleDay = (day: string) =>
     setOpenDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
-  const setDayTime = (day: string, field: "open" | "close", val: string) =>
-    setDayTimes((prev) => ({ ...prev, [day]: { open: prev[day]?.open ?? "", close: prev[day]?.close ?? "", [field]: val } }));
+  const setDayTime = (day: string, field: "open" | "close", val: string) => {
+    setDayTimes((prev) => {
+      const updated = { ...prev, [day]: { open: prev[day]?.open ?? "", close: prev[day]?.close ?? "", [field]: val } };
+      const { open, close } = updated[day]!;
+      const err = checkDayError(open, close);
+      setDayHoursErrors((e) => ({ ...e, [day]: err }));
+      return updated;
+    });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,6 +218,10 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     }
     if (openDays.length === 0) {
       toast({ title: "Select at least one open day", variant: "destructive" }); return;
+    }
+    const firstHoursError = openDays.map((d) => dayHoursErrors[d]).find(Boolean);
+    if (firstHoursError) {
+      toast({ title: "Fix opening hours", description: firstHoursError, variant: "destructive" }); return;
     }
     setDescError("");
     const dayHoursPayload: DayTimes = {};
@@ -319,34 +337,43 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             {ALL_DAYS.map((day) => {
               const isOpen = openDays.includes(day);
               return (
-                <div key={day} className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors ${isOpen ? "border-green-500/30 bg-green-600/10" : "border-white/10 bg-white/5"}`}>
-                  <button
-                    type="button"
-                    onClick={() => toggleDay(day)}
-                    className={`w-12 text-sm font-medium shrink-0 rounded px-1.5 py-0.5 transition-colors ${isOpen ? "text-green-300" : "text-muted-foreground"}`}
-                  >
-                    {day}
-                  </button>
-                  {isOpen ? (
-                    <>
-                      <Input
-                        type="time"
-                        value={dayTimes[day]?.open ?? ""}
-                        onChange={(e) => setDayTime(day, "open", e.target.value)}
-                        className="bg-black/40 border-white/10 h-8 text-sm w-32"
-                        title="Opening time"
-                      />
-                      <span className="text-muted-foreground text-xs">to</span>
-                      <Input
-                        type="time"
-                        value={dayTimes[day]?.close ?? ""}
-                        onChange={(e) => setDayTime(day, "close", e.target.value)}
-                        className="bg-black/40 border-white/10 h-8 text-sm w-32"
-                        title="Closing time"
-                      />
-                    </>
-                  ) : (
-                    <span className="text-xs text-muted-foreground italic">Closed</span>
+                <div key={day} className={`flex flex-col gap-1 rounded-lg border px-3 py-2 transition-colors ${isOpen ? (dayHoursErrors[day] ? "border-red-500/50 bg-red-600/5" : "border-green-500/30 bg-green-600/10") : "border-white/10 bg-white/5"}`}>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleDay(day)}
+                      className={`w-12 text-sm font-medium shrink-0 rounded px-1.5 py-0.5 transition-colors ${isOpen ? "text-green-300" : "text-muted-foreground"}`}
+                    >
+                      {day}
+                    </button>
+                    {isOpen ? (
+                      <>
+                        <Input
+                          type="time"
+                          value={dayTimes[day]?.open ?? ""}
+                          onChange={(e) => setDayTime(day, "open", e.target.value)}
+                          className={`bg-black/40 h-8 text-sm w-32 ${dayHoursErrors[day] ? "border-red-500" : "border-white/10"}`}
+                          title="Opening time"
+                        />
+                        <span className="text-muted-foreground text-xs">to</span>
+                        <Input
+                          type="time"
+                          value={dayTimes[day]?.close ?? ""}
+                          onChange={(e) => setDayTime(day, "close", e.target.value)}
+                          className={`bg-black/40 h-8 text-sm w-32 ${dayHoursErrors[day] ? "border-red-500" : "border-white/10"}`}
+                          title="Closing time"
+                        />
+                        {dayTimes[day]?.open && dayTimes[day]?.close && !dayHoursErrors[day] &&
+                          dayTimes[day]!.close < dayTimes[day]!.open && (
+                            <span className="text-xs text-amber-400">crosses midnight</span>
+                          )}
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Closed</span>
+                    )}
+                  </div>
+                  {dayHoursErrors[day] && (
+                    <p className="text-xs text-red-400 pl-14">{dayHoursErrors[day]}</p>
                   )}
                 </div>
               );

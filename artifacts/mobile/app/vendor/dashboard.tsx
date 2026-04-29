@@ -329,6 +329,7 @@ export default function VendorDashboardScreen() {
   const addrDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeDayPicker, setActiveDayPicker] = useState<{ day: string; field: "open" | "close" } | null>(null);
   const [pickerTimeDate, setPickerTimeDate] = useState<Date>(() => { const d = new Date(); d.setHours(18, 0, 0, 0); return d; });
+  const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>({});
   const [profCatPickerOpen, setProfCatPickerOpen] = useState(false);
   const [profSaving, setProfSaving] = useState(false);
 
@@ -372,6 +373,14 @@ export default function VendorDashboardScreen() {
   }, [user?.id]);
 
   async function saveProfile() {
+    const firstHoursError = profOpenDays
+      .filter((d) => VALID_API_DAYS.includes(d))
+      .map((d) => dayHoursErrors[d])
+      .find(Boolean);
+    if (firstHoursError) {
+      Alert.alert("Fix opening hours", firstHoursError);
+      return;
+    }
     setProfSaving(true);
     try {
       await updateVendorMut.mutateAsync({
@@ -468,17 +477,30 @@ export default function VendorDashboardScreen() {
     setActiveDayPicker({ day, field });
   }
 
+  function checkDayError(open: string, close: string): string {
+    if (!open || !close) return "";
+    if (open === close) return "Opening and closing time cannot be the same";
+    return "";
+  }
+
   function confirmDayTimePicker(d: Date) {
     if (!activeDayPicker) return;
     const timeStr = formatHHMM(d);
-    setProfDayTimes((prev) => ({
-      ...prev,
-      [activeDayPicker.day]: {
-        open: prev[activeDayPicker.day]?.open ?? "",
-        close: prev[activeDayPicker.day]?.close ?? "",
-        [activeDayPicker.field]: timeStr,
-      },
-    }));
+    const { day, field } = activeDayPicker;
+    setProfDayTimes((prev) => {
+      const updated = {
+        ...prev,
+        [day]: {
+          open: prev[day]?.open ?? "",
+          close: prev[day]?.close ?? "",
+          [field]: timeStr,
+        },
+      };
+      const { open, close } = updated[day]!;
+      const err = checkDayError(open, close);
+      setDayHoursErrors((e) => ({ ...e, [day]: err }));
+      return updated;
+    });
     setActiveDayPicker(null);
   }
 
@@ -932,8 +954,12 @@ export default function VendorDashboardScreen() {
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>OPERATING DAYS &amp; HOURS</Text>
           {ALL_DAYS.map((day) => {
             const active = profOpenDays.includes(day);
+            const dayErr = active ? (dayHoursErrors[day] ?? "") : "";
+            const open = profDayTimes[day]?.open ?? "";
+            const close = profDayTimes[day]?.close ?? "";
+            const crossesMidnight = active && open && close && !dayErr && close < open;
             return (
-              <View key={day} style={[styles.field, { backgroundColor: active ? colors.card : colors.muted, borderColor: active ? colors.primary + "50" : colors.border, marginBottom: 6 }]}>
+              <View key={day} style={[styles.field, { backgroundColor: active ? colors.card : colors.muted, borderColor: dayErr ? "#ef444480" : active ? colors.primary + "50" : colors.border, marginBottom: 6 }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                   <TouchableOpacity
                     onPress={() => toggleDay(day)}
@@ -942,26 +968,33 @@ export default function VendorDashboardScreen() {
                     <Text style={[styles.dayText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{day}</Text>
                   </TouchableOpacity>
                   {active ? (
-                    <View style={{ flexDirection: "row", gap: 8, flex: 1 }}>
-                      <TouchableOpacity
-                        style={[styles.timeBtn, { borderColor: colors.border, backgroundColor: colors.muted, flex: 1 }]}
-                        onPress={() => openDayTimePicker(day, "open")}
-                      >
-                        <Ionicons name="time-outline" size={14} color={colors.primary} />
-                        <Text style={[styles.timeBtnText, { color: profDayTimes[day]?.open ? colors.foreground : colors.mutedForeground, fontSize: 12 }]}>
-                          {displayTime(profDayTimes[day]?.open ?? "")}
-                        </Text>
-                      </TouchableOpacity>
-                      <Text style={{ color: colors.mutedForeground, alignSelf: "center", fontSize: 12 }}>–</Text>
-                      <TouchableOpacity
-                        style={[styles.timeBtn, { borderColor: colors.border, backgroundColor: colors.muted, flex: 1 }]}
-                        onPress={() => openDayTimePicker(day, "close")}
-                      >
-                        <Ionicons name="time-outline" size={14} color={colors.primary} />
-                        <Text style={[styles.timeBtnText, { color: profDayTimes[day]?.close ? colors.foreground : colors.mutedForeground, fontSize: 12 }]}>
-                          {displayTime(profDayTimes[day]?.close ?? "")}
-                        </Text>
-                      </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity
+                          style={[styles.timeBtn, { borderColor: dayErr ? "#ef4444" : colors.border, backgroundColor: colors.muted, flex: 1 }]}
+                          onPress={() => openDayTimePicker(day, "open")}
+                        >
+                          <Ionicons name="time-outline" size={14} color={dayErr ? "#ef4444" : colors.primary} />
+                          <Text style={[styles.timeBtnText, { color: open ? colors.foreground : colors.mutedForeground, fontSize: 12 }]}>
+                            {displayTime(open)}
+                          </Text>
+                        </TouchableOpacity>
+                        <Text style={{ color: colors.mutedForeground, alignSelf: "center", fontSize: 12 }}>–</Text>
+                        <TouchableOpacity
+                          style={[styles.timeBtn, { borderColor: dayErr ? "#ef4444" : colors.border, backgroundColor: colors.muted, flex: 1 }]}
+                          onPress={() => openDayTimePicker(day, "close")}
+                        >
+                          <Ionicons name="time-outline" size={14} color={dayErr ? "#ef4444" : colors.primary} />
+                          <Text style={[styles.timeBtnText, { color: close ? colors.foreground : colors.mutedForeground, fontSize: 12 }]}>
+                            {displayTime(close)}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      {dayErr ? (
+                        <Text style={{ fontSize: 11, color: "#ef4444", marginTop: 4, fontFamily: "Inter_400Regular" }}>{dayErr}</Text>
+                      ) : crossesMidnight ? (
+                        <Text style={{ fontSize: 11, color: "#f59e0b", marginTop: 4, fontFamily: "Inter_400Regular" }}>Crosses midnight</Text>
+                      ) : null}
                     </View>
                   ) : (
                     <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic" }}>Closed</Text>
