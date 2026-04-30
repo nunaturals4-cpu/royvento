@@ -29,5 +29,5 @@ export interface Vendor {
   city: string;
   state: string;
   country: string;
-  freeEntryRules?: FreeEntryRules;
+  freeEntryRules?: FreeEntryRules | null;
 }

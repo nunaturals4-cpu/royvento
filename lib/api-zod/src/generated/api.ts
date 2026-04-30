@@ -236,17 +236,20 @@ export const ListVendorsResponseItem = zod.object({
   state: zod.string(),
   country: zod.string(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
@@ -277,19 +280,24 @@ export const GetMyVendorResponse = zod.object({
       state: zod.string(),
       country: zod.string(),
       freeEntryRules: zod
-        .object({
-          enabled: zod.boolean(),
-          genders: zod.array(
-            zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-          ),
-          days: zod.array(
-            zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-          ),
-          beforeTime: zod
-            .string()
-            .optional()
-            .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-        })
+        .union([
+          zod.object({
+            enabled: zod.boolean(),
+            genders: zod.array(
+              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+            ),
+            days: zod.array(
+              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+            ),
+            beforeTime: zod
+              .string()
+              .optional()
+              .describe(
+                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+              ),
+          }),
+          zod.null(),
+        ])
         .optional(),
     }),
     zod.null(),
@@ -333,17 +341,20 @@ export const CreateMyVendorResponse = zod.object({
   state: zod.string(),
   country: zod.string(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -384,17 +395,20 @@ export const UpdateMyVendorResponse = zod.object({
   state: zod.string(),
   country: zod.string(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -426,17 +440,20 @@ export const GetVendorResponse = zod.object({
   state: zod.string(),
   country: zod.string(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -464,17 +481,20 @@ export const ListPendingVendorsResponseItem = zod.object({
   state: zod.string(),
   country: zod.string(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 export const ListPendingVendorsResponse = zod.array(
@@ -509,17 +529,20 @@ export const ApproveVendorResponse = zod.object({
   state: zod.string(),
   country: zod.string(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -551,17 +574,20 @@ export const RejectVendorResponse = zod.object({
   state: zod.string(),
   country: zod.string(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -614,17 +640,20 @@ export const ListEventsResponseItem = zod.object({
     )
     .optional(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
@@ -690,17 +719,20 @@ export const CreateEventResponse = zod.object({
     )
     .optional(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -740,17 +772,20 @@ export const ListFeaturedEventsResponseItem = zod.object({
     )
     .optional(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 export const ListFeaturedEventsResponse = zod.array(
@@ -798,17 +833,22 @@ export const GetEventResponse = zod
       )
       .optional(),
     freeEntryRules: zod
-      .object({
-        enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-        days: zod.array(
-          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-        ),
-        beforeTime: zod
-          .string()
-          .optional()
-          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-      })
+      .union([
+        zod.object({
+          enabled: zod.boolean(),
+          genders: zod.array(
+            zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+          ),
+          days: zod.array(
+            zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+          ),
+          beforeTime: zod
+            .string()
+            .optional()
+            .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+        }),
+        zod.null(),
+      ])
       .optional(),
   })
   .and(
@@ -834,21 +874,24 @@ export const GetEventResponse = zod
         state: zod.string(),
         country: zod.string(),
         freeEntryRules: zod
-          .object({
-            enabled: zod.boolean(),
-            genders: zod.array(
-              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-            ),
-            days: zod.array(
-              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-            ),
-            beforeTime: zod
-              .string()
-              .optional()
-              .describe(
-                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+          .union([
+            zod.object({
+              enabled: zod.boolean(),
+              genders: zod.array(
+                zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
               ),
-          })
+              days: zod.array(
+                zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+              ),
+              beforeTime: zod
+                .string()
+                .optional()
+                .describe(
+                  "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+                ),
+            }),
+            zod.null(),
+          ])
           .optional(),
       }),
     }),
@@ -922,17 +965,20 @@ export const UpdateEventResponse = zod.object({
     )
     .optional(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -983,17 +1029,20 @@ export const ListMyVendorEventsResponseItem = zod.object({
     )
     .optional(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 export const ListMyVendorEventsResponse = zod.array(
@@ -1692,17 +1741,22 @@ export const GetWishlistResponseItem = zod
       )
       .optional(),
     freeEntryRules: zod
-      .object({
-        enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-        days: zod.array(
-          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-        ),
-        beforeTime: zod
-          .string()
-          .optional()
-          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-      })
+      .union([
+        zod.object({
+          enabled: zod.boolean(),
+          genders: zod.array(
+            zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+          ),
+          days: zod.array(
+            zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+          ),
+          beforeTime: zod
+            .string()
+            .optional()
+            .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+        }),
+        zod.null(),
+      ])
       .optional(),
   })
   .and(

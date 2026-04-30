@@ -1321,7 +1321,9 @@ components:
         country:
           type: string
         freeEntryRules:
-          $ref: "#/components/schemas/FreeEntryRules"
+          anyOf:
+            - $ref: "#/components/schemas/FreeEntryRules"
+            - type: "null"
       required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state, country]
 
     MyVendorResponse:
@@ -1449,7 +1451,9 @@ components:
               couple:
                 type: number
         freeEntryRules:
-          $ref: "#/components/schemas/FreeEntryRules"
+          anyOf:
+            - $ref: "#/components/schemas/FreeEntryRules"
+            - type: "null"
       required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus]
 
     EventDetail:

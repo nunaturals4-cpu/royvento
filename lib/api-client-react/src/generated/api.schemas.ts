@@ -136,7 +136,7 @@ export interface Vendor {
   city: string;
   state: string;
   country: string;
-  freeEntryRules?: FreeEntryRules;
+  freeEntryRules?: FreeEntryRules | null;
 }
 
 export interface MyVendorResponse {
@@ -200,7 +200,7 @@ export interface Event {
   approvalStatus: string;
   pubEventTypes?: string[];
   dayPricing?: EventDayPricing;
-  freeEntryRules?: FreeEntryRules;
+  freeEntryRules?: FreeEntryRules | null;
 }
 
 export type EventDetail = Event & {
