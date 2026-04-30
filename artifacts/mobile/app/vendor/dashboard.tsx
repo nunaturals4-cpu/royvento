@@ -786,7 +786,7 @@ export default function VendorDashboardScreen() {
           </View>
         </View>
 
-        {form.category === "Pubs" && (
+        {(form.category === "Pubs" || editingEvent?.type === "pub") && (
           <View style={[styles.freeEntrySection, { borderColor: "#22c55e30", backgroundColor: "#22c55e08" }]}>
             <TouchableOpacity
               style={styles.freeEntryToggleRow}
