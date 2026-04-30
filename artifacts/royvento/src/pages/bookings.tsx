@@ -255,7 +255,19 @@ function CancelBookingDialog({
   );
 }
 
+function TicketField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-[0.22em] text-amber-400/50 mb-0.5">{label}</p>
+      <p className="text-sm text-white/90 font-medium leading-tight">{value}</p>
+    </div>
+  );
+}
+
 function PremiumTicket({ b }: { b: any }) {
+  const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
+  const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+
   const printTicket = async () => {
     const esc = (v: unknown): string =>
       String(v ?? "")
@@ -265,9 +277,7 @@ function PremiumTicket({ b }: { b: any }) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 
-    const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
-
-    const w = window.open("", "_blank", "width=720,height=900");
+    const w = window.open("", "_blank", "width=760,height=980");
     if (!w) return;
 
     let qrSvgHtml = "";
@@ -275,139 +285,267 @@ function PremiumTicket({ b }: { b: any }) {
       const svgString = await QRCode.toString(ticketCode, {
         type: "svg",
         margin: 1,
-        color: { dark: "#000000", light: "#ffffff" },
-        width: 120,
+        color: { dark: "#1a1008", light: "#ffffff" },
+        width: 150,
       });
-      qrSvgHtml = `
-        <div class="qr-wrap">
-          ${svgString}
-          <p class="qr-code">${esc(ticketCode)}</p>
-        </div>`;
+      qrSvgHtml = `<div class="qr-frame">${svgString}<p class="qr-venue">${esc(b.vendorName)}</p></div>`;
     } catch (_) {
-      qrSvgHtml = `<div class="qr-wrap"><p class="qr-code">${esc(ticketCode)}</p></div>`;
+      qrSvgHtml = `<div class="qr-frame"><p class="qr-venue">${esc(b.vendorName)}</p></div>`;
     }
 
-    const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
     const ticketBreakdown = [
       b.ticketWomen ? `${b.ticketWomen}\u00d7 Women` : "",
       b.ticketMen ? `${b.ticketMen}\u00d7 Men` : "",
       b.ticketCouple ? `${b.ticketCouple}\u00d7 Couple` : "",
     ].filter(Boolean).map(esc).join(" &middot; ");
-    w.document.write(`<!doctype html><html><head><title>Royvento Ticket #${esc(b.id)}</title>
+
+    w.document.write(`<!doctype html><html><head>
+      <meta charset="utf-8">
+      <title>Ticket — ${esc(b.eventTitle)}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
       <style>
-        *{box-sizing:border-box;}
-        body{margin:0;font-family:Georgia,serif;background:#0a0a0a;color:#fff;padding:24px;}
-        .ticket{background:linear-gradient(135deg,#1a0a0a 0%,#350f0f 100%);border:1px solid rgba(255,80,80,.4);border-radius:24px;padding:32px;max-width:640px;margin:0 auto;box-shadow:0 30px 60px rgba(220,38,38,.3);}
-        .header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;}
-        .header-info{flex:1;min-width:0;}
-        .brand{font-size:13px;letter-spacing:.4em;text-transform:uppercase;color:#fca5a5;}
-        .top-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
-        .code{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#fca5a5;background:rgba(255,255,255,.08);padding:4px 10px;border-radius:8px;}
-        h1{font-size:30px;margin:8px 0 2px;font-family:'Playfair Display',Georgia,serif;font-weight:normal;}
-        .venue{font-size:12px;color:#9ca3af;margin:0;}
-        .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;}
-        .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#9ca3af;margin:0;}
-        .val{font-size:17px;margin:2px 0 0;}
-        .val-sm{font-size:14px;margin:2px 0 0;color:#e5e7eb;}
-        hr{border:none;border-top:1px dashed rgba(255,255,255,.15);margin:20px 0;}
-        .totals{display:flex;justify-content:space-between;font-size:18px;align-items:center;}
-        .totals-lbl{color:#9ca3af;}
-        .totals-val{font-size:22px;font-family:'Playfair Display',Georgia,serif;}
-        .small{font-size:11px;color:#9ca3af;text-align:center;margin-top:20px;}
-        .qr-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;background:#fff;border-radius:12px;padding:10px;flex-shrink:0;}
-        .qr-wrap svg{display:block;width:110px;height:110px;}
-        .qr-code{font-family:ui-monospace,Menlo,monospace;font-size:9px;color:#1a0a0a;margin:0;letter-spacing:.08em;text-align:center;}
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{background:#0c0810;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:32px;}
+        .ticket{position:relative;background:linear-gradient(145deg,#14090f 0%,#1e0e1a 45%,#100c18 100%);border:1px solid rgba(212,168,83,.35);border-radius:24px;max-width:680px;width:100%;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,.7),0 0 0 1px rgba(212,168,83,.1) inset;}
+        .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:96px;font-family:'Playfair Display',serif;color:rgba(212,168,83,.04);white-space:nowrap;pointer-events:none;letter-spacing:.15em;}
+        .orn{position:absolute;width:60px;height:60px;opacity:.35;}
+        .orn-tl{top:16px;left:16px;}
+        .orn-tr{top:16px;right:16px;transform:scaleX(-1);}
+        .body-sec{padding:32px 36px 28px;}
+        .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+        .brand{font-size:11px;letter-spacing:.55em;text-transform:uppercase;color:rgba(212,168,83,.6);font-family:'Inter',sans-serif;}
+        .badge{font-size:10px;font-family:ui-monospace,Menlo,monospace;color:rgba(212,168,83,.7);background:rgba(212,168,83,.08);border:1px solid rgba(212,168,83,.2);padding:3px 10px;border-radius:6px;letter-spacing:.08em;}
+        .hero{display:flex;justify-content:space-between;align-items:flex-start;gap:28px;}
+        .hero-info{flex:1;min-width:0;}
+        .venue-name{font-family:'Playfair Display',serif;font-size:32px;color:#d4a853;line-height:1.1;font-weight:600;}
+        .event-title{font-size:16px;color:rgba(255,255,255,.75);margin-top:6px;font-weight:400;}
+        .event-city{font-size:11px;color:rgba(255,255,255,.35);margin-top:3px;letter-spacing:.06em;}
+        .fields{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px;margin-top:24px;}
+        .field-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.28em;color:rgba(212,168,83,.45);margin-bottom:3px;}
+        .field-val{font-size:15px;color:rgba(255,255,255,.88);font-weight:500;}
+        .field-val-sm{font-size:13px;color:rgba(255,255,255,.75);}
+        .qr-frame{display:flex;flex-direction:column;align-items:center;gap:8px;background:#fff;border:2px solid rgba(212,168,83,.45);border-radius:14px;padding:12px;flex-shrink:0;}
+        .qr-frame svg{display:block;width:140px;height:140px;}
+        .qr-venue{font-size:9px;color:#5a4010;font-family:ui-monospace,Menlo,monospace;letter-spacing:.1em;text-align:center;max-width:140px;word-break:break-word;}
+        .divider-row{display:flex;align-items:center;margin:0 -0px;}
+        .notch{width:22px;height:44px;background:#0c0810;border-radius:0 22px 22px 0;flex-shrink:0;}
+        .notch-r{border-radius:22px 0 0 22px;}
+        .perf{flex:1;border-top:2px dashed rgba(212,168,83,.22);height:0;position:relative;}
+        .tear-code{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:ui-monospace,Menlo,monospace;font-size:18px;letter-spacing:.35em;color:#d4a853;background:linear-gradient(145deg,#14090f,#1e0e1a);padding:4px 18px;white-space:nowrap;}
+        .footer-sec{padding:22px 36px 28px;display:flex;justify-content:space-between;align-items:center;}
+        .price-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.28em;color:rgba(212,168,83,.45);margin-bottom:4px;}
+        .price-val{font-family:'Playfair Display',serif;font-size:28px;color:#d4a853;}
+        .disclaimer{font-size:10px;color:rgba(255,255,255,.25);text-align:right;line-height:1.6;max-width:200px;}
         @media print{
-          body{background:#fff;color:#000;padding:0;}
-          .ticket{background:#fff;color:#000;border:2px solid #c00;box-shadow:none;border-radius:16px;padding:24px;}
-          .brand,.code,.qr-code{color:#900;}
-          .venue,.lbl,.totals-lbl,.small{color:#555;}
-          hr{border-top-color:#ccc;}
-          .qr-wrap{background:#fff;border:1px solid #ddd;}
-          h1,.val,.val-sm,.totals-val{color:#000;}
+          body{background:#fff;padding:0;}
+          .ticket{background:linear-gradient(145deg,#fdf8f0 0%,#fffbf2 100%);border:2px solid #c5963a;box-shadow:none;}
+          .wm{color:rgba(180,140,60,.06);}
+          .venue-name{color:#9a6f1a;}
+          .event-title{color:#333;}
+          .event-city{color:#888;}
+          .brand,.badge{color:#b8831e;}
+          .badge{background:rgba(180,140,60,.1);border-color:rgba(180,140,60,.3);}
+          .field-lbl{color:rgba(180,140,60,.6);}
+          .field-val,.field-val-sm{color:#222;}
+          .perf{border-top-color:rgba(180,140,60,.3);}
+          .tear-code{color:#9a6f1a;background:#fdf8f0;}
+          .qr-frame{border-color:rgba(180,140,60,.4);}
+          .qr-venue{color:#6b4f0a;}
+          .price-lbl{color:rgba(180,140,60,.6);}
+          .price-val{color:#9a6f1a;}
+          .disclaimer{color:#aaa;}
+          .orn{opacity:.2;}
+          .notch{background:#fff;}
         }
       </style></head><body>
       <div class="ticket">
-        <div class="header">
-          <div class="header-info">
-            <div class="top-row">
-              <span class="brand">ROYVENTO</span>
-              <span class="code">${esc(ticketCode)}</span>
-            </div>
-            <h1>${esc(b.eventTitle)}</h1>
-            <p class="venue">${esc(b.vendorName)}${b.eventCity ? ` &middot; ${esc(b.eventCity)}` : ""}</p>
-            <div class="grid">
-              <div><p class="lbl">Guest</p><p class="val">${esc(b.personName || b.userName)}</p></div>
-              <div><p class="lbl">Date</p><p class="val">${esc(b.bookingDate)}</p></div>
-              <div><p class="lbl">Tickets</p><p class="val-sm">${ticketBreakdown || "&mdash;"}<br><span style="color:#9ca3af;font-size:12px;">${total} guest${total !== 1 ? "s" : ""}</span></p></div>
-              <div><p class="lbl">Approved by</p><p class="val" style="text-transform:capitalize;">${esc(b.approvedBy || "partner")}</p></div>
-            </div>
+        <div class="wm">ROYVENTO</div>
+        <svg class="orn orn-tl" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L22 2 L2 22 Z" stroke="#d4a853" stroke-width="1" fill="none"/><path d="M2 2 L10 2 L2 10 Z" fill="rgba(212,168,83,.3)"/><circle cx="30" cy="2" r="1.5" fill="#d4a853"/><circle cx="2" cy="30" r="1.5" fill="#d4a853"/></svg>
+        <svg class="orn orn-tr" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L22 2 L2 22 Z" stroke="#d4a853" stroke-width="1" fill="none"/><path d="M2 2 L10 2 L2 10 Z" fill="rgba(212,168,83,.3)"/><circle cx="30" cy="2" r="1.5" fill="#d4a853"/><circle cx="2" cy="30" r="1.5" fill="#d4a853"/></svg>
+        <div class="body-sec">
+          <div class="top-bar">
+            <span class="brand">ROYVENTO</span>
+            <span class="badge">${esc(ticketCode)}</span>
           </div>
-          ${qrSvgHtml}
+          <div class="hero">
+            <div class="hero-info">
+              <div class="venue-name">${esc(b.vendorName)}</div>
+              <div class="event-title">${esc(b.eventTitle)}</div>
+              ${b.eventCity ? `<div class="event-city">${esc(b.eventCity)}</div>` : ""}
+              <div class="fields">
+                <div><div class="field-lbl">Guest</div><div class="field-val">${esc(b.personName || b.userName)}</div></div>
+                <div><div class="field-lbl">Date</div><div class="field-val">${esc(b.bookingDate)}</div></div>
+                <div><div class="field-lbl">Tickets</div><div class="field-val-sm">${ticketBreakdown || "&mdash;"}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} guest${total !== 1 ? "s" : ""}</span></div></div>
+                <div><div class="field-lbl">Approved by</div><div class="field-val" style="text-transform:capitalize;">${esc(b.approvedBy || "partner")}</div></div>
+              </div>
+            </div>
+            ${qrSvgHtml}
+          </div>
         </div>
-        <hr/>
-        <div class="totals">
-          <span class="totals-lbl">Amount paid</span>
-          <span class="totals-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</span>
+        <div class="divider-row">
+          <div class="notch"></div>
+          <div class="perf"><span class="tear-code">${esc(ticketCode)}</span></div>
+          <div class="notch notch-r"></div>
         </div>
-        <p class="small">Present this ticket at the entrance. Non-transferable.</p>
+        <div class="footer-sec">
+          <div>
+            <div class="price-lbl">Amount paid</div>
+            <div class="price-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</div>
+          </div>
+          <div class="disclaimer">Present this ticket at the entrance.<br/>Non-transferable &middot; Royvento</div>
+        </div>
       </div>
       <script>window.onload=()=>window.print();</script>
       </body></html>`);
     w.document.close();
   };
 
-  const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+  const ticketBreakdownParts = [
+    b.ticketWomen ? `${b.ticketWomen}× Women` : "",
+    b.ticketMen ? `${b.ticketMen}× Men` : "",
+    b.ticketCouple ? `${b.ticketCouple}× Couple` : "",
+  ].filter(Boolean);
 
   return (
     <div className="border-t border-white/10 pt-5 mt-2">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs uppercase tracking-wider text-primary flex items-center gap-1.5">
-          <TicketIcon className="h-3.5 w-3.5" /> Premium ticket — confirmed
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs uppercase tracking-wider text-amber-400/80 flex items-center gap-1.5">
+          <TicketIcon className="h-3.5 w-3.5" /> Your ticket
         </p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={printTicket} className="gap-1.5"><Printer className="h-3.5 w-3.5" />Print</Button>
-          <Button size="sm" onClick={printTicket} className="bg-gradient-to-br from-red-600 to-red-800 border-0 gap-1.5"><Download className="h-3.5 w-3.5" />Download PDF</Button>
+          <Button size="sm" variant="outline" onClick={printTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
+            <Printer className="h-3.5 w-3.5" />Print
+          </Button>
+          <Button size="sm" onClick={printTicket} className="gap-1.5 bg-gradient-to-br from-amber-600 to-amber-800 border-0 text-black font-semibold hover:from-amber-500 hover:to-amber-700">
+            <Download className="h-3.5 w-3.5" />PDF
+          </Button>
         </div>
       </div>
-      <div className="ticket rounded-2xl border border-red-500/40 bg-gradient-to-br from-red-950/60 to-black p-6">
-        <div className="row flex justify-between items-start gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-center">
-              <span className="brand text-xs tracking-[0.4em] uppercase text-red-300">ROYVENTO</span>
-              <span className="code text-xs font-mono text-red-300 bg-white/5 px-2 py-1 rounded">{b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`}</span>
-            </div>
-            <h1 className="font-serif text-3xl mt-2">{b.eventTitle}</h1>
-            <p className="text-xs text-muted-foreground">{b.vendorName}{b.eventCity ? ` · ${b.eventCity}` : ""}</p>
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Guest</p><p className="val text-lg mt-0.5">{b.personName || b.userName}</p></div>
-              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Date</p><p className="val text-lg mt-0.5">{b.bookingDate}</p></div>
-              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tickets</p>
-                <p className="val text-sm mt-0.5">
-                  {b.ticketWomen ? `${b.ticketWomen}W ` : ""}
-                  {b.ticketMen ? `${b.ticketMen}M ` : ""}
-                  {b.ticketCouple ? `${b.ticketCouple}C` : ""}
-                  <span className="text-muted-foreground"> · {total} guests</span>
-                </p>
+
+      {/* Premium Ticket Card */}
+      <div
+        className="relative rounded-2xl overflow-hidden"
+        style={{
+          background: "linear-gradient(145deg, #14090f 0%, #1e0e1a 45%, #100c18 100%)",
+          border: "1px solid rgba(212,168,83,0.35)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.08) inset",
+        }}
+      >
+        {/* Watermark */}
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
+          aria-hidden
+        >
+          <span
+            className="font-serif text-8xl tracking-[0.2em] whitespace-nowrap"
+            style={{ color: "rgba(212,168,83,0.035)", transform: "rotate(-28deg) translateY(10%)" }}
+          >
+            ROYVENTO
+          </span>
+        </div>
+
+        {/* Corner ornaments */}
+        <svg className="absolute top-4 left-4 w-12 h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none">
+          <path d="M2 2 L18 2 L2 18 Z" stroke="#d4a853" strokeWidth="1" fill="none"/>
+          <path d="M2 2 L8 2 L2 8 Z" fill="rgba(212,168,83,0.4)"/>
+          <circle cx="24" cy="2" r="1.2" fill="#d4a853"/>
+          <circle cx="2" cy="24" r="1.2" fill="#d4a853"/>
+        </svg>
+        <svg className="absolute top-4 right-4 w-12 h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none" style={{ transform: "scaleX(-1)" }}>
+          <path d="M2 2 L18 2 L2 18 Z" stroke="#d4a853" strokeWidth="1" fill="none"/>
+          <path d="M2 2 L8 2 L2 8 Z" fill="rgba(212,168,83,0.4)"/>
+          <circle cx="24" cy="2" r="1.2" fill="#d4a853"/>
+          <circle cx="2" cy="24" r="1.2" fill="#d4a853"/>
+        </svg>
+
+        {/* Top section */}
+        <div className="relative z-10 px-7 pt-7 pb-6">
+          {/* Brand + ticket code row */}
+          <div className="flex justify-between items-center mb-5">
+            <span className="text-[10px] tracking-[0.55em] uppercase text-amber-400/55 font-medium">ROYVENTO</span>
+            <span
+              className="text-[10px] font-mono tracking-[0.1em] px-2.5 py-1 rounded"
+              style={{
+                color: "rgba(212,168,83,0.7)",
+                background: "rgba(212,168,83,0.07)",
+                border: "1px solid rgba(212,168,83,0.2)",
+              }}
+            >
+              {ticketCode}
+            </span>
+          </div>
+
+          {/* Hero + QR */}
+          <div className="flex justify-between items-start gap-6">
+            <div className="flex-1 min-w-0">
+              <h2 className="font-serif text-2xl leading-tight" style={{ color: "#d4a853" }}>{b.vendorName}</h2>
+              <p className="text-base text-white/75 mt-1 font-light">{b.eventTitle}</p>
+              {b.eventCity && <p className="text-xs text-white/35 mt-0.5 tracking-wide">{b.eventCity}</p>}
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 mt-6">
+                <TicketField label="Guest" value={b.personName || b.userName} />
+                <TicketField label="Date" value={b.bookingDate} />
+                <TicketField
+                  label="Tickets"
+                  value={
+                    ticketBreakdownParts.length > 0 ? (
+                      <>
+                        {ticketBreakdownParts.join(" · ")}
+                        <span className="text-white/35 ml-1 text-xs">({total} guests)</span>
+                      </>
+                    ) : `${total} guests`
+                  }
+                />
+                <TicketField label="Approved by" value={<span className="capitalize">{b.approvedBy || "partner"}</span>} />
               </div>
-              <div><p className="lbl text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Approved by</p><p className="val text-lg mt-0.5 capitalize">{b.approvedBy || "partner"}</p></div>
+            </div>
+
+            {/* QR code block */}
+            <div className="shrink-0 flex flex-col items-center gap-2">
+              <div
+                className="p-2.5 rounded-xl"
+                style={{ background: "#fff", border: "2px solid rgba(212,168,83,0.4)" }}
+              >
+                <QRCodeSVG value={ticketCode} size={120} level="M" />
+              </div>
+              <p
+                className="text-[9px] font-mono tracking-wider text-center max-w-[132px] leading-tight"
+                style={{ color: "rgba(212,168,83,0.5)" }}
+              >
+                {b.vendorName}
+              </p>
             </div>
           </div>
-          {b.ticketCode && (
-            <div className="flex flex-col items-center gap-1.5 shrink-0">
-              <div className="bg-white p-2 rounded-lg">
-                <QRCodeSVG value={b.ticketCode} size={100} />
-              </div>
-              <p className="text-[10px] font-mono text-red-300 tracking-wider">{b.ticketCode}</p>
-            </div>
-          )}
         </div>
-        <hr className="border-dashed border-white/15 my-5" />
-        <div className="totals flex justify-between text-lg">
-          <span className="text-muted-foreground">Amount paid</span>
-          <span className="font-serif">{formatINR(b.finalPrice ?? b.totalPrice)}</span>
+
+        {/* Perforated tear line with ticket code */}
+        <div className="relative z-10 flex items-center">
+          <div className="w-5 h-10 rounded-r-full shrink-0" style={{ background: "rgba(0,0,0,0.55)" }} />
+          <div className="relative flex-1 flex items-center justify-center" style={{ borderTop: "2px dashed rgba(212,168,83,0.22)", height: "2.5rem" }}>
+            <span
+              className="absolute font-mono text-base tracking-[0.35em] px-4 py-0.5"
+              style={{
+                color: "#d4a853",
+                background: "linear-gradient(145deg, #14090f, #1e0e1a)",
+                letterSpacing: "0.35em",
+              }}
+            >
+              {ticketCode}
+            </span>
+          </div>
+          <div className="w-5 h-10 rounded-l-full shrink-0" style={{ background: "rgba(0,0,0,0.55)" }} />
         </div>
-        <p className="small text-xs text-muted-foreground text-center mt-4">Present this ticket at the entrance. Non-transferable.</p>
+
+        {/* Footer section */}
+        <div className="relative z-10 flex justify-between items-center px-7 py-5">
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>Amount paid</p>
+            <p className="font-serif text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
+          </div>
+          <p className="text-[10px] text-right leading-relaxed max-w-44" style={{ color: "rgba(255,255,255,0.25)" }}>
+            Present this ticket at the entrance.<br />Non-transferable · Royvento
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch, useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -46,6 +47,24 @@ interface ManagerInvitation {
   id: number;
   vendorName: string;
   createdAt: string;
+}
+
+interface ExtendedBooking {
+  personName?: string;
+  userName?: string;
+  ticketWomen?: number;
+  ticketMen?: number;
+  ticketCouple?: number;
+  approvedBy?: string;
+  finalPrice?: number;
+  cancellationAllowed?: boolean;
+  checkedIn?: boolean;
+  eventType_?: string;
+  pubMode?: string;
+  couponCode?: string;
+  pointsUsed?: number;
+  eventCity?: string;
+  selectedPubEvent?: string;
 }
 
 export default function BookingsScreen() {
@@ -231,6 +250,7 @@ export default function BookingsScreen() {
             const meta = STATUS_META[status] ?? STATUS_META.pending;
             const isExpanded = expandedId === b.id;
             const qrValue = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
+            const bx = b as typeof b & ExtendedBooking;
 
             return (
               <Pressable
@@ -292,23 +312,88 @@ export default function BookingsScreen() {
                   </View>
                 </View>
 
-                {/* Confirmed ticket with QR code */}
+                {/* Confirmed ticket — premium design */}
                 {isExpanded && status === "confirmed" && (
-                  <View style={[styles.ticket, { borderTopColor: colors.border, backgroundColor: colors.muted }]}>
-                    <View style={styles.ticketHeader}>
-                      <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                      <Text style={[styles.ticketTitle, { color: "#22c55e" }]}>Booking Confirmed</Text>
+                  <LinearGradient
+                    colors={["#14090f", "#1e0e1a", "#100c18"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.premiumTicket}
+                  >
+                    {/* Top bar: brand + status */}
+                    <View style={styles.ptTopBar}>
+                      <Text style={styles.ptBrand}>ROYVENTO</Text>
+                      <View style={styles.ptConfirmedBadge}>
+                        <Ionicons name="checkmark-circle" size={11} color="#22c55e" />
+                        <Text style={styles.ptConfirmedText}>Confirmed</Text>
+                      </View>
                     </View>
-                    <Text style={[styles.ticketRef, { color: colors.mutedForeground }]}>
-                      {qrValue}
-                    </Text>
-                    <View style={[styles.qrWrap, { backgroundColor: "#ffffff" }]}>
-                      <QRCode value={qrValue} size={140} />
+
+                    {/* Venue name hero */}
+                    <Text style={styles.ptVenueName} numberOfLines={2}>{bx.vendorName ?? b.eventTitle}</Text>
+                    <Text style={styles.ptEventTitle} numberOfLines={2}>{b.eventTitle}</Text>
+
+                    {/* Details grid */}
+                    <View style={styles.ptFieldsRow}>
+                      <View style={styles.ptField}>
+                        <Text style={styles.ptFieldLabel}>Guest</Text>
+                        <Text style={styles.ptFieldValue}>{bx.personName || bx.userName || "—"}</Text>
+                      </View>
+                      <View style={styles.ptField}>
+                        <Text style={styles.ptFieldLabel}>Date</Text>
+                        <Text style={styles.ptFieldValue}>{formatDate(b.bookingDate)}</Text>
+                      </View>
                     </View>
-                    <Text style={[styles.qrHint, { color: colors.mutedForeground }]}>
-                      Show this at the venue
-                    </Text>
-                  </View>
+                    <View style={styles.ptFieldsRow}>
+                      <View style={styles.ptField}>
+                        <Text style={styles.ptFieldLabel}>Tickets</Text>
+                        <Text style={styles.ptFieldValue}>
+                          {[
+                            bx.ticketWomen ? `${bx.ticketWomen}× W` : "",
+                            bx.ticketMen ? `${bx.ticketMen}× M` : "",
+                            bx.ticketCouple ? `${bx.ticketCouple}× C` : "",
+                          ].filter(Boolean).join("  ") || `${b.guests} guests`}
+                        </Text>
+                      </View>
+                      <View style={styles.ptField}>
+                        <Text style={styles.ptFieldLabel}>Approved by</Text>
+                        <Text style={[styles.ptFieldValue, { textTransform: "capitalize" }]}>{bx.approvedBy || "Partner"}</Text>
+                      </View>
+                    </View>
+
+                    {/* QR code block */}
+                    <View style={styles.ptQrBlock}>
+                      <View style={styles.ptQrFrame}>
+                        <QRCode value={qrValue} size={160} backgroundColor="#ffffff" color="#1a1008" />
+                      </View>
+                      <Text style={styles.ptQrVenue} numberOfLines={1}>{bx.vendorName ?? ""}</Text>
+                    </View>
+
+                    {/* Perforated divider */}
+                    <View style={styles.ptPerfRow}>
+                      <View style={styles.ptNotch} />
+                      <View style={styles.ptPerf} />
+                      <View style={[styles.ptNotch, styles.ptNotchR]} />
+                    </View>
+
+                    {/* Ticket code */}
+                    <Text style={styles.ptCode}>{qrValue}</Text>
+
+                    {/* Footer: price + disclaimer */}
+                    <View style={styles.ptFooter}>
+                      <View style={styles.ptPriceRow}>
+                        <Text style={styles.ptPriceLabel}>Amount paid</Text>
+                        <Text style={styles.ptPriceValue}>
+                          {bx.finalPrice != null
+                            ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
+                            : b.totalPrice != null
+                            ? `₹${Number(b.totalPrice).toLocaleString("en-IN")}`
+                            : "—"}
+                        </Text>
+                      </View>
+                      <Text style={styles.ptFooterHint}>Present at entrance · Non-transferable</Text>
+                    </View>
+                  </LinearGradient>
                 )}
 
                 {/* Payment pending — retry button */}
@@ -420,4 +505,29 @@ const styles = StyleSheet.create({
   expandedText: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   retryBtn: { marginTop: 10, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   retryBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  premiumTicket: { marginTop: 0, borderRadius: 0, overflow: "hidden", padding: 0 },
+  ptTopBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
+  ptBrand: { fontSize: 9, fontFamily: "Inter_600SemiBold", letterSpacing: 5, textTransform: "uppercase", color: "rgba(212,168,83,0.55)" },
+  ptConfirmedBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(34,197,94,0.12)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  ptConfirmedText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#22c55e" },
+  ptVenueName: { fontFamily: "Inter_700Bold", fontSize: 22, color: "#d4a853", paddingHorizontal: 20, lineHeight: 28, letterSpacing: -0.3 },
+  ptEventTitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.65)", paddingHorizontal: 20, marginTop: 3, lineHeight: 19 },
+  ptFieldsRow: { flexDirection: "row", paddingHorizontal: 20, marginTop: 14, gap: 0 },
+  ptField: { flex: 1 },
+  ptFieldLabel: { fontSize: 8, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 2, color: "rgba(212,168,83,0.45)", marginBottom: 3 },
+  ptFieldValue: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "rgba(255,255,255,0.85)" },
+  ptQrBlock: { alignItems: "center", paddingHorizontal: 20, paddingTop: 20, gap: 8 },
+  ptQrFrame: { padding: 10, backgroundColor: "#ffffff", borderRadius: 14, borderWidth: 2, borderColor: "rgba(212,168,83,0.45)" },
+  ptQrVenue: { fontSize: 9, fontFamily: "Inter_400Regular", color: "rgba(212,168,83,0.5)", letterSpacing: 1, textTransform: "uppercase" },
+  ptPerfRow: { flexDirection: "row", alignItems: "center", marginTop: 18, marginHorizontal: 0 },
+  ptNotch: { width: 18, height: 36, backgroundColor: "rgba(12,8,16,0.7)", borderTopRightRadius: 18, borderBottomRightRadius: 18 },
+  ptNotchR: { borderTopRightRadius: 0, borderBottomRightRadius: 0, borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
+  ptPerf: { flex: 1, borderTopWidth: 2, borderStyle: "dashed", borderColor: "rgba(212,168,83,0.22)" },
+  ptCode: { fontFamily: Platform.OS === "ios" ? "Courier New" : "monospace", fontSize: 17, fontWeight: "700", letterSpacing: 4, color: "#d4a853", textAlign: "center", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
+  ptFooter: { alignItems: "center", paddingHorizontal: 20, paddingBottom: 20, paddingTop: 4, gap: 6 },
+  ptPriceRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+  ptPriceLabel: { fontSize: 9, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 2, color: "rgba(212,168,83,0.45)" },
+  ptPriceValue: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#d4a853" },
+  ptFooterHint: { fontSize: 9, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.2)", letterSpacing: 0.5, textAlign: "center" },
 });
