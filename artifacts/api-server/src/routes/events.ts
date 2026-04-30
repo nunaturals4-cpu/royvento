@@ -42,7 +42,7 @@ function validateDayPricing(
 
 const FREE_ENTRY_GENDERS = new Set(["Everyone", "Ladies", "Men", "Couples"]);
 const FREE_ENTRY_DAYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-const FREE_ENTRY_TIME_RE = /^\d{2}:\d{2}$/;
+const FREE_ENTRY_TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 function validateFreeEntryRules(
   val: unknown,

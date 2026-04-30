@@ -99,7 +99,12 @@ async function serializeVendorList(rows: VendorRow[]) {
   const pubEvents = vendorIds.length > 0
     ? await db.select({ vendorId: eventsTable.vendorId, freeEntryRules: eventsTable.freeEntryRules })
         .from(eventsTable)
-        .where(and(inArray(eventsTable.vendorId, vendorIds), eq(eventsTable.type, "pub")))
+        .where(and(
+          inArray(eventsTable.vendorId, vendorIds),
+          eq(eventsTable.type, "pub"),
+          eq(eventsTable.approvalStatus, "approved"),
+        ))
+        .orderBy(desc(eventsTable.createdAt))
     : [];
   const freeEntryByVendor = new Map<number, ReturnType<typeof parseFreeEntryRules>>();
   for (const ev of pubEvents) {
