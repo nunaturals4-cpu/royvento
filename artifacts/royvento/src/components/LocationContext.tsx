@@ -53,8 +53,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     navigator.geolocation?.getCurrentPosition(
       async (pos) => {
         try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) return;
           const city = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-          if (city) setSelectedCity(city);
+          if (city && !localStorage.getItem(STORAGE_KEY)) setSelectedCity(city);
         } catch {}
       },
       () => {}
