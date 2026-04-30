@@ -1142,6 +1142,12 @@ export const PreviewGooglePubResponse = zod.object({
     phone: zod.string(),
     website: zod.string(),
     hasPhoto: zod.boolean(),
+    photoPreviewUrl: zod
+      .string()
+      .nullish()
+      .describe(
+        "Server-proxied URL to preview the cover photo (expires with session)",
+      ),
     openingHours: zod
       .record(
         zod.string(),

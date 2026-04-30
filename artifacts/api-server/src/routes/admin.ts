@@ -984,6 +984,40 @@ router.get("/admin/booking-report/top-pubs", requireAuth(["admin"]), async (req,
   })));
 });
 
+// ── Google Places photo proxy (admin) ────────────────────────────────────────
+
+router.get("/admin/places/photo", requireAuth(["admin"]), async (req, res) => {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: "GOOGLE_PLACES_API_KEY is not configured" });
+    return;
+  }
+  const ref = typeof req.query["ref"] === "string" ? req.query["ref"].trim() : "";
+  if (!ref) {
+    res.status(400).json({ error: "ref query parameter is required" });
+    return;
+  }
+  try {
+    const GOOGLE_PLACES_BASE = "https://maps.googleapis.com/maps/api/place";
+    const photoUrl = `${GOOGLE_PLACES_BASE}/photo?maxwidth=400&photoreference=${encodeURIComponent(ref)}&key=${apiKey}`;
+    const photoResp = await fetch(photoUrl, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!photoResp.ok) {
+      res.status(502).json({ error: `Google photo returned HTTP ${photoResp.status}` });
+      return;
+    }
+    const contentType = photoResp.headers.get("content-type") || "image/jpeg";
+    const buffer = Buffer.from(await photoResp.arrayBuffer());
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(buffer);
+  } catch {
+    res.status(502).json({ error: "Failed to fetch photo from Google" });
+  }
+});
+
 // ── Import pub from Google Business Profile ───────────────────────────────────
 
 router.post("/admin/pubs/preview-google", requireAuth(["admin"]), async (req, res) => {
@@ -1049,6 +1083,10 @@ router.post("/admin/pubs/preview-google", requireAuth(["admin"]), async (req, re
     return;
   }
 
+  const photoPreviewUrl = place.photoRef
+    ? `/api/admin/places/photo?ref=${encodeURIComponent(place.photoRef)}`
+    : null;
+
   res.json({
     vendor: {
       id: vendor.id,
@@ -1066,6 +1104,7 @@ router.post("/admin/pubs/preview-google", requireAuth(["admin"]), async (req, re
       website: place.website,
       openingHours: place.openingHours,
       hasPhoto: place.photoRef !== null,
+      photoPreviewUrl,
     },
   });
 });

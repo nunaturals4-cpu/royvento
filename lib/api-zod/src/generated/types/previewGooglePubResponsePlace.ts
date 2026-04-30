@@ -17,5 +17,7 @@ export type PreviewGooglePubResponsePlace = {
   phone: string;
   website: string;
   hasPhoto: boolean;
+  /** Server-proxied URL to preview the cover photo (expires with session) */
+  photoPreviewUrl?: string | null;
   openingHours?: PreviewGooglePubResponsePlaceOpeningHours;
 };

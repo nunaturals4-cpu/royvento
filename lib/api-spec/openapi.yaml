@@ -2052,6 +2052,10 @@ components:
               type: string
             hasPhoto:
               type: boolean
+            photoPreviewUrl:
+              type: string
+              nullable: true
+              description: Server-proxied URL to preview the cover photo (expires with session)
             openingHours:
               type: object
               nullable: true

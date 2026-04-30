@@ -2461,6 +2461,7 @@ type GooglePubPreview = {
     website: string;
     openingHours: Record<string, { open: string; close: string } | null> | null;
     hasPhoto: boolean;
+    photoPreviewUrl: string | null;
   };
 };
 
@@ -2471,7 +2472,7 @@ function ImportPubFromGoogle() {
   const [step, setStep] = useState<ImportStep>("form");
   const [googleUrl, setGoogleUrl] = useState("");
   const [partnerEmail, setPartnerEmail] = useState("");
-  const [pubMode, setPubMode] = useState("entry");
+  const [pubMode, setPubMode] = useState("both");
   const [category, setCategory] = useState("bar");
   const [preview, setPreview] = useState<GooglePubPreview | null>(null);
   const [result, setResult] = useState<ImportGooglePubResponse | null>(null);
@@ -2602,19 +2603,33 @@ function ImportPubFromGoogle() {
               </div>
             )}
           </div>
-          <Button variant="outline" onClick={handleReset} className="w-full">Import another pub</Button>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={handleReset} className="flex-1">Import another pub</Button>
+            <Button variant="secondary" asChild className="flex-1">
+              <a href={`/admin?tab=events`}>View in Events tab</a>
+            </Button>
+          </div>
         </div>
 
       ) : step === "preview" || step === "importing" ? (
         <div className="space-y-4">
           <div className="rounded-xl border p-5 space-y-4">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Place found</p>
-              <h3 className="font-semibold text-lg leading-tight">{preview?.place.name}</h3>
-              <p className="text-sm text-muted-foreground mt-0.5">{preview?.place.formattedAddress}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {[preview?.place.city, preview?.place.state, preview?.place.country].filter(Boolean).join(", ")}
-              </p>
+            <div className="flex items-start gap-4">
+              {preview?.place.photoPreviewUrl && (
+                <img
+                  src={preview.place.photoPreviewUrl}
+                  alt={preview.place.name}
+                  className="w-20 h-20 rounded-lg object-cover shrink-0 border"
+                />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Place found</p>
+                <h3 className="font-semibold text-lg leading-tight">{preview?.place.name}</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">{preview?.place.formattedAddress}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {[preview?.place.city, preview?.place.state, preview?.place.country].filter(Boolean).join(", ")}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -2630,8 +2645,12 @@ function ImportPubFromGoogle() {
                   </a>
                 </>
               )}
-              <span className="text-muted-foreground">Cover photo</span>
-              <span>{preview?.place.hasPhoto ? "Available" : "Not available"}</span>
+              {!preview?.place.photoPreviewUrl && (
+                <>
+                  <span className="text-muted-foreground">Cover photo</span>
+                  <span className="text-muted-foreground text-xs">Not available</span>
+                </>
+              )}
               <span className="text-muted-foreground">Partner</span>
               <span>{preview?.vendor.businessName} <span className="text-muted-foreground text-xs">({preview?.vendor.userEmail})</span></span>
             </div>
@@ -2660,9 +2679,9 @@ function ImportPubFromGoogle() {
               <Select value={pubMode} onValueChange={setPubMode} disabled={step === "importing"}>
                 <SelectTrigger id="pubModeConfirm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="entry">Entry tickets</SelectItem>
-                  <SelectItem value="bottle">Bottle service</SelectItem>
-                  <SelectItem value="table">Table booking</SelectItem>
+                  <SelectItem value="ticket">Tickets only</SelectItem>
+                  <SelectItem value="event">Events only</SelectItem>
+                  <SelectItem value="both">Tickets &amp; Events</SelectItem>
                 </SelectContent>
               </Select>
             </div>
