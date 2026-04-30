@@ -60,10 +60,12 @@
     "@react-native-community/datetimepicker": "^9.1.0",
     "expo-auth-session": "^7.0.11",
     "expo-camera": "^17.0.10",
+    "expo-localization": "^55.0.13",
     "expo-notifications": "~0.32.17",
     "expo-print": "^15.0.8",
     "expo-secure-store": "^15.0.8",
     "expo-sharing": "^14.0.8",
+    "i18n-js": "^4.5.3",
     "react-native-qrcode-svg": "^6.3.21",
     "react-native-render-html": "^6.3.4"
   }
