@@ -16,7 +16,7 @@ import {
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateBookingStatusBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
@@ -1330,30 +1330,23 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   const [out] = await serializeBookings([updated]);
 
-  // Award 100 loyalty points to the booking owner for attending the event
+  // Award 100 loyalty points to the booking owner for attending the event (atomic increment)
   try {
-    const [owner] = await db
-      .select({ points: usersTable.points })
-      .from(usersTable)
-      .where(eq(usersTable.id, updated.userId))
-      .limit(1);
     const [scanEvt] = await db
       .select({ title: eventsTable.title })
       .from(eventsTable)
       .where(eq(eventsTable.id, updated.eventId))
       .limit(1);
-    if (owner) {
-      await Promise.all([
-        db.update(usersTable)
-          .set({ points: owner.points + 100 })
-          .where(eq(usersTable.id, updated.userId)),
-        db.insert(notificationsTable).values({
-          userId: updated.userId,
-          title: "You earned 100 points!",
-          message: `You earned 100 points for attending "${scanEvt?.title ?? "this event"}"!`,
-        }),
-      ]);
-    }
+    await Promise.all([
+      db.update(usersTable)
+        .set({ points: sql`${usersTable.points} + 100` })
+        .where(eq(usersTable.id, updated.userId)),
+      db.insert(notificationsTable).values({
+        userId: updated.userId,
+        title: "You earned 100 points!",
+        message: `You earned 100 points for attending "${scanEvt?.title ?? "this event"}"!`,
+      }),
+    ]);
   } catch (err) {
     req.log.error({ err, bookingId: updated.id }, "Failed to award scan-in loyalty points");
   }
