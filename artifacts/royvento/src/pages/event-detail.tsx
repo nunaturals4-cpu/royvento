@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -495,6 +495,31 @@ export function EventDetail() {
               </section>
             );
           })()}
+
+          {isPub && vendorAddress && (
+            <section>
+              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block flex items-center gap-2">
+                <Navigation className="h-6 w-6 text-primary" />
+                Find us
+              </h2>
+              <iframe
+                title="Venue location"
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(vendorAddress)}&output=embed&hl=en`}
+                className="w-full h-64 md:h-80 rounded-2xl border border-white/10"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(vendorAddress)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Navigation className="h-3.5 w-3.5" />
+                {vendorAddress} — Open in Google Maps ↗
+              </a>
+            </section>
+          )}
 
           {isPub && announcements.length > 0 && (
             <section>
