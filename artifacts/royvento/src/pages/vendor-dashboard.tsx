@@ -892,12 +892,36 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                 <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={varyByDay} onCheckedChange={(v) => setVaryByDay(!!v)} />
+                <Checkbox
+                  checked={varyByDay}
+                  onCheckedChange={(v) => {
+                    const on = !!v;
+                    setVaryByDay(on);
+                    if (on) {
+                      const pre: Record<string, { women: number; men: number; couple: number }> = {};
+                      for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                      setDayPricingOverrides(pre);
+                    }
+                  }}
+                />
                 <span className="text-white/70">Vary prices by day</span>
               </label>
               {varyByDay && (
                 <div className="overflow-x-auto rounded-lg border border-white/10">
-                  <p className="px-3 pt-2 text-xs text-white/40">Leave a cell blank to fall back to the default price for that day.</p>
+                  <div className="flex items-center justify-between px-3 pt-2">
+                    <p className="text-xs text-white/40">Clear a cell to use the default price for that day.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pre: Record<string, { women: number; men: number; couple: number }> = {};
+                        for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                        setDayPricingOverrides(pre);
+                      }}
+                      className="text-xs text-primary/70 hover:text-primary underline"
+                    >
+                      Reset all to defaults
+                    </button>
+                  </div>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-white/10">
@@ -1168,12 +1192,36 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                 <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={varyByDay} onCheckedChange={(v) => setVaryByDay(!!v)} />
+                <Checkbox
+                  checked={varyByDay}
+                  onCheckedChange={(v) => {
+                    const on = !!v;
+                    setVaryByDay(on);
+                    if (on && Object.keys(dayPricingOverrides).length === 0) {
+                      const pre: Record<string, { women: number; men: number; couple: number }> = {};
+                      for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                      setDayPricingOverrides(pre);
+                    }
+                  }}
+                />
                 <span className="text-white/70">Vary prices by day</span>
               </label>
               {varyByDay && (
                 <div className="overflow-x-auto rounded-lg border border-white/10">
-                  <p className="px-3 pt-2 text-xs text-white/40">Leave a cell blank to fall back to the default price for that day.</p>
+                  <div className="flex items-center justify-between px-3 pt-2">
+                    <p className="text-xs text-white/40">Clear a cell to use the default price for that day.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pre: Record<string, { women: number; men: number; couple: number }> = {};
+                        for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                        setDayPricingOverrides(pre);
+                      }}
+                      className="text-xs text-primary/70 hover:text-primary underline"
+                    >
+                      Reset all to defaults
+                    </button>
+                  </div>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-white/10">

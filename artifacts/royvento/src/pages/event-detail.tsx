@@ -662,7 +662,7 @@ export function EventDetail() {
               {isPub ? "lowest entry price" : "per person · per event"}
             </p>
 
-            {isPub && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0) && (
+            {isPub && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0 || (dayPricingMap && Object.keys(dayPricingMap).length > 0)) && (
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-5 space-y-2">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
                   Entry prices{dayPricingMap && Object.keys(dayPricingMap).length > 0 ? " by day" : ""}
