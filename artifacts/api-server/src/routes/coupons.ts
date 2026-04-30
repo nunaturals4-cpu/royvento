@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, couponsTable, usersTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { db, couponsTable, usersTable, vendorsTable } from "@workspace/db";
+import { eq, desc, and, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 
@@ -14,11 +14,19 @@ router.get("/coupons/me", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const rows = await db
-    .select()
+    .select({
+      id: couponsTable.id,
+      code: couponsTable.code,
+      discountPercent: couponsTable.discountPercent,
+      used: couponsTable.used,
+      source: couponsTable.source,
+      vendorId: couponsTable.vendorId,
+      createdAt: couponsTable.createdAt,
+      vendorName: vendorsTable.businessName,
+    })
     .from(couponsTable)
-    .where(
-      and(eq(couponsTable.userId, user.id), eq(couponsTable.used, false)),
-    )
+    .leftJoin(vendorsTable, eq(couponsTable.vendorId, vendorsTable.id))
+    .where(and(eq(couponsTable.userId, user.id), eq(couponsTable.used, false)))
     .orderBy(desc(couponsTable.createdAt));
   return res.json(rows);
 });
@@ -26,11 +34,18 @@ router.get("/coupons/me", requireAuth(), async (req, res) => {
 router.post("/coupons/validate", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
-  const parsed = z.object({ code: z.string() }).safeParse(req.body);
+  const parsed = z.object({ code: z.string(), vendorId: z.number().int().positive().optional() }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
   const rows = await db
-    .select()
+    .select({
+      id: couponsTable.id,
+      code: couponsTable.code,
+      discountPercent: couponsTable.discountPercent,
+      vendorId: couponsTable.vendorId,
+      vendorName: vendorsTable.businessName,
+    })
     .from(couponsTable)
+    .leftJoin(vendorsTable, eq(couponsTable.vendorId, vendorsTable.id))
     .where(
       and(
         eq(couponsTable.code, parsed.data.code.trim().toUpperCase()),
@@ -41,6 +56,14 @@ router.post("/coupons/validate", requireAuth(), async (req, res) => {
     .limit(1);
   const coupon = rows[0];
   if (!coupon) return res.status(404).json({ error: "Invalid or used coupon" });
+  if (coupon.vendorId !== null && coupon.vendorId !== undefined) {
+    if (parsed.data.vendorId && coupon.vendorId !== parsed.data.vendorId) {
+      return res.status(400).json({
+        error: `This code is only valid for ${coupon.vendorName ?? "another pub"}. It cannot be used here.`,
+      });
+    }
+    return res.json({ valid: true, discountPercent: coupon.discountPercent, vendorId: coupon.vendorId, vendorName: coupon.vendorName });
+  }
   return res.json({ valid: true, discountPercent: coupon.discountPercent });
 });
 

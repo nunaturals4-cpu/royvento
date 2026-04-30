@@ -20,7 +20,15 @@ interface VendorRequest {
   createdAt: string;
 }
 
-interface Coupon { id: number; code: string; discountPercent: number; isUsed: boolean; }
+interface Coupon {
+  id: number;
+  code: string;
+  discountPercent: number;
+  used: boolean;
+  source: string | null;
+  vendorId: number | null;
+  vendorName: string | null;
+}
 interface Sub { planType: string; planPeriod: string; status: string; expiresAt: string; }
 interface ReferralData {
   code: string;
@@ -289,11 +297,20 @@ export function Profile() {
             {coupons.length === 0 ? (
               <p className="text-sm text-muted-foreground">No coupons yet.</p>
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {coupons.slice(0, 5).map((c) => (
-                  <div key={c.id} className="flex items-center justify-between text-sm border-b border-white/5 pb-1.5 last:border-0">
-                    <span className="font-mono text-xs text-red-200">{c.code}</span>
-                    <Badge variant={c.isUsed ? "outline" : "default"}>{c.isUsed ? "used" : `${c.discountPercent}% off`}</Badge>
+                  <div key={c.id} className="flex items-start justify-between gap-3 border-b border-white/5 pb-2 last:border-0">
+                    <div className="min-w-0">
+                      <span className="font-mono text-xs text-red-200 block">{c.code}</span>
+                      {c.vendorName && (
+                        <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                          Exclusive to {c.vendorName}
+                        </span>
+                      )}
+                    </div>
+                    <Badge variant={c.used ? "outline" : "default"} className="shrink-0">
+                      {c.used ? "used" : `${c.discountPercent}% off`}
+                    </Badge>
                   </div>
                 ))}
               </div>

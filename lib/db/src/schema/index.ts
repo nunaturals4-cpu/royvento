@@ -286,6 +286,7 @@ export const couponsTable = pgTable(
     discountPercent: integer("discount_percent").notNull().default(10),
     used: boolean("used").notNull().default(false),
     source: varchar("source", { length: 30 }).notNull().default("admin_grant"),
+    vendorId: integer("vendor_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -293,6 +294,7 @@ export const couponsTable = pgTable(
   (t) => ({
     userIdx: index("coupons_user_idx").on(t.userId),
     codeIdx: uniqueIndex("coupons_code_idx").on(t.code),
+    vendorIdx: index("coupons_vendor_idx").on(t.vendorId),
   }),
 );
 

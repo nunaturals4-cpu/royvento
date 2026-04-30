@@ -244,6 +244,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       .limit(1);
     const coupon = couponRows[0];
     if (coupon) {
+      if (coupon.vendorId !== null && coupon.vendorId !== undefined && coupon.vendorId !== evt.vendorId) {
+        const lockRows = await db.select({ businessName: vendorsTable.businessName }).from(vendorsTable).where(eq(vendorsTable.id, coupon.vendorId)).limit(1);
+        const lockName = lockRows[0]?.businessName ?? "another pub";
+        res.status(400).json({ error: `This discount code is only valid for ${lockName}. It cannot be used here.` });
+        return;
+      }
       discountAmount = Math.round(totalPrice * (coupon.discountPercent / 100));
       validCode = coupon.code;
       await db
@@ -1319,6 +1325,14 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   }
 
   const [out] = await serializeBookings([updated]);
+
+  // Ensure any coupon used on this booking is marked as used (idempotent — belt-and-suspenders for partner_lead codes)
+  if (updated.couponCode) {
+    db.update(couponsTable)
+      .set({ used: true })
+      .where(and(eq(couponsTable.code, updated.couponCode), eq(couponsTable.used, false)))
+      .catch(() => {});
+  }
 
   // Fire-and-forget ticket-scanned email to the customer
   try {

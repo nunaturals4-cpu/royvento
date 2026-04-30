@@ -22,7 +22,7 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
-  TrendingUp, IndianRupee, Clock, Navigation,
+  TrendingUp, IndianRupee, Clock, Navigation, Tag,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -1898,9 +1898,29 @@ function ManagersPanel() {
 
 function LeadsPanel() {
   const [data, setData] = useState<Lead | null>(null);
+  const [sentCodes, setSentCodes] = useState<Record<number, string>>({});
+  const [sendingId, setSendingId] = useState<number | null>(null);
+  const { toast } = useToast();
+
   useEffect(() => {
     apiGet<Lead>("/api/partner/leads/me").then(setData).catch(() => {});
   }, []);
+
+  const sendDiscount = async (viewId: number) => {
+    setSendingId(viewId);
+    try {
+      const result = await apiPost<{ code: string; discountPercent: number }>(
+        `/api/partner/leads/${viewId}/send-discount`,
+        { discountPercent: 15 },
+      );
+      setSentCodes((prev) => ({ ...prev, [viewId]: result.code }));
+      toast({ title: "Discount sent!", description: `Code ${result.code} (${result.discountPercent}% off) is now in the visitor's profile.` });
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message ?? "Could not send discount.", variant: "destructive" });
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   if (!data) return <p className="text-muted-foreground">Loading…</p>;
 
@@ -1964,16 +1984,46 @@ function LeadsPanel() {
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs uppercase tracking-wider text-muted-foreground">
-              <tr><th className="text-left py-2">Name</th><th className="text-left">Email</th><th className="text-right">When</th></tr>
+              <tr>
+                <th className="text-left py-2">Name</th>
+                <th className="text-left hidden sm:table-cell">Email</th>
+                <th className="text-right hidden md:table-cell">When</th>
+                <th className="text-right">Action</th>
+              </tr>
             </thead>
             <tbody>
-              {data.views.slice(0, 50).map((v: any, i: number) => (
-                <tr key={i} className="border-t border-white/5">
-                  <td className="py-2">{v.viewerName || "Anonymous"}</td>
-                  <td className="text-muted-foreground">{v.viewerEmail || "—"}</td>
-                  <td className="text-right text-muted-foreground">{new Date(v.viewedAt).toLocaleString()}</td>
-                </tr>
-              ))}
+              {data.views.slice(0, 50).map((v: any, i: number) => {
+                const sentCode = sentCodes[v.id];
+                const isAnon = !v.viewerUserId;
+                return (
+                  <tr key={i} className="border-t border-white/5">
+                    <td className="py-2 pr-2">
+                      <span className={isAnon ? "text-muted-foreground italic" : ""}>{v.viewerName || "Anonymous"}</span>
+                    </td>
+                    <td className="text-muted-foreground hidden sm:table-cell pr-2">{v.viewerEmail || "—"}</td>
+                    <td className="text-right text-muted-foreground hidden md:table-cell pr-2">{new Date(v.viewedAt).toLocaleString()}</td>
+                    <td className="text-right">
+                      {isAnon ? (
+                        <span className="text-xs text-muted-foreground/50">Anonymous</span>
+                      ) : sentCode ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-mono bg-primary/10 text-primary border border-primary/30 rounded px-2 py-0.5">
+                          <Tag className="h-3 w-3" /> {sentCode}
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 border-primary/30 text-primary hover:bg-primary/10"
+                          disabled={sendingId === v.id}
+                          onClick={() => sendDiscount(v.id)}
+                        >
+                          {sendingId === v.id ? "Sending…" : "Send Discount"}
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

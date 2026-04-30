@@ -33,9 +33,11 @@ interface ReferralData {
 interface Coupon {
   id: number;
   code: string;
-  discountType: string;
-  discountValue: number;
-  expiresAt: string | null;
+  discountPercent: number;
+  used: boolean;
+  source: string | null;
+  vendorId: number | null;
+  vendorName: string | null;
 }
 
 export default function ProfileScreen() {
@@ -196,12 +198,16 @@ export default function ProfileScreen() {
                 <Ionicons name="pricetag-outline" size={12} color={colors.primary} />
                 <Text style={[styles.couponCode, { color: colors.primary }]}>{c.code}</Text>
               </View>
-              <Text style={[styles.couponDetail, { color: colors.mutedForeground }]}>
-                {c.discountType === "percent"
-                  ? `${c.discountValue}% off`
-                  : `₹${c.discountValue} off`}
-                {c.expiresAt ? ` · exp ${new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}` : ""}
-              </Text>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={[styles.couponDetail, { color: colors.mutedForeground }]}>
+                  {`${c.discountPercent}% off`}
+                </Text>
+                {c.vendorName ? (
+                  <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", opacity: 0.7 }}>
+                    {c.vendorName} only
+                  </Text>
+                ) : null}
+              </View>
             </View>
           ))}
         </View>

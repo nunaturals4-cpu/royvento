@@ -5,10 +5,20 @@ import {
   vendorsTable,
   profileViewsTable,
   usersTable,
+  couponsTable,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+
+async function genUniqueCode(prefix: string, maxAttempts = 8): Promise<string> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const code = `${prefix}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+    const existing = await db.select({ id: couponsTable.id }).from(couponsTable).where(eq(couponsTable.code, code)).limit(1);
+    if (!existing.length) return code;
+  }
+  throw new Error("Could not generate unique code");
+}
 
 const router: IRouter = Router();
 
@@ -223,6 +233,49 @@ router.get(
         };
       }),
     });
+  },
+);
+
+const SendDiscountBody = z.object({
+  discountPercent: z.number().int().min(5).max(50).default(15),
+});
+
+router.post(
+  "/partner/leads/:profileViewId/send-discount",
+  requireAuth(["vendor"]),
+  async (req, res) => {
+    const user = await loadUserFromRequest(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    const vendor = await getMyVendor(user.id);
+    if (!vendor) return res.status(400).json({ error: "Partner profile required" });
+
+    const profileViewId = Number(req.params["profileViewId"]);
+    if (!Number.isFinite(profileViewId)) return res.status(400).json({ error: "Invalid id" });
+
+    const viewRows = await db
+      .select()
+      .from(profileViewsTable)
+      .where(and(eq(profileViewsTable.id, profileViewId), eq(profileViewsTable.vendorId, vendor.id)))
+      .limit(1);
+    const view = viewRows[0];
+    if (!view) return res.status(404).json({ error: "Lead not found" });
+    if (!view.viewerUserId) return res.status(400).json({ error: "This visitor is anonymous and has no account to receive a code" });
+
+    const parsed = SendDiscountBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+
+    const code = await genUniqueCode("PUB");
+    const [coupon] = await db
+      .insert(couponsTable)
+      .values({
+        userId: view.viewerUserId,
+        code,
+        discountPercent: parsed.data.discountPercent,
+        source: "partner_lead",
+        vendorId: vendor.id,
+      })
+      .returning();
+    return res.json({ code: coupon.code, discountPercent: coupon.discountPercent });
   },
 );
 
