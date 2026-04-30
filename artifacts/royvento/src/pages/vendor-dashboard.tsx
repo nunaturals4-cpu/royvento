@@ -22,7 +22,7 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
-  TrendingUp, IndianRupee, Clock,
+  TrendingUp, IndianRupee, Clock, Navigation,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -384,6 +384,27 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             </ul>
           )}
         </div>
+        {address.trim() && (
+          <div className="mt-1">
+            <iframe
+              key={address}
+              title="Venue location"
+              src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed&hl=en`}
+              className="w-full h-48 md:h-56 rounded-xl border border-white/10"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Navigation className="h-3 w-3" />
+              Open in Google Maps
+            </a>
+          </div>
+        )}
         <div>
           <Label className="mb-3 block text-sm font-medium">Operating hours</Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
