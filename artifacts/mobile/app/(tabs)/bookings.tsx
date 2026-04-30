@@ -117,6 +117,8 @@ export default function BookingsScreen() {
   const handleShareTicket = async (b: NonNullable<typeof data>[number]) => {
     const bx = b as typeof b & ExtendedBooking;
     const ticketCode = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     setSharingId(b.id);
     try {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(ticketCode)}&color=1a1008&bgcolor=ffffff`;
@@ -165,29 +167,29 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
   <div class="top">
     <div class="brand-row">
       <span class="brand">ROYVENTO</span>
-      <span class="code-badge">${ticketCode}</span>
+      <span class="code-badge">${esc(ticketCode)}</span>
     </div>
     <div class="hero">
       <div style="flex:1;min-width:0;">
-        <div class="venue">${(bx.vendorName ?? b.eventTitle ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
-        <div class="event-name">${(b.eventTitle ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+        <div class="venue">${esc(bx.vendorName ?? b.eventTitle)}</div>
+        <div class="event-name">${esc(b.eventTitle)}</div>
         <div class="fields">
-          <div><div class="lbl">Guest</div><div class="val">${(bx.personName || bx.userName || "—").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div></div>
-          <div><div class="lbl">Date</div><div class="val">${b.bookingDate}</div></div>
-          <div><div class="lbl">Tickets</div><div class="val">${ticketBreakdown.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div></div>
-          <div><div class="lbl">Approved by</div><div class="val">${(bx.approvedBy || "Partner").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div></div>
+          <div><div class="lbl">Guest</div><div class="val">${esc(bx.personName || bx.userName || "—")}</div></div>
+          <div><div class="lbl">Date</div><div class="val">${esc(b.bookingDate)}</div></div>
+          <div><div class="lbl">Tickets</div><div class="val">${esc(ticketBreakdown)}</div></div>
+          <div><div class="lbl">Approved by</div><div class="val">${esc(bx.approvedBy || "Partner")}</div></div>
         </div>
       </div>
       <div class="qr-block">
         <div class="qr-frame"><img src="${qrUrl}" alt="QR Code"/></div>
-        <div class="qr-venue">${(bx.vendorName ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+        <div class="qr-venue">${esc(bx.vendorName)}</div>
       </div>
     </div>
   </div>
   <div class="perf"><div class="notch"></div><div class="dash"></div><div class="notch notch-r"></div></div>
-  <div class="tear">${ticketCode}</div>
+  <div class="tear">${esc(ticketCode)}</div>
   <div class="footer">
-    <div><div class="price-lbl">Amount paid</div><div class="price">${price}</div></div>
+    <div><div class="price-lbl">Amount paid</div><div class="price">${esc(price)}</div></div>
     <div class="disclaimer">Present at entrance<br/>Non-transferable · Royvento</div>
   </div>
 </div>
