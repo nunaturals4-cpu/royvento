@@ -169,6 +169,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [dayTimes, setDayTimes] = useState<DayTimes>(() => parseDayHours(vendor.dayHours));
   const [address, setAddress] = useState<string>(vendor.address ?? "");
   const [addressQuery, setAddressQuery] = useState<string>(vendor.address ?? "");
+  const [fetchedAddress, setFetchedAddress] = useState<string>("");
   const [suggestions, setSuggestions] = useState<PlacesSuggestion[]>([]);
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -213,6 +214,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       const details = await apiGet<{ address: string | null; city: string | null; state: string | null; country: string | null }>(
         `/api/places/details?place_id=${encodeURIComponent(s.place_id)}`
       );
+      if (details.address) setFetchedAddress(details.address);
       if (details.city) setCity(details.city);
       if (details.state) setStateF(details.state);
       if (details.country) setCountry(details.country);
@@ -351,13 +353,13 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           </div>
         </div>
         <div className="relative">
-          <Label className="mb-1 block">Venue address <span className="text-muted-foreground text-xs">(optional — for map link)</span></Label>
+          <Label className="mb-1 block">Enter your business name (as on Google Maps) or full address</Label>
           <Input
             value={addressQuery}
-            onChange={(e) => { setAddressQuery(e.target.value); setAddress(e.target.value); searchAddress(e.target.value); }}
+            onChange={(e) => { setAddressQuery(e.target.value); setAddress(e.target.value); setFetchedAddress(""); searchAddress(e.target.value); }}
             onBlur={() => setTimeout(() => setShowSugg(false), 200)}
             onFocus={() => { if (suggestions.length > 0) setShowSugg(true); }}
-            placeholder="Start typing your venue address…"
+            placeholder="e.g. Tata Motors Kolkata or 123 Park Street, Kolkata"
             className="bg-black/40 border-white/10"
             autoComplete="off"
           />
@@ -384,6 +386,16 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             </ul>
           )}
         </div>
+        {fetchedAddress && (
+          <div className="mt-2">
+            <Label className="text-xs text-muted-foreground mb-1 block">Registered address on Google Maps</Label>
+            <Input
+              value={fetchedAddress}
+              readOnly
+              className="bg-black/20 border-white/5 text-muted-foreground cursor-default select-all"
+            />
+          </div>
+        )}
         {address.trim() && (
           <div className="mt-3">
             <iframe
