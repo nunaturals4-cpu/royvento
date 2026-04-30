@@ -170,6 +170,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [address, setAddress] = useState<string>(vendor.address ?? "");
   const [addressQuery, setAddressQuery] = useState<string>(vendor.address ?? "");
   const [fetchedAddress, setFetchedAddress] = useState<string>("");
+  const [addressMode, setAddressMode] = useState<"business" | "manual">("business");
   const [suggestions, setSuggestions] = useState<PlacesSuggestion[]>([]);
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -353,71 +354,114 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             </p>
           </div>
         </div>
-        <div className="relative">
-          <Label className="mb-1 block">Enter your business name (as on Google Maps) or full address</Label>
-          <Input
-            value={addressQuery}
-            onChange={(e) => { setAddressQuery(e.target.value); setAddress(e.target.value); setFetchedAddress(""); searchAddress(e.target.value); }}
-            onBlur={() => setTimeout(() => setShowSugg(false), 200)}
-            onFocus={() => { if (suggestions.length > 0) setShowSugg(true); }}
-            placeholder="e.g. Tata Motors Kolkata or 123 Park Street, Kolkata"
-            className="bg-black/40 border-white/10"
-            autoComplete="off"
-          />
-          {showSugg && suggestions.length > 0 && (
-            <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-card border border-white/10 shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-              {suggestions.map((s) => {
-                const isEstablishment = s.types.some((t) =>
-                  ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
-                );
-                const Icon = isEstablishment ? Building2 : MapPin;
-                return (
-                  <li key={s.place_id}>
-                    <button
-                      type="button"
-                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug flex items-start gap-2.5"
-                      onMouseDown={() => selectSuggestion(s)}
-                    >
-                      <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                      <span>{s.description}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+        <div>
+          <Label className="mb-2 block text-sm font-medium">Venue location</Label>
+          <div className="flex gap-6 mb-3">
+            {([
+              { value: "business", label: "Enter your business name (as on Google Maps)" },
+              { value: "manual", label: "Add full address" },
+            ] as const).map(({ value, label }) => (
+              <label key={value} className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="radio"
+                  name="addressMode"
+                  value={value}
+                  checked={addressMode === value}
+                  onChange={() => {
+                    setAddressMode(value);
+                    if (value === "manual") {
+                      setSuggestions([]); setShowSugg(false); setFetchedAddress("");
+                    }
+                  }}
+                  className="accent-primary"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+
+          {addressMode === "business" && (
+            <div className="relative">
+              <Input
+                value={addressQuery}
+                onChange={(e) => { setAddressQuery(e.target.value); setAddress(e.target.value); setFetchedAddress(""); searchAddress(e.target.value); }}
+                onBlur={() => setTimeout(() => setShowSugg(false), 200)}
+                onFocus={() => { if (suggestions.length > 0) setShowSugg(true); }}
+                placeholder="e.g. The Bandra Bar Mumbai"
+                className="bg-black/40 border-white/10"
+                autoComplete="off"
+              />
+              {showSugg && suggestions.length > 0 && (
+                <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-card border border-white/10 shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                  {suggestions.map((s) => {
+                    const isEstablishment = s.types.some((t) =>
+                      ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
+                    );
+                    const Icon = isEstablishment ? Building2 : MapPin;
+                    return (
+                      <li key={s.place_id}>
+                        <button
+                          type="button"
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug flex items-start gap-2.5"
+                          onMouseDown={() => selectSuggestion(s)}
+                        >
+                          <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          <span>{s.description}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {fetchedAddress && (
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground mb-1 block">Registered address on Google Maps</Label>
+                  <Input
+                    value={fetchedAddress}
+                    readOnly
+                    className="bg-black/20 border-white/5 text-muted-foreground cursor-default select-all"
+                  />
+                </div>
+              )}
+              {address.trim() && (
+                <div className="mt-3">
+                  <iframe
+                    key={address}
+                    title="Venue location"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed&hl=en`}
+                    className="w-full h-48 md:h-56 rounded-xl border border-white/10"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Navigation className="h-3 w-3" />
+                    Open in Google Maps ↗
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          {addressMode === "manual" && (
+            <div>
+              <Textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g. 123 Park Street, Kolkata, West Bengal 700016"
+                rows={3}
+                className="bg-black/40 border-white/10 resize-none"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                This address will appear on your public profile. You can paste a full address from Google Maps.
+              </p>
+            </div>
           )}
         </div>
-        {fetchedAddress && (
-          <div className="mt-2">
-            <Label className="text-xs text-muted-foreground mb-1 block">Registered address on Google Maps</Label>
-            <Input
-              value={fetchedAddress}
-              readOnly
-              className="bg-black/20 border-white/5 text-muted-foreground cursor-default select-all"
-            />
-          </div>
-        )}
-        {address.trim() && (
-          <div className="mt-3">
-            <iframe
-              key={address}
-              title="Venue location"
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed&hl=en`}
-              className="w-full h-48 md:h-56 rounded-xl border border-white/10"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-            <a
-              href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-            >
-              <Navigation className="h-3 w-3" />
-              Open in Google Maps ↗
-            </a>
-          </div>
-        )}
         <div>
           <Label className="mb-3 block text-sm font-medium">Operating hours</Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
