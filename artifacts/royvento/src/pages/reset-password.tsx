@@ -1,26 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiPost } from "@/lib/api";
-import { Lock, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Lock, CheckCircle2, ArrowLeft, Smartphone } from "lucide-react";
 
-function getTokenFromHash() {
-  const search = window.location.search;
-  const params = new URLSearchParams(search);
+function getTokenFromSearch() {
+  const params = new URLSearchParams(window.location.search);
   return params.get("token") ?? "";
+}
+
+function isMobileBrowser() {
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
 export function ResetPassword() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [token] = useState(getTokenFromHash);
+  const [token] = useState(getTokenFromSearch);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [appLinkAttempted, setAppLinkAttempted] = useState(false);
+
+  useEffect(() => {
+    if (!token || !isMobileBrowser()) return;
+    const deepLink = `royvento://reset-password?token=${encodeURIComponent(token)}`;
+    window.location.href = deepLink;
+    setAppLinkAttempted(true);
+  }, [token]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +81,22 @@ export function ResetPassword() {
         <p className="text-sm text-muted-foreground mt-2 mb-8">
           Enter and confirm your new password below.
         </p>
+        {appLinkAttempted && token && (
+          <div className="mb-6 p-3 rounded-xl bg-primary/10 border border-primary/20 text-sm text-primary flex items-start gap-2">
+            <Smartphone className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              Trying to open the Royvento app… If nothing happened,{" "}
+              <button
+                type="button"
+                className="underline underline-offset-2 cursor-pointer"
+                onClick={() => { window.location.href = `royvento://reset-password?token=${encodeURIComponent(token)}`; }}
+              >
+                tap here to try again
+              </button>{" "}
+              or reset below.
+            </span>
+          </div>
+        )}
         {!token && (
           <div className="mb-6 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive">
             No reset token found. Please use the link from the forgot-password email or demo page.
