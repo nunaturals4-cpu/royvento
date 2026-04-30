@@ -87,6 +87,7 @@ interface VendorEvent {
   title: string;
   description: string;
   category: string;
+  type?: string;
   location: string;
   price: number;
   capacity: number;
@@ -275,7 +276,7 @@ export default function VendorDashboardScreen() {
   }
 
   // ─── Edit event ──────────────────────────────────────────────────────────────
-  const [editingEvent, setEditingEvent] = useState<null | { id: number }>(null);
+  const [editingEvent, setEditingEvent] = useState<null | { id: number; type?: string }>(null);
   const [editForm, setEditForm] = useState<EventFormState>({ ...DEFAULT_EVENT_FORM });
   const [showEditCatPicker, setShowEditCatPicker] = useState(false);
   const [editImageUploading, setEditImageUploading] = useState(false);
@@ -308,7 +309,7 @@ export default function VendorDashboardScreen() {
       freeEntryBeforeTime: fer?.beforeTime ?? "",
     });
     setShowEditCatPicker(false);
-    setEditingEvent({ id: event.id });
+    setEditingEvent({ id: event.id, type: event.type });
   }
 
   function submitEditEvent() {
@@ -337,7 +338,7 @@ export default function VendorDashboardScreen() {
         price,
         capacity,
         imageUrl: editForm.imageUrl || undefined,
-        freeEntryRules: editForm.category === "Pubs" ? {
+        freeEntryRules: (editingEvent.type === "pub" || editForm.category === "Pubs") ? {
           enabled: editForm.freeEntryEnabled,
           genders: editForm.freeEntryGenders,
           days: editForm.freeEntryDays,
