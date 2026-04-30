@@ -19,6 +19,7 @@ interface Props {
     vendorName?: string;
     partnerName?: string;
     popular?: boolean;
+    freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   };
 }
 
@@ -71,6 +72,15 @@ export function EventCard({ event }: Props) {
           </h3>
           {partner && (
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{partner}</p>
+          )}
+          {event.freeEntryRules?.enabled && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 w-fit">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+              <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">
+                Free Entry
+                {event.freeEntryRules.genders.length > 0 && ` · ${event.freeEntryRules.genders.join(" & ")}`}
+              </span>
+            </div>
           )}
           <div className="flex items-center justify-between pt-2 border-t border-white/5">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">

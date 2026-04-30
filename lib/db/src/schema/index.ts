@@ -112,6 +112,7 @@ export const eventsTable = pgTable(
       .default("0"),
     pubEventTypes: text("pub_event_types").array().notNull().default([]),
     dayPricing: jsonb("day_pricing").$type<Record<string, { women: number; men: number; couple: number } | null>>(),
+    freeEntryRules: jsonb("free_entry_rules").$type<{ enabled: boolean; genders: string[]; days: string[]; beforeTime?: string }>(),
     galleryImages: text("gallery_images").array(),
     galleryVideos: text("gallery_videos").array(),
     approvalStatus: varchar("approval_status", { length: 20 })

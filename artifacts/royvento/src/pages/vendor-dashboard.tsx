@@ -750,6 +750,10 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   const [pubEventTypes, setPubEventTypes] = useState<string[]>([]);
   const [varyByDay, setVaryByDay] = useState(false);
   const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number | ""; men: number | ""; couple: number | "" }>>({});
+  const [freeEntryEnabled, setFreeEntryEnabled] = useState(false);
+  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>([]);
+  const [freeEntryDays, setFreeEntryDays] = useState<string[]>([]);
+  const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState("");
   const create = useCreateEvent();
   const { toast } = useToast();
 
@@ -814,6 +818,14 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       })(),
       galleryImages,
       galleryVideos,
+      ...(type === "pub" ? {
+        freeEntryRules: {
+          enabled: freeEntryEnabled,
+          genders: freeEntryGenders,
+          days: freeEntryDays,
+          ...(freeEntryBeforeTime ? { beforeTime: freeEntryBeforeTime } : {}),
+        },
+      } : {}),
     };
     create.mutate(
       { data: body },
@@ -981,6 +993,42 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
               </div>
             </div>
           )}
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)} />
+              <span className="text-sm font-medium text-emerald-400">Free Entry available</span>
+            </label>
+            {freeEntryEnabled && (
+              <div className="space-y-3 pl-1">
+                <div>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Ladies", "Men", "Couples"].map((g) => (
+                      <button key={g} type="button"
+                        onClick={() => setFreeEntryGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g])}
+                        className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(g) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                      >{g}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days?</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                      <button key={d} type="button"
+                        onClick={() => setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
+                        className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                      >{d}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1 block">Before time (optional, e.g. 10:00 PM)</Label>
+                  <Input value={freeEntryBeforeTime} onChange={(e) => setFreeEntryBeforeTime(e.target.value)} placeholder="e.g. 10:00 PM" className="bg-black/40 border-white/10 text-sm max-w-xs" />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1063,6 +1111,10 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
     }
     return {};
   });
+  const [freeEntryEnabled, setFreeEntryEnabled] = useState<boolean>(!!(event as any).freeEntryRules?.enabled);
+  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>((event as any).freeEntryRules?.genders ?? []);
+  const [freeEntryDays, setFreeEntryDays] = useState<string[]>((event as any).freeEntryRules?.days ?? []);
+  const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>((event as any).freeEntryRules?.beforeTime ?? "");
   const { toast } = useToast();
   const isPub = event.type === "pub";
 
@@ -1114,6 +1166,12 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
             }
             return Object.keys(result).length > 0 ? result : null;
           })(),
+          freeEntryRules: {
+            enabled: freeEntryEnabled,
+            genders: freeEntryGenders,
+            days: freeEntryDays,
+            ...(freeEntryBeforeTime ? { beforeTime: freeEntryBeforeTime } : {}),
+          },
         } : {}),
       });
       toast({ title: "Updated" });
@@ -1277,6 +1335,42 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                   >{t}</button>
                 ))}
               </div>
+            </div>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)} />
+                <span className="text-sm font-medium text-emerald-400">Free Entry available</span>
+              </label>
+              {freeEntryEnabled && (
+                <div className="space-y-3 pl-1">
+                  <div>
+                    <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Ladies", "Men", "Couples"].map((g) => (
+                        <button key={g} type="button"
+                          onClick={() => setFreeEntryGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g])}
+                          className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(g) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                        >{g}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days?</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                        <button key={d} type="button"
+                          onClick={() => setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
+                          className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                        >{d}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-white/60 mb-1 block">Before time (optional, e.g. 10:00 PM)</Label>
+                    <Input value={freeEntryBeforeTime} onChange={(e) => setFreeEntryBeforeTime(e.target.value)} placeholder="e.g. 10:00 PM" className="bg-black/40 border-white/10 text-sm max-w-xs" />
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

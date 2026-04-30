@@ -137,11 +137,16 @@ interface EventFormState {
   capacity: string;
   imageUrl: string;
   imageUri: string;  // local URI for preview before upload
+  freeEntryEnabled: boolean;
+  freeEntryGenders: string[];
+  freeEntryDays: string[];
+  freeEntryBeforeTime: string;
 }
 
 const DEFAULT_EVENT_FORM: EventFormState = {
   title: "", description: "", category: EVENT_CATEGORIES[0]!,
   location: "", price: "", capacity: "", imageUrl: "", imageUri: "",
+  freeEntryEnabled: false, freeEntryGenders: [], freeEntryDays: [], freeEntryBeforeTime: "",
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -247,6 +252,14 @@ export default function VendorDashboardScreen() {
         price,
         capacity,
         ...(createForm.imageUrl ? { imageUrl: createForm.imageUrl } : {}),
+        ...(createForm.category === "Pubs" ? {
+          freeEntryRules: {
+            enabled: createForm.freeEntryEnabled,
+            genders: createForm.freeEntryGenders,
+            days: createForm.freeEntryDays,
+            ...(createForm.freeEntryBeforeTime ? { beforeTime: createForm.freeEntryBeforeTime } : {}),
+          },
+        } : {}),
       },
     });
   }
@@ -269,6 +282,7 @@ export default function VendorDashboardScreen() {
   });
 
   function openEditModal(event: VendorEvent) {
+    const fer = (event as any).freeEntryRules;
     setEditForm({
       title: event.title,
       description: event.description,
@@ -278,6 +292,10 @@ export default function VendorDashboardScreen() {
       capacity: String(event.capacity),
       imageUrl: event.imageUrl,
       imageUri: event.imageUrl,
+      freeEntryEnabled: !!(fer?.enabled),
+      freeEntryGenders: fer?.genders ?? [],
+      freeEntryDays: fer?.days ?? [],
+      freeEntryBeforeTime: fer?.beforeTime ?? "",
     });
     setShowEditCatPicker(false);
     setEditingEvent({ id: event.id });
@@ -309,6 +327,14 @@ export default function VendorDashboardScreen() {
         price,
         capacity,
         imageUrl: editForm.imageUrl || undefined,
+        ...(editForm.category === "Pubs" ? {
+          freeEntryRules: {
+            enabled: editForm.freeEntryEnabled,
+            genders: editForm.freeEntryGenders,
+            days: editForm.freeEntryDays,
+            ...(editForm.freeEntryBeforeTime ? { beforeTime: editForm.freeEntryBeforeTime } : {}),
+          },
+        } : {}),
       },
     });
   }
@@ -742,6 +768,76 @@ export default function VendorDashboardScreen() {
             />
           </View>
         </View>
+
+        {form.category === "Pubs" && (
+          <View style={[styles.freeEntrySection, { borderColor: "#22c55e30", backgroundColor: "#22c55e08" }]}>
+            <TouchableOpacity
+              style={styles.freeEntryToggleRow}
+              onPress={() => setForm((p) => ({ ...p, freeEntryEnabled: !p.freeEntryEnabled }))}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.freeEntryCheckbox, { borderColor: form.freeEntryEnabled ? "#22c55e" : colors.border, backgroundColor: form.freeEntryEnabled ? "#22c55e" : "transparent" }]}>
+                {form.freeEntryEnabled ? <Ionicons name="checkmark" size={12} color="#fff" /> : null}
+              </View>
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#22c55e" }}>Free Entry Available</Text>
+            </TouchableOpacity>
+
+            {form.freeEntryEnabled && (
+              <>
+                <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Free for which genders?</Text>
+                <View style={styles.chipRow}>
+                  {["Ladies", "Men", "Couples"].map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[styles.chip, {
+                        borderColor: form.freeEntryGenders.includes(g) ? "#22c55e" : colors.border,
+                        backgroundColor: form.freeEntryGenders.includes(g) ? "#22c55e20" : colors.card,
+                      }]}
+                      onPress={() => setForm((p) => ({
+                        ...p,
+                        freeEntryGenders: p.freeEntryGenders.includes(g)
+                          ? p.freeEntryGenders.filter((x) => x !== g)
+                          : [...p.freeEntryGenders, g],
+                      }))}
+                    >
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: form.freeEntryGenders.includes(g) ? "#22c55e" : colors.mutedForeground }}>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Valid on which days?</Text>
+                <View style={styles.chipRow}>
+                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.chip, {
+                        borderColor: form.freeEntryDays.includes(d) ? "#22c55e" : colors.border,
+                        backgroundColor: form.freeEntryDays.includes(d) ? "#22c55e20" : colors.card,
+                      }]}
+                      onPress={() => setForm((p) => ({
+                        ...p,
+                        freeEntryDays: p.freeEntryDays.includes(d)
+                          ? p.freeEntryDays.filter((x) => x !== d)
+                          : [...p.freeEntryDays, d],
+                      }))}
+                    >
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: form.freeEntryDays.includes(d) ? "#22c55e" : colors.mutedForeground }}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Before time (optional)</Text>
+                <TextInput
+                  style={[styles.fieldInput, { color: colors.foreground, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }]}
+                  value={form.freeEntryBeforeTime}
+                  onChangeText={(v) => setForm((p) => ({ ...p, freeEntryBeforeTime: v }))}
+                  placeholder="e.g. 10:00 PM"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </>
+            )}
+          </View>
+        )}
       </>
     );
   }
@@ -1986,4 +2082,10 @@ const styles = StyleSheet.create({
   imageOverlayText: { color: "#fff", fontFamily: "Inter_500Medium", fontSize: 13 },
   imageChangeChip: { position: "absolute", bottom: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
   imageChangeText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
+  freeEntrySection: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 10 },
+  freeEntryToggleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  freeEntryCheckbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  freeEntrySubLabel: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 2 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
 });

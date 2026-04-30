@@ -391,6 +391,35 @@ export function EventDetail() {
             </div>
           ) : null}
 
+          {isPub && (ev.freeEntryRules as any)?.enabled && (() => {
+            const fer = ev.freeEntryRules as { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string };
+            return (
+              <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                  <h3 className="font-semibold text-emerald-400 text-sm uppercase tracking-wide">Free Entry Available</h3>
+                </div>
+                <div className="flex flex-wrap gap-3 text-sm text-white/70">
+                  {fer.genders.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-300 text-xs font-medium">
+                      For: {fer.genders.join(", ")}
+                    </span>
+                  )}
+                  {fer.days.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-white/60 text-xs">
+                      Days: {fer.days.join(", ")}
+                    </span>
+                  )}
+                  {fer.beforeTime && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-white/60 text-xs">
+                      Before {fer.beforeTime}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {isPub && vendorDayHours && (() => {
             const DAY_ORDER_h = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
             const DAY_FULL_h: Record<string, string> = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };

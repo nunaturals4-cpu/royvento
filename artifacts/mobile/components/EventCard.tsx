@@ -21,6 +21,7 @@ interface EventCardProps {
   type?: string;
   style?: object;
   compact?: boolean;
+  freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
 }
 
 export function EventCard({
@@ -33,6 +34,7 @@ export function EventCard({
   type,
   style,
   compact,
+  freeEntryRules,
 }: EventCardProps) {
   const colors = useColors();
 
@@ -112,6 +114,14 @@ export function EventCard({
           <Text style={[styles.price, { color: colors.primary }]}>
             {formatPrice(priceNum)}
           </Text>
+        ) : null}
+        {freeEntryRules?.enabled ? (
+          <View style={styles.freeEntryBadge}>
+            <View style={styles.freeEntryDot} />
+            <Text style={styles.freeEntryText}>
+              Free Entry{freeEntryRules.genders.length > 0 ? ` · ${freeEntryRules.genders.join(" & ")}` : ""}
+            </Text>
+          </View>
         ) : null}
       </View>
     </Pressable>
@@ -201,5 +211,29 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 12,
     fontFamily: "Inter_700Bold",
+  },
+  freeEntryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(34,197,94,0.12)",
+    alignSelf: "flex-start",
+    marginTop: 2,
+  },
+  freeEntryDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "#22c55e",
+  },
+  freeEntryText: {
+    fontSize: 9,
+    fontFamily: "Inter_600SemiBold",
+    color: "#22c55e",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
 });

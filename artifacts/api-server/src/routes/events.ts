@@ -40,6 +40,21 @@ function validateDayPricing(
   return result;
 }
 
+function validateFreeEntryRules(
+  val: unknown,
+): { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val !== "object" || Array.isArray(val)) {
+    throw Object.assign(new Error("freeEntryRules must be a plain object or null"), { status: 400 });
+  }
+  const v = val as Record<string, unknown>;
+  const enabled = !!v["enabled"];
+  const genders = Array.isArray(v["genders"]) ? (v["genders"] as string[]).filter((g) => typeof g === "string") : [];
+  const days = Array.isArray(v["days"]) ? (v["days"] as string[]).filter((d) => typeof d === "string") : [];
+  const beforeTime = typeof v["beforeTime"] === "string" ? v["beforeTime"] : undefined;
+  return { enabled, genders, days, ...(beforeTime !== undefined ? { beforeTime } : {}) };
+}
+
 interface EventRow {
   id: number;
   vendorId: number;
@@ -63,6 +78,7 @@ interface EventRow {
   priceCouple: string;
   pubEventTypes: string[];
   dayPricing: Record<string, { women: number; men: number; couple: number } | null> | null;
+  freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   galleryImages: string[] | null;
   galleryVideos: string[] | null;
   approvalStatus: string;
@@ -114,6 +130,7 @@ async function serializeEvents(rows: EventRow[]) {
       priceCouple: Number(e.priceCouple),
       pubEventTypes: e.pubEventTypes ?? [],
       dayPricing: e.dayPricing ?? null,
+      freeEntryRules: e.freeEntryRules ?? null,
       galleryImages: e.galleryImages ?? [],
       galleryVideos: e.galleryVideos ?? [],
       approvalStatus: e.approvalStatus,
@@ -361,6 +378,13 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     res.status(400).json({ error: (e as Error).message });
     return;
   }
+  let freeEntryRules: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
+  try {
+    freeEntryRules = validateFreeEntryRules(body["freeEntryRules"]);
+  } catch (e: unknown) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
 
   const [created] = await db
     .insert(eventsTable)
@@ -386,6 +410,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       priceCouple: priceCouple != null ? String(priceCouple) : "0",
       pubEventTypes,
       dayPricing,
+      freeEntryRules,
       galleryImages: parsed.data.galleryImages ?? null,
       galleryVideos: parsed.data.galleryVideos ?? null,
       approvalStatus: "pending",
@@ -463,6 +488,14 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   if ("dayPricing" in body) {
     try {
       updates["dayPricing"] = validateDayPricing(body["dayPricing"]);
+    } catch (e: unknown) {
+      res.status(400).json({ error: (e as Error).message });
+      return;
+    }
+  }
+  if ("freeEntryRules" in body) {
+    try {
+      updates["freeEntryRules"] = validateFreeEntryRules(body["freeEntryRules"]);
     } catch (e: unknown) {
       res.status(400).json({ error: (e as Error).message });
       return;
