@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useToast } from "@/hooks/use-toast";
@@ -9,9 +10,22 @@ import { apiPost } from "@/lib/api";
 import { Sparkles, MapPin, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 
+const VENUE_CATEGORIES = [
+  "Pub",
+  "Bar",
+  "Club",
+  "Lounge",
+  "Rooftop",
+  "Restaurant",
+  "Live Music Venue",
+  "Comedy Club",
+  "Other",
+] as const;
+
 export function BecomeVendor() {
   const { toast } = useToast();
   const [businessName, setBusinessName] = useState("");
+  const [category, setCategory] = useState<string>("Pub");
   const [reason, setReason] = useState("");
   const [country, setCountry] = useState("India");
   const [stateF, setStateF] = useState("");
@@ -25,7 +39,7 @@ export function BecomeVendor() {
     try {
       await apiPost("/api/vendor-requests", {
         businessName,
-        category: "Pub",
+        category,
         message: reason,
         country,
         state: stateF,
@@ -78,6 +92,19 @@ export function BecomeVendor() {
         <div>
           <Label htmlFor="bname">Business name</Label>
           <Input id="bname" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. The Royal Arms Pub" />
+        </div>
+        <div>
+          <Label htmlFor="bcategory">Venue category</Label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger id="bcategory" className="mt-1">
+              <SelectValue placeholder="Select a category" />
+            </SelectTrigger>
+            <SelectContent>
+              {VENUE_CATEGORIES.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />Where are you based?</Label>
