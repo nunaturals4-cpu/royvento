@@ -108,7 +108,7 @@ export function VendorDetail() {
                 <span className="flex items-center gap-2.5 min-w-0">
                   <span className={[
                     "h-2 w-2 rounded-full shrink-0",
-                    times ? "bg-emerald-500" : "bg-muted-foreground/25",
+                    times ? "bg-emerald-500" : "bg-muted-foreground/30",
                   ].join(" ")} />
                   <span className={["font-medium truncate", isToday ? "text-primary" : ""].join(" ")}>
                     {DAY_FULL[day]}
@@ -124,8 +124,8 @@ export function VendorDetail() {
                   times
                     ? isToday
                       ? "font-semibold text-primary"
-                      : "text-muted-foreground text-sm"
-                    : "text-muted-foreground/40 text-xs",
+                      : "text-foreground text-sm"
+                    : "text-muted-foreground/50 text-xs",
                 ].join(" ")}>
                   {times ? (
                     <>
