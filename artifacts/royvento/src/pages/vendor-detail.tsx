@@ -78,7 +78,7 @@ export function VendorDetail() {
           const toMin = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
 
           const todayKey = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date().getDay()];
-          const todayTimes = hours[todayKey];
+          const todayTimes = hours[todayKey] ?? null;
           const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
           let isOpenNow = false;
           if (todayTimes) {
@@ -89,12 +89,61 @@ export function VendorDetail() {
               : nowMin >= openMin && nowMin < closeMin;
           }
 
+          const leftDays = DAY_ORDER.slice(0, 4);
+          const rightDays = DAY_ORDER.slice(4);
+
+          const DayRow = ({ day }: { day: string }) => {
+            const times = hours[day] ?? null;
+            const isToday = day === todayKey;
+            const isOvernight = times ? toMin(times.close) < toMin(times.open) : false;
+            return (
+              <div
+                className={[
+                  "flex justify-between items-center px-4 py-3 text-sm rounded-lg transition-colors",
+                  isToday ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-white/3",
+                ].join(" ")}
+              >
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <span className={[
+                    "h-2 w-2 rounded-full shrink-0",
+                    times ? "bg-emerald-500" : "bg-muted-foreground/25",
+                  ].join(" ")} />
+                  <span className={["font-medium truncate", isToday ? "text-primary" : ""].join(" ")}>
+                    {DAY_FULL[day]}
+                  </span>
+                  {isToday && (
+                    <span className="shrink-0 text-[10px] font-semibold text-primary/70 uppercase tracking-wider border border-primary/30 rounded px-1 py-px">
+                      today
+                    </span>
+                  )}
+                </span>
+                <span className={[
+                  "ml-3 shrink-0 tabular-nums",
+                  times
+                    ? isToday
+                      ? "font-semibold text-primary"
+                      : "text-muted-foreground text-sm"
+                    : "text-muted-foreground/40 text-xs",
+                ].join(" ")}>
+                  {times ? (
+                    <>
+                      {fmt(times.open)} – {fmt(times.close)}
+                      {isOvernight && (
+                        <span className="ml-1 text-muted-foreground/50 text-[10px]">↪ next day</span>
+                      )}
+                    </>
+                  ) : "–"}
+                </span>
+              </div>
+            );
+          };
+
           return (
             <section>
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="font-serif text-2xl flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary" />
-                  Hours
+                  Opening Hours
                 </h2>
                 {isOpenNow ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-500">
@@ -107,28 +156,29 @@ export function VendorDetail() {
                   </span>
                 )}
               </div>
-              <div className="rounded-xl border overflow-hidden max-w-sm">
-                {DAY_ORDER.map((day, i) => {
-                  const times = hours[day] ?? null;
-                  const isToday = day === todayKey;
-                  const isOvernight = times ? toMin(times.close) < toMin(times.open) : false;
-                  return (
-                    <div
-                      key={day}
-                      className={`flex justify-between items-center px-4 py-3 text-sm${i > 0 ? " border-t" : ""}${isToday ? " bg-primary/5" : ""}`}
-                    >
-                      <span className={`font-medium${isToday ? " text-primary" : ""}`}>
-                        {DAY_FULL[day]}
-                        {isToday && <span className="ml-2 text-[10px] font-normal text-primary/60 uppercase tracking-wide">today</span>}
-                      </span>
-                      <span className={times ? (isToday ? "font-medium text-foreground" : "text-muted-foreground") : "text-muted-foreground/40 italic text-xs"}>
-                        {times
-                          ? `${fmt(times.open)} – ${fmt(times.close)}${isOvernight ? " (next day)" : ""}`
-                          : "Closed"}
-                      </span>
-                    </div>
-                  );
-                })}
+
+              {todayTimes && (
+                <div className="mb-5 flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
+                  <Clock className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm text-muted-foreground">
+                    Today ({DAY_FULL[todayKey]}):
+                  </span>
+                  <span className="font-semibold text-primary tabular-nums">
+                    {fmt(todayTimes.open)} – {fmt(todayTimes.close)}
+                    {toMin(todayTimes.close) < toMin(todayTimes.open) && (
+                      <span className="ml-1.5 text-xs text-muted-foreground font-normal">↪ next day</span>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-2 gap-1.5">
+                <div className="space-y-0.5">
+                  {leftDays.map((day) => <DayRow key={day} day={day} />)}
+                </div>
+                <div className="space-y-0.5">
+                  {rightDays.map((day) => <DayRow key={day} day={day} />)}
+                </div>
               </div>
             </section>
           );
