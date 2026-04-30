@@ -94,11 +94,11 @@ export default function ProfileScreen() {
     },
   });
 
-  const handlePickImage = async () => {
+  const pickImageAsset = async (): Promise<string | null> => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission needed", "Please allow access to your photo library to upload a profile picture.");
-      return;
+      return null;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: "images",
@@ -106,11 +106,32 @@ export default function ProfileScreen() {
       aspect: [1, 1],
       quality: 0.8,
     });
-    if (result.canceled || !result.assets?.[0]?.uri) return;
+    if (result.canceled || !result.assets?.[0]?.uri) return null;
+    return result.assets[0].uri;
+  };
+
+  const handlePickImage = async () => {
+    const uri = await pickImageAsset();
+    if (!uri) return;
     setImageUploading(true);
     try {
-      const url = await uploadImageToStorage(result.assets[0].uri);
+      const url = await uploadImageToStorage(uri);
       setEditProfileImage(url);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert("Upload failed", err?.message ?? "Could not upload photo.");
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handlePickAndSaveImage = async () => {
+    const uri = await pickImageAsset();
+    if (!uri) return;
+    setImageUploading(true);
+    try {
+      const url = await uploadImageToStorage(uri);
+      updateMeMutation.mutate({ data: { profileImage: url } });
     } catch (e: unknown) {
       const err = e as { message?: string };
       Alert.alert("Upload failed", err?.message ?? "Could not upload photo.");
@@ -196,13 +217,7 @@ export default function ProfileScreen() {
       >
         <View style={{ position: "relative" }}>
           <Pressable
-            onPress={() => {
-              setEditName(user.name);
-              setEditPhone(user.phone ?? "");
-              setEditAbout(user.about ?? "");
-              setEditProfileImage(user.profileImage ?? "");
-              handlePickImage();
-            }}
+            onPress={handlePickAndSaveImage}
             accessibilityLabel="Change profile photo"
           >
             {user.profileImage ? (
