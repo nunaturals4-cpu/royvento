@@ -541,22 +541,30 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                           <Ionicons name="share-outline" size={15} color="#d4a853" />
                         )}
                         <Text style={[styles.actionBtnText, { color: "#d4a853" }]}>
-                          {sharingId === b.id ? "Preparing…" : "Share Ticket"}
+                          {sharingId === b.id ? "Preparing…" : "Share / Download Ticket"}
                         </Text>
                       </TouchableOpacity>
                     )}
 
                     {/* Cancel Booking */}
                     {bx.checkedIn ? (
-                      <View style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.5 }]}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.6 }]}
+                        onPress={() => Alert.alert("Cannot cancel", "Your ticket has already been scanned at the venue — this booking can no longer be cancelled.")}
+                        activeOpacity={0.8}
+                      >
                         <Ionicons name="checkmark-circle-outline" size={15} color={colors.mutedForeground} />
                         <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Checked in</Text>
-                      </View>
+                      </TouchableOpacity>
                     ) : bx.cancellationAllowed === false ? (
-                      <View style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.5 }]}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.6 }]}
+                        onPress={() => Alert.alert("Cancellation closed", "Cancellations are not allowed within 24 hours of the event date.")}
+                        activeOpacity={0.8}
+                      >
                         <Ionicons name="close-circle-outline" size={15} color={colors.mutedForeground} />
                         <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Cancellation closed</Text>
-                      </View>
+                      </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
                         style={[styles.actionBtn, { backgroundColor: "#ef444418", borderColor: "rgba(239,68,68,0.35)" }]}
