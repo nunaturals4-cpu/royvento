@@ -67,7 +67,9 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
 
         <View style={styles.cardRow}>
           <Ionicons name="location-outline" size={12} color={colors.mutedForeground} />
-          <Text style={[styles.locationText, { color: colors.mutedForeground }]} numberOfLines={1}>{vendor.location || "India"}</Text>
+          <Text style={[styles.locationText, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {[vendor.city, vendor.state].filter(Boolean).join(", ") || vendor.location || "India"}
+          </Text>
         </View>
 
         <View style={styles.cardRow}>
@@ -134,16 +136,6 @@ export default function VendorsScreen() {
 
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
-      ) : approvedVendors.length === 0 ? (
-        <>
-          <EmptyState
-            icon="business-outline"
-            title="No partners found"
-            subtitle={activeCategory !== "All" ? "Try a different category" : "Check back soon"}
-            action={activeCategory !== "All" ? { label: "Show all", onPress: () => setActiveCategory("All") } : undefined}
-          />
-          <MobileFooter />
-        </>
       ) : (
         <FlatList
           data={approvedVendors}
@@ -151,7 +143,15 @@ export default function VendorsScreen() {
           contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
-          ListFooterComponent={<MobileFooter />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="business-outline"
+              title="No partners found"
+              subtitle={activeCategory !== "All" ? "Try a different category" : "Check back soon"}
+              action={activeCategory !== "All" ? { label: "Show all", onPress: () => setActiveCategory("All") } : undefined}
+            />
+          }
+          ListFooterComponent={approvedVendors.length > 0 ? <MobileFooter /> : null}
           renderItem={({ item }) => <VendorCard vendor={item} />}
         />
       )}
