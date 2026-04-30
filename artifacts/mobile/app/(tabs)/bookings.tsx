@@ -3,16 +3,21 @@ import { customFetch, useListMyBookings, getListMyBookingsQueryKey } from "@work
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
   FlatList,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   Alert,
@@ -77,8 +82,131 @@ export default function BookingsScreen() {
   const [invitations, setInvitations] = useState<ManagerInvitation[]>([]);
   const [actingInvId, setActingInvId] = useState<number | null>(null);
   const [managedVendors, setManagedVendors] = useState<{ id: number; businessName: string }[]>([]);
+  const [cancelModalBooking, setCancelModalBooking] = useState<null | { id: number; eventTitle: string; bookingDate: string }>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [sharingId, setSharingId] = useState<number | null>(null);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const appState = useRef(AppState.currentState);
+
+  const handleCancelBooking = async () => {
+    if (!cancelModalBooking) return;
+    if (!cancelReason.trim()) {
+      Alert.alert("Reason required", "Please enter a reason for cancellation.");
+      return;
+    }
+    setCancelLoading(true);
+    try {
+      await customFetch(`/api/bookings/${cancelModalBooking.id}/cancel`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancellationReason: cancelReason.trim() }),
+      });
+      setCancelModalBooking(null);
+      setCancelReason("");
+      refetch();
+      Alert.alert("Booking cancelled", "Your booking has been cancelled.");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert("Failed to cancel", err?.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const handleShareTicket = async (b: NonNullable<typeof data>[number]) => {
+    const bx = b as typeof b & ExtendedBooking;
+    const ticketCode = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
+    setSharingId(b.id);
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(ticketCode)}&color=1a1008&bgcolor=ffffff`;
+      const ticketBreakdown = [
+        bx.ticketWomen ? `${bx.ticketWomen}× Women` : "",
+        bx.ticketMen ? `${bx.ticketMen}× Men` : "",
+        bx.ticketCouple ? `${bx.ticketCouple}× Couple` : "",
+      ].filter(Boolean).join(" · ") || `${b.guests} guests`;
+
+      const price = bx.finalPrice != null
+        ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
+        : b.totalPrice != null
+        ? `₹${Number(b.totalPrice).toLocaleString("en-IN")}`
+        : "—";
+
+      const html = `<!doctype html><html><head><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+.ticket{background:linear-gradient(145deg,#14090f 0%,#1e0e1a 45%,#100c18 100%);border:1px solid rgba(212,168,83,.35);border-radius:20px;max-width:600px;width:100%;overflow:hidden;}
+.top{padding:28px 28px 20px;}
+.brand-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.brand{font-size:9px;letter-spacing:5px;text-transform:uppercase;color:rgba(212,168,83,.55);}
+.code-badge{font-size:10px;font-family:monospace;color:rgba(212,168,83,.7);background:rgba(212,168,83,.08);border:1px solid rgba(212,168,83,.2);padding:3px 10px;border-radius:6px;letter-spacing:.1em;}
+.hero{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;}
+.venue{font-size:26px;color:#d4a853;font-weight:700;line-height:1.15;margin-bottom:6px;}
+.event-name{font-size:14px;color:rgba(255,255,255,.7);margin-bottom:3px;}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-top:18px;}
+.lbl{font-size:8px;text-transform:uppercase;letter-spacing:2.5px;color:rgba(212,168,83,.45);margin-bottom:3px;}
+.val{font-size:13px;color:rgba(255,255,255,.85);font-weight:500;}
+.qr-block{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;}
+.qr-frame{background:#fff;border:2px solid rgba(212,168,83,.45);border-radius:12px;padding:8px;}
+.qr-frame img{display:block;width:130px;height:130px;}
+.qr-venue{font-size:8px;color:rgba(212,168,83,.5);letter-spacing:1px;text-align:center;max-width:130px;word-break:break-word;text-transform:uppercase;}
+.perf{display:flex;align-items:center;margin:0 -1px;}
+.notch{width:16px;height:32px;background:#0c0810;border-radius:0 16px 16px 0;}
+.notch-r{border-radius:16px 0 0 16px;}
+.dash{flex:1;border-top:2px dashed rgba(212,168,83,.22);}
+.tear{font-family:monospace;font-size:15px;letter-spacing:3px;color:#d4a853;text-align:center;padding:10px 0;}
+.footer{display:flex;justify-content:space-between;align-items:center;padding:16px 28px 24px;}
+.price-lbl{font-size:8px;text-transform:uppercase;letter-spacing:2px;color:rgba(212,168,83,.45);margin-bottom:3px;}
+.price{font-size:26px;color:#d4a853;font-weight:700;}
+.disclaimer{font-size:9px;color:rgba(255,255,255,.22);text-align:right;line-height:1.7;max-width:180px;}
+</style></head><body>
+<div class="ticket">
+  <div class="top">
+    <div class="brand-row">
+      <span class="brand">ROYVENTO</span>
+      <span class="code-badge">${ticketCode}</span>
+    </div>
+    <div class="hero">
+      <div style="flex:1;min-width:0;">
+        <div class="venue">${(bx.vendorName ?? b.eventTitle ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+        <div class="event-name">${(b.eventTitle ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+        <div class="fields">
+          <div><div class="lbl">Guest</div><div class="val">${(bx.personName || bx.userName || "—").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div></div>
+          <div><div class="lbl">Date</div><div class="val">${b.bookingDate}</div></div>
+          <div><div class="lbl">Tickets</div><div class="val">${ticketBreakdown.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div></div>
+          <div><div class="lbl">Approved by</div><div class="val">${(bx.approvedBy || "Partner").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div></div>
+        </div>
+      </div>
+      <div class="qr-block">
+        <div class="qr-frame"><img src="${qrUrl}" alt="QR Code"/></div>
+        <div class="qr-venue">${(bx.vendorName ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+      </div>
+    </div>
+  </div>
+  <div class="perf"><div class="notch"></div><div class="dash"></div><div class="notch notch-r"></div></div>
+  <div class="tear">${ticketCode}</div>
+  <div class="footer">
+    <div><div class="price-lbl">Amount paid</div><div class="price">${price}</div></div>
+    <div class="disclaimer">Present at entrance<br/>Non-transferable · Royvento</div>
+  </div>
+</div>
+</body></html>`;
+
+      const result = await Print.printToFileAsync({ html, base64: false });
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(result.uri, { mimeType: "application/pdf", UTI: "com.adobe.pdf", dialogTitle: "Share Ticket" });
+      } else {
+        Alert.alert("Sharing not available", "Sharing is not supported on this device.");
+      }
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert("Error", err?.message ?? "Could not generate ticket PDF.");
+    } finally {
+      setSharingId(null);
+    }
+  };
 
   const { data, isLoading, refetch } = useListMyBookings({ query: { queryKey: getListMyBookingsQueryKey(), enabled: !!user } });
 
@@ -396,6 +524,52 @@ export default function BookingsScreen() {
                   </LinearGradient>
                 )}
 
+                {/* Action bar for confirmed bookings */}
+                {isExpanded && status === "confirmed" && (
+                  <View style={[styles.actionBar, { borderTopColor: colors.border }]}>
+                    {/* Share Ticket — only for pub ticket mode */}
+                    {bx.pubMode === "ticket" && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: "#d4a85318", borderColor: "rgba(212,168,83,0.35)" }]}
+                        disabled={sharingId === b.id}
+                        onPress={() => handleShareTicket(b)}
+                        activeOpacity={0.75}
+                      >
+                        {sharingId === b.id ? (
+                          <ActivityIndicator size="small" color="#d4a853" />
+                        ) : (
+                          <Ionicons name="share-outline" size={15} color="#d4a853" />
+                        )}
+                        <Text style={[styles.actionBtnText, { color: "#d4a853" }]}>
+                          {sharingId === b.id ? "Preparing…" : "Share Ticket"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Cancel Booking */}
+                    {bx.checkedIn ? (
+                      <View style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.5 }]}>
+                        <Ionicons name="checkmark-circle-outline" size={15} color={colors.mutedForeground} />
+                        <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Checked in</Text>
+                      </View>
+                    ) : bx.cancellationAllowed === false ? (
+                      <View style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.5 }]}>
+                        <Ionicons name="close-circle-outline" size={15} color={colors.mutedForeground} />
+                        <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Cancellation closed</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: "#ef444418", borderColor: "rgba(239,68,68,0.35)" }]}
+                        onPress={() => setCancelModalBooking({ id: b.id, eventTitle: b.eventTitle ?? `Booking #${b.id}`, bookingDate: b.bookingDate })}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                        <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>Cancel Booking</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
                 {/* Payment pending — retry button */}
                 {isExpanded && status === "payment_pending" && (
                   <View style={[styles.expandedInfo, { borderTopColor: colors.border }]}>
@@ -463,6 +637,58 @@ export default function BookingsScreen() {
           }}
         />
       )}
+
+      {/* Cancel Booking Modal */}
+      <Modal
+        visible={!!cancelModalBooking}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setCancelModalBooking(null); setCancelReason(""); }}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <Pressable style={styles.modalOverlay} onPress={() => { setCancelModalBooking(null); setCancelReason(""); }}>
+            <Pressable style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => {}}>
+              <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Cancel booking</Text>
+              <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+                Are you sure you want to cancel{cancelModalBooking ? ` "${cancelModalBooking.eventTitle}" on ${cancelModalBooking.bookingDate}` : ""}? This cannot be undone.
+              </Text>
+              <Text style={[styles.modalLabel, { color: colors.foreground }]}>Reason for cancellation</Text>
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
+                placeholder="e.g. Plans changed, wrong date selected…"
+                placeholderTextColor={colors.mutedForeground}
+                value={cancelReason}
+                onChangeText={setCancelReason}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                editable={!cancelLoading}
+              />
+              <View style={styles.modalBtns}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { borderWidth: 1, borderColor: colors.border }]}
+                  onPress={() => { setCancelModalBooking(null); setCancelReason(""); }}
+                  disabled={cancelLoading}
+                >
+                  <Text style={[styles.modalBtnText, { color: colors.foreground }]}>Keep booking</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: "#ef4444" }, (cancelLoading || !cancelReason.trim()) && { opacity: 0.5 }]}
+                  onPress={handleCancelBooking}
+                  disabled={cancelLoading || !cancelReason.trim()}
+                >
+                  {cancelLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={[styles.modalBtnText, { color: "#fff" }]}>Confirm cancellation</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -530,4 +756,19 @@ const styles = StyleSheet.create({
   ptPriceLabel: { fontSize: 9, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 2, color: "rgba(212,168,83,0.45)" },
   ptPriceValue: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#d4a853" },
   ptFooterHint: { fontSize: 9, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.2)", letterSpacing: 0.5, textAlign: "center" },
+
+  actionBar: { flexDirection: "row", gap: 10, padding: 14, borderTopWidth: 1, flexWrap: "wrap" },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1, flex: 1 },
+  actionBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, borderWidth: 1, gap: 12 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
+  modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  modalSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  modalLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", marginTop: 4 },
+  modalInput: { borderRadius: 12, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: "Inter_400Regular", minHeight: 80 },
+  modalBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  modalBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });
