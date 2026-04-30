@@ -13,7 +13,8 @@ const objectStorageService = new ObjectStorageService();
 /**
  * POST /storage/uploads/request-url
  *
- * Request a presigned URL for file upload. Requires vendor authentication.
+ * Request a presigned URL for file upload. Requires any authenticated user.
+ * Used for vendor announcement images and user profile photos.
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
  */

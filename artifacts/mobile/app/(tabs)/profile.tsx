@@ -40,7 +40,8 @@ async function uploadImageToStorage(localUri: string): Promise<string> {
     "/api/storage/uploads/request-url",
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: filename, size, contentType }) },
   );
-  await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
+  const putRes = await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
+  if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
@@ -194,15 +195,29 @@ export default function ProfileScreen() {
         style={[styles.hero, { paddingTop: topPadding + 20 }]}
       >
         <View style={{ position: "relative" }}>
-          {user.profileImage ? (
-            <Image source={{ uri: user.profileImage }} style={[styles.avatar, { backgroundColor: colors.muted }]} contentFit="cover" />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>{initials}</Text>
-            </View>
-          )}
           <Pressable
-            style={[styles.editAvatar, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => {
+              setEditName(user.name);
+              setEditPhone(user.phone ?? "");
+              setEditAbout(user.about ?? "");
+              setEditProfileImage(user.profileImage ?? "");
+              handlePickImage();
+            }}
+            accessibilityLabel="Change profile photo"
+          >
+            {user.profileImage ? (
+              <Image source={{ uri: user.profileImage }} style={[styles.avatar, { backgroundColor: colors.muted }]} contentFit="cover" />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>{initials}</Text>
+              </View>
+            )}
+            <View style={[styles.editAvatar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="camera-outline" size={12} color={colors.primary} />
+            </View>
+          </Pressable>
+          <Pressable
+            style={[styles.editProfileBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => {
               setEditName(user.name);
               setEditPhone(user.phone ?? "");
@@ -210,6 +225,7 @@ export default function ProfileScreen() {
               setEditProfileImage(user.profileImage ?? "");
               setEditModal(true);
             }}
+            accessibilityLabel="Edit profile"
           >
             <Ionicons name="pencil" size={12} color={colors.primary} />
           </Pressable>
@@ -505,6 +521,7 @@ const styles = StyleSheet.create({
   avatar: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   avatarText: { fontSize: 28, fontFamily: "Inter_700Bold" },
   editAvatar: { position: "absolute", bottom: 4, right: -4, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  editProfileBtn: { position: "absolute", top: -4, right: -28, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   name: { fontSize: 22, fontFamily: "Inter_700Bold" },
   email: { fontSize: 14, fontFamily: "Inter_400Regular" },
   roleBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4 },
