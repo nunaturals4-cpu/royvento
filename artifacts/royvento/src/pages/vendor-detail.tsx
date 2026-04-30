@@ -100,7 +100,9 @@ export function VendorDetail() {
               <div
                 className={[
                   "flex justify-between items-center px-4 py-3 text-sm rounded-lg transition-colors",
-                  isToday ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-white/3",
+                  isToday
+                    ? "bg-primary/10 ring-1 ring-primary/20 border-l-[3px] border-primary"
+                    : "hover:bg-white/3",
                 ].join(" ")}
               >
                 <span className="flex items-center gap-2.5 min-w-0">
@@ -145,20 +147,27 @@ export function VendorDetail() {
                   <Clock className="h-5 w-5 text-primary" />
                   Opening Hours
                 </h2>
-                {isOpenNow ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-500">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                    Open now
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
-                    Closed now
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {todayTimes && (
+                    <span className="hidden sm:block text-sm text-muted-foreground tabular-nums">
+                      Today: <span className="text-foreground font-medium">{fmt(todayTimes.open)} – {fmt(todayTimes.close)}</span>
+                    </span>
+                  )}
+                  {isOpenNow ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      Open now
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
+                      Closed now
+                    </span>
+                  )}
+                </div>
               </div>
 
               {todayTimes && (
-                <div className="mb-5 flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
+                <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
                   <Clock className="h-4 w-4 text-primary shrink-0" />
                   <span className="text-sm text-muted-foreground">
                     Today ({DAY_FULL[todayKey]}):
@@ -167,6 +176,18 @@ export function VendorDetail() {
                     {fmt(todayTimes.open)} – {fmt(todayTimes.close)}
                     {toMin(todayTimes.close) < toMin(todayTimes.open) && (
                       <span className="ml-1.5 text-xs text-muted-foreground font-normal">↪ next day</span>
+                    )}
+                  </span>
+                  <span className="ml-auto">
+                    {isOpenNow ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                        Open now
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">
+                        Closed now
+                      </span>
                     )}
                   </span>
                 </div>
