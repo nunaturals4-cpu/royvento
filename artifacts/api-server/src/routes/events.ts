@@ -40,6 +40,10 @@ function validateDayPricing(
   return result;
 }
 
+const FREE_ENTRY_GENDERS = new Set(["Everyone", "Ladies", "Men", "Couples"]);
+const FREE_ENTRY_DAYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+const FREE_ENTRY_TIME_RE = /^\d{2}:\d{2}$/;
+
 function validateFreeEntryRules(
   val: unknown,
 ): { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null {
@@ -49,9 +53,23 @@ function validateFreeEntryRules(
   }
   const v = val as Record<string, unknown>;
   const enabled = !!v["enabled"];
-  const genders = Array.isArray(v["genders"]) ? (v["genders"] as string[]).filter((g) => typeof g === "string") : [];
-  const days = Array.isArray(v["days"]) ? (v["days"] as string[]).filter((d) => typeof d === "string") : [];
-  const beforeTime = typeof v["beforeTime"] === "string" ? v["beforeTime"] : undefined;
+  const rawGenders = Array.isArray(v["genders"]) ? (v["genders"] as unknown[]) : [];
+  const genders = rawGenders.filter((g): g is string => typeof g === "string" && FREE_ENTRY_GENDERS.has(g));
+  if (rawGenders.length !== genders.length) {
+    throw Object.assign(new Error(`freeEntryRules.genders contains invalid values; allowed: ${[...FREE_ENTRY_GENDERS].join(", ")}`), { status: 400 });
+  }
+  const rawDays = Array.isArray(v["days"]) ? (v["days"] as unknown[]) : [];
+  const days = rawDays.filter((d): d is string => typeof d === "string" && FREE_ENTRY_DAYS.has(d));
+  if (rawDays.length !== days.length) {
+    throw Object.assign(new Error(`freeEntryRules.days contains invalid values; allowed: ${[...FREE_ENTRY_DAYS].join(", ")}`), { status: 400 });
+  }
+  let beforeTime: string | undefined;
+  if (typeof v["beforeTime"] === "string" && v["beforeTime"]) {
+    if (!FREE_ENTRY_TIME_RE.test(v["beforeTime"])) {
+      throw Object.assign(new Error("freeEntryRules.beforeTime must be in HH:mm format"), { status: 400 });
+    }
+    beforeTime = v["beforeTime"];
+  }
   return { enabled, genders, days, ...(beforeTime !== undefined ? { beforeTime } : {}) };
 }
 
