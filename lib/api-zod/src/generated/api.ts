@@ -1114,6 +1114,50 @@ export const DeleteAdminEventResponse = zod.object({
 });
 
 /**
+ * @summary Resolve a Google place for preview without creating any record (admin)
+ */
+export const PreviewGooglePubBody = zod.object({
+  googleUrl: zod
+    .string()
+    .describe("Google Maps or Google Business Profile URL for the pub"),
+  partnerEmail: zod
+    .string()
+    .email()
+    .describe("Email of the approved partner to validate"),
+});
+
+export const PreviewGooglePubResponse = zod.object({
+  vendor: zod.object({
+    id: zod.number(),
+    businessName: zod.string(),
+    userEmail: zod.string(),
+  }),
+  place: zod.object({
+    placeId: zod.string(),
+    name: zod.string(),
+    formattedAddress: zod.string(),
+    city: zod.string(),
+    state: zod.string(),
+    country: zod.string(),
+    phone: zod.string(),
+    website: zod.string(),
+    hasPhoto: zod.boolean(),
+    openingHours: zod
+      .record(
+        zod.string(),
+        zod.union([
+          zod.object({
+            open: zod.string(),
+            close: zod.string(),
+          }),
+          zod.null(),
+        ]),
+      )
+      .nullish(),
+  }),
+});
+
+/**
  * @summary Import a pub listing from a Google Business Profile URL (admin)
  */
 export const importGooglePubBodyPubModeDefault = `entry`;
@@ -1122,7 +1166,14 @@ export const importGooglePubBodyCategoryDefault = `bar`;
 export const ImportGooglePubBody = zod.object({
   googleUrl: zod
     .string()
+    .optional()
     .describe("Google Maps or Google Business Profile URL for the pub"),
+  placeId: zod
+    .string()
+    .optional()
+    .describe(
+      "Google Place ID from a prior preview call — skips text search if provided",
+    ),
   partnerEmail: zod
     .string()
     .email()

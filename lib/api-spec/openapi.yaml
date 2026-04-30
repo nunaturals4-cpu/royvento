@@ -842,6 +842,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
+  /admin/pubs/preview-google:
+    post:
+      operationId: previewGooglePub
+      tags: [admin]
+      summary: Resolve a Google place for preview without creating any record (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewGooglePubBody"
+      responses:
+        "200":
+          description: Place resolved, ready for admin to review and confirm
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreviewGooglePubResponse"
+        "400":
+          description: Missing or invalid input
+        "403":
+          description: Partner not approved
+        "404":
+          description: Partner email or place not found
+        "409":
+          description: Partner already has a pub listing
+        "500":
+          description: API key not configured or server error
+        "502":
+          description: Google Places API error
+
   /admin/pubs/import-google:
     post:
       operationId: importGooglePub
@@ -1973,13 +2004,78 @@ components:
             $ref: "#/components/schemas/AdminLeadVendorSummary"
       required: [totalViews, allTimeTotalViews, knownLeads, anonymousVisitors, conversions, conversionRate, vendors]
 
-    ImportGooglePubBody:
+    PreviewGooglePubBody:
       type: object
       required: [googleUrl, partnerEmail]
       properties:
         googleUrl:
           type: string
           description: Google Maps or Google Business Profile URL for the pub
+        partnerEmail:
+          type: string
+          format: email
+          description: Email of the approved partner to validate
+
+    PreviewGooglePubResponse:
+      type: object
+      required: [vendor, place]
+      properties:
+        vendor:
+          type: object
+          required: [id, businessName, userEmail]
+          properties:
+            id:
+              type: integer
+            businessName:
+              type: string
+            userEmail:
+              type: string
+        place:
+          type: object
+          required: [placeId, name, formattedAddress, city, state, country, phone, website, hasPhoto]
+          properties:
+            placeId:
+              type: string
+            name:
+              type: string
+            formattedAddress:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            country:
+              type: string
+            phone:
+              type: string
+            website:
+              type: string
+            hasPhoto:
+              type: boolean
+            openingHours:
+              type: object
+              nullable: true
+              additionalProperties:
+                oneOf:
+                  - type: object
+                    properties:
+                      open:
+                        type: string
+                      close:
+                        type: string
+                    required: [open, close]
+                  - type: "null"
+
+    ImportGooglePubBody:
+      type: object
+      required: [partnerEmail]
+      properties:
+        googleUrl:
+          type: string
+          description: Google Maps or Google Business Profile URL for the pub
+        placeId:
+          type: string
+          description: Google Place ID from a prior preview call — skips text search if provided
         partnerEmail:
           type: string
           format: email

@@ -49,6 +49,8 @@ import type {
   Notification,
   Ok,
   PatchAdminEventBody,
+  PreviewGooglePubBody,
+  PreviewGooglePubResponse,
   RegisterBody,
   Review,
   SetAvailabilityBody,
@@ -3466,6 +3468,92 @@ export const useDeleteAdminEvent = <
   TContext
 > => {
   return useMutation(getDeleteAdminEventMutationOptions(options));
+};
+
+/**
+ * @summary Resolve a Google place for preview without creating any record (admin)
+ */
+export const getPreviewGooglePubUrl = () => {
+  return `/api/admin/pubs/preview-google`;
+};
+
+export const previewGooglePub = async (
+  previewGooglePubBody: PreviewGooglePubBody,
+  options?: RequestInit,
+): Promise<PreviewGooglePubResponse> => {
+  return customFetch<PreviewGooglePubResponse>(getPreviewGooglePubUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(previewGooglePubBody),
+  });
+};
+
+export const getPreviewGooglePubMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewGooglePub>>,
+    TError,
+    { data: BodyType<PreviewGooglePubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewGooglePub>>,
+  TError,
+  { data: BodyType<PreviewGooglePubBody> },
+  TContext
+> => {
+  const mutationKey = ["previewGooglePub"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewGooglePub>>,
+    { data: BodyType<PreviewGooglePubBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return previewGooglePub(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewGooglePubMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewGooglePub>>
+>;
+export type PreviewGooglePubMutationBody = BodyType<PreviewGooglePubBody>;
+export type PreviewGooglePubMutationError = ErrorType<void>;
+
+/**
+ * @summary Resolve a Google place for preview without creating any record (admin)
+ */
+export const usePreviewGooglePub = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewGooglePub>>,
+    TError,
+    { data: BodyType<PreviewGooglePubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewGooglePub>>,
+  TError,
+  { data: BodyType<PreviewGooglePubBody> },
+  TContext
+> => {
+  return useMutation(getPreviewGooglePubMutationOptions(options));
 };
 
 /**

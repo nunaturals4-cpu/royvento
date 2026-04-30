@@ -12,7 +12,7 @@ import {
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
-import { resolvePlaceFromUrl, downloadAndStorePhoto } from "../lib/googlePlaces";
+import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
 
 const router: IRouter = Router();
 
@@ -986,6 +986,90 @@ router.get("/admin/booking-report/top-pubs", requireAuth(["admin"]), async (req,
 
 // ── Import pub from Google Business Profile ───────────────────────────────────
 
+router.post("/admin/pubs/preview-google", requireAuth(["admin"]), async (req, res) => {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: "GOOGLE_PLACES_API_KEY is not configured on this server" });
+    return;
+  }
+
+  const body = req.body as Record<string, unknown>;
+  const googleUrl = typeof body["googleUrl"] === "string" ? body["googleUrl"].trim() : "";
+  const partnerEmail = typeof body["partnerEmail"] === "string" ? body["partnerEmail"].trim().toLowerCase() : "";
+
+  if (!googleUrl) {
+    res.status(400).json({ error: "googleUrl is required" });
+    return;
+  }
+  if (!partnerEmail) {
+    res.status(400).json({ error: "partnerEmail is required" });
+    return;
+  }
+
+  const [userRow] = await db
+    .select({ id: usersTable.id, email: usersTable.email })
+    .from(usersTable)
+    .where(eq(usersTable.email, partnerEmail))
+    .limit(1);
+  if (!userRow) {
+    res.status(404).json({ error: `No account found with email: ${partnerEmail}` });
+    return;
+  }
+
+  const [vendor] = await db
+    .select()
+    .from(vendorsTable)
+    .where(eq(vendorsTable.userId, userRow.id))
+    .limit(1);
+  if (!vendor) {
+    res.status(404).json({ error: "This user does not have a partner profile" });
+    return;
+  }
+  if (vendor.status !== "approved") {
+    res.status(403).json({ error: `Partner profile is not approved (status: ${vendor.status})` });
+    return;
+  }
+
+  const existingPub = await db
+    .select({ id: eventsTable.id })
+    .from(eventsTable)
+    .where(and(eq(eventsTable.vendorId, vendor.id), eq(eventsTable.type, "pub")))
+    .limit(1);
+  if (existingPub.length > 0) {
+    res.status(409).json({ error: "This partner already has a pub listing. Delete it before importing a new one." });
+    return;
+  }
+
+  let place;
+  try {
+    place = await resolvePlaceFromUrl(googleUrl, apiKey);
+  } catch (err: unknown) {
+    const e = err as Error & { status?: number };
+    res.status(e.status ?? 502).json({ error: e.message ?? "Failed to resolve Google place" });
+    return;
+  }
+
+  res.json({
+    vendor: {
+      id: vendor.id,
+      businessName: vendor.businessName,
+      userEmail: userRow.email,
+    },
+    place: {
+      placeId: place.placeId,
+      name: place.name,
+      formattedAddress: place.formattedAddress,
+      city: place.city,
+      state: place.state,
+      country: place.country,
+      phone: place.phone,
+      website: place.website,
+      openingHours: place.openingHours,
+      hasPhoto: place.photoRef !== null,
+    },
+  });
+});
+
 router.post("/admin/pubs/import-google", requireAuth(["admin"]), async (req, res) => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
@@ -998,8 +1082,10 @@ router.post("/admin/pubs/import-google", requireAuth(["admin"]), async (req, res
   const partnerEmail = typeof body["partnerEmail"] === "string" ? body["partnerEmail"].trim().toLowerCase() : "";
   const pubMode = typeof body["pubMode"] === "string" ? body["pubMode"] : "entry";
   const category = typeof body["category"] === "string" && body["category"].trim() ? body["category"].trim() : "bar";
+  // Optional placeId from a prior preview call — skips the text search step
+  const placeIdFromPreview = typeof body["placeId"] === "string" ? body["placeId"].trim() : "";
 
-  if (!googleUrl) {
+  if (!googleUrl && !placeIdFromPreview) {
     res.status(400).json({ error: "googleUrl is required" });
     return;
   }
@@ -1045,10 +1131,12 @@ router.post("/admin/pubs/import-google", requireAuth(["admin"]), async (req, res
     return;
   }
 
-  // Resolve place details from Google
+  // Resolve place details from Google (use placeId shortcut if provided by preview)
   let place;
   try {
-    place = await resolvePlaceFromUrl(googleUrl, apiKey);
+    place = placeIdFromPreview
+      ? await resolvePlaceById(placeIdFromPreview, apiKey)
+      : await resolvePlaceFromUrl(googleUrl, apiKey);
   } catch (err: unknown) {
     const e = err as Error & { status?: number };
     res.status(e.status ?? 502).json({ error: e.message ?? "Failed to resolve Google place" });

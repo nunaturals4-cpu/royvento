@@ -8,7 +8,9 @@
 
 export interface ImportGooglePubBody {
   /** Google Maps or Google Business Profile URL for the pub */
-  googleUrl: string;
+  googleUrl?: string;
+  /** Google Place ID from a prior preview call — skips text search if provided */
+  placeId?: string;
   /** Email of the approved partner who owns this pub */
   partnerEmail: string;
   /** Pub mode (entry, bottle, table) */

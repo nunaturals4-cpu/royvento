@@ -2448,37 +2448,84 @@ function CrmLeads() {
   );
 }
 
+type GooglePubPreview = {
+  vendor: { id: number; businessName: string; userEmail: string };
+  place: {
+    placeId: string;
+    name: string;
+    formattedAddress: string;
+    city: string;
+    state: string;
+    country: string;
+    phone: string;
+    website: string;
+    openingHours: Record<string, { open: string; close: string } | null> | null;
+    hasPhoto: boolean;
+  };
+};
+
+type ImportStep = "form" | "previewing" | "preview" | "importing" | "success";
+
 function ImportPubFromGoogle() {
   const { toast } = useToast();
+  const [step, setStep] = useState<ImportStep>("form");
   const [googleUrl, setGoogleUrl] = useState("");
   const [partnerEmail, setPartnerEmail] = useState("");
   const [pubMode, setPubMode] = useState("entry");
   const [category, setCategory] = useState("bar");
-  const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState<GooglePubPreview | null>(null);
   const [result, setResult] = useState<ImportGooglePubResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleImport(e: React.FormEvent) {
+  async function handlePreview(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setResult(null);
-    setLoading(true);
+    setStep("previewing");
     try {
-      const data = await importGooglePub({ googleUrl, partnerEmail, pubMode, category });
+      const data = await apiPost<GooglePubPreview>("/api/admin/pubs/preview-google", {
+        googleUrl,
+        partnerEmail,
+      });
+      setPreview(data);
+      setStep("preview");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Preview failed. Check the URL and partner email.";
+      setError(msg);
+      setStep("form");
+    }
+  }
+
+  async function handleConfirm() {
+    if (!preview) return;
+    setError(null);
+    setStep("importing");
+    try {
+      const data = await importGooglePub({
+        googleUrl,
+        partnerEmail,
+        pubMode,
+        category,
+        placeId: preview.place.placeId,
+      });
       setResult(data);
+      setStep("success");
       toast({ title: "Pub imported", description: `"${data.event.title}" has been created and approved.` });
     } catch (err: unknown) {
       const msg =
         err instanceof Error
           ? err.message
-          : "Import failed. Please check the URL and partner email.";
+          : "Import failed. Please try again.";
       setError(msg);
-    } finally {
-      setLoading(false);
+      setStep("preview");
     }
   }
 
   function handleReset() {
+    setStep("form");
+    setPreview(null);
     setResult(null);
     setError(null);
     setGoogleUrl("");
@@ -2486,6 +2533,8 @@ function ImportPubFromGoogle() {
     setPubMode("entry");
     setCategory("bar");
   }
+
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
   return (
     <div className="max-w-xl space-y-6">
@@ -2496,7 +2545,7 @@ function ImportPubFromGoogle() {
         </p>
       </div>
 
-      {result ? (
+      {step === "success" && result ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-5 space-y-4">
             <div className="flex items-start gap-4">
@@ -2518,23 +2567,15 @@ function ImportPubFromGoogle() {
                 </p>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               {result.place.phone && (
-                <>
-                  <span className="text-muted-foreground">Phone</span>
-                  <span>{result.place.phone}</span>
-                </>
+                <><span className="text-muted-foreground">Phone</span><span>{result.place.phone}</span></>
               )}
               {result.place.website && (
                 <>
                   <span className="text-muted-foreground">Website</span>
-                  <a
-                    href={result.place.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary underline-offset-2 hover:underline truncate"
-                  >
+                  <a href={result.place.website} target="_blank" rel="noopener noreferrer"
+                    className="text-primary underline-offset-2 hover:underline truncate">
                     {result.place.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
                   </a>
                 </>
@@ -2544,12 +2585,11 @@ function ImportPubFromGoogle() {
               <span className="text-muted-foreground">Status</span>
               <span className="text-green-400 capitalize">{result.event.approvalStatus}</span>
             </div>
-
             {result.place.openingHours && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Opening Hours</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm">
-                  {(["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] as const).map((day) => {
+                  {DAYS.map((day) => {
                     const h = result.place.openingHours?.[day];
                     return (
                       <div key={day} className="flex gap-2">
@@ -2562,51 +2602,63 @@ function ImportPubFromGoogle() {
               </div>
             )}
           </div>
-
-          <Button variant="outline" onClick={handleReset} className="w-full">
-            Import another pub
-          </Button>
+          <Button variant="outline" onClick={handleReset} className="w-full">Import another pub</Button>
         </div>
-      ) : (
-        <form onSubmit={handleImport} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="googleUrl">Google Maps / Business Profile URL</Label>
-            <Input
-              id="googleUrl"
-              placeholder="https://www.google.com/maps/place/..."
-              value={googleUrl}
-              onChange={(e) => setGoogleUrl(e.target.value)}
-              disabled={loading}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Paste the full Google Maps URL or a short maps.app.goo.gl link.
-            </p>
-          </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="partnerEmail">Partner email</Label>
-            <Input
-              id="partnerEmail"
-              type="email"
-              placeholder="partner@example.com"
-              value={partnerEmail}
-              onChange={(e) => setPartnerEmail(e.target.value)}
-              disabled={loading}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              The email of an approved partner account. The pub will be created under their profile.
-            </p>
+      ) : step === "preview" || step === "importing" ? (
+        <div className="space-y-4">
+          <div className="rounded-xl border p-5 space-y-4">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Place found</p>
+              <h3 className="font-semibold text-lg leading-tight">{preview?.place.name}</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">{preview?.place.formattedAddress}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {[preview?.place.city, preview?.place.state, preview?.place.country].filter(Boolean).join(", ")}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              {preview?.place.phone && (
+                <><span className="text-muted-foreground">Phone</span><span>{preview.place.phone}</span></>
+              )}
+              {preview?.place.website && (
+                <>
+                  <span className="text-muted-foreground">Website</span>
+                  <a href={preview.place.website} target="_blank" rel="noopener noreferrer"
+                    className="text-primary underline-offset-2 hover:underline truncate">
+                    {preview.place.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  </a>
+                </>
+              )}
+              <span className="text-muted-foreground">Cover photo</span>
+              <span>{preview?.place.hasPhoto ? "Available" : "Not available"}</span>
+              <span className="text-muted-foreground">Partner</span>
+              <span>{preview?.vendor.businessName} <span className="text-muted-foreground text-xs">({preview?.vendor.userEmail})</span></span>
+            </div>
+
+            {preview?.place.openingHours && (
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Opening Hours</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm">
+                  {DAYS.map((day) => {
+                    const h = preview.place.openingHours?.[day];
+                    return (
+                      <div key={day} className="flex gap-2">
+                        <span className="text-muted-foreground w-8 shrink-0">{day}</span>
+                        <span>{h ? `${h.open} – ${h.close}` : "Closed"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="pubMode">Pub mode</Label>
-              <Select value={pubMode} onValueChange={setPubMode} disabled={loading}>
-                <SelectTrigger id="pubMode">
-                  <SelectValue />
-                </SelectTrigger>
+              <Label htmlFor="pubModeConfirm">Pub mode</Label>
+              <Select value={pubMode} onValueChange={setPubMode} disabled={step === "importing"}>
+                <SelectTrigger id="pubModeConfirm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="entry">Entry tickets</SelectItem>
                   <SelectItem value="bottle">Bottle service</SelectItem>
@@ -2614,13 +2666,10 @@ function ImportPubFromGoogle() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-1.5">
-              <Label htmlFor="category">Category</Label>
-              <Select value={category} onValueChange={setCategory} disabled={loading}>
-                <SelectTrigger id="category">
-                  <SelectValue />
-                </SelectTrigger>
+              <Label htmlFor="categoryConfirm">Category</Label>
+              <Select value={category} onValueChange={setCategory} disabled={step === "importing"}>
+                <SelectTrigger id="categoryConfirm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bar">Bar</SelectItem>
                   <SelectItem value="club">Club</SelectItem>
@@ -2639,8 +2688,62 @@ function ImportPubFromGoogle() {
             </div>
           )}
 
-          <Button type="submit" disabled={loading || !googleUrl.trim() || !partnerEmail.trim()} className="w-full">
-            {loading ? "Importing…" : "Import pub from Google"}
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => { setStep("form"); setError(null); }}
+              disabled={step === "importing"} className="flex-1">
+              Back
+            </Button>
+            <Button onClick={handleConfirm} disabled={step === "importing"} className="flex-1">
+              {step === "importing" ? "Importing…" : "Confirm & Import"}
+            </Button>
+          </div>
+        </div>
+
+      ) : (
+        <form onSubmit={handlePreview} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="googleUrl">Google Maps / Business Profile URL</Label>
+            <Input
+              id="googleUrl"
+              placeholder="https://www.google.com/maps/place/..."
+              value={googleUrl}
+              onChange={(e) => setGoogleUrl(e.target.value)}
+              disabled={step === "previewing"}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Paste the full Google Maps URL or a short maps.app.goo.gl link.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="partnerEmail">Partner email</Label>
+            <Input
+              id="partnerEmail"
+              type="email"
+              placeholder="partner@example.com"
+              value={partnerEmail}
+              onChange={(e) => setPartnerEmail(e.target.value)}
+              disabled={step === "previewing"}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              The email of an approved partner account. The pub will be created under their profile.
+            </p>
+          </div>
+
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            disabled={step === "previewing" || !googleUrl.trim() || !partnerEmail.trim()}
+            className="w-full"
+          >
+            {step === "previewing" ? "Fetching from Google…" : "Preview pub details"}
           </Button>
         </form>
       )}

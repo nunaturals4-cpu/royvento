@@ -21,6 +21,22 @@ interface AddressComponent {
   types: string[];
 }
 
+type GoogleDetailsResult = {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  address_components?: AddressComponent[];
+  international_phone_number?: string;
+  website?: string;
+  opening_hours?: {
+    periods?: Array<{
+      open: { day: number; time: string };
+      close?: { day: number; time: string };
+    }>;
+  };
+  photos?: Array<{ photo_reference: string }>;
+};
+
 function getComponent(components: AddressComponent[], types: string[]): string {
   for (const c of components) {
     if (types.some((t) => c.types.includes(t))) return c.long_name;
@@ -67,88 +83,7 @@ function formatTime(hhmm: string): string {
   return hhmm.replace(/^(\d{2})(\d{2})$/, "$1:$2");
 }
 
-export interface PlaceDetails {
-  placeId: string;
-  name: string;
-  formattedAddress: string;
-  city: string;
-  state: string;
-  country: string;
-  phone: string;
-  website: string;
-  openingHours: Record<string, { open: string; close: string } | null> | null;
-  photoRef: string | null;
-}
-
-export async function resolvePlaceFromUrl(
-  googleUrl: string,
-  apiKey: string,
-): Promise<PlaceDetails> {
-  const resolvedUrl = await resolveUrl(googleUrl.trim());
-  const searchQuery = extractQueryFromUrl(resolvedUrl);
-
-  // Text search
-  const searchResp = await fetch(
-    `${GOOGLE_PLACES_BASE}/textsearch/json?query=${encodeURIComponent(searchQuery)}&key=${apiKey}`,
-    { signal: AbortSignal.timeout(15_000) },
-  );
-  if (!searchResp.ok) {
-    throw Object.assign(new Error("Google Places search request failed"), {
-      status: 502,
-    });
-  }
-  const searchData = (await searchResp.json()) as {
-    status: string;
-    results?: Array<{ place_id: string }>;
-    error_message?: string;
-  };
-  if (searchData.status !== "OK" || !searchData.results?.length) {
-    const msg =
-      searchData.error_message ??
-      `No place found for: "${searchQuery}". Try a more specific URL or business name.`;
-    throw Object.assign(new Error(msg), { status: 404 });
-  }
-  const placeId = searchData.results[0]!.place_id;
-
-  // Place details
-  const fields =
-    "place_id,name,formatted_address,address_components,international_phone_number,website,opening_hours,photos";
-  const detailsResp = await fetch(
-    `${GOOGLE_PLACES_BASE}/details/json?place_id=${placeId}&fields=${fields}&key=${apiKey}`,
-    { signal: AbortSignal.timeout(15_000) },
-  );
-  if (!detailsResp.ok) {
-    throw Object.assign(new Error("Google Place details fetch failed"), {
-      status: 502,
-    });
-  }
-  const detailsData = (await detailsResp.json()) as {
-    status: string;
-    result?: {
-      place_id: string;
-      name: string;
-      formatted_address: string;
-      address_components?: AddressComponent[];
-      international_phone_number?: string;
-      website?: string;
-      opening_hours?: {
-        periods?: Array<{
-          open: { day: number; time: string };
-          close?: { day: number; time: string };
-        }>;
-      };
-      photos?: Array<{ photo_reference: string }>;
-    };
-    error_message?: string;
-  };
-  if (detailsData.status !== "OK" || !detailsData.result) {
-    throw Object.assign(
-      new Error(detailsData.error_message ?? "Place details not available"),
-      { status: 502 },
-    );
-  }
-
-  const r = detailsData.result;
+function buildPlaceDetails(r: GoogleDetailsResult): PlaceDetails {
   const components = r.address_components ?? [];
 
   const city = getComponent(components, [
@@ -190,6 +125,87 @@ export async function resolvePlaceFromUrl(
   };
 }
 
+export interface PlaceDetails {
+  placeId: string;
+  name: string;
+  formattedAddress: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  website: string;
+  openingHours: Record<string, { open: string; close: string } | null> | null;
+  photoRef: string | null;
+}
+
+async function fetchPlaceDetails(
+  placeId: string,
+  apiKey: string,
+): Promise<PlaceDetails> {
+  const fields =
+    "place_id,name,formatted_address,address_components,international_phone_number,website,opening_hours,photos";
+  const detailsResp = await fetch(
+    `${GOOGLE_PLACES_BASE}/details/json?place_id=${placeId}&fields=${fields}&key=${apiKey}`,
+    { signal: AbortSignal.timeout(15_000) },
+  );
+  if (!detailsResp.ok) {
+    throw Object.assign(new Error("Google Place details fetch failed"), {
+      status: 502,
+    });
+  }
+  const detailsData = (await detailsResp.json()) as {
+    status: string;
+    result?: GoogleDetailsResult;
+    error_message?: string;
+  };
+  if (detailsData.status !== "OK" || !detailsData.result) {
+    throw Object.assign(
+      new Error(detailsData.error_message ?? "Place details not available"),
+      { status: 502 },
+    );
+  }
+  return buildPlaceDetails(detailsData.result);
+}
+
+export async function resolvePlaceFromUrl(
+  googleUrl: string,
+  apiKey: string,
+): Promise<PlaceDetails> {
+  const resolvedUrl = await resolveUrl(googleUrl.trim());
+  const searchQuery = extractQueryFromUrl(resolvedUrl);
+
+  // Text search to find place_id
+  const searchResp = await fetch(
+    `${GOOGLE_PLACES_BASE}/textsearch/json?query=${encodeURIComponent(searchQuery)}&key=${apiKey}`,
+    { signal: AbortSignal.timeout(15_000) },
+  );
+  if (!searchResp.ok) {
+    throw Object.assign(new Error("Google Places search request failed"), {
+      status: 502,
+    });
+  }
+  const searchData = (await searchResp.json()) as {
+    status: string;
+    results?: Array<{ place_id: string }>;
+    error_message?: string;
+  };
+  if (searchData.status !== "OK" || !searchData.results?.length) {
+    const msg =
+      searchData.error_message ??
+      `No place found for: "${searchQuery}". Try a more specific URL or business name.`;
+    throw Object.assign(new Error(msg), { status: 404 });
+  }
+  const placeId = searchData.results[0]!.place_id;
+  return fetchPlaceDetails(placeId, apiKey);
+}
+
+export async function resolvePlaceById(
+  placeId: string,
+  apiKey: string,
+): Promise<PlaceDetails> {
+  return fetchPlaceDetails(placeId, apiKey);
+}
+
 export async function downloadAndStorePhoto(
   photoRef: string,
   apiKey: string,
@@ -204,8 +220,7 @@ export async function downloadAndStorePhoto(
       `Failed to download Google photo (HTTP ${photoResp.status})`,
     );
   }
-  const contentType =
-    photoResp.headers.get("content-type") || "image/jpeg";
+  const contentType = photoResp.headers.get("content-type") || "image/jpeg";
   const buffer = Buffer.from(await photoResp.arrayBuffer());
 
   const objectId = randomUUID();

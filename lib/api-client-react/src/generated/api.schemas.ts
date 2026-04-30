@@ -492,9 +492,49 @@ export interface AdminLeadsSummary {
   vendors: AdminLeadVendorSummary[];
 }
 
-export interface ImportGooglePubBody {
+export interface PreviewGooglePubBody {
   /** Google Maps or Google Business Profile URL for the pub */
   googleUrl: string;
+  /** Email of the approved partner to validate */
+  partnerEmail: string;
+}
+
+export type PreviewGooglePubResponseVendor = {
+  id: number;
+  businessName: string;
+  userEmail: string;
+};
+
+export type PreviewGooglePubResponsePlaceOpeningHours = {
+  [key: string]: {
+    open: string;
+    close: string;
+  } | null;
+} | null;
+
+export type PreviewGooglePubResponsePlace = {
+  placeId: string;
+  name: string;
+  formattedAddress: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  website: string;
+  hasPhoto: boolean;
+  openingHours?: PreviewGooglePubResponsePlaceOpeningHours;
+};
+
+export interface PreviewGooglePubResponse {
+  vendor: PreviewGooglePubResponseVendor;
+  place: PreviewGooglePubResponsePlace;
+}
+
+export interface ImportGooglePubBody {
+  /** Google Maps or Google Business Profile URL for the pub */
+  googleUrl?: string;
+  /** Google Place ID from a prior preview call — skips text search if provided */
+  placeId?: string;
   /** Email of the approved partner who owns this pub */
   partnerEmail: string;
   /** Pub mode (entry, bottle, table) */
