@@ -25,12 +25,18 @@ export function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [appLinkAttempted, setAppLinkAttempted] = useState(false);
+  const [launchingApp, setLaunchingApp] = useState(false);
 
   useEffect(() => {
     if (!token || !isMobileBrowser()) return;
     const deepLink = `royvento://reset-password?token=${encodeURIComponent(token)}`;
+    setLaunchingApp(true);
     window.location.href = deepLink;
-    setAppLinkAttempted(true);
+    const timer = setTimeout(() => {
+      setLaunchingApp(false);
+      setAppLinkAttempted(true);
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [token]);
 
   const submit = async (e: React.FormEvent) => {
@@ -63,6 +69,18 @@ export function ResetPassword() {
           <Link href="/login">
             <Button className="bg-primary text-primary-foreground">Sign in now</Button>
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (launchingApp) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-20">
+        <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring text-center">
+          <Smartphone className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
+          <h1 className="font-serif text-2xl tracking-tight mb-2">Opening Royvento app…</h1>
+          <p className="text-sm text-muted-foreground">If the app doesn't open, you can reset your password here in a moment.</p>
         </div>
       </div>
     );

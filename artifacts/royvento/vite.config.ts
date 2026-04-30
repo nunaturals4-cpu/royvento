@@ -1,28 +1,8 @@
-import fs from "fs";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-
-function wellKnownPlugin(): Plugin {
-  return {
-    name: "well-known-json",
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        if (req.url === "/.well-known/apple-app-site-association") {
-          const filePath = path.resolve(import.meta.dirname, "public/.well-known/apple-app-site-association");
-          if (fs.existsSync(filePath)) {
-            res.setHeader("Content-Type", "application/json");
-            res.end(fs.readFileSync(filePath, "utf-8"));
-            return;
-          }
-        }
-        next();
-      });
-    },
-  };
-}
 
 const rawPort = process.env.PORT;
 
@@ -52,7 +32,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
-    wellKnownPlugin(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
