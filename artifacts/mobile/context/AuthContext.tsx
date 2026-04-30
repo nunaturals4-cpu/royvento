@@ -19,6 +19,8 @@ export interface AuthUser {
   role: "user" | "vendor" | "admin";
   createdAt: string;
   phone?: string;
+  about?: string;
+  profileImage?: string;
 }
 
 interface StoredAuth {

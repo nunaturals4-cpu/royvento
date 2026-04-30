@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch, useUpdateMe } from "@workspace/api-client-react";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -23,6 +25,26 @@ import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useLogout } from "@/hooks/useLogout";
+
+async function uploadImageToStorage(localUri: string): Promise<string> {
+  const filename = localUri.split("/").pop() ?? "profile.jpg";
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+  const mimeMap: Record<string, string> = {
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+  };
+  const contentType = mimeMap[ext] ?? "image/jpeg";
+  const fileRes = await fetch(localUri);
+  const blob = await fileRes.blob();
+  const size = blob.size || 1;
+  const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
+    "/api/storage/uploads/request-url",
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: filename, size, contentType }) },
+  );
+  await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
+  const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
+}
 
 interface ReferralData {
   code: string;
@@ -49,11 +71,20 @@ export default function ProfileScreen() {
   const [editModal, setEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editPhone, setEditPhone] = useState(user?.phone ?? "");
+  const [editAbout, setEditAbout] = useState(user?.about ?? "");
+  const [editProfileImage, setEditProfileImage] = useState(user?.profileImage ?? "");
+  const [imageUploading, setImageUploading] = useState(false);
 
   const updateMeMutation = useUpdateMe({
     mutation: {
       onSuccess: async (updated) => {
-        await updateUser({ name: updated.name, phone: updated.phone });
+        const u = updated as unknown as { name: string; phone?: string; about?: string; profileImage?: string };
+        await updateUser({
+          name: u.name,
+          phone: u.phone ?? undefined,
+          about: u.about ?? undefined,
+          profileImage: u.profileImage ?? undefined,
+        });
         setEditModal(false);
         Alert.alert("Saved", "Profile updated successfully");
       },
@@ -62,6 +93,31 @@ export default function ProfileScreen() {
       },
     },
   });
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow access to your photo library to upload a profile picture.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    setImageUploading(true);
+    try {
+      const url = await uploadImageToStorage(result.assets[0].uri);
+      setEditProfileImage(url);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert("Upload failed", err?.message ?? "Could not upload photo.");
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   const referralQuery = useQuery<ReferralData>({
     queryKey: ["referral-me"],
@@ -82,6 +138,8 @@ export default function ProfileScreen() {
       data: {
         name: editName.trim(),
         ...(phoneNormalized !== undefined ? { phone: phoneNormalized } : {}),
+        about: editAbout.trim() || undefined,
+        profileImage: editProfileImage || undefined,
       },
     });
   };
@@ -137,18 +195,31 @@ export default function ProfileScreen() {
         style={[styles.hero, { paddingTop: topPadding + 20 }]}
       >
         <View style={{ position: "relative" }}>
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>{initials}</Text>
-          </View>
+          {user.profileImage ? (
+            <Image source={{ uri: user.profileImage }} style={[styles.avatar, { backgroundColor: colors.muted }]} contentFit="cover" />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>{initials}</Text>
+            </View>
+          )}
           <Pressable
             style={[styles.editAvatar, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => { setEditName(user.name); setEditPhone(user.phone ?? ""); setEditModal(true); }}
+            onPress={() => {
+              setEditName(user.name);
+              setEditPhone(user.phone ?? "");
+              setEditAbout(user.about ?? "");
+              setEditProfileImage(user.profileImage ?? "");
+              setEditModal(true);
+            }}
           >
             <Ionicons name="pencil" size={12} color={colors.primary} />
           </Pressable>
         </View>
         <Text style={[styles.name, { color: colors.foreground }]}>{user.name}</Text>
         <Text style={[styles.email, { color: colors.mutedForeground }]}>{user.email}</Text>
+        {user.about ? (
+          <Text style={[styles.aboutText, { color: colors.mutedForeground }]} numberOfLines={2}>{user.about}</Text>
+        ) : null}
         <View style={[styles.roleBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
           <Ionicons
             name={
@@ -314,40 +385,109 @@ export default function ProfileScreen() {
       {/* Edit Profile Modal */}
       <Modal visible={editModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Profile</Text>
-              <Pressable onPress={() => setEditModal(false)}>
-                <Ionicons name="close" size={22} color={colors.mutedForeground} />
-              </Pressable>
-            </View>
-            {[
-              { label: "Name", value: editName, set: setEditName, placeholder: "Your name" },
-              { label: "Phone", value: editPhone, set: setEditPhone, placeholder: "+91 XXXXXXXXXX" },
-            ].map((f) => (
-              <View key={f.label} style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
-                <TextInput
-                  style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-                  value={f.value}
-                  onChangeText={f.set}
-                  placeholder={f.placeholder}
-                  placeholderTextColor={colors.mutedForeground}
-                />
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Profile</Text>
+                <Pressable onPress={() => setEditModal(false)}>
+                  <Ionicons name="close" size={22} color={colors.mutedForeground} />
+                </Pressable>
               </View>
-            ))}
-            <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: colors.primary }, updateMeMutation.isPending && { opacity: 0.7 }]}
-              onPress={handleSave}
-              disabled={updateMeMutation.isPending}
-            >
-              {updateMeMutation.isPending ? (
-                <ActivityIndicator color={colors.primaryForeground} />
-              ) : (
-                <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>Save Changes</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+
+              {/* Profile Photo */}
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Profile Photo</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}>
+                  {editProfileImage ? (
+                    <Image source={{ uri: editProfileImage }} style={styles.photoPreview} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.photoPreview, { backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }]}>
+                      <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: colors.primaryForeground }}>
+                        {editName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.photoBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
+                      onPress={handlePickImage}
+                      disabled={imageUploading}
+                    >
+                      {imageUploading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <>
+                          <Ionicons name="camera-outline" size={16} color={colors.primary} />
+                          <Text style={[styles.photoBtnText, { color: colors.primary }]}>
+                            {editProfileImage ? "Change Photo" : "Upload Photo"}
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    {editProfileImage ? (
+                      <TouchableOpacity
+                        style={[styles.photoBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
+                        onPress={() => setEditProfileImage("")}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={colors.destructive} />
+                        <Text style={[styles.photoBtnText, { color: colors.destructive }]}>Remove Photo</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+
+              {/* Name & Phone fields */}
+              {[
+                { label: "Name", value: editName, set: setEditName, placeholder: "Your name", multiline: false },
+                { label: "Phone", value: editPhone, set: setEditPhone, placeholder: "+91 XXXXXXXXXX", multiline: false },
+              ].map((f) => (
+                <View key={f.label} style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
+                  <TextInput
+                    style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                    value={f.value}
+                    onChangeText={f.set}
+                    placeholder={f.placeholder}
+                    placeholderTextColor={colors.mutedForeground}
+                  />
+                </View>
+              ))}
+
+              {/* About */}
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>About</Text>
+                <TextInput
+                  style={[styles.fieldInput, styles.aboutInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                  value={editAbout}
+                  onChangeText={setEditAbout}
+                  placeholder="Tell others a bit about yourself…"
+                  placeholderTextColor={colors.mutedForeground}
+                  multiline
+                  numberOfLines={4}
+                  maxLength={2000}
+                />
+                <Text style={[{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "right", marginTop: 4 }]}>
+                  {editAbout.length}/2000
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: colors.primary }, (updateMeMutation.isPending || imageUploading) && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={updateMeMutation.isPending || imageUploading}
+              >
+                {updateMeMutation.isPending ? (
+                  <ActivityIndicator color={colors.primaryForeground} />
+                ) : (
+                  <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
     </ScrollView>
@@ -395,13 +535,18 @@ const styles = StyleSheet.create({
   menuIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   menuLabel: { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium" },
   version: { textAlign: "center", fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 8 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-  modalCard: { borderRadius: 24, borderWidth: 1, padding: 24, margin: 16, gap: 16 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)" },
+  modalCard: { borderRadius: 24, borderWidth: 1, padding: 24, gap: 16 },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
   field: { gap: 6 },
   fieldLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.4 },
   fieldInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, fontFamily: "Inter_400Regular" },
+  aboutInput: { minHeight: 88, textAlignVertical: "top" },
+  aboutText: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", maxWidth: 280, lineHeight: 18 },
+  photoPreview: { width: 64, height: 64, borderRadius: 32 },
+  photoBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  photoBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   saveBtn: { borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   saveBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
 });

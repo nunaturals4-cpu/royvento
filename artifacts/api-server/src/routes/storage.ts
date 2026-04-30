@@ -20,7 +20,7 @@ const objectStorageService = new ObjectStorageService();
 const ALLOWED_ANNOUNCEMENT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_ANNOUNCEMENT_IMAGE_BYTES = 8 * 1024 * 1024;
 
-router.post("/storage/uploads/request-url", requireAuth(["vendor"]), async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
