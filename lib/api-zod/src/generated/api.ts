@@ -872,17 +872,20 @@ export const UpdateEventBody = zod.object({
   galleryImages: zod.array(zod.string()).optional(),
   galleryVideos: zod.array(zod.string()).optional(),
   freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-      ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 

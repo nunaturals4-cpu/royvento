@@ -1516,7 +1516,9 @@ components:
           items:
             type: string
         freeEntryRules:
-          $ref: "#/components/schemas/FreeEntryRules"
+          anyOf:
+            - $ref: "#/components/schemas/FreeEntryRules"
+            - type: "null"
 
     BookingStatus:
       type: string

@@ -63,6 +63,7 @@ interface EventWithVendor {
   vendor?: EventVendor;
   vendorId?: number;
   vendorName?: string;
+  freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   [key: string]: unknown;
 }
 
@@ -480,7 +481,7 @@ export default function EventDetailScreen() {
 
           {/* Free entry block (pub) */}
           {isPub && (() => {
-            const fer = (event as unknown as { freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null })?.freeEntryRules;
+            const fer = event?.freeEntryRules;
             if (!fer?.enabled) return null;
             return (
               <View style={[styles.freeEntryBox, { backgroundColor: "#052e16", borderColor: "#16a34a44" }]}>

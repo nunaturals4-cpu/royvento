@@ -230,7 +230,7 @@ export interface UpdateEventBody {
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
-  freeEntryRules?: FreeEntryRules;
+  freeEntryRules?: FreeEntryRules | null;
 }
 
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];

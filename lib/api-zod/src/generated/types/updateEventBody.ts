@@ -17,5 +17,5 @@ export interface UpdateEventBody {
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
-  freeEntryRules?: FreeEntryRules;
+  freeEntryRules?: FreeEntryRules | null;
 }

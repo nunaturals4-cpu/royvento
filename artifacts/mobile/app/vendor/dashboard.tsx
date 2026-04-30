@@ -337,14 +337,12 @@ export default function VendorDashboardScreen() {
         price,
         capacity,
         imageUrl: editForm.imageUrl || undefined,
-        ...(editForm.category === "Pubs" ? {
-          freeEntryRules: {
-            enabled: editForm.freeEntryEnabled,
-            genders: editForm.freeEntryGenders,
-            days: editForm.freeEntryDays,
-            ...(editForm.freeEntryBeforeTime ? { beforeTime: editForm.freeEntryBeforeTime } : {}),
-          },
-        } : {}),
+        freeEntryRules: editForm.category === "Pubs" ? {
+          enabled: editForm.freeEntryEnabled,
+          genders: editForm.freeEntryGenders,
+          days: editForm.freeEntryDays,
+          ...(editForm.freeEntryBeforeTime ? { beforeTime: editForm.freeEntryBeforeTime } : {}),
+        } : null,
       },
     });
   }
