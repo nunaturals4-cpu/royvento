@@ -385,7 +385,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           )}
         </div>
         {address.trim() && (
-          <div className="mt-1">
+          <div className="mt-3">
             <iframe
               key={address}
               title="Venue location"
@@ -401,7 +401,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
             >
               <Navigation className="h-3 w-3" />
-              Open in Google Maps
+              Open in Google Maps ↗
             </a>
           </div>
         )}
