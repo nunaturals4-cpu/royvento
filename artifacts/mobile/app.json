@@ -18,7 +18,17 @@
       "bundleIdentifier": "com.royvento.app"
     },
     "android": {
-      "package": "com.royvento.app"
+      "package": "com.royvento.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "pathPrefix": "/reset-password" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"

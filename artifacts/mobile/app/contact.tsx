@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { customFetch } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -32,23 +33,30 @@ export default function ContactScreen() {
 
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
+  const [phone, setPhone] = useState(user?.phone ?? "");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
     if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
-      Alert.alert("Missing fields", "Please fill in all fields before sending.");
+      Alert.alert("Missing fields", "Please fill in all required fields before sending.");
       return;
     }
     setLoading(true);
     try {
-      await new Promise((res) => setTimeout(res, 800));
+      await customFetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim(), subject: subject.trim(), message: message.trim() }),
+      });
       Alert.alert("Message sent", "Thanks for reaching out! We'll get back to you within 24 hours.");
       setSubject("");
       setMessage("");
-    } catch {
-      Alert.alert("Error", "Unable to send message. Please try again or email us directly.");
+      setPhone("");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert("Error", err?.message ?? "Unable to send message. Please try again or email us directly.");
     } finally {
       setLoading(false);
     }
@@ -127,6 +135,7 @@ export default function ContactScreen() {
             {[
               { label: "Your Name", value: name, set: setName, placeholder: "John Doe", keyboard: "default" as const },
               { label: "Email Address", value: email, set: setEmail, placeholder: "you@example.com", keyboard: "email-address" as const },
+              { label: "Phone (optional)", value: phone, set: setPhone, placeholder: "+91 XXXXXXXXXX", keyboard: "phone-pad" as const },
               { label: "Subject", value: subject, set: setSubject, placeholder: "How can we help?", keyboard: "default" as const },
             ].map((f) => (
               <View key={f.label} style={styles.field}>
@@ -138,8 +147,8 @@ export default function ContactScreen() {
                   placeholder={f.placeholder}
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType={f.keyboard}
-                  autoCapitalize={f.keyboard === "email-address" ? "none" : "sentences"}
-                  autoCorrect={f.keyboard !== "email-address"}
+                  autoCapitalize={f.keyboard === "email-address" || f.keyboard === "phone-pad" ? "none" : "sentences"}
+                  autoCorrect={f.keyboard !== "email-address" && f.keyboard !== "phone-pad"}
                 />
               </View>
             ))}
