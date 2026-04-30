@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.royvento.app"
+      "bundleIdentifier": "com.royvento.app",
+      "associatedDomains": ["applinks:royvento.replit.app"]
     },
     "android": {
       "package": "com.royvento.app",
@@ -24,7 +25,11 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "pathPrefix": "/reset-password" }
+            {
+              "scheme": "https",
+              "host": "royvento.replit.app",
+              "pathPrefix": "/reset-password"
+            }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
         }
