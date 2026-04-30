@@ -45,6 +45,13 @@ const TABS: Tab[] = [
     matchPaths: ["/(tabs)/bookings", "/bookings"],
   },
   {
+    label: "Partners",
+    icon: "business-outline",
+    iconFocused: "business",
+    route: "/(tabs)/vendors",
+    matchPaths: ["/(tabs)/vendors", "/vendors"],
+  },
+  {
     label: "Profile",
     icon: "person-outline",
     iconFocused: "person",
