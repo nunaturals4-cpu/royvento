@@ -50,7 +50,21 @@ function computeCrmTrial(v: VendorRow) {
 }
 
 async function serializeVendor(v: VendorRow) {
-  const summary = await getVendorRating(v.id);
+  const [summary, pubEvents] = await Promise.all([
+    getVendorRating(v.id),
+    db.select({ freeEntryRules: eventsTable.freeEntryRules })
+      .from(eventsTable)
+      .where(and(
+        eq(eventsTable.vendorId, v.id),
+        eq(eventsTable.type, "pub"),
+        eq(eventsTable.approvalStatus, "approved"),
+      ))
+      .orderBy(desc(eventsTable.createdAt))
+      .limit(1),
+  ]);
+  const freeEntryRules = pubEvents.length > 0
+    ? parseFreeEntryRules(pubEvents[0]!.freeEntryRules)
+    : null;
   const { crmTrialDaysRemaining, crmTrialActive } = computeCrmTrial(v);
   return {
     id: v.id,
@@ -76,6 +90,7 @@ async function serializeVendor(v: VendorRow) {
     createdAt: v.createdAt.toISOString(),
     crmTrialActive,
     crmTrialDaysRemaining,
+    freeEntryRules,
   };
 }
 
