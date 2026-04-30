@@ -7,6 +7,39 @@ import { getEventRatings } from "../lib/aggregates";
 
 const router: IRouter = Router();
 
+const VALID_DAY_KEYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+
+function validateDayPricing(
+  dp: unknown,
+): Record<string, { women: number; men: number; couple: number } | null> | null {
+  if (dp === null || dp === undefined) return null;
+  if (typeof dp !== "object" || Array.isArray(dp)) {
+    throw Object.assign(new Error("dayPricing must be a plain object or null"), { status: 400 });
+  }
+  const result: Record<string, { women: number; men: number; couple: number } | null> = {};
+  for (const [key, val] of Object.entries(dp as Record<string, unknown>)) {
+    if (!VALID_DAY_KEYS.has(key)) {
+      throw Object.assign(new Error(`Invalid day key: ${key}. Must be Mon/Tue/Wed/Thu/Fri/Sat/Sun`), { status: 400 });
+    }
+    if (val === null) { result[key] = null; continue; }
+    if (typeof val !== "object" || Array.isArray(val)) {
+      throw Object.assign(new Error(`dayPricing.${key} must be an object or null`), { status: 400 });
+    }
+    const v = val as Record<string, unknown>;
+    const women = Number(v["women"]);
+    const men = Number(v["men"]);
+    const couple = Number(v["couple"]);
+    if (!isFinite(women) || !isFinite(men) || !isFinite(couple)) {
+      throw Object.assign(new Error(`dayPricing.${key}: women, men, couple must be finite numbers`), { status: 400 });
+    }
+    if (women < 0 || men < 0 || couple < 0) {
+      throw Object.assign(new Error(`dayPricing.${key}: prices must be >= 0`), { status: 400 });
+    }
+    result[key] = { women, men, couple };
+  }
+  return result;
+}
+
 interface EventRow {
   id: number;
   vendorId: number;
@@ -29,6 +62,7 @@ interface EventRow {
   priceMen: string;
   priceCouple: string;
   pubEventTypes: string[];
+  dayPricing: Record<string, { women: number; men: number; couple: number } | null> | null;
   galleryImages: string[] | null;
   galleryVideos: string[] | null;
   approvalStatus: string;
@@ -320,11 +354,13 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
   const pubEventTypes = Array.isArray(body["pubEventTypes"])
     ? (body["pubEventTypes"] as string[])
     : [];
-  const dayPricingRaw = body["dayPricing"];
-  const dayPricing =
-    dayPricingRaw && typeof dayPricingRaw === "object" && !Array.isArray(dayPricingRaw)
-      ? (dayPricingRaw as Record<string, { women: number; men: number; couple: number } | null>)
-      : null;
+  let dayPricing: Record<string, { women: number; men: number; couple: number } | null> | null;
+  try {
+    dayPricing = validateDayPricing(body["dayPricing"]);
+  } catch (e: unknown) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
 
   const [created] = await db
     .insert(eventsTable)
@@ -425,8 +461,12 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   if (Array.isArray(body["pubEventTypes"]))
     updates["pubEventTypes"] = body["pubEventTypes"];
   if ("dayPricing" in body) {
-    const dp = body["dayPricing"];
-    updates["dayPricing"] = (dp && typeof dp === "object" && !Array.isArray(dp)) ? dp : null;
+    try {
+      updates["dayPricing"] = validateDayPricing(body["dayPricing"]);
+    } catch (e: unknown) {
+      res.status(400).json({ error: (e as Error).message });
+      return;
+    }
   }
   if (parsed.data.galleryImages !== undefined)
     updates["galleryImages"] = parsed.data.galleryImages;

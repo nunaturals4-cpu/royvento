@@ -749,7 +749,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   const [priceCouple, setPriceCouple] = useState(0);
   const [pubEventTypes, setPubEventTypes] = useState<string[]>([]);
   const [varyByDay, setVaryByDay] = useState(false);
-  const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number; men: number; couple: number }>>({});
+  const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number | ""; men: number | ""; couple: number | "" }>>({});
   const create = useCreateEvent();
   const { toast } = useToast();
 
@@ -799,7 +799,19 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       priceMen: type === "pub" ? priceMen : 0,
       priceCouple: type === "pub" ? priceCouple : 0,
       pubEventTypes: type === "pub" ? pubEventTypes : [],
-      dayPricing: type === "pub" && enableTickets && varyByDay ? dayPricingOverrides : null,
+      dayPricing: (() => {
+        if (type !== "pub" || !enableTickets || !varyByDay) return null;
+        const result: Record<string, { women: number; men: number; couple: number }> = {};
+        for (const [day, ov] of Object.entries(dayPricingOverrides)) {
+          if (!ov) continue;
+          const w = ov.women === "" ? null : ov.women;
+          const m = ov.men === "" ? null : ov.men;
+          const c = ov.couple === "" ? null : ov.couple;
+          if (w === null && m === null && c === null) continue;
+          result[day] = { women: w ?? priceWomen, men: m ?? priceMen, couple: c ?? priceCouple };
+        }
+        return Object.keys(result).length > 0 ? result : null;
+      })(),
       galleryImages,
       galleryVideos,
     };
@@ -880,22 +892,12 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                 <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox
-                  checked={varyByDay}
-                  onCheckedChange={(v) => {
-                    const on = !!v;
-                    setVaryByDay(on);
-                    if (on && Object.keys(dayPricingOverrides).length === 0) {
-                      const pre: Record<string, { women: number; men: number; couple: number }> = {};
-                      for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
-                      setDayPricingOverrides(pre);
-                    }
-                  }}
-                />
+                <Checkbox checked={varyByDay} onCheckedChange={(v) => setVaryByDay(!!v)} />
                 <span className="text-white/70">Vary prices by day</span>
               </label>
               {varyByDay && (
                 <div className="overflow-x-auto rounded-lg border border-white/10">
+                  <p className="px-3 pt-2 text-xs text-white/40">Leave a cell blank to fall back to the default price for that day.</p>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-white/10">
@@ -916,14 +918,12 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                                 min={0}
                                 value={dayPricingOverrides[day]?.[field] ?? ""}
                                 onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setDayPricingOverrides((prev) => ({
-                                    ...prev,
-                                    [day]: {
-                                      ...(prev[day] ?? { women: priceWomen, men: priceMen, couple: priceCouple }),
-                                      [field]: val,
-                                    },
-                                  }));
+                                  const raw = e.target.value;
+                                  const val: number | "" = raw === "" ? "" : Number(raw);
+                                  setDayPricingOverrides((prev) => {
+                                    const existing = prev[day] ?? { women: "" as number | "", men: "" as number | "", couple: "" as number | "" };
+                                    return { ...prev, [day]: { ...existing, [field]: val } };
+                                  });
                                 }}
                                 placeholder={String(field === "women" ? priceWomen : field === "men" ? priceMen : priceCouple)}
                                 className="bg-black/40 border-white/10 h-7 text-xs px-2"
@@ -1033,7 +1033,7 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
   const [pubEventTypes, setPubEventTypes] = useState<string[]>(event.pubEventTypes ?? []);
   const [pubMode, setPubMode] = useState<string>(event.pubMode ?? "");
   const [varyByDay, setVaryByDay] = useState<boolean>(!!(event.dayPricing && Object.keys(event.dayPricing).length > 0));
-  const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number; men: number; couple: number }>>(() => {
+  const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number | ""; men: number | ""; couple: number | "" }>>(() => {
     if (event.dayPricing && typeof event.dayPricing === "object" && !Array.isArray(event.dayPricing)) {
       return event.dayPricing as Record<string, { women: number; men: number; couple: number }>;
     }
@@ -1075,7 +1075,22 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
       await apiPatch(`/api/events/${event.id}`, {
         title, description, imageUrl, capacity,
         price: recalcPrice, galleryImages, galleryVideos,
-        ...(isPub ? { pubMode, priceWomen, priceMen, priceCouple, pubEventTypes, dayPricing: varyByDay ? dayPricingOverrides : null } : {}),
+        ...(isPub ? {
+          pubMode, priceWomen, priceMen, priceCouple, pubEventTypes,
+          dayPricing: (() => {
+            if (!varyByDay) return null;
+            const result: Record<string, { women: number; men: number; couple: number }> = {};
+            for (const [day, ov] of Object.entries(dayPricingOverrides)) {
+              if (!ov) continue;
+              const w = ov.women === "" ? null : ov.women;
+              const m = ov.men === "" ? null : ov.men;
+              const c = ov.couple === "" ? null : ov.couple;
+              if (w === null && m === null && c === null) continue;
+              result[day] = { women: w ?? priceWomen, men: m ?? priceMen, couple: c ?? priceCouple };
+            }
+            return Object.keys(result).length > 0 ? result : null;
+          })(),
+        } : {}),
       });
       toast({ title: "Updated" });
       onSaved();
@@ -1153,22 +1168,12 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                 <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox
-                  checked={varyByDay}
-                  onCheckedChange={(v) => {
-                    const on = !!v;
-                    setVaryByDay(on);
-                    if (on && Object.keys(dayPricingOverrides).length === 0) {
-                      const pre: Record<string, { women: number; men: number; couple: number }> = {};
-                      for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
-                      setDayPricingOverrides(pre);
-                    }
-                  }}
-                />
+                <Checkbox checked={varyByDay} onCheckedChange={(v) => setVaryByDay(!!v)} />
                 <span className="text-white/70">Vary prices by day</span>
               </label>
               {varyByDay && (
                 <div className="overflow-x-auto rounded-lg border border-white/10">
+                  <p className="px-3 pt-2 text-xs text-white/40">Leave a cell blank to fall back to the default price for that day.</p>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-white/10">
@@ -1189,14 +1194,12 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                                 min={0}
                                 value={dayPricingOverrides[day]?.[field] ?? ""}
                                 onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setDayPricingOverrides((prev) => ({
-                                    ...prev,
-                                    [day]: {
-                                      ...(prev[day] ?? { women: priceWomen, men: priceMen, couple: priceCouple }),
-                                      [field]: val,
-                                    },
-                                  }));
+                                  const raw = e.target.value;
+                                  const val: number | "" = raw === "" ? "" : Number(raw);
+                                  setDayPricingOverrides((prev) => {
+                                    const existing = prev[day] ?? { women: "" as number | "", men: "" as number | "", couple: "" as number | "" };
+                                    return { ...prev, [day]: { ...existing, [field]: val } };
+                                  });
                                 }}
                                 placeholder={String(field === "women" ? priceWomen : field === "men" ? priceMen : priceCouple)}
                                 className="bg-black/40 border-white/10 h-7 text-xs px-2"
