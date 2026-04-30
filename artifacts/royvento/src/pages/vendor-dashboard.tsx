@@ -789,6 +789,10 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       toast({ title: "Pick at least one of Tickets or Events", variant: "destructive" });
       return;
     }
+    if (type === "pub" && freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(freeEntryBeforeTime)) {
+      toast({ title: "Invalid before time", description: "Please use HH:mm 24-hour format (e.g. 22:00)", variant: "destructive" });
+      return;
+    }
     const pubMode = type === "pub"
       ? (enableTickets && enableEvents ? "both" : enableTickets ? "ticket" : "event")
       : "";
@@ -1143,6 +1147,10 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPub && freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(freeEntryBeforeTime)) {
+      toast({ title: "Invalid before time", description: "Please use HH:mm 24-hour format (e.g. 22:00)", variant: "destructive" });
+      return;
+    }
     try {
       const tierArr = [priceWomen, priceMen, priceCouple].filter((n) => n > 0);
       const recalcPrice = isPub

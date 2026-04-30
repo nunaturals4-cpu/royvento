@@ -254,6 +254,10 @@ export default function VendorDashboardScreen() {
       Alert.alert("Invalid capacity", "Please enter a valid capacity.");
       return;
     }
+    if (createForm.category === "Pubs" && createForm.freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(createForm.freeEntryBeforeTime)) {
+      Alert.alert("Invalid before time", "Please use HH:mm 24-hour format (e.g. 22:00).");
+      return;
+    }
     createEventMut.mutate({
       data: {
         title: createForm.title.trim(),
@@ -326,6 +330,10 @@ export default function VendorDashboardScreen() {
     }
     if (isNaN(capacity) || capacity < 1) {
       Alert.alert("Invalid capacity", "Please enter a valid capacity.");
+      return;
+    }
+    if ((editingEvent.type === "pub" || editForm.category === "Pubs") && editForm.freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(editForm.freeEntryBeforeTime)) {
+      Alert.alert("Invalid before time", "Please use HH:mm 24-hour format (e.g. 22:00).");
       return;
     }
     updateEventMut.mutate({
