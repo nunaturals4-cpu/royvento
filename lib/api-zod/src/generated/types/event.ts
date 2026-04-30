@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { EventDayPricing } from "./eventDayPricing";
 
 export interface Event {
   id: number;
@@ -28,4 +29,5 @@ export interface Event {
   priceCouple: number;
   approvalStatus: string;
   pubEventTypes?: string[];
+  dayPricing?: EventDayPricing;
 }

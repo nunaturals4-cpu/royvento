@@ -79,6 +79,7 @@ async function serializeEvents(rows: EventRow[]) {
       priceMen: Number(e.priceMen),
       priceCouple: Number(e.priceCouple),
       pubEventTypes: e.pubEventTypes ?? [],
+      dayPricing: e.dayPricing ?? null,
       galleryImages: e.galleryImages ?? [],
       galleryVideos: e.galleryVideos ?? [],
       approvalStatus: e.approvalStatus,
@@ -319,6 +320,11 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
   const pubEventTypes = Array.isArray(body["pubEventTypes"])
     ? (body["pubEventTypes"] as string[])
     : [];
+  const dayPricingRaw = body["dayPricing"];
+  const dayPricing =
+    dayPricingRaw && typeof dayPricingRaw === "object" && !Array.isArray(dayPricingRaw)
+      ? (dayPricingRaw as Record<string, { women: number; men: number; couple: number } | null>)
+      : null;
 
   const [created] = await db
     .insert(eventsTable)
@@ -343,6 +349,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       priceMen: priceMen != null ? String(priceMen) : "0",
       priceCouple: priceCouple != null ? String(priceCouple) : "0",
       pubEventTypes,
+      dayPricing,
       galleryImages: parsed.data.galleryImages ?? null,
       galleryVideos: parsed.data.galleryVideos ?? null,
       approvalStatus: "pending",
@@ -417,6 +424,10 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     updates["priceCouple"] = String(body["priceCouple"]);
   if (Array.isArray(body["pubEventTypes"]))
     updates["pubEventTypes"] = body["pubEventTypes"];
+  if ("dayPricing" in body) {
+    const dp = body["dayPricing"];
+    updates["dayPricing"] = (dp && typeof dp === "object" && !Array.isArray(dp)) ? dp : null;
+  }
   if (parsed.data.galleryImages !== undefined)
     updates["galleryImages"] = parsed.data.galleryImages;
   if (parsed.data.galleryVideos !== undefined)

@@ -1353,6 +1353,17 @@ components:
           type: array
           items:
             type: string
+        dayPricing:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              women:
+                type: number
+              men:
+                type: number
+              couple:
+                type: number
       required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus]
 
     EventDetail:

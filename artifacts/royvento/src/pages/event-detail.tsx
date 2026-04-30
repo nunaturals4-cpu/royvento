@@ -122,6 +122,7 @@ export function EventDetail() {
   const vendorOpenDays: string[] = (ev.vendor?.openDays ?? []) as string[];
   const vendorDayHours = ev.vendor?.dayHours as Record<string, { open: string; close: string } | null> | null | undefined;
   const vendorAddress: string = ev.vendor?.address ?? "";
+  const dayPricingMap = ev.dayPricing as Record<string, { women: number; men: number; couple: number } | null> | null;
 
   const formatHour = (t: string): string => {
     const [h, m] = t.split(":").map(Number);
@@ -132,6 +133,10 @@ export function EventDetail() {
   };
   const selectedDayName = date ? DAY_ABBRS[new Date(`${date}T12:00:00`).getDay()] : "";
   const isClosedDay = !!(date && vendorOpenDays.length > 0 && !vendorOpenDays.includes(selectedDayName));
+  const dayOverride = selectedDayName && dayPricingMap?.[selectedDayName] ? dayPricingMap[selectedDayName] : null;
+  const effectiveWomen = dayOverride ? Number(dayOverride.women) : Number(ev.priceWomen || 0);
+  const effectiveMen = dayOverride ? Number(dayOverride.men) : Number(ev.priceMen || 0);
+  const effectiveCouple = dayOverride ? Number(dayOverride.couple) : Number(ev.priceCouple || 0);
 
   const venueName = ev.vendor?.businessName ?? "This venue";
 
@@ -139,9 +144,9 @@ export function EventDetail() {
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     subtotal =
-      ticketWomen * Number(ev.priceWomen || 0) +
-      ticketMen * Number(ev.priceMen || 0) +
-      ticketCouple * Number(ev.priceCouple || 0);
+      ticketWomen * effectiveWomen +
+      ticketMen * effectiveMen +
+      ticketCouple * effectiveCouple;
   } else {
     subtotal = Number(ev.price) * Math.max(1, guests);
   }
@@ -659,24 +664,60 @@ export function EventDetail() {
 
             {isPub && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0) && (
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-5 space-y-2">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Entry prices</p>
-                {Number(ev.priceWomen) > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">Women</span>
-                    <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceWomen))}</span>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Entry prices{dayPricingMap && Object.keys(dayPricingMap).length > 0 ? " by day" : ""}
+                </p>
+                {dayPricingMap && Object.keys(dayPricingMap).length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 text-white/40">
+                          <th className="text-left pb-1 font-medium">Day</th>
+                          <th className="text-right pb-1 font-medium">Women</th>
+                          <th className="text-right pb-1 font-medium">Men</th>
+                          <th className="text-right pb-1 font-medium">Couple</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map((day) => {
+                          const ov = dayPricingMap[day] ?? null;
+                          const fw = ov ? Number(ov.women) : Number(ev.priceWomen || 0);
+                          const fm = ov ? Number(ov.men) : Number(ev.priceMen || 0);
+                          const fc = ov ? Number(ov.couple) : Number(ev.priceCouple || 0);
+                          const isActive = selectedDayName === day;
+                          return (
+                            <tr key={day} className={isActive ? "text-primary font-semibold" : "text-white/60"}>
+                              <td className="py-0.5">{day}</td>
+                              <td className="text-right py-0.5">{fw > 0 ? formatINRExact(fw) : "—"}</td>
+                              <td className="text-right py-0.5">{fm > 0 ? formatINRExact(fm) : "—"}</td>
+                              <td className="text-right py-0.5">{fc > 0 ? formatINRExact(fc) : "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-                {Number(ev.priceMen) > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">Men</span>
-                    <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceMen))}</span>
-                  </div>
-                )}
-                {Number(ev.priceCouple) > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">Couple</span>
-                    <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceCouple))}</span>
-                  </div>
+                ) : (
+                  <>
+                    {Number(ev.priceWomen) > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white/70">Women</span>
+                        <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceWomen))}</span>
+                      </div>
+                    )}
+                    {Number(ev.priceMen) > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white/70">Men</span>
+                        <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceMen))}</span>
+                      </div>
+                    )}
+                    {Number(ev.priceCouple) > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white/70">Couple</span>
+                        <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceCouple))}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -729,9 +770,9 @@ export function EventDetail() {
                   {pubMode === "ticket" && (
                     <div className="space-y-2 rounded-xl border border-white/10 p-3">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground">Ticket counts</p>
-                      <TicketRow label="Women" price={Number(ev.priceWomen || 0)} value={ticketWomen} onChange={setTicketWomen} />
-                      <TicketRow label="Men" price={Number(ev.priceMen || 0)} value={ticketMen} onChange={setTicketMen} />
-                      <TicketRow label="Couple" price={Number(ev.priceCouple || 0)} value={ticketCouple} onChange={setTicketCouple} />
+                      <TicketRow label="Women" price={effectiveWomen} value={ticketWomen} onChange={setTicketWomen} />
+                      <TicketRow label="Men" price={effectiveMen} value={ticketMen} onChange={setTicketMen} />
+                      <TicketRow label="Couple" price={effectiveCouple} value={ticketCouple} onChange={setTicketCouple} />
                     </div>
                   )}
 

@@ -10,6 +10,7 @@ import {
   date,
   uniqueIndex,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable(
@@ -110,6 +111,7 @@ export const eventsTable = pgTable(
       .notNull()
       .default("0"),
     pubEventTypes: text("pub_event_types").array().notNull().default([]),
+    dayPricing: jsonb("day_pricing").$type<Record<string, { women: number; men: number; couple: number } | null>>(),
     galleryImages: text("gallery_images").array(),
     galleryVideos: text("gallery_videos").array(),
     approvalStatus: varchar("approval_status", { length: 20 })

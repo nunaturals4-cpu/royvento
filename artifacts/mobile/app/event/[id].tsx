@@ -237,9 +237,15 @@ export default function EventDetailScreen() {
     enabled: !!eventId,
   });
 
-  const priceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
-  const priceMen = isPub ? parseFloat(String((event as unknown as { priceMen?: unknown })?.priceMen ?? 0)) : 0;
-  const priceCouple = isPub ? parseFloat(String((event as unknown as { priceCouple?: unknown })?.priceCouple ?? 0)) : 0;
+  const basePriceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
+  const basePriceMen = isPub ? parseFloat(String((event as unknown as { priceMen?: unknown })?.priceMen ?? 0)) : 0;
+  const basePriceCouple = isPub ? parseFloat(String((event as unknown as { priceCouple?: unknown })?.priceCouple ?? 0)) : 0;
+  const eventDayPricing = (event as unknown as { dayPricing?: Record<string, { women: number; men: number; couple: number } | null> })?.dayPricing ?? null;
+  const bookingDayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(`${bookingDate}T12:00:00`).getDay()];
+  const dayOverrideMobile = isPub && eventDayPricing?.[bookingDayName] ? eventDayPricing[bookingDayName] : null;
+  const priceWomen = dayOverrideMobile ? Number(dayOverrideMobile.women) : basePriceWomen;
+  const priceMen = dayOverrideMobile ? Number(dayOverrideMobile.men) : basePriceMen;
+  const priceCouple = dayOverrideMobile ? Number(dayOverrideMobile.couple) : basePriceCouple;
   const basePrice = parseFloat(String(event?.price ?? 0));
 
   const subtotal = isPub

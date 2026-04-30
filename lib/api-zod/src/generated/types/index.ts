@@ -30,6 +30,7 @@ export * from "./createEventBody";
 export * from "./createReviewBody";
 export * from "./createVendorBody";
 export * from "./event";
+export * from "./eventDayPricing";
 export * from "./eventDetail";
 export * from "./getAdminAnalyticsParams";
 export * from "./getAdminBookingsReportParams";

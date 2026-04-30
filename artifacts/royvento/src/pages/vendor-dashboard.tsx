@@ -748,6 +748,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   const [priceMen, setPriceMen] = useState(0);
   const [priceCouple, setPriceCouple] = useState(0);
   const [pubEventTypes, setPubEventTypes] = useState<string[]>([]);
+  const [varyByDay, setVaryByDay] = useState(false);
+  const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number; men: number; couple: number }>>({});
   const create = useCreateEvent();
   const { toast } = useToast();
 
@@ -797,6 +799,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       priceMen: type === "pub" ? priceMen : 0,
       priceCouple: type === "pub" ? priceCouple : 0,
       pubEventTypes: type === "pub" ? pubEventTypes : [],
+      dayPricing: type === "pub" && enableTickets && varyByDay ? dayPricingOverrides : null,
       galleryImages,
       galleryVideos,
     };
@@ -870,10 +873,69 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
             </label>
           </div>
           {enableTickets && (
-            <div className="grid md:grid-cols-3 gap-3">
-              <div><Label>Women (₹)</Label><Input type="number" min={0} value={priceWomen} onChange={(e) => setPriceWomen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-              <div><Label>Men (₹)</Label><Input type="number" min={0} value={priceMen} onChange={(e) => setPriceMen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-              <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+            <div className="space-y-3">
+              <div className="grid md:grid-cols-3 gap-3">
+                <div><Label>Women (₹)</Label><Input type="number" min={0} value={priceWomen} onChange={(e) => setPriceWomen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+                <div><Label>Men (₹)</Label><Input type="number" min={0} value={priceMen} onChange={(e) => setPriceMen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+                <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={varyByDay}
+                  onCheckedChange={(v) => {
+                    const on = !!v;
+                    setVaryByDay(on);
+                    if (on && Object.keys(dayPricingOverrides).length === 0) {
+                      const pre: Record<string, { women: number; men: number; couple: number }> = {};
+                      for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                      setDayPricingOverrides(pre);
+                    }
+                  }}
+                />
+                <span className="text-white/70">Vary prices by day</span>
+              </label>
+              {varyByDay && (
+                <div className="overflow-x-auto rounded-lg border border-white/10">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left px-3 py-2 text-white/50 font-medium w-14">Day</th>
+                        <th className="px-2 py-2 text-white/50 font-medium text-center">Women (₹)</th>
+                        <th className="px-2 py-2 text-white/50 font-medium text-center">Men (₹)</th>
+                        <th className="px-2 py-2 text-white/50 font-medium text-center">Couple (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ALL_DAYS.map((day) => (
+                        <tr key={day} className="border-b border-white/5 last:border-0">
+                          <td className="px-3 py-1.5 font-semibold text-white/70">{day}</td>
+                          {(["women", "men", "couple"] as const).map((field) => (
+                            <td key={field} className="px-1.5 py-1">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={dayPricingOverrides[day]?.[field] ?? ""}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setDayPricingOverrides((prev) => ({
+                                    ...prev,
+                                    [day]: {
+                                      ...(prev[day] ?? { women: priceWomen, men: priceMen, couple: priceCouple }),
+                                      [field]: val,
+                                    },
+                                  }));
+                                }}
+                                placeholder={String(field === "women" ? priceWomen : field === "men" ? priceMen : priceCouple)}
+                                className="bg-black/40 border-white/10 h-7 text-xs px-2"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
           {enableEvents && (
@@ -970,6 +1032,13 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
   const [capacity, setCapacity] = useState(Number(event.capacity ?? 0));
   const [pubEventTypes, setPubEventTypes] = useState<string[]>(event.pubEventTypes ?? []);
   const [pubMode, setPubMode] = useState<string>(event.pubMode ?? "");
+  const [varyByDay, setVaryByDay] = useState<boolean>(!!(event.dayPricing && Object.keys(event.dayPricing).length > 0));
+  const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number; men: number; couple: number }>>(() => {
+    if (event.dayPricing && typeof event.dayPricing === "object" && !Array.isArray(event.dayPricing)) {
+      return event.dayPricing as Record<string, { women: number; men: number; couple: number }>;
+    }
+    return {};
+  });
   const { toast } = useToast();
   const isPub = event.type === "pub";
 
@@ -1006,7 +1075,7 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
       await apiPatch(`/api/events/${event.id}`, {
         title, description, imageUrl, capacity,
         price: recalcPrice, galleryImages, galleryVideos,
-        ...(isPub ? { pubMode, priceWomen, priceMen, priceCouple, pubEventTypes } : {}),
+        ...(isPub ? { pubMode, priceWomen, priceMen, priceCouple, pubEventTypes, dayPricing: varyByDay ? dayPricingOverrides : null } : {}),
       });
       toast({ title: "Updated" });
       onSaved();
@@ -1077,10 +1146,69 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><Label>Women (₹)</Label><Input type="number" min={0} value={priceWomen} onChange={(e) => setPriceWomen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-              <div><Label>Men (₹)</Label><Input type="number" min={0} value={priceMen} onChange={(e) => setPriceMen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-              <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div><Label>Women (₹)</Label><Input type="number" min={0} value={priceWomen} onChange={(e) => setPriceWomen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+                <div><Label>Men (₹)</Label><Input type="number" min={0} value={priceMen} onChange={(e) => setPriceMen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+                <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={varyByDay}
+                  onCheckedChange={(v) => {
+                    const on = !!v;
+                    setVaryByDay(on);
+                    if (on && Object.keys(dayPricingOverrides).length === 0) {
+                      const pre: Record<string, { women: number; men: number; couple: number }> = {};
+                      for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                      setDayPricingOverrides(pre);
+                    }
+                  }}
+                />
+                <span className="text-white/70">Vary prices by day</span>
+              </label>
+              {varyByDay && (
+                <div className="overflow-x-auto rounded-lg border border-white/10">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left px-3 py-2 text-white/50 font-medium w-14">Day</th>
+                        <th className="px-2 py-2 text-white/50 font-medium text-center">Women (₹)</th>
+                        <th className="px-2 py-2 text-white/50 font-medium text-center">Men (₹)</th>
+                        <th className="px-2 py-2 text-white/50 font-medium text-center">Couple (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ALL_DAYS.map((day) => (
+                        <tr key={day} className="border-b border-white/5 last:border-0">
+                          <td className="px-3 py-1.5 font-semibold text-white/70">{day}</td>
+                          {(["women", "men", "couple"] as const).map((field) => (
+                            <td key={field} className="px-1.5 py-1">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={dayPricingOverrides[day]?.[field] ?? ""}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setDayPricingOverrides((prev) => ({
+                                    ...prev,
+                                    [day]: {
+                                      ...(prev[day] ?? { women: priceWomen, men: priceMen, couple: priceCouple }),
+                                      [field]: val,
+                                    },
+                                  }));
+                                }}
+                                placeholder={String(field === "women" ? priceWomen : field === "men" ? priceMen : priceCouple)}
+                                className="bg-black/40 border-white/10 h-7 text-xs px-2"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
             <div>
               <Label>Event types</Label>

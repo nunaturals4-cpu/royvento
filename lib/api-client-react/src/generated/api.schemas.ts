@@ -137,6 +137,14 @@ export interface UpdateVendorBody {
   portfolioImages?: string[];
 }
 
+export type EventDayPricing = {
+  [key: string]: {
+    women?: number;
+    men?: number;
+    couple?: number;
+  };
+};
+
 export interface Event {
   id: number;
   vendorId: number;
@@ -159,6 +167,7 @@ export interface Event {
   priceCouple: number;
   approvalStatus: string;
   pubEventTypes?: string[];
+  dayPricing?: EventDayPricing;
 }
 
 export type EventDetail = Event & {

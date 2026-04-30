@@ -497,6 +497,16 @@ export const ListEventsResponseItem = zod.object({
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
   pubEventTypes: zod.array(zod.string()).optional(),
+  dayPricing: zod
+    .record(
+      zod.string(),
+      zod.object({
+        women: zod.number().optional(),
+        men: zod.number().optional(),
+        couple: zod.number().optional(),
+      }),
+    )
+    .optional(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
 
@@ -537,6 +547,16 @@ export const CreateEventResponse = zod.object({
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
   pubEventTypes: zod.array(zod.string()).optional(),
+  dayPricing: zod
+    .record(
+      zod.string(),
+      zod.object({
+        women: zod.number().optional(),
+        men: zod.number().optional(),
+        couple: zod.number().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -564,6 +584,16 @@ export const ListFeaturedEventsResponseItem = zod.object({
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
   pubEventTypes: zod.array(zod.string()).optional(),
+  dayPricing: zod
+    .record(
+      zod.string(),
+      zod.object({
+        women: zod.number().optional(),
+        men: zod.number().optional(),
+        couple: zod.number().optional(),
+      }),
+    )
+    .optional(),
 });
 export const ListFeaturedEventsResponse = zod.array(
   ListFeaturedEventsResponseItem,
@@ -599,6 +629,16 @@ export const GetEventResponse = zod
     priceCouple: zod.number(),
     approvalStatus: zod.string(),
     pubEventTypes: zod.array(zod.string()).optional(),
+    dayPricing: zod
+      .record(
+        zod.string(),
+        zod.object({
+          women: zod.number().optional(),
+          men: zod.number().optional(),
+          couple: zod.number().optional(),
+        }),
+      )
+      .optional(),
   })
   .and(
     zod.object({
@@ -667,6 +707,16 @@ export const UpdateEventResponse = zod.object({
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
   pubEventTypes: zod.array(zod.string()).optional(),
+  dayPricing: zod
+    .record(
+      zod.string(),
+      zod.object({
+        women: zod.number().optional(),
+        men: zod.number().optional(),
+        couple: zod.number().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -705,6 +755,16 @@ export const ListMyVendorEventsResponseItem = zod.object({
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
   pubEventTypes: zod.array(zod.string()).optional(),
+  dayPricing: zod
+    .record(
+      zod.string(),
+      zod.object({
+        women: zod.number().optional(),
+        men: zod.number().optional(),
+        couple: zod.number().optional(),
+      }),
+    )
+    .optional(),
 });
 export const ListMyVendorEventsResponse = zod.array(
   ListMyVendorEventsResponseItem,
@@ -1270,6 +1330,16 @@ export const GetWishlistResponseItem = zod
     priceCouple: zod.number(),
     approvalStatus: zod.string(),
     pubEventTypes: zod.array(zod.string()).optional(),
+    dayPricing: zod
+      .record(
+        zod.string(),
+        zod.object({
+          women: zod.number().optional(),
+          men: zod.number().optional(),
+          couple: zod.number().optional(),
+        }),
+      )
+      .optional(),
   })
   .and(
     zod.object({
