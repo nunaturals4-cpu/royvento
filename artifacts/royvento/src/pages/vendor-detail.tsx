@@ -142,6 +142,31 @@ export function VendorDetail() {
           </section>
         ) : null}
 
+        {vendor.address && (
+          <section>
+            <h2 className="font-serif text-2xl mb-4 flex items-center gap-2">
+              <Navigation className="h-5 w-5 text-primary" />
+              Find us
+            </h2>
+            <iframe
+              title="Venue location"
+              src={`https://maps.google.com/maps?q=${encodeURIComponent(vendor.address)}&output=embed&hl=en`}
+              className="w-full h-64 md:h-80 rounded-2xl border border-white/10"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent(vendor.address)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 mt-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Navigation className="h-3.5 w-3.5" />
+              {vendor.address} — Open in Google Maps ↗
+            </a>
+          </section>
+        )}
+
         {vendor.portfolioImages.length > 0 && (
           <section>
             <h2 className="font-serif text-2xl mb-5">Portfolio</h2>
