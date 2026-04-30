@@ -6,8 +6,10 @@ import {
   profileViewsTable,
   usersTable,
   couponsTable,
+  bookingsTable,
+  eventsTable,
 } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 
@@ -213,12 +215,40 @@ router.get(
       .where(eq(profileViewsTable.vendorId, vendor.id))
       .orderBy(desc(profileViewsTable.viewedAt))
       .limit(200);
-    // join users to enrich
+
+    // Collect known viewer user IDs
     const ids = Array.from(
       new Set(rows.map((r) => r.viewerUserId).filter((x): x is number => !!x)),
     );
-    const users = ids.length ? await db.select().from(usersTable) : [];
+
+    // Fetch user details for enrichment
+    const users = ids.length
+      ? await db.select().from(usersTable).where(inArray(usersTable.id, ids))
+      : [];
     const uMap = new Map(users.map((u) => [u.id, u]));
+
+    // Determine which known viewers have already booked one of this vendor's events
+    const bookedUserIds = new Set<number>();
+    if (ids.length) {
+      const vendorEvents = await db
+        .select({ id: eventsTable.id })
+        .from(eventsTable)
+        .where(eq(eventsTable.vendorId, vendor.id));
+      const eventIds = vendorEvents.map((e) => e.id);
+      if (eventIds.length) {
+        const bookedRows = await db
+          .select({ userId: bookingsTable.userId })
+          .from(bookingsTable)
+          .where(
+            and(
+              inArray(bookingsTable.userId, ids),
+              inArray(bookingsTable.eventId, eventIds),
+            ),
+          );
+        bookedRows.forEach((b) => bookedUserIds.add(b.userId));
+      }
+    }
+
     return res.json({
       premium: vendor.isPremium,
       crmAccessGranted: true,
@@ -230,6 +260,7 @@ router.get(
           ...r,
           viewerName: u?.name ?? r.viewerName ?? "Anonymous",
           viewerEmail: u?.email ?? r.viewerEmail ?? "",
+          hasBooked: r.viewerUserId ? bookedUserIds.has(r.viewerUserId) : false,
         };
       }),
     });

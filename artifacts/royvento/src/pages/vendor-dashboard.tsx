@@ -1947,7 +1947,8 @@ function LeadsPanel() {
 
   const totalViews = data.views.length;
   const known = data.views.filter((v: any) => v.viewerUserId).length;
-  const conv = totalViews ? Math.round((known / totalViews) * 100) : 0;
+  const booked = data.views.filter((v: any) => v.hasBooked).length;
+  const conv = known ? Math.round((booked / known) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -1960,7 +1961,7 @@ function LeadsPanel() {
           </p>
         </div>
       )}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-2xl glass-card p-5">
           <Eye className="h-5 w-5 text-primary mb-2" />
           <p className="stat-number text-3xl">{totalViews}</p>
@@ -1972,9 +1973,14 @@ function LeadsPanel() {
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Known leads</p>
         </div>
         <div className="rounded-2xl glass-card p-5">
+          <TrendingUp className="h-5 w-5 text-green-400 mb-2" />
+          <p className="stat-number text-3xl text-green-400">{booked}</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Already booked</p>
+        </div>
+        <div className="rounded-2xl glass-card p-5">
           <Crown className="h-5 w-5 text-primary mb-2" />
           <p className="stat-number text-3xl">{conv}%</p>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Lead conversion</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Lead→booking rate</p>
         </div>
       </div>
       <div className="rounded-3xl glass-card-strong p-6">
@@ -1999,6 +2005,11 @@ function LeadsPanel() {
                   <tr key={i} className="border-t border-white/5">
                     <td className="py-2 pr-2">
                       <span className={isAnon ? "text-muted-foreground italic" : ""}>{v.viewerName || "Anonymous"}</span>
+                      {!isAnon && (
+                        <span className={`block text-[10px] mt-0.5 font-medium ${v.hasBooked ? "text-green-400" : "text-muted-foreground/60"}`}>
+                          {v.hasBooked ? "✓ Booked" : "Not booked yet"}
+                        </span>
+                      )}
                     </td>
                     <td className="text-muted-foreground hidden sm:table-cell pr-2">{v.viewerEmail || "—"}</td>
                     <td className="text-right text-muted-foreground hidden md:table-cell pr-2">{new Date(v.viewedAt).toLocaleString()}</td>

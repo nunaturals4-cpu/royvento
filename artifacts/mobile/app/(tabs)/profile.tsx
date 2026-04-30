@@ -202,10 +202,12 @@ export default function ProfileScreen() {
                 <Text style={[styles.couponDetail, { color: colors.mutedForeground }]}>
                   {`${c.discountPercent}% off`}
                 </Text>
-                {c.vendorName ? (
-                  <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", opacity: 0.7 }}>
-                    {c.vendorName} only
-                  </Text>
+                {c.vendorName && c.vendorId ? (
+                  <Pressable onPress={() => router.push(`/partner/${c.vendorId}` as any)}>
+                    <Text style={{ fontSize: 10, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>
+                      {c.vendorName} only ↗
+                    </Text>
+                  </Pressable>
                 ) : null}
               </View>
             </View>

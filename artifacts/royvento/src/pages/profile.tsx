@@ -302,10 +302,12 @@ export function Profile() {
                   <div key={c.id} className="flex items-start justify-between gap-3 border-b border-white/5 pb-2 last:border-0">
                     <div className="min-w-0">
                       <span className="font-mono text-xs text-red-200 block">{c.code}</span>
-                      {c.vendorName && (
-                        <span className="text-[10px] text-muted-foreground mt-0.5 block">
-                          Exclusive to {c.vendorName}
-                        </span>
+                      {c.vendorName && c.vendorId && (
+                        <Link href={`/vendors/${c.vendorId}`}>
+                          <span className="text-[10px] text-primary/80 hover:text-primary mt-0.5 block underline underline-offset-2 cursor-pointer">
+                            Exclusive to {c.vendorName} ↗
+                          </span>
+                        </Link>
                       )}
                     </div>
                     <Badge variant={c.used ? "outline" : "default"} className="shrink-0">
