@@ -22,7 +22,7 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
-  TrendingUp, IndianRupee, Clock, Navigation, Tag,
+  TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -997,13 +997,18 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
               </div>
             </div>
           )}
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)} />
-              <span className="text-sm font-medium text-emerald-400">Free Entry available</span>
-            </label>
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+            <button type="button" onClick={() => setFreeEntryEnabled((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
+                <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)}
+                  onClick={(e) => e.stopPropagation()} />
+                Free Entry
+              </span>
+              <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${freeEntryEnabled ? "rotate-180" : ""}`} />
+            </button>
             {freeEntryEnabled && (
-              <div className="space-y-3 pl-1">
+              <div className="space-y-3 px-4 pb-4 pt-1">
                 <div>
                   <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
                   <div className="flex flex-wrap gap-2">
@@ -1344,13 +1349,18 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)} />
-                <span className="text-sm font-medium text-emerald-400">Free Entry available</span>
-              </label>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+              <button type="button" onClick={() => setFreeEntryEnabled((v) => !v)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
+                <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
+                  <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)}
+                    onClick={(e) => e.stopPropagation()} />
+                  Free Entry
+                </span>
+                <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${freeEntryEnabled ? "rotate-180" : ""}`} />
+              </button>
               {freeEntryEnabled && (
-                <div className="space-y-3 pl-1">
+                <div className="space-y-3 px-4 pb-4 pt-1">
                   <div>
                     <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
                     <div className="flex flex-wrap gap-2">
