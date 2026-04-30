@@ -31,6 +31,12 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
+  useEffect(() => {
+    if (!done) return;
+    const timer = setTimeout(() => router.replace("/(auth)/login"), 3000);
+    return () => clearTimeout(timer);
+  }, [done]);
+
   const resolvedToken = typeof token === "string" ? token : "";
 
   async function handleSubmit() {
@@ -113,7 +119,7 @@ export default function ResetPasswordScreen() {
             </View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Password updated!</Text>
             <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
-              Your password has been reset successfully. Please sign in with your new password.
+              Your password has been reset successfully. Redirecting you to sign in…
             </Text>
             <TouchableOpacity
               style={[styles.btn, { backgroundColor: colors.primary }]}
