@@ -144,6 +144,22 @@ Full feature parity with web app. New screens and features in `artifacts/mobile/
 - **Vendor dashboard new tabs**: Analytics (revenue KPIs + per-event breakdown via `/api/partner/analytics`), Announcements (CRUD `/api/partner/announcements`), Leads (premium gate or lead list via `/api/partner/leads/me`).
 - **Admin panel screen** (`app/admin/index.tsx`): analytics KPIs, partner management (approve/reject), user list, event management with delete.
 
+## Import pub from Google Business Profile (Task #193, Apr 2026)
+- New admin-only endpoint: `POST /api/admin/pubs/import-google`
+  - Body: `{ googleUrl, partnerEmail, pubMode?, category? }`
+  - Resolves a Google Maps / Business Profile URL to place details via Google Places API
+  - Validates: partner email exists, vendor is approved, no existing pub listing (one-pub-per-vendor)
+  - Downloads the first Google photo and stores it in object storage
+  - Inserts an event with `type="pub"`, `approvalStatus="approved"`, and address/hours from Google
+- Google Places utility: `artifacts/api-server/src/lib/googlePlaces.ts`
+  - `resolvePlaceFromUrl(url, apiKey)` — handles standard and short (maps.app.goo.gl) URLs
+  - `downloadAndStorePhoto(photoRef, apiKey)` — saves photo to private object storage
+  - Uses `GOOGLE_PLACES_API_KEY` environment secret
+- Admin portal: new "Import Pub" tab in admin panel (`artifacts/royvento/src/pages/admin.tsx`)
+  - Form with Google URL, partner email, pub mode selector, and category selector
+  - Success state shows pub name, address, phone, website, opening hours table, and cover photo
+- OpenAPI spec updated + codegen rerun: `importGooglePub` mutation hook available in `@workspace/api-client-react`
+
 ## Common tasks
 - Regenerate API client: `pnpm --filter @workspace/api-spec run codegen`
 - Push DB schema: `pnpm --filter @workspace/db run push`

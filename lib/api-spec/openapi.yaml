@@ -842,6 +842,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
+  /admin/pubs/import-google:
+    post:
+      operationId: importGooglePub
+      tags: [admin]
+      summary: Import a pub listing from a Google Business Profile URL (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportGooglePubBody"
+      responses:
+        "200":
+          description: Pub imported and created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportGooglePubResponse"
+        "400":
+          description: Missing or invalid input
+        "403":
+          description: Partner not approved
+        "404":
+          description: Partner email or place not found
+        "409":
+          description: Partner already has a pub listing
+        "500":
+          description: API key not configured or server error
+        "502":
+          description: Google Places API error
+
   /admin/bookings/report:
     get:
       operationId: getAdminBookingsReport
@@ -1941,3 +1972,92 @@ components:
           items:
             $ref: "#/components/schemas/AdminLeadVendorSummary"
       required: [totalViews, allTimeTotalViews, knownLeads, anonymousVisitors, conversions, conversionRate, vendors]
+
+    ImportGooglePubBody:
+      type: object
+      required: [googleUrl, partnerEmail]
+      properties:
+        googleUrl:
+          type: string
+          description: Google Maps or Google Business Profile URL for the pub
+        partnerEmail:
+          type: string
+          format: email
+          description: Email of the approved partner who owns this pub
+        pubMode:
+          type: string
+          description: Pub mode (entry, bottle, table)
+          default: entry
+        category:
+          type: string
+          description: Event category (bar, club, lounge, etc.)
+          default: bar
+
+    ImportGooglePubResponse:
+      type: object
+      required: [ok, event, place]
+      properties:
+        ok:
+          type: boolean
+        event:
+          type: object
+          required: [id, vendorId, title, type, category, location, city, state, country, imageUrl, approvalStatus, createdAt]
+          properties:
+            id:
+              type: integer
+            vendorId:
+              type: integer
+            title:
+              type: string
+            type:
+              type: string
+            category:
+              type: string
+            location:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            country:
+              type: string
+            imageUrl:
+              type: string
+            approvalStatus:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+        place:
+          type: object
+          required: [placeId, name, formattedAddress, city, state, country, phone, website]
+          properties:
+            placeId:
+              type: string
+            name:
+              type: string
+            formattedAddress:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            country:
+              type: string
+            phone:
+              type: string
+            website:
+              type: string
+            openingHours:
+              type: object
+              nullable: true
+              additionalProperties:
+                oneOf:
+                  - type: object
+                    properties:
+                      open:
+                        type: string
+                      close:
+                        type: string
+                    required: [open, close]
+                  - type: "null"

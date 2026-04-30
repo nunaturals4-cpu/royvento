@@ -39,6 +39,8 @@ import type {
   GetAdminLeadsSummaryParams,
   GetBookingTicketCode200,
   HealthStatus,
+  ImportGooglePubBody,
+  ImportGooglePubResponse,
   ListEventsParams,
   ListVendorsParams,
   LoginBody,
@@ -3464,6 +3466,92 @@ export const useDeleteAdminEvent = <
   TContext
 > => {
   return useMutation(getDeleteAdminEventMutationOptions(options));
+};
+
+/**
+ * @summary Import a pub listing from a Google Business Profile URL (admin)
+ */
+export const getImportGooglePubUrl = () => {
+  return `/api/admin/pubs/import-google`;
+};
+
+export const importGooglePub = async (
+  importGooglePubBody: ImportGooglePubBody,
+  options?: RequestInit,
+): Promise<ImportGooglePubResponse> => {
+  return customFetch<ImportGooglePubResponse>(getImportGooglePubUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(importGooglePubBody),
+  });
+};
+
+export const getImportGooglePubMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importGooglePub>>,
+    TError,
+    { data: BodyType<ImportGooglePubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importGooglePub>>,
+  TError,
+  { data: BodyType<ImportGooglePubBody> },
+  TContext
+> => {
+  const mutationKey = ["importGooglePub"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importGooglePub>>,
+    { data: BodyType<ImportGooglePubBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return importGooglePub(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportGooglePubMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importGooglePub>>
+>;
+export type ImportGooglePubMutationBody = BodyType<ImportGooglePubBody>;
+export type ImportGooglePubMutationError = ErrorType<void>;
+
+/**
+ * @summary Import a pub listing from a Google Business Profile URL (admin)
+ */
+export const useImportGooglePub = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importGooglePub>>,
+    TError,
+    { data: BodyType<ImportGooglePubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof importGooglePub>>,
+  TError,
+  { data: BodyType<ImportGooglePubBody> },
+  TContext
+> => {
+  return useMutation(getImportGooglePubMutationOptions(options));
 };
 
 /**

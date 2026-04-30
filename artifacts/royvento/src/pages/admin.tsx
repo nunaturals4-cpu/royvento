@@ -10,7 +10,9 @@ import {
   useGetAdminBookingsPartnerSummary,
   useGetAdminLeads,
   useGetAdminLeadsSummary,
+  importGooglePub,
 } from "@workspace/api-client-react";
+import type { ImportGooglePubResponse } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
@@ -77,6 +79,7 @@ export function AdminPanel() {
           <TabsTrigger value="blogs">Blogs</TabsTrigger>
           <TabsTrigger value="booking-report">Booking Report</TabsTrigger>
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
+          <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
@@ -91,6 +94,7 @@ export function AdminPanel() {
         <TabsContent value="blogs"><BlogsAdmin /></TabsContent>
         <TabsContent value="booking-report"><BookingReport /></TabsContent>
         <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
+        <TabsContent value="import-pub"><ImportPubFromGoogle /></TabsContent>
       </Tabs>
     </div>
   );
@@ -2440,6 +2444,206 @@ function CrmLeads() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function ImportPubFromGoogle() {
+  const { toast } = useToast();
+  const [googleUrl, setGoogleUrl] = useState("");
+  const [partnerEmail, setPartnerEmail] = useState("");
+  const [pubMode, setPubMode] = useState("entry");
+  const [category, setCategory] = useState("bar");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ImportGooglePubResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleImport(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setResult(null);
+    setLoading(true);
+    try {
+      const data = await importGooglePub({ googleUrl, partnerEmail, pubMode, category });
+      setResult(data);
+      toast({ title: "Pub imported", description: `"${data.event.title}" has been created and approved.` });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Import failed. Please check the URL and partner email.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleReset() {
+    setResult(null);
+    setError(null);
+    setGoogleUrl("");
+    setPartnerEmail("");
+    setPubMode("entry");
+    setCategory("bar");
+  }
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <div>
+        <h2 className="font-serif text-2xl tracking-tight mb-1">Import Pub from Google</h2>
+        <p className="text-sm text-muted-foreground">
+          Paste a Google Maps or Google Business Profile URL to automatically create a pub listing for an approved partner.
+        </p>
+      </div>
+
+      {result ? (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-5 space-y-4">
+            <div className="flex items-start gap-4">
+              {result.event.imageUrl && (
+                <img
+                  src={result.event.imageUrl.startsWith("/objects/")
+                    ? `/api/storage${result.event.imageUrl}`
+                    : result.event.imageUrl}
+                  alt={result.event.title}
+                  className="w-20 h-20 rounded-lg object-cover shrink-0"
+                />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs text-green-400 font-medium uppercase tracking-widest mb-1">Imported successfully</p>
+                <h3 className="font-semibold text-lg leading-tight">{result.event.title}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{result.place.formattedAddress}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {[result.place.city, result.place.state, result.place.country].filter(Boolean).join(", ")}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              {result.place.phone && (
+                <>
+                  <span className="text-muted-foreground">Phone</span>
+                  <span>{result.place.phone}</span>
+                </>
+              )}
+              {result.place.website && (
+                <>
+                  <span className="text-muted-foreground">Website</span>
+                  <a
+                    href={result.place.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline-offset-2 hover:underline truncate"
+                  >
+                    {result.place.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  </a>
+                </>
+              )}
+              <span className="text-muted-foreground">Event ID</span>
+              <span className="font-mono text-xs">{result.event.id}</span>
+              <span className="text-muted-foreground">Status</span>
+              <span className="text-green-400 capitalize">{result.event.approvalStatus}</span>
+            </div>
+
+            {result.place.openingHours && (
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Opening Hours</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm">
+                  {(["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] as const).map((day) => {
+                    const h = result.place.openingHours?.[day];
+                    return (
+                      <div key={day} className="flex gap-2">
+                        <span className="text-muted-foreground w-8 shrink-0">{day}</span>
+                        <span>{h ? `${h.open} – ${h.close}` : "Closed"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Button variant="outline" onClick={handleReset} className="w-full">
+            Import another pub
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleImport} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="googleUrl">Google Maps / Business Profile URL</Label>
+            <Input
+              id="googleUrl"
+              placeholder="https://www.google.com/maps/place/..."
+              value={googleUrl}
+              onChange={(e) => setGoogleUrl(e.target.value)}
+              disabled={loading}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Paste the full Google Maps URL or a short maps.app.goo.gl link.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="partnerEmail">Partner email</Label>
+            <Input
+              id="partnerEmail"
+              type="email"
+              placeholder="partner@example.com"
+              value={partnerEmail}
+              onChange={(e) => setPartnerEmail(e.target.value)}
+              disabled={loading}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              The email of an approved partner account. The pub will be created under their profile.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="pubMode">Pub mode</Label>
+              <Select value={pubMode} onValueChange={setPubMode} disabled={loading}>
+                <SelectTrigger id="pubMode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entry">Entry tickets</SelectItem>
+                  <SelectItem value="bottle">Bottle service</SelectItem>
+                  <SelectItem value="table">Table booking</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="category">Category</Label>
+              <Select value={category} onValueChange={setCategory} disabled={loading}>
+                <SelectTrigger id="category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bar">Bar</SelectItem>
+                  <SelectItem value="club">Club</SelectItem>
+                  <SelectItem value="lounge">Lounge</SelectItem>
+                  <SelectItem value="pub">Pub</SelectItem>
+                  <SelectItem value="rooftop">Rooftop</SelectItem>
+                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          <Button type="submit" disabled={loading || !googleUrl.trim() || !partnerEmail.trim()} className="w-full">
+            {loading ? "Importing…" : "Import pub from Google"}
+          </Button>
+        </form>
+      )}
     </div>
   );
 }

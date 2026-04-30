@@ -12,6 +12,7 @@ import {
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
+import { resolvePlaceFromUrl, downloadAndStorePhoto } from "../lib/googlePlaces";
 
 const router: IRouter = Router();
 
@@ -981,6 +982,153 @@ router.get("/admin/booking-report/top-pubs", requireAuth(["admin"]), async (req,
     totalTickets: r.totalTickets,
     bookingCount: r.bookingCount,
   })));
+});
+
+// ── Import pub from Google Business Profile ───────────────────────────────────
+
+router.post("/admin/pubs/import-google", requireAuth(["admin"]), async (req, res) => {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: "GOOGLE_PLACES_API_KEY is not configured" });
+    return;
+  }
+
+  const body = req.body as Record<string, unknown>;
+  const googleUrl = typeof body["googleUrl"] === "string" ? body["googleUrl"].trim() : "";
+  const partnerEmail = typeof body["partnerEmail"] === "string" ? body["partnerEmail"].trim().toLowerCase() : "";
+  const pubMode = typeof body["pubMode"] === "string" ? body["pubMode"] : "entry";
+  const category = typeof body["category"] === "string" && body["category"].trim() ? body["category"].trim() : "bar";
+
+  if (!googleUrl) {
+    res.status(400).json({ error: "googleUrl is required" });
+    return;
+  }
+  if (!partnerEmail) {
+    res.status(400).json({ error: "partnerEmail is required" });
+    return;
+  }
+
+  // Look up user by email
+  const [userRow] = await db
+    .select({ id: usersTable.id, email: usersTable.email })
+    .from(usersTable)
+    .where(eq(usersTable.email, partnerEmail))
+    .limit(1);
+  if (!userRow) {
+    res.status(404).json({ error: `No account found with email: ${partnerEmail}` });
+    return;
+  }
+
+  // Look up vendor
+  const [vendor] = await db
+    .select()
+    .from(vendorsTable)
+    .where(eq(vendorsTable.userId, userRow.id))
+    .limit(1);
+  if (!vendor) {
+    res.status(404).json({ error: "This user does not have a partner profile" });
+    return;
+  }
+  if (vendor.status !== "approved") {
+    res.status(403).json({ error: `Partner profile is not approved (status: ${vendor.status})` });
+    return;
+  }
+
+  // Check one-pub-per-vendor rule
+  const existingPub = await db
+    .select({ id: eventsTable.id })
+    .from(eventsTable)
+    .where(and(eq(eventsTable.vendorId, vendor.id), eq(eventsTable.type, "pub")))
+    .limit(1);
+  if (existingPub.length > 0) {
+    res.status(409).json({ error: "This partner already has a pub listing. Delete it before importing a new one." });
+    return;
+  }
+
+  // Resolve place details from Google
+  let place;
+  try {
+    place = await resolvePlaceFromUrl(googleUrl, apiKey);
+  } catch (err: unknown) {
+    const e = err as Error & { status?: number };
+    res.status(e.status ?? 502).json({ error: e.message ?? "Failed to resolve Google place" });
+    return;
+  }
+
+  // Download and store the cover photo
+  let imageUrl = "";
+  if (place.photoRef) {
+    try {
+      imageUrl = await downloadAndStorePhoto(place.photoRef, apiKey);
+    } catch {
+      // Non-fatal: proceed without photo
+    }
+  }
+
+  // Build description
+  const descParts: string[] = [place.formattedAddress];
+  if (place.phone) descParts.push(`Phone: ${place.phone}`);
+  if (place.website) descParts.push(`Website: ${place.website}`);
+  const description = descParts.join("\n");
+
+  // Insert event
+  const [created] = await db
+    .insert(eventsTable)
+    .values({
+      vendorId: vendor.id,
+      title: place.name,
+      description,
+      category,
+      type: "pub",
+      location: place.formattedAddress,
+      city: place.city,
+      state: place.state,
+      country: place.country || "India",
+      price: "0",
+      capacity: 0,
+      imageUrl,
+      pubMode,
+      priceWomen: "0",
+      priceMen: "0",
+      priceCouple: "0",
+      pubEventTypes: [],
+      approvalStatus: "approved",
+    })
+    .returning();
+
+  if (!created) {
+    res.status(500).json({ error: "Failed to create pub listing" });
+    return;
+  }
+
+  res.json({
+    ok: true,
+    event: {
+      id: created.id,
+      vendorId: created.vendorId,
+      title: created.title,
+      type: created.type,
+      category: created.category,
+      location: created.location,
+      city: created.city,
+      state: created.state,
+      country: created.country,
+      imageUrl: created.imageUrl,
+      approvalStatus: created.approvalStatus,
+      createdAt: created.createdAt.toISOString(),
+    },
+    place: {
+      placeId: place.placeId,
+      name: place.name,
+      formattedAddress: place.formattedAddress,
+      city: place.city,
+      state: place.state,
+      country: place.country,
+      phone: place.phone,
+      website: place.website,
+      openingHours: place.openingHours,
+    },
+  });
 });
 
 const VALID_COUPON_TYPES = ["general", "event", "loyalty", "referral", "vip"] as const;

@@ -492,6 +492,57 @@ export interface AdminLeadsSummary {
   vendors: AdminLeadVendorSummary[];
 }
 
+export interface ImportGooglePubBody {
+  /** Google Maps or Google Business Profile URL for the pub */
+  googleUrl: string;
+  /** Email of the approved partner who owns this pub */
+  partnerEmail: string;
+  /** Pub mode (entry, bottle, table) */
+  pubMode?: string;
+  /** Event category (bar, club, lounge, etc.) */
+  category?: string;
+}
+
+export type ImportGooglePubResponseEvent = {
+  id: number;
+  vendorId: number;
+  title: string;
+  type: string;
+  category: string;
+  location: string;
+  city: string;
+  state: string;
+  country: string;
+  imageUrl: string;
+  approvalStatus: string;
+  createdAt: string;
+};
+
+export type ImportGooglePubResponsePlaceOpeningHours = {
+  [key: string]: {
+    open: string;
+    close: string;
+  } | null;
+} | null;
+
+export type ImportGooglePubResponsePlace = {
+  placeId: string;
+  name: string;
+  formattedAddress: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  website: string;
+  openingHours?: ImportGooglePubResponsePlaceOpeningHours;
+};
+
+export interface ImportGooglePubResponse {
+  ok: boolean;
+  event: ImportGooglePubResponseEvent;
+  place: ImportGooglePubResponsePlace;
+}
+
 export type ListVendorsParams = {
   category?: string;
   country?: string;

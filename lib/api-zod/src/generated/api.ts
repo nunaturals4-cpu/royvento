@@ -1114,6 +1114,70 @@ export const DeleteAdminEventResponse = zod.object({
 });
 
 /**
+ * @summary Import a pub listing from a Google Business Profile URL (admin)
+ */
+export const importGooglePubBodyPubModeDefault = `entry`;
+export const importGooglePubBodyCategoryDefault = `bar`;
+
+export const ImportGooglePubBody = zod.object({
+  googleUrl: zod
+    .string()
+    .describe("Google Maps or Google Business Profile URL for the pub"),
+  partnerEmail: zod
+    .string()
+    .email()
+    .describe("Email of the approved partner who owns this pub"),
+  pubMode: zod
+    .string()
+    .default(importGooglePubBodyPubModeDefault)
+    .describe("Pub mode (entry, bottle, table)"),
+  category: zod
+    .string()
+    .default(importGooglePubBodyCategoryDefault)
+    .describe("Event category (bar, club, lounge, etc.)"),
+});
+
+export const ImportGooglePubResponse = zod.object({
+  ok: zod.boolean(),
+  event: zod.object({
+    id: zod.number(),
+    vendorId: zod.number(),
+    title: zod.string(),
+    type: zod.string(),
+    category: zod.string(),
+    location: zod.string(),
+    city: zod.string(),
+    state: zod.string(),
+    country: zod.string(),
+    imageUrl: zod.string(),
+    approvalStatus: zod.string(),
+    createdAt: zod.coerce.date(),
+  }),
+  place: zod.object({
+    placeId: zod.string(),
+    name: zod.string(),
+    formattedAddress: zod.string(),
+    city: zod.string(),
+    state: zod.string(),
+    country: zod.string(),
+    phone: zod.string(),
+    website: zod.string(),
+    openingHours: zod
+      .record(
+        zod.string(),
+        zod.union([
+          zod.object({
+            open: zod.string(),
+            close: zod.string(),
+          }),
+          zod.null(),
+        ]),
+      )
+      .nullish(),
+  }),
+});
+
+/**
  * @summary Paginated, filterable booking report (admin)
  */
 export const GetAdminBookingsReportQueryParams = zod.object({
