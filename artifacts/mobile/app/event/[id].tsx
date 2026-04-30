@@ -258,10 +258,11 @@ export default function EventDetailScreen() {
   const discount = couponState
     ? Math.round(subtotal * (couponPercent / 100))
     : Math.round(subtotal * (newUserPercent / 100));
+  const POINTS_RUPEE_RATE = 0.10; // 100 pts = ₹10
   const pointsCap = Math.max(0, subtotal - discount);
-  const pointsAvail = Math.min(discountInfo?.points ?? 0, pointsCap);
+  const pointsAvail = Math.min(discountInfo?.points ?? 0, Math.floor(pointsCap / POINTS_RUPEE_RATE));
   const pointsApplied = Math.min(parseInt(pointsInput) || 0, pointsAvail);
-  const finalTotal = Math.max(0, subtotal - discount - pointsApplied);
+  const finalTotal = Math.max(0, subtotal - discount - pointsApplied * POINTS_RUPEE_RATE);
 
   const bookingMutation = useCreateBooking({
     mutation: {
@@ -836,7 +837,7 @@ export default function EventDetailScreen() {
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
                     <Ionicons name="diamond-outline" size={14} color={colors.primary} />
                     <Text style={[styles.pointsAvail, { color: colors.foreground }]}>
-                      {discountInfo!.points} points available (≈{formatINR(discountInfo!.points)})
+                      {discountInfo!.points} points available (≈{formatINR(discountInfo!.points * 0.10)})
                     </Text>
                   </View>
                   <View style={styles.couponRow}>
@@ -857,7 +858,7 @@ export default function EventDetailScreen() {
                   </View>
                   {pointsApplied > 0 && (
                     <Text style={[styles.couponSuccessText, { color: colors.primary, marginTop: 4 }]}>
-                      −{formatINR(pointsApplied)} deducted
+                      −{formatINR(pointsApplied * POINTS_RUPEE_RATE)} deducted
                     </Text>
                   )}
                 </View>
@@ -919,7 +920,7 @@ export default function EventDetailScreen() {
                 {pointsApplied > 0 && (
                   <View style={styles.summaryRow}>
                     <Text style={[styles.summaryLabel, { color: colors.primary }]}>Points</Text>
-                    <Text style={[styles.summaryVal, { color: colors.primary }]}>−{formatINR(pointsApplied)}</Text>
+                    <Text style={[styles.summaryVal, { color: colors.primary }]}>−{formatINR(pointsApplied * POINTS_RUPEE_RATE)}</Text>
                   </View>
                 )}
                 <View style={[styles.summaryRow, styles.summaryTotal]}>

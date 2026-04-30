@@ -237,7 +237,7 @@ export function Profile() {
                 <Gift className="h-5 w-5 text-primary" />
                 <h2 className="font-serif text-lg">Refer &amp; earn</h2>
               </div>
-              <p className="text-xs text-muted-foreground">Share your code — you both get 50 pts (₹50) when they make their first paid booking.</p>
+              <p className="text-xs text-muted-foreground">Share your code — you both get 50 pts (₹5) when they make their first paid booking.</p>
               <div className="mt-3 flex items-center gap-2">
                 <code className="px-3 py-2 rounded-lg bg-black/40 border border-white/10 font-mono text-sm tracking-wider flex-1 text-center">{referrals.code}</code>
                 <Button size="icon" variant="outline" onClick={copyReferral} aria-label="Copy referral link">
@@ -245,7 +245,7 @@ export function Profile() {
                 </Button>
               </div>
               <div className="mt-4 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Points balance</span>
+                <span className="text-muted-foreground">Points balance <span className="text-xs opacity-60">(100 pts = ₹10)</span></span>
                 <span className="font-semibold text-primary">{referrals.points} pts</span>
               </div>
               {referrals.referrals.length > 0 && (

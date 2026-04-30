@@ -165,7 +165,6 @@ export function Navbar() {
               <Link href="/subscription" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                 <Crown className="h-3.5 w-3.5 text-primary" /> Premium
               </Link>
-              <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
             </nav>
           </div>
 
@@ -382,7 +381,6 @@ export function Navbar() {
                   { href: "/", label: "Home" },
                   { href: "/pubs", label: "Pubs" },
                   { href: "/blogs", label: "Blog" },
-                  { href: "/contact", label: "Contact" },
                 ].map(({ href, label }) => (
                   <Link
                     key={href}

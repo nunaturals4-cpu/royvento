@@ -266,9 +266,13 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
 
   // Deduct points immediately to prevent double-spend. Restored on payment failure.
+  // Rate: 100 pts = ₹10, i.e. 1 pt = ₹0.10
+  const POINTS_RUPEE_RATE = 0.10;
   const pointsToUse = Math.min(parsed.data.pointsToUse || 0, user.points);
-  const pointsCap = Math.max(0, totalPrice - discountAmount);
-  const pointsUsed = Math.min(pointsToUse, pointsCap);
+  const pointsCap = Math.max(0, totalPrice - discountAmount); // max ₹ deductible via points
+  const maxPointsFromCap = Math.floor(pointsCap / POINTS_RUPEE_RATE);
+  const pointsUsed = Math.min(pointsToUse, maxPointsFromCap); // points count consumed
+  const pointsDeduction = pointsUsed * POINTS_RUPEE_RATE;     // ₹ value deducted
   if (pointsUsed > 0) {
     await db
       .update(usersTable)
@@ -276,7 +280,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       .where(eq(usersTable.id, user.id));
   }
 
-  const finalPrice = Math.max(0, totalPrice - discountAmount - pointsUsed);
+  const finalPrice = Math.max(0, totalPrice - discountAmount - pointsDeduction);
 
   const wantsOnline = parsed.data.paymentMethod !== "cod";
   const usePhonePe = wantsOnline && isPhonePeConfigured() && finalPrice > 0;
@@ -1325,6 +1329,34 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   }
 
   const [out] = await serializeBookings([updated]);
+
+  // Award 100 loyalty points to the booking owner for attending the event
+  try {
+    const [owner] = await db
+      .select({ points: usersTable.points })
+      .from(usersTable)
+      .where(eq(usersTable.id, updated.userId))
+      .limit(1);
+    const [scanEvt] = await db
+      .select({ title: eventsTable.title })
+      .from(eventsTable)
+      .where(eq(eventsTable.id, updated.eventId))
+      .limit(1);
+    if (owner) {
+      await Promise.all([
+        db.update(usersTable)
+          .set({ points: owner.points + 100 })
+          .where(eq(usersTable.id, updated.userId)),
+        db.insert(notificationsTable).values({
+          userId: updated.userId,
+          title: "You earned 100 points!",
+          message: `You earned 100 points for attending "${scanEvt?.title ?? "this event"}"!`,
+        }),
+      ]);
+    }
+  } catch (err) {
+    req.log.error({ err, bookingId: updated.id }, "Failed to award scan-in loyalty points");
+  }
 
   // Ensure any coupon used on this booking is marked as used (idempotent — belt-and-suspenders for partner_lead codes)
   if (updated.couponCode) {

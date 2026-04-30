@@ -154,10 +154,11 @@ export function EventDetail() {
   const newUserPercent = discountInfo?.isNewUser && !couponState?.valid ? (discountInfo.bookingDiscountPercent || 0) : 0;
   const newUserDiscount = newUserPercent > 0 ? Math.round(subtotal * (newUserPercent / 100)) : 0;
   const discount = Math.max(couponDiscount, newUserDiscount);
+  const POINTS_RUPEE_RATE = 0.10; // 100 pts = ₹10
   const pointsCap = Math.max(0, subtotal - discount);
-  const pointsAvail = Math.min(discountInfo?.points ?? 0, pointsCap);
+  const pointsAvail = Math.min(discountInfo?.points ?? 0, Math.floor(pointsCap / POINTS_RUPEE_RATE));
   const pointsApplied = Math.min(pointsToUse, pointsAvail);
-  const finalTotal = Math.max(0, subtotal - discount - pointsApplied);
+  const finalTotal = Math.max(0, subtotal - discount - pointsApplied * POINTS_RUPEE_RATE);
 
   const startingAt = (() => {
     if (isPub) {
@@ -888,7 +889,7 @@ export function EventDetail() {
                 <div>
                   <Label htmlFor="ppoints" className="flex items-center gap-1.5">
                     <Coins className="h-3.5 w-3.5 text-primary" />
-                    Use points (1 pt = ₹1) — {discountInfo?.points ?? 0} available
+                    Use points (100 pts = ₹10) — {discountInfo?.points ?? 0} available
                   </Label>
                   <Input
                     id="ppoints"
@@ -968,7 +969,7 @@ export function EventDetail() {
                 {pointsApplied > 0 && (
                   <div className="flex items-center justify-between text-primary">
                     <span>Points</span>
-                    <span>– {formatINRExact(pointsApplied)}</span>
+                    <span>– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between font-semibold text-lg pt-1">

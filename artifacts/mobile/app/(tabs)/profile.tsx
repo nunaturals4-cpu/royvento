@@ -278,6 +278,9 @@ export default function ProfileScreen() {
               <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>
                 {referral.referralCount} referral{referral.referralCount !== 1 ? "s" : ""} · {referral.referralPoints} points
               </Text>
+              <Text style={[styles.referralSub, { color: colors.mutedForeground, fontSize: 10, marginTop: 2 }]}>
+                100 pts = ₹10
+              </Text>
             </View>
             <TouchableOpacity
               style={[styles.copyBtn, { backgroundColor: colors.muted }]}
@@ -376,7 +379,6 @@ export default function ProfileScreen() {
           { icon: "search-outline" as const, label: "Explore Events", onPress: () => router.push("/(tabs)/explore") },
           { icon: "newspaper-outline" as const, label: "Blog & Stories", onPress: () => router.push("/blogs") },
           { icon: "star-outline" as const, label: "Subscription / Premium", onPress: () => router.push("/subscription") },
-          { icon: "help-circle-outline" as const, label: "Contact Support", onPress: () => router.push("/contact") },
           {
             icon: "log-out-outline" as const,
             label: "Sign Out",
