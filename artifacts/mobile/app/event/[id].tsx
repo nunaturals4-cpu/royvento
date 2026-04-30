@@ -478,6 +478,35 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
+          {/* Free entry block (pub) */}
+          {isPub && (() => {
+            const fer = (event as unknown as { freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null })?.freeEntryRules;
+            if (!fer?.enabled) return null;
+            return (
+              <View style={[styles.freeEntryBox, { backgroundColor: "#052e16", borderColor: "#16a34a44" }]}>
+                <View style={styles.freeEntryHeader}>
+                  <View style={[styles.freeEntryDot, { backgroundColor: "#22c55e" }]} />
+                  <Text style={[styles.freeEntryTitle, { color: "#4ade80" }]}>Free Entry</Text>
+                </View>
+                {fer.genders.length > 0 && (
+                  <Text style={[styles.freeEntryLine, { color: "#86efac" }]}>
+                    For: {fer.genders.join(", ")}
+                  </Text>
+                )}
+                {fer.days.length > 0 && (
+                  <Text style={[styles.freeEntryLine, { color: "#86efac" }]}>
+                    Days: {fer.days.join(", ")}
+                  </Text>
+                )}
+                {fer.beforeTime && (
+                  <Text style={[styles.freeEntryLine, { color: "#86efac" }]}>
+                    Entry before: {fer.beforeTime}
+                  </Text>
+                )}
+              </View>
+            );
+          })()}
+
           {/* Description */}
           {event.description ? (
             <View style={{ gap: 6 }}>
@@ -1028,6 +1057,11 @@ const styles = StyleSheet.create({
   pubPriceItem: { alignItems: "center", gap: 3 },
   pubPriceLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
   pubPriceVal: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  freeEntryBox: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 6 },
+  freeEntryHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  freeEntryDot: { width: 8, height: 8, borderRadius: 4 },
+  freeEntryTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  freeEntryLine: { fontSize: 13, fontFamily: "Inter_400Regular" },
   sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
   description: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
   gallery: { flexDirection: "row", paddingHorizontal: 20, gap: 10 },

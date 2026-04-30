@@ -1111,10 +1111,10 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
     }
     return {};
   });
-  const [freeEntryEnabled, setFreeEntryEnabled] = useState<boolean>(!!(event as any).freeEntryRules?.enabled);
-  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>((event as any).freeEntryRules?.genders ?? []);
-  const [freeEntryDays, setFreeEntryDays] = useState<string[]>((event as any).freeEntryRules?.days ?? []);
-  const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>((event as any).freeEntryRules?.beforeTime ?? "");
+  const [freeEntryEnabled, setFreeEntryEnabled] = useState<boolean>(!!(event.freeEntryRules?.enabled));
+  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(event.freeEntryRules?.genders ?? []);
+  const [freeEntryDays, setFreeEntryDays] = useState<string[]>(event.freeEntryRules?.days ?? []);
+  const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>(event.freeEntryRules?.beforeTime ?? "");
   const { toast } = useToast();
   const isPub = event.type === "pub";
 

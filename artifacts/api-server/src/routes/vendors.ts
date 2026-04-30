@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, vendorsTable, usersTable } from "@workspace/db";
-import { eq, desc, and, ilike } from "drizzle-orm";
+import { db, vendorsTable, usersTable, eventsTable } from "@workspace/db";
+import { eq, desc, and, ilike, inArray } from "drizzle-orm";
 import {
   CreateMyVendorBody,
   UpdateMyVendorBody,
@@ -79,8 +79,35 @@ async function serializeVendor(v: VendorRow) {
   };
 }
 
+function parseFreeEntryRules(raw: unknown): { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (!r["enabled"]) return null;
+  return {
+    enabled: true,
+    genders: Array.isArray(r["genders"]) ? (r["genders"] as string[]) : [],
+    days: Array.isArray(r["days"]) ? (r["days"] as string[]) : [],
+    ...(typeof r["beforeTime"] === "string" && r["beforeTime"] ? { beforeTime: r["beforeTime"] } : {}),
+  };
+}
+
 async function serializeVendorList(rows: VendorRow[]) {
   const ratings = await getVendorRatings(rows.map((r) => r.id));
+
+  // Batch-fetch the pub event free entry rules for these vendors
+  const vendorIds = rows.map((r) => r.id);
+  const pubEvents = vendorIds.length > 0
+    ? await db.select({ vendorId: eventsTable.vendorId, freeEntryRules: eventsTable.freeEntryRules })
+        .from(eventsTable)
+        .where(and(inArray(eventsTable.vendorId, vendorIds), eq(eventsTable.type, "pub")))
+    : [];
+  const freeEntryByVendor = new Map<number, ReturnType<typeof parseFreeEntryRules>>();
+  for (const ev of pubEvents) {
+    if (ev.vendorId !== null && !freeEntryByVendor.has(ev.vendorId)) {
+      freeEntryByVendor.set(ev.vendorId, parseFreeEntryRules(ev.freeEntryRules));
+    }
+  }
+
   return rows.map((v) => {
     const r = ratings.get(v.id) ?? { rating: 0, reviewCount: 0 };
     return {
@@ -103,6 +130,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       rating: r.rating,
       reviewCount: r.reviewCount,
       createdAt: v.createdAt.toISOString(),
+      freeEntryRules: freeEntryByVendor.get(v.id) ?? null,
     };
   });
 }

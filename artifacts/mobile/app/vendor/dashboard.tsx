@@ -73,6 +73,13 @@ interface BlockedDate {
   source: string;
 }
 
+interface FreeEntryRules {
+  enabled: boolean;
+  genders: string[];
+  days: string[];
+  beforeTime?: string;
+}
+
 interface VendorEvent {
   id: number;
   title: string;
@@ -82,6 +89,7 @@ interface VendorEvent {
   price: number;
   capacity: number;
   imageUrl: string;
+  freeEntryRules?: FreeEntryRules | null;
 }
 
 // ─── Image upload helper ──────────────────────────────────────────────────────
@@ -282,7 +290,7 @@ export default function VendorDashboardScreen() {
   });
 
   function openEditModal(event: VendorEvent) {
-    const fer = (event as any).freeEntryRules;
+    const fer = event.freeEntryRules;
     setEditForm({
       title: event.title,
       description: event.description,

@@ -391,7 +391,7 @@ export function EventDetail() {
             </div>
           ) : null}
 
-          {isPub && (ev.freeEntryRules as any)?.enabled && (() => {
+          {isPub && ev.freeEntryRules?.enabled && (() => {
             const fer = ev.freeEntryRules as { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string };
             return (
               <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-5 space-y-3">

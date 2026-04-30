@@ -2,6 +2,13 @@ import { Link } from "wouter";
 import { Star, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+interface FreeEntryRules {
+  enabled: boolean;
+  genders: string[];
+  days: string[];
+  beforeTime?: string;
+}
+
 interface Props {
   vendor: {
     id: number;
@@ -11,14 +18,16 @@ interface Props {
     bannerImage: string;
     rating: number;
     reviewCount: number;
+    freeEntryRules?: FreeEntryRules | null;
   };
 }
 
 export function VendorCard({ vendor }: Props) {
+  const fer = vendor.freeEntryRules;
   return (
     <Link href={`/vendors/${vendor.id}`}>
       <div className="group cursor-pointer overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-1 hover:shadow-xl">
-        <div className="aspect-[16/10] overflow-hidden bg-muted">
+        <div className="aspect-[16/10] overflow-hidden bg-muted relative">
           {vendor.bannerImage ? (
             <img
               src={vendor.bannerImage}
@@ -27,6 +36,11 @@ export function VendorCard({ vendor }: Props) {
               loading="lazy"
             />
           ) : null}
+          {fer?.enabled && (
+            <span className="absolute top-2 left-2 bg-emerald-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow">
+              Free Entry{fer.genders.length > 0 ? ` · ${fer.genders.join(" & ")}` : ""}
+            </span>
+          )}
         </div>
         <div className="p-5 space-y-2">
           <div className="flex items-center justify-between">
