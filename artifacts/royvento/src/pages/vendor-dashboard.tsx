@@ -208,6 +208,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const selectSuggestion = async (s: PlacesSuggestion) => {
     setAddress(s.description);
     setAddressQuery(s.description);
+    setFetchedAddress("");
     setSuggestions([]);
     setShowSugg(false);
     try {
