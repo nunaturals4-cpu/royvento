@@ -78,12 +78,11 @@ export default function ProfileScreen() {
   const updateMeMutation = useUpdateMe({
     mutation: {
       onSuccess: async (updated) => {
-        const u = updated as unknown as { name: string; phone?: string; about?: string; profileImage?: string };
         await updateUser({
-          name: u.name,
-          phone: u.phone ?? undefined,
-          about: u.about ?? undefined,
-          profileImage: u.profileImage ?? undefined,
+          name: updated.name,
+          phone: updated.phone || undefined,
+          about: updated.about || undefined,
+          profileImage: updated.profileImage || undefined,
         });
         setEditModal(false);
         Alert.alert("Saved", "Profile updated successfully");
@@ -138,8 +137,8 @@ export default function ProfileScreen() {
       data: {
         name: editName.trim(),
         ...(phoneNormalized !== undefined ? { phone: phoneNormalized } : {}),
-        about: editAbout.trim() || undefined,
-        profileImage: editProfileImage || undefined,
+        about: editAbout.trim(),
+        profileImage: editProfileImage,
       },
     });
   };
