@@ -24,9 +24,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CityPickerSheet } from "@/components/CityPickerSheet";
 import { EventCard } from "@/components/EventCard";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
+import { useSelectedCity } from "@/context/CityContext";
 import { useColors } from "@/hooks/useColors";
 
 interface ChatMessage {
@@ -47,9 +49,24 @@ interface RecentAnnouncement {
   eventTitle: string;
 }
 
+function sortCityFirst<T extends { location?: string | null }>(
+  items: T[],
+  city: string
+): T[] {
+  if (!city) return items;
+  const lower = city.toLowerCase();
+  return [...items].sort((a, b) => {
+    const aMatch = (a.location ?? "").toLowerCase().includes(lower) ? 0 : 1;
+    const bMatch = (b.location ?? "").toLowerCase().includes(lower) ? 0 : 1;
+    return aMatch - bMatch;
+  });
+}
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { selectedCity, setSelectedCity } = useSelectedCity();
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -63,6 +80,9 @@ export default function HomeScreen() {
     queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/recent"),
     staleTime: 1000 * 60 * 5,
   });
+
+  const sortedPopular = sortCityFirst(popular.data ?? [], selectedCity);
+  const sortedFeatured = sortCityFirst(featured.data ?? [], selectedCity);
 
   const isLoading = featured.isLoading && popular.isLoading;
   const onRefresh = () => {
@@ -124,14 +144,52 @@ export default function HomeScreen() {
             <Ionicons name="search" size={18} color={colors.mutedForeground} />
           </Pressable>
         </View>
+        <TouchableOpacity
+          style={[
+            styles.cityChip,
+            {
+              backgroundColor: selectedCity ? colors.primary + "18" : colors.muted,
+              borderColor: selectedCity ? colors.primary : colors.border,
+            },
+          ]}
+          onPress={() => setCityPickerOpen(true)}
+          activeOpacity={0.75}
+        >
+          <Ionicons
+            name="location-outline"
+            size={13}
+            color={selectedCity ? colors.primary : colors.mutedForeground}
+          />
+          <Text
+            style={[
+              styles.cityChipText,
+              { color: selectedCity ? colors.primary : colors.mutedForeground },
+            ]}
+            numberOfLines={1}
+          >
+            {selectedCity || "All cities"}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={11}
+            color={selectedCity ? colors.primary : colors.mutedForeground}
+          />
+        </TouchableOpacity>
       </LinearGradient>
+
+      <CityPickerSheet
+        visible={cityPickerOpen}
+        onClose={() => setCityPickerOpen(false)}
+        selectedCity={selectedCity}
+        onSelect={setSelectedCity}
+      />
 
       {/* Popular Pubs — first */}
       {(popular.data?.length ?? 0) > 0 && (
         <Section title="Popular Pubs" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
           <FlatList
             horizontal
-            data={popular.data}
+            data={sortedPopular}
             keyExtractor={(item) => String(item.id)}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.row}
@@ -199,7 +257,7 @@ export default function HomeScreen() {
         <Section title="Featured Events" onSeeAll={() => router.push("/(tabs)/explore")}>
           <FlatList
             horizontal
-            data={featured.data}
+            data={sortedFeatured}
             keyExtractor={(item) => String(item.id)}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.row}
@@ -351,6 +409,22 @@ const styles = StyleSheet.create({
   hero: {
     paddingBottom: 16,
     paddingHorizontal: 20,
+    gap: 10,
+  },
+  cityChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  cityChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    maxWidth: 140,
   },
   heroInner: {
     flexDirection: "row",

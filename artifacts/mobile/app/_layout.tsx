@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { CityProvider } from "@/context/CityContext";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
 
 SplashScreen.preventAutoHideAsync();
@@ -203,6 +204,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider onAfterLogout={() => queryClient.clear()}>
+          <CityProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <StatusBar style="light" backgroundColor="#0e0d12" />
@@ -226,6 +228,7 @@ export default function RootLayout() {
               </Stack>
             </KeyboardProvider>
           </GestureHandlerRootView>
+          </CityProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
