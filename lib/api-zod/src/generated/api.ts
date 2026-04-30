@@ -235,6 +235,19 @@ export const ListVendorsResponseItem = zod.object({
   city: zod.string(),
   state: zod.string(),
   country: zod.string(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 
@@ -263,6 +276,21 @@ export const GetMyVendorResponse = zod.object({
       city: zod.string(),
       state: zod.string(),
       country: zod.string(),
+      freeEntryRules: zod
+        .object({
+          enabled: zod.boolean(),
+          genders: zod.array(
+            zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+          ),
+          days: zod.array(
+            zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+          ),
+          beforeTime: zod
+            .string()
+            .optional()
+            .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+        })
+        .optional(),
     }),
     zod.null(),
   ]),
@@ -304,6 +332,19 @@ export const CreateMyVendorResponse = zod.object({
   city: zod.string(),
   state: zod.string(),
   country: zod.string(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 
 /**
@@ -342,6 +383,19 @@ export const UpdateMyVendorResponse = zod.object({
   city: zod.string(),
   state: zod.string(),
   country: zod.string(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 
 /**
@@ -371,6 +425,19 @@ export const GetVendorResponse = zod.object({
   city: zod.string(),
   state: zod.string(),
   country: zod.string(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 
 /**
@@ -396,6 +463,19 @@ export const ListPendingVendorsResponseItem = zod.object({
   city: zod.string(),
   state: zod.string(),
   country: zod.string(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 export const ListPendingVendorsResponse = zod.array(
   ListPendingVendorsResponseItem,
@@ -428,6 +508,19 @@ export const ApproveVendorResponse = zod.object({
   city: zod.string(),
   state: zod.string(),
   country: zod.string(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 
 /**
@@ -457,6 +550,19 @@ export const RejectVendorResponse = zod.object({
   city: zod.string(),
   state: zod.string(),
   country: zod.string(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 
 /**
@@ -507,6 +613,19 @@ export const ListEventsResponseItem = zod.object({
       }),
     )
     .optional(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
 
@@ -523,6 +642,19 @@ export const CreateEventBody = zod.object({
   imageUrl: zod.string().optional(),
   galleryImages: zod.array(zod.string()).optional(),
   galleryVideos: zod.array(zod.string()).optional(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 
 export const CreateEventResponse = zod.object({
@@ -556,6 +688,19 @@ export const CreateEventResponse = zod.object({
         couple: zod.number().optional(),
       }),
     )
+    .optional(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
     .optional(),
 });
 
@@ -593,6 +738,19 @@ export const ListFeaturedEventsResponseItem = zod.object({
         couple: zod.number().optional(),
       }),
     )
+    .optional(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
     .optional(),
 });
 export const ListFeaturedEventsResponse = zod.array(
@@ -639,6 +797,19 @@ export const GetEventResponse = zod
         }),
       )
       .optional(),
+    freeEntryRules: zod
+      .object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      })
+      .optional(),
   })
   .and(
     zod.object({
@@ -662,6 +833,23 @@ export const GetEventResponse = zod
         city: zod.string(),
         state: zod.string(),
         country: zod.string(),
+        freeEntryRules: zod
+          .object({
+            enabled: zod.boolean(),
+            genders: zod.array(
+              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+            ),
+            days: zod.array(
+              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+            ),
+            beforeTime: zod
+              .string()
+              .optional()
+              .describe(
+                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+              ),
+          })
+          .optional(),
       }),
     }),
   );
@@ -683,6 +871,19 @@ export const UpdateEventBody = zod.object({
   imageUrl: zod.string().optional(),
   galleryImages: zod.array(zod.string()).optional(),
   galleryVideos: zod.array(zod.string()).optional(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
+    .optional(),
 });
 
 export const UpdateEventResponse = zod.object({
@@ -716,6 +917,19 @@ export const UpdateEventResponse = zod.object({
         couple: zod.number().optional(),
       }),
     )
+    .optional(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
     .optional(),
 });
 
@@ -764,6 +978,19 @@ export const ListMyVendorEventsResponseItem = zod.object({
         couple: zod.number().optional(),
       }),
     )
+    .optional(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean(),
+      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+      days: zod.array(
+        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+      ),
+      beforeTime: zod
+        .string()
+        .optional()
+        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+    })
     .optional(),
 });
 export const ListMyVendorEventsResponse = zod.array(
@@ -1460,6 +1687,19 @@ export const GetWishlistResponseItem = zod
           couple: zod.number().optional(),
         }),
       )
+      .optional(),
+    freeEntryRules: zod
+      .object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      })
       .optional(),
   })
   .and(

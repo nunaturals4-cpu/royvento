@@ -5,6 +5,37 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+export type FreeEntryRulesGendersItem =
+  (typeof FreeEntryRulesGendersItem)[keyof typeof FreeEntryRulesGendersItem];
+
+export const FreeEntryRulesGendersItem = {
+  Everyone: "Everyone",
+  Ladies: "Ladies",
+  Men: "Men",
+  Couples: "Couples",
+} as const;
+
+export type FreeEntryRulesDaysItem =
+  (typeof FreeEntryRulesDaysItem)[keyof typeof FreeEntryRulesDaysItem];
+
+export const FreeEntryRulesDaysItem = {
+  Mon: "Mon",
+  Tue: "Tue",
+  Wed: "Wed",
+  Thu: "Thu",
+  Fri: "Fri",
+  Sat: "Sat",
+  Sun: "Sun",
+} as const;
+
+export interface FreeEntryRules {
+  enabled: boolean;
+  genders: FreeEntryRulesGendersItem[];
+  days: FreeEntryRulesDaysItem[];
+  /** Entry cutoff time in 24-hour HH:mm format, e.g. 22:00 */
+  beforeTime?: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -105,6 +136,7 @@ export interface Vendor {
   city: string;
   state: string;
   country: string;
+  freeEntryRules?: FreeEntryRules;
 }
 
 export interface MyVendorResponse {
@@ -168,6 +200,7 @@ export interface Event {
   approvalStatus: string;
   pubEventTypes?: string[];
   dayPricing?: EventDayPricing;
+  freeEntryRules?: FreeEntryRules;
 }
 
 export type EventDetail = Event & {
@@ -184,6 +217,7 @@ export interface CreateEventBody {
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
+  freeEntryRules?: FreeEntryRules;
 }
 
 export interface UpdateEventBody {
@@ -196,6 +230,7 @@ export interface UpdateEventBody {
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
+  freeEntryRules?: FreeEntryRules;
 }
 
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];

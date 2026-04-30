@@ -14,6 +14,8 @@ import {
   useUpdateBookingStatus,
   useUpdateEvent,
   useUpdateMyVendor,
+  type FreeEntryRulesGendersItem,
+  type FreeEntryRulesDaysItem,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -75,8 +77,8 @@ interface BlockedDate {
 
 interface FreeEntryRules {
   enabled: boolean;
-  genders: string[];
-  days: string[];
+  genders: FreeEntryRulesGendersItem[];
+  days: FreeEntryRulesDaysItem[];
   beforeTime?: string;
 }
 
@@ -146,8 +148,8 @@ interface EventFormState {
   imageUrl: string;
   imageUri: string;  // local URI for preview before upload
   freeEntryEnabled: boolean;
-  freeEntryGenders: string[];
-  freeEntryDays: string[];
+  freeEntryGenders: FreeEntryRulesGendersItem[];
+  freeEntryDays: FreeEntryRulesDaysItem[];
   freeEntryBeforeTime: string;
 }
 
@@ -794,7 +796,7 @@ export default function VendorDashboardScreen() {
               <>
                 <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Free for which genders?</Text>
                 <View style={styles.chipRow}>
-                  {["Everyone", "Ladies", "Men", "Couples"].map((g) => (
+                  {(["Everyone", "Ladies", "Men", "Couples"] as const).map((g) => (
                     <TouchableOpacity
                       key={g}
                       style={[styles.chip, {
@@ -815,7 +817,7 @@ export default function VendorDashboardScreen() {
 
                 <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Valid on which days?</Text>
                 <View style={styles.chipRow}>
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                  {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map((d) => (
                     <TouchableOpacity
                       key={d}
                       style={[styles.chip, {
@@ -834,12 +836,12 @@ export default function VendorDashboardScreen() {
                   ))}
                 </View>
 
-                <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Before time (optional)</Text>
+                <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Before time (optional, 24-hour format)</Text>
                 <TextInput
                   style={[styles.fieldInput, { color: colors.foreground, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }]}
                   value={form.freeEntryBeforeTime}
                   onChangeText={(v) => setForm((p) => ({ ...p, freeEntryBeforeTime: v }))}
-                  placeholder="e.g. 10:00 PM"
+                  placeholder="e.g. 22:00"
                   placeholderTextColor={colors.mutedForeground}
                 />
               </>

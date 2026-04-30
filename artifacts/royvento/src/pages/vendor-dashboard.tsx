@@ -1023,8 +1023,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs text-white/60 mb-1 block">Before time (optional, e.g. 10:00 PM)</Label>
-                  <Input value={freeEntryBeforeTime} onChange={(e) => setFreeEntryBeforeTime(e.target.value)} placeholder="e.g. 10:00 PM" className="bg-black/40 border-white/10 text-sm max-w-xs" />
+                  <Label className="text-xs text-white/60 mb-1 block">Before time (optional, 24-hour format)</Label>
+                  <Input value={freeEntryBeforeTime} onChange={(e) => setFreeEntryBeforeTime(e.target.value)} placeholder="e.g. 22:00" className="bg-black/40 border-white/10 text-sm max-w-xs" />
                 </div>
               </div>
             )}
@@ -1366,8 +1366,8 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs text-white/60 mb-1 block">Before time (optional, e.g. 10:00 PM)</Label>
-                    <Input value={freeEntryBeforeTime} onChange={(e) => setFreeEntryBeforeTime(e.target.value)} placeholder="e.g. 10:00 PM" className="bg-black/40 border-white/10 text-sm max-w-xs" />
+                    <Label className="text-xs text-white/60 mb-1 block">Before time (optional, 24-hour format)</Label>
+                    <Input value={freeEntryBeforeTime} onChange={(e) => setFreeEntryBeforeTime(e.target.value)} placeholder="e.g. 22:00" className="bg-black/40 border-white/10 text-sm max-w-xs" />
                   </div>
                 </div>
               )}

@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { FreeEntryRules } from "./freeEntryRules";
 import type { VendorDayHours } from "./vendorDayHours";
 import type { VendorStatus } from "./vendorStatus";
 
@@ -28,4 +29,5 @@ export interface Vendor {
   city: string;
   state: string;
   country: string;
+  freeEntryRules?: FreeEntryRules;
 }

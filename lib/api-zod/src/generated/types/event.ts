@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EventDayPricing } from "./eventDayPricing";
+import type { FreeEntryRules } from "./freeEntryRules";
 
 export interface Event {
   id: number;
@@ -30,4 +31,5 @@ export interface Event {
   approvalStatus: string;
   pubEventTypes?: string[];
   dayPricing?: EventDayPricing;
+  freeEntryRules?: FreeEntryRules;
 }

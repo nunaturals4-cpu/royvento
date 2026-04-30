@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { FreeEntryRules } from "./freeEntryRules";
 
 export interface CreateEventBody {
   title: string;
@@ -16,4 +17,5 @@ export interface CreateEventBody {
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
+  freeEntryRules?: FreeEntryRules;
 }

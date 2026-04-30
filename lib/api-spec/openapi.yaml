@@ -1138,6 +1138,26 @@ paths:
 
 components:
   schemas:
+    FreeEntryRules:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        genders:
+          type: array
+          items:
+            type: string
+            enum: [Everyone, Ladies, Men, Couples]
+        days:
+          type: array
+          items:
+            type: string
+            enum: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+        beforeTime:
+          type: string
+          description: "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"
+      required: [enabled, genders, days]
+
     HealthStatus:
       type: object
       properties:
@@ -1300,6 +1320,8 @@ components:
           type: string
         country:
           type: string
+        freeEntryRules:
+          $ref: "#/components/schemas/FreeEntryRules"
       required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state, country]
 
     MyVendorResponse:
@@ -1426,6 +1448,8 @@ components:
                 type: number
               couple:
                 type: number
+        freeEntryRules:
+          $ref: "#/components/schemas/FreeEntryRules"
       required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus]
 
     EventDetail:
@@ -1462,6 +1486,8 @@ components:
           type: array
           items:
             type: string
+        freeEntryRules:
+          $ref: "#/components/schemas/FreeEntryRules"
       required: [title, description, category, location, price, capacity]
 
     UpdateEventBody:
@@ -1489,6 +1515,8 @@ components:
           type: array
           items:
             type: string
+        freeEntryRules:
+          $ref: "#/components/schemas/FreeEntryRules"
 
     BookingStatus:
       type: string
