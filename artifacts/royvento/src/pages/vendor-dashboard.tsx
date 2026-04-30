@@ -371,6 +371,8 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
                     setAddressMode(value);
                     if (value === "manual") {
                       setSuggestions([]); setShowSugg(false); setFetchedAddress("");
+                    } else {
+                      setAddressQuery(address);
                     }
                   }}
                   className="accent-primary"
