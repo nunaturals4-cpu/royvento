@@ -1903,7 +1903,14 @@ function LeadsPanel() {
   const { toast } = useToast();
 
   useEffect(() => {
-    apiGet<Lead>("/api/partner/leads/me").then(setData).catch(() => {});
+    apiGet<Lead>("/api/partner/leads/me").then((d) => {
+      setData(d);
+      const initial: Record<number, string> = {};
+      (d.views ?? []).forEach((v: any) => {
+        if (v.existingCode) initial[v.id] = v.existingCode;
+      });
+      setSentCodes(initial);
+    }).catch(() => {});
   }, []);
 
   const sendDiscount = async (viewId: number) => {

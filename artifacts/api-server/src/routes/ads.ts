@@ -227,6 +227,23 @@ router.get(
       : [];
     const uMap = new Map(users.map((u) => [u.id, u]));
 
+    // Pre-load any partner_lead coupons already sent to these viewers by this vendor
+    const existingCouponMap = new Map<number, string>();
+    if (ids.length) {
+      const existingCoupons = await db
+        .select({ userId: couponsTable.userId, code: couponsTable.code })
+        .from(couponsTable)
+        .where(
+          and(
+            inArray(couponsTable.userId, ids),
+            eq(couponsTable.vendorId, vendor.id),
+            eq(couponsTable.source, "partner_lead"),
+            eq(couponsTable.used, false),
+          ),
+        );
+      existingCoupons.forEach((c) => existingCouponMap.set(c.userId, c.code));
+    }
+
     // Determine which known viewers have already booked one of this vendor's events
     const bookedUserIds = new Set<number>();
     if (ids.length) {
@@ -261,6 +278,7 @@ router.get(
           viewerName: u?.name ?? r.viewerName ?? "Anonymous",
           viewerEmail: u?.email ?? r.viewerEmail ?? "",
           hasBooked: r.viewerUserId ? bookedUserIds.has(r.viewerUserId) : false,
+          existingCode: r.viewerUserId ? (existingCouponMap.get(r.viewerUserId) ?? null) : null,
         };
       }),
     });

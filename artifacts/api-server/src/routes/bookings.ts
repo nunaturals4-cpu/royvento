@@ -1328,10 +1328,14 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   // Ensure any coupon used on this booking is marked as used (idempotent — belt-and-suspenders for partner_lead codes)
   if (updated.couponCode) {
-    db.update(couponsTable)
-      .set({ used: true })
-      .where(and(eq(couponsTable.code, updated.couponCode), eq(couponsTable.used, false)))
-      .catch(() => {});
+    try {
+      await db
+        .update(couponsTable)
+        .set({ used: true })
+        .where(and(eq(couponsTable.code, updated.couponCode), eq(couponsTable.used, false)));
+    } catch (err) {
+      req.log.error({ err, couponCode: updated.couponCode }, "Failed to mark coupon used at scan time");
+    }
   }
 
   // Fire-and-forget ticket-scanned email to the customer

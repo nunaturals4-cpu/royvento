@@ -286,7 +286,7 @@ export const couponsTable = pgTable(
     discountPercent: integer("discount_percent").notNull().default(10),
     used: boolean("used").notNull().default(false),
     source: varchar("source", { length: 30 }).notNull().default("admin_grant"),
-    vendorId: integer("vendor_id"),
+    vendorId: integer("vendor_id").references(() => vendorsTable.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
