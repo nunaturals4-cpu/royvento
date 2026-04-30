@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useEffect, useMemo, useState } from "react";
+import { useSelectedCity } from "@/components/LocationContext";
 import {
   ArrowRight,
   Calendar,
@@ -60,32 +61,12 @@ export function Home() {
   const [popular, setPopular] = useState<PublicEvent[]>([]);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [userCity, setUserCity] = useState("");
+  const { selectedCity: userCity } = useSelectedCity();
 
   useEffect(() => {
     apiGet<PublicEvent[]>("/api/events/popular").then(setPopular).catch(() => {});
     apiGet<PublicEvent[]>("/api/events?type=pub").then((r) => setPubs(r.slice(0, 6))).catch(() => {});
     apiGet<Announcement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
-
-    navigator.geolocation?.getCurrentPosition(
-      async (pos) => {
-        try {
-          const r = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
-            { headers: { "Accept-Language": "en" } }
-          );
-          const data = await r.json();
-          const raw =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.state_district ||
-            data.address?.state ||
-            "";
-          if (raw) setUserCity(raw.split(",")[0].trim());
-        } catch {}
-      },
-      () => {}
-    );
   }, []);
 
   const sortedPopular = useMemo(() => sortCityFirst(popular, userCity), [popular, userCity]);

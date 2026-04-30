@@ -36,6 +36,7 @@ import { PaymentResult } from "@/pages/payment-result";
 
 import { RequireAuth } from "@/components/RequireAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { LocationProvider } from "@/components/LocationContext";
 
 const queryClient = new QueryClient();
 
@@ -121,12 +122,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
+        <LocationProvider>
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </LocationProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
