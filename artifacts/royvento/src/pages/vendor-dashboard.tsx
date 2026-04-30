@@ -1003,7 +1003,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
                 <div>
                   <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
                   <div className="flex flex-wrap gap-2">
-                    {["Ladies", "Men", "Couples"].map((g) => (
+                    {["Everyone", "Ladies", "Men", "Couples"].map((g) => (
                       <button key={g} type="button"
                         onClick={() => setFreeEntryGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g])}
                         className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(g) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
@@ -1346,7 +1346,7 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
                   <div>
                     <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
                     <div className="flex flex-wrap gap-2">
-                      {["Ladies", "Men", "Couples"].map((g) => (
+                      {["Everyone", "Ladies", "Men", "Couples"].map((g) => (
                         <button key={g} type="button"
                           onClick={() => setFreeEntryGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g])}
                           className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(g) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}

@@ -794,7 +794,7 @@ export default function VendorDashboardScreen() {
               <>
                 <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Free for which genders?</Text>
                 <View style={styles.chipRow}>
-                  {["Ladies", "Men", "Couples"].map((g) => (
+                  {["Everyone", "Ladies", "Men", "Couples"].map((g) => (
                     <TouchableOpacity
                       key={g}
                       style={[styles.chip, {
