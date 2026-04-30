@@ -19,6 +19,8 @@ export function VendorDetail() {
   if (!vendor) return <div className="container mx-auto px-4 py-20">Partner not found.</div>;
 
   const events = allEvents.filter((e) => e.vendorId === vendor.id);
+  const pubEvent = events.find((e) => e.type === "pub");
+  const pubEventTypes: string[] = pubEvent?.pubEventTypes ?? [];
 
   return (
     <div>
@@ -235,6 +237,22 @@ export function VendorDetail() {
               <Navigation className="h-3.5 w-3.5" />
               {vendor.address} — Open in Google Maps ↗
             </a>
+          </section>
+        )}
+
+        {pubEventTypes.length > 0 && (
+          <section>
+            <h2 className="font-serif text-2xl mb-4">What we host</h2>
+            <div className="flex flex-wrap gap-2">
+              {pubEventTypes.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
           </section>
         )}
 

@@ -496,6 +496,7 @@ export const ListEventsResponseItem = zod.object({
   priceMen: zod.number(),
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
+  pubEventTypes: zod.array(zod.string()),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
 
@@ -535,6 +536,7 @@ export const CreateEventResponse = zod.object({
   priceMen: zod.number(),
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
+  pubEventTypes: zod.array(zod.string()),
 });
 
 /**
@@ -561,6 +563,7 @@ export const ListFeaturedEventsResponseItem = zod.object({
   priceMen: zod.number(),
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
+  pubEventTypes: zod.array(zod.string()),
 });
 export const ListFeaturedEventsResponse = zod.array(
   ListFeaturedEventsResponseItem,
@@ -595,6 +598,7 @@ export const GetEventResponse = zod
     priceMen: zod.number(),
     priceCouple: zod.number(),
     approvalStatus: zod.string(),
+    pubEventTypes: zod.array(zod.string()),
   })
   .and(
     zod.object({
@@ -662,6 +666,7 @@ export const UpdateEventResponse = zod.object({
   priceMen: zod.number(),
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
+  pubEventTypes: zod.array(zod.string()),
 });
 
 /**
@@ -699,6 +704,7 @@ export const ListMyVendorEventsResponseItem = zod.object({
   priceMen: zod.number(),
   priceCouple: zod.number(),
   approvalStatus: zod.string(),
+  pubEventTypes: zod.array(zod.string()),
 });
 export const ListMyVendorEventsResponse = zod.array(
   ListMyVendorEventsResponseItem,
@@ -1263,6 +1269,7 @@ export const GetWishlistResponseItem = zod
     priceMen: zod.number(),
     priceCouple: zod.number(),
     approvalStatus: zod.string(),
+    pubEventTypes: zod.array(zod.string()),
   })
   .and(
     zod.object({

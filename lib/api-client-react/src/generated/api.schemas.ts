@@ -158,6 +158,7 @@ export interface Event {
   priceMen: number;
   priceCouple: number;
   approvalStatus: string;
+  pubEventTypes: string[];
 }
 
 export type EventDetail = Event & {

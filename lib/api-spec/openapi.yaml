@@ -1349,7 +1349,11 @@ components:
           type: number
         approvalStatus:
           type: string
-      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus]
+        pubEventTypes:
+          type: array
+          items:
+            type: string
+      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus, pubEventTypes]
 
     EventDetail:
       allOf:

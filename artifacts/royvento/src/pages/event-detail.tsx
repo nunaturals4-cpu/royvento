@@ -373,6 +373,19 @@ export function EventDetail() {
             <div className="flex items-center gap-2"><Star className="h-4 w-4 fill-primary text-primary" />{event.rating > 0 ? `${event.rating.toFixed(1)} (${event.reviewCount})` : "New"}</div>
           </div>
 
+          {isPub && (ev.pubEventTypes as string[] | undefined)?.length ? (
+            <div className="flex flex-wrap gap-2">
+              {(ev.pubEventTypes as string[]).map((t: string) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
           {isPub && vendorDayHours && (() => {
             const DAY_ORDER_h = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
             const DAY_FULL_h: Record<string, string> = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
