@@ -47,7 +47,10 @@ export function EventDetail() {
     enabled: !!vendorId,
   });
 
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [guests, setGuests] = useState(1);
   const [notes, setNotes] = useState("");
   const [personName, setPersonName] = useState("");
@@ -969,10 +972,12 @@ export function EventDetail() {
                 )}
               </div>}
 
-              <div>
-                <Label htmlFor="notes">{t("events.notes_label")}</Label>
-                <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("events.notes_placeholder")} className="bg-black/40 border-white/10 mt-1" />
-              </div>
+              {!isFreeEntryDay && (
+                <div>
+                  <Label htmlFor="notes">{t("events.notes_label")}</Label>
+                  <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("events.notes_placeholder")} className="bg-black/40 border-white/10 mt-1" />
+                </div>
+              )}
               {!isFreeEntryDay && (
                 <div className="space-y-1.5 border-t border-white/10 pt-3 text-sm">
                   <div className="flex items-center justify-between text-muted-foreground">
