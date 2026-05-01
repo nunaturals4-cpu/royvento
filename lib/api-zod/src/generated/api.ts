@@ -601,6 +601,170 @@ export const RejectVendorResponse = zod.object({
 });
 
 /**
+ * @summary Get drink plans for a vendor
+ */
+export const ListVendorDrinkPlansParams = zod.object({
+  vendorId: zod.coerce.number(),
+});
+
+export const listVendorDrinkPlansResponseLineItemsItemDiscountedPriceMin = 0;
+
+export const ListVendorDrinkPlansResponseItem = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+  productName: zod.string(),
+  gender: zod.enum(["all", "female"]),
+  price: zod.number(),
+  days: zod.array(zod.string()),
+  timeFrom: zod.string(),
+  timeTo: zod.string(),
+  description: zod.string(),
+  lineItems: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        qty: zod.number().min(1),
+        discountedPrice: zod
+          .number()
+          .min(listVendorDrinkPlansResponseLineItemsItemDiscountedPriceMin),
+      }),
+    )
+    .nullish(),
+  createdAt: zod.string(),
+});
+export const ListVendorDrinkPlansResponse = zod.array(
+  ListVendorDrinkPlansResponseItem,
+);
+
+/**
+ * @summary Create a drink plan (vendor)
+ */
+export const createDrinkPlanBodyPriceMin = 0;
+
+export const createDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
+
+export const CreateDrinkPlanBody = zod.object({
+  type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+  productName: zod.string().optional(),
+  gender: zod.enum(["all", "female"]).optional(),
+  price: zod.number().min(createDrinkPlanBodyPriceMin).optional(),
+  days: zod.array(zod.string()).optional(),
+  timeFrom: zod.string().optional(),
+  timeTo: zod.string().optional(),
+  description: zod.string().optional(),
+  lineItems: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        qty: zod.number().min(1),
+        discountedPrice: zod
+          .number()
+          .min(createDrinkPlanBodyLineItemsItemDiscountedPriceMin),
+      }),
+    )
+    .nullish(),
+});
+
+export const createDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
+
+export const CreateDrinkPlanResponse = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+  productName: zod.string(),
+  gender: zod.enum(["all", "female"]),
+  price: zod.number(),
+  days: zod.array(zod.string()),
+  timeFrom: zod.string(),
+  timeTo: zod.string(),
+  description: zod.string(),
+  lineItems: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        qty: zod.number().min(1),
+        discountedPrice: zod
+          .number()
+          .min(createDrinkPlanResponseLineItemsItemDiscountedPriceMin),
+      }),
+    )
+    .nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Update a drink plan (vendor)
+ */
+export const UpdateDrinkPlanParams = zod.object({
+  planId: zod.coerce.number(),
+});
+
+export const updateDrinkPlanBodyPriceMin = 0;
+
+export const updateDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
+
+export const UpdateDrinkPlanBody = zod.object({
+  type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+  productName: zod.string().optional(),
+  gender: zod.enum(["all", "female"]).optional(),
+  price: zod.number().min(updateDrinkPlanBodyPriceMin).optional(),
+  days: zod.array(zod.string()).optional(),
+  timeFrom: zod.string().optional(),
+  timeTo: zod.string().optional(),
+  description: zod.string().optional(),
+  lineItems: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        qty: zod.number().min(1),
+        discountedPrice: zod
+          .number()
+          .min(updateDrinkPlanBodyLineItemsItemDiscountedPriceMin),
+      }),
+    )
+    .nullish(),
+});
+
+export const updateDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
+
+export const UpdateDrinkPlanResponse = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+  productName: zod.string(),
+  gender: zod.enum(["all", "female"]),
+  price: zod.number(),
+  days: zod.array(zod.string()),
+  timeFrom: zod.string(),
+  timeTo: zod.string(),
+  description: zod.string(),
+  lineItems: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        qty: zod.number().min(1),
+        discountedPrice: zod
+          .number()
+          .min(updateDrinkPlanResponseLineItemsItemDiscountedPriceMin),
+      }),
+    )
+    .nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete a drink plan (vendor)
+ */
+export const DeleteDrinkPlanParams = zod.object({
+  planId: zod.coerce.number(),
+});
+
+export const DeleteDrinkPlanResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
  * @summary List events (supports optional pagination via page param)
  */
 export const ListEventsQueryParams = zod.object({

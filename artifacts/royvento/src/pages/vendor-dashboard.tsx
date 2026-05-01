@@ -2437,19 +2437,24 @@ function LeadsPanel() {
   );
 }
 
-const PLAN_TYPES = [
-  { value: "welcome", label: "Welcome Drink" },
-  { value: "unlimited", label: "Unlimited Drinks" },
-  { value: "ticket", label: "Included with Ticket" },
-  { value: "custom", label: "Custom Package" },
-] as const;
-
 const PLAN_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const PLAN_TYPE_BADGE: Record<string, string> = {
+  welcome: "Free Drink",
+  unlimited: "Unlimited Drinks",
+  ticket: "Included with Ticket",
+  custom: "Custom Package",
+};
+
+interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number; }
 
 interface DrinkPlan {
   id: number; vendorId: number; type: string; productName: string; gender: string;
   price: number; days: string[]; timeFrom: string; timeTo: string; description: string; createdAt: string;
+  lineItems?: DrinkPlanLineItem[] | null;
 }
+
+const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: 0 });
 
 function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const { toast } = useToast();
@@ -2460,19 +2465,26 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
-  const [type, setType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
-  const [productName, setProductName] = useState("");
-  const [gender, setGender] = useState<"all" | "female">("all");
-  const [price, setPrice] = useState("0");
+  // Add form — Free Entry section
+  const [freeEntryChecked, setFreeEntryChecked] = useState(false);
+  const [feDrinkType, setFeDrinkType] = useState<"welcome" | "unlimited">("welcome");
+  const [feGender, setFeGender] = useState<"all" | "female">("all");
+
+  // Add form — Included with Ticket section
+  const [ticketChecked, setTicketChecked] = useState(false);
+  const [ticketItems, setTicketItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
+
+  // Common fields for add form
   const [days, setDays] = useState<string[]>([]);
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [description, setDescription] = useState("");
 
+  // Edit form state
   const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
   const [editProductName, setEditProductName] = useState("");
   const [editGender, setEditGender] = useState<"all" | "female">("all");
-  const [editPrice, setEditPrice] = useState("0");
+  const [editItems, setEditItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
   const [editDays, setEditDays] = useState<string[]>([]);
   const [editTimeFrom, setEditTimeFrom] = useState("");
   const [editTimeTo, setEditTimeTo] = useState("");
@@ -2502,7 +2514,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
   const resetForm = () => {
-    setType("welcome"); setProductName(""); setGender("all"); setPrice("0");
+    setFreeEntryChecked(false); setFeDrinkType("welcome"); setFeGender("all");
+    setTicketChecked(false); setTicketItems([emptyItem()]);
     setDays([]); setTimeFrom(""); setTimeTo(""); setDescription("");
   };
 
@@ -2511,7 +2524,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditType(plan.type as typeof editType);
     setEditProductName(plan.productName);
     setEditGender(plan.gender as typeof editGender);
-    setEditPrice(String(plan.price / 100));
+    setEditItems(plan.lineItems?.length ? plan.lineItems : [emptyItem()]);
     setEditDays(plan.days);
     setEditTimeFrom(plan.timeFrom);
     setEditTimeTo(plan.timeTo);
@@ -2522,17 +2535,28 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productName.trim()) {
-      toast({ title: "Product name is required", variant: "destructive" }); return;
+    if (!freeEntryChecked && !ticketChecked) {
+      toast({ title: "Select at least one plan type", variant: "destructive" }); return;
     }
-    const priceInt = Math.max(0, Math.round(parseFloat(price || "0") * 100));
+    if (ticketChecked && ticketItems.some((i) => !i.name.trim())) {
+      toast({ title: "Each ticket item must have a name", variant: "destructive" }); return;
+    }
     setSaving(true);
     try {
-      await apiPost("/api/vendors/me/drink-plans", {
-        type, productName: productName.trim(), gender, price: priceInt,
-        days, timeFrom, timeTo, description: description.trim(),
-      });
-      toast({ title: "Drink plan added" });
+      const common = { days, timeFrom, timeTo, description: description.trim() };
+      if (freeEntryChecked) {
+        await apiPost("/api/vendors/me/drink-plans", {
+          type: feDrinkType, productName: feDrinkType === "welcome" ? "Free Drink" : "Unlimited Drinks",
+          gender: feGender, price: 0, lineItems: null, ...common,
+        });
+      }
+      if (ticketChecked) {
+        await apiPost("/api/vendors/me/drink-plans", {
+          type: "ticket", productName: "Included with Ticket", gender: "all", price: 0,
+          lineItems: ticketItems.filter((i) => i.name.trim()), ...common,
+        });
+      }
+      toast({ title: "Drink plan(s) added" });
       resetForm();
       await fetchPlans();
     } catch (err: unknown) {
@@ -2544,15 +2568,20 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editProductName.trim()) {
-      toast({ title: "Product name is required", variant: "destructive" }); return;
+    if (editType === "ticket" && editItems.some((i) => !i.name.trim())) {
+      toast({ title: "Each item must have a name", variant: "destructive" }); return;
     }
-    const priceInt = Math.max(0, Math.round(parseFloat(editPrice || "0") * 100));
     setEditSaving(true);
     try {
+      const isTicket = editType === "ticket";
+      const isFreeEntry = editType === "welcome" || editType === "unlimited";
       const updated: DrinkPlan = await apiPatch(`/api/vendors/me/drink-plans/${editingId}`, {
-        type: editType, productName: editProductName.trim(), gender: editGender,
-        price: priceInt, days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
+        type: editType,
+        productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
+        gender: isFreeEntry ? editGender : "all",
+        price: 0,
+        lineItems: isTicket ? editItems.filter((i) => i.name.trim()) : null,
+        days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
         description: editDescription.trim(),
       });
       setPlans((prev) => prev.map((p) => p.id === editingId ? updated : p));
@@ -2578,17 +2607,69 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     }
   };
 
-  const fmtPrice = (priceCents: number) =>
-    priceCents === 0 ? "Free" : `₹${(priceCents / 100).toFixed(0)}`;
-
   const fmtTime = (hhmm: string) => {
     if (!hhmm) return "";
     const [h, m] = hhmm.split(":").map(Number);
-    const suffix = h < 12 ? "AM" : "PM";
-    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
+    const suffix = h! < 12 ? "AM" : "PM";
+    return `${h! % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
   };
 
-  const planTypeLabel = (t: string) => PLAN_TYPES.find((p) => p.value === t)?.label ?? t;
+  const DayPicker = ({ selected, onToggle }: { selected: string[]; onToggle: (d: string) => void }) => (
+    <div className="flex flex-wrap gap-2">
+      {PLAN_DAYS.map((day) => (
+        <button key={day} type="button" onClick={() => onToggle(day)}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${selected.includes(day) ? "bg-primary text-primary-foreground border-primary" : "border-white/15 text-muted-foreground hover:bg-white/5"}`}>
+          {day}
+        </button>
+      ))}
+    </div>
+  );
+
+  const LineItemsEditor = ({
+    items,
+    onChange,
+  }: {
+    items: DrinkPlanLineItem[];
+    onChange: (items: DrinkPlanLineItem[]) => void;
+  }) => (
+    <div className="space-y-2">
+      {items.map((item, idx) => (
+        <div key={idx} className="flex gap-2 items-center">
+          <Input
+            placeholder="Offer / product name"
+            value={item.name}
+            onChange={(e) => { const next = [...items]; next[idx] = { ...item, name: e.target.value }; onChange(next); }}
+            className="bg-black/40 border-white/10 flex-1"
+          />
+          <Input
+            type="number" min="1" placeholder="Qty"
+            value={item.qty}
+            onChange={(e) => { const next = [...items]; next[idx] = { ...item, qty: Math.max(1, parseInt(e.target.value) || 1) }; onChange(next); }}
+            className="bg-black/40 border-white/10 w-20"
+          />
+          <div className="relative w-32">
+            <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              type="number" min="0" placeholder="Price"
+              value={item.discountedPrice}
+              onChange={(e) => { const next = [...items]; next[idx] = { ...item, discountedPrice: Math.max(0, parseInt(e.target.value) || 0) }; onChange(next); }}
+              className="bg-black/40 border-white/10 pl-7"
+            />
+          </div>
+          {items.length > 1 && (
+            <button type="button" onClick={() => onChange(items.filter((_, i) => i !== idx))}
+              className="rounded-lg border border-destructive/30 p-1.5 text-destructive hover:bg-destructive/10 transition-colors">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...items, emptyItem()])}
+        className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-1">
+        <Plus className="h-3.5 w-3.5" /> Add item
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-8">
@@ -2597,107 +2678,101 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
           <GlassWater className="h-5 w-5 text-primary" /> Drink Plans &amp; Offers
         </h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Add drink packages that will appear on your public profile. These are informational — no payment is collected at booking.
+          Add drink packages that will appear on your public profile. Select one or both offer types below.
         </p>
 
-        <form onSubmit={handleAdd} className="space-y-4 border border-white/10 rounded-2xl p-5 bg-black/20">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Add a new plan</h3>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label>Plan type</Label>
-              <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
-                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PLAN_TYPES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Product / offer name</Label>
-              <Input
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="e.g. Welcome cocktail, Beer bucket"
-                className="bg-black/40 border-white/10"
+        <form onSubmit={handleAdd} className="space-y-5 border border-white/10 rounded-2xl p-5 bg-black/20">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Add new plan(s)</h3>
+
+          {/* Free Entry */}
+          <div className={`rounded-xl border p-4 transition-colors ${freeEntryChecked ? "border-primary/40 bg-primary/5" : "border-white/10 bg-black/10"}`}>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={freeEntryChecked}
+                onChange={(e) => setFreeEntryChecked(e.target.checked)}
+                className="h-4 w-4 accent-primary"
               />
-            </div>
-            <div>
-              <Label>Applicable gender</Label>
-              <Select value={gender} onValueChange={(v) => setGender(v as typeof gender)}>
-                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All guests</SelectItem>
-                  <SelectItem value="female">Female guests only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Price <span className="text-muted-foreground text-xs">(₹0 for free)</span></Label>
-              <div className="relative">
-                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="bg-black/40 border-white/10 pl-8"
-                  placeholder="0"
-                />
+              <span className="font-semibold text-sm">Free Entry</span>
+            </label>
+            {freeEntryChecked && (
+              <div className="mt-4 grid sm:grid-cols-2 gap-4 pl-7">
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Drink type</Label>
+                  <div className="flex gap-3">
+                    {([["welcome", "Free Drink"], ["unlimited", "Unlimited Drinks"]] as const).map(([val, label]) => (
+                      <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input type="radio" name="feDrinkType" value={val} checked={feDrinkType === val}
+                          onChange={() => setFeDrinkType(val)} className="accent-primary" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
+                  <div className="flex gap-3">
+                    {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+                      <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input type="radio" name="feGender" value={val} checked={feGender === val}
+                          onChange={() => setFeGender(val)} className="accent-primary" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="sm:col-span-2">
-              <Label className="mb-2 block">Applicable days <span className="text-muted-foreground text-xs">(leave blank for all days)</span></Label>
-              <div className="flex flex-wrap gap-2">
-                {PLAN_DAYS.map((day) => (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => toggleDay(day)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      days.includes(day)
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-white/15 text-muted-foreground hover:bg-white/5"
-                    }`}
-                  >
-                    {day}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label>Valid from <span className="text-muted-foreground text-xs">(HH:MM)</span></Label>
-              <Input
-                type="time"
-                value={timeFrom}
-                onChange={(e) => setTimeFrom(e.target.value)}
-                className="bg-black/40 border-white/10"
-              />
-            </div>
-            <div>
-              <Label>Valid until <span className="text-muted-foreground text-xs">(HH:MM)</span></Label>
-              <Input
-                type="time"
-                value={timeTo}
-                onChange={(e) => setTimeTo(e.target.value)}
-                className="bg-black/40 border-white/10"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <Label>Short description <span className="text-muted-foreground text-xs">(optional)</span></Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Any extra details customers should know…"
-                rows={2}
-                className="bg-black/40 border-white/10 resize-none"
-                maxLength={500}
-              />
-            </div>
+            )}
           </div>
-          <Button type="submit" disabled={saving} className="gap-2">
+
+          {/* Included with Ticket */}
+          <div className={`rounded-xl border p-4 transition-colors ${ticketChecked ? "border-primary/40 bg-primary/5" : "border-white/10 bg-black/10"}`}>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={ticketChecked}
+                onChange={(e) => setTicketChecked(e.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+              <span className="font-semibold text-sm">Included with Ticket</span>
+            </label>
+            {ticketChecked && (
+              <div className="mt-4 pl-7">
+                <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
+                  Items included <span className="normal-case text-muted-foreground/60">(name, quantity, discounted price)</span>
+                </Label>
+                <LineItemsEditor items={ticketItems} onChange={setTicketItems} />
+              </div>
+            )}
+          </div>
+
+          {/* Common fields */}
+          {(freeEntryChecked || ticketChecked) && (
+            <div className="grid sm:grid-cols-2 gap-4 border-t border-white/10 pt-4">
+              <div className="sm:col-span-2">
+                <Label className="mb-2 block">Applicable days <span className="text-muted-foreground text-xs">(leave blank for all days)</span></Label>
+                <DayPicker selected={days} onToggle={toggleDay} />
+              </div>
+              <div>
+                <Label>Valid from</Label>
+                <Input type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)} className="bg-black/40 border-white/10" />
+              </div>
+              <div>
+                <Label>Valid until</Label>
+                <Input type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)} className="bg-black/40 border-white/10" />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Short description <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Any extra details customers should know…" rows={2}
+                  className="bg-black/40 border-white/10 resize-none" maxLength={500} />
+              </div>
+            </div>
+          )}
+
+          <Button type="submit" disabled={saving || (!freeEntryChecked && !ticketChecked)} className="gap-2">
             <Plus className="h-4 w-4" />
-            {saving ? "Adding…" : "Add plan"}
+            {saving ? "Adding…" : "Add plan(s)"}
           </Button>
         </form>
       </div>
@@ -2715,47 +2790,59 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                 {editingId === plan.id ? (
                   <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
                     <h4 className="text-sm font-semibold text-primary">Editing plan</h4>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Plan type</Label>
-                        <Select value={editType} onValueChange={(v) => setEditType(v as typeof editType)}>
-                          <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {PLAN_TYPES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+
+                    {/* Free-entry edit controls */}
+                    {(editType === "welcome" || editType === "unlimited") && (
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Drink type</Label>
+                          <div className="flex gap-3">
+                            {([["welcome", "Free Drink"], ["unlimited", "Unlimited Drinks"]] as const).map(([val, label]) => (
+                              <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
+                                <input type="radio" name="editDrinkType" value={val} checked={editType === val}
+                                  onChange={() => setEditType(val)} className="accent-primary" />
+                                {label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
+                          <div className="flex gap-3">
+                            {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+                              <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
+                                <input type="radio" name="editGender" value={val} checked={editGender === val}
+                                  onChange={() => setEditGender(val)} className="accent-primary" />
+                                {label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                       </div>
+                    )}
+
+                    {/* Ticket edit controls */}
+                    {editType === "ticket" && (
+                      <div>
+                        <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
+                          Items included <span className="normal-case text-muted-foreground/60">(name, qty, discounted price)</span>
+                        </Label>
+                        <LineItemsEditor items={editItems} onChange={setEditItems} />
+                      </div>
+                    )}
+
+                    {/* Custom/legacy type — show product name field */}
+                    {editType === "custom" && (
                       <div>
                         <Label>Product / offer name</Label>
                         <Input value={editProductName} onChange={(e) => setEditProductName(e.target.value)} className="bg-black/40 border-white/10" />
                       </div>
-                      <div>
-                        <Label>Applicable gender</Label>
-                        <Select value={editGender} onValueChange={(v) => setEditGender(v as typeof editGender)}>
-                          <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All guests</SelectItem>
-                            <SelectItem value="female">Female guests only</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Price <span className="text-muted-foreground text-xs">(₹0 for free)</span></Label>
-                        <div className="relative">
-                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                          <Input type="number" min="0" step="1" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="bg-black/40 border-white/10 pl-8" />
-                        </div>
-                      </div>
+                    )}
+
+                    <div className="grid sm:grid-cols-2 gap-4 border-t border-white/10 pt-4">
                       <div className="sm:col-span-2">
                         <Label className="mb-2 block">Applicable days</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {PLAN_DAYS.map((day) => (
-                            <button key={day} type="button" onClick={() => toggleEditDay(day)}
-                              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${editDays.includes(day) ? "bg-primary text-primary-foreground border-primary" : "border-white/15 text-muted-foreground hover:bg-white/5"}`}>
-                              {day}
-                            </button>
-                          ))}
-                        </div>
+                        <DayPicker selected={editDays} onToggle={toggleEditDay} />
                       </div>
                       <div>
                         <Label>Valid from</Label>
@@ -2777,26 +2864,34 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                   </form>
                 ) : (
                   <div className="flex items-start justify-between gap-4 px-5 py-4">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold">{plan.productName}</span>
                         <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
-                          {planTypeLabel(plan.type)}
-                        </span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          plan.price === 0
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-white/5 text-muted-foreground border border-white/10"
-                        }`}>
-                          {fmtPrice(plan.price)}
+                          {PLAN_TYPE_BADGE[plan.type] ?? plan.type}
                         </span>
                         {plan.gender === "female" && (
                           <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">
-                            Female only
+                            Girls only
+                          </span>
+                        )}
+                        {plan.gender === "all" && (plan.type === "welcome" || plan.type === "unlimited") && (
+                          <span className="rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] text-muted-foreground font-medium">
+                            All guests
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {plan.lineItems && plan.lineItems.length > 0 && (
+                        <ul className="mt-1 space-y-0.5">
+                          {plan.lineItems.map((item, i) => (
+                            <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                              <span className="font-medium text-foreground/80">{item.name}</span>
+                              <span>×{item.qty}</span>
+                              {item.discountedPrice > 0 && <span>₹{item.discountedPrice}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
                         {plan.days.length > 0 && <span>{plan.days.join(", ")}</span>}
                         {plan.timeFrom && plan.timeTo && (
                           <span className="flex items-center gap-1">
@@ -2808,21 +2903,12 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(plan)}
-                        className="rounded-lg border border-white/15 p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
-                        title="Edit plan"
-                      >
+                      <button type="button" onClick={() => startEdit(plan)}
+                        className="rounded-lg border border-white/15 p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors" title="Edit plan">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(plan.id)}
-                        disabled={deleting === plan.id}
-                        className="rounded-lg border border-destructive/30 p-2 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                        title="Remove plan"
-                      >
+                      <button type="button" onClick={() => handleDelete(plan.id)} disabled={deleting === plan.id}
+                        className="rounded-lg border border-destructive/30 p-2 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50" title="Remove plan">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>

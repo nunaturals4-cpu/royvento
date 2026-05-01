@@ -31,6 +31,8 @@ import type {
   CreateEventBody,
   CreateReviewBody,
   CreateVendorBody,
+  DrinkPlan,
+  DrinkPlanBody,
   Event,
   EventDetail,
   GetAdminAnalyticsParams,
@@ -1540,6 +1542,352 @@ export const useRejectVendor = <
   TContext
 > => {
   return useMutation(getRejectVendorMutationOptions(options));
+};
+
+/**
+ * @summary Get drink plans for a vendor
+ */
+export const getListVendorDrinkPlansUrl = (vendorId: number) => {
+  return `/api/vendors/${vendorId}/drink-plans`;
+};
+
+export const listVendorDrinkPlans = async (
+  vendorId: number,
+  options?: RequestInit,
+): Promise<DrinkPlan[]> => {
+  return customFetch<DrinkPlan[]>(getListVendorDrinkPlansUrl(vendorId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListVendorDrinkPlansQueryKey = (vendorId: number) => {
+  return [`/api/vendors/${vendorId}/drink-plans`] as const;
+};
+
+export const getListVendorDrinkPlansQueryOptions = <
+  TData = Awaited<ReturnType<typeof listVendorDrinkPlans>>,
+  TError = ErrorType<unknown>,
+>(
+  vendorId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVendorDrinkPlans>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListVendorDrinkPlansQueryKey(vendorId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listVendorDrinkPlans>>
+  > = ({ signal }) =>
+    listVendorDrinkPlans(vendorId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!vendorId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listVendorDrinkPlans>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListVendorDrinkPlansQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listVendorDrinkPlans>>
+>;
+export type ListVendorDrinkPlansQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get drink plans for a vendor
+ */
+
+export function useListVendorDrinkPlans<
+  TData = Awaited<ReturnType<typeof listVendorDrinkPlans>>,
+  TError = ErrorType<unknown>,
+>(
+  vendorId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVendorDrinkPlans>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVendorDrinkPlansQueryOptions(vendorId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a drink plan (vendor)
+ */
+export const getCreateDrinkPlanUrl = () => {
+  return `/api/vendors/me/drink-plans`;
+};
+
+export const createDrinkPlan = async (
+  drinkPlanBody: DrinkPlanBody,
+  options?: RequestInit,
+): Promise<DrinkPlan> => {
+  return customFetch<DrinkPlan>(getCreateDrinkPlanUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(drinkPlanBody),
+  });
+};
+
+export const getCreateDrinkPlanMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDrinkPlan>>,
+    TError,
+    { data: BodyType<DrinkPlanBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createDrinkPlan>>,
+  TError,
+  { data: BodyType<DrinkPlanBody> },
+  TContext
+> => {
+  const mutationKey = ["createDrinkPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createDrinkPlan>>,
+    { data: BodyType<DrinkPlanBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createDrinkPlan(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateDrinkPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createDrinkPlan>>
+>;
+export type CreateDrinkPlanMutationBody = BodyType<DrinkPlanBody>;
+export type CreateDrinkPlanMutationError = ErrorType<void>;
+
+/**
+ * @summary Create a drink plan (vendor)
+ */
+export const useCreateDrinkPlan = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDrinkPlan>>,
+    TError,
+    { data: BodyType<DrinkPlanBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createDrinkPlan>>,
+  TError,
+  { data: BodyType<DrinkPlanBody> },
+  TContext
+> => {
+  return useMutation(getCreateDrinkPlanMutationOptions(options));
+};
+
+/**
+ * @summary Update a drink plan (vendor)
+ */
+export const getUpdateDrinkPlanUrl = (planId: number) => {
+  return `/api/vendors/me/drink-plans/${planId}`;
+};
+
+export const updateDrinkPlan = async (
+  planId: number,
+  drinkPlanBody: DrinkPlanBody,
+  options?: RequestInit,
+): Promise<DrinkPlan> => {
+  return customFetch<DrinkPlan>(getUpdateDrinkPlanUrl(planId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(drinkPlanBody),
+  });
+};
+
+export const getUpdateDrinkPlanMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDrinkPlan>>,
+    TError,
+    { planId: number; data: BodyType<DrinkPlanBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateDrinkPlan>>,
+  TError,
+  { planId: number; data: BodyType<DrinkPlanBody> },
+  TContext
+> => {
+  const mutationKey = ["updateDrinkPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateDrinkPlan>>,
+    { planId: number; data: BodyType<DrinkPlanBody> }
+  > = (props) => {
+    const { planId, data } = props ?? {};
+
+    return updateDrinkPlan(planId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateDrinkPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateDrinkPlan>>
+>;
+export type UpdateDrinkPlanMutationBody = BodyType<DrinkPlanBody>;
+export type UpdateDrinkPlanMutationError = ErrorType<void>;
+
+/**
+ * @summary Update a drink plan (vendor)
+ */
+export const useUpdateDrinkPlan = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDrinkPlan>>,
+    TError,
+    { planId: number; data: BodyType<DrinkPlanBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateDrinkPlan>>,
+  TError,
+  { planId: number; data: BodyType<DrinkPlanBody> },
+  TContext
+> => {
+  return useMutation(getUpdateDrinkPlanMutationOptions(options));
+};
+
+/**
+ * @summary Delete a drink plan (vendor)
+ */
+export const getDeleteDrinkPlanUrl = (planId: number) => {
+  return `/api/vendors/me/drink-plans/${planId}`;
+};
+
+export const deleteDrinkPlan = async (
+  planId: number,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getDeleteDrinkPlanUrl(planId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteDrinkPlanMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDrinkPlan>>,
+    TError,
+    { planId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteDrinkPlan>>,
+  TError,
+  { planId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteDrinkPlan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteDrinkPlan>>,
+    { planId: number }
+  > = (props) => {
+    const { planId } = props ?? {};
+
+    return deleteDrinkPlan(planId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteDrinkPlanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteDrinkPlan>>
+>;
+
+export type DeleteDrinkPlanMutationError = ErrorType<void>;
+
+/**
+ * @summary Delete a drink plan (vendor)
+ */
+export const useDeleteDrinkPlan = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDrinkPlan>>,
+    TError,
+    { planId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteDrinkPlan>>,
+  TError,
+  { planId: number },
+  TContext
+> => {
+  return useMutation(getDeleteDrinkPlanMutationOptions(options));
 };
 
 /**

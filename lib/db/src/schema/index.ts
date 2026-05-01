@@ -547,6 +547,7 @@ export const drinkPlansTable = pgTable(
     timeFrom: varchar("time_from", { length: 8 }).notNull().default(""),
     timeTo: varchar("time_to", { length: 8 }).notNull().default(""),
     description: text("description").notNull().default(""),
+    lineItems: jsonb("line_items").$type<Array<{ name: string; qty: number; discountedPrice: number }>>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

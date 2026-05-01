@@ -373,15 +373,22 @@ router.post(
 const VALID_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+const DrinkPlanLineItem = z.object({
+  name: z.string().min(1).max(255),
+  qty: z.number().int().min(1),
+  discountedPrice: z.number().int().min(0),
+});
+
 const DrinkPlanBody = z.object({
   type: z.enum(["welcome", "unlimited", "ticket", "custom"]),
-  productName: z.string().min(1).max(255),
+  productName: z.string().max(255).default(""),
   gender: z.enum(["all", "female"]).default("all"),
   price: z.number().int().min(0).default(0),
   days: z.array(z.enum(VALID_DAYS)).default([]),
   timeFrom: z.string().refine((v) => v === "" || HH_MM_RE.test(v), { message: "timeFrom must be HH:MM or empty" }).default(""),
   timeTo: z.string().refine((v) => v === "" || HH_MM_RE.test(v), { message: "timeTo must be HH:MM or empty" }).default(""),
   description: z.string().max(500).default(""),
+  lineItems: z.array(DrinkPlanLineItem).optional(),
 });
 
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {

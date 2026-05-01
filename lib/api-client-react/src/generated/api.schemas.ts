@@ -631,6 +631,77 @@ export interface ImportGooglePubResponse {
   place: ImportGooglePubResponsePlace;
 }
 
+export interface DrinkPlanLineItem {
+  name: string;
+  /** @minimum 1 */
+  qty: number;
+  /** @minimum 0 */
+  discountedPrice: number;
+}
+
+export type DrinkPlanType = (typeof DrinkPlanType)[keyof typeof DrinkPlanType];
+
+export const DrinkPlanType = {
+  welcome: "welcome",
+  unlimited: "unlimited",
+  ticket: "ticket",
+  custom: "custom",
+} as const;
+
+export type DrinkPlanGender =
+  (typeof DrinkPlanGender)[keyof typeof DrinkPlanGender];
+
+export const DrinkPlanGender = {
+  all: "all",
+  female: "female",
+} as const;
+
+export interface DrinkPlan {
+  id: number;
+  vendorId: number;
+  type: DrinkPlanType;
+  productName: string;
+  gender: DrinkPlanGender;
+  price: number;
+  days: string[];
+  timeFrom: string;
+  timeTo: string;
+  description: string;
+  lineItems?: DrinkPlanLineItem[] | null;
+  createdAt: string;
+}
+
+export type DrinkPlanBodyType =
+  (typeof DrinkPlanBodyType)[keyof typeof DrinkPlanBodyType];
+
+export const DrinkPlanBodyType = {
+  welcome: "welcome",
+  unlimited: "unlimited",
+  ticket: "ticket",
+  custom: "custom",
+} as const;
+
+export type DrinkPlanBodyGender =
+  (typeof DrinkPlanBodyGender)[keyof typeof DrinkPlanBodyGender];
+
+export const DrinkPlanBodyGender = {
+  all: "all",
+  female: "female",
+} as const;
+
+export interface DrinkPlanBody {
+  type: DrinkPlanBodyType;
+  productName?: string;
+  gender?: DrinkPlanBodyGender;
+  /** @minimum 0 */
+  price?: number;
+  days?: string[];
+  timeFrom?: string;
+  timeTo?: string;
+  description?: string;
+  lineItems?: DrinkPlanLineItem[] | null;
+}
+
 export type ListVendorsParams = {
   category?: string;
   country?: string;

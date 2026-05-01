@@ -10,9 +10,12 @@ import { EventCard } from "@/components/EventCard";
 import { Star, MapPin, Navigation, Clock, GlassWater, Music2 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 
+interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number; }
+
 interface DrinkPlan {
   id: number; type: string; productName: string; gender: string;
   price: number; days: string[]; timeFrom: string; timeTo: string; description: string;
+  lineItems?: DrinkPlanLineItem[] | null;
 }
 
 const PLAN_TYPE_LABELS: Record<string, string> = {
@@ -327,23 +330,34 @@ export function VendorDetail() {
                   className="rounded-xl border border-white/10 bg-card px-5 py-4 space-y-2"
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-sm">{plan.productName}</span>
                     <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
                       {PLAN_TYPE_LABELS[plan.type] ?? plan.type}
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      plan.price === 0
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-white/5 text-muted-foreground border border-white/10"
-                    }`}>
-                      {plan.price === 0 ? "Free" : `₹${(plan.price / 100).toFixed(0)}`}
                     </span>
                     {plan.gender === "female" && (
                       <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">
                         Ladies only
                       </span>
                     )}
+                    {plan.gender === "all" && (plan.type === "welcome" || plan.type === "unlimited") && (
+                      <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-400 font-medium">
+                        All guests
+                      </span>
+                    )}
                   </div>
+                  {plan.lineItems && plan.lineItems.length > 0 && (
+                    <ul className="space-y-1 mt-1">
+                      {plan.lineItems.map((item, i) => (
+                        <li key={i} className="flex items-center gap-3 text-sm">
+                          <span className="font-medium">{item.name}</span>
+                          <span className="text-muted-foreground text-xs">×{item.qty}</span>
+                          {item.discountedPrice > 0
+                            ? <span className="text-xs text-emerald-400">₹{item.discountedPrice}</span>
+                            : <span className="text-xs text-emerald-400">Free</span>
+                          }
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     {plan.days.length > 0 && (
                       <span>{plan.days.join(", ")}</span>
