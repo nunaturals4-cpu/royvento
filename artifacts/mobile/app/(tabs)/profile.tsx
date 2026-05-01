@@ -89,10 +89,10 @@ export default function ProfileScreen() {
           profileImage: updated.profileImage || undefined,
         });
         setEditModal(false);
-        Alert.alert("Saved", "Profile updated successfully");
+        Alert.alert(t("profile.saved_title"), t("profile.profile_updated_mobile"));
       },
       onError: (err: Error) => {
-        Alert.alert("Error", err.message || "Failed to update profile");
+        Alert.alert(t("common.error"), err.message || t("profile.update_failed"));
       },
     },
   });
@@ -100,7 +100,7 @@ export default function ProfileScreen() {
   const pickImageAsset = async (): Promise<string | null> => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow access to your photo library to upload a profile picture.");
+      Alert.alert(t("profile.permission_needed"), t("profile.photo_permission"));
       return null;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -122,7 +122,7 @@ export default function ProfileScreen() {
       setEditProfileImage(url);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      Alert.alert("Upload failed", err?.message ?? "Could not upload photo.");
+      Alert.alert(t("profile.upload_failed"), err?.message ?? t("profile.upload_failed_desc"));
     } finally {
       setImageUploading(false);
     }
@@ -137,7 +137,7 @@ export default function ProfileScreen() {
       updateMeMutation.mutate({ data: { profileImage: url } });
     } catch (e: unknown) {
       const err = e as { message?: string };
-      Alert.alert("Upload failed", err?.message ?? "Could not upload photo.");
+      Alert.alert(t("profile.upload_failed"), err?.message ?? t("profile.upload_failed_desc"));
     } finally {
       setImageUploading(false);
     }
@@ -156,7 +156,7 @@ export default function ProfileScreen() {
   });
 
   const handleSave = () => {
-    if (!editName.trim()) { Alert.alert("Name required"); return; }
+    if (!editName.trim()) { Alert.alert(t("profile.name_required")); return; }
     const phoneNormalized = editPhone.replace(/\D/g, "").slice(-10) || undefined;
     updateMeMutation.mutate({
       data: {
@@ -180,7 +180,7 @@ export default function ProfileScreen() {
           >
             <Ionicons name="person" size={40} color={colors.primaryForeground} />
           </LinearGradient>
-          <Text style={[styles.signInTitle, { color: colors.foreground }]}>Welcome to Royvento</Text>
+          <Text style={[styles.signInTitle, { color: colors.foreground }]}>{t("profile.welcome_title")}</Text>
           <Text style={[styles.signInSub, { color: colors.mutedForeground }]}>
             Sign in to manage bookings, wishlists, and more
           </Text>
@@ -287,7 +287,7 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity
               style={[styles.copyBtn, { backgroundColor: colors.muted }]}
-              onPress={() => Alert.alert("Code Copied", `Share your code: ${referral.code}`)}
+              onPress={() => Alert.alert(t("profile.code_copied"), `${t("profile.share_code")}: ${referral.code}`)}
             >
               <Ionicons name="copy-outline" size={16} color={colors.primary} />
             </TouchableOpacity>
@@ -298,7 +298,7 @@ export default function ProfileScreen() {
       {/* Coupons */}
       {coupons.length > 0 ? (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Active Coupons</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("profile.active_coupons")}</Text>
           {coupons.map((c) => (
             <View key={c.id} style={[styles.couponRow, { borderTopColor: colors.border }]}>
               <View style={[styles.couponTag, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
@@ -325,21 +325,21 @@ export default function ProfileScreen() {
       {/* Quick Actions (vendor/admin) */}
       {(user.role === "vendor" || user.role === "admin") && (
         <View style={[styles.quickActions, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("profile.quick_actions")}</Text>
           <View style={styles.quickRow}>
             <TouchableOpacity
               style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
               onPress={() => router.push("/vendor/dashboard")}
             >
               <Ionicons name="bar-chart-outline" size={22} color={colors.primary} />
-              <Text style={[styles.quickLabel, { color: colors.primary }]}>Dashboard</Text>
+              <Text style={[styles.quickLabel, { color: colors.primary }]}>{t("profile.dashboard")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
               onPress={() => router.push("/scanner")}
             >
               <Ionicons name="qr-code-outline" size={22} color={colors.primary} />
-              <Text style={[styles.quickLabel, { color: colors.primary }]}>Scan Ticket</Text>
+              <Text style={[styles.quickLabel, { color: colors.primary }]}>{t("profile.scan_ticket")}</Text>
             </TouchableOpacity>
             {user.role === "admin" && (
               <TouchableOpacity
@@ -347,7 +347,7 @@ export default function ProfileScreen() {
                 onPress={() => router.push("/admin")}
               >
                 <Ionicons name="shield-outline" size={22} color={colors.primary} />
-                <Text style={[styles.quickLabel, { color: colors.primary }]}>Admin Panel</Text>
+                <Text style={[styles.quickLabel, { color: colors.primary }]}>{t("profile.admin_panel")}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -364,7 +364,7 @@ export default function ProfileScreen() {
             <Ionicons name="business-outline" size={24} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.becomeVendorTitle, { color: colors.foreground }]}>List Your Venue</Text>
+            <Text style={[styles.becomeVendorTitle, { color: colors.foreground }]}>{t("profile.list_venue")}</Text>
             <Text style={[styles.becomeVendorSub, { color: colors.mutedForeground }]}>Apply to become a Royvento partner</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.primary} />
@@ -375,11 +375,11 @@ export default function ProfileScreen() {
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
           ...(user.role === "user"
-            ? [{ icon: "business-outline" as const, label: "Become a Partner", onPress: () => router.push("/become-vendor") }]
+            ? [{ icon: "business-outline" as const, label: t("profile.become_partner"), onPress: () => router.push("/become-vendor") }]
             : []),
-          { icon: "ticket-outline" as const, label: "My Bookings", onPress: () => router.push("/(tabs)/bookings") },
-          { icon: "heart-outline" as const, label: "Wishlist", onPress: () => router.push("/(tabs)/wishlist") },
-          { icon: "search-outline" as const, label: "Explore Events", onPress: () => router.push("/(tabs)/explore") },
+          { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings") },
+          { icon: "heart-outline" as const, label: t("profile.wishlist"), onPress: () => router.push("/(tabs)/wishlist") },
+          { icon: "search-outline" as const, label: t("profile.explore_events"), onPress: () => router.push("/(tabs)/explore") },
           { icon: "newspaper-outline" as const, label: t("profile.blog_stories"), onPress: () => router.push("/blogs") },
           { icon: "star-outline" as const, label: t("profile.subscription_premium"), onPress: () => router.push("/subscription") },
           { icon: "language-outline" as const, label: t("profile.language"), onPress: () => setLangModal(true) },
@@ -387,9 +387,9 @@ export default function ProfileScreen() {
             icon: "log-out-outline" as const,
             label: t("profile.sign_out"),
             onPress: () =>
-              Alert.alert("Sign Out", "Are you sure?", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Sign Out", style: "destructive", onPress: handleLogout },
+              Alert.alert(t("profile.sign_out_title"), t("profile.sign_out_confirm"), [
+                { text: t("common.cancel"), style: "cancel" },
+                { text: t("profile.sign_out"), style: "destructive", onPress: handleLogout },
               ]),
             tint: colors.destructive,
           },
@@ -427,7 +427,7 @@ export default function ProfileScreen() {
           >
             <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Profile</Text>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("profile.edit_profile")}</Text>
                 <Pressable onPress={() => setEditModal(false)}>
                   <Ionicons name="close" size={22} color={colors.mutedForeground} />
                 </Pressable>
@@ -435,7 +435,7 @@ export default function ProfileScreen() {
 
               {/* Profile Photo */}
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Profile Photo</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("profile.profile_photo")}</Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}>
                   {editProfileImage ? (
                     <Image source={{ uri: editProfileImage }} style={styles.photoPreview} contentFit="cover" />
@@ -458,7 +458,7 @@ export default function ProfileScreen() {
                         <>
                           <Ionicons name="camera-outline" size={16} color={colors.primary} />
                           <Text style={[styles.photoBtnText, { color: colors.primary }]}>
-                            {editProfileImage ? "Change Photo" : "Upload Photo"}
+                            {editProfileImage ? t("profile.change_photo") : t("profile.upload_photo")}
                           </Text>
                         </>
                       )}
@@ -469,7 +469,7 @@ export default function ProfileScreen() {
                         onPress={() => setEditProfileImage("")}
                       >
                         <Ionicons name="trash-outline" size={16} color={colors.destructive} />
-                        <Text style={[styles.photoBtnText, { color: colors.destructive }]}>Remove Photo</Text>
+                        <Text style={[styles.photoBtnText, { color: colors.destructive }]}>{t("profile.remove_photo")}</Text>
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -478,8 +478,8 @@ export default function ProfileScreen() {
 
               {/* Name & Phone fields */}
               {[
-                { label: "Name", value: editName, set: setEditName, placeholder: "Your name", multiline: false },
-                { label: "Phone", value: editPhone, set: setEditPhone, placeholder: "+91 XXXXXXXXXX", multiline: false },
+                { label: t("profile.name"), value: editName, set: setEditName, placeholder: t("profile.name_placeholder"), multiline: false },
+                { label: t("profile.phone"), value: editPhone, set: setEditPhone, placeholder: "+91 XXXXXXXXXX", multiline: false },
               ].map((f) => (
                 <View key={f.label} style={styles.field}>
                   <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
@@ -495,12 +495,12 @@ export default function ProfileScreen() {
 
               {/* About */}
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>About</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("profile.about")}</Text>
                 <TextInput
                   style={[styles.fieldInput, styles.aboutInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                   value={editAbout}
                   onChangeText={setEditAbout}
-                  placeholder="Tell others a bit about yourself…"
+                  placeholder={t("profile.about_placeholder")}
                   placeholderTextColor={colors.mutedForeground}
                   multiline
                   numberOfLines={4}

@@ -35,9 +35,9 @@ export function Bookings() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="mb-10">
-        <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Your account</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">{t("bookings.your_account")}</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">{t("bookings.title")}</h1>
-        <p className="mt-2 text-muted-foreground">Every event you've booked or requested.</p>
+        <p className="mt-2 text-muted-foreground">{t("bookings.subtitle")}</p>
       </header>
 
       {isLoading ? (
@@ -58,6 +58,7 @@ export function Bookings() {
 }
 
 function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
+  const { t } = useTranslation();
   const isPubTicket = (b.eventType_ === "pub" || b.pubMode === "ticket") && b.pubMode === "ticket";
   const showTicket = isPubTicket && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -77,55 +78,55 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant={STATUS_VARIANT[b.status] ?? "default"}>{b.status}</Badge>
-              {b.eventType_ === "pub" && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />Pub</Badge>}
-              {b.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Ticket</Badge>}
-              {b.pubMode === "event" && <Badge variant="outline">Event booking</Badge>}
-              <span className="text-xs text-muted-foreground">Booked {new Date(b.createdAt).toLocaleDateString()}</span>
+              {b.eventType_ === "pub" && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />{t("bookings.pub_badge")}</Badge>}
+              {b.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />{t("bookings.ticket_badge")}</Badge>}
+              {b.pubMode === "event" && <Badge variant="outline">{t("bookings.event_booking_badge")}</Badge>}
+              <span className="text-xs text-muted-foreground">{t("bookings.booked_on")} {new Date(b.createdAt).toLocaleDateString()}</span>
             </div>
             <Link href={`/events/${b.eventId}`} className="font-serif text-2xl hover:text-primary">{b.eventTitle}</Link>
             <p className="text-xs uppercase tracking-wider text-muted-foreground">{b.vendorName}</p>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground pt-2">
               <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" />{b.bookingDate}</span>
-              <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{b.guests} guests</span>
+              <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{b.guests} {t("bookings.guests_label")}</span>
               {b.couponCode && (
                 <span className="flex items-center gap-1.5 text-green-400">
-                  <Tag className="h-4 w-4" />Coupon {b.couponCode}
+                  <Tag className="h-4 w-4" />{t("bookings.coupon_applied")} {b.couponCode}
                 </span>
               )}
               {b.pointsUsed > 0 && (
                 <span className="flex items-center gap-1.5 text-primary">
-                  ⬢ {b.pointsUsed} pts used
+                  ⬢ {b.pointsUsed} {t("bookings.pts_used")}
                 </span>
               )}
             </div>
             {b.pubMode === "ticket" && (b.ticketWomen || b.ticketMen || b.ticketCouple) ? (
               <p className="text-sm text-muted-foreground">
-                Tickets:
+                {t("bookings.ticket_badge")}:
                 {b.ticketWomen ? ` ${b.ticketWomen}× Women` : ""}
                 {b.ticketMen ? ` ${b.ticketMen}× Men` : ""}
                 {b.ticketCouple ? ` ${b.ticketCouple}× Couple` : ""}
               </p>
             ) : null}
             {b.pubMode === "event" && b.selectedPubEvent && (
-              <p className="text-sm text-muted-foreground">Event: {b.selectedPubEvent}</p>
+              <p className="text-sm text-muted-foreground">{t("bookings.event_booking_badge")}: {b.selectedPubEvent}</p>
             )}
             {b.notes && <p className="text-sm italic text-muted-foreground">"{b.notes}"</p>}
             {b.status === "pending" && (
-              <p className="text-xs text-amber-400">Awaiting partner or admin approval.</p>
+              <p className="text-xs text-amber-400">{t("bookings.awaiting_approval")}</p>
             )}
             {b.status === "payment_pending" && (
-              <p className="text-xs text-amber-400">Payment pending — complete your payment to confirm this booking.</p>
+              <p className="text-xs text-amber-400">{t("bookings.payment_pending_msg")}</p>
             )}
             {b.status === "cancelled" && b.rejectionReason && (
               <div className="mt-2 rounded-lg border border-red-500/30 bg-red-900/20 px-3 py-2">
-                <p className="text-xs text-red-300 font-medium mb-0.5">Cancellation reason</p>
+                <p className="text-xs text-red-300 font-medium mb-0.5">{t("bookings.cancellation_reason")}</p>
                 <p className="text-xs text-red-200">{b.rejectionReason}</p>
               </div>
             )}
           </div>
           <div className="text-right flex flex-col items-end gap-3">
             <div>
-              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-xs text-muted-foreground">{t("bookings.total_label")}</p>
               <p className="font-serif text-3xl">{formatINRExact(b.finalPrice ?? b.totalPrice)}</p>
               {b.finalPrice != null && b.finalPrice !== b.totalPrice && (
                 <p className="text-xs text-muted-foreground line-through">{formatINRExact(b.totalPrice)}</p>
@@ -138,11 +139,11 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
                     <TooltipTrigger asChild>
                       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-not-allowed select-none border border-white/10 rounded-md px-3 py-1.5">
                         <TicketIcon className="h-3.5 w-3.5 text-green-400" />
-                        Checked in
+                        {t("bookings.checked_in")}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent side="left" className="max-w-56 text-center">
-                      Your ticket has already been scanned — this booking can no longer be cancelled.
+                      {t("bookings.ticket_scanned")}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -152,11 +153,11 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
                     <TooltipTrigger asChild>
                       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-not-allowed select-none border border-white/10 rounded-md px-3 py-1.5">
                         <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
-                        Cancellation closed
+                        {t("bookings.cancellation_closed")}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent side="left" className="max-w-56 text-center">
-                      Cancellations are not allowed within 24 hours of the event date.
+                      {t("bookings.cancellation_closed_msg")}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -167,7 +168,7 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
                   onClick={() => setCancelOpen(true)}
                   className="text-xs"
                 >
-                  Cancel booking
+                  {t("bookings.cancel")}
                 </Button>
               )
             )}
@@ -198,26 +199,27 @@ function CancelBookingDialog({
   booking: any;
   onCancelled: () => void;
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const handleCancel = async () => {
     if (!reason.trim()) {
-      toast({ title: "Please provide a cancellation reason.", variant: "destructive" });
+      toast({ title: t("bookings.reason_required"), variant: "destructive" });
       return;
     }
     setLoading(true);
     try {
       await apiPatch(`/api/bookings/${booking.id}/cancel`, { cancellationReason: reason.trim() });
-      toast({ title: "Booking cancelled", description: "Your booking has been cancelled." });
+      toast({ title: t("bookings.cancelled_title"), description: t("bookings.cancelled_desc") });
       onCancelled();
       onClose();
       setReason("");
     } catch (err: any) {
       toast({
-        title: "Failed to cancel",
-        description: err?.message ?? "Something went wrong. Please try again.",
+        title: t("bookings.cancel_failed"),
+        description: err?.message ?? t("bookings.cancel_failed_desc"),
         variant: "destructive",
       });
     } finally {
@@ -229,16 +231,15 @@ function CancelBookingDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Cancel booking</DialogTitle>
+          <DialogTitle>{t("bookings.cancel_dialog_title")}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to cancel your booking for <strong>{booking.eventTitle}</strong> on {booking.bookingDate}?
-            The partner will be notified. This cannot be undone.
+            {t("bookings.cancel_dialog_desc")} <strong>{booking.eventTitle}</strong> {booking.bookingDate}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 py-2">
-          <label className="text-sm font-medium">Reason for cancellation</label>
+          <label className="text-sm font-medium">{t("bookings.reason_for_cancellation")}</label>
           <Textarea
-            placeholder="e.g. Plans have changed, wrong date selected…"
+            placeholder={t("bookings.reason_placeholder")}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
@@ -246,10 +247,10 @@ function CancelBookingDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
-            Keep booking
+            {t("bookings.keep_booking")}
           </Button>
           <Button variant="destructive" onClick={handleCancel} disabled={loading || !reason.trim()}>
-            {loading ? "Cancelling…" : "Confirm cancellation"}
+            {loading ? t("bookings.cancelling") : t("bookings.confirm_cancellation")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -267,6 +268,7 @@ function TicketField({ label, value }: { label: string; value: React.ReactNode }
 }
 
 function PremiumTicket({ b }: { b: any }) {
+  const { t } = useTranslation();
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
 
@@ -412,7 +414,7 @@ function PremiumTicket({ b }: { b: any }) {
     <div className="border-t border-white/10 pt-5 mt-2">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs uppercase tracking-wider text-amber-400/80 flex items-center gap-1.5">
-          <TicketIcon className="h-3.5 w-3.5" /> Your ticket
+          <TicketIcon className="h-3.5 w-3.5" /> {t("bookings.your_ticket")}
         </p>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={printTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">

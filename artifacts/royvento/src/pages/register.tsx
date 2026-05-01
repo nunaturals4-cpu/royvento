@@ -44,7 +44,7 @@ export function Register() {
       );
       if (data.token) localStorage.setItem("royvento_token", data.token);
       qc.invalidateQueries();
-      toast({ title: "Welcome to Royvento" });
+      toast({ title: t("auth.welcome") });
       setLocation("/");
     } catch (err: any) {
       toast({ title: t("common.error"), description: err?.message, variant: "destructive" });
@@ -56,8 +56,8 @@ export function Register() {
   const handleGoogle = () => {
     if (!googleEnabled) {
       toast({
-        title: "Google sign-up not configured",
-        description: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable.",
+        title: t("auth.google_signup_not_configured"),
+        description: t("auth.google_not_configured_desc"),
       });
       return;
     }

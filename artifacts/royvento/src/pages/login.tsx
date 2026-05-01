@@ -47,8 +47,8 @@ export function Login() {
   const handleGoogle = () => {
     if (!googleEnabled) {
       toast({
-        title: "Google sign-in not configured",
-        description: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable.",
+        title: t("auth.google_not_configured"),
+        description: t("auth.google_not_configured_desc"),
       });
       return;
     }

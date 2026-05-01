@@ -190,7 +190,7 @@ export function Navbar() {
             >
               <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="truncate text-sm font-medium text-foreground/80">
-                {selectedCity || "Select city"}
+                {selectedCity || t("nav.select_city")}
               </span>
               <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
             </button>
@@ -218,20 +218,20 @@ export function Navbar() {
                 {notifOpen && (
                   <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl glass-card-strong border border-border shadow-2xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                      <p className="font-semibold text-sm">Notifications</p>
+                      <p className="font-semibold text-sm">{t("nav.notifications")}</p>
                       {unreadCount > 0 && (
                         <button
                           onClick={markAllRead}
                           className="text-xs text-primary hover:underline"
                         >
-                          Mark all read
+                          {t("nav.mark_all_read")}
                         </button>
                       )}
                     </div>
                     {notifs.length === 0 ? (
                       <div className="px-4 py-8 text-center">
                         <Bell className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-40" />
-                        <p className="text-sm text-muted-foreground">No notifications yet</p>
+                        <p className="text-sm text-muted-foreground">{t("nav.no_notifications")}</p>
                       </div>
                     ) : (
                       <div className="max-h-80 overflow-y-auto divide-y divide-border">
@@ -295,56 +295,56 @@ export function Navbar() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/profile" className="cursor-pointer w-full">My profile</Link>
+                    <Link href="/dashboard/profile" className="cursor-pointer w-full">{t("nav.my_profile")}</Link>
                   </DropdownMenuItem>
                   {user.role === "user" && (
                     <>
                       <DropdownMenuItem asChild>
-                        <Link href="/dashboard/bookings" className="cursor-pointer w-full">My bookings</Link>
+                        <Link href="/dashboard/bookings" className="cursor-pointer w-full">{t("nav.my_bookings")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/wishlist" className="cursor-pointer w-full">Wishlist</Link>
+                        <Link href="/wishlist" className="cursor-pointer w-full">{t("nav.wishlist")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/subscription" className="cursor-pointer w-full">Subscription</Link>
+                        <Link href="/subscription" className="cursor-pointer w-full">{t("nav.subscription")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/dashboard/become-vendor" className="cursor-pointer w-full">Become a partner</Link>
+                        <Link href="/dashboard/become-vendor" className="cursor-pointer w-full">{t("nav.become_partner")}</Link>
                       </DropdownMenuItem>
                     </>
                   )}
                   {user.role === "vendor" && (
                     <>
                       <DropdownMenuItem asChild>
-                        <Link href="/dashboard/bookings" className="cursor-pointer w-full">My bookings</Link>
+                        <Link href="/dashboard/bookings" className="cursor-pointer w-full">{t("nav.my_bookings")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/dashboard/partner" className="cursor-pointer w-full">Partner dashboard</Link>
+                        <Link href="/dashboard/partner" className="cursor-pointer w-full">{t("nav.partner_dashboard")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/subscription" className="cursor-pointer w-full">Partner premium</Link>
+                        <Link href="/subscription" className="cursor-pointer w-full">{t("nav.partner_premium")}</Link>
                       </DropdownMenuItem>
                     </>
                   )}
                   {user.role === "admin" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin" className="cursor-pointer w-full">Admin panel</Link>
+                      <Link href="/admin" className="cursor-pointer w-full">{t("nav.admin_panel")}</Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
-                    Log out
+                    {t("nav.log_out")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <>
                 <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden lg:block">
-                  Log in
+                  {t("nav.login")}
                 </Link>
                 <Link href="/register" className="hidden lg:block">
                   <Button className="bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0">
-                    Get started
+                    {t("nav.register")}
                   </Button>
                 </Link>
               </>
@@ -362,7 +362,7 @@ export function Navbar() {
                 <Input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search pubs…"
+                  placeholder={t("nav.search_placeholder")}
                   className="h-10 w-full pl-9 bg-card/60 border-border focus:border-primary/40"
                 />
               </form>
@@ -374,7 +374,7 @@ export function Navbar() {
               >
                 <MapPin className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-foreground/80 font-medium">
-                  {selectedCity ? selectedCity : "Select city"}
+                  {selectedCity ? selectedCity : t("nav.select_city")}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
               </button>
@@ -420,10 +420,10 @@ export function Navbar() {
               {!user && (
                 <div className="flex gap-3 pt-1">
                   <Link href="/login" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <Button variant="outline" className="w-full">Log in</Button>
+                    <Button variant="outline" className="w-full">{t("nav.login")}</Button>
                   </Link>
                   <Link href="/register" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0">Get started</Button>
+                    <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0">{t("nav.register")}</Button>
                   </Link>
                 </div>
               )}
