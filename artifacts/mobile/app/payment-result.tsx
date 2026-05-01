@@ -10,13 +10,14 @@ export default function PaymentResultScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
-  const { status, eventTitle, bookingId } = useLocalSearchParams<{
+  const { payment, status, eventTitle, bookingId } = useLocalSearchParams<{
+    payment?: string;
     status?: string;
     eventTitle?: string;
     bookingId?: string;
   }>();
 
-  const success = status !== "failed" && status !== "cancelled";
+  const success = payment === "success" || (payment === undefined && status !== "failed" && status !== "cancelled");
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

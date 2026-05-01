@@ -25,7 +25,46 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub";
+
+interface ContactMessage {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+  createdAt: string;
+}
+
+interface TopUser {
+  userId: number;
+  name: string;
+  email: string;
+  phone: string;
+  totalTickets: number;
+  bookingCount: number;
+}
+
+interface TopPub {
+  vendorId: number;
+  businessName: string;
+  city: string;
+  totalTickets: number;
+  bookingCount: number;
+}
+
+interface CrmLead {
+  id: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  vendorId?: number;
+  vendorName?: string;
+  eventTitle?: string;
+  source: string;
+  createdAt: string;
+}
 
 interface AdminVendor {
   id: number;
@@ -114,6 +153,327 @@ interface AdminBlog {
   slug: string;
   published: boolean;
   createdAt: string;
+}
+
+// ─── AdminMessagesTab ─────────────────────────────────────────────────────────
+function AdminMessagesTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  function load() {
+    setLoading(true);
+    customFetch<ContactMessage[]>("/api/admin/messages")
+      .then(setMessages)
+      .catch(() => setMessages([]))
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, []);
+
+  async function resolve(id: number) {
+    try {
+      await customFetch(`/api/admin/messages/${id}`, { method: "DELETE" });
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+    } catch {
+      Alert.alert("Error", "Failed to resolve message.");
+    }
+  }
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+  if (messages.length === 0) return (
+    <View style={{ alignItems: "center", justifyContent: "center", padding: 40, gap: 12 }}>
+      <Ionicons name="mail-outline" size={40} color={colors.mutedForeground} />
+      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>No contact messages.</Text>
+    </View>
+  );
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 100 }}>
+      {messages.map((m) => (
+        <View key={m.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground, flex: 1 }} numberOfLines={1}>{m.subject || "(no subject)"}</Text>
+            <TouchableOpacity onPress={() => Alert.alert("Resolve", "Mark this message as resolved?", [
+              { text: "Cancel", style: "cancel" },
+              { text: "Resolve", style: "destructive", onPress: () => resolve(m.id) },
+            ])}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#22c55e" />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary }}>{m.name} · {m.email}{m.phone ? ` · ${m.phone}` : ""}</Text>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 18 }}>{m.message}</Text>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+            {new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── AdminBookingReportTab ────────────────────────────────────────────────────
+function AdminBookingReportTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [topUsers, setTopUsers] = useState<TopUser[]>([]);
+  const [topPubs, setTopPubs] = useState<TopPub[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      customFetch<TopUser[]>("/api/admin/booking-report/top-users"),
+      customFetch<TopPub[]>("/api/admin/booking-report/top-pubs"),
+    ]).then(([u, p]) => { setTopUsers(u ?? []); setTopPubs(p ?? []); })
+      .catch(() => { setTopUsers([]); setTopPubs([]); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 100 }}>
+      {/* Top Users */}
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>TOP USERS BY BOOKINGS</Text>
+      {topUsers.length === 0 ? (
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>No data available.</Text>
+      ) : topUsers.slice(0, 10).map((u, i) => (
+        <View key={u.userId} style={{ flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12 }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + "20", alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.primary }}>#{i + 1}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{u.name}</Text>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{u.email}</Text>
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 2 }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>{u.totalTickets} tickets</Text>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{u.bookingCount} bookings</Text>
+          </View>
+        </View>
+      ))}
+
+      {/* Top Pubs */}
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground, marginTop: 8 }}>TOP VENUES BY REVENUE</Text>
+      {topPubs.length === 0 ? (
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>No data available.</Text>
+      ) : topPubs.slice(0, 10).map((p, i) => (
+        <View key={p.vendorId} style={{ flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12 }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + "20", alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.primary }}>#{i + 1}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{p.businessName}</Text>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{p.city}</Text>
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 2 }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>{p.totalTickets} tickets</Text>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{p.bookingCount} bookings</Text>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── AdminCrmLeadsTab ─────────────────────────────────────────────────────────
+function AdminCrmLeadsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [leads, setLeads] = useState<CrmLead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  function loadLeads(p: number, append = false) {
+    if (p === 1) setLoading(true); else setLoadingMore(true);
+    customFetch<{ leads: CrmLead[]; total: number; totalPages: number }>(`/api/admin/leads?page=${p}&limit=20`)
+      .then((r) => {
+        setLeads(append ? (prev) => [...prev, ...(r.leads ?? [])] : (r.leads ?? []));
+        setHasMore(p < r.totalPages);
+      })
+      .catch(() => {})
+      .finally(() => { setLoading(false); setLoadingMore(false); });
+  }
+
+  useEffect(() => { loadLeads(1); }, []);
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 10, paddingBottom: 100 }}>
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>{leads.length} LEADS</Text>
+      {leads.length === 0 ? (
+        <View style={{ alignItems: "center", padding: 32, gap: 12 }}>
+          <Ionicons name="person-add-outline" size={40} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>No leads found.</Text>
+        </View>
+      ) : leads.map((lead) => (
+        <View key={lead.id} style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{lead.name || "Anonymous"}</Text>
+            <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.muted }}>
+              <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{lead.source}</Text>
+            </View>
+          </View>
+          {lead.email && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{lead.email}{lead.phone ? ` · ${lead.phone}` : ""}</Text>}
+          {lead.vendorName && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.primary }}>{lead.vendorName}</Text>}
+          {lead.eventTitle && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }} numberOfLines={1}>{lead.eventTitle}</Text>}
+          <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+            {new Date(lead.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          </Text>
+        </View>
+      ))}
+      {hasMore && (
+        <TouchableOpacity
+          onPress={() => { const next = page + 1; setPage(next); loadLeads(next, true); }}
+          disabled={loadingMore}
+          style={{ borderRadius: 12, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: colors.border }}
+        >
+          {loadingMore ? <ActivityIndicator color={colors.primary} size="small" /> : <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Load more</Text>}
+        </TouchableOpacity>
+      )}
+    </ScrollView>
+  );
+}
+
+// ─── AdminImportPubTab ────────────────────────────────────────────────────────
+type ImportStep = "form" | "previewing" | "preview" | "importing" | "success";
+
+interface GooglePubPreview {
+  place: { placeId: string; name: string; address: string; phone?: string; website?: string; rating?: number; photos?: string[] };
+  suggestedTitle: string;
+  suggestedDescription: string;
+}
+
+function AdminImportPubTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [step, setStep] = useState<ImportStep>("form");
+  const [googleUrl, setGoogleUrl] = useState("");
+  const [partnerEmail, setPartnerEmail] = useState("");
+  const [preview, setPreview] = useState<GooglePubPreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handlePreview() {
+    setError(null);
+    setStep("previewing");
+    try {
+      const data = await customFetch<GooglePubPreview>("/api/admin/pubs/preview-google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ googleUrl: googleUrl.trim(), partnerEmail: partnerEmail.trim() }),
+      });
+      setPreview(data);
+      setStep("preview");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Preview failed. Check the URL and partner email.");
+      setStep("form");
+    }
+  }
+
+  async function handleConfirm() {
+    if (!preview) return;
+    setError(null);
+    setStep("importing");
+    try {
+      await customFetch("/api/admin/pubs/import-google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ googleUrl: googleUrl.trim(), partnerEmail: partnerEmail.trim(), placeId: preview.place.placeId }),
+      });
+      setStep("success");
+      Alert.alert("Pub Imported", `"${preview.suggestedTitle}" has been created and approved.`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Import failed. Please try again.");
+      setStep("preview");
+    }
+  }
+
+  function reset() { setStep("form"); setPreview(null); setError(null); setGoogleUrl(""); setPartnerEmail(""); }
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 100 }}>
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>IMPORT PUB FROM GOOGLE MAPS</Text>
+
+      {step === "success" ? (
+        <View style={{ alignItems: "center", padding: 32, gap: 16 }}>
+          <Ionicons name="checkmark-circle" size={56} color="#22c55e" />
+          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground, textAlign: "center" }}>Pub Imported!</Text>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" }}>"{preview?.suggestedTitle}" has been created and approved.</Text>
+          <TouchableOpacity onPress={reset} style={{ borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28, backgroundColor: colors.primary }}>
+            <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Import Another</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 10 }}>
+            <View style={{ gap: 4 }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>GOOGLE MAPS URL</Text>
+              <TextInput
+                value={googleUrl}
+                onChangeText={setGoogleUrl}
+                placeholder="https://maps.google.com/..."
+                placeholderTextColor={colors.mutedForeground}
+                style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14 }}
+                autoCapitalize="none"
+                editable={step === "form" || step === "preview"}
+              />
+            </View>
+            <View style={{ gap: 4 }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PARTNER EMAIL</Text>
+              <TextInput
+                value={partnerEmail}
+                onChangeText={setPartnerEmail}
+                placeholder="partner@example.com"
+                placeholderTextColor={colors.mutedForeground}
+                style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14 }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={step === "form" || step === "preview"}
+              />
+            </View>
+          </View>
+
+          {error && (
+            <View style={{ borderRadius: 12, borderWidth: 1, borderColor: "#ef4444", backgroundColor: "#ef444410", padding: 12 }}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#ef4444" }}>{error}</Text>
+            </View>
+          )}
+
+          {preview && step === "preview" && (
+            <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.card, padding: 14, gap: 8 }}>
+              <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>{preview.place.name}</Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{preview.place.address}</Text>
+              {preview.place.phone && <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{preview.place.phone}</Text>}
+              <View style={{ borderRadius: 8, backgroundColor: colors.muted, padding: 10 }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{preview.suggestedTitle}</Text>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 4 }} numberOfLines={3}>{preview.suggestedDescription}</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {(step === "form" || step === "preview") && (
+              <TouchableOpacity
+                onPress={step === "preview" ? handleConfirm : handlePreview}
+                disabled={!googleUrl.trim() || !partnerEmail.trim()}
+                style={{ flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", backgroundColor: colors.primary, opacity: (!googleUrl.trim() || !partnerEmail.trim()) ? 0.5 : 1 }}
+              >
+                <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  {step === "preview" ? "Confirm & Import" : "Preview"}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {(step === "previewing" || step === "importing") && (
+              <View style={{ flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", backgroundColor: colors.primary, opacity: 0.6 }}>
+                <ActivityIndicator color={colors.primaryForeground} size="small" />
+              </View>
+            )}
+            {step === "preview" && (
+              <TouchableOpacity onPress={reset} style={{ borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 14 }}>Reset</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </>
+      )}
+    </ScrollView>
+  );
 }
 
 export default function AdminPanelScreen() {
@@ -914,6 +1274,26 @@ export default function AdminPanelScreen() {
     );
   }
 
+  // ─── Messages tab ─────────────────────────────────────────────────────────────
+  function renderMessages() {
+    return <AdminMessagesTab colors={colors} />;
+  }
+
+  // ─── Booking Report tab ───────────────────────────────────────────────────────
+  function renderBookingReport() {
+    return <AdminBookingReportTab colors={colors} />;
+  }
+
+  // ─── CRM Leads tab ────────────────────────────────────────────────────────────
+  function renderCrmLeads() {
+    return <AdminCrmLeadsTab colors={colors} />;
+  }
+
+  // ─── Import Pub tab ───────────────────────────────────────────────────────────
+  function renderImportPub() {
+    return <AdminImportPubTab colors={colors} />;
+  }
+
   const TABS = [
     { key: "analytics" as AdminTab, icon: "bar-chart-outline" as const, label: "Analytics" },
     { key: "bookings" as AdminTab, icon: "ticket-outline" as const, label: "Bookings" },
@@ -923,6 +1303,10 @@ export default function AdminPanelScreen() {
     { key: "subscriptions" as AdminTab, icon: "card-outline" as const, label: "Subs" },
     { key: "coupons" as AdminTab, icon: "pricetag-outline" as const, label: "Coupons" },
     { key: "content" as AdminTab, icon: "newspaper-outline" as const, label: "Content" },
+    { key: "messages" as AdminTab, icon: "mail-outline" as const, label: "Messages" },
+    { key: "booking-report" as AdminTab, icon: "stats-chart-outline" as const, label: "Report" },
+    { key: "crm-leads" as AdminTab, icon: "person-add-outline" as const, label: "CRM" },
+    { key: "import-pub" as AdminTab, icon: "cloud-download-outline" as const, label: "Import" },
   ];
 
   if (!user || user.role !== "admin") {
@@ -982,6 +1366,10 @@ export default function AdminPanelScreen() {
       {activeTab === "subscriptions" && renderSubscriptions()}
       {activeTab === "coupons" && renderCoupons()}
       {activeTab === "content" && renderContent()}
+      {activeTab === "messages" && renderMessages()}
+      {activeTab === "booking-report" && renderBookingReport()}
+      {activeTab === "crm-leads" && renderCrmLeads()}
+      {activeTab === "import-pub" && renderImportPub()}
     </View>
   );
 }

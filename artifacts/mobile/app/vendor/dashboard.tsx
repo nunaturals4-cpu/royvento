@@ -306,10 +306,14 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
             </View>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <TouchableOpacity onPress={() => {
+                const validType = (PLAN_TYPES as readonly string[]).includes(plan.type)
+                  ? (plan.type as DrinkPlanFormState["type"])
+                  : "welcome";
+                const validGender = plan.gender === "female" ? "female" : "all";
                 setForm({
-                  type: plan.type as any,
+                  type: validType,
                   productName: plan.productName,
-                  gender: plan.gender as any,
+                  gender: validGender,
                   price: plan.price > 0 ? String(plan.price) : "",
                   days: plan.days,
                   timeFrom: plan.timeFrom,
@@ -377,8 +381,8 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
               <View style={{ gap: 6 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FOR</Text>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  {[{ v: "all", label: "Everyone" }, { v: "female", label: "Ladies Only" }].map(({ v, label }) => (
-                    <TouchableOpacity key={v} onPress={() => setForm((p) => ({ ...p, gender: v as any }))}
+                  {([{ v: "all", label: "Everyone" }, { v: "female", label: "Ladies Only" }] as { v: DrinkPlanFormState["gender"]; label: string }[]).map(({ v, label }) => (
+                    <TouchableOpacity key={v} onPress={() => setForm((p) => ({ ...p, gender: v }))}
                       style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.gender === v ? colors.primary : colors.muted, borderColor: form.gender === v ? colors.primary : colors.border }}>
                       <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.gender === v ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
                     </TouchableOpacity>

@@ -27,11 +27,9 @@ interface PublicEvent {
 }
 
 const PRICE_PRESETS = [
-  { label: "Under ₹1K", min: 0, max: 1000 },
-  { label: "₹1K – ₹3K", min: 1000, max: 3000 },
-  { label: "₹3K – ₹7K", min: 3000, max: 7000 },
-  { label: "₹7K – ₹20K", min: 7000, max: 20000 },
-  { label: "₹20K+", min: 20000, max: 99999999 },
+  { label: "Under ₹500", min: 0, max: 500 },
+  { label: "₹500 – ₹1.5K", min: 500, max: 1500 },
+  { label: "₹1.5K+", min: 1500, max: 99999999 },
 ];
 
 export function Pubs() {

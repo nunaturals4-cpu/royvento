@@ -1,34 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { customFetch, type ListEventsPaginatedResponse } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
-import { Search, SlidersHorizontal, X } from "lucide-react";
-import { apiGet, BUDGET_RANGES } from "@/lib/api";
+import { Search, SlidersHorizontal, X, Loader2 } from "lucide-react";
+import { BUDGET_RANGES } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useLocation } from "wouter";
 import { Switch } from "@/components/ui/switch";
 
-interface PublicEvent {
-  id: number;
-  title: string;
-  category: string;
-  type: string;
-  location: string;
-  city: string;
-  state: string;
-  country: string;
-  price: number;
-  imageUrl: string;
-  rating: number;
-  reviewCount: number;
-  partnerName: string;
-  popular: boolean;
-  freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
-}
+const PAGE_SIZE = 18;
 
 export function Explore() {
   const { t } = useTranslation();
@@ -47,46 +33,55 @@ export function Explore() {
   const [stateF, setStateF] = useState<string>("");
   const [city, setCity] = useState<string>("");
   const [freeEntry, setFreeEntry] = useState(false);
-  const [rawEvents, setRawEvents] = useState<PublicEvent[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (search.trim()) params.set("search", search.trim());
-    if (stateF) params.set("state", stateF);
-    if (city) params.set("city", city);
-    if (country) params.set("country", country);
+  const queryParams = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (search.trim()) p.search = search.trim();
+    if (stateF) p.state = stateF;
+    if (city) p.city = city;
+    if (country) p.country = country;
     if (budget !== "any") {
       const b = BUDGET_RANGES.find((x) => x.value === budget);
-      if (b) {
-        params.set("minPrice", String(b.min));
-        params.set("maxPrice", String(b.max));
-      }
+      if (b) { p.minPrice = String(b.min); p.maxPrice = String(b.max); }
     }
-    setLoading(true);
-    apiGet<PublicEvent[]>(`/api/events?${params.toString()}`)
-      .then((r) => setRawEvents(r))
-      .catch(() => setRawEvents([]))
-      .finally(() => setLoading(false));
+    return p;
   }, [search, budget, stateF, city, country]);
 
-  const [visibleCount, setVisibleCount] = useState(18);
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery<ListEventsPaginatedResponse>({
+    queryKey: ["explore-events", queryParams, freeEntry],
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams(queryParams);
+      params.set("page", String(pageParam ?? 1));
+      params.set("limit", String(PAGE_SIZE));
+      return customFetch<ListEventsPaginatedResponse>(`/api/events?${params.toString()}`);
+    },
+    initialPageParam: 1,
+    getNextPageParam: (last) => last.hasMore ? last.page + 1 : undefined,
+  });
 
-  const events = useMemo(() => {
-    let result = minRating === "any" ? rawEvents : rawEvents.filter((e) => e.rating >= Number(minRating));
-    if (freeEntry) {
-      result = result.filter((e) => e.freeEntryRules?.enabled === true && (e.freeEntryRules.days?.length ?? 0) > 0);
-    }
-    return result;
-  }, [rawEvents, minRating, freeEntry]);
-
-  const visibleEvents = useMemo(() => events.slice(0, visibleCount), [events, visibleCount]);
+  const allEvents = useMemo(() => {
+    const flat = (data?.pages ?? []).flatMap((p) => p.data);
+    if (!freeEntry) return flat;
+    return flat.filter((e) => e.freeEntryRules?.enabled === true && (e.freeEntryRules?.days?.length ?? 0) > 0);
+  }, [data, freeEntry]);
 
   const clear = () => {
     setSearch(""); setMinRating("any");
     setBudget("any"); setCountry(""); setStateF(""); setCity(""); setFreeEntry(false);
-    setVisibleCount(18);
   };
+
+  const hasFilters = search || country || stateF || city || budget !== "any" || freeEntry;
+
+  const filteredEvents = useMemo(() => {
+    if (minRating === "any") return allEvents;
+    return allEvents.filter((e) => (e.rating ?? 0) >= Number(minRating));
+  }, [allEvents, minRating]);
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
@@ -102,9 +97,11 @@ export function Explore() {
         <div className="flex items-center gap-2 mb-4">
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">{t("explore.filters")}</span>
-          <button onClick={clear} className="ml-auto text-xs text-white/50 hover:text-white inline-flex items-center gap-1">
-            <X className="h-3 w-3" /> {t("explore.clear_all")}
-          </button>
+          {hasFilters && (
+            <button onClick={clear} className="ml-auto text-xs text-white/50 hover:text-white inline-flex items-center gap-1">
+              <X className="h-3 w-3" /> {t("explore.clear_all")}
+            </button>
+          )}
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="relative md:col-span-2 lg:col-span-1">
@@ -165,9 +162,12 @@ export function Explore() {
         </div>
       </div>
 
-      {loading ? (
-        <p className="text-muted-foreground">{t("explore.loading")}</p>
-      ) : events.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <p>{t("explore.loading")}</p>
+        </div>
+      ) : filteredEvents.length === 0 ? (
         <div className="rounded-3xl glass-card p-16 text-center">
           <p className="font-serif text-3xl mb-2">{t("explore.no_match")}</p>
           <p className="text-muted-foreground">{t("explore.no_match_sub")}</p>
@@ -175,20 +175,25 @@ export function Explore() {
       ) : (
         <>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleEvents.map((e) => <EventCard key={e.id} event={e} />)}
+            {filteredEvents.map((e) => <EventCard key={e.id} event={e} />)}
           </div>
-          {visibleCount < events.length && (
+          {hasNextPage && (
             <div className="flex justify-center mt-10">
               <button
-                onClick={() => setVisibleCount((c) => c + 18)}
-                className="px-8 py-3 rounded-full border border-white/10 text-sm font-medium text-muted-foreground hover:border-white/20 hover:text-foreground transition-colors"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="px-8 py-3 rounded-full border border-white/10 text-sm font-medium text-muted-foreground hover:border-white/20 hover:text-foreground transition-colors inline-flex items-center gap-2 disabled:opacity-60"
               >
-                Load more ({events.length - visibleCount} remaining)
+                {isFetchingNextPage ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</>
+                ) : (
+                  "Load more events"
+                )}
               </button>
             </div>
           )}
-          {visibleCount >= events.length && events.length > 18 && (
-            <p className="text-center text-xs text-muted-foreground mt-8">All {events.length} results shown</p>
+          {!hasNextPage && filteredEvents.length > PAGE_SIZE && (
+            <p className="text-center text-xs text-muted-foreground mt-8">All {filteredEvents.length} results shown</p>
           )}
         </>
       )}
