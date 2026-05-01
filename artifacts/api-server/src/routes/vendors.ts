@@ -157,6 +157,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       createdAt: v.createdAt.toISOString(),
       freeEntryRules: freeEntryByVendor.get(v.id) ?? null,
       danceFloor: v.danceFloor ?? null,
+      danceFloorPhotos: v.danceFloorPhotos ?? null,
     };
   });
 }
