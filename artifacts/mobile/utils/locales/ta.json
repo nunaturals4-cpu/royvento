@@ -23,7 +23,11 @@
     "admin_panel": "நிர்வாக பலகை",
     "log_out": "வெளியேறு",
     "theme": "தீம்",
-    "language": "மொழி"
+    "language": "மொழி",
+    "bookings": "முன்பதிவுகள்",
+    "partners": "கூட்டாளிகள்",
+    "partner": "கூட்டாளி",
+    "profile": "சுயவிவரம்"
   },
   "auth": {
     "welcome_back": "மீண்டும் வரவேற்கிறோம்",

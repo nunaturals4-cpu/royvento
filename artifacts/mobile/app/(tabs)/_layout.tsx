@@ -4,8 +4,10 @@ import { SymbolView, type SFSymbol } from "expo-symbols";
 import React from "react";
 import { Platform } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function TabLayout() {
+  const { t } = useLanguage();
   const colors = useColors();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
@@ -39,7 +41,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("nav.home"),
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "house.fill", "house", "home", "home-outline"),
         }}
@@ -47,7 +49,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Pubs",
+          title: t("nav.pubs"),
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "wineglass.fill", "wineglass", "beer", "beer-outline"),
         }}
@@ -55,7 +57,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="pubs"
         options={{
-          title: "Pubs",
+          title: t("nav.pubs"),
           tabBarItemStyle: { display: "none" },
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "wineglass.fill", "wineglass", "beer", "beer-outline"),
@@ -64,7 +66,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="wishlist"
         options={{
-          title: "Wishlist",
+          title: t("nav.wishlist"),
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "heart.fill", "heart", "heart", "heart-outline"),
         }}
@@ -72,7 +74,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="bookings"
         options={{
-          title: "Bookings",
+          title: t("nav.bookings"),
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "ticket.fill", "ticket", "ticket", "ticket-outline"),
         }}
@@ -80,7 +82,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="vendor"
         options={{
-          title: "Partner",
+          title: t("nav.partner"),
           tabBarItemStyle: { display: "none" },
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "building.2.fill", "building.2", "business", "business-outline"),
@@ -89,7 +91,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="vendors"
         options={{
-          title: "Partners",
+          title: t("nav.partners"),
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "building.2.fill", "building.2", "business", "business-outline"),
         }}
@@ -97,7 +99,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: t("nav.profile"),
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "person.fill", "person", "person", "person-outline"),
         }}

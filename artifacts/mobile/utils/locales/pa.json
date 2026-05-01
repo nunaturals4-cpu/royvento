@@ -23,7 +23,11 @@
     "admin_panel": "ਐਡਮਿਨ ਪੈਨਲ",
     "log_out": "ਲੌਗ ਆਊਟ",
     "theme": "ਥੀਮ",
-    "language": "ਭਾਸ਼ਾ"
+    "language": "ਭਾਸ਼ਾ",
+    "bookings": "ਬੁਕਿੰਗ",
+    "partners": "ਭਾਈਵਾਲ",
+    "partner": "ਭਾਈਵਾਲ",
+    "profile": "ਪ੍ਰੋਫ਼ਾਈਲ"
   },
   "auth": {
     "welcome_back": "ਵਾਪਸੀ ਤੇ ਸੁਆਗਤ ਹੈ",

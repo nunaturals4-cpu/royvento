@@ -23,7 +23,11 @@
     "admin_panel": "Admin panel",
     "log_out": "Log out",
     "theme": "Theme",
-    "language": "Language"
+    "language": "Language",
+    "bookings": "Bookings",
+    "partners": "Partners",
+    "partner": "Partner",
+    "profile": "Profile"
   },
   "auth": {
     "welcome_back": "Welcome back",

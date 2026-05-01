@@ -4,11 +4,12 @@ import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 
 export const BOTTOM_NAV_HEIGHT = 60;
 
 interface Tab {
-  label: string;
+  labelKey: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   iconFocused: React.ComponentProps<typeof Ionicons>["name"];
   route: string;
@@ -17,42 +18,42 @@ interface Tab {
 
 const TABS: Tab[] = [
   {
-    label: "Home",
+    labelKey: "nav.home",
     icon: "home-outline",
     iconFocused: "home",
     route: "/(tabs)",
     matchPaths: ["/(tabs)", "/(tabs)/index", "/", "/index"],
   },
   {
-    label: "Pubs",
+    labelKey: "nav.pubs",
     icon: "beer-outline",
     iconFocused: "beer",
     route: "/(tabs)/explore",
     matchPaths: ["/(tabs)/explore", "/explore"],
   },
   {
-    label: "Wishlist",
+    labelKey: "nav.wishlist",
     icon: "heart-outline",
     iconFocused: "heart",
     route: "/(tabs)/wishlist",
     matchPaths: ["/(tabs)/wishlist", "/wishlist"],
   },
   {
-    label: "Bookings",
+    labelKey: "nav.bookings",
     icon: "ticket-outline",
     iconFocused: "ticket",
     route: "/(tabs)/bookings",
     matchPaths: ["/(tabs)/bookings", "/bookings"],
   },
   {
-    label: "Partners",
+    labelKey: "nav.partners",
     icon: "business-outline",
     iconFocused: "business",
     route: "/(tabs)/vendors",
     matchPaths: ["/(tabs)/vendors", "/vendors"],
   },
   {
-    label: "Profile",
+    labelKey: "nav.profile",
     icon: "person-outline",
     iconFocused: "person",
     route: "/(tabs)/profile",
@@ -61,6 +62,7 @@ const TABS: Tab[] = [
 ];
 
 export function PersistentBottomNav() {
+  const { t } = useLanguage();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -101,13 +103,13 @@ export function PersistentBottomNav() {
             onPress={() => router.push(tab.route as never)}
             style={styles.tab}
             accessibilityRole="tab"
-            accessibilityLabel={tab.label}
+            accessibilityLabel={t(tab.labelKey)}
             accessibilityState={{ selected: focused }}
           >
             <View style={[styles.indicator, focused && { backgroundColor: colors.primary + "22" }]}>
               <Ionicons name={focused ? tab.iconFocused : tab.icon} size={22} color={color} />
             </View>
-            <Text style={[styles.label, { color }]}>{tab.label}</Text>
+            <Text style={[styles.label, { color }]}>{t(tab.labelKey)}</Text>
           </Pressable>
         );
       })}

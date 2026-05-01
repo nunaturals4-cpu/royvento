@@ -23,7 +23,11 @@
     "admin_panel": "एडमिन पैनल",
     "log_out": "लॉग आउट",
     "theme": "थीम",
-    "language": "भाषा"
+    "language": "भाषा",
+    "bookings": "बुकिंग",
+    "partners": "भागीदार",
+    "partner": "भागीदार",
+    "profile": "प्रोफ़ाइल"
   },
   "auth": {
     "welcome_back": "वापसी पर स्वागत है",

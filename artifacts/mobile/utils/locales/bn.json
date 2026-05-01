@@ -23,7 +23,11 @@
     "admin_panel": "অ্যাডমিন প্যানেল",
     "log_out": "লগ আউট",
     "theme": "থিম",
-    "language": "ভাষা"
+    "language": "ভাষা",
+    "bookings": "বুকিং",
+    "partners": "অংশীদার",
+    "partner": "অংশীদার",
+    "profile": "প্রোফাইল"
   },
   "auth": {
     "welcome_back": "স্বাগতম",

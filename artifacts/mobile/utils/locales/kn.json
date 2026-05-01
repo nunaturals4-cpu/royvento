@@ -23,7 +23,11 @@
     "admin_panel": "ಅಡ್ಮಿನ್ ಪ್ಯಾನೆಲ್",
     "log_out": "ಲಾಗ್ ಔಟ್",
     "theme": "ಥೀಮ್",
-    "language": "ಭಾಷೆ"
+    "language": "ಭಾಷೆ",
+    "bookings": "ಬುಕಿಂಗ್",
+    "partners": "ಪಾಲುದಾರರು",
+    "partner": "ಪಾಲುದಾರ",
+    "profile": "ಪ್ರೊಫೈಲ್"
   },
   "auth": {
     "welcome_back": "ಮರಳಿ ಸ್ವಾಗತ",
