@@ -9,6 +9,7 @@ import {
   useGetEvent,
   useGetWishlist,
   useListEventReviews,
+  useListVendorDrinkPlans,
   useRemoveFromWishlist,
 } from "@workspace/api-client-react";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -243,6 +244,11 @@ export default function EventDetailScreen() {
     queryKey: ["event-announcements", eventId],
     queryFn: () => customFetch(`/api/events/${eventId}/announcements`),
     enabled: !!eventId,
+  });
+
+  const vendorId = (event as unknown as EventWithVendor).vendorId ?? (event as unknown as EventWithVendor).vendor?.id;
+  const { data: drinkPlans = [] } = useListVendorDrinkPlans(vendorId ?? 0, {
+    query: { enabled: isPub && !!vendorId } as any,
   });
 
   const basePriceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
@@ -539,6 +545,50 @@ export default function EventDetailScreen() {
               </View>
             );
           })()}
+
+          {/* Drink deals (pub) */}
+          {isPub && drinkPlans.length > 0 ? (
+            <View style={[styles.drinkDealsBox, { borderColor: colors.primary + "40", backgroundColor: colors.primary + "0D" }]}>
+              <View style={styles.drinkDealsHeader}>
+                <Ionicons name="wine-outline" size={15} color={colors.primary} />
+                <Text style={[styles.drinkDealsTitle, { color: colors.primary }]}>Drink Deals</Text>
+              </View>
+              <View style={{ gap: 12 }}>
+                {drinkPlans.map((plan) => (
+                  <View key={plan.id} style={{ gap: 4 }}>
+                    <View style={styles.drinkPlanRow}>
+                      <Text style={[styles.drinkPlanSummary, { color: colors.foreground, flex: 1 }]}>
+                        {plan.type === "welcome"
+                          ? plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests"
+                          : plan.type === "unlimited"
+                          ? plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests"
+                          : plan.type === "ticket"
+                          ? (() => { const c = (plan.lineItems ?? []).filter((i: { name: string }) => i.name).length; return c > 0 ? `${c} item${c !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket"; })()
+                          : plan.productName || "Drink offer"}
+                      </Text>
+                      <View style={[styles.genderPill, { backgroundColor: colors.primary + "22" }]}>
+                        <Text style={[styles.genderPillText, { color: colors.primary }]}>
+                          {plan.gender === "female" ? "Ladies" : "All guests"}
+                        </Text>
+                      </View>
+                    </View>
+                    {plan.lineItems && plan.lineItems.length > 0 ? (
+                      <View style={{ paddingLeft: 12, gap: 2 }}>
+                        {plan.lineItems.map((item: { name: string; qty: number }, i: number) => (
+                          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <View style={[styles.drinkDot, { backgroundColor: colors.primary + "66" }]} />
+                            <Text style={[styles.drinkLineItem, { color: colors.mutedForeground }]}>
+                              {item.qty}× {item.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {/* Description */}
           {event.description ? (
@@ -1232,6 +1282,15 @@ const styles = StyleSheet.create({
   modalSecondaryBtn: { width: "100%", alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 14, paddingVertical: 14 },
   modalSecondaryBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
   modalDismiss: { fontSize: 13, fontFamily: "Inter_400Regular", paddingVertical: 8 },
+  drinkDealsBox: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 10 },
+  drinkDealsHeader: { flexDirection: "row", alignItems: "center", gap: 7 },
+  drinkDealsTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
+  drinkPlanRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  drinkPlanSummary: { fontSize: 13, fontFamily: "Inter_500Medium", lineHeight: 19 },
+  genderPill: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 },
+  genderPillText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  drinkDot: { width: 5, height: 5, borderRadius: 3, flexShrink: 0 },
+  drinkLineItem: { fontSize: 12, fontFamily: "Inter_400Regular" },
   announcementItem: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
   announcementItemHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   announcementItemIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },

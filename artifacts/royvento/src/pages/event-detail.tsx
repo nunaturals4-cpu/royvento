@@ -24,6 +24,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
 
+function getPlanSummary(plan: { type: string; gender: string; productName?: string; lineItems?: { name: string }[] | null }): string {
+  if (plan.type === "welcome") return plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests";
+  if (plan.type === "unlimited") return plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests";
+  if (plan.type === "ticket") {
+    const count = (plan.lineItems ?? []).filter((i) => i.name).length;
+    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket";
+  }
+  return plan.productName || "Drink offer";
+}
+
 export function EventDetail() {
   const { t } = useTranslation();
   const params = useParams();
@@ -46,6 +56,11 @@ export function EventDetail() {
     queryKey: ["partner-blocked-dates", vendorId],
     queryFn: () => apiGet(`/api/partners/${vendorId}/blocked-dates`),
     enabled: !!vendorId,
+  });
+  const { data: drinkPlans = [] } = useQuery<any[]>({
+    queryKey: ["vendor-drink-plans", vendorId],
+    queryFn: () => apiGet<any[]>(`/api/vendors/${vendorId}/drink-plans`),
+    enabled: (event as any)?.type === "pub" && !!vendorId,
   });
 
   const [date, setDate] = useState(() => {
@@ -442,6 +457,37 @@ export function EventDetail() {
               </div>
             );
           })()}
+
+          {isPub && drinkPlans.length > 0 && (
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Wine className="h-4 w-4 text-primary shrink-0" />
+                <h3 className="font-semibold text-primary text-sm uppercase tracking-wide">Drink Deals</h3>
+              </div>
+              <div className="space-y-4">
+                {drinkPlans.map((plan: any) => (
+                  <div key={plan.id} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <span className="text-sm text-white/85">{getPlanSummary(plan)}</span>
+                      <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary shrink-0">
+                        {plan.gender === "female" ? "Ladies" : "All guests"}
+                      </span>
+                    </div>
+                    {plan.lineItems && plan.lineItems.length > 0 && (
+                      <ul className="space-y-0.5 pl-4">
+                        {plan.lineItems.map((item: any, i: number) => (
+                          <li key={i} className="text-xs text-white/50 flex items-center gap-1.5">
+                            <span className="h-1 w-1 rounded-full bg-primary/40 shrink-0" />
+                            {item.qty}× {item.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {isPub && vendorDayHours && (() => {
             const DAY_ORDER_h = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
