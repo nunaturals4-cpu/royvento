@@ -59,6 +59,13 @@ export function Bookings() {
 
 function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
   const { t } = useTranslation();
+  const STATUS_LABEL: Record<string, string> = {
+    pending: t("bookings.status_pending"),
+    payment_pending: t("bookings.status_payment_pending"),
+    confirmed: t("bookings.status_confirmed"),
+    completed: t("bookings.status_completed"),
+    cancelled: t("bookings.status_cancelled"),
+  };
   const isPubTicket = (b.eventType_ === "pub" || b.pubMode === "ticket") && b.pubMode === "ticket";
   const showTicket = isPubTicket && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -77,7 +84,7 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant={STATUS_VARIANT[b.status] ?? "default"}>{b.status}</Badge>
+              <Badge variant={STATUS_VARIANT[b.status] ?? "default"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
               {b.eventType_ === "pub" && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />{t("bookings.pub_badge")}</Badge>}
               {b.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />{t("bookings.ticket_badge")}</Badge>}
               {b.pubMode === "event" && <Badge variant="outline">{t("bookings.event_booking_badge")}</Badge>}

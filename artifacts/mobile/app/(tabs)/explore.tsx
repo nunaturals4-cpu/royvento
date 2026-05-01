@@ -151,7 +151,7 @@ export default function ExploreScreen() {
         style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}
       >
         <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Pub & Nightlife</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>{t("explore.pub_nightlife")}</Text>
           <TouchableOpacity
             onPress={openFilter}
             style={[styles.filterBtn, { backgroundColor: activeFilterCount > 0 ? colors.primary : colors.muted, borderColor: colors.border }]}
@@ -197,7 +197,7 @@ export default function ExploreScreen() {
             <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
               <Ionicons name="wine-outline" size={12} color={colors.primary} />
               <Text style={[styles.pillText, { color: colors.primary }]}>
-                {typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1)}s only
+                {t("explore.type_only", { type: typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1) })}
               </Text>
             </View>
           ) : null}
@@ -221,7 +221,7 @@ export default function ExploreScreen() {
             <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
               <Ionicons name="star" size={12} color={colors.primary} />
               <Text style={[styles.pillText, { color: colors.primary }]}>
-                {filters.minRating}+ stars
+                {t("explore.min_stars", { rating: filters.minRating })}
               </Text>
             </View>
           ) : null}
@@ -230,7 +230,7 @@ export default function ExploreScreen() {
             onPress={clearFilter}
           >
             <Ionicons name="close" size={12} color={colors.destructive} />
-            <Text style={[styles.pillText, { color: colors.destructive }]}>Clear</Text>
+            <Text style={[styles.pillText, { color: colors.destructive }]}>{t("explore.clear")}</Text>
           </TouchableOpacity>
         </ScrollView>
       ) : null}
@@ -266,7 +266,7 @@ export default function ExploreScreen() {
               {isFetchingNextPage ? (
                 <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
               ) : hasNextPage ? null : events.length > PAGE_SIZE ? (
-                <Text style={[styles.endText, { color: colors.mutedForeground }]}>All events loaded</Text>
+                <Text style={[styles.endText, { color: colors.mutedForeground }]}>{t("explore.all_loaded")}</Text>
               ) : null}
               <MobileFooter />
             </>

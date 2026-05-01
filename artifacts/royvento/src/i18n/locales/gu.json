@@ -66,7 +66,8 @@
     "send_reset_link": "રીસેટ લિંક મોકળો",
     "check_inbox_web": "તમારો ઇનબોક્સ જુઓ",
     "check_inbox_sub_web": "જો {email} Royvento પર નોંધાયેલું હೌय, તો ટூંક સમયમાં રીસેટ લિંક મળશે.",
-    "error": "ભૂલ"
+    "error": "ભૂલ",
+    "email_address": "ઇમેઇલ સરનામું"
   },
   "home": {
     "hero_eyebrow": "ભારતનો અગ્રણી પબ બુકિંગ પ્લેટફોર્મ",
@@ -214,7 +215,7 @@
     "upcoming": "આગળ",
     "past": "ભૂતકાળ",
     "status_pending": "બાકી",
-    "status_confirmed": "પુષ્ટ",
+    "status_confirmed": "પુષ્ટિ થઈ",
     "status_cancelled": "રદ",
     "status_rejected": "નકાર",
     "download_ticket": "ટિકિટ ડાઉનલોડ",

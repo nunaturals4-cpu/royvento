@@ -112,7 +112,13 @@
     "roy_suggestion_1": "Best pubs in Bandra?",
     "roy_suggestion_2": "Events this weekend?",
     "roy_suggestion_3": "Couple-friendly venues?",
-    "roy_placeholder": "Ask Roy anything..."
+    "roy_placeholder": "Ask Roy anything...",
+    "see_all": "See all",
+    "discover": "Discover",
+    "events": "Events",
+    "roy_chat_title": "Roy — Nightlife AI",
+    "roy_online": "● Online",
+    "roy_intro": "Your personal nightlife assistant. Ask me about pubs, events, prices, or anything about the Indian nightlife scene!"
   },
   "explore": {
     "eyebrow": "Explore",
@@ -138,7 +144,12 @@
     "minimum_rating": "Minimum Rating",
     "any": "Any",
     "apply_filters": "Apply Filters",
-    "search_placeholder": "Search events, venues, cities…"
+    "search_placeholder": "Search events, venues, cities…",
+    "pub_nightlife": "Pub & Nightlife",
+    "type_only": "%{type}s only",
+    "min_stars": "%{rating}+ stars",
+    "clear": "Clear",
+    "all_loaded": "All events loaded"
   },
   "pubs": {
     "title": "Pubs & Clubs",

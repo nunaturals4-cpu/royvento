@@ -112,7 +112,13 @@
     "roy_suggestion_1": "बांद्रा में बेस्ट पब?",
     "roy_suggestion_2": "इस वीकेंड के इवेंट?",
     "roy_suggestion_3": "कपल-फ्रेंडली वेन्यू?",
-    "roy_placeholder": "रॉय से कुछ भी पूछें..."
+    "roy_placeholder": "रॉय से कुछ भी पूछें...",
+    "see_all": "सभी देखें",
+    "discover": "खोजें",
+    "events": "इवेंट",
+    "roy_chat_title": "रॉय — नाइटलाइफ़ AI",
+    "roy_online": "● ऑनलाइन",
+    "roy_intro": "आपका निजी नाइटलाइफ़ असिस्टेंट। पब, इवेंट, कीमतें या भारतीय नाइटलाइफ़ के बारे में कुछ भी पूछें!"
   },
   "explore": {
     "eyebrow": "एक्सप्लोर",
@@ -138,7 +144,12 @@
     "minimum_rating": "न्यूनतम रेटिंग",
     "any": "कोई भी",
     "apply_filters": "फ़िल्टर लगाएं",
-    "search_placeholder": "इवेंट, वेन्यू, शहर खोजें…"
+    "search_placeholder": "इवेंट, वेन्यू, शहर खोजें…",
+    "pub_nightlife": "पब और नाइटलाइफ़",
+    "type_only": "केवल %{type}",
+    "min_stars": "%{rating}+ सितारे",
+    "clear": "साफ़ करें",
+    "all_loaded": "सभी इवेंट लोड हो गए"
   },
   "pubs": {
     "title": "पब और क्लब",

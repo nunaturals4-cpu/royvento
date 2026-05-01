@@ -112,7 +112,13 @@
     "roy_suggestion_1": "બાંદ્રામાં શ્રેષ્ઠ પબ?",
     "roy_suggestion_2": "આ વીકેંડમાં ઇવેંટ?",
     "roy_suggestion_3": "કપલ-ફ્રેંડલી વેન્યુ?",
-    "roy_placeholder": "રೌযને કુછ પણ પூછો..."
+    "roy_placeholder": "રೌযને કુછ પણ પூછો...",
+    "see_all": "બધું જુઓ",
+    "discover": "શોધો",
+    "events": "ઇવેન્ટ્સ",
+    "roy_chat_title": "રૉય — નાઇટલાઇફ AI",
+    "roy_online": "● ઓનલાઇન",
+    "roy_intro": "તમારો વ્યક્તિગત નાઇટલાઇફ સહાયક. પબ, ઇવેન્ટ, ભાવ અથવા ભારતીય નાઇટલાઇફ વિશે કંઈ પણ પૂછો!"
   },
   "explore": {
     "eyebrow": "અન્વેષણ",
@@ -138,7 +144,12 @@
     "minimum_rating": "ഓඡેદ રેટિંગ",
     "any": "કોઈ પણ",
     "apply_filters": "ફિલ્ટર લાગુ કરો",
-    "search_placeholder": "ઇવેંટ, વેન્યુ, શહેર શોધો…"
+    "search_placeholder": "ઇવેંટ, વેન્યુ, શહેર શોધો…",
+    "pub_nightlife": "પબ & નાઇટલાઇફ",
+    "type_only": "ફક્ત %{type}",
+    "min_stars": "%{rating}+ સ્ટાર",
+    "clear": "સાફ કરો",
+    "all_loaded": "બધી ઇવેન્ટ્સ લોડ થઈ"
   },
   "pubs": {
     "title": "પબ અને ક્લબ",

@@ -136,8 +136,8 @@ export default function HomeScreen() {
       >
         <View style={styles.heroInner}>
           <Text style={[styles.heroTitle, { color: colors.foreground }]}>
-            Discover{" "}
-            <Text style={{ color: colors.primary }}>Events</Text>
+            {t("home.discover")}{" "}
+            <Text style={{ color: colors.primary }}>{t("home.events")}</Text>
           </Text>
           <Pressable
             onPress={() => router.push("/(tabs)/explore")}
@@ -303,8 +303,8 @@ export default function HomeScreen() {
               <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_700Bold", fontSize: 12 }}>R</Text>
             </View>
             <View>
-              <Text style={[styles.chatTitle, { color: colors.foreground }]}>Roy — Nightlife AI</Text>
-              <Text style={[styles.chatSub, { color: "#22c55e" }]}>● Online</Text>
+              <Text style={[styles.chatTitle, { color: colors.foreground }]}>{t("home.roy_chat_title")}</Text>
+              <Text style={[styles.chatSub, { color: "#22c55e" }]}>{t("home.roy_online")}</Text>
             </View>
           </View>
           <Pressable onPress={() => setChatOpen(false)}>
@@ -326,7 +326,7 @@ export default function HomeScreen() {
               </View>
               <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>{t("home.roy_title")}</Text>
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center", lineHeight: 21 }}>
-                Your personal nightlife assistant. Ask me about pubs, events, prices, or anything about the Indian nightlife scene!
+                {t("home.roy_intro")}
               </Text>
               {[t("home.roy_suggestion_1"), t("home.roy_suggestion_2"), t("home.roy_suggestion_3")].map((q) => (
                 <Pressable
@@ -390,6 +390,7 @@ function Section({
   onSeeAll?: () => void;
   icon?: React.ComponentProps<typeof Ionicons>["name"];
 }) {
+  const { t } = useLanguage();
   const colors = useColors();
   return (
     <View style={styles.section}>
@@ -400,7 +401,7 @@ function Section({
         </View>
         {onSeeAll ? (
           <Pressable onPress={onSeeAll}>
-            <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+            <Text style={[styles.seeAll, { color: colors.primary }]}>{t("home.see_all")}</Text>
           </Pressable>
         ) : null}
       </View>

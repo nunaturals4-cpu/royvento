@@ -66,7 +66,8 @@
     "send_reset_link": "மீட்டமை இணைப்பு அனுப்பு",
     "check_inbox_web": "உங்கள் இன்பாக்ஸ் சரிபார்க்கவும்",
     "check_inbox_sub_web": "{email} Royvento-ல் பதிவாகியிருந்தால், மீட்டமை இணைப்பு கிடைக்கும்.",
-    "error": "பிழை"
+    "error": "பிழை",
+    "email_address": "மின்னஞ்சல் முகவரி"
   },
   "home": {
     "hero_eyebrow": "இந்தியாவின் முன்னணி பப் முன்பதிவு தளம்",
@@ -213,9 +214,9 @@
     "explore": "நிகழ்வுகளை ஆராயுங்கள்",
     "upcoming": "வரவிருக்கும்",
     "past": "கடந்த",
-    "status_pending": "நிலுவையில்",
+    "status_pending": "நிலுவை",
     "status_confirmed": "உறுதிப்படுத்தப்பட்டது",
-    "status_cancelled": "ரத்து செய்யப்பட்டது",
+    "status_cancelled": "ரத்து",
     "status_rejected": "நிராகரிக்கப்பட்டது",
     "download_ticket": "டிக்கெட் பதிவிறக்கவும்",
     "cancel": "முன்பதிவை ரத்து செய்க",
@@ -223,7 +224,7 @@
     "subtitle": "உங்கள் அனைத்து முன்பதிவுகளும் ஒரே இடத்தில்",
     "total_label": "மொத்தம்",
     "status_payment_pending": "கட்டணம் நிலுவை",
-    "status_completed": "நிறைவு",
+    "status_completed": "முடிந்தது",
     "booked_on": "முன்பதிவு தேதி",
     "guests_label": "விருந்தினர்கள்",
     "pts_used": "புள்ளிகள் பயன்படுத்தப்பட்டன",

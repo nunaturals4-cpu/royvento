@@ -66,7 +66,8 @@
     "send_reset_link": "রিসেট লিংক পাঠান",
     "check_inbox_web": "আপনার ইনবক্স দেখুন",
     "check_inbox_sub_web": "যদি {email} Royvento-তে নিবন্ধিত থাকে, তাহলে শীঘ্রই রিসেট লিংক পাবেন।",
-    "error": "ত্রুটি"
+    "error": "ত্রুটি",
+    "email_address": "ইমেইল ঠিকানা"
   },
   "home": {
     "hero_eyebrow": "ভারতের প্রধান পাব বুকিং প্ল্যাটফর্ম",
@@ -213,7 +214,7 @@
     "explore": "ইভেন্ট এক্সপ্লোর করুন",
     "upcoming": "আসন্ন",
     "past": "অতীত",
-    "status_pending": "অপেক্ষমাণ",
+    "status_pending": "মুলতুবি",
     "status_confirmed": "নিশ্চিত",
     "status_cancelled": "বাতিল",
     "status_rejected": "প্রত্যাখ্যাত",

@@ -66,7 +66,8 @@
     "send_reset_link": "ਰੀਸੈੱਟ ਲਿੰਕ ਭੇਜੋ",
     "check_inbox_web": "ਆਪਣਾ ਇਨਬਾਕਸ ਦੇਖੋ",
     "check_inbox_sub_web": "ਜੇ {email} Royvento ਤੇ ਦਰਜ ਹੈ, ਤਾਂ ਤੁਹਾਨੂੰ ਜਲਦੀ ਰੀਸੈੱਟ ਲਿੰਕ ਮਿਲੇਗਾ।",
-    "error": "ਗਲਤੀ"
+    "error": "ਗਲਤੀ",
+    "email_address": "ਈਮੇਲ ਪਤਾ"
   },
   "home": {
     "hero_eyebrow": "ਭਾਰਤ ਦਾ ਪ੍ਰਮੁੱਖ ਪੱਬ ਬੁਕਿੰਗ ਪਲੇਟਫਾਰਮ",
@@ -213,7 +214,7 @@
     "explore": "ਇਵੈਂਟ ਐਕਸਪਲੋਰ ਕਰੋ",
     "upcoming": "ਆਉਣ ਵਾਲੇ",
     "past": "ਪਿਛਲੇ",
-    "status_pending": "ਲੰਬਿਤ",
+    "status_pending": "ਬਕਾਇਆ",
     "status_confirmed": "ਪੁਸ਼ਟੀ ਹੋਈ",
     "status_cancelled": "ਰੱਦ",
     "status_rejected": "ਰੱਦ ਕੀਤੀ",
@@ -223,7 +224,7 @@
     "subtitle": "ਤੁਹਾਡੀਆਂ ਸਾਰੀਆਂ ਬੁਕਿੰਗਾਂ ਇੱਕ ਥਾਂ",
     "total_label": "ਕੁੱਲ",
     "status_payment_pending": "ਭੁਗਤਾਨ ਬਕਾਇਆ",
-    "status_completed": "ਪੂਰਾ",
+    "status_completed": "ਮੁਕੰਮਲ",
     "booked_on": "ਬੁਕਿੰਗ ਮਿਤੀ",
     "guests_label": "ਮਹਿਮਾਨ",
     "pts_used": "ਪੁਆਇੰਟ ਵਰਤੇ",

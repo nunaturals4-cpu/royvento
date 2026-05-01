@@ -112,7 +112,13 @@
     "roy_suggestion_1": "ਬਾਂਦਰਾ ਵਿੱਚ ਸਭ ਤੋਂ ਵਧੀਆ ਪਬ?",
     "roy_suggestion_2": "ਇਸ ਵੀਕੈਂਡ ਦੇ ਇਵੈਂਟ?",
     "roy_suggestion_3": "ਕਪਲ-ਫ੍ਰੈਂਡਲੀ ਵੇਨਿਊ?",
-    "roy_placeholder": "ਰੌਏ ਨੂੰ ਕੁਝ ਵੀ ਪੁੱਛੋ..."
+    "roy_placeholder": "ਰੌਏ ਨੂੰ ਕੁਝ ਵੀ ਪੁੱਛੋ...",
+    "see_all": "ਸਭ ਵੇਖੋ",
+    "discover": "ਖੋਜੋ",
+    "events": "ਇਵੈਂਟ",
+    "roy_chat_title": "ਰਾਏ — ਨਾਈਟਲਾਈਫ਼ AI",
+    "roy_online": "● ਆਨਲਾਈਨ",
+    "roy_intro": "ਤੁਹਾਡਾ ਨਿੱਜੀ ਨਾਈਟਲਾਈਫ਼ ਅਸਿਸਟੈਂਟ। ਪੱਬ, ਇਵੈਂਟ, ਕੀਮਤਾਂ ਜਾਂ ਭਾਰਤੀ ਨਾਈਟਲਾਈਫ਼ ਬਾਰੇ ਕੁਝ ਵੀ ਪੁੱਛੋ!"
   },
   "explore": {
     "eyebrow": "ਐਕਸਪਲੋਰ",
@@ -138,7 +144,12 @@
     "minimum_rating": "ਘੱਟੋ-ਘੱਟ ਰੇਟਿੰਗ",
     "any": "ਕੋਈ ਵੀ",
     "apply_filters": "ਫਿਲਟਰ ਲਗਾਓ",
-    "search_placeholder": "ਇਵੈਂਟ, ਵੇਨਿਊ, ਸ਼ਹਿਰ ਲੱਭੋ…"
+    "search_placeholder": "ਇਵੈਂਟ, ਵੇਨਿਊ, ਸ਼ਹਿਰ ਲੱਭੋ…",
+    "pub_nightlife": "ਪੱਬ ਅਤੇ ਨਾਈਟਲਾਈਫ਼",
+    "type_only": "ਸਿਰਫ਼ %{type}",
+    "min_stars": "%{rating}+ ਸਿਤਾਰੇ",
+    "clear": "ਸਾਫ਼ ਕਰੋ",
+    "all_loaded": "ਸਾਰੇ ਇਵੈਂਟ ਲੋਡ ਹੋ ਗਏ"
   },
   "pubs": {
     "title": "ਪੱਬ ਅਤੇ ਕਲੱਬ",

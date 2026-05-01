@@ -66,7 +66,8 @@
     "send_reset_link": "Send reset link",
     "check_inbox_web": "Check your inbox",
     "check_inbox_sub_web": "If {email} is registered on Royvento, you will receive a password reset link shortly.",
-    "error": "Error"
+    "error": "Error",
+    "email_address": "Email address"
   },
   "home": {
     "hero_eyebrow": "India's premier pub booking platform",
@@ -220,7 +221,7 @@
     "status_confirmed": "Confirmed",
     "status_cancelled": "Cancelled",
     "status_rejected": "Rejected",
-    "status_payment_pending": "Payment pending",
+    "status_payment_pending": "Payment Pending",
     "status_completed": "Completed",
     "booked_on": "Booked",
     "guests_label": "guests",

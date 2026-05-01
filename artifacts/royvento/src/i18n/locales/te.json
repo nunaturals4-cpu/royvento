@@ -66,7 +66,8 @@
     "send_reset_link": "రీసెట్ లింక్ పంపండి",
     "check_inbox_web": "మీ ఇన్‌బాక్స్ తనిఖీ చేయండి",
     "check_inbox_sub_web": "{email} Royvento లో నమోదైతే, త్వరలో రీసెట్ లింక్ వస్తుంది.",
-    "error": "లోపం"
+    "error": "లోపం",
+    "email_address": "ఇమెయిల్ చిరునామా"
   },
   "home": {
     "hero_eyebrow": "భారతదేశంలో అగ్రశ్రేణి పబ్ బుకింగ్ ప్లాట్‌ఫారమ్",
@@ -215,7 +216,7 @@
     "past": "గత",
     "status_pending": "పెండింగ్",
     "status_confirmed": "నిర్ధారించబడింది",
-    "status_cancelled": "రద్దు చేయబడింది",
+    "status_cancelled": "రద్దు",
     "status_rejected": "తిరస్కరించబడింది",
     "download_ticket": "టికెట్ డౌన్‌లోడ్ చేయండి",
     "cancel": "బుకింగ్ రద్దు చేయండి",
@@ -223,7 +224,7 @@
     "subtitle": "మీ అన్ని బుకింగ్‌లు ఒకే చోట",
     "total_label": "మొత్తం",
     "status_payment_pending": "చెల్లింపు పెండింగ్",
-    "status_completed": "పూర్తయింది",
+    "status_completed": "పూర్తైంది",
     "booked_on": "బుక్ చేసిన తేదీ",
     "guests_label": "అతిథులు",
     "pts_used": "పాయింట్లు వాడారు",

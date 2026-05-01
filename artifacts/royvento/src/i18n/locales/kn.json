@@ -66,7 +66,8 @@
     "send_reset_link": "ಮರುಹೊಂದಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ",
     "check_inbox_web": "ನಿಮ್ಮ ಇನ್‌ಬಾಕ್ಸ್ ಪರಿಶೀಲಿಸಿ",
     "check_inbox_sub_web": "ಅಂ {email} Royvento ನಲ್ಲಿ ನೋಂದಾಯಿಸಿದ್ದರೆ, ಶೀಘ್ರದಲ್ಲೇ ರೀಸೆಟ್ ಲಿಂಕ್ ಪಡೆಯುತ್ತೀರಿ.",
-    "error": "ದೋಷ"
+    "error": "ದೋಷ",
+    "email_address": "ಇಮೇಲ್ ವಿಳಾಸ"
   },
   "home": {
     "hero_eyebrow": "ಭಾರತದ ಪ್ರಮುಖ ಪಬ್ ಬುಕಿಂಗ್ ಪ್ಲಾಟ್‌ಫಾರ್ಮ್",
@@ -215,7 +216,7 @@
     "past": "ಹಿಂದಿನ",
     "status_pending": "ಬಾಕಿ",
     "status_confirmed": "ದೃಢೀಕರಿಸಲಾಗಿದೆ",
-    "status_cancelled": "ರದ್ದಾಗಿದೆ",
+    "status_cancelled": "ರದ್ದು",
     "status_rejected": "ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
     "download_ticket": "ಟಿಕೆಟ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
     "cancel": "ಬುಕಿಂಗ್ ರದ್ದು ಮಾಡಿ",
@@ -223,7 +224,7 @@
     "subtitle": "ನಿಮ್ಮ ಎಲ್ಲಾ ಬುಕಿಂಗ್‌ಗಳು ಒಂದೇ ಕಡೆ",
     "total_label": "ಒಟ್ಟು",
     "status_payment_pending": "ಪಾವತಿ ಬಾಕಿ",
-    "status_completed": "ಪೂರ್ಣ",
+    "status_completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
     "booked_on": "ಬುಕ್ ಮಾಡಲಾಗಿದೆ",
     "guests_label": "ಅತಿಥಿಗಳು",
     "pts_used": "ಪಾಯಿಂಟ್‌ಗಳು ಬಳಸಲಾಗಿವೆ",
