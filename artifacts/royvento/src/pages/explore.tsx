@@ -168,9 +168,24 @@ export function Explore() {
           <p>{t("explore.loading")}</p>
         </div>
       ) : filteredEvents.length === 0 ? (
-        <div className="rounded-3xl glass-card p-16 text-center">
+        <div className="rounded-3xl glass-card p-16 text-center space-y-4">
           <p className="font-serif text-3xl mb-2">{t("explore.no_match")}</p>
           <p className="text-muted-foreground">{t("explore.no_match_sub")}</p>
+          {hasNextPage && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="px-8 py-3 rounded-full border border-white/10 text-sm font-medium text-muted-foreground hover:border-white/20 hover:text-foreground transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+              >
+                {isFetchingNextPage ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</>
+                ) : (
+                  "Load more events"
+                )}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <>
