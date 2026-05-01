@@ -249,7 +249,16 @@
     "pdf": "PDF",
     "women": "ಮಹಿಳೆ",
     "men": "ಪುರುಷ",
-    "couple": "ಕಪಲ್"
+    "couple": "ಕಪಲ್",
+    "guest": "ಅತಿಥಿ",
+    "date": "ದಿನಾಂಕ",
+    "tickets": "ಟಿಕೆಟ್ಗಳು",
+    "guests": "ಅತಿಥಿಗಳು",
+    "amount_paid": "ಪಾವತಿ ಮಾಡಿದ ಮೊತ್ತ",
+    "present_at_entrance": "ಪ್ರವೇಶದ್ವಾರದಲ್ಲಿ ಈ ಟಿಕೆಟ್ ತೋರಿಸಿ.",
+    "non_transferable": "ವರ್ಗಾಯಿಸಲಾಗದ",
+    "partner": "ಪಾರ್ಟ್ನರ್",
+    "approved_by": "ಅನುಮೋದಿಸಿದವರು"
   },
   "common": {
     "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",

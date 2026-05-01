@@ -377,10 +377,10 @@ function PremiumTicket({ b }: { b: any }) {
               <div class="event-title">${esc(b.eventTitle)}</div>
               ${b.eventCity ? `<div class="event-city">${esc(b.eventCity)}</div>` : ""}
               <div class="fields">
-                <div><div class="field-lbl">Guest</div><div class="field-val">${esc(b.personName || b.userName)}</div></div>
-                <div><div class="field-lbl">Date</div><div class="field-val">${esc(b.bookingDate)}</div></div>
-                <div><div class="field-lbl">Tickets</div><div class="field-val-sm">${ticketBreakdown || "&mdash;"}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} guest${total !== 1 ? "s" : ""}</span></div></div>
-                <div><div class="field-lbl">Approved by</div><div class="field-val" style="text-transform:capitalize;">${esc(b.approvedBy || "partner")}</div></div>
+                <div><div class="field-lbl">${esc(t("bookings.guest"))}</div><div class="field-val">${esc(b.personName || b.userName)}</div></div>
+                <div><div class="field-lbl">${esc(t("bookings.date"))}</div><div class="field-val">${esc(b.bookingDate)}</div></div>
+                <div><div class="field-lbl">${esc(t("bookings.tickets"))}</div><div class="field-val-sm">${ticketBreakdown || "&mdash;"}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} ${esc(t("bookings.guests"))}</span></div></div>
+                <div><div class="field-lbl">${esc(t("bookings.approved_by"))}</div><div class="field-val" style="text-transform:capitalize;">${esc(b.approvedBy || t("bookings.partner"))}</div></div>
               </div>
             </div>
             ${qrSvgHtml}
@@ -393,10 +393,10 @@ function PremiumTicket({ b }: { b: any }) {
         </div>
         <div class="footer-sec">
           <div>
-            <div class="price-lbl">Amount paid</div>
+            <div class="price-lbl">${esc(t("bookings.amount_paid"))}</div>
             <div class="price-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</div>
           </div>
-          <div class="disclaimer">Present this ticket at the entrance.<br/>Non-transferable &middot; Royvento</div>
+          <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>${esc(t("bookings.non_transferable"))} &middot; Royvento</div>
         </div>
       </div>
       <script>window.onload=()=>window.print();</script>
@@ -487,20 +487,20 @@ function PremiumTicket({ b }: { b: any }) {
               {b.eventCity && <p className="text-xs text-white/35 mt-0.5 tracking-wide">{b.eventCity}</p>}
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-4 mt-6">
-                <TicketField label="Guest" value={b.personName || b.userName} />
-                <TicketField label="Date" value={b.bookingDate} />
+                <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
+                <TicketField label={t("bookings.date")} value={b.bookingDate} />
                 <TicketField
-                  label="Tickets"
+                  label={t("bookings.tickets")}
                   value={
                     ticketBreakdownParts.length > 0 ? (
                       <>
                         {ticketBreakdownParts.join(" · ")}
-                        <span className="text-white/35 ml-1 text-xs">({total} guests)</span>
+                        <span className="text-white/35 ml-1 text-xs">({total} {t("bookings.guests")})</span>
                       </>
-                    ) : `${total} guests`
+                    ) : `${total} ${t("bookings.guests")}`
                   }
                 />
-                <TicketField label="Approved by" value={<span className="capitalize">{b.approvedBy || "partner"}</span>} />
+                <TicketField label={t("bookings.approved_by")} value={<span className="capitalize">{b.approvedBy || t("bookings.partner")}</span>} />
               </div>
             </div>
 

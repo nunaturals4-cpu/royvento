@@ -365,7 +365,7 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.becomeVendorTitle, { color: colors.foreground }]}>{t("profile.list_venue")}</Text>
-            <Text style={[styles.becomeVendorSub, { color: colors.mutedForeground }]}>Apply to become a Royvento partner</Text>
+            <Text style={[styles.becomeVendorSub, { color: colors.mutedForeground }]}>{t("profile.apply_partner")}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.primary} />
         </TouchableOpacity>

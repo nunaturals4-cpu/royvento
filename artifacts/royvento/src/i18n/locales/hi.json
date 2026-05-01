@@ -249,7 +249,16 @@
     "pdf": "PDF",
     "women": "महिला",
     "men": "पुरुष",
-    "couple": "कपल"
+    "couple": "कपल",
+    "guest": "अतिथि",
+    "date": "तारीख",
+    "tickets": "टिकट",
+    "guests": "अतिथि",
+    "amount_paid": "भुगतान राशि",
+    "present_at_entrance": "प्रवेश पर यह टिकट दिखाएं।",
+    "non_transferable": "अहस्तांतरणीय",
+    "partner": "पार्टनर",
+    "approved_by": "अनुमोदित द्वारा"
   },
   "common": {
     "loading": "लोड हो रहा है…",

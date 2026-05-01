@@ -249,7 +249,16 @@
     "pdf": "PDF",
     "women": "మహిళ",
     "men": "పురుషుడు",
-    "couple": "జంట"
+    "couple": "జంట",
+    "guest": "అతిథి",
+    "date": "తేదీ",
+    "tickets": "టికెట్లు",
+    "guests": "అతిథులు",
+    "amount_paid": "చెల్లించిన మొత్తం",
+    "present_at_entrance": "ప్రవేశద్వారం వద్ద ఈ టికెట్ చూపించండి.",
+    "non_transferable": "బదిలీ చేయలేనిది",
+    "partner": "భాగస్వామి",
+    "approved_by": "ఆమోదించినది"
   },
   "common": {
     "loading": "లోడ్ అవుతోంది…",

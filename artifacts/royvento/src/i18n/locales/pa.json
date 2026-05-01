@@ -249,7 +249,16 @@
     "pdf": "PDF",
     "women": "ਮਹਿਲਾ",
     "men": "ਪੁਰਸ਼",
-    "couple": "ਜੋੜਾ"
+    "couple": "ਜੋੜਾ",
+    "guest": "ਮਹਿਮਾਨ",
+    "date": "ਤਾਰੀਖ਼",
+    "tickets": "ਟਿਕਟਾਂ",
+    "guests": "ਮਹਿਮਾਨ",
+    "amount_paid": "ਅਦਾ ਕੀਤੀ ਰਕਮ",
+    "present_at_entrance": "ਦਾਖਲੇ ਤੇ ਇਹ ਟਿਕਟ ਦਿਖਾਓ।",
+    "non_transferable": "ਅਟੱਲ",
+    "partner": "ਪਾਰਟਨਰ",
+    "approved_by": "ਮਨਜ਼ੂਰ ਕਰਨ ਵਾਲੇ"
   },
   "common": {
     "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",

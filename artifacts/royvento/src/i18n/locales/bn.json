@@ -249,7 +249,16 @@
     "pdf": "PDF",
     "women": "মহিলা",
     "men": "পুরুষ",
-    "couple": "দম্পতি"
+    "couple": "দম্পতি",
+    "guest": "অতিথি",
+    "date": "তারিখ",
+    "tickets": "টিকেট",
+    "guests": "অতিথি",
+    "amount_paid": "পরিশোধিত পরিমাণ",
+    "present_at_entrance": "প্রবেশদ্বারে এই টিকেট দেখান।",
+    "non_transferable": "অ-হস্তান্তরযোগ্য",
+    "partner": "পার্টনার",
+    "approved_by": "অনুমোদিত দ্বারা"
   },
   "common": {
     "loading": "লোড হচ্ছে…",

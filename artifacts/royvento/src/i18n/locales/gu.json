@@ -249,7 +249,16 @@
     "pdf": "PDF",
     "women": "મહિલા",
     "men": "પુરુષ",
-    "couple": "યુગલ"
+    "couple": "યુગલ",
+    "guest": "મહેમાન",
+    "date": "તારીખ",
+    "tickets": "ટિકિટો",
+    "guests": "મહેમાનો",
+    "amount_paid": "ચૂકવેલ રકમ",
+    "present_at_entrance": "પ્રવેશ પર આ ટિકિટ બતાવો.",
+    "non_transferable": "અહસ્તાંતરણીય",
+    "partner": "ભાગીદાર",
+    "approved_by": "મંજૂર કર્નારા"
   },
   "common": {
     "loading": "લોડ…",
