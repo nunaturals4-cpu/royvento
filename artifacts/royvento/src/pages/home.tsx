@@ -11,9 +11,11 @@ import {
   PartyPopper,
   Megaphone,
   Clock,
+  GlassWater,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useListFeaturedEvents } from "@workspace/api-client-react";
+import { useListFeaturedEvents, useListVendorDrinkOffers } from "@workspace/api-client-react";
+import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
 import { apiGet, formatINR } from "@/lib/api";
 import { useTranslation } from "react-i18next";
@@ -57,9 +59,20 @@ function sortCityFirst<T extends { city: string }>(items: T[], userCity: string)
   ];
 }
 
+function getPlanSummary(plan: DrinkPlanSummary): string {
+  if (plan.type === "welcome") return plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests";
+  if (plan.type === "unlimited") return plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests";
+  if (plan.type === "ticket") {
+    const count = (plan.lineItems ?? []).filter((i) => i.name).length;
+    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket";
+  }
+  return plan.productName || "Drink offer";
+}
+
 export function Home() {
   const { t } = useTranslation();
   const { data: featured = [] } = useListFeaturedEvents();
+  const { data: drinkOffers = [] } = useListVendorDrinkOffers();
   const [popular, setPopular] = useState<PublicEvent[]>([]);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -137,6 +150,55 @@ export function Home() {
           </div>
         </div>
       </section>
+
+      {/* Drink Deals */}
+      {drinkOffers.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-12">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
+                <GlassWater className="h-3.5 w-3.5" /> Drink Deals
+              </p>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Drink Deals at Our Partners</h2>
+            </div>
+            <Link href="/pubs" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
+              Browse pubs <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0">
+            {drinkOffers.map((offer: VendorDrinkOffer) => (
+              <Link key={offer.vendorId} href={`/vendors/${offer.vendorId}`}>
+                <div className="glass-card rounded-2xl overflow-hidden flex-shrink-0 w-64 hover:bg-white/5 transition-colors cursor-pointer lift-3d">
+                  <div className="h-36 bg-white/5 relative overflow-hidden">
+                    {offer.coverImageUrl ? (
+                      <img src={offer.coverImageUrl} alt={offer.vendorName} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full flex items-center justify-center">
+                        <GlassWater className="h-10 w-10 text-white/20" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-serif text-base font-semibold tracking-tight mb-2 truncate">{offer.vendorName}</h3>
+                    <div className="flex flex-col gap-1.5">
+                      {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
+                        <span key={i} className="text-xs text-white/65 flex items-center gap-1.5">
+                          <span className="h-1 w-1 rounded-full bg-primary flex-shrink-0" />
+                          {getPlanSummary(plan)}
+                        </span>
+                      ))}
+                      {offer.plans.length > 2 && (
+                        <span className="text-xs text-white/40">+{offer.plans.length - 2} more</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Value props */}
       <section className="container mx-auto px-4 md:px-6 py-24">

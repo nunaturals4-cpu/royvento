@@ -364,6 +364,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/Vendor"
 
+  /vendors/drink-offers:
+    get:
+      operationId: listVendorDrinkOffers
+      tags: [vendors]
+      summary: List approved vendors that have at least one drink plan
+      responses:
+        "200":
+          description: Vendor drink offers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VendorDrinkOffer"
+
   /vendors/{vendorId}/drink-plans:
     get:
       operationId: listVendorDrinkPlans
@@ -2381,3 +2396,36 @@ components:
           items:
             $ref: "#/components/schemas/DrinkPlanLineItem"
       required: [type]
+
+    DrinkPlanSummary:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [welcome, unlimited, ticket, custom]
+        productName:
+          type: string
+        gender:
+          type: string
+          enum: [all, female]
+        lineItems:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/DrinkPlanLineItem"
+      required: [type, productName, gender]
+
+    VendorDrinkOffer:
+      type: object
+      properties:
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        coverImageUrl:
+          type: string
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/DrinkPlanSummary"
+      required: [vendorId, vendorName, coverImageUrl, plans]

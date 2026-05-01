@@ -292,6 +292,43 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
   res.json(await serializeVendor(v));
 });
 
+router.get("/vendors/drink-offers", async (_req, res) => {
+  const vendorIdsWithPlans = await db
+    .selectDistinct({ vendorId: drinkPlansTable.vendorId })
+    .from(drinkPlansTable);
+  const ids = vendorIdsWithPlans.map((r) => r.vendorId);
+  if (ids.length === 0) { res.json([]); return; }
+  const vendors = await db
+    .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, coverImageUrl: vendorsTable.coverImageUrl })
+    .from(vendorsTable)
+    .where(and(eq(vendorsTable.status, "approved"), inArray(vendorsTable.id, ids)));
+  const plans = await db
+    .select()
+    .from(drinkPlansTable)
+    .where(inArray(drinkPlansTable.vendorId, ids))
+    .orderBy(drinkPlansTable.createdAt);
+  const plansByVendor = new Map<number, typeof plans>();
+  for (const plan of plans) {
+    const arr = plansByVendor.get(plan.vendorId) ?? [];
+    arr.push(plan);
+    plansByVendor.set(plan.vendorId, arr);
+  }
+  const result = vendors
+    .map((v) => ({
+      vendorId: v.id,
+      vendorName: v.businessName,
+      coverImageUrl: v.coverImageUrl,
+      plans: (plansByVendor.get(v.id) ?? []).map((p) => ({
+        type: p.type,
+        productName: p.productName,
+        gender: p.gender,
+        lineItems: p.lineItems,
+      })),
+    }))
+    .filter((v) => v.plans.length > 0);
+  res.json(result);
+});
+
 router.get("/vendors/:vendorId", async (req, res) => {
   const id = Number(req.params["vendorId"]);
   if (!Number.isFinite(id)) {

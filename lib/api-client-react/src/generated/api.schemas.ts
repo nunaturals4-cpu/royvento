@@ -702,6 +702,38 @@ export interface DrinkPlanBody {
   lineItems?: DrinkPlanLineItem[] | null;
 }
 
+export type DrinkPlanSummaryType =
+  (typeof DrinkPlanSummaryType)[keyof typeof DrinkPlanSummaryType];
+
+export const DrinkPlanSummaryType = {
+  welcome: "welcome",
+  unlimited: "unlimited",
+  ticket: "ticket",
+  custom: "custom",
+} as const;
+
+export type DrinkPlanSummaryGender =
+  (typeof DrinkPlanSummaryGender)[keyof typeof DrinkPlanSummaryGender];
+
+export const DrinkPlanSummaryGender = {
+  all: "all",
+  female: "female",
+} as const;
+
+export interface DrinkPlanSummary {
+  type: DrinkPlanSummaryType;
+  productName: string;
+  gender: DrinkPlanSummaryGender;
+  lineItems?: DrinkPlanLineItem[] | null;
+}
+
+export interface VendorDrinkOffer {
+  vendorId: number;
+  vendorName: string;
+  coverImageUrl: string;
+  plans: DrinkPlanSummary[];
+}
+
 export type ListVendorsParams = {
   category?: string;
   country?: string;

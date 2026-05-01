@@ -601,6 +601,41 @@ export const RejectVendorResponse = zod.object({
 });
 
 /**
+ * @summary List approved vendors that have at least one drink plan
+ */
+
+export const listVendorDrinkOffersResponsePlansItemLineItemsItemDiscountedPriceMin = 0;
+
+export const ListVendorDrinkOffersResponseItem = zod.object({
+  vendorId: zod.number(),
+  vendorName: zod.string(),
+  coverImageUrl: zod.string(),
+  plans: zod.array(
+    zod.object({
+      type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+      productName: zod.string(),
+      gender: zod.enum(["all", "female"]),
+      lineItems: zod
+        .array(
+          zod.object({
+            name: zod.string(),
+            qty: zod.number().min(1),
+            discountedPrice: zod
+              .number()
+              .min(
+                listVendorDrinkOffersResponsePlansItemLineItemsItemDiscountedPriceMin,
+              ),
+          }),
+        )
+        .nullish(),
+    }),
+  ),
+});
+export const ListVendorDrinkOffersResponse = zod.array(
+  ListVendorDrinkOffersResponseItem,
+);
+
+/**
  * @summary Get drink plans for a vendor
  */
 export const ListVendorDrinkPlansParams = zod.object({

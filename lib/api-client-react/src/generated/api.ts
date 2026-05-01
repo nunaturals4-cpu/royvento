@@ -65,6 +65,7 @@ import type {
   UploadUrlResponse,
   User,
   Vendor,
+  VendorDrinkOffer,
   WishlistAddResponse,
   WishlistItem,
 } from "./api.schemas";
@@ -1543,6 +1544,81 @@ export const useRejectVendor = <
 > => {
   return useMutation(getRejectVendorMutationOptions(options));
 };
+
+/**
+ * @summary List approved vendors that have at least one drink plan
+ */
+export const getListVendorDrinkOffersUrl = () => {
+  return `/api/vendors/drink-offers`;
+};
+
+export const listVendorDrinkOffers = async (
+  options?: RequestInit,
+): Promise<VendorDrinkOffer[]> => {
+  return customFetch<VendorDrinkOffer[]>(getListVendorDrinkOffersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListVendorDrinkOffersQueryKey = () => {
+  return [`/api/vendors/drink-offers`] as const;
+};
+
+export const getListVendorDrinkOffersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listVendorDrinkOffers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listVendorDrinkOffers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListVendorDrinkOffersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listVendorDrinkOffers>>
+  > = ({ signal }) => listVendorDrinkOffers({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listVendorDrinkOffers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListVendorDrinkOffersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listVendorDrinkOffers>>
+>;
+export type ListVendorDrinkOffersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List approved vendors that have at least one drink plan
+ */
+
+export function useListVendorDrinkOffers<
+  TData = Awaited<ReturnType<typeof listVendorDrinkOffers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listVendorDrinkOffers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVendorDrinkOffersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get drink plans for a vendor
