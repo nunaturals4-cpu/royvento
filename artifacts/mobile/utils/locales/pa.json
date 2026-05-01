@@ -153,7 +153,9 @@
     "type_only": "ਸਿਰਫ਼ %{type}",
     "min_stars": "%{rating}+ ਸਿਤਾਰੇ",
     "clear": "ਸਾਫ਼ ਕਰੋ",
-    "all_loaded": "ਸਾਰੇ ਇਵੈਂਟ ਲੋਡ ਹੋ ਗਏ"
+    "all_loaded": "ਸਾਰੇ ਇਵੈਂਟ ਲੋਡ ਹੋ ਗਏ",
+    "free_entry": "ਸਿਰਫ਼ ਮੁਫ਼ਤ ਦਾਖਲਾ",
+    "free_entry_pill": "ਮੁਫ਼ਤ ਦਾਖਲਾ"
   },
   "pubs": {
     "title": "ਪੱਬ ਅਤੇ ਕਲੱਬ",

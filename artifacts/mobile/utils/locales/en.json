@@ -153,7 +153,9 @@
     "type_only": "%{type}s only",
     "min_stars": "%{rating}+ stars",
     "clear": "Clear",
-    "all_loaded": "All events loaded"
+    "all_loaded": "All events loaded",
+    "free_entry": "Free Entry Only",
+    "free_entry_pill": "Free Entry"
   },
   "pubs": {
     "title": "Pubs & Clubs",

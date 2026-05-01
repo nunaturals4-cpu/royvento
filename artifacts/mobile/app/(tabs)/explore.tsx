@@ -34,12 +34,13 @@ interface FilterState {
   minPrice: string;
   maxPrice: string;
   minRating: string;
+  freeEntry: boolean;
 }
 
-const EMPTY_FILTER: FilterState = { country: "", state: "", city: "", minPrice: "", maxPrice: "", minRating: "" };
+const EMPTY_FILTER: FilterState = { country: "", state: "", city: "", minPrice: "", maxPrice: "", minRating: "", freeEntry: false };
 
 function countActiveFilters(f: FilterState) {
-  return ((f.country || f.state || f.city) ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0) + (f.minRating ? 1 : 0);
+  return ((f.country || f.state || f.city) ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0) + (f.minRating ? 1 : 0) + (f.freeEntry ? 1 : 0);
 }
 
 export default function ExploreScreen() {
@@ -111,7 +112,9 @@ export default function ExploreScreen() {
 
   const minRatingNum = filters.minRating ? parseFloat(filters.minRating) : 0;
   const events = (paginatedData?.pages.flatMap((p) => p.data) ?? []).filter(
-    (item) => !minRatingNum || (item.rating ?? 0) >= minRatingNum
+    (item) =>
+      (!minRatingNum || (item.rating ?? 0) >= minRatingNum) &&
+      (!filters.freeEntry || item.freeEntryRules?.enabled === true)
   );
 
   function handleSearchChange(text: string) {
@@ -222,6 +225,14 @@ export default function ExploreScreen() {
               <Ionicons name="star" size={12} color={colors.primary} />
               <Text style={[styles.pillText, { color: colors.primary }]}>
                 {t("explore.min_stars", { rating: filters.minRating })}
+              </Text>
+            </View>
+          ) : null}
+          {filters.freeEntry ? (
+            <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
+              <Ionicons name="ticket-outline" size={12} color={colors.primary} />
+              <Text style={[styles.pillText, { color: colors.primary }]}>
+                {t("explore.free_entry_pill")}
               </Text>
             </View>
           ) : null}
@@ -386,6 +397,32 @@ export default function ExploreScreen() {
               </ScrollView>
             </View>
 
+            {/* Free Entry */}
+            <View style={styles.sheetSection}>
+              <Pressable
+                onPress={() => setDraftFilter((p) => ({ ...p, freeEntry: !p.freeEntry }))}
+                style={[styles.freeEntryRow, {
+                  backgroundColor: draftFilter.freeEntry ? colors.primary + "15" : colors.muted,
+                  borderColor: draftFilter.freeEntry ? colors.primary : colors.border,
+                }]}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                  <Ionicons name="ticket-outline" size={18} color={draftFilter.freeEntry ? colors.primary : colors.mutedForeground} />
+                  <Text style={[styles.freeEntryLabel, { color: draftFilter.freeEntry ? colors.primary : colors.foreground }]}>
+                    {t("explore.free_entry")}
+                  </Text>
+                </View>
+                <View style={[styles.toggleTrack, {
+                  backgroundColor: draftFilter.freeEntry ? colors.primary : colors.border,
+                }]}>
+                  <View style={[styles.toggleThumb, {
+                    backgroundColor: colors.card,
+                    transform: [{ translateX: draftFilter.freeEntry ? 18 : 2 }],
+                  }]} />
+                </View>
+              </Pressable>
+            </View>
+
             <View style={styles.sheetActions}>
               <TouchableOpacity style={[styles.clearBtn, { borderColor: colors.border }]} onPress={clearFilter}>
                 <Text style={[styles.clearBtnText, { color: colors.mutedForeground }]}>{t("explore.clear_all")}</Text>
@@ -432,4 +469,8 @@ const styles = StyleSheet.create({
   clearBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   applyBtn: { flex: 2, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   applyBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  freeEntryRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  freeEntryLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  toggleTrack: { width: 40, height: 22, borderRadius: 11, justifyContent: "center" },
+  toggleThumb: { width: 18, height: 18, borderRadius: 9, position: "absolute" },
 });

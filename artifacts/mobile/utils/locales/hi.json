@@ -153,7 +153,9 @@
     "type_only": "केवल %{type}",
     "min_stars": "%{rating}+ सितारे",
     "clear": "साफ़ करें",
-    "all_loaded": "सभी इवेंट लोड हो गए"
+    "all_loaded": "सभी इवेंट लोड हो गए",
+    "free_entry": "केवल फ्री एंट्री",
+    "free_entry_pill": "फ्री एंट्री"
   },
   "pubs": {
     "title": "पब और क्लब",

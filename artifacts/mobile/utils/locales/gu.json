@@ -153,7 +153,9 @@
     "type_only": "ફક્ત %{type}",
     "min_stars": "%{rating}+ સ્ટાર",
     "clear": "સાફ કરો",
-    "all_loaded": "બધી ઇવેન્ટ્સ લોડ થઈ"
+    "all_loaded": "બધી ઇવેન્ટ્સ લોડ થઈ",
+    "free_entry": "ફ્રી એન્ટ્રી માત્ર",
+    "free_entry_pill": "ફ્રી એન્ટ્રી"
   },
   "pubs": {
     "title": "પબ અને ક્લબ",
