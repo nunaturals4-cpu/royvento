@@ -256,7 +256,7 @@ export function TicketScanner() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
-  const [cameraMode, setCameraMode] = useState(false);
+  const [cameraMode, setCameraMode] = useState(true);
   const { toast } = useToast();
   const { accessStatus, managedVendors } = useAccessCheck();
 
