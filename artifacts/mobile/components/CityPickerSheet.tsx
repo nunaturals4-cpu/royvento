@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
@@ -57,10 +59,31 @@ function groupByLetter(cities: string[]): { title: string; data: string[] }[] {
     .map((letter) => ({ title: letter, data: groups[letter] }));
 }
 
+async function detectCityFromLocation(): Promise<string> {
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== "granted") return "";
+  const coords = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  const [place] = await Location.reverseGeocodeAsync({
+    latitude: coords.coords.latitude,
+    longitude: coords.coords.longitude,
+  });
+  const normalized = (name: string) => name.trim().toLowerCase();
+  const candidates = [place?.city, place?.subregion, place?.region].filter(Boolean) as string[];
+  for (const candidate of candidates) {
+    const match =
+      ALL_CITIES.find((c) => normalized(c) === normalized(candidate)) ??
+      ALL_CITIES.find((c) => normalized(candidate).includes(normalized(c))) ??
+      ALL_CITIES.find((c) => normalized(c).includes(normalized(candidate)));
+    if (match) return match;
+  }
+  return "";
+}
+
 export function CityPickerSheet({ visible, onClose, selectedCity, onSelect }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
+  const [locating, setLocating] = useState(false);
 
   const filteredCities = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -82,6 +105,21 @@ export function CityPickerSheet({ visible, onClose, selectedCity, onSelect }: Pr
     onSelect("");
     setQuery("");
     onClose();
+  }
+
+  async function handleUseMyLocation() {
+    setLocating(true);
+    try {
+      const city = await detectCityFromLocation();
+      if (city) {
+        onSelect(city);
+        setQuery("");
+        onClose();
+      }
+    } catch {
+    } finally {
+      setLocating(false);
+    }
   }
 
   return (
@@ -146,17 +184,36 @@ export function CityPickerSheet({ visible, onClose, selectedCity, onSelect }: Pr
             )}
           </View>
 
-          {selectedCity ? (
+          <View style={styles.actionRow}>
             <TouchableOpacity
-              style={[styles.clearAll, { borderColor: colors.border }]}
-              onPress={handleClear}
+              style={[styles.actionButton, { borderColor: colors.primary + "60", backgroundColor: colors.primary + "12" }]}
+              onPress={handleUseMyLocation}
+              disabled={locating}
+              activeOpacity={0.7}
             >
-              <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
-              <Text style={[styles.clearAllText, { color: colors.mutedForeground }]}>
-                Show all cities
+              {locating ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="navigate" size={13} color={colors.primary} />
+              )}
+              <Text style={[styles.actionButtonText, { color: colors.primary }]}>
+                {locating ? "Detecting…" : "Use my location"}
               </Text>
             </TouchableOpacity>
-          ) : null}
+
+            {selectedCity ? (
+              <TouchableOpacity
+                style={[styles.actionButton, { borderColor: colors.border }]}
+                onPress={handleClear}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close-circle-outline" size={13} color={colors.mutedForeground} />
+                <Text style={[styles.actionButtonText, { color: colors.mutedForeground }]}>
+                  Show all cities
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {isSearching ? (
             <FlatList
@@ -336,18 +393,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     padding: 0,
   },
-  clearAll: {
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 10,
+  },
+  actionButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    alignSelf: "flex-start",
-    marginBottom: 10,
   },
-  clearAllText: {
+  actionButtonText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
   },

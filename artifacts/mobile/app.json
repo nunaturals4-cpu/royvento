@@ -28,7 +28,10 @@
               "host": "reset-password"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -58,6 +61,12 @@
           "color": "#d4a017",
           "sounds": [],
           "mode": "production"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Royvento to use your location to show events near you."
         }
       ]
     ],
