@@ -219,7 +219,7 @@ export default function HomeScreen() {
                 price={item.priceWomen}
                 category="Pub"
                 type="pub"
-                popular
+                hasDrinkPlans={item.hasDrinkPlans}
                 freeEntryRules={item.freeEntryRules}
               />
             )}
@@ -354,6 +354,7 @@ export default function HomeScreen() {
                 price={item.price}
                 category={item.category}
                 type={item.type}
+                hasDrinkPlans={item.hasDrinkPlans}
                 freeEntryRules={item.freeEntryRules}
               />
             )}
