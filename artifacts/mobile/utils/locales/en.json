@@ -327,7 +327,9 @@
     "wishlist_add_error": "Could not add to wishlist",
     "wishlist_added": "Added to wishlist",
     "wishlist_removed": "Removed from wishlist",
-    "women": "Women"
+    "women": "Women",
+    "free_entry_today": "Free Entry Today",
+    "free_some_days": "Free some days"
   },
   "profile": {
     "my_profile": "My Profile",

@@ -327,7 +327,9 @@
     "wishlist_add_error": "উইশলিস্টে যোগ করা যায়নি",
     "wishlist_added": "উইশলিস্টে যোগ হয়েছে",
     "wishlist_removed": "উইশলিস্ট থেকে সরানো হয়েছে",
-    "women": "মহিলা"
+    "women": "মহিলা",
+    "free_entry_today": "আজ বিনামূল্যে প্রবেশ",
+    "free_some_days": "কিছু দিন বিনামূল্যে"
   },
   "profile": {
     "my_profile": "আমার প্রোফাইল",

@@ -50,6 +50,14 @@ export function EventCard({
 
   const isPub = type === "pub";
 
+  const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const fer = freeEntryRules;
+  const freeDays = fer?.enabled === true ? (fer.days ?? []) : [];
+  const hasFreeEntry = freeDays.length > 0;
+  const todayAbbr = DAY_ABBRS[new Date().getDay()];
+  const isFreeToday = hasFreeEntry && freeDays.includes(todayAbbr);
+  const freeLabel = isFreeToday ? "Free Entry Today" : "Free some days";
+
   return (
     <Pressable
       onPress={() => router.push(`/event/${id}`)}
@@ -115,11 +123,11 @@ export function EventCard({
             {formatPrice(priceNum)}
           </Text>
         ) : null}
-        {freeEntryRules?.enabled ? (
-          <View style={styles.freeEntryBadge}>
-            <View style={styles.freeEntryDot} />
-            <Text style={styles.freeEntryText}>
-              Free Entry{freeEntryRules.genders.length > 0 ? ` · ${freeEntryRules.genders.join(" & ")}` : ""}
+        {hasFreeEntry ? (
+          <View style={[styles.freeEntryBadge, isFreeToday && styles.freeEntryBadgeToday]}>
+            <View style={[styles.freeEntryDot, isFreeToday && styles.freeEntryDotToday]} />
+            <Text style={[styles.freeEntryText, isFreeToday && styles.freeEntryTextToday]}>
+              {freeLabel}
             </Text>
           </View>
         ) : null}
@@ -219,21 +227,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: "rgba(34,197,94,0.12)",
+    backgroundColor: "rgba(34,197,94,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.20)",
     alignSelf: "flex-start",
     marginTop: 2,
+  },
+  freeEntryBadgeToday: {
+    backgroundColor: "rgba(34,197,94,0.20)",
+    borderColor: "rgba(34,197,94,0.40)",
   },
   freeEntryDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
+    backgroundColor: "#4ade80",
+  },
+  freeEntryDotToday: {
     backgroundColor: "#22c55e",
   },
   freeEntryText: {
     fontSize: 9,
     fontFamily: "Inter_600SemiBold",
-    color: "#22c55e",
+    color: "#4ade80",
     textTransform: "uppercase",
     letterSpacing: 0.3,
+  },
+  freeEntryTextToday: {
+    color: "#22c55e",
   },
 });

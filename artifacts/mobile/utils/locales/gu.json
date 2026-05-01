@@ -327,7 +327,9 @@
     "wishlist_add_error": "વિષ્‌લિસ્ટમાં ઉમેરી શકાયું નહીં",
     "wishlist_added": "વિષ્‌લિસ્ટમાં ઉમેર્યું",
     "wishlist_removed": "વિષ્‌લિસ્ટ માંથી દૂર કર્યું",
-    "women": "મહિલાઓ"
+    "women": "મહિલાઓ",
+    "free_entry_today": "આજે મફત પ્રવેશ",
+    "free_some_days": "કેટલાક દિવસ મફત"
   },
   "profile": {
     "my_profile": "મારી પ્રોફ़ाइल",

@@ -327,7 +327,9 @@
     "wishlist_add_error": "ವಿಷ್‌ಲಿಸ್ಟ್‌ಗೆ ಸೇರಿಸಲಾಗಲಿಲ್ಲ",
     "wishlist_added": "ವಿಷ್‌ಲಿಸ್ಟ್‌ಗೆ ಸೇರಿಸಲಾಗಿದೆ",
     "wishlist_removed": "ವಿಷ್‌ಲಿಸ್ಟ್‌ನಿಂದ ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
-    "women": "ಮಹಿಳೆಯರು"
+    "women": "ಮಹಿಳೆಯರು",
+    "free_entry_today": "ಇಂದು ಉಚಿತ ಪ್ರವೇಶ",
+    "free_some_days": "ಕೆಲವು ದಿನ ಉಚಿತ"
   },
   "profile": {
     "my_profile": "ನನ್ನ ಪ್ರೊಫೈಲ್",

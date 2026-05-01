@@ -327,7 +327,9 @@
     "wishlist_add_error": "విష్‌లిస్ట్‌కు జోడించలేకపోయాం",
     "wishlist_added": "విష్‌లిస్ట్‌కు జోడించబడింది",
     "wishlist_removed": "విష్‌లిస్ట్ నుండి తీసివేయబడింది",
-    "women": "మహిళలు"
+    "women": "మహిళలు",
+    "free_entry_today": "ఈ రోజు ఉచిత ప్రవేశం",
+    "free_some_days": "కొన్ని రోజులు ఉచితం"
   },
   "profile": {
     "my_profile": "నా ప్రొఫైల్",

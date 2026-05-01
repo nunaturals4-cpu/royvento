@@ -327,7 +327,9 @@
     "wishlist_add_error": "विशलिस्ट में जोड़ नहीं सका",
     "wishlist_added": "विशलिस्ट में जोड़ा गया",
     "wishlist_removed": "विशलिस्ट से हटाया गया",
-    "women": "महिलाएँ"
+    "women": "महिलाएँ",
+    "free_entry_today": "आज मुफ़्त प्रवेश",
+    "free_some_days": "कुछ दिन मुफ़्त"
   },
   "profile": {
     "my_profile": "मेरा प्रोफ़ाइल",
