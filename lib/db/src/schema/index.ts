@@ -71,6 +71,7 @@ export const vendorsTable = pgTable(
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     ticketPrefix: varchar("ticket_prefix", { length: 8 }).notNull().default(""),
     ticketSalt: varchar("ticket_salt", { length: 32 }).notNull().default(""),
+    danceFloor: varchar("dance_floor", { length: 20 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

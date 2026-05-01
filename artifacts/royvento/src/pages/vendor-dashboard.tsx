@@ -161,12 +161,19 @@ function parseDayHours(raw: unknown): DayTimes {
   return out;
 }
 
+const DANCE_FLOOR_OPTIONS = [
+  { value: "dedicated", label: "Dedicated dance floor" },
+  { value: "general", label: "Dancing in main area" },
+  { value: "none", label: "No dancing / seated only" },
+] as const;
+
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [city, setCity] = useState(vendor.city ?? "");
   const [country, setCountry] = useState(vendor.country || "India");
+  const [danceFloor, setDanceFloor] = useState<string>(vendor.danceFloor ?? "");
   const [openDays, setOpenDays] = useState<string[]>(
     Array.isArray(vendor.openDays) && vendor.openDays.length > 0 ? vendor.openDays : [...ALL_DAYS]
   );
@@ -289,6 +296,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           try {
             await apiPatch("/api/partner/profile", {
               state: stateF, city, country, address, openDays, dayHours: dayHoursPayload,
+              danceFloor: danceFloor || null,
             });
             toast({ title: "Profile updated" });
             onSaved();
@@ -356,6 +364,31 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             <p className={`text-xs ml-auto ${description.length >= 300 ? "text-green-400" : "text-muted-foreground"}`}>
               {description.length} / 300
             </p>
+          </div>
+        </div>
+        <div>
+          <Label className="mb-3 block text-sm font-medium">Dance floor</Label>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {DANCE_FLOOR_OPTIONS.map(({ value, label }) => (
+              <label
+                key={value}
+                className={`flex items-center gap-2.5 cursor-pointer rounded-xl border px-4 py-3 text-sm transition-colors flex-1 ${
+                  danceFloor === value
+                    ? "border-primary/50 bg-primary/10 text-foreground"
+                    : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="danceFloor"
+                  value={value}
+                  checked={danceFloor === value}
+                  onChange={() => setDanceFloor(value)}
+                  className="accent-primary"
+                />
+                {label}
+              </label>
+            ))}
           </div>
         </div>
         <div>

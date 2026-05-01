@@ -31,6 +31,7 @@ interface VendorRow {
   portfolioImages: string[];
   openDays: string[];
   dayHours?: string | null;
+  danceFloor?: string | null;
   status: string;
   isPremium?: boolean;
   approvedAt?: Date | null;
@@ -92,6 +93,7 @@ async function serializeVendor(v: VendorRow) {
     crmTrialActive,
     crmTrialDaysRemaining,
     freeEntryRules,
+    danceFloor: v.danceFloor ?? null,
   };
 }
 
@@ -152,6 +154,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       reviewCount: r.reviewCount,
       createdAt: v.createdAt.toISOString(),
       freeEntryRules: freeEntryByVendor.get(v.id) ?? null,
+      danceFloor: v.danceFloor ?? null,
     };
   });
 }

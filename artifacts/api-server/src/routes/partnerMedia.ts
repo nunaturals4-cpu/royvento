@@ -113,6 +113,7 @@ const UpdatePartnerProfileBody = z.object({
   coverImageUrl: z.string().optional(),
   openDays: z.array(z.enum(VALID_DAYS)).optional(),
   dayHours: z.record(DayTimesSchema).optional(),
+  danceFloor: z.enum(["dedicated", "general", "none"]).nullable().optional(),
 });
 
 router.patch(
@@ -146,6 +147,8 @@ router.patch(
       updates["openDays"] = parsed.data.openDays;
     if (parsed.data.dayHours !== undefined)
       updates["dayHours"] = parsed.data.dayHours !== null ? JSON.stringify(parsed.data.dayHours) : null;
+    if (parsed.data.danceFloor !== undefined)
+      updates["danceFloor"] = parsed.data.danceFloor ?? null;
     const [v] = await db
       .update(vendorsTable)
       .set(updates)

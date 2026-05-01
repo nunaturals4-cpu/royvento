@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { EventCard } from "@/components/EventCard";
-import { Star, MapPin, Navigation, Clock, GlassWater } from "lucide-react";
+import { Star, MapPin, Navigation, Clock, GlassWater, Music2 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 
 interface DrinkPlan {
@@ -43,6 +43,7 @@ export function VendorDetail() {
   const events = allEvents.filter((e) => e.vendorId === vendor.id);
   const pubEvent = events.find((e) => e.type === "pub");
   const pubEventTypes: string[] = pubEvent?.pubEventTypes ?? [];
+  const danceFloor = (vendor as unknown as Record<string, unknown>)["danceFloor"] as string | null | undefined;
 
   const fmtTime = (hhmm: string) => {
     if (!hhmm) return "";
@@ -281,6 +282,34 @@ export function VendorDetail() {
                   {t}
                 </span>
               ))}
+            </div>
+          </section>
+        )}
+
+        {danceFloor && (
+          <section>
+            <h2 className="font-serif text-2xl mb-4 flex items-center gap-2">
+              <Music2 className="h-5 w-5 text-primary" />
+              Dance floor
+            </h2>
+            <div className="flex items-center gap-3">
+              {danceFloor === "dedicated" && (
+                <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
+                  <Music2 className="h-4 w-4" />
+                  Dedicated dance floor
+                </span>
+              )}
+              {danceFloor === "general" && (
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-foreground">
+                  <Music2 className="h-4 w-4 text-muted-foreground" />
+                  Dancing in main area
+                </span>
+              )}
+              {danceFloor === "none" && (
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-medium text-muted-foreground">
+                  No dancing / seated only
+                </span>
+              )}
             </div>
           </section>
         )}
