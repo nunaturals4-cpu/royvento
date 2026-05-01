@@ -454,39 +454,35 @@ interface VendorAd {
 }
 
 function AdsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
-  const [ads, setAds] = useState<VendorAd[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
   const [message, setMessage] = useState("");
-  const [requesting, setRequesting] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  function fetchAds() {
-    setLoading(true);
-    customFetch<VendorAd[]>("/api/partner/ads/me")
-      .then(setAds)
-      .catch(() => setAds([]))
-      .finally(() => setLoading(false));
-  }
+  const { data: ads, isLoading } = useQuery<VendorAd[]>({
+    queryKey: ["vendorAds"],
+    queryFn: () => customFetch<VendorAd[]>("/api/partner/ads/me"),
+  });
 
-  useEffect(() => { fetchAds(); }, []);
-
-  async function requestAd() {
-    setRequesting(true);
-    try {
-      await customFetch("/api/partner/ads/request", {
+  const requestAdMutation = useMutation({
+    mutationFn: (msg: string) =>
+      customFetch("/api/partner/ads/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: message.trim() }),
-      });
+        body: JSON.stringify({ message: msg }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendorAds"] });
       setMessage("");
       setShowForm(false);
-      fetchAds();
       Alert.alert("Request Submitted", "Your ad request has been sent for review.");
-    } catch {
+    },
+    onError: () => {
       Alert.alert("Error", "Failed to submit request.");
-    } finally {
-      setRequesting(false);
-    }
+    },
+  });
+
+  function requestAd() {
+    requestAdMutation.mutate(message.trim());
   }
 
   const STATUS_STYLE: Record<string, { bg: string; text: string }> = {
@@ -495,7 +491,7 @@ function AdsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
     rejected: { bg: "#ef444420", text: "#ef4444" },
   };
 
-  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+  if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 120 }}>
@@ -533,19 +529,19 @@ function AdsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
             />
             <TouchableOpacity
               onPress={requestAd}
-              disabled={requesting}
+              disabled={requestAdMutation.isPending}
               style={{ borderRadius: 10, paddingVertical: 11, alignItems: "center", backgroundColor: colors.primary }}
             >
-              {requesting ? <ActivityIndicator color={colors.primaryForeground} size="small" /> : <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Submit Request</Text>}
+              {requestAdMutation.isPending ? <ActivityIndicator color={colors.primaryForeground} size="small" /> : <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Submit Request</Text>}
             </TouchableOpacity>
           </View>
         )}
       </View>
 
-      {ads.length > 0 && (
+      {(ads ?? []).length > 0 && (
         <View style={{ gap: 10 }}>
           <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8, color: colors.mutedForeground }}>MY AD REQUESTS</Text>
-          {ads.map((ad) => {
+          {(ads ?? []).map((ad) => {
             const st = STATUS_STYLE[ad.status] ?? STATUS_STYLE.pending;
             return (
               <View key={ad.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 8 }}>
