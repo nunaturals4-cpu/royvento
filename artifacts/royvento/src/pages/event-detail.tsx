@@ -140,10 +140,10 @@ export function EventDetail() {
   const effectiveMen = dayOverride ? Number(dayOverride.men) : Number(ev.priceMen || 0);
   const effectiveCouple = dayOverride ? Number(dayOverride.couple) : Number(ev.priceCouple || 0);
 
-  const _fer = (ev as unknown as { freeEntryRules?: { enabled?: boolean; days?: string[] } }).freeEntryRules;
+  const _fer = (ev as any)?.freeEntryRules as { enabled?: boolean; days?: string[] } | undefined;
   const isFreeEntryDay = isPub && (
     (_fer?.enabled === true && (_fer.days ?? []).includes(selectedDayName)) ||
-    (effectiveWomen === 0 && effectiveMen === 0 && effectiveCouple === 0 && isPub)
+    (effectiveWomen === 0 && effectiveMen === 0 && effectiveCouple === 0)
   );
 
   const venueName = ev.vendor?.businessName ?? "This venue";
