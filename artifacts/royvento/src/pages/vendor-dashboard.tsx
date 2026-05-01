@@ -2582,7 +2582,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
         gender: isTicket ? "all" : editGender,
         price: (isTicket || isFreeEntry) ? 0 : (editingPlan?.price ?? 0),
-        ...(isTicket && filledTicketItems.length > 0 ? { lineItems: filledTicketItems } : {}),
+        ...(isTicket ? { lineItems: filledTicketItems } : {}),
         days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
         description: editDescription.trim(),
       });
