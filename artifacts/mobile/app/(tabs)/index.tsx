@@ -219,6 +219,7 @@ export default function HomeScreen() {
                 price={item.priceWomen}
                 category="Pub"
                 type="pub"
+                popular
                 freeEntryRules={item.freeEntryRules}
               />
             )}

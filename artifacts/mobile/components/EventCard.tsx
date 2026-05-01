@@ -24,6 +24,7 @@ interface EventCardProps {
   type?: string;
   style?: object;
   compact?: boolean;
+  popular?: boolean;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   hasDrinkPlans?: boolean;
 }
@@ -38,6 +39,7 @@ export function EventCard({
   type,
   style,
   compact,
+  popular,
   freeEntryRules,
   hasDrinkPlans,
 }: EventCardProps) {
@@ -53,8 +55,6 @@ export function EventCard({
     if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`;
     return `₹${Math.round(v)}`;
   }
-
-  const isPub = type === "pub";
 
   const fer = freeEntryRules;
   const freeDays = fer?.enabled === true ? (fer.days ?? []) : [];
@@ -95,32 +95,47 @@ export function EventCard({
           colors={["transparent", "rgba(0,0,0,0.72)"]}
           style={styles.gradient}
         />
-        {category ? (
-          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
-              {category}
-            </Text>
-          </View>
-        ) : null}
-        {isPub ? (
-          <View style={[styles.pubBadge, { backgroundColor: "rgba(0,0,0,0.6)", borderColor: colors.primary }]}>
-            <Ionicons name="wine" size={10} color={colors.primary} />
-          </View>
-        ) : null}
-        {hasDrinkPlans ? (
+
+        {/* Top-left: category + popular stacked */}
+        <View style={styles.topLeft}>
+          {category ? (
+            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
+                {category}
+              </Text>
+            </View>
+          ) : null}
+          {popular ? (
+            <View style={[styles.popularBadge, { backgroundColor: colors.primary + "E6" }]}>
+              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>★ Popular</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Bottom-right: drink deal badge — only shown when not compact (no room in compact row) */}
+        {hasDrinkPlans && !compact ? (
           <View style={[styles.drinkBadge, { backgroundColor: colors.primary }]}>
             <Ionicons name="wine-outline" size={9} color={colors.primaryForeground} />
             <Text style={[styles.drinkBadgeText, { color: colors.primaryForeground }]}>Drink deal</Text>
           </View>
         ) : null}
       </View>
+
       <View style={[styles.info, compact && styles.infoCompact]}>
-        <Text
-          style={[styles.title, { color: colors.foreground }, compact && styles.titleCompact]}
-          numberOfLines={2}
-        >
-          {title}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text
+            style={[styles.title, { color: colors.foreground }, compact && styles.titleCompact]}
+            numberOfLines={2}
+          >
+            {title}
+          </Text>
+          {/* Drink deal pill in compact mode — next to title */}
+          {hasDrinkPlans && compact ? (
+            <View style={[styles.drinkPillCompact, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
+              <Ionicons name="wine-outline" size={8} color={colors.primary} />
+            </View>
+          ) : null}
+        </View>
         {location ? (
           <View style={styles.row}>
             <Ionicons name="location-outline" size={11} color={colors.mutedForeground} />
@@ -178,27 +193,29 @@ const styles = StyleSheet.create({
     right: 0,
     height: 60,
   },
-  badge: {
+  topLeft: {
     position: "absolute",
     top: 8,
     left: 8,
+    gap: 4,
+  },
+  badge: {
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 3,
+    alignSelf: "flex-start",
+  },
+  popularBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    alignSelf: "flex-start",
   },
   badgeText: {
     fontSize: 9,
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-  },
-  pubBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    borderRadius: 8,
-    padding: 4,
-    borderWidth: 1,
   },
   info: {
     padding: 10,
@@ -209,10 +226,16 @@ const styles = StyleSheet.create({
     padding: 12,
     justifyContent: "center",
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
   title: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     lineHeight: 18,
+    flex: 1,
   },
   titleCompact: {
     fontSize: 14,
@@ -283,5 +306,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 0.4,
+  },
+  drinkPillCompact: {
+    borderRadius: 4,
+    padding: 3,
+    borderWidth: 1,
+    alignSelf: "center",
   },
 });
