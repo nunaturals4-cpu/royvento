@@ -2568,19 +2568,21 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editType === "ticket" && editItems.some((i) => !i.name.trim())) {
+    const filledTicketItems = editItems.filter((i) => i.name.trim());
+    if (editType === "ticket" && editItems.some((i) => !i.name.trim() && (i.qty !== 1 || i.discountedPrice !== 0))) {
       toast({ title: "Each item must have a name", variant: "destructive" }); return;
     }
     setEditSaving(true);
     try {
       const isTicket = editType === "ticket";
       const isFreeEntry = editType === "welcome" || editType === "unlimited";
+      const editingPlan = plans.find((p) => p.id === editingId);
       const updated: DrinkPlan = await apiPatch(`/api/vendors/me/drink-plans/${editingId}`, {
         type: editType,
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
-        gender: isFreeEntry ? editGender : "all",
-        price: 0,
-        ...(isTicket ? { lineItems: editItems.filter((i) => i.name.trim()) } : {}),
+        gender: isTicket ? "all" : editGender,
+        price: (isTicket || isFreeEntry) ? 0 : (editingPlan?.price ?? 0),
+        ...(isTicket && filledTicketItems.length > 0 ? { lineItems: filledTicketItems } : {}),
         days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
         description: editDescription.trim(),
       });
