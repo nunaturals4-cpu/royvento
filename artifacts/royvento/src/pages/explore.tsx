@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { EventCard } from "@/components/EventCard";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { apiGet, BUDGET_RANGES } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useLocation } from "wouter";
+import { Switch } from "@/components/ui/switch";
 
 interface PublicEvent {
   id: number;
@@ -26,6 +27,7 @@ interface PublicEvent {
   reviewCount: number;
   partnerName: string;
   popular: boolean;
+  freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
 }
 
 export function Explore() {
@@ -44,7 +46,8 @@ export function Explore() {
   const [country, setCountry] = useState<string>("");
   const [stateF, setStateF] = useState<string>("");
   const [city, setCity] = useState<string>("");
-  const [events, setEvents] = useState<PublicEvent[]>([]);
+  const [freeEntry, setFreeEntry] = useState(false);
+  const [rawEvents, setRawEvents] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,20 +65,22 @@ export function Explore() {
     }
     setLoading(true);
     apiGet<PublicEvent[]>(`/api/events?${params.toString()}`)
-      .then((r) => {
-        const filtered =
-          minRating === "any"
-            ? r
-            : r.filter((e) => e.rating >= Number(minRating));
-        setEvents(filtered);
-      })
-      .catch(() => setEvents([]))
+      .then((r) => setRawEvents(r))
+      .catch(() => setRawEvents([]))
       .finally(() => setLoading(false));
-  }, [search, budget, stateF, city, country, minRating]);
+  }, [search, budget, stateF, city, country]);
+
+  const events = useMemo(() => {
+    let result = minRating === "any" ? rawEvents : rawEvents.filter((e) => e.rating >= Number(minRating));
+    if (freeEntry) {
+      result = result.filter((e) => e.freeEntryRules?.enabled === true && (e.freeEntryRules.days?.length ?? 0) > 0);
+    }
+    return result;
+  }, [rawEvents, minRating, freeEntry]);
 
   const clear = () => {
     setSearch(""); setMinRating("any");
-    setBudget("any"); setCountry(""); setStateF(""); setCity("");
+    setBudget("any"); setCountry(""); setStateF(""); setCity(""); setFreeEntry(false);
   };
 
   return (
@@ -141,6 +146,17 @@ export function Explore() {
               setCity(next.city);
             }}
           />
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <Switch
+            id="free-entry-toggle"
+            checked={freeEntry}
+            onCheckedChange={setFreeEntry}
+          />
+          <Label htmlFor="free-entry-toggle" className="flex items-center gap-1.5 cursor-pointer select-none">
+            <span className="h-1.5 w-1.5 rounded-full inline-block bg-emerald-400" />
+            <span className="text-sm">{t("explore.free_entry")}</span>
+          </Label>
         </div>
       </div>
 

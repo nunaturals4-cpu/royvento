@@ -114,7 +114,8 @@
     "location": "Location",
     "loading": "Loading events…",
     "no_match": "No events match yet",
-    "no_match_sub": "Try a different filter or search term."
+    "no_match_sub": "Try a different filter or search term.",
+    "free_entry": "Free Entry only"
   },
   "pubs": {
     "title": "Pubs & Clubs",
