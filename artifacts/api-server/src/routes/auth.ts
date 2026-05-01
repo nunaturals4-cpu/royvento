@@ -153,8 +153,13 @@ router.get("/auth/me", async (req, res) => {
 
 function getGoogleCallbackUrl(): string {
   if (process.env["GOOGLE_CALLBACK_URL"]) return process.env["GOOGLE_CALLBACK_URL"];
-  const domain = process.env["REPLIT_DEV_DOMAIN"];
-  if (domain) return `https://${domain}/api/auth/google/callback`;
+  const productionDomains = process.env["REPLIT_DOMAINS"];
+  if (productionDomains) {
+    const domain = productionDomains.split(",")[0]?.trim();
+    if (domain) return `https://${domain}/api/auth/google/callback`;
+  }
+  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
+  if (devDomain) return `https://${devDomain}/api/auth/google/callback`;
   return "http://localhost:3000/api/auth/google/callback";
 }
 
