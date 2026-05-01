@@ -229,6 +229,12 @@ paths:
           required: false
           schema:
             type: string
+        - name: danceFloor
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [dedicated, general, none]
       responses:
         "200":
           description: Vendors list

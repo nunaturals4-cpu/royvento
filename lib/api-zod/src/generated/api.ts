@@ -213,6 +213,7 @@ export const ListVendorsQueryParams = zod.object({
   country: zod.coerce.string().optional(),
   state: zod.coerce.string().optional(),
   city: zod.coerce.string().optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).optional(),
 });
 
 export const ListVendorsResponseItem = zod.object({

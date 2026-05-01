@@ -48,6 +48,7 @@ export * from "./importGooglePubResponsePlace";
 export * from "./importGooglePubResponsePlaceOpeningHours";
 export * from "./listEventsPaginatedResponse";
 export * from "./listEventsParams";
+export * from "./listVendorsDanceFloor";
 export * from "./listVendorsParams";
 export * from "./loginBody";
 export * from "./meResponse";

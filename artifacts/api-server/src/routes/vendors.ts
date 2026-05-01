@@ -167,6 +167,7 @@ router.get("/vendors", async (req, res) => {
   if (filters.country) conditions.push(ilike(vendorsTable.country, `%${filters.country}%`));
   if (filters.state) conditions.push(ilike(vendorsTable.state, `%${filters.state}%`));
   if (filters.city) conditions.push(ilike(vendorsTable.city, `%${filters.city}%`));
+  if (filters.danceFloor) conditions.push(eq(vendorsTable.danceFloor, filters.danceFloor));
   const rows = await db
     .select()
     .from(vendorsTable)

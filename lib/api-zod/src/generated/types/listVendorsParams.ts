@@ -5,10 +5,12 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListVendorsDanceFloor } from "./listVendorsDanceFloor";
 
 export type ListVendorsParams = {
   category?: string;
   country?: string;
   state?: string;
   city?: string;
+  danceFloor?: ListVendorsDanceFloor;
 };

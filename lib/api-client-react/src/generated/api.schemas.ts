@@ -636,7 +636,17 @@ export type ListVendorsParams = {
   country?: string;
   state?: string;
   city?: string;
+  danceFloor?: ListVendorsDanceFloor;
 };
+
+export type ListVendorsDanceFloor =
+  (typeof ListVendorsDanceFloor)[keyof typeof ListVendorsDanceFloor];
+
+export const ListVendorsDanceFloor = {
+  dedicated: "dedicated",
+  general: "general",
+  none: "none",
+} as const;
 
 export type ListEventsParams = {
   category?: string;

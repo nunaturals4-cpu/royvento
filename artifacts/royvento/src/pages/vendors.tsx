@@ -1,15 +1,28 @@
 import { useState } from "react";
 import { useListVendors } from "@workspace/api-client-react";
+import type { ListVendorsParams } from "@workspace/api-client-react";
 import { VendorCard } from "@/components/VendorCard";
 import { Button } from "@/components/ui/button";
 import { EVENT_CATEGORIES } from "@/lib/api";
 
 const CATEGORIES = ["All", ...EVENT_CATEGORIES];
 
+type DanceFloorFilter = NonNullable<ListVendorsParams["danceFloor"]>;
+
+const DANCE_FLOOR_OPTIONS: { value: DanceFloorFilter; label: string }[] = [
+  { value: "dedicated", label: "Dedicated dance floor" },
+  { value: "general", label: "Dancing in main area" },
+  { value: "none", label: "Seated only" },
+];
+
 export function Vendors() {
   const [active, setActive] = useState<string>("All");
-  const params: Record<string, string> = {};
-  if (active !== "All") params["category"] = active;
+  const [danceFloor, setDanceFloor] = useState<DanceFloorFilter | null>(null);
+
+  const params: ListVendorsParams = {};
+  if (active !== "All") params.category = active;
+  if (danceFloor) params.danceFloor = danceFloor;
+
   const { data: vendors = [], isLoading } = useListVendors(params);
 
   return (
@@ -22,7 +35,7 @@ export function Vendors() {
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-2 mb-10">
+      <div className="flex flex-wrap gap-2 mb-4">
         {CATEGORIES.map((c) => (
           <Button
             key={c}
@@ -32,6 +45,29 @@ export function Vendors() {
             className="rounded-full"
           >
             {c}
+          </Button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-10">
+        <span className="text-sm text-muted-foreground mr-1">Dance floor:</span>
+        <Button
+          variant={danceFloor === null ? "default" : "outline"}
+          size="sm"
+          onClick={() => setDanceFloor(null)}
+          className="rounded-full"
+        >
+          Any
+        </Button>
+        {DANCE_FLOOR_OPTIONS.map((opt) => (
+          <Button
+            key={opt.value}
+            variant={danceFloor === opt.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setDanceFloor(danceFloor === opt.value ? null : opt.value)}
+            className="rounded-full"
+          >
+            {opt.label}
           </Button>
         ))}
       </div>
