@@ -1611,6 +1611,12 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
           <p className="font-serif text-2xl mb-2">No bookings yet</p>
           <p className="text-muted-foreground text-sm">Your booking report will appear here once guests start booking your events.</p>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-3xl glass-card p-10 text-center">
+          <CalendarCheck className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-40" />
+          <p className="font-serif text-2xl mb-2">No bookings in this period</p>
+          <p className="text-muted-foreground text-sm">Try a wider time range to see your booking history.</p>
+        </div>
       ) : (
         <>
           {/* Monthly revenue bar chart */}
