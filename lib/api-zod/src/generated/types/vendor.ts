@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FreeEntryRules } from "./freeEntryRules";
+import type { VendorDanceFloor } from "./vendorDanceFloor";
 import type { VendorDayHours } from "./vendorDayHours";
 import type { VendorStatus } from "./vendorStatus";
 
@@ -30,4 +31,5 @@ export interface Vendor {
   state: string;
   country: string;
   freeEntryRules?: FreeEntryRules | null;
+  danceFloor?: VendorDanceFloor;
 }

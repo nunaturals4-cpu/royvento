@@ -43,7 +43,7 @@ export function VendorDetail() {
   const events = allEvents.filter((e) => e.vendorId === vendor.id);
   const pubEvent = events.find((e) => e.type === "pub");
   const pubEventTypes: string[] = pubEvent?.pubEventTypes ?? [];
-  const danceFloor = (vendor as unknown as Record<string, unknown>)["danceFloor"] as string | null | undefined;
+  const danceFloor = vendor.danceFloor;
 
   const fmtTime = (hhmm: string) => {
     if (!hhmm) return "";

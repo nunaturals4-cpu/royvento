@@ -73,6 +73,7 @@ export * from "./uploadUrlRequest";
 export * from "./uploadUrlResponse";
 export * from "./user";
 export * from "./vendor";
+export * from "./vendorDanceFloor";
 export * from "./vendorDayHours";
 export * from "./vendorStatus";
 export * from "./wishlistAddResponse";

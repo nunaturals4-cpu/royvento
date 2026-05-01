@@ -251,6 +251,7 @@ export const ListVendorsResponseItem = zod.object({
       zod.null(),
     ])
     .optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 
@@ -299,6 +300,7 @@ export const GetMyVendorResponse = zod.object({
           zod.null(),
         ])
         .optional(),
+      danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
     }),
     zod.null(),
   ]),
@@ -356,6 +358,7 @@ export const CreateMyVendorResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
 });
 
 /**
@@ -410,6 +413,7 @@ export const UpdateMyVendorResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
 });
 
 /**
@@ -455,6 +459,7 @@ export const GetVendorResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
 });
 
 /**
@@ -496,6 +501,7 @@ export const ListPendingVendorsResponseItem = zod.object({
       zod.null(),
     ])
     .optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
 });
 export const ListPendingVendorsResponse = zod.array(
   ListPendingVendorsResponseItem,
@@ -544,6 +550,7 @@ export const ApproveVendorResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
 });
 
 /**
@@ -589,6 +596,7 @@ export const RejectVendorResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+  danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
 });
 
 /**
@@ -893,6 +901,7 @@ export const GetEventResponse = zod
             zod.null(),
           ])
           .optional(),
+        danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
       }),
     }),
   );

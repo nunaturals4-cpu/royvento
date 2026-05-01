@@ -116,6 +116,16 @@ export const VendorStatus = {
 
 export type VendorDayHours = { [key: string]: unknown } | null;
 
+export type VendorDanceFloor =
+  | (typeof VendorDanceFloor)[keyof typeof VendorDanceFloor]
+  | null;
+
+export const VendorDanceFloor = {
+  dedicated: "dedicated",
+  general: "general",
+  none: "none",
+} as const;
+
 export interface Vendor {
   id: number;
   userId: number;
@@ -137,6 +147,7 @@ export interface Vendor {
   state: string;
   country: string;
   freeEntryRules?: FreeEntryRules | null;
+  danceFloor?: VendorDanceFloor;
 }
 
 export interface MyVendorResponse {

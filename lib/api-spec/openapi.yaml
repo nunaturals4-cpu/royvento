@@ -1324,6 +1324,10 @@ components:
           anyOf:
             - $ref: "#/components/schemas/FreeEntryRules"
             - type: "null"
+        danceFloor:
+          type: string
+          enum: [dedicated, general, none]
+          nullable: true
       required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state, country]
 
     MyVendorResponse:
