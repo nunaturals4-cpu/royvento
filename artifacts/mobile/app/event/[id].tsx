@@ -136,6 +136,8 @@ export default function EventDetailScreen() {
   const [showSignInModal, setShowSignInModal] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [confirmedAge, setConfirmedAge] = useState(false);
   const [couponInput, setCouponInput] = useState("");
   const [couponState, setCouponState] = useState<{ code: string; discountPercent: number } | null>(null);
   const [couponError, setCouponError] = useState("");
@@ -314,6 +316,15 @@ export default function EventDetailScreen() {
     }
     if (isPub && pubMode === "event" && (!parseInt(guests) || parseInt(guests) < 10)) {
       Alert.alert(t("events.min_guests"), t("events.min_guests_desc"));
+      return;
+    }
+
+    if (!agreedTerms) {
+      Alert.alert("Consent required", "Please agree to the Terms & Conditions and Privacy Policy to continue.");
+      return;
+    }
+    if (isPub && !confirmedAge) {
+      Alert.alert("Age confirmation required", "Please confirm you are 18 or older to continue.");
       return;
     }
 
@@ -950,6 +961,48 @@ export default function EventDetailScreen() {
               </View>
             ) : null}
 
+            {/* Consent checkboxes */}
+            <View style={[styles.consentBox, { borderTopColor: colors.border }]}>
+              <Pressable
+                style={styles.consentRow}
+                onPress={() => setAgreedTerms((v) => !v)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: agreedTerms }}
+              >
+                <View style={[styles.checkBox, { borderColor: agreedTerms ? colors.primary : colors.mutedForeground, backgroundColor: agreedTerms ? colors.primary : "transparent" }]}>
+                  {agreedTerms && <Ionicons name="checkmark" size={12} color={colors.primaryForeground} />}
+                </View>
+                <Text style={[styles.consentText, { color: colors.mutedForeground }]}>
+                  {"I agree to the "}
+                  <Text
+                    style={{ color: colors.primary, textDecorationLine: "underline" }}
+                    onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/terms`)}
+                  >Terms & Conditions</Text>
+                  {" and "}
+                  <Text
+                    style={{ color: colors.primary, textDecorationLine: "underline" }}
+                    onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/privacy`)}
+                  >Privacy Policy</Text>
+                </Text>
+              </Pressable>
+
+              {isPub && (
+                <Pressable
+                  style={styles.consentRow}
+                  onPress={() => setConfirmedAge((v) => !v)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: confirmedAge }}
+                >
+                  <View style={[styles.checkBox, { borderColor: confirmedAge ? colors.primary : colors.mutedForeground, backgroundColor: confirmedAge ? colors.primary : "transparent" }]}>
+                    {confirmedAge && <Ionicons name="checkmark" size={12} color={colors.primaryForeground} />}
+                  </View>
+                  <Text style={[styles.consentText, { color: colors.mutedForeground }]}>
+                    I confirm I am 18 or older and understand that alcohol will be served at this venue
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+
             <View style={styles.bookingButtons}>
               <TouchableOpacity
                 style={[styles.cancelBtn, { borderColor: colors.border }]}
@@ -958,9 +1011,9 @@ export default function EventDetailScreen() {
                 <Text style={[styles.cancelBtnText, { color: colors.mutedForeground }]}>{t("events.cancel_btn")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.primary }, bookingMutation.isPending && { opacity: 0.7 }]}
+                style={[styles.submitBtn, { backgroundColor: colors.primary }, (bookingMutation.isPending || !agreedTerms || (isPub && !confirmedAge)) && { opacity: 0.5 }]}
                 onPress={handleBook}
-                disabled={bookingMutation.isPending}
+                disabled={bookingMutation.isPending || !agreedTerms || (isPub && !confirmedAge)}
               >
                 {bookingMutation.isPending ? (
                   <ActivityIndicator color={colors.primaryForeground} />
@@ -1170,4 +1223,8 @@ const styles = StyleSheet.create({
   announcementItemDateRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
   announcementItemDate: { fontSize: 11, fontFamily: "Inter_500Medium" },
   announcementItemBody: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  consentBox: { gap: 12, borderTopWidth: 1, paddingTop: 12 },
+  consentRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  checkBox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, alignItems: "center", justifyContent: "center", marginTop: 1, flexShrink: 0 },
+  consentText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18, flex: 1 },
 });

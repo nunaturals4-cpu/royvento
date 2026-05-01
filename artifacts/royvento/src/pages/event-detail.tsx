@@ -9,6 +9,7 @@ import {
   useGetMe,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -77,6 +78,8 @@ export function EventDetail() {
   const [occasion, setOccasion] = useState("");
   const [pointsToUse, setPointsToUse] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [confirmedAge, setConfirmedAge] = useState(false);
 
   const createReview = useCreateReview();
   const qc = useQueryClient();
@@ -221,6 +224,14 @@ export function EventDetail() {
     }
     if (isClosedDay) {
       toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" });
+      return;
+    }
+    if (!agreedTerms) {
+      toast({ title: "Please accept the Terms & Conditions and Privacy Policy to continue.", variant: "destructive" });
+      return;
+    }
+    if (isPub && !confirmedAge) {
+      toast({ title: "Please confirm you are 18+ to continue.", variant: "destructive" });
       return;
     }
     setBooking(true);
@@ -1042,7 +1053,48 @@ export function EventDetail() {
                   )}
                 </div>
               )}
-              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12" size="lg" onClick={handleBook} disabled={booking}>
+              {/* Consent checkboxes */}
+              <div className="space-y-3 pt-2 border-t border-white/10">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="agree-terms"
+                    checked={agreedTerms}
+                    onCheckedChange={(v) => setAgreedTerms(!!v)}
+                    className="mt-0.5 shrink-0"
+                  />
+                  <Label htmlFor="agree-terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer font-normal">
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-primary hover:underline underline-offset-2">Terms &amp; Conditions</Link>
+                    {" "}and{" "}
+                    <Link href="/privacy" className="text-primary hover:underline underline-offset-2">Privacy Policy</Link>
+                  </Label>
+                </div>
+                {isPub && (
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="confirm-age"
+                      checked={confirmedAge}
+                      onCheckedChange={(v) => setConfirmedAge(!!v)}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <Label htmlFor="confirm-age" className="text-xs text-muted-foreground leading-relaxed cursor-pointer font-normal">
+                      I confirm I am 18 or older and understand that alcohol will be served at this venue
+                    </Label>
+                  </div>
+                )}
+                {(!agreedTerms || (isPub && !confirmedAge)) && (
+                  <p className="text-[11px] text-muted-foreground/70 pl-7">
+                    Please tick {!agreedTerms && isPub && !confirmedAge ? "both boxes" : "the box above"} to proceed with your booking.
+                  </p>
+                )}
+              </div>
+
+              <Button
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12 disabled:opacity-50"
+                size="lg"
+                onClick={handleBook}
+                disabled={booking || !agreedTerms || (isPub && !confirmedAge)}
+              >
                 <CalIcon className="h-4 w-4 mr-2" />
                 {booking ? t("events.booking_processing") : isFreeEntryDay ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
               </Button>
