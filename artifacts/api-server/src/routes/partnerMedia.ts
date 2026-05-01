@@ -114,7 +114,7 @@ const UpdatePartnerProfileBody = z.object({
   openDays: z.array(z.enum(VALID_DAYS)).optional(),
   dayHours: z.record(DayTimesSchema).optional(),
   danceFloor: z.enum(["dedicated", "general", "none"]).nullable().optional(),
-  danceFloorPhotos: z.array(z.string().url()).optional(),
+  danceFloorPhotos: z.array(z.string().min(1)).optional(),
 });
 
 router.patch(

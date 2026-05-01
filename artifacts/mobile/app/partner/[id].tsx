@@ -341,7 +341,7 @@ export default function PartnerDetailScreen() {
         ) : null}
 
         {/* Dance Floor Photos */}
-        {vendor.danceFloor === "dedicated" && (vendor as any).danceFloorPhotos?.length > 0 ? (
+        {vendor.danceFloor === "dedicated" && (vendor.danceFloorPhotos ?? []).length > 0 ? (
           <View style={{ gap: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Ionicons name="musical-notes-outline" size={16} color={colors.primary} />
@@ -349,7 +349,7 @@ export default function PartnerDetailScreen() {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
               <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 10 }}>
-                {((vendor as any).danceFloorPhotos as string[]).map((img: string, i: number) => (
+                {(vendor.danceFloorPhotos ?? []).map((img, i) => (
                   <Image
                     key={i}
                     source={{ uri: img }}

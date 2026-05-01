@@ -314,9 +314,9 @@ export function VendorDetail() {
                 </span>
               )}
             </div>
-            {danceFloor === "dedicated" && (vendor as any).danceFloorPhotos?.length > 0 && (
+            {danceFloor === "dedicated" && (vendor.danceFloorPhotos ?? []).length > 0 && (
               <div className="flex gap-3 mt-4 flex-wrap">
-                {((vendor as any).danceFloorPhotos as string[]).map((url: string, i: number) => (
+                {(vendor.danceFloorPhotos ?? []).map((url, i) => (
                   <div key={i} className="w-32 h-24 md:w-40 md:h-28 rounded-xl overflow-hidden border border-white/10">
                     <img src={url} alt={`Dance floor ${i + 1}`} className="w-full h-full object-cover" />
                   </div>
