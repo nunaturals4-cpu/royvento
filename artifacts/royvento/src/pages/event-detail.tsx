@@ -83,6 +83,7 @@ export function EventDetail() {
   const [booking, setBooking] = useState(false);
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [expandedDrinkPlans, setExpandedDrinkPlans] = useState<Set<number>>(new Set());
 
   // Pub-specific state
   const isPub = (event as any)?.type === "pub";
@@ -464,27 +465,45 @@ export function EventDetail() {
                 <Wine className="h-4 w-4 text-primary shrink-0" />
                 <h3 className="font-semibold text-primary text-sm uppercase tracking-wide">Drink Deals</h3>
               </div>
-              <div className="space-y-4">
-                {drinkPlans.map((plan: any) => (
-                  <div key={plan.id} className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <span className="text-sm text-white/85">{getPlanSummary(plan)}</span>
-                      <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary shrink-0">
-                        {plan.gender === "female" ? "Ladies" : "All guests"}
-                      </span>
+              <div className="space-y-3">
+                {drinkPlans.map((plan: any) => {
+                  const hasItems = plan.lineItems && plan.lineItems.length > 0;
+                  const isExpanded = expandedDrinkPlans.has(plan.id);
+                  return (
+                    <div key={plan.id} className="flex flex-col gap-1.5">
+                      <button
+                        className="flex items-center justify-between gap-3 flex-wrap text-left w-full group"
+                        onClick={hasItems ? () => setExpandedDrinkPlans((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(plan.id)) next.delete(plan.id); else next.add(plan.id);
+                          return next;
+                        }) : undefined}
+                      >
+                        <span className="text-sm text-white/85">{getPlanSummary(plan)}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary">
+                            {plan.gender === "female" ? "Ladies" : "All guests"}
+                          </span>
+                          {hasItems && (
+                            <span className="text-white/30 text-xs group-hover:text-white/60 transition-colors">
+                              {isExpanded ? "▲" : "▼"}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                      {hasItems && isExpanded && (
+                        <ul className="space-y-0.5 pl-4">
+                          {plan.lineItems.map((item: any, i: number) => (
+                            <li key={i} className="text-xs text-white/50 flex items-center gap-1.5">
+                              <span className="h-1 w-1 rounded-full bg-primary/40 shrink-0" />
+                              {item.qty}× {item.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                    {plan.lineItems && plan.lineItems.length > 0 && (
-                      <ul className="space-y-0.5 pl-4">
-                        {plan.lineItems.map((item: any, i: number) => (
-                          <li key={i} className="text-xs text-white/50 flex items-center gap-1.5">
-                            <span className="h-1 w-1 rounded-full bg-primary/40 shrink-0" />
-                            {item.qty}× {item.name}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

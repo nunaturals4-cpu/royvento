@@ -4,6 +4,7 @@ import {
   customFetch,
   getGetWishlistQueryKey,
   getListMyBookingsQueryKey,
+  getListVendorDrinkPlansQueryKey,
   useAddToWishlist,
   useCreateBooking,
   useGetEvent,
@@ -152,6 +153,7 @@ export default function EventDetailScreen() {
   const [ticketCouple, setTicketCouple] = useState(0);
   const [pubMode, setPubMode] = useState<"ticket" | "event">("ticket");
   const [occasion, setOccasion] = useState("farewell");
+  const [expandedDrinkPlans, setExpandedDrinkPlans] = useState<Set<number>>(new Set());
   const [personName, setPersonName] = useState("");
 
   const bookingDate = bookingDateObj.toISOString().slice(0, 10);
@@ -248,7 +250,7 @@ export default function EventDetailScreen() {
 
   const vendorId = (event as unknown as EventWithVendor).vendorId ?? (event as unknown as EventWithVendor).vendor?.id;
   const { data: drinkPlans = [] } = useListVendorDrinkPlans(vendorId ?? 0, {
-    query: { enabled: isPub && !!vendorId } as any,
+    query: { queryKey: getListVendorDrinkPlansQueryKey(vendorId ?? 0), enabled: isPub && !!vendorId },
   });
 
   const basePriceWomen = isPub ? parseFloat(String((event as unknown as { priceWomen?: unknown })?.priceWomen ?? 0)) : 0;
@@ -554,38 +556,55 @@ export default function EventDetailScreen() {
                 <Text style={[styles.drinkDealsTitle, { color: colors.primary }]}>Drink Deals</Text>
               </View>
               <View style={{ gap: 12 }}>
-                {drinkPlans.map((plan) => (
-                  <View key={plan.id} style={{ gap: 4 }}>
-                    <View style={styles.drinkPlanRow}>
-                      <Text style={[styles.drinkPlanSummary, { color: colors.foreground, flex: 1 }]}>
-                        {plan.type === "welcome"
-                          ? plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests"
-                          : plan.type === "unlimited"
-                          ? plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests"
-                          : plan.type === "ticket"
-                          ? (() => { const c = (plan.lineItems ?? []).filter((i: { name: string }) => i.name).length; return c > 0 ? `${c} item${c !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket"; })()
-                          : plan.productName || "Drink offer"}
-                      </Text>
-                      <View style={[styles.genderPill, { backgroundColor: colors.primary + "22" }]}>
-                        <Text style={[styles.genderPillText, { color: colors.primary }]}>
-                          {plan.gender === "female" ? "Ladies" : "All guests"}
-                        </Text>
-                      </View>
+                {drinkPlans.map((plan) => {
+                  const hasItems = plan.lineItems && plan.lineItems.length > 0;
+                  const isExpanded = expandedDrinkPlans.has(plan.id);
+                  const summary = plan.type === "welcome"
+                    ? plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests"
+                    : plan.type === "unlimited"
+                    ? plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests"
+                    : plan.type === "ticket"
+                    ? (() => { const c = (plan.lineItems ?? []).filter((i: { name: string }) => i.name).length; return c > 0 ? `${c} item${c !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket"; })()
+                    : plan.productName || "Drink offer";
+                  return (
+                    <View key={plan.id} style={{ gap: 4 }}>
+                      <Pressable
+                        style={styles.drinkPlanRow}
+                        onPress={hasItems ? () => setExpandedDrinkPlans((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(plan.id)) next.delete(plan.id); else next.add(plan.id);
+                          return next;
+                        }) : undefined}
+                      >
+                        <Text style={[styles.drinkPlanSummary, { color: colors.foreground, flex: 1 }]}>{summary}</Text>
+                        <View style={[styles.genderPill, { backgroundColor: colors.primary + "22" }]}>
+                          <Text style={[styles.genderPillText, { color: colors.primary }]}>
+                            {plan.gender === "female" ? "Ladies" : "All guests"}
+                          </Text>
+                        </View>
+                        {hasItems ? (
+                          <Ionicons
+                            name={isExpanded ? "chevron-up" : "chevron-down"}
+                            size={13}
+                            color={colors.mutedForeground}
+                          />
+                        ) : null}
+                      </Pressable>
+                      {hasItems && isExpanded ? (
+                        <View style={{ paddingLeft: 12, gap: 2 }}>
+                          {plan.lineItems!.map((item: { name: string; qty: number }, i: number) => (
+                            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                              <View style={[styles.drinkDot, { backgroundColor: colors.primary + "66" }]} />
+                              <Text style={[styles.drinkLineItem, { color: colors.mutedForeground }]}>
+                                {item.qty}× {item.name}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
                     </View>
-                    {plan.lineItems && plan.lineItems.length > 0 ? (
-                      <View style={{ paddingLeft: 12, gap: 2 }}>
-                        {plan.lineItems.map((item: { name: string; qty: number }, i: number) => (
-                          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <View style={[styles.drinkDot, { backgroundColor: colors.primary + "66" }]} />
-                            <Text style={[styles.drinkLineItem, { color: colors.mutedForeground }]}>
-                              {item.qty}× {item.name}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             </View>
           ) : null}
