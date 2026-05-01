@@ -328,13 +328,13 @@ export default function ProfileScreen() {
         <View style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.referralRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.referralTitle, { color: colors.foreground }]}>Your Referral Code</Text>
+              <Text style={[styles.referralTitle, { color: colors.foreground }]}>{t("profile.your_referral_code")}</Text>
               <Text style={[styles.referralCode, { color: colors.primary }]}>{referral.code}</Text>
               <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>
-                {referral.referralCount} referral{referral.referralCount !== 1 ? "s" : ""} · {referral.referralPoints} points
+                {t("profile.referral_stats", { count: referral.referralCount, points: referral.referralPoints })}
               </Text>
               <Text style={[styles.referralSub, { color: colors.mutedForeground, fontSize: 10, marginTop: 2 }]}>
-                100 pts = ₹10
+                {t("profile.pts_conversion")}
               </Text>
             </View>
             <TouchableOpacity
@@ -571,7 +571,7 @@ export default function ProfileScreen() {
                 {updateMeMutation.isPending ? (
                   <ActivityIndicator color={colors.primaryForeground} />
                 ) : (
-                  <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>Save Changes</Text>
+                  <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>{t("profile.save_changes")}</Text>
                 )}
               </TouchableOpacity>
             </View>

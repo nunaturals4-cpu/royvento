@@ -65,7 +65,7 @@
     "sending": "Sending…",
     "send_reset_link": "Send reset link",
     "check_inbox_web": "Check your inbox",
-    "check_inbox_sub_web": "If {email} is registered on Royvento, you will receive a password reset link shortly.",
+    "check_inbox_sub_web": "If {{email}} is registered on Royvento, you will receive a password reset link shortly.",
     "error": "Error",
     "email_address": "Email address"
   },

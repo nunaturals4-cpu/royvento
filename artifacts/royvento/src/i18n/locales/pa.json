@@ -65,7 +65,7 @@
     "sending": "ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
     "send_reset_link": "ਰੀਸੈੱਟ ਲਿੰਕ ਭੇਜੋ",
     "check_inbox_web": "ਆਪਣਾ ਇਨਬਾਕਸ ਦੇਖੋ",
-    "check_inbox_sub_web": "ਜੇ {email} Royvento ਤੇ ਦਰਜ ਹੈ, ਤਾਂ ਤੁਹਾਨੂੰ ਜਲਦੀ ਰੀਸੈੱਟ ਲਿੰਕ ਮਿਲੇਗਾ।",
+    "check_inbox_sub_web": "ਜੇ {{email}} Royvento ਤੇ ਦਰਜ ਹੈ, ਤਾਂ ਤੁਹਾਨੂੰ ਜਲਦੀ ਰੀਸੈੱਟ ਲਿੰਕ ਮਿਲੇਗਾ।",
     "error": "ਗਲਤੀ",
     "email_address": "ਈਮੇਲ ਪਤਾ"
   },

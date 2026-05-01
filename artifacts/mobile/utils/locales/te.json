@@ -242,7 +242,9 @@
     "sign_out_title": "సైన్ అవుట్",
     "sign_in_sub": "బుకింగ్‌లు, విష్‌లిస్ట్ మరియు మరిన్నింటిని నిర్వహించడానికి సైన్ ఇన్ చేయండి",
     "percent_off": "%{percent}% తగ్గింపు",
-    "vendor_only": "కేవలం %{vendor}"
+    "vendor_only": "కేవలం %{vendor}",
+    "referral_stats": "%{count} రెఫరల్‌లు · %{points} పాయింట్లు",
+    "pts_conversion": "100 pts = ₹10"
   },
   "bookings": {
     "title": "నా బుకింగ్‌లు",

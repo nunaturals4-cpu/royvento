@@ -65,7 +65,7 @@
     "sending": "పంపుతున్నాం…",
     "send_reset_link": "రీసెట్ లింక్ పంపండి",
     "check_inbox_web": "మీ ఇన్‌బాక్స్ తనిఖీ చేయండి",
-    "check_inbox_sub_web": "{email} Royvento లో నమోదైతే, త్వరలో రీసెట్ లింక్ వస్తుంది.",
+    "check_inbox_sub_web": "{{email}} Royvento లో నమోదైతే, త్వరలో రీసెట్ లింక్ వస్తుంది.",
     "error": "లోపం",
     "email_address": "ఇమెయిల్ చిరునామా"
   },

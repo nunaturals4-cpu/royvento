@@ -38,7 +38,7 @@ export function ForgotPassword() {
           <CheckCircle2 className="h-14 w-14 text-primary mx-auto mb-4" />
           <h1 className="font-serif text-3xl tracking-tight mb-3">{t("auth.check_inbox_web")}</h1>
           <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-            {t("auth.check_inbox_sub_web", { email: <strong>{email}</strong> })}
+            {t("auth.check_inbox_sub_web", { email })}
           </p>
           <Link href="/login">
             <Button variant="outline" className="gap-2">

@@ -65,7 +65,7 @@
     "sending": "મોકલાઈ રહ્યું છે…",
     "send_reset_link": "રીસેટ લિંક મોકળો",
     "check_inbox_web": "તમારો ઇનબોક્સ જુઓ",
-    "check_inbox_sub_web": "જો {email} Royvento પર નોંધાયેલું હೌय, તો ટூંક સમયમાં રીસેટ લિંક મળશે.",
+    "check_inbox_sub_web": "જો {{email}} Royvento પર નોંધાયેલું હೌय, તો ટூંક સમયમાં રીસેટ લિંક મળશે.",
     "error": "ભૂલ",
     "email_address": "ઇમેઇલ સરનામું"
   },

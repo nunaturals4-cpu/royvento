@@ -242,7 +242,9 @@
     "sign_out_title": "Sign Out",
     "sign_in_sub": "Sign in to manage bookings, wishlists, and more",
     "percent_off": "%{percent}% off",
-    "vendor_only": "%{vendor} only"
+    "vendor_only": "%{vendor} only",
+    "referral_stats": "%{count} referrals · %{points} points",
+    "pts_conversion": "100 pts = ₹10"
   },
   "bookings": {
     "title": "My Bookings",

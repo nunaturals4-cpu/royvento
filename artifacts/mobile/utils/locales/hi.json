@@ -242,7 +242,9 @@
     "sign_out_title": "साइन आउट",
     "sign_in_sub": "बुकिंग, विशलिस्ट और अधिक प्रबंधित करने के लिए साइन इन करें",
     "percent_off": "%{percent}% की छूट",
-    "vendor_only": "केवल %{vendor}"
+    "vendor_only": "केवल %{vendor}",
+    "referral_stats": "%{count} रेफरल · %{points} पॉइंट",
+    "pts_conversion": "100 pts = ₹10"
   },
   "bookings": {
     "title": "मेरी बुकिंग",

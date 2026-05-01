@@ -242,7 +242,9 @@
     "sign_out_title": "ಸೈನ್ ಔಟ್",
     "sign_in_sub": "ಬುಕಿಂಗ್, ವಿಷ್‌ಲಿಸ್ಟ್ ಮತ್ತು ಹೆಚ್ಚಿನದನ್ನು ನಿರ್ವಹಿಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ",
     "percent_off": "%{percent}% ರಿಯಾಯಿತಿ",
-    "vendor_only": "ಕೇವಲ %{vendor}"
+    "vendor_only": "ಕೇವಲ %{vendor}",
+    "referral_stats": "%{count} ರೆಫರಲ್ · %{points} ಪಾಯಿಂಟ್",
+    "pts_conversion": "100 pts = ₹10"
   },
   "bookings": {
     "title": "ನನ್ನ ಬುಕಿಂಗ್‌ಗಳು",

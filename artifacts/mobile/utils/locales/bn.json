@@ -242,7 +242,9 @@
     "sign_out_title": "সাইন আউট",
     "sign_in_sub": "বুকিং, উইশলিস্ট এবং আরও পরিচালনা করতে সাইন ইন করুন",
     "percent_off": "%{percent}% ছাড়",
-    "vendor_only": "শুধুমাত্র %{vendor}"
+    "vendor_only": "শুধুমাত্র %{vendor}",
+    "referral_stats": "%{count} রেফারেল · %{points} পয়েন্ট",
+    "pts_conversion": "100 pts = ₹10"
   },
   "bookings": {
     "title": "আমার বুকিং",

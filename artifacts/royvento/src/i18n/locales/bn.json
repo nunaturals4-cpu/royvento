@@ -65,7 +65,7 @@
     "sending": "পাঠানো হচ্ছে…",
     "send_reset_link": "রিসেট লিংক পাঠান",
     "check_inbox_web": "আপনার ইনবক্স দেখুন",
-    "check_inbox_sub_web": "যদি {email} Royvento-তে নিবন্ধিত থাকে, তাহলে শীঘ্রই রিসেট লিংক পাবেন।",
+    "check_inbox_sub_web": "যদি {{email}} Royvento-তে নিবন্ধিত থাকে, তাহলে শীঘ্রই রিসেট লিংক পাবেন।",
     "error": "ত্রুটি",
     "email_address": "ইমেইল ঠিকানা"
   },
