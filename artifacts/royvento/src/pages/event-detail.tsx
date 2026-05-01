@@ -697,8 +697,7 @@ export function EventDetail() {
             {isFreeEntryDay ? (
               <>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
-                <p className="font-serif text-5xl mt-1 text-green-400">{t("events.free_entry_label")}</p>
-                <p className="text-xs text-muted-foreground mb-3">{t("events.free_entry_day_sub")}</p>
+                <p className="font-serif text-5xl mt-1 text-green-400 mb-3">{t("events.free_entry_label")}</p>
               </>
             ) : (
               <>
