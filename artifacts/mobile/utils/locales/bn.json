@@ -221,6 +221,7 @@
     "free_days": "দিন: %{days}",
     "free_entry": "বিনামূল্যে প্রবেশ",
     "free_entry_available": "বিনামূল্যে প্রবেশ পাওয়া যাচ্ছে",
+    "free_entry_form_notice": "বিনামূল্যে প্রবেশ – এই তারিখের জন্য কোনো পেমেন্ট প্রয়োজন নেই।",
     "free_for": "জন্য: %{genders}",
     "group_booking": "গ্রুপ বা কর্পোরেট বুকিং",
     "guests": "অতিথি",

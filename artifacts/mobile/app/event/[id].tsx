@@ -85,14 +85,16 @@ function formatINR(v: number) {
 function TickerCounter({
   label, value, price, onChange, color, mutedColor,
 }: {
-  label: string; value: number; price: number; onChange: (v: number) => void;
+  label: string; value: number; price?: number; onChange: (v: number) => void;
   color: string; mutedColor: string;
 }) {
   return (
     <View style={styles.tickerRow}>
       <View style={{ flex: 1 }}>
         <Text style={[styles.tickerLabel, { color }]}>{label}</Text>
-        <Text style={[styles.tickerPrice, { color: mutedColor }]}>{formatINR(price)} each</Text>
+        {price != null && price > 0 && (
+          <Text style={[styles.tickerPrice, { color: mutedColor }]}>{formatINR(price)} each</Text>
+        )}
       </View>
       <View style={styles.tickerControls}>
         <TouchableOpacity
@@ -250,6 +252,12 @@ export default function EventDetailScreen() {
   const priceMen = dayOverrideMobile ? Number(dayOverrideMobile.men) : basePriceMen;
   const priceCouple = dayOverrideMobile ? Number(dayOverrideMobile.couple) : basePriceCouple;
   const basePrice = parseFloat(String(event?.price ?? 0));
+
+  const freeEntryRules = (event as unknown as { freeEntryRules?: { enabled?: boolean; days?: string[] } })?.freeEntryRules;
+  const isFreeEntryDay = isPub && (
+    (freeEntryRules?.enabled === true && (freeEntryRules.days ?? []).includes(bookingDayName)) ||
+    (priceWomen === 0 && priceMen === 0 && priceCouple === 0)
+  );
 
   const subtotal = isPub
     ? ticketWomen * priceWomen + ticketMen * priceMen + ticketCouple * priceCouple
@@ -467,7 +475,7 @@ export default function EventDetailScreen() {
           ) : null}
 
           {/* Pub pricing */}
-          {isPub && (priceWomen > 0 || priceMen > 0) ? (
+          {isPub && !isFreeEntryDay && (priceWomen > 0 || priceMen > 0) ? (
             <View style={[styles.pubPricing, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               {[
                 { label: t("events.women"), p: priceWomen },
@@ -675,6 +683,16 @@ export default function EventDetailScreen() {
               )}
             </View>
 
+            {/* Free-entry day notice */}
+            {isFreeEntryDay ? (
+              <View style={[styles.freeEntryNotice, { backgroundColor: "#052e16", borderColor: "#16a34a44" }]}>
+                <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                <Text style={[styles.freeEntryNoticeText, { color: "#4ade80" }]}>
+                  {t("events.free_entry_form_notice")}
+                </Text>
+              </View>
+            ) : null}
+
             {/* Pub booking type + conditional fields OR guest count */}
             {isPub ? (
               <>
@@ -708,16 +726,16 @@ export default function EventDetailScreen() {
                 {pubMode === "ticket" && (
                   <View style={[styles.pubTickets, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("events.ticket_counts")}</Text>
-                    {priceWomen > 0 && (
-                      <TickerCounter label={t("events.women")} value={ticketWomen} price={priceWomen} onChange={setTicketWomen}
+                    {(isFreeEntryDay || priceWomen > 0) && (
+                      <TickerCounter label={t("events.women")} value={ticketWomen} price={isFreeEntryDay ? undefined : priceWomen} onChange={setTicketWomen}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
-                    {priceMen > 0 && (
-                      <TickerCounter label={t("events.men")} value={ticketMen} price={priceMen} onChange={setTicketMen}
+                    {(isFreeEntryDay || priceMen > 0) && (
+                      <TickerCounter label={t("events.men")} value={ticketMen} price={isFreeEntryDay ? undefined : priceMen} onChange={setTicketMen}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
-                    {priceCouple > 0 && (
-                      <TickerCounter label={t("events.couple")} value={ticketCouple} price={priceCouple} onChange={setTicketCouple}
+                    {(isFreeEntryDay || priceCouple > 0) && (
+                      <TickerCounter label={t("events.couple")} value={ticketCouple} price={isFreeEntryDay ? undefined : priceCouple} onChange={setTicketCouple}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
                   </View>
@@ -799,7 +817,7 @@ export default function EventDetailScreen() {
             </View>
 
             {/* Coupon code */}
-            <View style={styles.field}>
+            {!isFreeEntryDay && <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.coupon_code_field")}</Text>
               <View style={styles.couponRow}>
                 <TextInput
@@ -829,10 +847,10 @@ export default function EventDetailScreen() {
                 </View>
               )}
               {couponError ? <Text style={[styles.couponErrorText, { color: "#ef4444" }]}>{couponError}</Text> : null}
-            </View>
+            </View>}
 
             {/* Points redemption */}
-            {(discountInfo?.points ?? 0) > 0 ? (
+            {!isFreeEntryDay && (discountInfo?.points ?? 0) > 0 ? (
               <View style={styles.field}>
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.loyalty_points")}</Text>
                 <View style={[styles.pointsBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
@@ -868,7 +886,7 @@ export default function EventDetailScreen() {
             ) : null}
 
             {/* Notes */}
-            <View style={styles.field}>
+            {!isFreeEntryDay && <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.notes_optional")}</Text>
               <TextInput
                 style={[styles.fieldInput, styles.fieldTextArea, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
@@ -879,10 +897,10 @@ export default function EventDetailScreen() {
                 multiline
                 numberOfLines={3}
               />
-            </View>
+            </View>}
 
             {/* Payment method toggle */}
-            <View style={styles.field}>
+            {!isFreeEntryDay && <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.payment_method")}</Text>
               <View style={[styles.payToggle, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 {(["cod", "online"] as const).map((m) => (
@@ -902,10 +920,10 @@ export default function EventDetailScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
+            </View>}
 
             {/* Price summary */}
-            {subtotal > 0 ? (
+            {!isFreeEntryDay && subtotal > 0 ? (
               <View style={[styles.summary, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{t("events.subtotal_label")}</Text>
@@ -1066,6 +1084,8 @@ const styles = StyleSheet.create({
   freeEntryDot: { width: 8, height: 8, borderRadius: 4 },
   freeEntryTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   freeEntryLine: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  freeEntryNotice: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 4 },
+  freeEntryNoticeText: { fontSize: 13, fontFamily: "Inter_600SemiBold", flex: 1 },
   sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
   description: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
   gallery: { flexDirection: "row", paddingHorizontal: 20, gap: 10 },

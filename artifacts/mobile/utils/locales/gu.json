@@ -221,6 +221,7 @@
     "free_days": "દિવસ: %{days}",
     "free_entry": "મફ્ત પ્રવેશ",
     "free_entry_available": "મફ્ત પ્રવેશ ઉપલબ્ધ",
+    "free_entry_form_notice": "મફત પ્રવેશ – આ તારીખ માટે કોઈ ચુકવણી જરૂરી નથી.",
     "free_for": "માટે: %{genders}",
     "group_booking": "ગ્રૂપ અથવા કૉર્પોરેટ બુકિંગ",
     "guests": "મહેમાન",

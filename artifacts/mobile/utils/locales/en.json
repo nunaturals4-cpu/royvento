@@ -221,6 +221,7 @@
     "free_days": "Days: %{days}",
     "free_entry": "Free entry",
     "free_entry_available": "Free Entry Available",
+    "free_entry_form_notice": "Free Entry – No payment required for this date.",
     "free_for": "For: %{genders}",
     "group_booking": "Group or corporate booking",
     "guests": "guests",
