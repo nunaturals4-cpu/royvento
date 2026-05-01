@@ -401,6 +401,8 @@ export default function PartnerDetailScreen() {
                   price={item.price}
                   category={item.category}
                   type={item.type}
+                  rating={item.rating}
+                  reviewCount={item.reviewCount}
                 />
               )}
             />

@@ -310,6 +310,8 @@ export default function ExploreScreen() {
               price={item.price}
               category={item.category}
               type={item.type}
+              rating={item.rating}
+              reviewCount={item.reviewCount}
               freeEntryRules={item.freeEntryRules}
               hasDrinkPlans={item.hasDrinkPlans}
               compact

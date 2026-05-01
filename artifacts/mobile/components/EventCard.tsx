@@ -25,6 +25,8 @@ interface EventCardProps {
   style?: object;
   compact?: boolean;
   popular?: boolean;
+  rating?: number;
+  reviewCount?: number;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   hasDrinkPlans?: boolean;
 }
@@ -40,6 +42,8 @@ export function EventCard({
   style,
   compact,
   popular,
+  rating,
+  reviewCount,
   freeEntryRules,
   hasDrinkPlans,
 }: EventCardProps) {
@@ -62,6 +66,10 @@ export function EventCard({
   const todayAbbr = DAY_ABBRS[new Date().getDay()];
   const isFreeToday = hasFreeEntry && freeDays.includes(todayAbbr);
   const freeLabel = isFreeToday ? t("events.free_entry_today") : t("events.free_some_days");
+
+  const isNew = !popular && rating !== undefined && rating === 0 && !reviewCount;
+  const showPopularBadge = !!popular;
+  const showNewBadge = isNew;
 
   return (
     <Pressable
@@ -96,7 +104,7 @@ export function EventCard({
           style={styles.gradient}
         />
 
-        {/* Top-left: category + popular stacked */}
+        {/* Top-left: category + popular/new stacked */}
         <View style={styles.topLeft}>
           {category ? (
             <View style={[styles.badge, { backgroundColor: colors.primary }]}>
@@ -105,14 +113,18 @@ export function EventCard({
               </Text>
             </View>
           ) : null}
-          {popular ? (
-            <View style={[styles.popularBadge, { backgroundColor: colors.primary + "E6" }]}>
+          {showPopularBadge ? (
+            <View style={[styles.secondaryBadge, { backgroundColor: colors.primary + "E0" }]}>
               <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>★ Popular</Text>
+            </View>
+          ) : showNewBadge ? (
+            <View style={[styles.secondaryBadge, { backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }]}>
+              <Text style={[styles.badgeText, { color: "rgba(255,255,255,0.9)" }]}>★ New</Text>
             </View>
           ) : null}
         </View>
 
-        {/* Bottom-right: drink deal badge — only shown when not compact (no room in compact row) */}
+        {/* Bottom-right: drink deal badge — above the card body, only for non-compact */}
         {hasDrinkPlans && !compact ? (
           <View style={[styles.drinkBadge, { backgroundColor: colors.primary }]}>
             <Ionicons name="wine-outline" size={9} color={colors.primaryForeground} />
@@ -129,7 +141,7 @@ export function EventCard({
           >
             {title}
           </Text>
-          {/* Drink deal pill in compact mode — next to title */}
+          {/* Drink deal icon in compact mode — sits next to title */}
           {hasDrinkPlans && compact ? (
             <View style={[styles.drinkPillCompact, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
               <Ionicons name="wine-outline" size={8} color={colors.primary} />
@@ -205,7 +217,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     alignSelf: "flex-start",
   },
-  popularBadge: {
+  secondaryBadge: {
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 3,

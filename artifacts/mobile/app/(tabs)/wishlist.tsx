@@ -104,6 +104,8 @@ export default function WishlistScreen() {
                 price={item.price}
                 category={item.category}
                 type={item.type}
+                rating={item.rating}
+                reviewCount={item.reviewCount}
                 compact
                 style={{ width: "100%" }}
               />
