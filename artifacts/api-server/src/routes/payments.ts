@@ -296,7 +296,7 @@ router.get("/payments/booking-callback", async (req, res) => {
   const appUrl = getAppUrl();
 
   function buildBookingRedirect(status: "success" | "failed", extra?: Record<string, string>): string {
-    const params = new URLSearchParams({ payment: status, type: "booking", ...extra });
+    const params = new URLSearchParams({ status, payment: status, type: "booking", ...extra });
     if (callbackScheme) {
       return `${callbackScheme}://payment-result?${params.toString()}`;
     }

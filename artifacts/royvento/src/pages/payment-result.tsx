@@ -9,7 +9,7 @@ function getQueryParam(search: string, key: string): string | null {
 
 export function PaymentResult() {
   const search = typeof window !== "undefined" ? window.location.search : "";
-  const status = getQueryParam(search, "status");
+  const status = getQueryParam(search, "status") ?? getQueryParam(search, "payment");
   const type = getQueryParam(search, "type");
   const code = getQueryParam(search, "code");
 
