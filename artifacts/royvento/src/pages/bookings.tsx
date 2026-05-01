@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useState } from "react";
 import QRCode from "qrcode";
+import { useTranslation } from "react-i18next";
 import { useListMyBookings } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,23 +29,24 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 export function Bookings() {
+  const { t } = useTranslation();
   const { data: bookings = [], isLoading, refetch } = useListMyBookings();
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Your account</p>
-        <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">My bookings</h1>
+        <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">{t("bookings.title")}</h1>
         <p className="mt-2 text-muted-foreground">Every event you've booked or requested.</p>
       </header>
 
       {isLoading ? (
-        <p className="text-muted-foreground">Loading…</p>
+        <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : bookings.length === 0 ? (
         <div className="rounded-3xl glass-card p-16 text-center">
-          <p className="font-serif text-2xl mb-2">No bookings yet</p>
-          <p className="text-muted-foreground mb-6">Discover events to book your first one.</p>
-          <Link href="/explore"><Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">Browse events</Button></Link>
+          <p className="font-serif text-2xl mb-2">{t("bookings.no_bookings")}</p>
+          <p className="text-muted-foreground mb-6">{t("bookings.no_bookings_sub")}</p>
+          <Link href="/explore"><Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">{t("bookings.explore")}</Button></Link>
         </div>
       ) : (
         <div className="space-y-6">

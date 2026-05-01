@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { useLogout } from "@/hooks/useLogout";
 
@@ -68,8 +69,10 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
   const handleLogout = useLogout();
+  const { locale, setLocale, t, languages } = useLanguage();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [editModal, setEditModal] = useState(false);
+  const [langModal, setLangModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editPhone, setEditPhone] = useState(user?.phone ?? "");
   const [editAbout, setEditAbout] = useState(user?.about ?? "");
@@ -377,11 +380,12 @@ export default function ProfileScreen() {
           { icon: "ticket-outline" as const, label: "My Bookings", onPress: () => router.push("/(tabs)/bookings") },
           { icon: "heart-outline" as const, label: "Wishlist", onPress: () => router.push("/(tabs)/wishlist") },
           { icon: "search-outline" as const, label: "Explore Events", onPress: () => router.push("/(tabs)/explore") },
-          { icon: "newspaper-outline" as const, label: "Blog & Stories", onPress: () => router.push("/blogs") },
-          { icon: "star-outline" as const, label: "Subscription / Premium", onPress: () => router.push("/subscription") },
+          { icon: "newspaper-outline" as const, label: t("profile.blog_stories"), onPress: () => router.push("/blogs") },
+          { icon: "star-outline" as const, label: t("profile.subscription_premium"), onPress: () => router.push("/subscription") },
+          { icon: "language-outline" as const, label: t("profile.language"), onPress: () => setLangModal(true) },
           {
             icon: "log-out-outline" as const,
-            label: "Sign Out",
+            label: t("profile.sign_out"),
             onPress: () =>
               Alert.alert("Sign Out", "Are you sure?", [
                 { text: "Cancel", style: "cancel" },
@@ -520,6 +524,51 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Language Picker Modal */}
+      <Modal visible={langModal} animationType="slide" transparent presentationStyle="overFullScreen">
+        <View style={styles.modalOverlay}>
+          <View style={{ flex: 1, justifyContent: "flex-end" }}>
+            <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 32 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("profile.select_language")}</Text>
+                <Pressable onPress={() => setLangModal(false)}>
+                  <Ionicons name="close" size={22} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
+              {languages.map((lang) => {
+                const active = locale === lang.code;
+                return (
+                  <Pressable
+                    key={lang.code}
+                    onPress={async () => {
+                      await setLocale(lang.code);
+                      setLangModal(false);
+                    }}
+                    style={({ pressed }) => [{
+                      flexDirection: "row" as const,
+                      alignItems: "center" as const,
+                      paddingVertical: 14,
+                      paddingHorizontal: 4,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
+                      opacity: pressed ? 0.7 : 1,
+                    }]}
+                  >
+                    <Text style={{ flex: 1, fontSize: 16, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular", color: active ? colors.primary : colors.foreground }}>
+                      {lang.native}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginRight: 8 }}>
+                      {lang.english}
+                    </Text>
+                    {active && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
         </View>
       </Modal>
     </ScrollView>

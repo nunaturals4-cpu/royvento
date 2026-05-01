@@ -8,8 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff } from "lucide-react";
 import { apiGet } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 export function Login() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -33,11 +35,11 @@ export function Login() {
         onSuccess: (data) => {
           if (data.token) localStorage.setItem("royvento_token", data.token);
           qc.invalidateQueries();
-          toast({ title: `Welcome back, ${data.user.name.split(" ")[0]}` });
+          toast({ title: `${t("auth.welcome_back")}, ${data.user.name.split(" ")[0]}` });
           setLocation("/");
         },
         onError: (err: any) =>
-          toast({ title: "Login failed", description: err?.message ?? "Check your credentials.", variant: "destructive" }),
+          toast({ title: t("common.error"), description: err?.message ?? "Check your credentials.", variant: "destructive" }),
       },
     );
   };
@@ -56,8 +58,8 @@ export function Login() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-20">
       <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">Welcome back</p>
-        <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">Sign in to Royvento</h1>
+        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">{t("auth.welcome_back")}</p>
+        <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">{t("auth.sign_in_to")}</h1>
 
         <Button
           type="button"
@@ -65,23 +67,23 @@ export function Login() {
           className="w-full h-11 border-white/15 hover:bg-white/5 mb-4 gap-2"
           onClick={handleGoogle}
         >
-          <GoogleIcon /> Continue with Google
+          <GoogleIcon /> {t("auth.continue_google")}
         </Button>
         <div className="flex items-center gap-3 my-4">
           <div className="h-px flex-1 bg-white/10" />
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">or email</span>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("auth.or_email")}</span>
           <div className="h-px flex-1 bg-white/10" />
         </div>
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label htmlFor="password">Password</Label>
-              <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+              <Label htmlFor="password">{t("auth.password")}</Label>
+              <Link href="/forgot-password" className="text-xs text-primary hover:underline">{t("auth.forgot_password")}</Link>
             </div>
             <div className="relative mt-1">
               <Input
@@ -97,18 +99,18 @@ export function Login() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? t("auth.hide_password") : t("auth.show_password")}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
           <Button type="submit" className="w-full h-11 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0" disabled={login.isPending}>
-            {login.isPending ? "Signing in…" : "Sign in"}
+            {login.isPending ? t("auth.signing_in") : t("auth.sign_in")}
           </Button>
         </form>
         <p className="mt-6 text-sm text-muted-foreground text-center">
-          New to Royvento? <Link href="/register" className="text-primary hover:underline">Create an account</Link>
+          {t("auth.no_account")} <Link href="/register" className="text-primary hover:underline">{t("auth.create_account_link")}</Link>
         </p>
         <div className="mt-8 pt-6 border-t border-white/10 text-xs text-muted-foreground space-y-1">
           <p className="font-medium text-foreground">Demo accounts</p>

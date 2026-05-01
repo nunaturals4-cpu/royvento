@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Wine } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
+import { useTranslation } from "react-i18next";
 
 interface PublicEvent {
   id: number;
@@ -25,6 +26,7 @@ interface PublicEvent {
 }
 
 export function Pubs() {
+  const { t } = useTranslation();
   const searchStr = useSearch();
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("");
@@ -57,7 +59,7 @@ export function Pubs() {
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
           <Wine className="h-3.5 w-3.5" /> Nightlife
         </p>
-        <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">Pubs &amp; lounges</h1>
+        <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pubs.title")}</h1>
         <p className="mt-4 text-white/60 leading-relaxed">
           Hand-picked nightlife venues — book a table for tickets or a private event evening.
         </p>
@@ -69,7 +71,7 @@ export function Pubs() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search pubs…"
+            placeholder={t("pubs.search_placeholder")}
             className="pl-10 h-11 bg-black/40 border-white/10"
           />
         </div>
@@ -86,10 +88,10 @@ export function Pubs() {
       </div>
 
       {loading ? (
-        <p className="text-muted-foreground">Loading…</p>
+        <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : pubs.length === 0 ? (
         <div className="rounded-3xl glass-card p-16 text-center">
-          <p className="font-serif text-2xl mb-2">No pubs match your filter</p>
+          <p className="font-serif text-2xl mb-2">{t("pubs.no_results")}</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">

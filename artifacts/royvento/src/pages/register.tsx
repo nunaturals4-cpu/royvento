@@ -7,8 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 export function Register() {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -45,7 +47,7 @@ export function Register() {
       toast({ title: "Welcome to Royvento" });
       setLocation("/");
     } catch (err: any) {
-      toast({ title: "Registration failed", description: err?.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err?.message, variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -65,8 +67,8 @@ export function Register() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-20">
       <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">Get started</p>
-        <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">Create your account</h1>
+        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">{t("auth.get_started")}</p>
+        <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">{t("auth.create_your_account")}</h1>
 
         <Button
           type="button"
@@ -80,29 +82,29 @@ export function Register() {
             <path fill="#FBBC05" d="M6.04 14.06A7.46 7.46 0 0 1 5.66 12c0-.71.13-1.4.36-2.04L1.16 6.16A12 12 0 0 0 0 12c0 1.94.46 3.78 1.28 5.42l4.76-3.36z" />
             <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.9l-3.92-3.04c-1.08.72-2.46 1.16-4.02 1.16-3.08 0-5.7-2.07-6.64-4.86L1.4 17.72C3.4 21.46 7.4 24 12 24z" />
           </svg>
-          Sign up with Google
+          {t("auth.sign_up_google")}
         </Button>
         <div className="flex items-center gap-3 my-4">
           <div className="h-px flex-1 bg-white/10" />
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">or email</span>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">{t("auth.or_email")}</span>
           <div className="h-px flex-1 bg-white/10" />
         </div>
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <Label htmlFor="name">Full name</Label>
+            <Label htmlFor="name">{t("auth.full_name")}</Label>
             <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
           </div>
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
           </div>
           <div>
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="phone">{t("auth.phone")}</Label>
             <Input id="phone" type="tel" placeholder="+91 …" value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <div className="relative mt-1">
               <Input
                 id="password"
@@ -118,14 +120,14 @@ export function Register() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? t("auth.hide_password") : t("auth.show_password")}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
           <div>
-            <Label htmlFor="referralCode">Referral code <span className="text-muted-foreground">(optional)</span></Label>
+            <Label htmlFor="referralCode">{t("auth.referral_code")} <span className="text-muted-foreground">({t("auth.optional")})</span></Label>
             <Input
               id="referralCode"
               value={referralCode}
@@ -134,15 +136,15 @@ export function Register() {
               className="bg-black/40 border-white/10 mt-1 uppercase tracking-wider"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Both you and your referrer earn 50 points (₹50) on your first paid booking.
+              {t("auth.referral_earn_note")}
             </p>
           </div>
           <Button type="submit" className="w-full h-11 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0" disabled={busy}>
-            {busy ? "Creating…" : "Create account"}
+            {busy ? t("auth.creating") : t("auth.create_account")}
           </Button>
         </form>
         <p className="mt-6 text-sm text-muted-foreground text-center">
-          Already have one? <Link href="/login" className="text-primary hover:underline">Sign in</Link>
+          {t("auth.already_have_account")} <Link href="/login" className="text-primary hover:underline">{t("auth.sign_in_link")}</Link>
         </p>
       </div>
     </div>

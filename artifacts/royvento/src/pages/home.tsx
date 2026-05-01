@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
 import { apiGet, formatINR } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 interface PublicEvent {
   id: number;
@@ -57,6 +58,7 @@ function sortCityFirst<T extends { city: string }>(items: T[], userCity: string)
 }
 
 export function Home() {
+  const { t } = useTranslation();
   const { data: featured = [] } = useListFeaturedEvents();
   const [popular, setPopular] = useState<PublicEvent[]>([]);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
@@ -71,6 +73,12 @@ export function Home() {
 
   const sortedPopular = useMemo(() => sortCityFirst(popular, userCity), [popular, userCity]);
   const sortedPubs = useMemo(() => sortCityFirst(pubs, userCity), [pubs, userCity]);
+
+  const features = [
+    { icon: ShieldCheck, title: t("home.feature1_title"), body: t("home.feature1_body") },
+    { icon: PartyPopper, title: t("home.feature2_title"), body: t("home.feature2_body") },
+    { icon: Sparkles, title: t("home.feature3_title"), body: t("home.feature3_body") },
+  ];
 
   return (
     <div>
@@ -89,24 +97,24 @@ export function Home() {
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full glass-card px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-white/80 mb-8">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              India's premier pub booking platform
+              {t("home.hero_eyebrow")}
             </div>
             <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] tracking-tight">
-              India's best pubs,<br />
-              <span className="italic text-gradient-red">one booking away.</span>
+              {t("home.hero_title_1")}<br />
+              <span className="italic text-gradient-red">{t("home.hero_title_2")}</span>
             </h1>
             <p className="mt-6 text-lg md:text-xl text-white/70 max-w-2xl leading-relaxed">
-              Discover verified pubs and clubs across India's top cities. Book tickets for ladies nights, couple entry, stag passes, and table reservations — all in one place.
+              {t("home.hero_subtitle")}
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link href="/pubs">
                 <Button size="lg" className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0 h-12 px-7">
-                  Browse pubs <ArrowRight className="h-4 w-4" />
+                  {t("home.browse_pubs")} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/register">
                 <Button size="lg" variant="outline" className="h-12 px-7 border-white/20 hover:bg-white/5">
-                  Join for free
+                  {t("home.join_free")}
                 </Button>
               </Link>
             </div>
@@ -115,15 +123,15 @@ export function Home() {
             <div className="mt-14 grid grid-cols-3 gap-6 max-w-xl">
               <div>
                 <p className="stat-number text-3xl">200+</p>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Verified pubs</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">{t("home.verified_pubs")}</p>
               </div>
               <div>
                 <p className="stat-number text-3xl">15K</p>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Tickets booked</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">{t("home.tickets_booked")}</p>
               </div>
               <div>
                 <p className="stat-number text-3xl">4.9★</p>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Avg. rating</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">{t("home.avg_rating")}</p>
               </div>
             </div>
           </div>
@@ -133,11 +141,7 @@ export function Home() {
       {/* Value props */}
       <section className="container mx-auto px-4 md:px-6 py-24">
         <div className="grid md:grid-cols-3 gap-6">
-          {[
-            { icon: ShieldCheck, title: "Verified pubs only", body: "Every pub on Royvento is reviewed and approved by our team. No fake listings, no surprises." },
-            { icon: PartyPopper, title: "All entry types covered", body: "Ladies night, couple entry, stag passes, table reservations — book any format in seconds." },
-            { icon: Sparkles, title: "Verified reviews", body: "Reviews come from confirmed bookings only — what you read is what you get." },
-          ].map((f) => (
+          {features.map((f) => (
             <div key={f.title} className="rounded-3xl glass-card p-7 lift-3d">
               <div className="w-12 h-12 rounded-xl bg-primary/20 text-primary flex items-center justify-center mb-5 red-ring">
                 <f.icon className="h-5 w-5" />
@@ -155,12 +159,12 @@ export function Home() {
           <div className="flex items-end justify-between mb-8">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
-                <Flame className="h-3.5 w-3.5" /> Trending right now
+                <Flame className="h-3.5 w-3.5" /> {t("home.trending_label")}
               </p>
-              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Popular this season</h2>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">{t("home.trending_title")}</h2>
             </div>
             <Link href="/explore" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
-              View all <ArrowRight className="h-4 w-4" />
+              {t("home.view_all_events")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -175,9 +179,9 @@ export function Home() {
           <div className="flex items-end justify-between mb-8">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
-                <Megaphone className="h-3.5 w-3.5" /> Fresh from the venues
+                <Megaphone className="h-3.5 w-3.5" /> {t("home.announcements_label")}
               </p>
-              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">What's On</h2>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">{t("home.announcements_title")}</h2>
             </div>
           </div>
           <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
@@ -216,12 +220,12 @@ export function Home() {
         <div className="flex items-end justify-between mb-8">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5" /> In the spotlight
+              <Sparkles className="h-3.5 w-3.5" /> {t("home.pubs_label")}
             </p>
-            <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Featured events</h2>
+            <h2 className="font-serif text-3xl md:text-5xl tracking-tight">{t("home.pubs_title")}</h2>
           </div>
           <Link href="/explore" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
-            View all <ArrowRight className="h-4 w-4" />
+            {t("home.view_all")} <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -235,12 +239,12 @@ export function Home() {
           <div className="flex items-end justify-between mb-8">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
-                <PartyPopper className="h-3.5 w-3.5" /> Nightlife
+                <PartyPopper className="h-3.5 w-3.5" /> {t("home.pubs_label")}
               </p>
-              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Pubs &amp; lounges</h2>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">{t("home.pubs_title")}</h2>
             </div>
             <Link href="/pubs" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
-              All pubs <ArrowRight className="h-4 w-4" />
+              {t("home.view_all_pubs")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -267,12 +271,12 @@ export function Home() {
           <div className="relative flex flex-col gap-3">
             <Link href="/subscription">
               <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12">
-                See plans
+                {t("profile.subscription_premium")}
               </Button>
             </Link>
             <Link href="/dashboard/become-vendor">
               <Button size="lg" variant="outline" className="w-full border-white/20 hover:bg-white/5 h-12">
-                Become a partner
+                {t("profile.become_partner")}
               </Button>
             </Link>
           </div>
