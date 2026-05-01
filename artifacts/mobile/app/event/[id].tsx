@@ -1001,6 +1001,12 @@ export default function EventDetailScreen() {
                   </Text>
                 </Pressable>
               )}
+
+              {(!agreedTerms || (isPub && !confirmedAge)) && (
+                <Text style={[styles.consentHint, { color: colors.mutedForeground }]}>
+                  Please tick {!agreedTerms && isPub && !confirmedAge ? "both boxes" : "the box above"} to proceed with your booking.
+                </Text>
+              )}
             </View>
 
             <View style={styles.bookingButtons}>
@@ -1227,4 +1233,5 @@ const styles = StyleSheet.create({
   consentRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   checkBox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, alignItems: "center", justifyContent: "center", marginTop: 1, flexShrink: 0 },
   consentText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18, flex: 1 },
+  consentHint: { fontSize: 11, fontFamily: "Inter_400Regular", opacity: 0.6, paddingLeft: 28 },
 });
