@@ -283,8 +283,15 @@
     "men": "Men",
     "couple": "Couple",
     "managing": "Managing",
-    "complete_payment": "Complete Payment",
-    "scan_for": "Scan"
+    "complete_payment": "கட்டணம் முடிக்கவும்",
+    "scan_for": "Scan",
+    "guest": "விருந்தினர்",
+    "date": "தேதி",
+    "tickets": "டிக்கெட்கள்",
+    "amount_paid": "செலுத்திய தொகை",
+    "notes": "குறிப்புகள்",
+    "status": "நிலை",
+    "present_at_entrance": "நுழைவாயிலில் காட்டவும் · மாற்றமுடியாதது"
   },
   "common": {
     "loading": "ஏற்றுகிறது…",

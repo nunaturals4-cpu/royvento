@@ -283,8 +283,15 @@
     "men": "Men",
     "couple": "Couple",
     "managing": "Managing",
-    "complete_payment": "Complete Payment",
-    "scan_for": "Scan"
+    "complete_payment": "ਭੁਗਤਾਨ ਪੂਰਾ ਕਰੋ",
+    "scan_for": "Scan",
+    "guest": "ਮਹਿਮਾਨ",
+    "date": "ਤਾਰੀਖ਼",
+    "tickets": "ਟਿਕਟਾਂ",
+    "amount_paid": "ਅਦਾ ਕੀਤੀ ਰਕਮ",
+    "notes": "ਨੋਟਸ",
+    "status": "ਸਥਿਤੀ",
+    "present_at_entrance": "ਦਾਖਲੇ ਤੇ ਪੇਸ਼ ਕਰੋ · ਅਟੱਲ"
   },
   "common": {
     "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",

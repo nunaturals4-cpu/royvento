@@ -283,8 +283,15 @@
     "men": "Men",
     "couple": "Couple",
     "managing": "Managing",
-    "complete_payment": "Complete Payment",
-    "scan_for": "Scan"
+    "complete_payment": "পেমেন্ট সম্পন্ন করুন",
+    "scan_for": "Scan",
+    "guest": "অতিথি",
+    "date": "তারিখ",
+    "tickets": "টিকেট",
+    "amount_paid": "পরিশোধিত পরিমাণ",
+    "notes": "নোটস",
+    "status": "অবস্থা",
+    "present_at_entrance": "প্রবেশদ্বারে উপস্থাপন করুন · অ-হস্তান্তরযোগ্য"
   },
   "common": {
     "loading": "লোড হচ্ছে…",

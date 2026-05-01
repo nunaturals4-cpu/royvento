@@ -184,9 +184,9 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
         <div class="venue">${esc(bx.vendorName ?? b.eventTitle)}</div>
         <div class="event-name">${esc(b.eventTitle)}</div>
         <div class="fields">
-          <div><div class="lbl">Guest</div><div class="val">${esc(bx.personName || bx.userName || "—")}</div></div>
-          <div><div class="lbl">Date</div><div class="val">${esc(b.bookingDate)}</div></div>
-          <div><div class="lbl">Tickets</div><div class="val">${esc(ticketBreakdown)}</div></div>
+          <div><div class="lbl">${esc(t("bookings.guest"))}</div><div class="val">${esc(bx.personName || bx.userName || "—")}</div></div>
+          <div><div class="lbl">${esc(t("bookings.date"))}</div><div class="val">${esc(b.bookingDate)}</div></div>
+          <div><div class="lbl">${esc(t("bookings.tickets"))}</div><div class="val">${esc(ticketBreakdown)}</div></div>
           <div><div class="lbl">${esc(t("bookings.approved_by"))}</div><div class="val">${esc(bx.approvedBy || t("bookings.partner"))}</div></div>
         </div>
       </div>
@@ -199,8 +199,8 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
   <div class="perf"><div class="notch"></div><div class="dash"></div><div class="notch notch-r"></div></div>
   <div class="tear">${esc(ticketCode)}</div>
   <div class="footer">
-    <div><div class="price-lbl">Amount paid</div><div class="price">${esc(price)}</div></div>
-    <div class="disclaimer">Present at entrance<br/>Non-transferable · Royvento</div>
+    <div><div class="price-lbl">${esc(t("bookings.amount_paid"))}</div><div class="price">${esc(price)}</div></div>
+    <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>Royvento</div>
   </div>
 </div>
 </body></html>`;
@@ -477,17 +477,17 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     {/* Details grid */}
                     <View style={styles.ptFieldsRow}>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>{t("bookings.booked_on")}</Text>
+                        <Text style={styles.ptFieldLabel}>{t("bookings.guest")}</Text>
                         <Text style={styles.ptFieldValue}>{bx.personName || bx.userName || "—"}</Text>
                       </View>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>{t("events.book_now")}</Text>
+                        <Text style={styles.ptFieldLabel}>{t("bookings.date")}</Text>
                         <Text style={styles.ptFieldValue}>{formatDate(b.bookingDate)}</Text>
                       </View>
                     </View>
                     <View style={styles.ptFieldsRow}>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>{t("bookings.ticket_badge")}</Text>
+                        <Text style={styles.ptFieldLabel}>{t("bookings.tickets")}</Text>
                         <Text style={styles.ptFieldValue}>
                           {[
                             bx.ticketWomen ? `${bx.ticketWomen}× ${t("bookings.women")}` : "",
@@ -532,7 +532,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                             : "—"}
                         </Text>
                       </View>
-                      <Text style={styles.ptFooterHint}>Present at entrance · Non-transferable</Text>
+                      <Text style={styles.ptFooterHint}>{t("bookings.present_at_entrance")}</Text>
                     </View>
                   </LinearGradient>
                 )}
@@ -643,12 +643,12 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                 {isExpanded && status !== "confirmed" && status !== "payment_pending" && (
                   <View style={[styles.expandedInfo, { borderTopColor: colors.border }]}>
                     <Text style={[styles.expandedText, { color: colors.mutedForeground }]}>
-                      Status: {meta.label}
-                      {status === "pending" ? " — awaiting partner confirmation." : ""}
+                      {statusLabel}
+                      {status === "pending" ? ` — ${t("bookings.awaiting_approval")}` : ""}
                     </Text>
                     {b.notes ? (
                       <Text style={[styles.expandedText, { color: colors.mutedForeground }]}>
-                        Notes: {b.notes}
+                        {t("bookings.notes")}: {b.notes}
                       </Text>
                     ) : null}
                   </View>

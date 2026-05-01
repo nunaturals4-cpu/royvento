@@ -283,8 +283,15 @@
     "men": "Men",
     "couple": "Couple",
     "managing": "Managing",
-    "complete_payment": "Complete Payment",
-    "scan_for": "Scan"
+    "complete_payment": "ಪಾವತಿ ಪೂರ್ಣಗೊಳಿಸಿ",
+    "scan_for": "Scan",
+    "guest": "ಅತಿಥಿ",
+    "date": "ದಿನಾಂಕ",
+    "tickets": "ಟಿಕೆಟ್ಗಳು",
+    "amount_paid": "ಪಾವತಿ ಮಾಡಿದ ಮೊತ್ತ",
+    "notes": "ಟಿಪ್ಪಣಿಗಳು",
+    "status": "ಸ್ಥಿತಿ",
+    "present_at_entrance": "ಪ್ರವೇಶದ್ವಾರದಲ್ಲಿ ಪ್ರಸ್ತುತಪಡಿಸಿ · ವರ್ಗಾಯಿಸಲಾಗದ"
   },
   "common": {
     "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",

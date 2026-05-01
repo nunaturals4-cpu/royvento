@@ -283,8 +283,15 @@
     "men": "Men",
     "couple": "Couple",
     "managing": "Managing",
-    "complete_payment": "Complete Payment",
-    "scan_for": "Scan"
+    "complete_payment": "చెల్లింపు పూర్తి చేయండి",
+    "scan_for": "Scan",
+    "guest": "అతిథి",
+    "date": "తేదీ",
+    "tickets": "టికెట్లు",
+    "amount_paid": "చెల్లించిన మొత్తం",
+    "notes": "గమనికలు",
+    "status": "స్థితి",
+    "present_at_entrance": "ప్రవేశద్వారంలో చూపించండి · బదిలీ చేయలేనిది"
   },
   "common": {
     "loading": "లోడ్ అవుతోంది…",

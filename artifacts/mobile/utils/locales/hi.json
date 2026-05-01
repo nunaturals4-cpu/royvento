@@ -283,8 +283,15 @@
     "men": "Men",
     "couple": "Couple",
     "managing": "Managing",
-    "complete_payment": "Complete Payment",
-    "scan_for": "Scan"
+    "complete_payment": "भुगतान पूरा करें",
+    "scan_for": "Scan",
+    "guest": "अतिथि",
+    "date": "तारीख",
+    "tickets": "टिकट",
+    "amount_paid": "भुगतान राशि",
+    "notes": "नोट्स",
+    "status": "स्थिति",
+    "present_at_entrance": "प्रवेश पर प्रस्तुत करें · अहस्तांतरणीय"
   },
   "common": {
     "loading": "लोड हो रहा है…",

@@ -284,7 +284,14 @@
     "couple": "Couple",
     "managing": "Managing",
     "complete_payment": "Complete Payment",
-    "scan_for": "Scan"
+    "scan_for": "Scan",
+    "guest": "Guest",
+    "date": "Date",
+    "tickets": "Tickets",
+    "amount_paid": "Amount paid",
+    "notes": "Notes",
+    "status": "Status",
+    "present_at_entrance": "Present at entrance · Non-transferable"
   },
   "common": {
     "loading": "Loading…",
