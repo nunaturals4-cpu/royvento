@@ -2547,7 +2547,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       if (freeEntryChecked) {
         await apiPost("/api/vendors/me/drink-plans", {
           type: feDrinkType, productName: feDrinkType === "welcome" ? "Free Drink" : "Unlimited Drinks",
-          gender: feGender, price: 0, lineItems: null, ...common,
+          gender: feGender, price: 0, ...common,
         });
       }
       if (ticketChecked) {
@@ -2580,7 +2580,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
         gender: isFreeEntry ? editGender : "all",
         price: 0,
-        lineItems: isTicket ? editItems.filter((i) => i.name.trim()) : null,
+        ...(isTicket ? { lineItems: editItems.filter((i) => i.name.trim()) } : {}),
         days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
         description: editDescription.trim(),
       });
@@ -2879,7 +2879,16 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                             All guests
                           </span>
                         )}
+                        {plan.price > 0 && (
+                          <span className="rounded-full bg-white/5 text-muted-foreground border border-white/10 px-2 py-0.5 text-[10px] font-medium">
+                            ₹{(plan.price / 100).toFixed(0)}
+                          </span>
+                        )}
                       </div>
+                      {/* Show legacy productName when there are no line items */}
+                      {(!plan.lineItems || plan.lineItems.length === 0) && plan.productName && plan.type !== "welcome" && plan.type !== "unlimited" && (
+                        <p className="text-sm font-medium">{plan.productName}</p>
+                      )}
                       {plan.lineItems && plan.lineItems.length > 0 && (
                         <ul className="mt-1 space-y-0.5">
                           {plan.lineItems.map((item, i) => (

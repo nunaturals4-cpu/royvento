@@ -388,7 +388,7 @@ const DrinkPlanBody = z.object({
   timeFrom: z.string().refine((v) => v === "" || HH_MM_RE.test(v), { message: "timeFrom must be HH:MM or empty" }).default(""),
   timeTo: z.string().refine((v) => v === "" || HH_MM_RE.test(v), { message: "timeTo must be HH:MM or empty" }).default(""),
   description: z.string().max(500).default(""),
-  lineItems: z.array(DrinkPlanLineItem).optional(),
+  lineItems: z.array(DrinkPlanLineItem).nullable().optional(),
 });
 
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {

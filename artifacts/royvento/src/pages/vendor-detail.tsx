@@ -343,7 +343,16 @@ export function VendorDetail() {
                         All guests
                       </span>
                     )}
+                    {plan.price > 0 && (
+                      <span className="rounded-full bg-white/5 text-muted-foreground border border-white/10 px-2 py-0.5 text-[10px] font-medium">
+                        ₹{(plan.price / 100).toFixed(0)}
+                      </span>
+                    )}
                   </div>
+                  {/* Fallback: show productName for legacy plans without line items */}
+                  {(!plan.lineItems || plan.lineItems.length === 0) && plan.productName && plan.type !== "welcome" && plan.type !== "unlimited" && (
+                    <p className="text-sm font-semibold">{plan.productName}</p>
+                  )}
                   {plan.lineItems && plan.lineItems.length > 0 && (
                     <ul className="space-y-1 mt-1">
                       {plan.lineItems.map((item, i) => (
