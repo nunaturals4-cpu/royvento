@@ -1594,7 +1594,7 @@ components:
             - type: "null"
         hasDrinkPlans:
           type: boolean
-      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus, hasDrinkPlans]
+      required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus]
 
     EventDetail:
       allOf:
