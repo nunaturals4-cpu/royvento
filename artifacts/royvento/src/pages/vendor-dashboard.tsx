@@ -174,6 +174,10 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [city, setCity] = useState(vendor.city ?? "");
   const [country, setCountry] = useState(vendor.country || "India");
   const [danceFloor, setDanceFloor] = useState<string>(vendor.danceFloor ?? "");
+  const [danceFloorPhotos, setDanceFloorPhotos] = useState<string[]>(
+    Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []
+  );
+  const [uploadingDfPhoto, setUploadingDfPhoto] = useState(false);
   const [openDays, setOpenDays] = useState<string[]>(
     Array.isArray(vendor.openDays) && vendor.openDays.length > 0 ? vendor.openDays : [...ALL_DAYS]
   );
@@ -198,6 +202,20 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   });
   const update = useUpdateMyVendor();
   const { toast } = useToast();
+
+  const uploadDanceFloorPhoto = async (file: File): Promise<string> => {
+    const res = await fetch("/api/storage/uploads/request-url", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+    });
+    if (!res.ok) throw new Error("Could not get upload URL");
+    const { uploadURL, objectPath } = await res.json();
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    if (!put.ok) throw new Error("Upload failed");
+    return `/api/storage${objectPath}`;
+  };
 
   const checkDayError = (open: string, close: string): string => {
     if (!open || !close) return "";
@@ -297,6 +315,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             await apiPatch("/api/partner/profile", {
               state: stateF, city, country, address, openDays, dayHours: dayHoursPayload,
               danceFloor: danceFloor || null,
+              danceFloorPhotos,
             });
             toast({ title: "Profile updated" });
             onSaved();
@@ -391,6 +410,59 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             ))}
           </div>
         </div>
+        {danceFloor === "dedicated" && (
+          <div>
+            <Label className="mb-2 block text-sm font-medium flex items-center gap-1.5">
+              <ImageIcon className="h-3.5 w-3.5 text-primary" />
+              Dance floor photos
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {danceFloorPhotos.map((url, i) => (
+                <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-white/10">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i))}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="h-4 w-4 text-white" />
+                  </button>
+                </div>
+              ))}
+              <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-lg border border-dashed cursor-pointer transition-colors ${uploadingDfPhoto ? "opacity-50 pointer-events-none" : "border-white/20 hover:border-primary/50 bg-black/20 hover:bg-primary/5"}`}>
+                {uploadingDfPhoto ? (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 text-muted-foreground mb-1" />
+                    <span className="text-xs text-muted-foreground">Add</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  multiple
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    if (!files.length) return;
+                    setUploadingDfPhoto(true);
+                    try {
+                      const urls = await Promise.all(files.map((f) => uploadDanceFloorPhoto(f)));
+                      setDanceFloorPhotos((prev) => [...prev, ...urls]);
+                    } catch {
+                      toast({ title: "Photo upload failed", variant: "destructive" });
+                    } finally {
+                      setUploadingDfPhoto(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        )}
         <div>
           <Label className="mb-2 block text-sm font-medium">Venue location</Label>
           <div className="flex gap-6 mb-3">

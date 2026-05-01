@@ -32,6 +32,7 @@ interface VendorRow {
   openDays: string[];
   dayHours?: string | null;
   danceFloor?: string | null;
+  danceFloorPhotos?: string[] | null;
   status: string;
   isPremium?: boolean;
   approvedAt?: Date | null;
@@ -94,6 +95,7 @@ async function serializeVendor(v: VendorRow) {
     crmTrialDaysRemaining,
     freeEntryRules,
     danceFloor: v.danceFloor ?? null,
+    danceFloorPhotos: v.danceFloorPhotos ?? null,
   };
 }
 

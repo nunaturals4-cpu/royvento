@@ -32,4 +32,5 @@ export interface Vendor {
   country: string;
   freeEntryRules?: FreeEntryRules | null;
   danceFloor?: VendorDanceFloor;
+  danceFloorPhotos?: string[] | null;
 }

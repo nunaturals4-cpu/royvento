@@ -253,6 +253,7 @@ export const ListVendorsResponseItem = zod.object({
     ])
     .optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+  danceFloorPhotos: zod.array(zod.string()).nullish(),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 
@@ -302,6 +303,7 @@ export const GetMyVendorResponse = zod.object({
         ])
         .optional(),
       danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+      danceFloorPhotos: zod.array(zod.string()).nullish(),
     }),
     zod.null(),
   ]),
@@ -360,6 +362,7 @@ export const CreateMyVendorResponse = zod.object({
     ])
     .optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+  danceFloorPhotos: zod.array(zod.string()).nullish(),
 });
 
 /**
@@ -415,6 +418,7 @@ export const UpdateMyVendorResponse = zod.object({
     ])
     .optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+  danceFloorPhotos: zod.array(zod.string()).nullish(),
 });
 
 /**
@@ -461,6 +465,7 @@ export const GetVendorResponse = zod.object({
     ])
     .optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+  danceFloorPhotos: zod.array(zod.string()).nullish(),
 });
 
 /**
@@ -503,6 +508,7 @@ export const ListPendingVendorsResponseItem = zod.object({
     ])
     .optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+  danceFloorPhotos: zod.array(zod.string()).nullish(),
 });
 export const ListPendingVendorsResponse = zod.array(
   ListPendingVendorsResponseItem,
@@ -552,6 +558,7 @@ export const ApproveVendorResponse = zod.object({
     ])
     .optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+  danceFloorPhotos: zod.array(zod.string()).nullish(),
 });
 
 /**
@@ -598,6 +605,7 @@ export const RejectVendorResponse = zod.object({
     ])
     .optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+  danceFloorPhotos: zod.array(zod.string()).nullish(),
 });
 
 /**
@@ -1102,6 +1110,7 @@ export const GetEventResponse = zod
           ])
           .optional(),
         danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+        danceFloorPhotos: zod.array(zod.string()).nullish(),
       }),
     }),
   );

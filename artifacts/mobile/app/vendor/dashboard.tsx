@@ -781,6 +781,9 @@ export default function VendorDashboardScreen() {
   const [profLocation, setProfLocation] = useState({ country: "India", state: "", city: "" });
   const [profOpenDays, setProfOpenDays] = useState<string[]>([...ALL_DAYS]);
   const [profDayTimes, setProfDayTimes] = useState<Record<string, { open: string; close: string }>>({});
+  const [profDanceFloor, setProfDanceFloor] = useState<string>("");
+  const [profDanceFloorPhotos, setProfDanceFloorPhotos] = useState<string[]>([]);
+  const [uploadingDfPhoto, setUploadingDfPhoto] = useState(false);
   const [profAddress, setProfAddress] = useState("");
   const [profAddressQuery, setProfAddressQuery] = useState("");
   const [addrSuggestions, setAddrSuggestions] = useState<{ place_id: string; description: string; types: string[] }[]>([]);
@@ -831,6 +834,8 @@ export default function VendorDashboardScreen() {
       }
       setProfAddress(vendor.address ?? "");
       setProfAddressQuery(vendor.address ?? "");
+      setProfDanceFloor(vendor.danceFloor ?? "");
+      setProfDanceFloorPhotos(Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []);
     }
   }, [vendor?.id]);
 
@@ -876,6 +881,8 @@ export default function VendorDashboardScreen() {
           address: profAddress.trim() || null,
           openDays: profOpenDays.filter((d) => VALID_API_DAYS.includes(d)),
           dayHours: dayHoursPayload,
+          danceFloor: profDanceFloor || null,
+          danceFloorPhotos: profDanceFloorPhotos,
         }),
       });
       if (profPhone.trim()) {
@@ -1685,6 +1692,95 @@ export default function VendorDashboardScreen() {
                 }}
               />
             )
+          )}
+
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DANCE FLOOR</Text>
+
+          {(["dedicated", "general", "none"] as const).map((opt) => {
+            const labels = { dedicated: "Dedicated dance floor", general: "Dancing in main area", none: "No dancing / seated only" };
+            const selected = profDanceFloor === opt;
+            return (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => setProfDanceFloor(opt)}
+                style={{
+                  flexDirection: "row", alignItems: "center", gap: 10,
+                  borderRadius: 12, borderWidth: 1,
+                  borderColor: selected ? colors.primary + "80" : colors.border,
+                  backgroundColor: selected ? colors.primary + "15" : colors.card,
+                  paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8,
+                }}
+              >
+                <View style={{
+                  width: 18, height: 18, borderRadius: 9, borderWidth: 2,
+                  borderColor: selected ? colors.primary : colors.border,
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  {selected && <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary }} />}
+                </View>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: selected ? colors.foreground : colors.mutedForeground }}>
+                  {labels[opt]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          {profDanceFloor === "dedicated" && (
+            <View style={{ marginTop: 4, marginBottom: 8, gap: 10 }}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Dance floor photos (optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {profDanceFloorPhotos.map((url, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onLongPress={() => {
+                        Alert.alert("Remove photo?", undefined, [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Remove", style: "destructive", onPress: () => setProfDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i)) },
+                        ]);
+                      }}
+                      style={{ width: 80, height: 80, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
+                    >
+                      <Image source={{ uri: url }} style={{ width: 80, height: 80 }} resizeMode="cover" />
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    disabled={uploadingDfPhoto}
+                    onPress={async () => {
+                      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                      if (status !== "granted") { Alert.alert("Permission required", "Allow photo library access to upload photos."); return; }
+                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, quality: 0.85 });
+                      if (result.canceled) return;
+                      setUploadingDfPhoto(true);
+                      try {
+                        const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri)));
+                        setProfDanceFloorPhotos((prev) => [...prev, ...urls]);
+                      } catch {
+                        Alert.alert("Upload failed", "Could not upload photo.");
+                      } finally {
+                        setUploadingDfPhoto(false);
+                      }
+                    }}
+                    style={{
+                      width: 80, height: 80, borderRadius: 10,
+                      borderWidth: 1, borderStyle: "dashed", borderColor: uploadingDfPhoto ? colors.border : colors.primary + "60",
+                      backgroundColor: colors.card, alignItems: "center", justifyContent: "center", gap: 4,
+                    }}
+                  >
+                    {uploadingDfPhoto
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <>
+                          <Ionicons name="add" size={22} color={colors.primary} />
+                          <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Add</Text>
+                        </>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
+                Long-press a photo to remove it
+              </Text>
+            </View>
           )}
 
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>CONTACT INFO</Text>

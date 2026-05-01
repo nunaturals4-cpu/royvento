@@ -72,6 +72,7 @@ export const vendorsTable = pgTable(
     ticketPrefix: varchar("ticket_prefix", { length: 8 }).notNull().default(""),
     ticketSalt: varchar("ticket_salt", { length: 32 }).notNull().default(""),
     danceFloor: varchar("dance_floor", { length: 20 }),
+    danceFloorPhotos: text("dance_floor_photos").array(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
