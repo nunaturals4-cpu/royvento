@@ -55,12 +55,18 @@
     "sign_up": "সাইন আপ",
     "forgot_password_title": "পাসওয়ার্ড ভুলে গেছেন?",
     "reset_password": "পাসওয়ার্ড রিসেট করুন",
-    "back_to_login": "সাইন ইনে ফিরুন",
+    "back_to_login": "লগইনে ফিরুন",
     "referral_earn_note": "আপনি এবং আপনার রেফারার উভয়ই প্রথম পেইড বুকিংয়ে ৫০ পয়েন্ট (₹৫) পাবেন।",
     "google_not_configured": "Google সাইন-ইন কনফিগার করা নেই",
     "google_not_configured_desc": "GOOGLE_CLIENT_ID এবং GOOGLE_CLIENT_SECRET যোগ করুন।",
     "google_signup_not_configured": "Google সাইন-আপ কনফিগার করা নেই",
-    "welcome": "Royvento-তে আপনাকে স্বাগতম"
+    "welcome": "Royvento-তে আপনাকে স্বাগতম",
+    "forgot_sub_web": "আপনার ইমেইল দিন এবং আমরা পাসওয়ার্ড রিসেট লিংক পাঠাব।",
+    "sending": "পাঠানো হচ্ছে…",
+    "send_reset_link": "রিসেট লিংক পাঠান",
+    "check_inbox_web": "আপনার ইনবক্স দেখুন",
+    "check_inbox_sub_web": "যদি {email} Royvento-তে নিবন্ধিত থাকে, তাহলে শীঘ্রই রিসেট লিংক পাবেন।",
+    "error": "ত্রুটি"
   },
   "home": {
     "hero_eyebrow": "ভারতের প্রধান পাব বুকিং প্ল্যাটফর্ম",

@@ -55,12 +55,18 @@
     "sign_up": "ਸਾਈਨ ਅੱਪ",
     "forgot_password_title": "ਪਾਸਵਰਡ ਭੁੱਲ ਗਏ?",
     "reset_password": "ਪਾਸਵਰਡ ਰੀਸੈੱਟ ਕਰੋ",
-    "back_to_login": "ਸਾਈਨ ਇਨ ਤੇ ਵਾਪਸ",
+    "back_to_login": "ਲੌਗਿਨ ਤੇ ਵਾਪਸ ਜਾਓ",
     "referral_earn_note": "ਤੁਸੀਂ ਅਤੇ ਤੁਹਾਡਾ ਰੈਫਰਰ ਦੋਵੇਂ ਪਹਿਲੀ ਅਦਾਇਗੀ ਬੁਕਿੰਗ ਤੇ 50 ਪੁਆਇੰਟ (₹5) ਕਮਾਓਗੇ।",
     "google_not_configured": "Google ਸਾਈਨ-ਇਨ ਕੌਂਫਿਗਰ ਨਹੀਂ",
     "google_not_configured_desc": "GOOGLE_CLIENT_ID ਅਤੇ GOOGLE_CLIENT_SECRET ਜੋੜੋ।",
     "google_signup_not_configured": "Google ਸਾਈਨ-ਅੱਪ ਕੌਂਫਿਗਰ ਨਹੀਂ",
-    "welcome": "Royvento ਵਿੱਚ ਜੀ ਆਇਆਂ"
+    "welcome": "Royvento ਵਿੱਚ ਜੀ ਆਇਆਂ",
+    "forgot_sub_web": "ਆਪਣਾ ਈਮੇਲ ਦਾਖਲ ਕਰੋ ਅਤੇ ਅਸੀਂ ਪਾਸਵਰਡ ਰੀਸੈੱਟ ਲਿੰਕ ਭੇਜਾਂਗੇ।",
+    "sending": "ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+    "send_reset_link": "ਰੀਸੈੱਟ ਲਿੰਕ ਭੇਜੋ",
+    "check_inbox_web": "ਆਪਣਾ ਇਨਬਾਕਸ ਦੇਖੋ",
+    "check_inbox_sub_web": "ਜੇ {email} Royvento ਤੇ ਦਰਜ ਹੈ, ਤਾਂ ਤੁਹਾਨੂੰ ਜਲਦੀ ਰੀਸੈੱਟ ਲਿੰਕ ਮਿਲੇਗਾ।",
+    "error": "ਗਲਤੀ"
   },
   "home": {
     "hero_eyebrow": "ਭਾਰਤ ਦਾ ਪ੍ਰਮੁੱਖ ਪੱਬ ਬੁਕਿੰਗ ਪਲੇਟਫਾਰਮ",

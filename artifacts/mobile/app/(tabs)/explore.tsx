@@ -23,6 +23,7 @@ import { LocationPicker } from "@/components/LocationPicker";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 
 const PAGE_SIZE = 20;
 
@@ -42,6 +43,7 @@ function countActiveFilters(f: FilterState) {
 }
 
 export default function ExploreScreen() {
+  const { t } = useLanguage();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ city?: string; type?: string }>();
@@ -169,7 +171,7 @@ export default function ExploreScreen() {
             style={[styles.searchInput, { color: colors.foreground }]}
             value={search}
             onChangeText={handleSearchChange}
-            placeholder="Search events, venues, cities…"
+            placeholder={t("explore.search_placeholder")}
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="search"
             clearButtonMode="while-editing"
@@ -239,10 +241,10 @@ export default function ExploreScreen() {
         <>
           <EmptyState
             icon="search-outline"
-            title="No events found"
-            subtitle="Try different filters or search terms"
+            title={t("explore.no_match")}
+            subtitle={t("explore.no_match_sub")}
             action={{
-              label: "Clear all filters",
+              label: t("explore.clear_all"),
               onPress: () => { setSearch(""); setDebouncedSearch(""); clearFilter(); },
             }}
           />
@@ -295,7 +297,7 @@ export default function ExploreScreen() {
           >
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Filter Events</Text>
+              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>{t("explore.filter_events")}</Text>
               <Pressable onPress={() => setShowFilter(false)}>
                 <Ionicons name="close" size={22} color={colors.mutedForeground} />
               </Pressable>
@@ -303,16 +305,16 @@ export default function ExploreScreen() {
 
             {/* Location */}
             <View style={styles.sheetSection}>
-              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Location</Text>
+              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>{t("explore.location")}</Text>
               <LocationPicker value={draftLocation} onChange={setDraftLocation} />
             </View>
 
             {/* Price Range */}
             <View style={styles.sheetSection}>
-              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Price Range (₹)</Text>
+              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>{t("explore.price_range")}</Text>
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.sheetSubLabel, { color: colors.mutedForeground }]}>Min</Text>
+                  <Text style={[styles.sheetSubLabel, { color: colors.mutedForeground }]}>{t("explore.min")}</Text>
                   <TextInput
                     style={[styles.sheetInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                     value={draftFilter.minPrice}
@@ -323,7 +325,7 @@ export default function ExploreScreen() {
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.sheetSubLabel, { color: colors.mutedForeground }]}>Max</Text>
+                  <Text style={[styles.sheetSubLabel, { color: colors.mutedForeground }]}>{t("explore.max")}</Text>
                   <TextInput
                     style={[styles.sheetInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                     value={draftFilter.maxPrice}
@@ -335,7 +337,11 @@ export default function ExploreScreen() {
                 </View>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingTop: 8 }}>
-                {([ ["Budget", "0", "1000"], ["Mid-range", "1000", "5000"], ["Premium", "5000", "20000"] ] as const).map(([label, min, max]) => (
+                {([
+                  [t("explore.budget"), "0", "1000"],
+                  [t("explore.mid_range"), "1000", "5000"],
+                  [t("explore.premium"), "5000", "20000"],
+                ] as const).map(([label, min, max]) => (
                   <Pressable
                     key={label}
                     onPress={() => setDraftFilter((p) => ({ ...p, minPrice: min, maxPrice: max }))}
@@ -354,7 +360,7 @@ export default function ExploreScreen() {
 
             {/* Minimum Rating */}
             <View style={styles.sheetSection}>
-              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Minimum Rating</Text>
+              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>{t("explore.minimum_rating")}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                 {(["Any", "3", "3.5", "4", "4.5"] as const).map((val) => {
                   const active = val === "Any" ? !draftFilter.minRating : draftFilter.minRating === val;
@@ -372,7 +378,7 @@ export default function ExploreScreen() {
                     >
                       {val !== "Any" && <Ionicons name="star" size={11} color={active ? colors.primaryForeground : colors.mutedForeground} />}
                       <Text style={[styles.chipText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>
-                        {val === "Any" ? "Any" : `${val}+`}
+                        {val === "Any" ? t("explore.any") : `${val}+`}
                       </Text>
                     </Pressable>
                   );
@@ -382,10 +388,10 @@ export default function ExploreScreen() {
 
             <View style={styles.sheetActions}>
               <TouchableOpacity style={[styles.clearBtn, { borderColor: colors.border }]} onPress={clearFilter}>
-                <Text style={[styles.clearBtnText, { color: colors.mutedForeground }]}>Clear All</Text>
+                <Text style={[styles.clearBtnText, { color: colors.mutedForeground }]}>{t("explore.clear_all")}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.applyBtn, { backgroundColor: colors.primary }]} onPress={applyFilter}>
-                <Text style={[styles.applyBtnText, { color: colors.primaryForeground }]}>Apply Filters</Text>
+                <Text style={[styles.applyBtnText, { color: colors.primaryForeground }]}>{t("explore.apply_filters")}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

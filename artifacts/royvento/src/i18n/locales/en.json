@@ -55,12 +55,18 @@
     "sign_up": "Sign Up",
     "forgot_password_title": "Forgot your password?",
     "reset_password": "Reset password",
-    "back_to_login": "Back to sign in",
+    "back_to_login": "Back to login",
     "referral_earn_note": "Both you and your referrer earn 50 points (₹5) on your first paid booking.",
     "google_not_configured": "Google sign-in not configured",
     "google_not_configured_desc": "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable.",
     "google_signup_not_configured": "Google sign-up not configured",
-    "welcome": "Welcome to Royvento"
+    "welcome": "Welcome to Royvento",
+    "forgot_sub_web": "Enter your email and we'll send you a link to reset your password.",
+    "sending": "Sending…",
+    "send_reset_link": "Send reset link",
+    "check_inbox_web": "Check your inbox",
+    "check_inbox_sub_web": "If {email} is registered on Royvento, you will receive a password reset link shortly.",
+    "error": "Error"
   },
   "home": {
     "hero_eyebrow": "India's premier pub booking platform",

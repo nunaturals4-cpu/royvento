@@ -170,31 +170,83 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topPadding + 12 }}>
-        <View style={styles.signInContainer}>
-          <LinearGradient
-            colors={[colors.primary, colors.goldLight ?? "#e8c050"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatarPlaceholder}
-          >
-            <Ionicons name="person" size={40} color={colors.primaryForeground} />
-          </LinearGradient>
-          <Text style={[styles.signInTitle, { color: colors.foreground }]}>{t("profile.welcome_title")}</Text>
-          <Text style={[styles.signInSub, { color: colors.mutedForeground }]}>
-            {t("profile.sign_in_sub")}
-          </Text>
-          <Pressable
-            style={[styles.signInBtn, { backgroundColor: colors.primary }]}
-            onPress={() => router.push("/(auth)/login")}
-          >
-            <Text style={[styles.signInBtnText, { color: colors.primaryForeground }]}>{t("auth.sign_in")}</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push("/(auth)/register")}>
-            <Text style={[styles.registerLink, { color: colors.primary }]}>{t("auth.create_account")}</Text>
-          </Pressable>
+      <>
+        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topPadding + 12 }}>
+          <View style={styles.signInContainer}>
+            <LinearGradient
+              colors={[colors.primary, colors.goldLight ?? "#e8c050"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatarPlaceholder}
+            >
+              <Ionicons name="person" size={40} color={colors.primaryForeground} />
+            </LinearGradient>
+            <Text style={[styles.signInTitle, { color: colors.foreground }]}>{t("profile.welcome_title")}</Text>
+            <Text style={[styles.signInSub, { color: colors.mutedForeground }]}>
+              {t("profile.sign_in_sub")}
+            </Text>
+            <Pressable
+              style={[styles.signInBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push("/(auth)/login")}
+            >
+              <Text style={[styles.signInBtnText, { color: colors.primaryForeground }]}>{t("auth.sign_in")}</Text>
+            </Pressable>
+            <Pressable onPress={() => router.push("/(auth)/register")}>
+              <Text style={[styles.registerLink, { color: colors.primary }]}>{t("auth.create_account")}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setLangModal(true)}
+              style={[styles.languageSignedOutBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
+            >
+              <Ionicons name="language-outline" size={18} color={colors.mutedForeground} />
+              <Text style={[styles.languageSignedOutText, { color: colors.mutedForeground }]}>{t("profile.language")}</Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
+        <Modal visible={langModal} animationType="slide" transparent presentationStyle="overFullScreen">
+          <View style={styles.modalOverlay}>
+            <View style={{ flex: 1, justifyContent: "flex-end" }}>
+              <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 32 }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("profile.select_language")}</Text>
+                  <Pressable onPress={() => setLangModal(false)}>
+                    <Ionicons name="close" size={22} color={colors.mutedForeground} />
+                  </Pressable>
+                </View>
+                {languages.map((lang) => {
+                  const active = locale === lang.code;
+                  return (
+                    <Pressable
+                      key={lang.code}
+                      onPress={async () => {
+                        await setLocale(lang.code);
+                        setLangModal(false);
+                      }}
+                      style={({ pressed }) => [{
+                        flexDirection: "row" as const,
+                        alignItems: "center" as const,
+                        paddingVertical: 14,
+                        paddingHorizontal: 4,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.border,
+                        opacity: pressed ? 0.7 : 1,
+                      }]}
+                    >
+                      <Text style={{ flex: 1, fontSize: 16, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular", color: active ? colors.primary : colors.foreground }}>
+                        {lang.native}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginRight: 8 }}>
+                        {lang.english}
+                      </Text>
+                      {active && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </>
     );
   }
 
@@ -583,6 +635,8 @@ const styles = StyleSheet.create({
   signInBtn: { marginTop: 8, paddingHorizontal: 40, paddingVertical: 14, borderRadius: 14 },
   signInBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   registerLink: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  languageSignedOutBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginTop: 4 },
+  languageSignedOutText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   hero: { alignItems: "center", paddingBottom: 28, paddingHorizontal: 20, gap: 6 },
   avatar: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   avatarText: { fontSize: 28, fontFamily: "Inter_700Bold" },

@@ -55,12 +55,18 @@
     "sign_up": "ಸೈನ್ ಅಪ್",
     "forgot_password_title": "ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿದ್ದೀರಾ?",
     "reset_password": "ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಿ",
-    "back_to_login": "ಸೈನ್ ಇನ್ ಗೆ ಹಿಂತಿರುಗಿ",
+    "back_to_login": "ಲಾಗಿನ್‌ಗೆ ಹಿಂತಿರುಗಿ",
     "referral_earn_note": "ನೀವು ಮತ್ತು ನಿಮ್ಮ ರೆಫರರ್ ಇಬ್ಬರೂ ಮೊದಲ ಪಾವತಿ ಬುಕಿಂಗ್‌ನಲ್ಲಿ 50 ಅಂಕಗಳು (₹5) ಗಳಿಸುತ್ತೀರಿ।",
     "google_not_configured": "Google ಸೈನ್-ಇನ್ ಕಾನ್ಫಿಗರ್ ಆಗಿಲ್ಲ",
     "google_not_configured_desc": "GOOGLE_CLIENT_ID ಮತ್ತು GOOGLE_CLIENT_SECRET ಸೇರಿಸಿ.",
     "google_signup_not_configured": "Google ಸೈನ್-ಅಪ್ ಕಾನ್ಫಿಗರ್ ಆಗಿಲ್ಲ",
-    "welcome": "Royvento ಗೆ ಸ್ವಾಗತ"
+    "welcome": "Royvento ಗೆ ಸ್ವಾಗತ",
+    "forgot_sub_web": "ನಿಮ್ಮ ಇಮೇಲ್ ನಮೂದಿಸಿ ಮತ್ತು ನಾವು ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸುತ್ತೇವೆ.",
+    "sending": "ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ…",
+    "send_reset_link": "ಮರುಹೊಂದಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ",
+    "check_inbox_web": "ನಿಮ್ಮ ಇನ್‌ಬಾಕ್ಸ್ ಪರಿಶೀಲಿಸಿ",
+    "check_inbox_sub_web": "ಅಂ {email} Royvento ನಲ್ಲಿ ನೋಂದಾಯಿಸಿದ್ದರೆ, ಶೀಘ್ರದಲ್ಲೇ ರೀಸೆಟ್ ಲಿಂಕ್ ಪಡೆಯುತ್ತೀರಿ.",
+    "error": "ದೋಷ"
   },
   "home": {
     "hero_eyebrow": "ಭಾರತದ ಪ್ರಮುಖ ಪಬ್ ಬುಕಿಂಗ್ ಪ್ಲಾಟ್‌ಫಾರ್ಮ್",

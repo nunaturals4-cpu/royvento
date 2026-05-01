@@ -102,7 +102,17 @@
     "view_all_events": "View all events",
     "view_all_pubs": "View all pubs",
     "no_events": "No events found",
-    "no_pubs": "No pubs found"
+    "no_pubs": "No pubs found",
+    "all_cities": "All cities",
+    "popular_pubs": "Popular Pubs",
+    "whats_on": "What's On",
+    "featured_events": "Featured Events",
+    "roy_title": "Hey! I'm Roy 👋",
+    "roy_error": "Sorry, I couldn't get a response. Please try again.",
+    "roy_suggestion_1": "Best pubs in Bandra?",
+    "roy_suggestion_2": "Events this weekend?",
+    "roy_suggestion_3": "Couple-friendly venues?",
+    "roy_placeholder": "Ask Roy anything..."
   },
   "explore": {
     "eyebrow": "Explore",
@@ -118,7 +128,17 @@
     "location": "Location",
     "loading": "Loading events…",
     "no_match": "No events match yet",
-    "no_match_sub": "Try a different filter or search term."
+    "no_match_sub": "Try a different filter or search term.",
+    "filter_events": "Filter Events",
+    "price_range": "Price Range (₹)",
+    "min": "Min",
+    "max": "Max",
+    "mid_range": "Mid-range",
+    "premium": "Premium",
+    "minimum_rating": "Minimum Rating",
+    "any": "Any",
+    "apply_filters": "Apply Filters",
+    "search_placeholder": "Search events, venues, cities…"
   },
   "pubs": {
     "title": "Pubs & Clubs",

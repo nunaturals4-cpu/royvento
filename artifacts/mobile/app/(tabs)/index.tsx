@@ -29,6 +29,7 @@ import { EventCard } from "@/components/EventCard";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useSelectedCity } from "@/context/CityContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
 interface ChatMessage {
@@ -63,6 +64,7 @@ function sortCityFirst<T extends { location?: string | null }>(
 }
 
 export default function HomeScreen() {
+  const { t } = useLanguage();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { selectedCity, setSelectedCity } = useSelectedCity();
@@ -107,7 +109,7 @@ export default function HomeScreen() {
       });
       setChatMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
     } catch {
-      setChatMessages((prev) => [...prev, { role: "assistant", content: "Sorry, I couldn't get a response. Please try again." }]);
+      setChatMessages((prev) => [...prev, { role: "assistant", content: t("home.roy_error") }]);
     } finally {
       setChatLoading(false);
       setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -167,7 +169,7 @@ export default function HomeScreen() {
             ]}
             numberOfLines={1}
           >
-            {selectedCity || "All cities"}
+            {selectedCity || t("home.all_cities")}
           </Text>
           <Ionicons
             name="chevron-down"
@@ -186,7 +188,7 @@ export default function HomeScreen() {
 
       {/* Popular Pubs — first */}
       {(popular.data?.length ?? 0) > 0 && (
-        <Section title="Popular Pubs" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
+        <Section title={t("home.popular_pubs")} onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
           <FlatList
             horizontal
             data={sortedPopular}
@@ -212,7 +214,7 @@ export default function HomeScreen() {
 
       {/* Announcements */}
       {(announcements?.length ?? 0) > 0 && (
-        <Section title="What's On" icon="megaphone-outline">
+        <Section title={t("home.whats_on")} icon="megaphone-outline">
           <FlatList
             horizontal
             data={announcements}
@@ -255,7 +257,7 @@ export default function HomeScreen() {
 
       {/* Featured Events — second */}
       {(featured.data?.length ?? 0) > 0 && (
-        <Section title="Featured Events" onSeeAll={() => router.push("/(tabs)/explore")}>
+        <Section title={t("home.featured_events")} onSeeAll={() => router.push("/(tabs)/explore")}>
           <FlatList
             horizontal
             data={sortedFeatured}
@@ -322,11 +324,11 @@ export default function HomeScreen() {
               <View style={[styles.chatAvatarLarge, { backgroundColor: colors.primary }]}>
                 <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_700Bold", fontSize: 24 }}>R</Text>
               </View>
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>Hey! I'm Roy 👋</Text>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>{t("home.roy_title")}</Text>
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center", lineHeight: 21 }}>
                 Your personal nightlife assistant. Ask me about pubs, events, prices, or anything about the Indian nightlife scene!
               </Text>
-              {["Best pubs in Bandra?", "Events this weekend?", "Couple-friendly venues?"].map((q) => (
+              {[t("home.roy_suggestion_1"), t("home.roy_suggestion_2"), t("home.roy_suggestion_3")].map((q) => (
                 <Pressable
                   key={q}
                   style={[styles.suggestionChip, { backgroundColor: colors.muted, borderColor: colors.border }]}
@@ -356,7 +358,7 @@ export default function HomeScreen() {
               style={[styles.chatInputField, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
               value={chatInput}
               onChangeText={setChatInput}
-              placeholder="Ask Roy anything..."
+              placeholder={t("home.roy_placeholder")}
               placeholderTextColor={colors.mutedForeground}
               onSubmitEditing={sendChatMessage}
               returnKeyType="send"
