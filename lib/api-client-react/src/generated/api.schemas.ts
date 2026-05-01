@@ -743,6 +743,7 @@ export type ListVendorsParams = {
   state?: string;
   city?: string;
   danceFloor?: ListVendorsDanceFloor;
+  drinkPlanType?: ListVendorsDrinkPlanType;
 };
 
 export type ListVendorsDanceFloor =
@@ -752,6 +753,16 @@ export const ListVendorsDanceFloor = {
   dedicated: "dedicated",
   general: "general",
   none: "none",
+} as const;
+
+export type ListVendorsDrinkPlanType =
+  (typeof ListVendorsDrinkPlanType)[keyof typeof ListVendorsDrinkPlanType];
+
+export const ListVendorsDrinkPlanType = {
+  welcome: "welcome",
+  unlimited: "unlimited",
+  ticket: "ticket",
+  custom: "custom",
 } as const;
 
 export type ListEventsParams = {
@@ -765,7 +776,18 @@ export type ListEventsParams = {
   maxPrice?: string;
   page?: number;
   limit?: number;
+  drinkPlanType?: ListEventsDrinkPlanType;
 };
+
+export type ListEventsDrinkPlanType =
+  (typeof ListEventsDrinkPlanType)[keyof typeof ListEventsDrinkPlanType];
+
+export const ListEventsDrinkPlanType = {
+  welcome: "welcome",
+  unlimited: "unlimited",
+  ticket: "ticket",
+  custom: "custom",
+} as const;
 
 export type GetBookingTicketCode200 = {
   ticketCode: string;

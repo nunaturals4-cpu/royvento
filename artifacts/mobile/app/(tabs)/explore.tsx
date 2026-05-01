@@ -27,6 +27,15 @@ import { useLanguage } from "@/context/LanguageContext";
 
 const PAGE_SIZE = 20;
 
+const DRINK_DEAL_OPTIONS = [
+  { value: "welcome", label: "Welcome Drink" },
+  { value: "unlimited", label: "Unlimited" },
+  { value: "ticket", label: "Incl. with Ticket" },
+  { value: "custom", label: "Custom Deal" },
+] as const;
+
+type DrinkPlanType = typeof DRINK_DEAL_OPTIONS[number]["value"] | "";
+
 interface FilterState {
   country: string;
   state: string;
@@ -35,12 +44,13 @@ interface FilterState {
   maxPrice: string;
   minRating: string;
   freeEntry: boolean;
+  drinkPlanType: DrinkPlanType;
 }
 
-const EMPTY_FILTER: FilterState = { country: "", state: "", city: "", minPrice: "", maxPrice: "", minRating: "", freeEntry: false };
+const EMPTY_FILTER: FilterState = { country: "", state: "", city: "", minPrice: "", maxPrice: "", minRating: "", freeEntry: false, drinkPlanType: "" };
 
 function countActiveFilters(f: FilterState) {
-  return ((f.country || f.state || f.city) ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0) + (f.minRating ? 1 : 0) + (f.freeEntry ? 1 : 0);
+  return ((f.country || f.state || f.city) ? 1 : 0) + (f.minPrice ? 1 : 0) + (f.maxPrice ? 1 : 0) + (f.minRating ? 1 : 0) + (f.freeEntry ? 1 : 0) + (f.drinkPlanType ? 1 : 0);
 }
 
 export default function ExploreScreen() {
@@ -83,6 +93,7 @@ export default function ExploreScreen() {
     if (filters.minPrice) p["minPrice"] = filters.minPrice;
     if (filters.maxPrice) p["maxPrice"] = filters.maxPrice;
     if (filters.minRating) p["minRating"] = filters.minRating;
+    if (filters.drinkPlanType) p["drinkPlanType"] = filters.drinkPlanType;
     if (typeFilter) p["type"] = typeFilter;
     p["limit"] = String(PAGE_SIZE);
     return p;
@@ -233,6 +244,14 @@ export default function ExploreScreen() {
               <Ionicons name="ticket-outline" size={12} color={colors.primary} />
               <Text style={[styles.pillText, { color: colors.primary }]}>
                 {t("explore.free_entry_pill")}
+              </Text>
+            </View>
+          ) : null}
+          {filters.drinkPlanType ? (
+            <View style={[styles.pill, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
+              <Ionicons name="wine-outline" size={12} color={colors.primary} />
+              <Text style={[styles.pillText, { color: colors.primary }]}>
+                {DRINK_DEAL_OPTIONS.find((o) => o.value === filters.drinkPlanType)?.label ?? filters.drinkPlanType}
               </Text>
             </View>
           ) : null}
@@ -422,6 +441,34 @@ export default function ExploreScreen() {
                   }]} />
                 </View>
               </Pressable>
+            </View>
+
+            {/* Drink Deal */}
+            <View style={styles.sheetSection}>
+              <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Drink Deal</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {([{ value: "" as DrinkPlanType, label: "Any" }, ...DRINK_DEAL_OPTIONS] as const).map((opt) => {
+                  const active = draftFilter.drinkPlanType === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => setDraftFilter((p) => ({ ...p, drinkPlanType: opt.value }))}
+                      style={[styles.chip, {
+                        backgroundColor: active ? colors.primary : colors.muted,
+                        borderColor: active ? colors.primary : colors.border,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                      }]}
+                    >
+                      {opt.value !== "" && <Ionicons name="wine-outline" size={11} color={active ? colors.primaryForeground : colors.mutedForeground} />}
+                      <Text style={[styles.chipText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
 
             <View style={styles.sheetActions}>

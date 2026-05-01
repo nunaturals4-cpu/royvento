@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ListVendorsDanceFloor } from "./listVendorsDanceFloor";
+import type { ListVendorsDrinkPlanType } from "./listVendorsDrinkPlanType";
 
 export type ListVendorsParams = {
   category?: string;
@@ -13,4 +14,5 @@ export type ListVendorsParams = {
   state?: string;
   city?: string;
   danceFloor?: ListVendorsDanceFloor;
+  drinkPlanType?: ListVendorsDrinkPlanType;
 };

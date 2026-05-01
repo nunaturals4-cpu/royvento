@@ -171,6 +171,15 @@ router.get("/vendors", async (req, res) => {
   if (filters.state) conditions.push(ilike(vendorsTable.state, `%${filters.state}%`));
   if (filters.city) conditions.push(ilike(vendorsTable.city, `%${filters.city}%`));
   if (filters.danceFloor) conditions.push(eq(vendorsTable.danceFloor, filters.danceFloor));
+  if (filters.drinkPlanType) {
+    const vendorIdsWithPlan = await db
+      .selectDistinct({ vendorId: drinkPlansTable.vendorId })
+      .from(drinkPlansTable)
+      .where(eq(drinkPlansTable.type, filters.drinkPlanType));
+    const ids = vendorIdsWithPlan.map((r) => r.vendorId);
+    if (ids.length === 0) { res.json([]); return; }
+    conditions.push(inArray(vendorsTable.id, ids));
+  }
   const rows = await db
     .select()
     .from(vendorsTable)

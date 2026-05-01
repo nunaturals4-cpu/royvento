@@ -8,6 +8,15 @@ import { LocationSelect } from "@/components/LocationSelect";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
+const DRINK_DEAL_OPTIONS = [
+  { value: "welcome", label: "Welcome Drink" },
+  { value: "unlimited", label: "Unlimited" },
+  { value: "ticket", label: "Included with Ticket" },
+  { value: "custom", label: "Custom Deal" },
+] as const;
+
+type DrinkPlanType = typeof DRINK_DEAL_OPTIONS[number]["value"] | "";
+
 interface PublicEvent {
   id: number;
   title: string;
@@ -42,6 +51,7 @@ export function Pubs() {
   const [stateF, setStateF] = useState("");
   const [city, setCity] = useState(() => new URLSearchParams(searchStr).get("city") ?? "");
   const [pricePreset, setPricePreset] = useState<number | null>(null);
+  const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -63,14 +73,15 @@ export function Pubs() {
         params.set("maxPrice", String(preset.max));
       }
     }
+    if (drinkPlanType) params.set("drinkPlanType", drinkPlanType);
     setLoading(true);
     apiGet<PublicEvent[]>(`/api/events?${params.toString()}`)
       .then(setPubs)
       .catch(() => setPubs([]))
       .finally(() => setLoading(false));
-  }, [search, country, stateF, city, pricePreset]);
+  }, [search, country, stateF, city, pricePreset, drinkPlanType]);
 
-  const hasFilters = search || country || stateF || city || pricePreset !== null;
+  const hasFilters = search || country || stateF || city || pricePreset !== null || drinkPlanType;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
@@ -93,6 +104,38 @@ export function Pubs() {
             placeholder={t("pubs.search_placeholder")}
             className="pl-10 h-11 bg-black/40 border-white/10"
           />
+        </div>
+
+        {/* Drink Deal filter chips */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Drink Deal</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setDrinkPlanType("")}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                drinkPlanType === ""
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+              )}
+            >
+              Any deal
+            </button>
+            {DRINK_DEAL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDrinkPlanType(drinkPlanType === opt.value ? "" : opt.value)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  drinkPlanType === opt.value
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Price range preset chips */}
@@ -140,7 +183,7 @@ export function Pubs() {
 
         {hasFilters && (
           <button
-            onClick={() => { setSearch(""); setCountry(""); setStateF(""); setCity(""); setPricePreset(null); }}
+            onClick={() => { setSearch(""); setCountry(""); setStateF(""); setCity(""); setPricePreset(null); setDrinkPlanType(""); }}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <X className="h-3 w-3" /> Clear all filters

@@ -235,6 +235,12 @@ paths:
           schema:
             type: string
             enum: [dedicated, general, none]
+        - name: drinkPlanType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [welcome, unlimited, ticket, custom]
       responses:
         "200":
           description: Vendors list
@@ -531,6 +537,12 @@ paths:
           required: false
           schema:
             type: integer
+        - name: drinkPlanType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [welcome, unlimited, ticket, custom]
       responses:
         "200":
           description: Events list (Event[] when no page param; ListEventsPaginatedResponse when page param provided)

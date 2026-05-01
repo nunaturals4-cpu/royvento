@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListEventsDrinkPlanType } from "./listEventsDrinkPlanType";
 
 export type ListEventsParams = {
   category?: string;
@@ -17,4 +18,5 @@ export type ListEventsParams = {
   maxPrice?: string;
   page?: number;
   limit?: number;
+  drinkPlanType?: ListEventsDrinkPlanType;
 };

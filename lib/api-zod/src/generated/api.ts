@@ -214,6 +214,9 @@ export const ListVendorsQueryParams = zod.object({
   state: zod.coerce.string().optional(),
   city: zod.coerce.string().optional(),
   danceFloor: zod.enum(["dedicated", "general", "none"]).optional(),
+  drinkPlanType: zod
+    .enum(["welcome", "unlimited", "ticket", "custom"])
+    .optional(),
 });
 
 export const ListVendorsResponseItem = zod.object({
@@ -822,6 +825,9 @@ export const ListEventsQueryParams = zod.object({
   maxPrice: zod.coerce.string().optional(),
   page: zod.coerce.number().optional(),
   limit: zod.coerce.number().optional(),
+  drinkPlanType: zod
+    .enum(["welcome", "unlimited", "ticket", "custom"])
+    .optional(),
 });
 
 export const ListEventsResponseItem = zod.object({

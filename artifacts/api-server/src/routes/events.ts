@@ -190,6 +190,24 @@ router.get("/events", async (req, res) => {
     );
     if (searchCond) conditions.push(searchCond);
   }
+  if (q["drinkPlanType"]) {
+    const vendorIdsWithPlan = await db
+      .selectDistinct({ vendorId: drinkPlansTable.vendorId })
+      .from(drinkPlansTable)
+      .where(eq(drinkPlansTable.type, q["drinkPlanType"]));
+    const ids = vendorIdsWithPlan.map((r) => r.vendorId);
+    if (ids.length === 0) {
+      if (q["page"] !== undefined) {
+        const page = Math.max(1, parseInt(q["page"], 10) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(q["limit"] ?? "20", 10) || 20));
+        res.json({ data: [], page, limit, hasMore: false });
+      } else {
+        res.json([]);
+      }
+      return;
+    }
+    conditions.push(inArray(eventsTable.vendorId, ids));
+  }
 
   if (q["page"] !== undefined) {
     const page = Math.max(1, parseInt(q["page"], 10) || 1);
