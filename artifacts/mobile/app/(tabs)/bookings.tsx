@@ -3,6 +3,7 @@ import { customFetch, useListMyBookings, getListMyBookingsQueryKey } from "@work
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { router } from "expo-router";
@@ -611,10 +612,22 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                         try {
                           const result = await customFetch<{ redirectUrl?: string; error?: string }>(
                             `/api/bookings/${b.id}/retry-payment`,
-                            { method: "POST" },
+                            {
+                              method: "POST",
+                              body: JSON.stringify({ callbackScheme: "royvento" }),
+                              headers: { "Content-Type": "application/json" },
+                            },
                           );
                           if (result?.redirectUrl) {
-                            await Linking.openURL(result.redirectUrl);
+                            const browserResult = await WebBrowser.openAuthSessionAsync(result.redirectUrl, "royvento://");
+                            if (browserResult.type === "success") {
+                              const parsed = new URL(browserResult.url);
+                              const payment = parsed.searchParams.get("payment") ?? "failed";
+                              const id = parsed.searchParams.get("id") ?? undefined;
+                              router.replace(`/payment-result?payment=${encodeURIComponent(payment)}${id ? `&bookingId=${encodeURIComponent(id)}` : ""}`);
+                            } else {
+                              router.replace("/payment-result?payment=failed");
+                            }
                           } else {
                             throw new Error(result?.error ?? "Could not initiate payment");
                           }

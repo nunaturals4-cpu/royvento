@@ -15,6 +15,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -282,7 +283,15 @@ export default function EventDetailScreen() {
         const d = data as { requiresPayment?: boolean; redirectUrl?: string } | undefined;
         if (d?.requiresPayment && d?.redirectUrl) {
           setShowBooking(false);
-          await Linking.openURL(d.redirectUrl);
+          const browserResult = await WebBrowser.openAuthSessionAsync(d.redirectUrl, "royvento://");
+          if (browserResult.type === "success") {
+            const parsed = new URL(browserResult.url);
+            const payment = parsed.searchParams.get("payment") ?? "failed";
+            const id = parsed.searchParams.get("id") ?? undefined;
+            router.replace(`/payment-result?payment=${encodeURIComponent(payment)}${id ? `&bookingId=${encodeURIComponent(id)}` : ""}`);
+          } else {
+            router.replace("/payment-result?payment=failed");
+          }
           return;
         }
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -336,6 +345,7 @@ export default function EventDetailScreen() {
       couponCode: couponState?.code || undefined,
       pointsToUse: pointsApplied || undefined,
       paymentMethod,
+      callbackScheme: "royvento",
     };
 
     if (isPub) {

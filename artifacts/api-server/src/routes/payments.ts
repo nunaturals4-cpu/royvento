@@ -280,6 +280,8 @@ async function handleSubscriptionPaymentFailure(payment: { id: number; subscript
     .where(and(eq(subscriptionsTable.id, payment.subscriptionId), eq(subscriptionsTable.status, "pending")));
 }
 
+const ALLOWED_CALLBACK_SCHEMES = new Set(["royvento"]);
+
 /**
  * GET /payments/booking-callback
  *
@@ -289,10 +291,20 @@ async function handleSubscriptionPaymentFailure(payment: { id: number; subscript
  */
 router.get("/payments/booking-callback", async (req, res) => {
   const merchantTransactionId = req.query["merchantTransactionId"] as string | undefined;
+  const rawScheme = req.query["callbackScheme"] as string | undefined;
+  const callbackScheme = rawScheme && ALLOWED_CALLBACK_SCHEMES.has(rawScheme) ? rawScheme : undefined;
   const appUrl = getAppUrl();
 
+  function buildBookingRedirect(status: "success" | "failed", extra?: Record<string, string>): string {
+    const params = new URLSearchParams({ payment: status, type: "booking", ...extra });
+    if (callbackScheme) {
+      return `${callbackScheme}://payment-result?${params.toString()}`;
+    }
+    return `${appUrl}/payment-result?${params.toString()}`;
+  }
+
   if (!merchantTransactionId) {
-    return res.redirect(`${appUrl}/payment-result?status=failed&type=booking`);
+    return res.redirect(buildBookingRedirect("failed"));
   }
 
   const [payment] = await db
@@ -302,8 +314,8 @@ router.get("/payments/booking-callback", async (req, res) => {
     .limit(1);
 
   if (!payment || !payment.bookingId) {
-    console.warn(`[payments] booking-callback: no payment record for ${merchantTransactionId}`);
-    return res.redirect(`${appUrl}/payment-result?status=failed&type=booking`);
+    req.log.warn(`[payments] booking-callback: no payment record for ${merchantTransactionId}`);
+    return res.redirect(buildBookingRedirect("failed"));
   }
 
   const bookingId = payment.bookingId;
@@ -313,13 +325,13 @@ router.get("/payments/booking-callback", async (req, res) => {
 
     if (result.success) {
       await activateBookingAfterPayment(bookingId, result.transactionId);
-      return res.redirect(`${appUrl}/payment-result?status=success&type=booking&id=${bookingId}`);
+      return res.redirect(buildBookingRedirect("success", { id: String(bookingId) }));
     }
 
-    return res.redirect(`${appUrl}/payment-result?status=failed&type=booking&code=${encodeURIComponent(result.code)}`);
+    return res.redirect(buildBookingRedirect("failed", { code: result.code }));
   } catch (err) {
-    console.error("[payments] booking-callback error:", err);
-    return res.redirect(`${appUrl}/payment-result?status=failed&type=booking`);
+    req.log.error({ err }, "[payments] booking-callback error");
+    return res.redirect(buildBookingRedirect("failed"));
   }
 });
 
@@ -329,8 +341,6 @@ router.get("/payments/booking-callback", async (req, res) => {
  * UX redirect after user returns from PhonePe. On success: activates subscription.
  * On non-success: redirects user without touching DB state.
  */
-const ALLOWED_CALLBACK_SCHEMES = new Set(["royvento"]);
-
 router.get("/payments/subscription-callback", async (req, res) => {
   const merchantTransactionId = req.query["merchantTransactionId"] as string | undefined;
   const rawScheme = req.query["callbackScheme"] as string | undefined;

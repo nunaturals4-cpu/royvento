@@ -59,6 +59,7 @@ const CreateBookingBody = z.object({
   phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits").optional().default(""),
   pointsToUse: z.number().int().nonnegative().optional().default(0),
   paymentMethod: z.enum(["cod", "online"]).optional().default("online"),
+  callbackScheme: z.enum(["royvento"]).optional(),
 });
 
 const router: IRouter = Router();
@@ -341,7 +342,8 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   if (usePhonePe) {
     const merchantTransactionId = `BK${b.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
     const appUrl = getAppUrl();
-    const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}`;
+    const { callbackScheme } = parsed.data;
+    const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}${callbackScheme ? `&callbackScheme=${encodeURIComponent(callbackScheme)}` : ""}`;
     const webhookUrl = `${appUrl}/api/payments/webhook`;
 
     await db.insert(paymentsTable).values({
@@ -554,9 +556,13 @@ router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
   const finalPrice = parseFloat(String(booking.finalPrice ?? booking.totalPrice ?? 0));
   if (finalPrice <= 0) { res.status(400).json({ error: "No payment required for this booking" }); return; }
 
+  const ALLOWED_RETRY_SCHEMES = new Set(["royvento"]);
+  const rawScheme = typeof req.body?.callbackScheme === "string" ? req.body.callbackScheme : undefined;
+  const retryCallbackScheme = rawScheme && ALLOWED_RETRY_SCHEMES.has(rawScheme) ? rawScheme : undefined;
+
   const merchantTransactionId = `BK${booking.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
   const appUrl = getAppUrl();
-  const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}`;
+  const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}${retryCallbackScheme ? `&callbackScheme=${encodeURIComponent(retryCallbackScheme)}` : ""}`;
   const webhookUrl = `${appUrl}/api/payments/webhook`;
 
   await db.insert(paymentsTable).values({

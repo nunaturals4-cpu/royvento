@@ -69,9 +69,9 @@ export function Bookings() {
   today.setHours(0, 0, 0, 0);
 
   const filtered = (bookings as BookingRecord[]).filter((b) => {
-    if (!b.bookingDate) return view === "upcoming";
-    const d = new Date(b.bookingDate);
-    return view === "upcoming" ? d >= today : d < today;
+    const terminalStatus = b.status === "cancelled" || b.status === "completed";
+    if (view === "past") return terminalStatus || (!!b.bookingDate && new Date(b.bookingDate) < today);
+    return !terminalStatus && (!b.bookingDate || new Date(b.bookingDate) >= today);
   });
 
   return (
