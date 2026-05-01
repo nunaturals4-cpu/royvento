@@ -553,19 +553,20 @@ export default function EventDetailScreen() {
             <View style={[styles.drinkDealsBox, { borderColor: colors.primary + "40", backgroundColor: colors.primary + "0D" }]}>
               <View style={styles.drinkDealsHeader}>
                 <Ionicons name="wine-outline" size={15} color={colors.primary} />
-                <Text style={[styles.drinkDealsTitle, { color: colors.primary }]}>Drink Deals</Text>
+                <Text style={[styles.drinkDealsTitle, { color: colors.primary }]}>{t("events.drink_deals")}</Text>
               </View>
               <View style={{ gap: 12 }}>
                 {drinkPlans.map((plan) => {
                   const hasItems = plan.lineItems && plan.lineItems.length > 0;
                   const isExpanded = expandedDrinkPlans.has(plan.id);
+                  const c = plan.type === "ticket" ? (plan.lineItems ?? []).filter((i: { name: string }) => i.name).length : 0;
                   const summary = plan.type === "welcome"
-                    ? plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests"
+                    ? plan.gender === "female" ? t("events.drink_welcome_ladies") : t("events.drink_welcome_all")
                     : plan.type === "unlimited"
-                    ? plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests"
+                    ? plan.gender === "female" ? t("events.drink_unlimited_ladies") : t("events.drink_unlimited_all")
                     : plan.type === "ticket"
-                    ? (() => { const c = (plan.lineItems ?? []).filter((i: { name: string }) => i.name).length; return c > 0 ? `${c} item${c !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket"; })()
-                    : plan.productName || "Drink offer";
+                    ? (c === 1 ? t("events.drink_ticket_items_one") : c > 1 ? t("events.drink_ticket_items_other", { count: c }) : t("events.drink_ticket_generic"))
+                    : plan.productName || t("events.drink_offer_generic");
                   return (
                     <View key={plan.id} style={{ gap: 4 }}>
                       <Pressable

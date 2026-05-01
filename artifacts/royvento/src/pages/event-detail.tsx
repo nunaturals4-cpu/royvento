@@ -24,14 +24,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
 
-function getPlanSummary(plan: { type: string; gender: string; productName?: string; lineItems?: { name: string }[] | null }): string {
-  if (plan.type === "welcome") return plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests";
-  if (plan.type === "unlimited") return plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests";
+function getPlanSummary(plan: { type: string; gender: string; productName?: string; lineItems?: { name: string }[] | null }, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  if (plan.type === "welcome") return plan.gender === "female" ? t("events.drink_welcome_ladies") : t("events.drink_welcome_all");
+  if (plan.type === "unlimited") return plan.gender === "female" ? t("events.drink_unlimited_ladies") : t("events.drink_unlimited_all");
   if (plan.type === "ticket") {
     const count = (plan.lineItems ?? []).filter((i) => i.name).length;
-    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket";
+    if (count === 1) return t("events.drink_ticket_items_one");
+    return count > 1 ? t("events.drink_ticket_items_other", { count }) : t("events.drink_ticket_generic");
   }
-  return plan.productName || "Drink offer";
+  return plan.productName || t("events.drink_offer_generic");
 }
 
 export function EventDetail() {
@@ -463,7 +464,7 @@ export function EventDetail() {
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <Wine className="h-4 w-4 text-primary shrink-0" />
-                <h3 className="font-semibold text-primary text-sm uppercase tracking-wide">Drink Deals</h3>
+                <h3 className="font-semibold text-primary text-sm uppercase tracking-wide">{t("events.drink_deals")}</h3>
               </div>
               <div className="space-y-3">
                 {drinkPlans.map((plan: any) => {
@@ -479,10 +480,10 @@ export function EventDetail() {
                           return next;
                         }) : undefined}
                       >
-                        <span className="text-sm text-white/85">{getPlanSummary(plan)}</span>
+                        <span className="text-sm text-white/85">{getPlanSummary(plan, t)}</span>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary">
-                            {plan.gender === "female" ? "Ladies" : "All guests"}
+                            {plan.gender === "female" ? t("events.drink_gender_ladies") : t("events.drink_gender_all")}
                           </span>
                           {hasItems && (
                             <span className="text-white/30 text-xs group-hover:text-white/60 transition-colors">

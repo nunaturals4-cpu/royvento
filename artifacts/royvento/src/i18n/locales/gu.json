@@ -287,7 +287,18 @@
     "pts_avail_note": "{{n}} પૉઇન્ટ (≈{{amount}})",
     "free_entry_form_notice": "મફત પ્રવેશ – આ તારીખ માટે કોઈ ચુકવણી જરૂરી નથી.",
     "free_entry_label": "મફત પ્રવેશ",
-    "free_entry_day_sub": "આજે કોઈ કવર ચાર્જ નથી"
+    "free_entry_day_sub": "આજે કોઈ કવર ચાર્જ નથી",
+    "drink_deals": "Drink Deals",
+    "drink_gender_ladies": "Ladies",
+    "drink_gender_all": "All guests",
+    "drink_welcome_ladies": "Free welcome drink · Ladies",
+    "drink_welcome_all": "Free welcome drink · All guests",
+    "drink_unlimited_ladies": "Unlimited drinks · Ladies",
+    "drink_unlimited_all": "Unlimited drinks · All guests",
+    "drink_ticket_items_one": "1 item included with ticket",
+    "drink_ticket_items_other": "{{count}} items included with ticket",
+    "drink_ticket_generic": "Drinks included with ticket",
+    "drink_offer_generic": "Drink offer"
   },
   "profile": {
     "my_profile": "મારી પ્રોફ़ाइल",

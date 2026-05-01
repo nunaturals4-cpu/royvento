@@ -287,7 +287,18 @@
     "pts_avail_note": "{{n}} पॉइंट उपलब्ध (≈{{amount}})",
     "free_entry_form_notice": "निःशुल्क प्रवेश – इस तारीख के लिए कोई भुगतान आवश्यक नहीं है।",
     "free_entry_label": "निःशुल्क प्रवेश",
-    "free_entry_day_sub": "आज कोई प्रवेश शुल्क नहीं"
+    "free_entry_day_sub": "आज कोई प्रवेश शुल्क नहीं",
+    "drink_deals": "Drink Deals",
+    "drink_gender_ladies": "Ladies",
+    "drink_gender_all": "All guests",
+    "drink_welcome_ladies": "Free welcome drink · Ladies",
+    "drink_welcome_all": "Free welcome drink · All guests",
+    "drink_unlimited_ladies": "Unlimited drinks · Ladies",
+    "drink_unlimited_all": "Unlimited drinks · All guests",
+    "drink_ticket_items_one": "1 item included with ticket",
+    "drink_ticket_items_other": "{{count}} items included with ticket",
+    "drink_ticket_generic": "Drinks included with ticket",
+    "drink_offer_generic": "Drink offer"
   },
   "profile": {
     "my_profile": "मेरा प्रोफ़ाइल",
