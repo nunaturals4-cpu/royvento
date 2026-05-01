@@ -732,6 +732,7 @@ export interface VendorDrinkOffer {
   vendorId: number;
   vendorName: string;
   coverImageUrl: string;
+  pubEventId: number | null;
   plans: DrinkPlanSummary[];
 }
 

@@ -310,6 +310,21 @@ router.get("/vendors/drink-offers", async (_req, res) => {
     .from(drinkPlansTable)
     .where(inArray(drinkPlansTable.vendorId, ids))
     .orderBy(drinkPlansTable.createdAt);
+  const pubEvents = await db
+    .select({ id: eventsTable.id, vendorId: eventsTable.vendorId })
+    .from(eventsTable)
+    .where(and(
+      inArray(eventsTable.vendorId, ids),
+      eq(eventsTable.type, "pub"),
+      eq(eventsTable.approvalStatus, "approved"),
+    ))
+    .orderBy(desc(eventsTable.createdAt));
+  const pubEventByVendor = new Map<number, number>();
+  for (const ev of pubEvents) {
+    if (ev.vendorId !== null && !pubEventByVendor.has(ev.vendorId)) {
+      pubEventByVendor.set(ev.vendorId, ev.id);
+    }
+  }
   const plansByVendor = new Map<number, typeof plans>();
   for (const plan of plans) {
     const arr = plansByVendor.get(plan.vendorId) ?? [];
@@ -321,6 +336,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
       vendorId: v.id,
       vendorName: v.businessName,
       coverImageUrl: v.coverImageUrl,
+      pubEventId: pubEventByVendor.get(v.id) ?? null,
       plans: (plansByVendor.get(v.id) ?? []).map((p) => ({
         type: p.type,
         productName: p.productName,

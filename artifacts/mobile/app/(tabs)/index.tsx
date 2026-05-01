@@ -281,7 +281,13 @@ export default function HomeScreen() {
             renderItem={({ item }) => (
               <Pressable
                 style={[styles.drinkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => router.push(`/partner/${item.vendorId}` as never)}
+                onPress={() => {
+                  if (item.pubEventId) {
+                    router.push(`/event/${item.pubEventId}` as never);
+                  } else {
+                    router.push(`/partner/${item.vendorId}` as never);
+                  }
+                }}
               >
                 <View style={styles.drinkCardImage}>
                   {item.coverImageUrl ? (
@@ -296,7 +302,7 @@ export default function HomeScreen() {
                     </View>
                   )}
                   <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.65)"]}
+                    colors={["transparent", "rgba(0,0,0,0.75)"]}
                     style={StyleSheet.absoluteFillObject}
                   />
                   <Text style={styles.drinkCardName} numberOfLines={1}>{item.vendorName}</Text>
@@ -305,16 +311,22 @@ export default function HomeScreen() {
                   {item.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
                     <View key={i} style={styles.drinkPlanRow}>
                       <View style={[styles.drinkDot, { backgroundColor: colors.primary }]} />
-                      <Text style={[styles.drinkPlanText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.drinkPlanText, { color: colors.foreground }]} numberOfLines={1}>
                         {getPlanSummary(plan)}
                       </Text>
                     </View>
                   ))}
                   {item.plans.length > 2 && (
                     <Text style={[styles.drinkMoreText, { color: colors.mutedForeground }]}>
-                      +{item.plans.length - 2} more
+                      +{item.plans.length - 2} more offer{item.plans.length - 2 !== 1 ? "s" : ""}
                     </Text>
                   )}
+                  <View style={[styles.drinkCta, { borderTopColor: colors.border }]}>
+                    <Text style={[styles.drinkCtaText, { color: colors.primary }]}>
+                      {item.pubEventId ? "Book now" : "View venue"}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={13} color={colors.primary} />
+                  </View>
                 </View>
               </Pressable>
             )}
@@ -663,5 +675,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
+  },
+  drinkCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    marginTop: 6,
+    paddingTop: 8,
+  },
+  drinkCtaText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });

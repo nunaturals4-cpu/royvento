@@ -618,6 +618,7 @@ export const ListVendorDrinkOffersResponseItem = zod.object({
   vendorId: zod.number(),
   vendorName: zod.string(),
   coverImageUrl: zod.string(),
+  pubEventId: zod.number().nullable(),
   plans: zod.array(
     zod.object({
       type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),

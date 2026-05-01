@@ -2429,8 +2429,11 @@ components:
           type: string
         coverImageUrl:
           type: string
+        pubEventId:
+          type: integer
+          nullable: true
         plans:
           type: array
           items:
             $ref: "#/components/schemas/DrinkPlanSummary"
-      required: [vendorId, vendorName, coverImageUrl, plans]
+      required: [vendorId, vendorName, coverImageUrl, pubEventId, plans]

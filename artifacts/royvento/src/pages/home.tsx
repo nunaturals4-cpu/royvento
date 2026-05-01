@@ -167,8 +167,12 @@ export function Home() {
           </div>
           <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
             {drinkOffers.map((offer: VendorDrinkOffer) => (
-              <Link key={offer.vendorId} href={`/vendors/${offer.vendorId}`} className="snap-start flex-shrink-0">
-                <div className="glass-card rounded-2xl overflow-hidden w-60 sm:w-64 hover:bg-white/5 transition-colors cursor-pointer lift-3d h-full">
+              <Link
+                key={offer.vendorId}
+                href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
+                className="snap-start flex-shrink-0"
+              >
+                <div className="glass-card rounded-2xl overflow-hidden w-60 sm:w-64 hover:bg-white/5 transition-colors cursor-pointer lift-3d h-full flex flex-col">
                   <div className="h-36 bg-white/5 relative overflow-hidden">
                     {offer.coverImageUrl ? (
                       <img src={offer.coverImageUrl} alt={offer.vendorName} className="h-full w-full object-cover" />
@@ -177,22 +181,28 @@ export function Home() {
                         <GlassWater className="h-10 w-10 text-white/20" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                     <div className="absolute bottom-2 left-3 right-3">
                       <h3 className="font-serif text-sm font-semibold tracking-tight text-white drop-shadow truncate">{offer.vendorName}</h3>
                     </div>
                   </div>
-                  <div className="p-3.5">
-                    <div className="flex flex-col gap-1.5">
+                  <div className="p-3.5 flex flex-col gap-2 flex-1">
+                    <div className="flex flex-col gap-1.5 flex-1">
                       {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
-                        <span key={i} className="text-xs text-white/65 flex items-center gap-1.5">
-                          <span className="h-1 w-1 rounded-full bg-primary flex-shrink-0" />
+                        <span key={i} className="text-xs text-white/90 flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
                           {getPlanSummary(plan)}
                         </span>
                       ))}
                       {offer.plans.length > 2 && (
-                        <span className="text-xs text-white/40">+{offer.plans.length - 2} more</span>
+                        <span className="text-xs text-white/60">+{offer.plans.length - 2} more offer{offer.plans.length - 2 !== 1 ? "s" : ""}</span>
                       )}
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                      <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
+                        {offer.pubEventId ? "Book now" : "View venue"}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 text-primary" />
                     </div>
                   </div>
                 </div>
