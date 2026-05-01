@@ -10,6 +10,9 @@ import {
   View,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
+
+const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface EventCardProps {
   id: number;
@@ -37,6 +40,7 @@ export function EventCard({
   freeEntryRules,
 }: EventCardProps) {
   const colors = useColors();
+  const { t } = useLanguage();
 
   const priceNum = typeof price === "string" ? parseFloat(price) : price ?? 0;
 
@@ -50,13 +54,12 @@ export function EventCard({
 
   const isPub = type === "pub";
 
-  const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const fer = freeEntryRules;
   const freeDays = fer?.enabled === true ? (fer.days ?? []) : [];
   const hasFreeEntry = freeDays.length > 0;
   const todayAbbr = DAY_ABBRS[new Date().getDay()];
   const isFreeToday = hasFreeEntry && freeDays.includes(todayAbbr);
-  const freeLabel = isFreeToday ? "Free Entry Today" : "Free some days";
+  const freeLabel = isFreeToday ? t("events.free_entry_today") : t("events.free_some_days");
 
   return (
     <Pressable
