@@ -39,6 +39,9 @@ export function EventCard({ event }: Props) {
   const isFreeToday = hasFreeEntry && freeDays.includes(todayAbbr);
   const freeLabel = isFreeToday ? "Free Entry Today" : "Free some days";
 
+  const isNew = event.rating === 0 && event.reviewCount === 0;
+  const ratingLabel = event.rating > 0 ? event.rating.toFixed(1) : null;
+
   return (
     <Link href={`/events/${event.id}`}>
       <div className="group cursor-pointer relative overflow-hidden rounded-2xl glass-card lift-3d perspective-card">
@@ -52,6 +55,8 @@ export function EventCard({ event }: Props) {
             />
           ) : null}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+
+          {/* Top-left: Popular badge */}
           {event.popular && (
             <div className="absolute top-3 left-3">
               <Badge className="bg-primary text-primary-foreground border-0 red-glow">
@@ -59,6 +64,8 @@ export function EventCard({ event }: Props) {
               </Badge>
             </div>
           )}
+
+          {/* Top-right: Pub label */}
           {event.type === "pub" && (
             <div className="absolute top-3 right-3">
               <Badge variant="outline" className="bg-black/70 border-white/20 text-white">
@@ -66,29 +73,44 @@ export function EventCard({ event }: Props) {
               </Badge>
             </div>
           )}
+
+          {/* Bottom-right: Drink deal — sole occupant of this corner */}
           {event.hasDrinkPlans && (
-            <div className="absolute bottom-11 right-3">
+            <div className="absolute bottom-3 right-3">
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-semibold uppercase tracking-wide backdrop-blur">
                 <GlassWater className="h-3 w-3" />
                 Drink deal
               </span>
             </div>
           )}
-          <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
+
+          {/* Bottom-left: Category badge — sole occupant of this corner */}
+          <div className="absolute bottom-3 left-4">
             <Badge variant="secondary" className="bg-white/10 text-white border-white/10 backdrop-blur">
               {event.category}
             </Badge>
-            <div className="flex items-center gap-1 text-xs text-white/90 bg-black/50 px-2 py-1 rounded-md backdrop-blur">
-              <Star className="h-3.5 w-3.5 fill-primary text-primary" />
-              <span className="font-medium">{event.rating > 0 ? event.rating.toFixed(1) : "New"}</span>
-              {event.reviewCount > 0 && <span className="opacity-70">({event.reviewCount})</span>}
-            </div>
           </div>
         </div>
+
         <div className="p-5 space-y-2.5">
-          <h3 className="font-serif text-xl leading-tight tracking-tight group-hover:text-primary transition-colors line-clamp-2">
-            {event.title}
-          </h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-serif text-xl leading-tight tracking-tight group-hover:text-primary transition-colors line-clamp-2 flex-1">
+              {event.title}
+            </h3>
+            {/* Rating chip — moved to card body, right of title */}
+            <div className="flex items-center gap-1 text-xs text-muted-foreground bg-white/5 px-2 py-1 rounded-md flex-shrink-0 mt-0.5">
+              <Star className="h-3 w-3 fill-primary text-primary" />
+              {ratingLabel ? (
+                <>
+                  <span className="font-medium text-white">{ratingLabel}</span>
+                  {event.reviewCount > 0 && <span className="opacity-60">({event.reviewCount})</span>}
+                </>
+              ) : isNew ? (
+                <span className="font-medium text-white/80">New</span>
+              ) : null}
+            </div>
+          </div>
+
           {partner && (
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{partner}</p>
           )}

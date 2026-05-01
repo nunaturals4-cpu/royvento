@@ -310,6 +310,7 @@ export default function ExploreScreen() {
               price={item.price}
               category={item.category}
               type={item.type}
+              popular={(item as { popular?: boolean }).popular}
               rating={item.rating}
               reviewCount={item.reviewCount}
               freeEntryRules={item.freeEntryRules}
