@@ -13,6 +13,8 @@ import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
 
 interface Notification {
   id: number;
@@ -74,6 +76,7 @@ function ThemeSwitcher() {
 }
 
 export function Navbar() {
+  const { t } = useTranslation();
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
   const logout = useLogout();
   const [, setLocation] = useLocation();
@@ -159,11 +162,11 @@ export function Navbar() {
               <span className="font-serif font-bold text-xl tracking-tight">Royvento</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-6 text-sm font-medium">
-              <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-              <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">Pubs</Link>
-              <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">Blog</Link>
+              <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.home")}</Link>
+              <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pubs")}</Link>
+              <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.blog")}</Link>
               <Link href="/subscription" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                <Crown className="h-3.5 w-3.5 text-primary" /> Premium
+                <Crown className="h-3.5 w-3.5 text-primary" /> {t("nav.premium")}
               </Link>
             </nav>
           </div>
@@ -174,7 +177,7 @@ export function Navbar() {
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search events, pubs…"
+                placeholder={t("nav.search_placeholder")}
                 className="h-9 w-44 lg:w-60 pl-8 bg-card/60 border-border focus:border-primary/40"
               />
             </form>
@@ -193,6 +196,7 @@ export function Navbar() {
             </button>
 
             <span className="hidden lg:contents"><ThemeSwitcher /></span>
+            <span className="hidden lg:contents"><LanguageSwitcher /></span>
 
             {user && (
               <div className="relative" ref={notifRef}>
@@ -378,9 +382,9 @@ export function Navbar() {
               {/* Mobile nav links */}
               <nav className="flex flex-col">
                 {[
-                  { href: "/", label: "Home" },
-                  { href: "/pubs", label: "Pubs" },
-                  { href: "/blogs", label: "Blog" },
+                  { href: "/", label: t("nav.home") },
+                  { href: "/pubs", label: t("nav.pubs") },
+                  { href: "/blogs", label: t("nav.blog") },
                 ].map(({ href, label }) => (
                   <Link
                     key={href}
@@ -396,14 +400,20 @@ export function Navbar() {
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-1.5 py-3 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-border/40"
                 >
-                  <Crown className="h-4 w-4 text-primary" /> Premium
+                  <Crown className="h-4 w-4 text-primary" /> {t("nav.premium")}
                 </Link>
               </nav>
 
               {/* Theme switcher */}
               <div className="border-t border-border pt-3">
-                <p className="text-xs text-muted-foreground mb-2.5 font-medium uppercase tracking-wider">Theme</p>
+                <p className="text-xs text-muted-foreground mb-2.5 font-medium uppercase tracking-wider">{t("nav.theme")}</p>
                 <ThemeSwitcher />
+              </div>
+
+              {/* Language switcher */}
+              <div className="border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">{t("nav.language")}</p>
+                <LanguageSwitcher />
               </div>
 
               {/* Mobile auth — logged-out only */}
