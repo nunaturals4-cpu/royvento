@@ -95,7 +95,7 @@ export function VendorDashboard() {
           <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
             <TabsTrigger value="overview">Profile</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="bookings">Booking Report</TabsTrigger>
             <TabsTrigger value="analytics">
               <TrendingUp className="h-3.5 w-3.5 mr-1 text-primary" /> Analytics
             </TabsTrigger>
@@ -1530,11 +1530,8 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
   );
 }
 
-function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => void }) {
-  const { toast } = useToast();
+function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refetch: () => void }) {
   const [preset, setPreset] = useState<ReportPreset>("12m");
-  const [rejectingId, setRejectingId] = useState<number | null>(null);
-  const [reason, setReason] = useState("");
 
   const now = new Date();
   const startDate = (() => {
@@ -1550,7 +1547,7 @@ function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => 
 
   const totalBookings = filtered.length;
   const totalRevenue = confirmed.reduce((s: number, b: any) => s + ((b.finalPrice ?? b.totalPrice) ?? 0), 0);
-  const totalGuests = confirmed.reduce((s: number, b: any) => s + (b.guests ?? 0), 0);
+  const totalGuests = confirmed.reduce((s: number, b: any) => s + ((b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0)), 0);
 
   const monthMap: Record<string, number> = {};
   confirmed.forEach((b) => {
@@ -1561,18 +1558,19 @@ function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => 
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, revenue]) => ({ month, revenue }));
 
-  const eventMap: Record<number, { eventId: number; eventTitle: string; bookingCount: number; guests: number; revenue: number }> = {};
+  const eventMap: Record<number, { eventId: number; eventTitle: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }> = {};
   confirmed.forEach((b) => {
     if (!eventMap[b.eventId]) {
-      eventMap[b.eventId] = { eventId: b.eventId, eventTitle: b.eventTitle, bookingCount: 0, guests: 0, revenue: 0 };
+      eventMap[b.eventId] = { eventId: b.eventId, eventTitle: b.eventTitle, bookingCount: 0, ticketWomen: 0, ticketMen: 0, ticketCouple: 0, revenue: 0 };
     }
     eventMap[b.eventId].bookingCount += 1;
-    eventMap[b.eventId].guests += b.guests ?? 0;
+    eventMap[b.eventId].ticketWomen += b.ticketWomen ?? 0;
+    eventMap[b.eventId].ticketMen += b.ticketMen ?? 0;
+    eventMap[b.eventId].ticketCouple += b.ticketCouple ?? 0;
     eventMap[b.eventId].revenue += (b.finalPrice ?? b.totalPrice) ?? 0;
   });
   const perEvent = Object.values(eventMap).sort((a, b) => b.revenue - a.revenue);
 
-  const pending = bookings.filter((b) => b.status === "pending");
   const chartMax = Math.max(...monthlyData.map((m) => m.revenue), 1);
 
   const presetLabel: Record<ReportPreset, string> = {
@@ -1581,95 +1579,8 @@ function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => 
     "12m": "Last 12 months",
   };
 
-  const approve = async (id: number) => {
-    try {
-      await apiPatch(`/api/bookings/${id}/status`, { status: "confirmed" });
-      toast({ title: "Booking approved" });
-      refetch();
-    } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
-    }
-  };
-
-  const reject = async (id: number) => {
-    if (!reason.trim()) {
-      toast({ title: "Please enter a rejection reason", variant: "destructive" });
-      return;
-    }
-    try {
-      await apiPatch(`/api/bookings/${id}/status`, { status: "cancelled", rejectionReason: reason.trim() });
-      toast({ title: "Booking rejected" });
-      setRejectingId(null);
-      setReason("");
-      refetch();
-    } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
-    }
-  };
-
   return (
     <div className="space-y-6">
-      {pending.length > 0 && (
-        <div>
-          <h3 className="font-serif text-xl mb-1 flex items-center gap-2">
-            Manual review queue
-            <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5">{pending.length}</span>
-          </h3>
-          <p className="text-xs text-muted-foreground mb-3">These are legacy bookings that weren't auto-approved. Approve or reject each one manually.</p>
-          <div className="space-y-3">
-            {pending.map((b) => (
-              <div key={b.id} className="rounded-2xl glass-card overflow-hidden border border-amber-500/20">
-                <div className="p-5 flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div>
-                    <p className="font-serif text-lg">{b.eventTitle}</p>
-                    <p className="text-sm text-muted-foreground">{b.userName} · {b.userEmail}</p>
-                    <p className="text-sm mt-1">
-                      {b.bookingDate} · {b.guests} guests · {formatINR(b.finalPrice ?? b.totalPrice)}
-                      {b.couponCode && <span className="text-green-400 ml-2">(coupon {b.couponCode})</span>}
-                    </p>
-                    {b.notes && <p className="text-sm italic text-muted-foreground mt-1">"{b.notes}"</p>}
-                  </div>
-                  <div className="flex flex-col gap-2 shrink-0">
-                    <div className="flex gap-2">
-                      <Button onClick={() => approve(b.id)} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0 gap-1.5 text-sm">
-                        Approve
-                      </Button>
-                      <Button variant="outline" className="gap-1.5 text-sm" onClick={() => { setRejectingId(b.id); setReason(""); }}>
-                        Reject
-                      </Button>
-                    </div>
-                    <a href={`/events/${b.eventId}`} target="_blank" rel="noreferrer"
-                      className="text-xs text-center text-muted-foreground hover:text-foreground transition-colors">
-                      View event details →
-                    </a>
-                  </div>
-                </div>
-                {rejectingId === b.id && (
-                  <div className="border-t border-white/10 px-5 pb-5 pt-4 bg-black/20 space-y-3">
-                    <p className="text-sm font-medium">Rejection reason (required)</p>
-                    <Textarea
-                      rows={2}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Enter reason for rejection…"
-                      className="bg-black/40 border-white/10"
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => reject(b.id)} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-                        Confirm rejection
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setRejectingId(null); setReason(""); }}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Date preset picker */}
       <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
         <div>
@@ -1753,7 +1664,9 @@ function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => 
                     <tr>
                       <th className="text-left py-2 pr-4">Event</th>
                       <th className="text-right py-2 px-2">Bookings</th>
-                      <th className="text-right py-2 px-2">Guests</th>
+                      <th className="text-right py-2 px-2 text-pink-300">Women</th>
+                      <th className="text-right py-2 px-2 text-blue-300">Men</th>
+                      <th className="text-right py-2 px-2 text-purple-300">Couples</th>
                       <th className="text-right py-2 pl-2">Revenue</th>
                     </tr>
                   </thead>
@@ -1762,7 +1675,9 @@ function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => 
                       <tr key={row.eventId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                         <td className="py-3 pr-4 font-medium">{row.eventTitle}</td>
                         <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
-                        <td className="text-right px-2 tabular-nums">{row.guests}</td>
+                        <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
+                        <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
+                        <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
                         <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
                       </tr>
                     ))}
@@ -1774,8 +1689,14 @@ function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => 
                         <td className="text-right px-2 font-semibold text-foreground tabular-nums">
                           {perEvent.reduce((s, r) => s + r.bookingCount, 0)}
                         </td>
-                        <td className="text-right px-2 tabular-nums">
-                          {perEvent.reduce((s, r) => s + r.guests, 0)}
+                        <td className="text-right px-2 tabular-nums text-pink-300">
+                          {perEvent.reduce((s, r) => s + r.ticketWomen, 0) || "—"}
+                        </td>
+                        <td className="text-right px-2 tabular-nums text-blue-300">
+                          {perEvent.reduce((s, r) => s + r.ticketMen, 0) || "—"}
+                        </td>
+                        <td className="text-right px-2 tabular-nums text-purple-300">
+                          {perEvent.reduce((s, r) => s + r.ticketCouple, 0) || "—"}
                         </td>
                         <td className="text-right pl-2 tabular-nums text-primary font-semibold">
                           {formatINR(perEvent.reduce((s, r) => s + r.revenue, 0))}
