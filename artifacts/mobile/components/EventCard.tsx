@@ -25,6 +25,7 @@ interface EventCardProps {
   style?: object;
   compact?: boolean;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
+  hasDrinkPlans?: boolean;
 }
 
 export function EventCard({
@@ -38,6 +39,7 @@ export function EventCard({
   style,
   compact,
   freeEntryRules,
+  hasDrinkPlans,
 }: EventCardProps) {
   const colors = useColors();
   const { t } = useLanguage();
@@ -103,6 +105,12 @@ export function EventCard({
         {isPub ? (
           <View style={[styles.pubBadge, { backgroundColor: "rgba(0,0,0,0.6)", borderColor: colors.primary }]}>
             <Ionicons name="wine" size={10} color={colors.primary} />
+          </View>
+        ) : null}
+        {hasDrinkPlans ? (
+          <View style={[styles.drinkBadge, { backgroundColor: colors.primary }]}>
+            <Ionicons name="wine-outline" size={9} color={colors.primaryForeground} />
+            <Text style={[styles.drinkBadgeText, { color: colors.primaryForeground }]}>Drink deal</Text>
           </View>
         ) : null}
       </View>
@@ -258,5 +266,22 @@ const styles = StyleSheet.create({
   },
   freeEntryTextToday: {
     color: "#22c55e",
+  },
+  drinkBadge: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  drinkBadgeText: {
+    fontSize: 9,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 });

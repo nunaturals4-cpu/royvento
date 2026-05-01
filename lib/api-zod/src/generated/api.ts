@@ -872,6 +872,7 @@ export const ListEventsResponseItem = zod.object({
       zod.null(),
     ])
     .optional(),
+  hasDrinkPlans: zod.boolean(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
 
@@ -951,6 +952,7 @@ export const CreateEventResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+  hasDrinkPlans: zod.boolean(),
 });
 
 /**
@@ -1004,6 +1006,7 @@ export const ListFeaturedEventsResponseItem = zod.object({
       zod.null(),
     ])
     .optional(),
+  hasDrinkPlans: zod.boolean(),
 });
 export const ListFeaturedEventsResponse = zod.array(
   ListFeaturedEventsResponseItem,
@@ -1067,6 +1070,7 @@ export const GetEventResponse = zod
         zod.null(),
       ])
       .optional(),
+    hasDrinkPlans: zod.boolean(),
   })
   .and(
     zod.object({
@@ -1199,6 +1203,7 @@ export const UpdateEventResponse = zod.object({
       zod.null(),
     ])
     .optional(),
+  hasDrinkPlans: zod.boolean(),
 });
 
 /**
@@ -1263,6 +1268,7 @@ export const ListMyVendorEventsResponseItem = zod.object({
       zod.null(),
     ])
     .optional(),
+  hasDrinkPlans: zod.boolean(),
 });
 export const ListMyVendorEventsResponse = zod.array(
   ListMyVendorEventsResponseItem,
@@ -1977,6 +1983,7 @@ export const GetWishlistResponseItem = zod
         zod.null(),
       ])
       .optional(),
+    hasDrinkPlans: zod.boolean(),
   })
   .and(
     zod.object({

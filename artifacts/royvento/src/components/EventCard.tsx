@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Star, MapPin } from "lucide-react";
+import { Star, MapPin, GlassWater } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/lib/api";
 
@@ -19,6 +19,7 @@ interface Props {
     vendorName?: string;
     partnerName?: string;
     popular?: boolean;
+    hasDrinkPlans?: boolean;
     freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   };
 }
@@ -63,6 +64,14 @@ export function EventCard({ event }: Props) {
               <Badge variant="outline" className="bg-black/70 border-white/20 text-white">
                 Pub
               </Badge>
+            </div>
+          )}
+          {event.hasDrinkPlans && (
+            <div className="absolute bottom-3 right-3">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-semibold uppercase tracking-wide backdrop-blur">
+                <GlassWater className="h-3 w-3" />
+                Drink deal
+              </span>
             </div>
           )}
           <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">

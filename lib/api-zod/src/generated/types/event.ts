@@ -32,4 +32,5 @@ export interface Event {
   pubEventTypes?: string[];
   dayPricing?: EventDayPricing;
   freeEntryRules?: FreeEntryRules | null;
+  hasDrinkPlans: boolean;
 }

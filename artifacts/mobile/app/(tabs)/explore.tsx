@@ -292,6 +292,7 @@ export default function ExploreScreen() {
               category={item.category}
               type={item.type}
               freeEntryRules={item.freeEntryRules}
+              hasDrinkPlans={item.hasDrinkPlans}
               compact
               style={{ width: "100%" }}
             />

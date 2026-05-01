@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, eventsTable, vendorsTable } from "@workspace/db";
-import { eq, desc, and, ilike, sql, gte, lte, or } from "drizzle-orm";
+import { db, eventsTable, vendorsTable, drinkPlansTable } from "@workspace/db";
+import { eq, desc, and, ilike, sql, gte, lte, or, inArray } from "drizzle-orm";
 import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { getEventRatings } from "../lib/aggregates";
@@ -116,6 +116,13 @@ async function serializeEvents(rows: EventRow[]) {
           .where(sql`${vendorsTable.id} IN (${sql.join(vendorIds, sql`, `)})`);
   const vendorMap = new Map(vendors.map((v) => [v.id, v]));
   const ratings = await getEventRatings(rows.map((r) => r.id));
+  const vendorsWithPlans = vendorIds.length > 0
+    ? await db
+        .selectDistinct({ vendorId: drinkPlansTable.vendorId })
+        .from(drinkPlansTable)
+        .where(inArray(drinkPlansTable.vendorId, vendorIds))
+    : [];
+  const vendorIdsWithPlans = new Set(vendorsWithPlans.map((r) => r.vendorId));
   return rows.map((e) => {
     const v = vendorMap.get(e.vendorId);
     const r = ratings.get(e.id) ?? { rating: 0, reviewCount: 0 };
@@ -158,6 +165,7 @@ async function serializeEvents(rows: EventRow[]) {
       vendorName: v?.businessName ?? "",
       partnerName: v?.businessName ?? "",
       createdAt: e.createdAt.toISOString(),
+      hasDrinkPlans: vendorIdsWithPlans.has(e.vendorId),
     };
   });
 }

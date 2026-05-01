@@ -24,6 +24,8 @@ interface PublicEvent {
   reviewCount: number;
   partnerName: string;
   popular: boolean;
+  hasDrinkPlans?: boolean;
+  freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
 }
 
 const PRICE_PRESETS = [
