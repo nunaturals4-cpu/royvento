@@ -23,8 +23,8 @@ import { useColors } from "@/hooks/useColors";
 interface Notification {
   id: number;
   title: string;
-  body: string;
-  read: boolean;
+  message: string;
+  isRead: boolean;
   createdAt: string;
 }
 
@@ -46,7 +46,7 @@ export default function NotificationsScreen() {
   });
 
   const markAllRead = async () => {
-    const unread = (data ?? []).filter((n) => !n.read);
+    const unread = (data ?? []).filter((n) => !n.isRead);
     for (const n of unread) {
       await customFetch(`/api/notifications/${n.id}/read`, { method: "PATCH" });
     }
@@ -54,7 +54,7 @@ export default function NotificationsScreen() {
   };
 
   const notifications = data ?? [];
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   function formatTime(iso: string) {
     const d = new Date(iso);
@@ -125,27 +125,27 @@ export default function NotificationsScreen() {
               style={[
                 styles.item,
                 {
-                  backgroundColor: item.read ? colors.background : colors.card,
+                  backgroundColor: item.isRead ? colors.background : colors.card,
                   borderBottomColor: colors.border,
                 },
               ]}
               onPress={() => {
-                if (!item.read) markRead.mutate(item.id);
+                if (!item.isRead) markRead.mutate(item.id);
               }}
             >
-              <View style={[styles.dot, { backgroundColor: item.read ? "transparent" : colors.primary }]} />
+              <View style={[styles.dot, { backgroundColor: item.isRead ? "transparent" : colors.primary }]} />
               <View style={{ flex: 1, gap: 3 }}>
                 <Text
                   style={[
                     styles.itemTitle,
-                    { color: colors.foreground, fontFamily: item.read ? "Inter_400Regular" : "Inter_600SemiBold" },
+                    { color: colors.foreground, fontFamily: item.isRead ? "Inter_400Regular" : "Inter_600SemiBold" },
                   ]}
                 >
                   {item.title}
                 </Text>
-                {item.body ? (
+                {item.message ? (
                   <Text style={[styles.itemBody, { color: colors.mutedForeground }]} numberOfLines={2}>
-                    {item.body}
+                    {item.message}
                   </Text>
                 ) : null}
                 <Text style={[styles.itemTime, { color: colors.mutedForeground }]}>

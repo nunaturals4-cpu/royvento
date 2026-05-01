@@ -28,6 +28,38 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   cancelled: "destructive",
 };
 
+interface BookingRecord {
+  id: number;
+  eventId: number;
+  eventTitle: string;
+  eventImage?: string | null;
+  vendorName: string;
+  bookingDate: string;
+  createdAt: string;
+  guests: number;
+  totalPrice: number;
+  finalPrice?: number | null;
+  status: string;
+  notes?: string | null;
+  rejectionReason?: string | null;
+  ticketCode?: string | null;
+  // extended runtime fields
+  eventType_?: string | null;
+  pubMode?: string | null;
+  checkedIn?: boolean | null;
+  cancellationAllowed?: boolean | null;
+  couponCode?: string | null;
+  pointsUsed?: number | null;
+  ticketWomen?: number | null;
+  ticketMen?: number | null;
+  ticketCouple?: number | null;
+  selectedPubEvent?: string | null;
+  eventCity?: string | null;
+  personName?: string | null;
+  userName?: string | null;
+  approvedBy?: string | null;
+}
+
 export function Bookings() {
   const { t } = useTranslation();
   const { data: bookings = [], isLoading, refetch } = useListMyBookings();
@@ -36,7 +68,7 @@ export function Bookings() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const filtered = (bookings as any[]).filter((b) => {
+  const filtered = (bookings as BookingRecord[]).filter((b) => {
     if (!b.bookingDate) return view === "upcoming";
     const d = new Date(b.bookingDate);
     return view === "upcoming" ? d >= today : d < today;
@@ -90,14 +122,14 @@ export function Bookings() {
         </div>
       ) : (
         <div className="space-y-6">
-          {filtered.map((b: any) => <BookingCard key={b.id} b={b} onRefetch={refetch} />)}
+          {filtered.map((b) => <BookingCard key={b.id} b={b} onRefetch={refetch} />)}
         </div>
       )}
     </div>
   );
 }
 
-function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
+function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void }) {
   const { t } = useTranslation();
   const STATUS_LABEL: Record<string, string> = {
     pending: t("bookings.status_pending"),
@@ -140,7 +172,7 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
                   <Tag className="h-4 w-4" />{t("bookings.coupon_applied")} {b.couponCode}
                 </span>
               )}
-              {b.pointsUsed > 0 && (
+              {(b.pointsUsed ?? 0) > 0 && (
                 <span className="flex items-center gap-1.5 text-primary">
                   ⬢ {b.pointsUsed} {t("bookings.pts_used")}
                 </span>
@@ -243,7 +275,7 @@ function CancelBookingDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  booking: any;
+  booking: BookingRecord;
   onCancelled: () => void;
 }) {
   const { t } = useTranslation();
@@ -263,10 +295,10 @@ function CancelBookingDialog({
       onCancelled();
       onClose();
       setReason("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: t("bookings.cancel_failed"),
-        description: err?.message ?? t("bookings.cancel_failed_desc"),
+        description: err instanceof Error ? err.message : t("bookings.cancel_failed_desc"),
         variant: "destructive",
       });
     } finally {
@@ -314,7 +346,7 @@ function TicketField({ label, value }: { label: string; value: React.ReactNode }
   );
 }
 
-function PremiumTicket({ b }: { b: any }) {
+function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;

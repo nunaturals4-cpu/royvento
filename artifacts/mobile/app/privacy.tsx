@@ -8,50 +8,52 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
+const LAST_UPDATED = "1 May 2026";
+
 const SECTIONS = [
   {
-    title: "1. Information We Collect",
-    body: "We collect information you provide directly (name, email, phone), usage data (pages visited, bookings made), and device information (device type, OS version) to provide and improve our services.",
+    title: "1. Who We Are",
+    body: 'Royvento ("we", "us", or "our") operates the Royvento platform \u2014 a marketplace connecting customers with event venues and pub partners across India. This Privacy Policy explains how we collect, use, and protect your personal information when you use our Service.',
   },
   {
-    title: "2. How We Use Your Information",
-    body: "We use your information to: process bookings, personalise your experience, send booking confirmations and notifications, improve the platform, and comply with legal obligations.",
+    title: "2. Information We Collect",
+    body: "Account information: Name, email address, phone number, and password when you register.\n\nBooking data: Event bookings, ticket types, number of guests, and payment method preferences.\n\nLocation data: City selected by you or, with your permission, your approximate location for personalisation.\n\nUsage data: Pages visited, search queries, filters used, and interactions with listings.\n\nDevice data: Device type, operating system, browser type, and IP address.\n\nCommunications: Messages you send to us via contact forms or support channels.",
   },
   {
-    title: "3. Sharing Your Information",
-    body: "We share your information with vendors only as necessary to fulfil your bookings. We do not sell your personal data to third parties. We may share data with service providers who assist our operations under strict confidentiality agreements.",
+    title: "3. How We Use Your Information",
+    body: "To create and manage your account and process bookings.\n\nTo send booking confirmations, reminders, and updates via email or SMS.\n\nTo personalise your experience \u2014 for example, surfacing events in your city.\n\nTo improve the platform through analytics and user research.\n\nTo detect and prevent fraud, abuse, or security incidents.\n\nTo comply with applicable laws and legal obligations.",
   },
   {
-    title: "4. Cookies & Tracking",
-    body: "We use cookies and similar technologies to remember your preferences, analyse platform usage, and enhance your experience. You can control cookies through your device settings.",
+    title: "4. Sharing Your Information",
+    body: "We do not sell your personal data. We may share information in the following limited circumstances:\n\nVenue partners: Your name and contact details are shared with the venue partner when you make a booking, so they can manage attendance.\n\nPayment processors: Payment data is handled by third-party processors (e.g. PhonePe) and is governed by their own privacy policies.\n\nService providers: We use third-party services for hosting, analytics, and communications, all operating under data processing agreements.\n\nLegal requirements: We may disclose your data if required by law, court order, or to protect the rights and safety of Royvento or others.",
   },
   {
-    title: "5. Data Security",
-    body: "We implement industry-standard security measures to protect your personal data. However, no transmission over the internet is 100% secure, and we cannot guarantee absolute security.",
+    title: "5. Cookies & Tracking",
+    body: "We use cookies and similar technologies to keep you logged in, remember your preferences, and understand how the platform is used. You can disable cookies in your browser settings, but some features may not work correctly as a result.",
   },
   {
     title: "6. Data Retention",
-    body: "We retain your data for as long as your account is active or as needed to provide services. You may request deletion of your account and associated data at any time.",
+    body: "We retain your account and booking data for as long as your account is active or as required to fulfil the purposes described in this Policy. You may request deletion of your account at any time; we will delete your personal data within 30 days, except where retention is required by law.",
   },
   {
     title: "7. Your Rights",
-    body: "You have the right to access, correct, or delete your personal data. You may also object to certain processing or request data portability. Contact us to exercise these rights.",
+    body: "You have the right to:\n\n\u2022 Access the personal data we hold about you.\n\u2022 Correct inaccurate or incomplete information.\n\u2022 Request deletion of your personal data.\n\u2022 Opt out of marketing communications at any time.\n\u2022 Withdraw consent for optional data processing.\n\nTo exercise any of these rights, contact us using the details below.",
   },
   {
-    title: "8. Third-Party Links",
-    body: "Our platform may contain links to third-party websites or services. We are not responsible for their privacy practices and encourage you to review their privacy policies.",
+    title: "8. Security",
+    body: "We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.",
   },
   {
     title: "9. Children's Privacy",
-    body: "Royvento is not directed to children under 18. We do not knowingly collect personal information from minors. If you believe we have, please contact us immediately.",
+    body: "The Service is intended for users aged 18 and over. We do not knowingly collect personal data from anyone under 18. If we become aware that a minor has provided us with personal data, we will delete it promptly.",
   },
   {
     title: "10. Changes to This Policy",
-    body: "We may update this Privacy Policy periodically. We will notify you of significant changes via the app or email. Continued use after changes constitutes acceptance.",
+    body: 'We may update this Privacy Policy from time to time. We will notify you of material changes by updating the "Last updated" date at the top of this page. Your continued use of the Service after any changes constitutes acceptance of the updated Policy.',
   },
   {
     title: "11. Contact Us",
-    body: "For privacy-related questions or requests, contact our Data Protection team at privacy@royvento.com.",
+    body: "If you have questions or concerns about this Privacy Policy, please contact us via our Contact page or email privacy@royvento.com.",
   },
 ];
 
@@ -70,7 +72,7 @@ export default function PrivacyScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>Privacy Policy</Text>
-        <Text style={[styles.sub, { color: colors.mutedForeground }]}>Last updated: January 2025</Text>
+        <Text style={[styles.sub, { color: colors.mutedForeground }]}>Last updated: {LAST_UPDATED}</Text>
       </LinearGradient>
 
       <ScrollView
@@ -81,7 +83,7 @@ export default function PrivacyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.intro, { color: colors.mutedForeground }]}>
-          At Royvento, we are committed to protecting your privacy and handling your data transparently.
+          Royvento is committed to protecting your privacy and handling your data transparently.
         </Text>
 
         {SECTIONS.map((s) => (
