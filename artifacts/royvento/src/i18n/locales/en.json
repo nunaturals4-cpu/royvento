@@ -284,7 +284,9 @@
     "discount_new_user_pct": "New User ({{pct}}%)",
     "pts_deducted": "−{{amount}} deducted",
     "pts_avail_note": "{{n}} points available (≈{{amount}})",
-    "free_entry_form_notice": "Free Entry – No payment required for this date."
+    "free_entry_form_notice": "Free Entry – No payment required for this date.",
+    "free_entry_label": "Free Entry",
+    "free_entry_day_sub": "No cover charge today"
   },
   "profile": {
     "my_profile": "My Profile",

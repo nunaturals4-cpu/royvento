@@ -284,7 +284,9 @@
     "discount_new_user_pct": "ਨਵਾਂ ਉਪਭੋਗਤਾ ({{pct}}%)",
     "pts_deducted": "−{{amount}} ਕੱਟੇ",
     "pts_avail_note": "{{n}} ਪੁਆਇੰਟ (≈{{amount}})",
-    "free_entry_form_notice": "ਮੁਫ਼ਤ ਦਾਖਲਾ – ਇਸ ਤਾਰੀਖ ਲਈ ਕੋਈ ਭੁਗਤਾਨ ਜ਼ਰੂਰੀ ਨਹੀਂ।"
+    "free_entry_form_notice": "ਮੁਫ਼ਤ ਦਾਖਲਾ – ਇਸ ਤਾਰੀਖ ਲਈ ਕੋਈ ਭੁਗਤਾਨ ਜ਼ਰੂਰੀ ਨਹੀਂ।",
+    "free_entry_label": "ਮੁਫ਼ਤ ਦਾਖਲਾ",
+    "free_entry_day_sub": "ਅੱਜ ਕੋਈ ਕਵਰ ਚਾਰਜ ਨਹੀਂ"
   },
   "profile": {
     "my_profile": "ਮੇਰਾ ਪ੍ਰੋਫ਼ਾਈਲ",

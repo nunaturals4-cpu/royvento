@@ -694,11 +694,21 @@ export function EventDetail() {
 
         <aside className="lg:sticky lg:top-24 lg:self-start space-y-4 order-first lg:order-none">
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
-            <p className="font-serif text-5xl mt-1">{startingAt > 0 ? formatINR(startingAt) : "—"}</p>
-            <p className="text-xs text-muted-foreground mb-3">
-              {isPub ? t("events.lowest_entry") : t("events.per_person_event")}
-            </p>
+            {isFreeEntryDay ? (
+              <>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
+                <p className="font-serif text-5xl mt-1 text-green-400">{t("events.free_entry_label")}</p>
+                <p className="text-xs text-muted-foreground mb-3">{t("events.free_entry_day_sub")}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
+                <p className="font-serif text-5xl mt-1">{startingAt > 0 ? formatINR(startingAt) : "—"}</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {isPub ? t("events.lowest_entry") : t("events.per_person_event")}
+                </p>
+              </>
+            )}
 
             {isPub && !isFreeEntryDay && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0 || (dayPricingMap && Object.keys(dayPricingMap).length > 0)) && (
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-5 space-y-2">
@@ -760,7 +770,7 @@ export function EventDetail() {
               </div>
             )}
 
-            {discountInfo?.isNewUser && (
+            {!isFreeEntryDay && discountInfo?.isNewUser && (
               <div className="mb-4 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs flex items-center gap-2 text-primary">
                 <Sparkle className="h-3.5 w-3.5" />
                 {t("events.new_member_discount", { pct: discountInfo.bookingDiscountPercent })}
@@ -815,9 +825,9 @@ export function EventDetail() {
                   {pubMode === "ticket" && (
                     <div className="space-y-2 rounded-xl border border-white/10 p-3">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.ticket_counts")}</p>
-                      <TicketRow label={t("events.women")} price={effectiveWomen} value={ticketWomen} onChange={setTicketWomen} />
-                      <TicketRow label={t("events.men")} price={effectiveMen} value={ticketMen} onChange={setTicketMen} />
-                      <TicketRow label={t("events.couple")} price={effectiveCouple} value={ticketCouple} onChange={setTicketCouple} />
+                      <TicketRow label={t("events.women")} price={effectiveWomen} value={ticketWomen} onChange={setTicketWomen} hidePrice={isFreeEntryDay} />
+                      <TicketRow label={t("events.men")} price={effectiveMen} value={ticketMen} onChange={setTicketMen} hidePrice={isFreeEntryDay} />
+                      <TicketRow label={t("events.couple")} price={effectiveCouple} value={ticketCouple} onChange={setTicketCouple} hidePrice={isFreeEntryDay} />
                     </div>
                   )}
 
@@ -1064,12 +1074,12 @@ export function EventDetail() {
   );
 }
 
-function TicketRow({ label, price, value, onChange }: { label: string; price: number; value: number; onChange: (n: number) => void }) {
+function TicketRow({ label, price, value, onChange, hidePrice }: { label: string; price: number; value: number; onChange: (n: number) => void; hidePrice?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <div className="flex-1">
         <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground ml-2">{price > 0 ? formatINRExact(price) : "—"}</span>
+        {!hidePrice && <span className="text-muted-foreground ml-2">{price > 0 ? formatINRExact(price) : "—"}</span>}
       </div>
       <div className="flex items-center gap-1">
         <button
