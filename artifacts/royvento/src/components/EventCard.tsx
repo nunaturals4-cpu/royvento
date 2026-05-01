@@ -66,19 +66,19 @@ export function EventCard({ event }: Props) {
               </Badge>
             </div>
           )}
-          <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge variant="secondary" className="bg-white/10 text-white border-white/10 backdrop-blur">
-                {event.category}
-              </Badge>
-              {event.hasDrinkPlans && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-semibold uppercase tracking-wide backdrop-blur">
-                  <GlassWater className="h-3 w-3" />
-                  Drink deal
-                </span>
-              )}
+          {event.hasDrinkPlans && (
+            <div className="absolute bottom-11 right-3">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/90 text-primary-foreground text-[10px] font-semibold uppercase tracking-wide backdrop-blur">
+                <GlassWater className="h-3 w-3" />
+                Drink deal
+              </span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-white/90 bg-black/50 px-2 py-1 rounded-md backdrop-blur flex-shrink-0">
+          )}
+          <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
+            <Badge variant="secondary" className="bg-white/10 text-white border-white/10 backdrop-blur">
+              {event.category}
+            </Badge>
+            <div className="flex items-center gap-1 text-xs text-white/90 bg-black/50 px-2 py-1 rounded-md backdrop-blur">
               <Star className="h-3.5 w-3.5 fill-primary text-primary" />
               <span className="font-medium">{event.rating > 0 ? event.rating.toFixed(1) : "New"}</span>
               {event.reviewCount > 0 && <span className="opacity-70">({event.reviewCount})</span>}
