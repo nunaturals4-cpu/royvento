@@ -23,11 +23,21 @@ interface Props {
   };
 }
 
+const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 export function EventCard({ event }: Props) {
   const partner = event.partnerName ?? event.vendorName ?? "";
   const loc = event.city
     ? `${event.city}${event.state ? ", " + event.state : ""}`
     : event.location;
+
+  const fer = event.freeEntryRules;
+  const freeDays = fer?.enabled === true ? (fer.days ?? []) : [];
+  const hasFreeEntry = freeDays.length > 0;
+  const todayAbbr = DAY_ABBRS[new Date().getDay()];
+  const isFreeToday = hasFreeEntry && freeDays.includes(todayAbbr);
+  const freeLabel = isFreeToday ? "Free Entry Today" : "Free some days";
+
   return (
     <Link href={`/events/${event.id}`}>
       <div className="group cursor-pointer relative overflow-hidden rounded-2xl glass-card lift-3d perspective-card">
@@ -73,12 +83,11 @@ export function EventCard({ event }: Props) {
           {partner && (
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{partner}</p>
           )}
-          {event.freeEntryRules?.enabled && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 w-fit">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+          {hasFreeEntry && (
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg w-fit border ${isFreeToday ? "bg-emerald-500/20 border-emerald-500/40" : "bg-emerald-500/10 border-emerald-500/20"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full inline-block ${isFreeToday ? "bg-emerald-400 animate-pulse" : "bg-emerald-500"}`} />
               <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">
-                Free Entry
-                {event.freeEntryRules.genders.length > 0 && ` · ${event.freeEntryRules.genders.join(" & ")}`}
+                {freeLabel}
               </span>
             </div>
           )}
