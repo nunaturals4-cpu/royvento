@@ -53,12 +53,12 @@ interface RecentAnnouncement {
   eventTitle: string;
 }
 
-function getPlanSummary(plan: DrinkPlanSummary): string {
-  if (plan.type === "welcome") return plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests";
-  if (plan.type === "unlimited") return plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests";
+function getPlanLabel(plan: DrinkPlanSummary): string {
+  if (plan.type === "welcome") return "Free welcome drink";
+  if (plan.type === "unlimited") return "Unlimited drinks";
   if (plan.type === "ticket") {
     const count = (plan.lineItems ?? []).filter((i: { name?: string }) => i.name).length;
-    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket";
+    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} with ticket` : "Drinks with ticket";
   }
   return plan.productName || "Drink offer";
 }
@@ -275,7 +275,7 @@ export default function HomeScreen() {
 
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (
-        <Section title="Drink Deals" icon="wine-outline" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
+        <Section title={t("events.drink_deals")} icon="wine-outline" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
           <FlatList
             horizontal
             data={drinkOffers as VendorDrinkOffer[]}
@@ -302,11 +302,11 @@ export default function HomeScreen() {
                     />
                   ) : (
                     <View style={[styles.drinkCardImagePlaceholder, { backgroundColor: colors.muted }]}>
-                      <Ionicons name="wine-outline" size={22} color={colors.mutedForeground} />
+                      <Ionicons name="wine-outline" size={28} color={colors.mutedForeground} />
                     </View>
                   )}
                   <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.75)"]}
+                    colors={["transparent", "rgba(0,0,0,0.82)"]}
                     style={StyleSheet.absoluteFillObject}
                   />
                   <Text style={styles.drinkCardName} numberOfLines={1}>{item.vendorName}</Text>
@@ -314,22 +314,36 @@ export default function HomeScreen() {
                 <View style={styles.drinkCardBody}>
                   {item.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
                     <View key={i} style={styles.drinkPlanRow}>
-                      <View style={[styles.drinkDot, { backgroundColor: colors.primary }]} />
-                      <Text style={[styles.drinkPlanText, { color: colors.foreground }]} numberOfLines={1}>
-                        {getPlanSummary(plan)}
+                      <View style={[styles.drinkIconBox, { backgroundColor: colors.primary + "22" }]}>
+                        <Ionicons
+                          name={plan.type === "unlimited" ? "wine-outline" : plan.type === "ticket" ? "ticket-outline" : "star-outline"}
+                          size={11}
+                          color={colors.primary}
+                        />
+                      </View>
+                      <Text style={[styles.drinkPlanText, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>
+                        {getPlanLabel(plan)}
                       </Text>
+                      <View style={[
+                        styles.drinkGenderPill,
+                        { backgroundColor: plan.gender === "female" ? "rgba(244,63,94,0.18)" : colors.primary + "22" },
+                      ]}>
+                        <Text style={[styles.drinkGenderText, { color: plan.gender === "female" ? "#fb7185" : colors.primary }]}>
+                          {plan.gender === "female" ? "Ladies" : "All"}
+                        </Text>
+                      </View>
                     </View>
                   ))}
                   {item.plans.length > 2 && (
                     <Text style={[styles.drinkMoreText, { color: colors.mutedForeground }]}>
-                      +{item.plans.length - 2} more offer{item.plans.length - 2 !== 1 ? "s" : ""}
+                      +{item.plans.length - 2} more
                     </Text>
                   )}
-                  <View style={[styles.drinkCta, { borderTopColor: colors.border }]}>
+                  <View style={[styles.drinkCta, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "33" }]}>
                     <Text style={[styles.drinkCtaText, { color: colors.primary }]}>
-                      {item.pubEventId ? "Book now" : "View venue"}
+                      {item.pubEventId ? t("events.book_now_btn") : "View venue"}
                     </Text>
-                    <Ionicons name="arrow-forward" size={13} color={colors.primary} />
+                    <Ionicons name="arrow-forward" size={14} color={colors.primary} />
                   </View>
                 </View>
               </Pressable>
@@ -636,13 +650,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   drinkCard: {
-    width: 200,
-    borderRadius: 14,
+    width: 280,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
   },
   drinkCardImage: {
-    height: 110,
+    height: 160,
     position: "relative",
     justifyContent: "flex-end",
     overflow: "hidden",
@@ -653,49 +667,61 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   drinkCardName: {
-    fontSize: 13,
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
     color: "#fff",
-    paddingHorizontal: 10,
-    paddingBottom: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
   },
   drinkCardBody: {
-    padding: 10,
-    gap: 5,
+    padding: 12,
+    gap: 8,
   },
   drinkPlanRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
-  drinkDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
+  drinkIconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   drinkPlanText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    flex: 1,
+  },
+  drinkGenderPill: {
+    borderRadius: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    flexShrink: 0,
+  },
+  drinkGenderText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
   },
   drinkMoreText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
+    paddingLeft: 34,
   },
   drinkCta: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderTopWidth: 1,
-    marginTop: 6,
-    paddingTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   drinkCtaText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
 });

@@ -12,6 +12,8 @@ import {
   Megaphone,
   Clock,
   GlassWater,
+  Ticket,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents, useListVendorDrinkOffers } from "@workspace/api-client-react";
@@ -59,14 +61,20 @@ function sortCityFirst<T extends { city: string }>(items: T[], userCity: string)
   ];
 }
 
-function getPlanSummary(plan: DrinkPlanSummary): string {
-  if (plan.type === "welcome") return plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests";
-  if (plan.type === "unlimited") return plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests";
+function getPlanLabel(plan: DrinkPlanSummary): string {
+  if (plan.type === "welcome") return "Free welcome drink";
+  if (plan.type === "unlimited") return "Unlimited drinks";
   if (plan.type === "ticket") {
     const count = (plan.lineItems ?? []).filter((i) => i.name).length;
-    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket";
+    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} with ticket` : "Drinks with ticket";
   }
   return plan.productName || "Drink offer";
+}
+
+function PlanIcon({ type }: { type: string }) {
+  if (type === "unlimited") return <GlassWater className="h-3.5 w-3.5 text-primary" />;
+  if (type === "ticket") return <Ticket className="h-3.5 w-3.5 text-primary" />;
+  return <Star className="h-3.5 w-3.5 text-primary" />;
 }
 
 export function Home() {
@@ -153,61 +161,103 @@ export function Home() {
 
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (
-        <section className="container mx-auto px-4 md:px-6 py-12">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
-                <GlassWater className="h-3.5 w-3.5" /> Drink Deals
-              </p>
-              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Drink Deals at Our Partners</h2>
-            </div>
-            <Link href="/pubs" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
-              Browse pubs <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
-            {drinkOffers.map((offer: VendorDrinkOffer) => (
-              <Link
-                key={offer.vendorId}
-                href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
-                className="snap-start flex-shrink-0"
-              >
-                <div className="glass-card rounded-2xl overflow-hidden w-60 sm:w-64 hover:bg-white/5 transition-colors cursor-pointer lift-3d h-full flex flex-col">
-                  <div className="h-36 bg-white/5 relative overflow-hidden">
-                    {offer.coverImageUrl ? (
-                      <img src={offer.coverImageUrl} alt={offer.vendorName} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full flex items-center justify-center">
-                        <GlassWater className="h-10 w-10 text-white/20" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                    <div className="absolute bottom-2 left-3 right-3">
-                      <h3 className="font-serif text-sm font-semibold tracking-tight text-white drop-shadow truncate">{offer.vendorName}</h3>
-                    </div>
-                  </div>
-                  <div className="p-3.5 flex flex-col gap-2 flex-1">
-                    <div className="flex flex-col gap-1.5 flex-1">
-                      {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
-                        <span key={i} className="text-xs text-white/90 flex items-center gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                          {getPlanSummary(plan)}
-                        </span>
-                      ))}
-                      {offer.plans.length > 2 && (
-                        <span className="text-xs text-white/60">+{offer.plans.length - 2} more offer{offer.plans.length - 2 !== 1 ? "s" : ""}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                      <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
-                        {offer.pubEventId ? "Book now" : "View venue"}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                  </div>
-                </div>
+        <section className="relative py-16 md:py-20 overflow-hidden">
+          {/* Dark background band */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/50 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_60%_at_50%_50%,rgba(220,38,38,0.07),transparent)] pointer-events-none" />
+
+          <div className="container mx-auto px-4 md:px-6 relative">
+            {/* Section header */}
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-primary mb-3 flex items-center gap-2">
+                  <GlassWater className="h-3.5 w-3.5" /> Exclusive Offers
+                </p>
+                <h2 className="font-serif text-4xl md:text-6xl tracking-tight leading-none">
+                  Drink Deals
+                  <span className="block italic text-gradient-red">at Our Partners</span>
+                </h2>
+                <div className="mt-3 h-px w-24 bg-gradient-to-r from-primary to-transparent" />
+                <p className="mt-4 text-white/55 text-sm md:text-base max-w-sm leading-relaxed">
+                  Exclusive drink deals — book before they're gone
+                </p>
+              </div>
+              <Link href="/pubs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-primary/40 text-primary hover:bg-primary/10 rounded-full px-5"
+                >
+                  Browse pubs <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
               </Link>
-            ))}
+            </div>
+
+            {/* Cards track — peek of next card invites scrolling */}
+            <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
+              {drinkOffers.map((offer: VendorDrinkOffer) => (
+                <Link
+                  key={offer.vendorId}
+                  href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
+                  className="snap-start flex-shrink-0"
+                >
+                  <div className="glass-card rounded-2xl overflow-hidden w-72 sm:w-80 hover:bg-white/[0.06] transition-all cursor-pointer lift-3d h-full flex flex-col group">
+                    {/* Image — taller with zoom on hover */}
+                    <div className="h-44 bg-white/5 relative overflow-hidden">
+                      {offer.coverImageUrl ? (
+                        <img
+                          src={offer.coverImageUrl}
+                          alt={offer.vendorName}
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-transparent">
+                          <GlassWater className="h-12 w-12 text-white/20" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                      <div className="absolute bottom-3 left-4 right-4">
+                        <h3 className="font-serif text-xl font-semibold tracking-tight text-white drop-shadow leading-tight">
+                          {offer.vendorName}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Plan rows */}
+                    <div className="p-4 flex flex-col gap-3 flex-1">
+                      <div className="flex flex-col gap-2.5 flex-1">
+                        {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
+                          <div key={i} className="flex items-center gap-2.5">
+                            <span className="flex-shrink-0 h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
+                              <PlanIcon type={plan.type} />
+                            </span>
+                            <span className="text-sm text-white/90 flex-1 leading-snug">
+                              {getPlanLabel(plan)}
+                            </span>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${plan.gender === "female" ? "bg-rose-500/20 text-rose-300" : "bg-primary/20 text-primary"}`}>
+                              {plan.gender === "female" ? "Ladies" : "All"}
+                            </span>
+                          </div>
+                        ))}
+                        {offer.plans.length > 2 && (
+                          <span className="text-xs text-white/45 pl-9">
+                            +{offer.plans.length - 2} more offer{offer.plans.length - 2 !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Full-width CTA strip */}
+                      <div className="mt-1 rounded-xl bg-primary/10 border border-primary/25 px-4 py-2.5 flex items-center justify-between group-hover:bg-primary/20 transition-colors">
+                        <span className="text-sm font-semibold text-primary">
+                          {offer.pubEventId ? "Book now" : "View venue"}
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-primary" />
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
         </section>
       )}
