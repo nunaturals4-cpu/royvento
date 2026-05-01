@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
 import {
   useGetVendor,
@@ -6,7 +7,20 @@ import {
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { EventCard } from "@/components/EventCard";
-import { Star, MapPin, Navigation, Clock } from "lucide-react";
+import { Star, MapPin, Navigation, Clock, GlassWater } from "lucide-react";
+import { apiGet } from "@/lib/api";
+
+interface DrinkPlan {
+  id: number; type: string; productName: string; gender: string;
+  price: number; days: string[]; timeFrom: string; timeTo: string; description: string;
+}
+
+const PLAN_TYPE_LABELS: Record<string, string> = {
+  welcome: "Welcome Drink",
+  unlimited: "Unlimited Drinks",
+  ticket: "Included with Ticket",
+  custom: "Custom Package",
+};
 
 export function VendorDetail() {
   const params = useParams();
@@ -14,6 +28,14 @@ export function VendorDetail() {
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: reviews = [] } = useListVendorReviews(id);
   const { data: allEvents = [] } = useListEvents();
+  const [drinkPlans, setDrinkPlans] = useState<DrinkPlan[]>([]);
+
+  useEffect(() => {
+    if (!id) return;
+    apiGet<DrinkPlan[]>(`/api/vendors/${id}/drink-plans`)
+      .then(setDrinkPlans)
+      .catch(() => {});
+  }, [id]);
 
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
   if (!vendor) return <div className="container mx-auto px-4 py-20">Partner not found.</div>;
@@ -21,6 +43,13 @@ export function VendorDetail() {
   const events = allEvents.filter((e) => e.vendorId === vendor.id);
   const pubEvent = events.find((e) => e.type === "pub");
   const pubEventTypes: string[] = pubEvent?.pubEventTypes ?? [];
+
+  const fmtTime = (hhmm: string) => {
+    if (!hhmm) return "";
+    const [h, m] = hhmm.split(":").map(Number);
+    const suffix = h < 12 ? "AM" : "PM";
+    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
+  };
 
   return (
     <div>
@@ -251,6 +280,56 @@ export function VendorDetail() {
                 >
                   {t}
                 </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {drinkPlans.length > 0 && (
+          <section>
+            <h2 className="font-serif text-2xl mb-5 flex items-center gap-2">
+              <GlassWater className="h-5 w-5 text-primary" />
+              Drinks &amp; Offers
+            </h2>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {drinkPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className="rounded-xl border border-white/10 bg-card px-5 py-4 space-y-2"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-sm">{plan.productName}</span>
+                    <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
+                      {PLAN_TYPE_LABELS[plan.type] ?? plan.type}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      plan.price === 0
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        : "bg-white/5 text-muted-foreground border border-white/10"
+                    }`}>
+                      {plan.price === 0 ? "Free" : `₹${(plan.price / 100).toFixed(0)}`}
+                    </span>
+                    {plan.gender === "female" && (
+                      <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">
+                        Ladies only
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {plan.days.length > 0 && (
+                      <span>{plan.days.join(", ")}</span>
+                    )}
+                    {plan.timeFrom && plan.timeTo && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {fmtTime(plan.timeFrom)} – {fmtTime(plan.timeTo)}
+                      </span>
+                    )}
+                  </div>
+                  {plan.description && (
+                    <p className="text-xs text-muted-foreground/80 leading-relaxed">{plan.description}</p>
+                  )}
+                </div>
               ))}
             </div>
           </section>

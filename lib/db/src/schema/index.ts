@@ -532,3 +532,25 @@ export const paymentsTable = pgTable(
 );
 
 export type Payment = typeof paymentsTable.$inferSelect;
+
+export const drinkPlansTable = pgTable(
+  "drink_plans",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull().references(() => vendorsTable.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 20 }).notNull().default("welcome"),
+    productName: varchar("product_name", { length: 255 }).notNull().default(""),
+    gender: varchar("gender", { length: 10 }).notNull().default("all"),
+    price: integer("price").notNull().default(0),
+    days: text("days").array().notNull().default([]),
+    timeFrom: varchar("time_from", { length: 8 }).notNull().default(""),
+    timeTo: varchar("time_to", { length: 8 }).notNull().default(""),
+    description: text("description").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("drink_plans_vendor_idx").on(t.vendorId),
+  }),
+);
+
+export type DrinkPlan = typeof drinkPlansTable.$inferSelect;

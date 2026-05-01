@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
-import { db, vendorsTable, usersTable, eventsTable } from "@workspace/db";
+import { db, vendorsTable, usersTable, eventsTable, drinkPlansTable } from "@workspace/db";
 import { eq, desc, and, ilike, inArray } from "drizzle-orm";
 import {
   CreateMyVendorBody,
   UpdateMyVendorBody,
   ListVendorsQueryParams,
 } from "@workspace/api-zod";
+import { z } from "zod";
 import { requireAuth, loadUserFromRequest, type Role } from "../lib/auth";
 import { getVendorRatings, getVendorRating } from "../lib/aggregates";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
@@ -364,5 +365,56 @@ router.post(
     res.json(await serializeVendor(v));
   },
 );
+
+const DrinkPlanBody = z.object({
+  type: z.enum(["welcome", "unlimited", "ticket", "custom"]),
+  productName: z.string().min(1).max(255),
+  gender: z.enum(["all", "female"]).default("all"),
+  price: z.number().int().min(0).default(0),
+  days: z.array(z.string()).default([]),
+  timeFrom: z.string().max(8).default(""),
+  timeTo: z.string().max(8).default(""),
+  description: z.string().max(500).default(""),
+});
+
+router.get("/vendors/:vendorId/drink-plans", async (req, res) => {
+  const id = Number(req.params["vendorId"]);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const plans = await db
+    .select()
+    .from(drinkPlansTable)
+    .where(eq(drinkPlansTable.vendorId, id))
+    .orderBy(drinkPlansTable.createdAt);
+  res.json(plans);
+});
+
+router.post("/vendors/me/drink-plans", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const vendor = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
+  const parsed = DrinkPlanBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
+  const [plan] = await db.insert(drinkPlansTable).values({
+    vendorId: vendor[0].id,
+    ...parsed.data,
+  }).returning();
+  res.json(plan);
+});
+
+router.delete("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const planId = Number(req.params["planId"]);
+  if (!Number.isFinite(planId)) { res.status(400).json({ error: "Invalid plan id" }); return; }
+  const vendor = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
+  const [deleted] = await db
+    .delete(drinkPlansTable)
+    .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, vendor[0].id)))
+    .returning();
+  if (!deleted) { res.status(404).json({ error: "Plan not found" }); return; }
+  res.json({ ok: true });
+});
 
 export default router;

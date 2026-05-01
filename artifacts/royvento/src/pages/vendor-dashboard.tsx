@@ -22,7 +22,7 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
-  TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown,
+  TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -107,6 +107,9 @@ export function VendorDashboard() {
             <TabsTrigger value="leads">
               <Crown className="h-3.5 w-3.5 mr-1 text-primary" /> Leads
             </TabsTrigger>
+            <TabsTrigger value="drinkplans">
+              <GlassWater className="h-3.5 w-3.5 mr-1 text-primary" /> Drink Plans
+            </TabsTrigger>
             <TabsTrigger value="managers">
               <Users className="h-3.5 w-3.5 mr-1 text-primary" /> Managers
             </TabsTrigger>
@@ -125,6 +128,7 @@ export function VendorDashboard() {
           <TabsContent value="ads"><AdsPanel /></TabsContent>
           <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
           <TabsContent value="leads"><LeadsPanel /></TabsContent>
+          <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
           <TabsContent value="managers"><ManagersPanel /></TabsContent>
         </Tabs>
       )}
@@ -2394,6 +2398,279 @@ function LeadsPanel() {
               })}
             </tbody>
           </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const PLAN_TYPES = [
+  { value: "welcome", label: "Welcome Drink" },
+  { value: "unlimited", label: "Unlimited Drinks" },
+  { value: "ticket", label: "Included with Ticket" },
+  { value: "custom", label: "Custom Package" },
+] as const;
+
+const PLAN_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+interface DrinkPlan {
+  id: number; vendorId: number; type: string; productName: string; gender: string;
+  price: number; days: string[]; timeFrom: string; timeTo: string; description: string; createdAt: string;
+}
+
+function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
+  const { toast } = useToast();
+  const [plans, setPlans] = useState<DrinkPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  const [type, setType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
+  const [productName, setProductName] = useState("");
+  const [gender, setGender] = useState<"all" | "female">("all");
+  const [price, setPrice] = useState("0");
+  const [days, setDays] = useState<string[]>([]);
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
+  const [description, setDescription] = useState("");
+
+  const fetchPlans = async () => {
+    try {
+      setLoading(true);
+      const data: DrinkPlan[] = await apiGet(`/api/vendors/${vendorId}/drink-plans`);
+      setPlans(data);
+    } catch {
+      toast({ title: "Failed to load drink plans", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void fetchPlans(); }, [vendorId]);
+
+  const toggleDay = (day: string) =>
+    setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+
+  const resetForm = () => {
+    setType("welcome"); setProductName(""); setGender("all"); setPrice("0");
+    setDays([]); setTimeFrom(""); setTimeTo(""); setDescription("");
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productName.trim()) {
+      toast({ title: "Product name is required", variant: "destructive" }); return;
+    }
+    const priceInt = Math.max(0, Math.round(parseFloat(price || "0") * 100));
+    setSaving(true);
+    try {
+      await apiPost("/api/vendors/me/drink-plans", {
+        type, productName: productName.trim(), gender, price: priceInt,
+        days, timeFrom, timeTo, description: description.trim(),
+      });
+      toast({ title: "Drink plan added" });
+      resetForm();
+      await fetchPlans();
+    } catch (err: any) {
+      toast({ title: "Failed to add plan", description: err?.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (planId: number) => {
+    setDeleting(planId);
+    try {
+      await apiDelete(`/api/vendors/me/drink-plans/${planId}`);
+      setPlans((prev) => prev.filter((p) => p.id !== planId));
+      toast({ title: "Drink plan removed" });
+    } catch (err: any) {
+      toast({ title: "Failed to remove plan", description: err?.message, variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const fmtPrice = (priceCents: number) =>
+    priceCents === 0 ? "Free" : `₹${(priceCents / 100).toFixed(0)}`;
+
+  const fmtTime = (hhmm: string) => {
+    if (!hhmm) return "";
+    const [h, m] = hhmm.split(":").map(Number);
+    const suffix = h < 12 ? "AM" : "PM";
+    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
+  };
+
+  const planTypeLabel = (t: string) => PLAN_TYPES.find((p) => p.value === t)?.label ?? t;
+
+  return (
+    <div className="space-y-8">
+      <div className="rounded-3xl glass-card-strong p-8">
+        <h2 className="font-serif text-2xl mb-1 flex items-center gap-2">
+          <GlassWater className="h-5 w-5 text-primary" /> Drink Plans &amp; Offers
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Add drink packages that will appear on your public profile. These are informational — no payment is collected at booking.
+        </p>
+
+        <form onSubmit={handleAdd} className="space-y-4 border border-white/10 rounded-2xl p-5 bg-black/20">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Add a new plan</h3>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <Label>Plan type</Label>
+              <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
+                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PLAN_TYPES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Product / offer name</Label>
+              <Input
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="e.g. Welcome cocktail, Beer bucket"
+                className="bg-black/40 border-white/10"
+              />
+            </div>
+            <div>
+              <Label>Applicable gender</Label>
+              <Select value={gender} onValueChange={(v) => setGender(v as typeof gender)}>
+                <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All guests</SelectItem>
+                  <SelectItem value="female">Female guests only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Price <span className="text-muted-foreground text-xs">(₹0 for free)</span></Label>
+              <div className="relative">
+                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="bg-black/40 border-white/10 pl-8"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="mb-2 block">Applicable days <span className="text-muted-foreground text-xs">(leave blank for all days)</span></Label>
+              <div className="flex flex-wrap gap-2">
+                {PLAN_DAYS.map((day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleDay(day)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      days.includes(day)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-white/15 text-muted-foreground hover:bg-white/5"
+                    }`}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Valid from <span className="text-muted-foreground text-xs">(HH:MM)</span></Label>
+              <Input
+                type="time"
+                value={timeFrom}
+                onChange={(e) => setTimeFrom(e.target.value)}
+                className="bg-black/40 border-white/10"
+              />
+            </div>
+            <div>
+              <Label>Valid until <span className="text-muted-foreground text-xs">(HH:MM)</span></Label>
+              <Input
+                type="time"
+                value={timeTo}
+                onChange={(e) => setTimeTo(e.target.value)}
+                className="bg-black/40 border-white/10"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Short description <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Any extra details customers should know…"
+                rows={2}
+                className="bg-black/40 border-white/10 resize-none"
+                maxLength={500}
+              />
+            </div>
+          </div>
+          <Button type="submit" disabled={saving} className="gap-2">
+            <Plus className="h-4 w-4" />
+            {saving ? "Adding…" : "Add plan"}
+          </Button>
+        </form>
+      </div>
+
+      <div className="rounded-3xl glass-card p-8">
+        <h3 className="font-serif text-xl mb-5">Your current plans</h3>
+        {loading ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : plans.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No drink plans added yet. Add one above to display it on your public profile.</p>
+        ) : (
+          <div className="space-y-3">
+            {plans.map((plan) => (
+              <div key={plan.id} className="flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-black/20 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold">{plan.productName}</span>
+                    <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
+                      {planTypeLabel(plan.type)}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      plan.price === 0
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        : "bg-white/5 text-muted-foreground border border-white/10"
+                    }`}>
+                      {fmtPrice(plan.price)}
+                    </span>
+                    {plan.gender === "female" && (
+                      <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">
+                        Female only
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {plan.days.length > 0 && (
+                      <span>{plan.days.join(", ")}</span>
+                    )}
+                    {plan.timeFrom && plan.timeTo && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {fmtTime(plan.timeFrom)} – {fmtTime(plan.timeTo)}
+                      </span>
+                    )}
+                    {plan.description && (
+                      <span className="italic text-muted-foreground/70">{plan.description}</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(plan.id)}
+                  disabled={deleting === plan.id}
+                  className="shrink-0 rounded-lg border border-destructive/30 p-2 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                  title="Remove plan"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
