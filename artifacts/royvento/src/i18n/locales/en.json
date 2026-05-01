@@ -283,7 +283,8 @@
     "discount_coupon_pct": "Coupon ({{pct}}%)",
     "discount_new_user_pct": "New User ({{pct}}%)",
     "pts_deducted": "−{{amount}} deducted",
-    "pts_avail_note": "{{n}} points available (≈{{amount}})"
+    "pts_avail_note": "{{n}} points available (≈{{amount}})",
+    "free_entry_form_notice": "Free Entry – No payment required for this date."
   },
   "profile": {
     "my_profile": "My Profile",

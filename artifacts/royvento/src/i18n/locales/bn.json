@@ -283,7 +283,8 @@
     "discount_coupon_pct": "কূপন ({{pct}}%)",
     "discount_new_user_pct": "নতুন ব্যবহারকারী ({{pct}}%)",
     "pts_deducted": "−{{amount}} কাটা হয়েছে",
-    "pts_avail_note": "{{n}} পয়েন্ট (≈{{amount}})"
+    "pts_avail_note": "{{n}} পয়েন্ট (≈{{amount}})",
+    "free_entry_form_notice": "বিনামূল্যে প্রবেশ – এই তারিখের জন্য কোনো পেমেন্ট প্রয়োজন নেই।"
   },
   "profile": {
     "my_profile": "আমার প্রোফাইল",

@@ -283,7 +283,8 @@
     "discount_coupon_pct": "కూపన్ ({{pct}}%)",
     "discount_new_user_pct": "కొత్త వినియోగదారు ({{pct}}%)",
     "pts_deducted": "−{{amount}} తగ్గించబడింది",
-    "pts_avail_note": "{{n}} పాయింట్లు (≈{{amount}})"
+    "pts_avail_note": "{{n}} పాయింట్లు (≈{{amount}})",
+    "free_entry_form_notice": "ఉచిత ప్రవేశం – ఈ తేదీకి చెల్లింపు అవసరం లేదు."
   },
   "profile": {
     "my_profile": "నా ప్రొఫైల్",

@@ -283,7 +283,8 @@
     "discount_coupon_pct": "கூப்பன் ({{pct}}%)",
     "discount_new_user_pct": "புதிய பயனர் ({{pct}}%)",
     "pts_deducted": "−{{amount}} கழிக்கப்பட்டது",
-    "pts_avail_note": "{{n}} புள்ளிகள் (≈{{amount}})"
+    "pts_avail_note": "{{n}} புள்ளிகள் (≈{{amount}})",
+    "free_entry_form_notice": "இலவச நுழைவு – இந்த தேதிக்கு எந்த கட்டணமும் தேவையில்லை."
   },
   "profile": {
     "my_profile": "என் சுயவிவரம்",

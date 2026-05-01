@@ -283,7 +283,8 @@
     "discount_coupon_pct": "કૂપન ({{pct}}%)",
     "discount_new_user_pct": "નવો વપરાશકર્તા ({{pct}}%)",
     "pts_deducted": "−{{amount}} બાદ",
-    "pts_avail_note": "{{n}} પૉઇન્ટ (≈{{amount}})"
+    "pts_avail_note": "{{n}} પૉઇન્ટ (≈{{amount}})",
+    "free_entry_form_notice": "મફત પ્રવેશ – આ તારીખ માટે કોઈ ચુકવણી જરૂરી નથી."
   },
   "profile": {
     "my_profile": "મારી પ્રોફ़ाइल",

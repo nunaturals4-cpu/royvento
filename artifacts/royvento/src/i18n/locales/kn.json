@@ -283,7 +283,8 @@
     "discount_coupon_pct": "ಕೂಪನ್ ({{pct}}%)",
     "discount_new_user_pct": "ಹೊಸ ಬಳಕೆದಾರ ({{pct}}%)",
     "pts_deducted": "−{{amount}} ಕಡಿತಗೊಳಿಸಲಾಗಿದೆ",
-    "pts_avail_note": "{{n}} ಅಂಕಗಳು (≈{{amount}})"
+    "pts_avail_note": "{{n}} ಅಂಕಗಳು (≈{{amount}})",
+    "free_entry_form_notice": "ಉಚಿತ ಪ್ರವೇಶ – ಈ ದಿನಾಂಕಕ್ಕೆ ಯಾವುದೇ ಪಾವತಿ ಅಗತ್ಯವಿಲ್ಲ."
   },
   "profile": {
     "my_profile": "ನನ್ನ ಪ್ರೊಫೈಲ್",

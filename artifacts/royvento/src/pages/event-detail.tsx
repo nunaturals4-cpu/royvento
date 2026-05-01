@@ -140,6 +140,12 @@ export function EventDetail() {
   const effectiveMen = dayOverride ? Number(dayOverride.men) : Number(ev.priceMen || 0);
   const effectiveCouple = dayOverride ? Number(dayOverride.couple) : Number(ev.priceCouple || 0);
 
+  const _fer = (ev as unknown as { freeEntryRules?: { enabled?: boolean; days?: string[] } }).freeEntryRules;
+  const isFreeEntryDay = isPub && (
+    (_fer?.enabled === true && (_fer.days ?? []).includes(selectedDayName)) ||
+    (effectiveWomen === 0 && effectiveMen === 0 && effectiveCouple === 0 && isPub)
+  );
+
   const venueName = ev.vendor?.businessName ?? "This venue";
 
   // Compute subtotal based on mode
@@ -694,7 +700,7 @@ export function EventDetail() {
               {isPub ? t("events.lowest_entry") : t("events.per_person_event")}
             </p>
 
-            {isPub && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0 || (dayPricingMap && Object.keys(dayPricingMap).length > 0)) && (
+            {isPub && !isFreeEntryDay && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0 || (dayPricingMap && Object.keys(dayPricingMap).length > 0)) && (
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-5 space-y-2">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
                   {dayPricingMap && Object.keys(dayPricingMap).length > 0 ? t("events.entry_prices_by_day") : t("events.entry_prices")}
@@ -778,6 +784,13 @@ export function EventDetail() {
                   </p>
                 )}
               </div>
+
+              {isFreeEntryDay && (
+                <div className="flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-950/40 px-3 py-2.5">
+                  <span className="text-green-400 text-base">✓</span>
+                  <p className="text-sm font-medium text-green-300">{t("events.free_entry_form_notice")}</p>
+                </div>
+              )}
 
               {isPub ? (
                 <>
@@ -887,7 +900,7 @@ export function EventDetail() {
                 </>
               )}
 
-              {pointsAvail > 0 && (
+              {!isFreeEntryDay && pointsAvail > 0 && (
                 <div>
                   <Label htmlFor="ppoints" className="flex items-center gap-1.5">
                     <Coins className="h-3.5 w-3.5 text-primary" />
@@ -906,7 +919,7 @@ export function EventDetail() {
               )}
 
               {/* Coupon — login gated */}
-              <div>
+              {!isFreeEntryDay && <div>
                 <Label className="flex items-center gap-1">
                   <Tag className="h-3.5 w-3.5 text-primary" /> {t("events.coupon_code_label")}
                   {!me?.user && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
@@ -945,75 +958,79 @@ export function EventDetail() {
                     )}
                   </>
                 )}
-              </div>
+              </div>}
 
               <div>
                 <Label htmlFor="notes">{t("events.notes_label")}</Label>
                 <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("events.notes_placeholder")} className="bg-black/40 border-white/10 mt-1" />
               </div>
-              <div className="space-y-1.5 border-t border-white/10 pt-3 text-sm">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>{t("events.subtotal_label")}</span>
-                  <span>{formatINRExact(subtotal)}</span>
+              {!isFreeEntryDay && (
+                <div className="space-y-1.5 border-t border-white/10 pt-3 text-sm">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>{t("events.subtotal_label")}</span>
+                    <span>{formatINRExact(subtotal)}</span>
+                  </div>
+                  {couponDiscount > 0 && couponDiscount === discount && (
+                    <div className="flex items-center justify-between text-green-400">
+                      <span>{t("events.coupon_label")}</span>
+                      <span>– {formatINRExact(couponDiscount)}</span>
+                    </div>
+                  )}
+                  {newUserDiscount > 0 && newUserDiscount === discount && couponDiscount < newUserDiscount && (
+                    <div className="flex items-center justify-between text-green-400">
+                      <span>{t("events.new_member_pct_off", { pct: newUserPercent })}</span>
+                      <span>– {formatINRExact(newUserDiscount)}</span>
+                    </div>
+                  )}
+                  {pointsApplied > 0 && (
+                    <div className="flex items-center justify-between text-primary">
+                      <span>{t("events.points_label")}</span>
+                      <span>– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between font-semibold text-lg pt-1">
+                    <span>{t("events.total_label")}</span>
+                    <span>{formatINRExact(finalTotal)}</span>
+                  </div>
                 </div>
-                {couponDiscount > 0 && couponDiscount === discount && (
-                  <div className="flex items-center justify-between text-green-400">
-                    <span>{t("events.coupon_label")}</span>
-                    <span>– {formatINRExact(couponDiscount)}</span>
-                  </div>
-                )}
-                {newUserDiscount > 0 && newUserDiscount === discount && couponDiscount < newUserDiscount && (
-                  <div className="flex items-center justify-between text-green-400">
-                    <span>{t("events.new_member_pct_off", { pct: newUserPercent })}</span>
-                    <span>– {formatINRExact(newUserDiscount)}</span>
-                  </div>
-                )}
-                {pointsApplied > 0 && (
-                  <div className="flex items-center justify-between text-primary">
-                    <span>{t("events.points_label")}</span>
-                    <span>– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between font-semibold text-lg pt-1">
-                  <span>{t("events.total_label")}</span>
-                  <span>{formatINRExact(finalTotal)}</span>
-                </div>
-              </div>
+              )}
               {/* Payment method selector */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">{t("events.payment_method")}</Label>
-                <RadioGroup
-                  value={paymentMethod}
-                  onValueChange={(v) => setPaymentMethod(v as "cod" | "online")}
-                  className="grid grid-cols-2 gap-2"
-                >
-                  <Label
-                    htmlFor="pay-cod"
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-3 cursor-pointer text-sm transition-colors ${paymentMethod === "cod" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}
+              {!isFreeEntryDay && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t("events.payment_method")}</Label>
+                  <RadioGroup
+                    value={paymentMethod}
+                    onValueChange={(v) => setPaymentMethod(v as "cod" | "online")}
+                    className="grid grid-cols-2 gap-2"
                   >
-                    <RadioGroupItem id="pay-cod" value="cod" className="sr-only" />
-                    <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "cod" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
-                    <span>{t("events.pay_cod")}</span>
-                  </Label>
-                  <Label
-                    htmlFor="pay-online"
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-3 cursor-pointer text-sm transition-colors ${paymentMethod === "online" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}
-                  >
-                    <RadioGroupItem id="pay-online" value="online" className="sr-only" />
-                    <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "online" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
-                    <span>{t("events.pay_online_phonepe")}</span>
-                  </Label>
-                </RadioGroup>
-                {paymentMethod === "cod" && (
-                  <p className="text-xs text-muted-foreground">{t("events.cod_hint")}</p>
-                )}
-                {paymentMethod === "online" && (
-                  <p className="text-xs text-muted-foreground">{t("events.online_hint")}</p>
-                )}
-              </div>
+                    <Label
+                      htmlFor="pay-cod"
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-3 cursor-pointer text-sm transition-colors ${paymentMethod === "cod" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}
+                    >
+                      <RadioGroupItem id="pay-cod" value="cod" className="sr-only" />
+                      <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "cod" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
+                      <span>{t("events.pay_cod")}</span>
+                    </Label>
+                    <Label
+                      htmlFor="pay-online"
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-3 cursor-pointer text-sm transition-colors ${paymentMethod === "online" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}
+                    >
+                      <RadioGroupItem id="pay-online" value="online" className="sr-only" />
+                      <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "online" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
+                      <span>{t("events.pay_online_phonepe")}</span>
+                    </Label>
+                  </RadioGroup>
+                  {paymentMethod === "cod" && (
+                    <p className="text-xs text-muted-foreground">{t("events.cod_hint")}</p>
+                  )}
+                  {paymentMethod === "online" && (
+                    <p className="text-xs text-muted-foreground">{t("events.online_hint")}</p>
+                  )}
+                </div>
+              )}
               <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12" size="lg" onClick={handleBook} disabled={booking}>
                 <CalIcon className="h-4 w-4 mr-2" />
-                {booking ? t("events.booking_processing") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
+                {booking ? t("events.booking_processing") : isFreeEntryDay ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
               </Button>
             </div>
           </div>

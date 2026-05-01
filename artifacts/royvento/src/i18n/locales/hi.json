@@ -283,7 +283,8 @@
     "discount_coupon_pct": "कूपन ({{pct}}%)",
     "discount_new_user_pct": "नया उपयोगकर्ता ({{pct}}%)",
     "pts_deducted": "−{{amount}} कटे",
-    "pts_avail_note": "{{n}} पॉइंट उपलब्ध (≈{{amount}})"
+    "pts_avail_note": "{{n}} पॉइंट उपलब्ध (≈{{amount}})",
+    "free_entry_form_notice": "निःशुल्क प्रवेश – इस तारीख के लिए कोई भुगतान आवश्यक नहीं है।"
   },
   "profile": {
     "my_profile": "मेरा प्रोफ़ाइल",
