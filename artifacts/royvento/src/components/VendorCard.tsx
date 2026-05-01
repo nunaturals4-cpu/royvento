@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Star, MapPin } from "lucide-react";
+import { Star, MapPin, Music2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface FreeEntryRules {
@@ -8,6 +8,12 @@ interface FreeEntryRules {
   days: string[];
   beforeTime?: string;
 }
+
+const DANCE_FLOOR_LABELS: Record<string, string> = {
+  dedicated: "Dedicated dance floor",
+  general: "Dancing in main area",
+  none: "Seated only",
+};
 
 interface Props {
   vendor: {
@@ -19,11 +25,13 @@ interface Props {
     rating: number;
     reviewCount: number;
     freeEntryRules?: FreeEntryRules | null;
+    danceFloor?: string | null;
   };
 }
 
 export function VendorCard({ vendor }: Props) {
   const fer = vendor.freeEntryRules;
+  const danceFloorLabel = vendor.danceFloor ? DANCE_FLOOR_LABELS[vendor.danceFloor] : null;
   return (
     <Link href={`/vendors/${vendor.id}`}>
       <div className="group cursor-pointer overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-1 hover:shadow-xl">
@@ -57,6 +65,12 @@ export function VendorCard({ vendor }: Props) {
             <MapPin className="h-3.5 w-3.5" />
             <span>{vendor.location}</span>
           </div>
+          {danceFloorLabel && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Music2 className="h-3.5 w-3.5 shrink-0" />
+              <span>{danceFloorLabel}</span>
+            </div>
+          )}
         </div>
       </div>
     </Link>
