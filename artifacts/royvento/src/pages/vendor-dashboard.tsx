@@ -22,10 +22,10 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
-  TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus,
+  TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck,
 } from "lucide-react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
   apiGet, apiPost, apiDelete, apiPatch,
@@ -122,7 +122,7 @@ export function VendorDashboard() {
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
-          <TabsContent value="bookings"><BookingsManager bookings={bookings} refetch={refetchBookings} /></TabsContent>
+          <TabsContent value="bookings"><BookingReport bookings={bookings} refetch={refetchBookings} /></TabsContent>
           <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
@@ -1510,10 +1510,76 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
   );
 }
 
-function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () => void }) {
+type ReportPreset = "30d" | "90d" | "12m";
+
+function toReportDateStr(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl glass-card p-5 lift-3d">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
+        <div className="w-9 h-9 rounded-lg bg-red-600/15 text-primary flex items-center justify-center red-ring">
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <p className="stat-number text-3xl">{value}</p>
+    </div>
+  );
+}
+
+function BookingReport({ bookings, refetch }: { bookings: any[]; refetch: () => void }) {
   const { toast } = useToast();
+  const [preset, setPreset] = useState<ReportPreset>("12m");
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [reason, setReason] = useState("");
+
+  const now = new Date();
+  const startDate = (() => {
+    if (preset === "30d") return new Date(now.getTime() - 30 * 86400000);
+    if (preset === "90d") return new Date(now.getTime() - 90 * 86400000);
+    const s = new Date(now); s.setFullYear(s.getFullYear() - 1); s.setDate(1);
+    return s;
+  })();
+  const startStr = toReportDateStr(startDate);
+
+  const filtered = bookings.filter((b) => b.bookingDate >= startStr);
+  const confirmed = filtered.filter((b) => b.status === "confirmed" || b.status === "completed");
+
+  const totalBookings = filtered.length;
+  const totalRevenue = confirmed.reduce((s: number, b: any) => s + ((b.finalPrice ?? b.totalPrice) ?? 0), 0);
+  const totalGuests = confirmed.reduce((s: number, b: any) => s + (b.guests ?? 0), 0);
+
+  const monthMap: Record<string, number> = {};
+  confirmed.forEach((b) => {
+    const month = (b.bookingDate as string).slice(0, 7);
+    monthMap[month] = (monthMap[month] ?? 0) + ((b.finalPrice ?? b.totalPrice) ?? 0);
+  });
+  const monthlyData = Object.entries(monthMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, revenue]) => ({ month, revenue }));
+
+  const eventMap: Record<number, { eventId: number; eventTitle: string; bookingCount: number; guests: number; revenue: number }> = {};
+  confirmed.forEach((b) => {
+    if (!eventMap[b.eventId]) {
+      eventMap[b.eventId] = { eventId: b.eventId, eventTitle: b.eventTitle, bookingCount: 0, guests: 0, revenue: 0 };
+    }
+    eventMap[b.eventId].bookingCount += 1;
+    eventMap[b.eventId].guests += b.guests ?? 0;
+    eventMap[b.eventId].revenue += (b.finalPrice ?? b.totalPrice) ?? 0;
+  });
+  const perEvent = Object.values(eventMap).sort((a, b) => b.revenue - a.revenue);
+
+  const pending = bookings.filter((b) => b.status === "pending");
+  const chartMax = Math.max(...monthlyData.map((m) => m.revenue), 1);
+
+  const presetLabel: Record<ReportPreset, string> = {
+    "30d": "Last 30 days",
+    "90d": "Last 90 days",
+    "12m": "Last 12 months",
+  };
 
   const approve = async (id: number) => {
     try {
@@ -1540,10 +1606,6 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
     }
   };
-
-  if (bookings.length === 0) return <p className="text-muted-foreground">No bookings yet.</p>;
-  const pending = bookings.filter((b) => b.status === "pending");
-  const others = bookings.filter((b) => b.status !== "pending");
 
   return (
     <div className="space-y-6">
@@ -1607,37 +1669,125 @@ function BookingsManager({ bookings, refetch }: { bookings: any[]; refetch: () =
           </div>
         </div>
       )}
-      {others.length > 0 && (
+
+      {/* Date preset picker */}
+      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
         <div>
-          <h3 className="font-serif text-xl mb-3">All bookings</h3>
-          <div className="space-y-3">
-            {others.map((b) => (
-              <div key={b.id} className="rounded-2xl glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                      b.status === "confirmed" ? "bg-green-500/20 text-green-300 border-green-500/30" :
-                      b.status === "cancelled" ? "bg-red-500/20 text-red-300 border-red-500/30" :
-                      b.status === "completed" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
-                      "bg-white/10 text-white/60 border-white/10"
-                    }`}>{b.status}</span>
-                  </div>
-                  <p className="font-serif text-lg">{b.eventTitle}</p>
-                  <p className="text-sm text-muted-foreground">{b.userName} · {b.userEmail}</p>
-                  <p className="text-sm mt-1">
-                    {b.bookingDate} · {b.guests} guests · {formatINR(b.finalPrice ?? b.totalPrice)}
-                  </p>
-                  {b.status === "cancelled" && b.approvedBy === "customer" && (
-                    <p className="text-xs text-amber-400 mt-1 font-medium">Cancelled by customer</p>
-                  )}
-                  {b.rejectionReason && (
-                    <p className="text-xs text-red-400 mt-1">Reason: {b.rejectionReason}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Time range</Label>
+          <Select value={preset} onValueChange={(v) => setPreset(v as ReportPreset)}>
+            <SelectTrigger className="w-44">
+              <SelectValue>{presetLabel[preset]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="12m">Last 12 months</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+      </div>
+
+      {/* Stat row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Stat icon={CalendarCheck} label="Bookings" value={String(totalBookings)} />
+        <Stat icon={Users} label="Guests" value={String(totalGuests)} />
+        <Stat icon={IndianRupee} label="Revenue" value={formatINR(totalRevenue)} />
+      </div>
+
+      {bookings.length === 0 ? (
+        <div className="rounded-3xl glass-card p-10 text-center">
+          <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-40" />
+          <p className="font-serif text-2xl mb-2">No bookings yet</p>
+          <p className="text-muted-foreground text-sm">Your booking report will appear here once guests start booking your events.</p>
+        </div>
+      ) : (
+        <>
+          {/* Monthly revenue bar chart */}
+          {monthlyData.length > 0 && (
+            <div className="rounded-2xl glass-card p-6">
+              <h3 className="font-serif text-xl mb-5">Monthly revenue — {presetLabel[preset]}</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickFormatter={(m: string) => {
+                      const [y, mo] = m.split("-");
+                      const d = new Date(Number(y), Number(mo) - 1, 1);
+                      return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+                    }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickFormatter={(v: number) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                    width={48}
+                    domain={[0, Math.ceil(chartMax * 1.15)]}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "hsl(var(--card))",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                    }}
+                    formatter={(v: number) => [formatINR(v), "Revenue"]}
+                    labelFormatter={(label: string) => {
+                      const [y, mo] = label.split("-");
+                      return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+                    }}
+                  />
+                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Per-event table */}
+          {perEvent.length > 0 && (
+            <div className="rounded-2xl glass-card p-6">
+              <h3 className="font-serif text-xl mb-4">Revenue by event</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[480px]">
+                  <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                    <tr>
+                      <th className="text-left py-2 pr-4">Event</th>
+                      <th className="text-right py-2 px-2">Bookings</th>
+                      <th className="text-right py-2 px-2">Guests</th>
+                      <th className="text-right py-2 pl-2">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {perEvent.map((row) => (
+                      <tr key={row.eventId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 pr-4 font-medium">{row.eventTitle}</td>
+                        <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
+                        <td className="text-right px-2 tabular-nums">{row.guests}</td>
+                        <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {perEvent.length > 1 && (
+                    <tfoot className="border-t border-white/15 text-xs text-muted-foreground">
+                      <tr>
+                        <td className="py-2 pr-4 font-semibold text-foreground">Total</td>
+                        <td className="text-right px-2 font-semibold text-foreground tabular-nums">
+                          {perEvent.reduce((s, r) => s + r.bookingCount, 0)}
+                        </td>
+                        <td className="text-right px-2 tabular-nums">
+                          {perEvent.reduce((s, r) => s + r.guests, 0)}
+                        </td>
+                        <td className="text-right pl-2 tabular-nums text-primary font-semibold">
+                          {formatINR(perEvent.reduce((s, r) => s + r.revenue, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
