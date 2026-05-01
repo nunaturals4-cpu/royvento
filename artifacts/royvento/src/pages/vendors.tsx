@@ -18,12 +18,14 @@ const DANCE_FLOOR_OPTIONS: { value: DanceFloorFilter; label: string }[] = [
 export function Vendors() {
   const [active, setActive] = useState<string>("All");
   const [danceFloor, setDanceFloor] = useState<DanceFloorFilter | null>(null);
+  const [freeEntry, setFreeEntry] = useState(false);
 
   const params: ListVendorsParams = {};
   if (active !== "All") params.category = active;
   if (danceFloor) params.danceFloor = danceFloor;
 
   const { data: vendors = [], isLoading } = useListVendors(params);
+  const filteredVendors = freeEntry ? vendors.filter((v) => v.freeEntryRules?.enabled === true) : vendors;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
@@ -49,7 +51,7 @@ export function Vendors() {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-10">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <span className="text-sm text-muted-foreground mr-1">Dance floor:</span>
         <Button
           variant={danceFloor === null ? "default" : "outline"}
@@ -72,16 +74,27 @@ export function Vendors() {
         ))}
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 mb-10">
+        <Button
+          variant={freeEntry ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFreeEntry((prev) => !prev)}
+          className="rounded-full"
+        >
+          Free Entry
+        </Button>
+      </div>
+
       {isLoading ? (
         <p className="text-muted-foreground">Loading vendors…</p>
-      ) : vendors.length === 0 ? (
+      ) : filteredVendors.length === 0 ? (
         <div className="rounded-2xl border bg-card p-16 text-center">
-          <p className="font-serif text-2xl mb-2">No vendors here yet</p>
-          <p className="text-muted-foreground">Check back soon.</p>
+          <p className="font-serif text-2xl mb-2">{vendors.length === 0 ? "No vendors here yet" : "No vendors match this filter"}</p>
+          <p className="text-muted-foreground">{vendors.length === 0 ? "Check back soon." : "Try removing some filters."}</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {vendors.map((v) => <VendorCard key={v.id} vendor={v} />)}
+          {filteredVendors.map((v) => <VendorCard key={v.id} vendor={v} />)}
         </div>
       )}
     </div>
