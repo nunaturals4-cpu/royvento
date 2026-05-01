@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch, type Vendor } from "@workspace/api-client-react";
+import { type ListVendorsParams } from "@workspace/api-zod";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -32,6 +33,15 @@ const VENDOR_CATEGORIES = [
   "Concert",
   "Brand Activation",
   "Pubs",
+];
+
+type DanceFloorFilter = NonNullable<ListVendorsParams["danceFloor"]> | "";
+
+const DANCE_FLOOR_OPTIONS: { label: string; value: DanceFloorFilter }[] = [
+  { label: "Any", value: "" },
+  { label: "Dedicated", value: "dedicated" },
+  { label: "Dancing in main area", value: "general" },
+  { label: "Seated only", value: "none" },
 ];
 
 function VendorCard({ vendor }: { vendor: Vendor }) {
@@ -91,9 +101,11 @@ export default function VendorsScreen() {
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [activeCategory, setActiveCategory] = useState("All");
+  const [activeDanceFloor, setActiveDanceFloor] = useState<DanceFloorFilter>("");
 
   const params: Record<string, string> = {};
   if (activeCategory !== "All") params["category"] = activeCategory;
+  if (activeDanceFloor !== "") params["danceFloor"] = activeDanceFloor;
 
   const { data: vendors, isLoading, refetch, isRefetching } = useQuery<Vendor[]>({
     queryKey: ["vendors", params],
@@ -134,6 +146,27 @@ export default function VendorsScreen() {
         })}
       </ScrollView>
 
+      {/* Dance floor filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ maxHeight: 46, backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border }}
+        contentContainerStyle={styles.chipRowSecondary}
+      >
+        {DANCE_FLOOR_OPTIONS.map((opt) => {
+          const active = activeDanceFloor === opt.value;
+          return (
+            <Pressable
+              key={opt.value || "any"}
+              style={[styles.chipSmall, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }]}
+              onPress={() => setActiveDanceFloor(opt.value)}
+            >
+              <Text style={[styles.chipText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
       ) : (
@@ -147,8 +180,8 @@ export default function VendorsScreen() {
             <EmptyState
               icon="business-outline"
               title="No partners found"
-              subtitle={activeCategory !== "All" ? "Try a different category" : "Check back soon"}
-              action={activeCategory !== "All" ? { label: "Show all", onPress: () => setActiveCategory("All") } : undefined}
+              subtitle={activeCategory !== "All" || activeDanceFloor !== "" ? "Try adjusting your filters" : "Check back soon"}
+              action={activeCategory !== "All" || activeDanceFloor !== "" ? { label: "Clear filters", onPress: () => { setActiveCategory("All"); setActiveDanceFloor(""); } } : undefined}
             />
           }
           ListFooterComponent={approvedVendors.length > 0 ? <MobileFooter /> : null}
@@ -164,7 +197,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
   subtitle: { fontSize: 13, fontFamily: "Inter_400Regular" },
   chipRow: { gap: 8, paddingHorizontal: 20, paddingVertical: 10 },
+  chipRowSecondary: { gap: 8, paddingHorizontal: 20, paddingVertical: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  chipSmall: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
   chipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   list: { padding: 16, gap: 12 },
   card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
