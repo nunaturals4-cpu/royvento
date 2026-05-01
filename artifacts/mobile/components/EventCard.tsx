@@ -24,7 +24,6 @@ interface EventCardProps {
   type?: string;
   style?: object;
   compact?: boolean;
-  popular?: boolean;
   rating?: number;
   reviewCount?: number;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
@@ -41,7 +40,6 @@ export function EventCard({
   type,
   style,
   compact,
-  popular,
   rating,
   reviewCount,
   freeEntryRules,
@@ -67,9 +65,7 @@ export function EventCard({
   const isFreeToday = hasFreeEntry && freeDays.includes(todayAbbr);
   const freeLabel = isFreeToday ? t("events.free_entry_today") : t("events.free_some_days");
 
-  const isNew = !popular && rating !== undefined && rating === 0 && !reviewCount;
-  const showPopularBadge = !!popular;
-  const showNewBadge = isNew;
+  const showNewBadge = rating !== undefined && rating === 0 && !reviewCount;
 
   return (
     <Pressable
@@ -113,11 +109,7 @@ export function EventCard({
               </Text>
             </View>
           ) : null}
-          {showPopularBadge ? (
-            <View style={[styles.secondaryBadge, { backgroundColor: colors.primary + "E0" }]}>
-              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>★ Popular</Text>
-            </View>
-          ) : showNewBadge ? (
+          {showNewBadge ? (
             <View style={[styles.secondaryBadge, { backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }]}>
               <Text style={[styles.badgeText, { color: "rgba(255,255,255,0.9)" }]}>★ New</Text>
             </View>
