@@ -260,9 +260,7 @@ export function TicketScanner() {
   const { toast } = useToast();
   const { accessStatus, managedVendors } = useAccessCheck();
 
-  const scan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = input.trim();
+  const validateCode = async (code: string) => {
     if (!code) return;
     setLoading(true);
     setResult(null);
@@ -305,6 +303,11 @@ export function TicketScanner() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const scan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await validateCode(input.trim());
   };
 
   if (accessStatus === "loading") {
@@ -373,38 +376,7 @@ export function TicketScanner() {
               const cleaned = code.trim().toUpperCase();
               setInput(cleaned);
               setCameraMode(false);
-              setResult(null);
-              // Trigger scan with detected code directly
-              (async () => {
-                setLoading(true);
-                try {
-                  const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
-                  const res = await fetch("/api/partner/scan-ticket", {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                    body: JSON.stringify({ code: cleaned }),
-                  });
-                  if (res.ok) {
-                    setResult(await res.json() as ScanSuccess);
-                  } else {
-                    const json = await res.json() as Record<string, unknown>;
-                    const errCode = typeof json.code === "string" ? json.code : "UNKNOWN";
-                    const message = typeof json.message === "string" ? json.message : `Error ${res.status}`;
-                    if (errCode === "ALREADY_CHECKED_IN") {
-                      setResult({ code: "ALREADY_CHECKED_IN", message, checkedInAt: typeof json.checkedInAt === "string" ? json.checkedInAt : null, booking: json.booking as BookingData });
-                    } else {
-                      setResult({ code: errCode, message });
-                      toast({ title: "Scan failed", description: message, variant: "destructive" });
-                    }
-                  }
-                } catch {
-                  setResult({ code: "NETWORK_ERROR", message: "Network error. Check your connection." });
-                  toast({ title: "Scan failed", description: "Network error. Check your connection.", variant: "destructive" });
-                } finally {
-                  setLoading(false);
-                }
-              })();
+              validateCode(cleaned);
             }}
           />
         </div>

@@ -17,7 +17,10 @@ export default function PaymentResultScreen() {
     bookingId?: string;
   }>();
 
-  const success = payment === "success" || (payment === undefined && status !== "failed" && status !== "cancelled");
+  const isSuccess = payment === "success" || status === "success";
+  const isFailed = payment === "failed" || payment === "cancelled" || status === "failed" || status === "cancelled";
+  const success = isSuccess && !isFailed;
+  const unknown = !isSuccess && !isFailed;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -35,18 +38,18 @@ export default function PaymentResultScreen() {
         <View
           style={[
             styles.iconCircle,
-            { backgroundColor: success ? "#22c55e20" : "#ef444420" },
+            { backgroundColor: success ? "#22c55e20" : unknown ? "#6b728020" : "#ef444420" },
           ]}
         >
           <Ionicons
-            name={success ? "checkmark-circle" : "close-circle"}
+            name={success ? "checkmark-circle" : unknown ? "help-circle" : "close-circle"}
             size={72}
-            color={success ? "#22c55e" : "#ef4444"}
+            color={success ? "#22c55e" : unknown ? colors.mutedForeground : "#ef4444"}
           />
         </View>
 
         <Text style={[styles.status, { color: colors.foreground }]}>
-          {success ? "Payment Successful!" : "Payment Failed"}
+          {success ? "Payment Successful!" : unknown ? "Payment Status Unknown" : "Payment Failed"}
         </Text>
 
         {eventTitle ? (
@@ -58,6 +61,10 @@ export default function PaymentResultScreen() {
         {success ? (
           <Text style={[styles.message, { color: colors.mutedForeground }]}>
             Your booking has been confirmed. You can view your ticket in My Bookings.
+          </Text>
+        ) : unknown ? (
+          <Text style={[styles.message, { color: colors.mutedForeground }]}>
+            We could not determine your payment result. Please check My Bookings or contact support.
           </Text>
         ) : (
           <Text style={[styles.message, { color: colors.mutedForeground }]}>
