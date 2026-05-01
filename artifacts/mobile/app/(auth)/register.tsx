@@ -20,11 +20,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function RegisterScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const { t } = useLanguage();
   const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const returnTo = typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") ? rawReturnTo : undefined;
   const [name, setName] = useState("");
@@ -41,14 +43,14 @@ export default function RegisterScreen() {
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Registration Failed", err?.message ?? "Something went wrong");
+        Alert.alert(t("auth.registration_failed"), err?.message ?? t("common.error"));
       },
     },
   });
 
   const handleRegister = () => {
     if (!name.trim() || !email.trim() || password.length < 6) {
-      Alert.alert("Error", "Please fill all fields. Password must be at least 6 characters.");
+      Alert.alert(t("common.error"), t("auth.fill_all_fields"));
       return;
     }
     registerMutation.mutate({
@@ -85,45 +87,58 @@ export default function RegisterScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Create Account</Text>
-
-          {(
-            [
-              { label: "Full Name", value: name, set: setName, placeholder: "Your name", icon: "person-outline" as const, keyboard: "default" as const, capitalize: "words" as const },
-              { label: "Email", value: email, set: setEmail, placeholder: "you@example.com", icon: "mail-outline" as const, keyboard: "email-address" as const, capitalize: "none" as const },
-            ] as const
-          ).map((f) => (
-            <View key={f.label} style={styles.field}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>{f.label}</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Ionicons name={f.icon} size={16} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  value={f.value}
-                  onChangeText={f.set}
-                  placeholder={f.placeholder}
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType={f.keyboard}
-                  autoCapitalize={f.capitalize}
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-          ))}
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("auth.create_account")}</Text>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>Password</Text>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.full_name")}</Text>
+            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Ionicons name="person-outline" size={16} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.input, { color: colors.foreground }]}
+                value={name}
+                onChangeText={setName}
+                placeholder={t("auth.name_placeholder")}
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="default"
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.email")}</Text>
+            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.input, { color: colors.foreground }]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t("auth.email_placeholder")}
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.password")}</Text>
             <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
               <TextInput
                 style={[styles.input, { color: colors.foreground }]}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Min. 6 characters"
+                placeholder={t("auth.password_min")}
                 placeholderTextColor={colors.mutedForeground}
                 secureTextEntry={!showPassword}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)}>
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                accessibilityLabel={showPassword ? t("auth.hide_password") : t("auth.show_password")}
+              >
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
                   size={16}
@@ -141,17 +156,17 @@ export default function RegisterScreen() {
             {registerMutation.isPending ? (
               <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Create Account</Text>
+              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("auth.create_account")}</Text>
             )}
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-            Already have an account?{" "}
+            {t("auth.already_have_account")}{" "}
           </Text>
           <Pressable onPress={() => router.push(returnTo ? { pathname: "/(auth)/login", params: { returnTo } } : "/(auth)/login")}>
-            <Text style={[styles.link, { color: colors.primary }]}>Sign In</Text>
+            <Text style={[styles.link, { color: colors.primary }]}>{t("auth.sign_in_link")}</Text>
           </Pressable>
         </View>
       </ScrollView>

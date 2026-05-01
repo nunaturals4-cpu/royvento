@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { WebFormWrapper } from "@/components/WebFormWrapper";
+import { useLanguage } from "@/context/LanguageContext";
 import type { AuthUser } from "@/context/AuthContext";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -32,6 +33,7 @@ export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+  const { t } = useLanguage();
   const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const returnTo = typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") ? rawReturnTo : undefined;
   const [email, setEmail] = useState("");
@@ -67,11 +69,11 @@ export default function LoginScreen() {
         })
         .catch((err: Error) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert("Google Sign-In Failed", err.message);
+          Alert.alert(t("auth.google_signin_failed"), err.message);
         })
         .finally(() => setGoogleLoading(false));
     } else if (response?.type === "error") {
-      Alert.alert("Google Sign-In Error", "Unable to sign in with Google. Please try email login.");
+      Alert.alert(t("auth.google_signin_failed"), t("auth.google_signin_failed_desc"));
     }
   }, [response]);
 
@@ -84,14 +86,14 @@ export default function LoginScreen() {
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Login Failed", err?.message ?? "Invalid credentials");
+        Alert.alert(t("auth.login_failed"), err?.message ?? t("auth.invalid_credentials"));
       },
     },
   });
 
   const handleLogin = () => {
     if (!email.trim() || !password) {
-      Alert.alert("Error", "Please enter your email and password");
+      Alert.alert(t("common.error"), t("auth.enter_email_password"));
       return;
     }
     loginMutation.mutate({ data: { email: email.trim(), password } });
@@ -124,14 +126,13 @@ export default function LoginScreen() {
           </LinearGradient>
           <Text style={[styles.brand, { color: colors.primary }]}>Royvento</Text>
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
-            Premium event experiences
+            {t("auth.premium_event_exp")}
           </Text>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Sign In</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("auth.sign_in")}</Text>
 
-          {/* Google Sign-In */}
           {!!googleClientId && (
             <TouchableOpacity
               style={[styles.googleBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
@@ -144,7 +145,7 @@ export default function LoginScreen() {
                 <>
                   <Ionicons name="logo-google" size={18} color="#4285F4" />
                   <Text style={[styles.googleBtnText, { color: colors.foreground }]}>
-                    Continue with Google
+                    {t("auth.continue_google")}
                   </Text>
                 </>
               )}
@@ -154,21 +155,21 @@ export default function LoginScreen() {
           {!!googleClientId && (
             <View style={styles.dividerRow}>
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
-              <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+              <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>{t("common.or")}</Text>
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
             </View>
           )}
 
           <WebFormWrapper onSubmit={handleLogin}>
             <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>Email</Text>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.email")}</Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="you@example.com"
+                  placeholder={t("auth.email_placeholder")}
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -180,7 +181,7 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>Password</Text>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.password")}</Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
@@ -194,7 +195,10 @@ export default function LoginScreen() {
                   returnKeyType="done"
                   onSubmitEditing={handleLogin}
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)}>
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  accessibilityLabel={showPassword ? t("auth.hide_password") : t("auth.show_password")}
+                >
                   <Ionicons
                     name={showPassword ? "eye-off-outline" : "eye-outline"}
                     size={16}
@@ -216,22 +220,22 @@ export default function LoginScreen() {
               {loginMutation.isPending ? (
                 <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Sign In</Text>
+                <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("auth.sign_in")}</Text>
               )}
             </TouchableOpacity>
 
             <Pressable style={styles.forgotWrap} onPress={() => router.push("/(auth)/forgot-password")}>
-              <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot password?</Text>
+              <Text style={[styles.forgotText, { color: colors.primary }]}>{t("auth.forgot_password")}</Text>
             </Pressable>
           </WebFormWrapper>
         </View>
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-            Don't have an account?{" "}
+            {t("auth.dont_have_account")}{" "}
           </Text>
           <Pressable onPress={() => router.push(returnTo ? { pathname: "/(auth)/register", params: { returnTo } } : "/(auth)/register")}>
-            <Text style={[styles.link, { color: colors.primary }]}>Sign Up</Text>
+            <Text style={[styles.link, { color: colors.primary }]}>{t("auth.sign_up")}</Text>
           </Pressable>
         </View>
       </ScrollView>

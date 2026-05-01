@@ -1,6 +1,7 @@
 import { I18n } from "i18n-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getLocales } from "expo-localization";
+import { useCallback, useEffect, useState } from "react";
 
 import en from "./locales/en.json";
 import hi from "./locales/hi.json";
@@ -42,8 +43,16 @@ export async function initI18n(): Promise<void> {
   }
 }
 
+type LocaleListener = () => void;
+const localeListeners = new Set<LocaleListener>();
+
+function notifyLocaleChange() {
+  localeListeners.forEach((fn) => fn());
+}
+
 export async function changeLanguage(code: string): Promise<void> {
   i18n.locale = code;
+  notifyLocaleChange();
   try {
     await AsyncStorage.setItem(STORAGE_KEY, code);
   } catch {}
@@ -51,6 +60,20 @@ export async function changeLanguage(code: string): Promise<void> {
 
 export function t(key: string, options?: Record<string, unknown>): string {
   return i18n.t(key, options);
+}
+
+export function useTranslation() {
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const listener: LocaleListener = () => forceUpdate((n) => n + 1);
+    localeListeners.add(listener);
+    return () => { localeListeners.delete(listener); };
+  }, []);
+  const translate = useCallback(
+    (key: string, options?: Record<string, unknown>) => i18n.t(key, options),
+    [],
+  );
+  return { t: translate };
 }
 
 export const LANGUAGES = [

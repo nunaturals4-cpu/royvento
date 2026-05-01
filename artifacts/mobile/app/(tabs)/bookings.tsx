@@ -29,15 +29,16 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 
 type BookingStatus = "pending" | "payment_pending" | "confirmed" | "cancelled" | "completed";
 
-const STATUS_META: Record<BookingStatus, { bg: string; text: string; label: string }> = {
-  pending:         { bg: "#f59e0b20", text: "#f59e0b", label: "Pending" },
-  payment_pending: { bg: "#f97316" + "20", text: "#f97316", label: "Payment Pending" },
-  confirmed:       { bg: "#22c55e20", text: "#22c55e", label: "Confirmed" },
-  cancelled:       { bg: "#ef444420", text: "#ef4444", label: "Cancelled" },
-  completed:       { bg: "#6366f120", text: "#6366f1", label: "Completed" },
+const STATUS_STYLE: Record<BookingStatus, { bg: string; text: string }> = {
+  pending:         { bg: "#f59e0b20", text: "#f59e0b" },
+  payment_pending: { bg: "#f97316" + "20", text: "#f97316" },
+  confirmed:       { bg: "#22c55e20", text: "#22c55e" },
+  cancelled:       { bg: "#ef444420", text: "#ef4444" },
+  completed:       { bg: "#6366f120", text: "#6366f1" },
 };
 
 function formatDate(d: string) {
@@ -76,6 +77,15 @@ export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useLanguage();
+
+  const statusLabels: Record<BookingStatus, string> = {
+    pending: t("bookings.status_pending"),
+    payment_pending: t("bookings.status_payment_pending"),
+    confirmed: t("bookings.status_confirmed"),
+    cancelled: t("bookings.status_cancelled"),
+    completed: t("bookings.status_completed"),
+  };
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
@@ -92,7 +102,7 @@ export default function BookingsScreen() {
   const handleCancelBooking = async () => {
     if (!cancelModalBooking) return;
     if (!cancelReason.trim()) {
-      Alert.alert("Reason required", "Please enter a reason for cancellation.");
+      Alert.alert(t("bookings.reason_required_title"), t("bookings.reason_required_body"));
       return;
     }
     setCancelLoading(true);
@@ -105,10 +115,10 @@ export default function BookingsScreen() {
       setCancelModalBooking(null);
       setCancelReason("");
       refetch();
-      Alert.alert("Booking cancelled", "Your booking has been cancelled.");
+      Alert.alert(t("bookings.cancelled_success"), t("bookings.cancelled_success_msg"));
     } catch (e: unknown) {
       const err = e as { message?: string };
-      Alert.alert("Failed to cancel", err?.message ?? "Something went wrong. Please try again.");
+      Alert.alert(t("bookings.cancel_failed_title"), err?.message ?? t("bookings.cancel_failed_desc"));
     } finally {
       setCancelLoading(false);
     }
@@ -123,10 +133,10 @@ export default function BookingsScreen() {
     try {
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(ticketCode)}&color=1a1008&bgcolor=ffffff`;
       const ticketBreakdown = [
-        bx.ticketWomen ? `${bx.ticketWomen}× Women` : "",
-        bx.ticketMen ? `${bx.ticketMen}× Men` : "",
-        bx.ticketCouple ? `${bx.ticketCouple}× Couple` : "",
-      ].filter(Boolean).join(" · ") || `${b.guests} guests`;
+        bx.ticketWomen ? `${bx.ticketWomen}× ${t("bookings.women")}` : "",
+        bx.ticketMen ? `${bx.ticketMen}× ${t("bookings.men")}` : "",
+        bx.ticketCouple ? `${bx.ticketCouple}× ${t("bookings.couple")}` : "",
+      ].filter(Boolean).join(" · ") || `${b.guests} ${t("bookings.guests_label")}`;
 
       const price = bx.finalPrice != null
         ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
@@ -177,7 +187,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
           <div><div class="lbl">Guest</div><div class="val">${esc(bx.personName || bx.userName || "—")}</div></div>
           <div><div class="lbl">Date</div><div class="val">${esc(b.bookingDate)}</div></div>
           <div><div class="lbl">Tickets</div><div class="val">${esc(ticketBreakdown)}</div></div>
-          <div><div class="lbl">Approved by</div><div class="val">${esc(bx.approvedBy || "Partner")}</div></div>
+          <div><div class="lbl">${esc(t("bookings.approved_by"))}</div><div class="val">${esc(bx.approvedBy || t("bookings.partner"))}</div></div>
         </div>
       </div>
       <div class="qr-block">
@@ -198,13 +208,13 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
       const result = await Print.printToFileAsync({ html, base64: false });
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        await Sharing.shareAsync(result.uri, { mimeType: "application/pdf", UTI: "com.adobe.pdf", dialogTitle: "Share Ticket" });
+        await Sharing.shareAsync(result.uri, { mimeType: "application/pdf", UTI: "com.adobe.pdf", dialogTitle: t("bookings.share_ticket") });
       } else {
-        Alert.alert("Sharing not available", "Sharing is not supported on this device.");
+        Alert.alert(t("bookings.sharing_unavailable"), t("bookings.sharing_unavailable_msg"));
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
-      Alert.alert("Error", err?.message ?? "Could not generate ticket PDF.");
+      Alert.alert(t("common.error"), err?.message ?? t("bookings.pdf_error"));
     } finally {
       setSharingId(null);
     }
@@ -228,12 +238,10 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
       });
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
       if (action === "accept") {
-        // Refresh managed vendors list after accepting
         customFetch<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then(setManagedVendors).catch(() => {});
-        Alert.alert("Invitation accepted!", "You can now scan tickets for this venue.");
       }
     } catch {
-      Alert.alert("Error", "Failed to respond to invitation.");
+      Alert.alert(t("common.error"), t("bookings.invitation_error"));
     } finally {
       setActingInvId(null);
     }
@@ -253,13 +261,13 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={[styles.header, { paddingTop: topPadding + 12, borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>{t("bookings.title")}</Text>
         </View>
         <EmptyState
           icon="ticket-outline"
-          title="Sign in to view bookings"
-          subtitle="Track your event bookings and tickets"
-          action={{ label: "Sign In", onPress: () => router.push("/(auth)/login") }}
+          title={t("bookings.sign_in_title")}
+          subtitle={t("bookings.sign_in_sub_screen")}
+          action={{ label: t("auth.sign_in"), onPress: () => router.push("/(auth)/login") }}
         />
       </View>
     );
@@ -283,7 +291,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
         ]}
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={[styles.title, { color: colors.foreground }]}>My Bookings</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>{t("bookings.title")}</Text>
           {(managedVendors.length > 0 || user.role === "vendor") && (
             <TouchableOpacity
               style={[styles.scanBtn, { backgroundColor: colors.primary }]}
@@ -329,23 +337,25 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
           >
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.primary} />
             <Text style={[styles.managedVenueText, { color: colors.foreground }]} numberOfLines={1}>
-              Managing: {v.businessName}
+              {t("bookings.managing")}: {v.businessName}
             </Text>
             <Ionicons name="scan-outline" size={14} color={colors.primary} style={{ marginLeft: "auto" }} />
-            <Text style={{ fontSize: 11, color: colors.primary, marginLeft: 3 }}>Scan tickets</Text>
+            <Text style={{ fontSize: 11, color: colors.primary, marginLeft: 3 }}>{t("profile.scan_ticket")}</Text>
           </TouchableOpacity>
         ))}
         <View style={[styles.tabs, { backgroundColor: colors.muted }]}>
-          {(["upcoming", "past"] as const).map((t) => (
+          {(["upcoming", "past"] as const).map((tabKey) => (
             <Pressable
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.tabBtn, tab === t && { backgroundColor: colors.primary }]}
+              key={tabKey}
+              onPress={() => setTab(tabKey)}
+              style={[styles.tabBtn, tab === tabKey && { backgroundColor: colors.primary }]}
             >
               <Text
-                style={[styles.tabText, { color: tab === t ? colors.primaryForeground : colors.mutedForeground }]}
+                style={[styles.tabText, { color: tab === tabKey ? colors.primaryForeground : colors.mutedForeground }]}
               >
-                {t === "upcoming" ? `Upcoming (${upcoming.length})` : `Past (${past.length})`}
+                {tabKey === "upcoming"
+                  ? `${t("bookings.upcoming")} (${upcoming.length})`
+                  : `${t("bookings.past")} (${past.length})`}
               </Text>
             </Pressable>
           ))}
@@ -356,11 +366,11 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
         <>
           <EmptyState
             icon="ticket-outline"
-            title={tab === "upcoming" ? "No upcoming bookings" : "No past bookings"}
-            subtitle={tab === "upcoming" ? "Book an event to get started" : "Your past bookings will appear here"}
+            title={tab === "upcoming" ? t("bookings.no_upcoming") : t("bookings.no_past")}
+            subtitle={tab === "upcoming" ? t("bookings.no_upcoming_sub") : t("bookings.no_past_sub")}
             action={
               tab === "upcoming"
-                ? { label: "Explore Events", onPress: () => router.push("/(tabs)/explore") }
+                ? { label: t("profile.explore_events"), onPress: () => router.push("/(tabs)/explore") }
                 : undefined
             }
           />
@@ -377,7 +387,8 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
           ListFooterComponent={<MobileFooter />}
           renderItem={({ item: b }) => {
             const status = (b.status ?? "pending") as BookingStatus;
-            const meta = STATUS_META[status] ?? STATUS_META.pending;
+            const meta = STATUS_STYLE[status] ?? STATUS_STYLE.pending;
+            const statusLabel = statusLabels[status] ?? statusLabels.pending;
             const isExpanded = expandedId === b.id;
             const qrValue = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
             const bx = b as typeof b & ExtendedBooking;
@@ -432,7 +443,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 8 }}>
                     <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
-                      <Text style={[styles.statusText, { color: meta.text }]}>{meta.label}</Text>
+                      <Text style={[styles.statusText, { color: meta.text }]}>{statusLabel}</Text>
                     </View>
                     <Ionicons
                       name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -455,7 +466,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                       <Text style={styles.ptBrand}>ROYVENTO</Text>
                       <View style={styles.ptConfirmedBadge}>
                         <Ionicons name="checkmark-circle" size={11} color="#22c55e" />
-                        <Text style={styles.ptConfirmedText}>Confirmed</Text>
+                        <Text style={styles.ptConfirmedText}>{t("bookings.status_confirmed")}</Text>
                       </View>
                     </View>
 
@@ -466,28 +477,28 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     {/* Details grid */}
                     <View style={styles.ptFieldsRow}>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>Guest</Text>
+                        <Text style={styles.ptFieldLabel}>{t("bookings.booked_on")}</Text>
                         <Text style={styles.ptFieldValue}>{bx.personName || bx.userName || "—"}</Text>
                       </View>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>Date</Text>
+                        <Text style={styles.ptFieldLabel}>{t("events.book_now")}</Text>
                         <Text style={styles.ptFieldValue}>{formatDate(b.bookingDate)}</Text>
                       </View>
                     </View>
                     <View style={styles.ptFieldsRow}>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>Tickets</Text>
+                        <Text style={styles.ptFieldLabel}>{t("bookings.ticket_badge")}</Text>
                         <Text style={styles.ptFieldValue}>
                           {[
-                            bx.ticketWomen ? `${bx.ticketWomen}× W` : "",
-                            bx.ticketMen ? `${bx.ticketMen}× M` : "",
-                            bx.ticketCouple ? `${bx.ticketCouple}× C` : "",
-                          ].filter(Boolean).join("  ") || `${b.guests} guests`}
+                            bx.ticketWomen ? `${bx.ticketWomen}× ${t("bookings.women")}` : "",
+                            bx.ticketMen ? `${bx.ticketMen}× ${t("bookings.men")}` : "",
+                            bx.ticketCouple ? `${bx.ticketCouple}× ${t("bookings.couple")}` : "",
+                          ].filter(Boolean).join("  ") || `${b.guests} ${t("bookings.guests_label")}`}
                         </Text>
                       </View>
                       <View style={styles.ptField}>
-                        <Text style={styles.ptFieldLabel}>Approved by</Text>
-                        <Text style={[styles.ptFieldValue, { textTransform: "capitalize" }]}>{bx.approvedBy || "Partner"}</Text>
+                        <Text style={styles.ptFieldLabel}>{t("bookings.approved_by")}</Text>
+                        <Text style={[styles.ptFieldValue, { textTransform: "capitalize" }]}>{bx.approvedBy || t("bookings.partner")}</Text>
                       </View>
                     </View>
 
@@ -512,7 +523,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     {/* Footer: price + disclaimer */}
                     <View style={styles.ptFooter}>
                       <View style={styles.ptPriceRow}>
-                        <Text style={styles.ptPriceLabel}>Amount paid</Text>
+                        <Text style={styles.ptPriceLabel}>{t("bookings.total_label")}</Text>
                         <Text style={styles.ptPriceValue}>
                           {bx.finalPrice != null
                             ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
@@ -543,7 +554,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                           <Ionicons name="share-outline" size={15} color="#d4a853" />
                         )}
                         <Text style={[styles.actionBtnText, { color: "#d4a853" }]}>
-                          {sharingId === b.id ? "Preparing…" : "Share / Download Ticket"}
+                          {sharingId === b.id ? t("common.loading") : t("bookings.download_ticket")}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -552,20 +563,20 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     {bx.checkedIn ? (
                       <TouchableOpacity
                         style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.6 }]}
-                        onPress={() => Alert.alert("Cannot cancel", "Your ticket has already been scanned at the venue — this booking can no longer be cancelled.")}
+                        onPress={() => Alert.alert(t("bookings.cannot_cancel_title"), t("bookings.cannot_cancel_scanned"))}
                         activeOpacity={0.8}
                       >
                         <Ionicons name="checkmark-circle-outline" size={15} color={colors.mutedForeground} />
-                        <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Checked in</Text>
+                        <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>{t("bookings.checked_in")}</Text>
                       </TouchableOpacity>
                     ) : bx.cancellationAllowed === false ? (
                       <TouchableOpacity
                         style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, opacity: 0.6 }]}
-                        onPress={() => Alert.alert("Cancellation closed", "Cancellations are not allowed within 24 hours of the event date.")}
+                        onPress={() => Alert.alert(t("bookings.cancellation_closed"), t("bookings.cancellation_closed_msg_full"))}
                         activeOpacity={0.8}
                       >
                         <Ionicons name="close-circle-outline" size={15} color={colors.mutedForeground} />
-                        <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Cancellation closed</Text>
+                        <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>{t("bookings.cancellation_closed")}</Text>
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
@@ -574,7 +585,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                         activeOpacity={0.75}
                       >
                         <Ionicons name="trash-outline" size={15} color="#ef4444" />
-                        <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>Cancel Booking</Text>
+                        <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>{t("bookings.cancel")}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -586,11 +597,11 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
                       <Ionicons name="alert-circle-outline" size={16} color="#f97316" />
                       <Text style={[styles.expandedText, { color: "#f97316", fontFamily: "Inter_600SemiBold" }]}>
-                        Payment not completed
+                        {t("bookings.payment_pending_msg")}
                       </Text>
                     </View>
                     <Text style={[styles.expandedText, { color: colors.mutedForeground }]}>
-                      Tap below to re-open the payment page and complete your booking.
+                      {t("bookings.status_payment_pending")}
                     </Text>
                     <TouchableOpacity
                       style={[styles.retryBtn, { backgroundColor: "#f97316" }, retryingId === b.id && { opacity: 0.7 }]}
@@ -659,14 +670,15 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
           <Pressable style={styles.modalOverlay} onPress={() => { setCancelModalBooking(null); setCancelReason(""); }}>
             <Pressable style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => {}}>
               <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Cancel booking</Text>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("bookings.cancel_dialog_title")}</Text>
               <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
-                Are you sure you want to cancel{cancelModalBooking ? ` "${cancelModalBooking.eventTitle}" on ${cancelModalBooking.bookingDate}` : ""}? This cannot be undone.
+                {t("bookings.cancel_dialog_desc")}
+                {cancelModalBooking ? ` "${cancelModalBooking.eventTitle}" — ${cancelModalBooking.bookingDate}` : ""}
               </Text>
-              <Text style={[styles.modalLabel, { color: colors.foreground }]}>Reason for cancellation</Text>
+              <Text style={[styles.modalLabel, { color: colors.foreground }]}>{t("bookings.reason_for_cancellation")}</Text>
               <TextInput
                 style={[styles.modalInput, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
-                placeholder="e.g. Plans changed, wrong date selected…"
+                placeholder={t("bookings.reason_placeholder")}
                 placeholderTextColor={colors.mutedForeground}
                 value={cancelReason}
                 onChangeText={setCancelReason}
@@ -681,7 +693,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                   onPress={() => { setCancelModalBooking(null); setCancelReason(""); }}
                   disabled={cancelLoading}
                 >
-                  <Text style={[styles.modalBtnText, { color: colors.foreground }]}>Keep booking</Text>
+                  <Text style={[styles.modalBtnText, { color: colors.foreground }]}>{t("bookings.keep_booking")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalBtn, { backgroundColor: "#ef4444" }, (cancelLoading || !cancelReason.trim()) && { opacity: 0.5 }]}
@@ -691,7 +703,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                   {cancelLoading ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={[styles.modalBtnText, { color: "#fff" }]}>Confirm cancellation</Text>
+                    <Text style={[styles.modalBtnText, { color: "#fff" }]}>{t("bookings.confirm_cancellation")}</Text>
                   )}
                 </TouchableOpacity>
               </View>

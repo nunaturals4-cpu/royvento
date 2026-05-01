@@ -18,17 +18,19 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function ForgotPasswordScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   async function handleSubmit() {
     if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email address");
+      Alert.alert(t("common.error"), t("auth.enter_email"));
       return;
     }
     setLoading(true);
@@ -69,9 +71,9 @@ export default function ForgotPasswordScreen() {
           >
             <Ionicons name="key-outline" size={28} color={colors.primaryForeground} />
           </LinearGradient>
-          <Text style={[styles.title, { color: colors.foreground }]}>Reset Password</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>{t("auth.forgot_title")}</Text>
           <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-            Enter your email and we'll send a reset link
+            {t("auth.forgot_sub")}
           </Text>
         </View>
 
@@ -80,28 +82,28 @@ export default function ForgotPasswordScreen() {
             <View style={[styles.successIcon, { backgroundColor: colors.primary + "20" }]}>
               <Ionicons name="checkmark-circle-outline" size={40} color={colors.primary} />
             </View>
-            <Text style={[styles.successTitle, { color: colors.foreground }]}>Check your inbox</Text>
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>{t("auth.check_inbox")}</Text>
             <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
-              If an account exists for {email.trim()}, you'll receive a password reset link shortly.
+              {t("auth.check_inbox_sub", { email: email.trim() })}
             </Text>
             <TouchableOpacity
               style={[styles.btn, { backgroundColor: colors.primary }]}
               onPress={() => router.back()}
             >
-              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Back to Sign In</Text>
+              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("auth.back_to_sign_in")}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>Email Address</Text>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.email_address")}</Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="you@example.com"
+                  placeholder={t("auth.email_placeholder")}
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -119,7 +121,7 @@ export default function ForgotPasswordScreen() {
               {loading ? (
                 <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Send Reset Link</Text>
+                <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{t("auth.send_reset_link")}</Text>
               )}
             </TouchableOpacity>
           </View>
