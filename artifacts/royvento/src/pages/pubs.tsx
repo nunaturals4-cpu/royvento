@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useSearch } from "wouter";
 import { EventCard } from "@/components/EventCard";
 import { Input } from "@/components/ui/input";
-import { Search, Wine } from "lucide-react";
-import { apiGet } from "@/lib/api";
+import { Search, Wine, X } from "lucide-react";
+import { apiGet, BUDGET_RANGES } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
 
 interface PublicEvent {
   id: number;
@@ -25,6 +26,14 @@ interface PublicEvent {
   popular: boolean;
 }
 
+const PRICE_PRESETS = [
+  { label: "Under ₹1K", min: 0, max: 1000 },
+  { label: "₹1K – ₹3K", min: 1000, max: 3000 },
+  { label: "₹3K – ₹7K", min: 3000, max: 7000 },
+  { label: "₹7K – ₹20K", min: 7000, max: 20000 },
+  { label: "₹20K+", min: 20000, max: 99999999 },
+];
+
 export function Pubs() {
   const { t } = useTranslation();
   const searchStr = useSearch();
@@ -32,6 +41,7 @@ export function Pubs() {
   const [country, setCountry] = useState("");
   const [stateF, setStateF] = useState("");
   const [city, setCity] = useState(() => new URLSearchParams(searchStr).get("city") ?? "");
+  const [pricePreset, setPricePreset] = useState<number | null>(null);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,12 +56,21 @@ export function Pubs() {
     if (country) params.set("country", country);
     if (stateF) params.set("state", stateF);
     if (city) params.set("city", city);
+    if (pricePreset !== null) {
+      const preset = PRICE_PRESETS[pricePreset];
+      if (preset) {
+        params.set("minPrice", String(preset.min));
+        params.set("maxPrice", String(preset.max));
+      }
+    }
     setLoading(true);
     apiGet<PublicEvent[]>(`/api/events?${params.toString()}`)
       .then(setPubs)
       .catch(() => setPubs([]))
       .finally(() => setLoading(false));
-  }, [search, country, stateF, city]);
+  }, [search, country, stateF, city, pricePreset]);
+
+  const hasFilters = search || country || stateF || city || pricePreset !== null;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
@@ -65,7 +84,7 @@ export function Pubs() {
         </p>
       </header>
 
-      <div className="rounded-3xl glass-card p-5 md:p-6 mb-8 space-y-3">
+      <div className="rounded-3xl glass-card p-5 md:p-6 mb-8 space-y-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -75,6 +94,39 @@ export function Pubs() {
             className="pl-10 h-11 bg-black/40 border-white/10"
           />
         </div>
+
+        {/* Price range preset chips */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Price Range</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setPricePreset(null)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                pricePreset === null
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+              )}
+            >
+              Any price
+            </button>
+            {PRICE_PRESETS.map((preset, idx) => (
+              <button
+                key={preset.label}
+                onClick={() => setPricePreset(pricePreset === idx ? null : idx)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  pricePreset === idx
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+                )}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <LocationSelect
           country={country}
           state={stateF}
@@ -85,6 +137,15 @@ export function Pubs() {
             setCity(next.city);
           }}
         />
+
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(""); setCountry(""); setStateF(""); setCity(""); setPricePreset(null); }}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" /> Clear all filters
+          </button>
+        )}
       </div>
 
       {loading ? (

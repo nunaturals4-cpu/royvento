@@ -44,7 +44,7 @@ import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads";
+type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending:   { bg: "#f59e0b20", text: "#f59e0b" },
@@ -159,6 +159,415 @@ const DEFAULT_EVENT_FORM: EventFormState = {
   location: "", price: "", capacity: "", imageUrl: "", imageUri: "",
   freeEntryEnabled: false, freeEntryGenders: [], freeEntryDays: [], freeEntryBeforeTime: "",
 };
+
+// ─── Drink Plans Tab Component ────────────────────────────────────────────────
+
+interface DrinkPlan {
+  id: number;
+  type: string;
+  productName: string;
+  gender: string;
+  price: number;
+  days: string[];
+  timeFrom: string;
+  timeTo: string;
+  description: string;
+  lineItems: { name: string; qty: number; discountedPrice: number }[] | null;
+}
+
+const PLAN_TYPES = ["welcome", "unlimited", "ticket", "custom"] as const;
+const PLAN_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+interface DrinkPlanFormState {
+  type: "welcome" | "unlimited" | "ticket" | "custom";
+  productName: string;
+  gender: "all" | "female";
+  price: string;
+  days: string[];
+  timeFrom: string;
+  timeTo: string;
+  description: string;
+}
+
+const BLANK_PLAN: DrinkPlanFormState = {
+  type: "welcome",
+  productName: "",
+  gender: "all",
+  price: "",
+  days: [],
+  timeFrom: "",
+  timeTo: "",
+  description: "",
+};
+
+function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: ReturnType<typeof useColors> }) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<DrinkPlanFormState>({ ...BLANK_PLAN });
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+
+  const { data: plans, isLoading } = useQuery<DrinkPlan[]>({
+    queryKey: ["myDrinkPlans", vendorId],
+    queryFn: () => customFetch<DrinkPlan[]>(`/api/vendors/${vendorId}/drink-plans`),
+    enabled: !!vendorId,
+  });
+
+  async function savePlan() {
+    setSaving(true);
+    try {
+      const body = {
+        type: form.type,
+        productName: form.productName.trim(),
+        gender: form.gender,
+        price: parseInt(form.price) || 0,
+        days: form.days,
+        timeFrom: form.timeFrom.trim(),
+        timeTo: form.timeTo.trim(),
+        description: form.description.trim(),
+      };
+      if (editId) {
+        await customFetch(`/api/vendors/me/drink-plans/${editId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } else {
+        await customFetch("/api/vendors/me/drink-plans", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["myDrinkPlans"] });
+      setShowForm(false);
+      setEditId(null);
+      setForm({ ...BLANK_PLAN });
+    } catch {
+      Alert.alert("Error", "Failed to save drink plan.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deletePlan(id: number) {
+    Alert.alert("Delete Plan", "Remove this drink plan?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await customFetch(`/api/vendors/me/drink-plans/${id}`, { method: "DELETE" });
+            qc.invalidateQueries({ queryKey: ["myDrinkPlans"] });
+          } catch {
+            Alert.alert("Error", "Failed to delete plan.");
+          }
+        },
+      },
+    ]);
+  }
+
+  const TYPE_LABEL: Record<string, string> = { welcome: "Welcome Drink", unlimited: "Unlimited", ticket: "Ticket Plan", custom: "Custom" };
+
+  if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 120 }}>
+      <TouchableOpacity
+        onPress={() => { setShowForm(true); setEditId(null); setForm({ ...BLANK_PLAN }); }}
+        style={[{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1, borderStyle: "dashed" as const }, { borderColor: colors.primary, backgroundColor: colors.primary + "10" }]}
+      >
+        <Ionicons name="add" size={18} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Add Drink Plan</Text>
+      </TouchableOpacity>
+
+      {(plans ?? []).length === 0 && (
+        <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
+          <Ionicons name="wine-outline" size={40} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
+            No drink plans yet. Add one to showcase your offers.
+          </Text>
+        </View>
+      )}
+
+      {(plans ?? []).map((plan) => (
+        <View key={plan.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+              <View style={{ backgroundColor: colors.primary + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.primary }}>{TYPE_LABEL[plan.type] ?? plan.type}</Text>
+              </View>
+              {plan.gender === "female" && (
+                <View style={{ backgroundColor: "#ec489920", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#ec4899" }}>Ladies</Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity onPress={() => {
+                setForm({
+                  type: plan.type as any,
+                  productName: plan.productName,
+                  gender: plan.gender as any,
+                  price: plan.price > 0 ? String(plan.price) : "",
+                  days: plan.days,
+                  timeFrom: plan.timeFrom,
+                  timeTo: plan.timeTo,
+                  description: plan.description,
+                });
+                setEditId(plan.id);
+                setShowForm(true);
+              }}>
+                <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => deletePlan(plan.id)}>
+                <Ionicons name="trash-outline" size={18} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          {plan.productName ? <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{plan.productName}</Text> : null}
+          {plan.description ? <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 18 }}>{plan.description}</Text> : null}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            {plan.days.length > 0 && <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{plan.days.join(", ")}</Text>}
+            {plan.price > 0 && <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>₹{plan.price.toLocaleString("en-IN")}</Text>}
+          </View>
+        </View>
+      ))}
+
+      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card }}>
+            <TouchableOpacity onPress={() => { setShowForm(false); setEditId(null); }}>
+              <Ionicons name="close" size={22} color={colors.foreground} />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground }}>{editId ? "Edit Drink Plan" : "New Drink Plan"}</Text>
+            <TouchableOpacity onPress={savePlan} disabled={saving}>
+              {saving ? <ActivityIndicator color={colors.primary} size="small" /> : <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 80 }}>
+              {/* Type */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PLAN TYPE</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {PLAN_TYPES.map((t) => (
+                    <TouchableOpacity key={t} onPress={() => setForm((p) => ({ ...p, type: t }))}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.type === t ? colors.primary : colors.muted, borderColor: form.type === t ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.type === t ? colors.primaryForeground : colors.mutedForeground }}>
+                        {TYPE_LABEL[t]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {/* Product name */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRODUCT NAME</Text>
+                <TextInput
+                  value={form.productName}
+                  onChangeText={(v) => setForm((p) => ({ ...p, productName: v }))}
+                  placeholder="e.g. House Beer, Cocktails"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                />
+              </View>
+              {/* Gender */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FOR</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {[{ v: "all", label: "Everyone" }, { v: "female", label: "Ladies Only" }].map(({ v, label }) => (
+                    <TouchableOpacity key={v} onPress={() => setForm((p) => ({ ...p, gender: v as any }))}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.gender === v ? colors.primary : colors.muted, borderColor: form.gender === v ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.gender === v ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {/* Price */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRICE (₹)</Text>
+                <TextInput
+                  value={form.price}
+                  onChangeText={(v) => setForm((p) => ({ ...p, price: v }))}
+                  placeholder="0"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numeric"
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                />
+              </View>
+              {/* Days */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>AVAILABLE DAYS</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {PLAN_DAYS.map((d) => {
+                    const active = form.days.includes(d);
+                    return (
+                      <TouchableOpacity key={d} onPress={() => setForm((p) => ({ ...p, days: active ? p.days.filter((x) => x !== d) : [...p.days, d] }))}
+                        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }}>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: active ? colors.primaryForeground : colors.mutedForeground }}>{d}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+              {/* Time range */}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FROM (HH:MM)</Text>
+                  <TextInput value={form.timeFrom} onChangeText={(v) => setForm((p) => ({ ...p, timeFrom: v }))} placeholder="21:00" placeholderTextColor={colors.mutedForeground} style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }} />
+                </View>
+                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>TO (HH:MM)</Text>
+                  <TextInput value={form.timeTo} onChangeText={(v) => setForm((p) => ({ ...p, timeTo: v }))} placeholder="23:00" placeholderTextColor={colors.mutedForeground} style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }} />
+                </View>
+              </View>
+              {/* Description */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DESCRIPTION</Text>
+                <TextInput
+                  value={form.description}
+                  onChangeText={(v) => setForm((p) => ({ ...p, description: v }))}
+                  placeholder="Brief description of the plan"
+                  placeholderTextColor={colors.mutedForeground}
+                  multiline
+                  numberOfLines={3}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20, textAlignVertical: "top", minHeight: 70 }}
+                />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+// ─── Ads Tab Component ────────────────────────────────────────────────────────
+
+interface VendorAd {
+  id: number;
+  message: string;
+  status: string;
+  createdAt: string;
+}
+
+function AdsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [ads, setAds] = useState<VendorAd[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [requesting, setRequesting] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
+  function fetchAds() {
+    setLoading(true);
+    customFetch<VendorAd[]>("/api/partner/ads/me")
+      .then(setAds)
+      .catch(() => setAds([]))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { fetchAds(); }, []);
+
+  async function requestAd() {
+    setRequesting(true);
+    try {
+      await customFetch("/api/partner/ads/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message.trim() }),
+      });
+      setMessage("");
+      setShowForm(false);
+      fetchAds();
+      Alert.alert("Request Submitted", "Your ad request has been sent for review.");
+    } catch {
+      Alert.alert("Error", "Failed to submit request.");
+    } finally {
+      setRequesting(false);
+    }
+  }
+
+  const STATUS_STYLE: Record<string, { bg: string; text: string }> = {
+    pending:  { bg: "#f59e0b20", text: "#f59e0b" },
+    approved: { bg: "#22c55e20", text: "#22c55e" },
+    rejected: { bg: "#ef444420", text: "#ef4444" },
+  };
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 120 }}>
+      <View style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 16, gap: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + "20", alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="megaphone-outline" size={20} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>Promoted Listings</Text>
+            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Boost your venue's visibility on Royvento</Text>
+          </View>
+        </View>
+        <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 19 }}>
+          Request a promoted ad slot to appear at the top of search results and on the homepage. Our team will review your request within 24 hours.
+        </Text>
+        <TouchableOpacity
+          onPress={() => setShowForm(!showForm)}
+          style={[{ borderRadius: 12, paddingVertical: 12, alignItems: "center" }, { backgroundColor: colors.primary }]}
+        >
+          <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+            {showForm ? "Cancel" : "Request Ad Slot"}
+          </Text>
+        </TouchableOpacity>
+        {showForm && (
+          <View style={{ gap: 10 }}>
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Any specific requirements or notes (optional)"
+              placeholderTextColor={colors.mutedForeground}
+              multiline
+              numberOfLines={3}
+              style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, padding: 12, color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, textAlignVertical: "top", minHeight: 80 }}
+            />
+            <TouchableOpacity
+              onPress={requestAd}
+              disabled={requesting}
+              style={{ borderRadius: 10, paddingVertical: 11, alignItems: "center", backgroundColor: colors.primary }}
+            >
+              {requesting ? <ActivityIndicator color={colors.primaryForeground} size="small" /> : <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Submit Request</Text>}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {ads.length > 0 && (
+        <View style={{ gap: 10 }}>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8, color: colors.mutedForeground }}>MY AD REQUESTS</Text>
+          {ads.map((ad) => {
+            const st = STATUS_STYLE[ad.status] ?? STATUS_STYLE.pending;
+            return (
+              <View key={ad.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                    {new Date(ad.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  </Text>
+                  <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: st!.bg }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: st!.text, textTransform: "capitalize" }}>{ad.status}</Text>
+                  </View>
+                </View>
+                {ad.message ? (
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 18 }}>{ad.message}</Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -1873,6 +2282,16 @@ export default function VendorDashboardScreen() {
     );
   }
 
+  // ─── Drink Plans tab ─────────────────────────────────────────────────────────
+  function renderDrinkPlans() {
+    return <DrinkPlansTab vendorId={vendor?.id ?? null} colors={colors} />;
+  }
+
+  // ─── Ads tab ─────────────────────────────────────────────────────────────────
+  function renderAds() {
+    return <AdsTab colors={colors} />;
+  }
+
   // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -1906,8 +2325,10 @@ export default function VendorDashboardScreen() {
           {([
             { key: "bookings",      icon: "ticket-outline",          label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
             { key: "events",        icon: "calendar-outline",         label: "My Listings" },
+            { key: "drinkplans",    icon: "wine-outline",             label: "Drink Plans" },
+            { key: "ads",           icon: "megaphone-outline",        label: "Ads" },
             { key: "analytics",     icon: "bar-chart-outline",        label: "Analytics" },
-            { key: "announcements", icon: "megaphone-outline",        label: "Announcements" },
+            { key: "announcements", icon: "flag-outline",             label: "Announcements" },
             { key: "leads",         icon: "people-outline",           label: "Leads" },
             { key: "profile",       icon: "person-outline",           label: "Profile" },
             { key: "calendar",      icon: "calendar-clear-outline",   label: "Calendar" },
@@ -1930,6 +2351,8 @@ export default function VendorDashboardScreen() {
       {/* Content */}
       {activeTab === "bookings"       && renderBookings()}
       {activeTab === "events"         && renderEvents()}
+      {activeTab === "drinkplans"     && renderDrinkPlans()}
+      {activeTab === "ads"            && renderAds()}
       {activeTab === "analytics"      && renderAnalytics()}
       {activeTab === "announcements"  && renderAnnouncements()}
       {activeTab === "leads"          && renderLeads()}

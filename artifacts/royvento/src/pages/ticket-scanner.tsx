@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import jsQR from "jsqr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 
 interface BookingData {
@@ -134,10 +135,128 @@ function useAccessCheck() {
   return { accessStatus, managedVendors };
 }
 
+function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
+  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+
+  const stopCamera = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
+  const scanFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      rafRef.current = requestAnimationFrame(scanFrame);
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { rafRef.current = requestAnimationFrame(scanFrame); return; }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+    if (code?.data) {
+      onDetect(code.data);
+      return;
+    }
+    rafRef.current = requestAnimationFrame(scanFrame);
+  }, [onDetect]);
+
+  const startCamera = useCallback(async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setScanning(true);
+      rafRef.current = requestAnimationFrame(scanFrame);
+    } catch {
+      setError("Camera access denied. Please allow camera permission and try again.");
+    }
+  }, [scanFrame]);
+
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, [startCamera, stopCamera]);
+
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-500/30 bg-red-900/10 p-6 text-center space-y-3">
+        <CameraOff className="h-8 w-8 text-red-400 mx-auto" />
+        <p className="text-sm text-red-300">{error}</p>
+        <Button size="sm" variant="outline" onClick={startCamera}>Try again</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="w-full"
+        style={{ maxHeight: 320 }}
+      />
+      <canvas ref={canvasRef} className="hidden" />
+      {/* Scanning overlay */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-52 h-52 relative">
+          {/* Corner markers */}
+          {["top-0 left-0", "top-0 right-0", "bottom-0 left-0", "bottom-0 right-0"].map((pos) => (
+            <div key={pos} className={`absolute w-8 h-8 ${pos} border-2 border-primary`}
+              style={{
+                borderRight: pos.includes("right") ? undefined : "none",
+                borderLeft: pos.includes("left") ? undefined : "none",
+                borderBottom: pos.includes("bottom") ? undefined : "none",
+                borderTop: pos.includes("top") ? undefined : "none",
+                borderRadius: 4,
+              }}
+            />
+          ))}
+          {/* Scan line */}
+          {scanning && (
+            <div
+              className="absolute left-2 right-2 h-0.5 bg-primary opacity-80"
+              style={{ animation: "scanLine 2s ease-in-out infinite", top: "50%" }}
+            />
+          )}
+        </div>
+      </div>
+      <p className="absolute bottom-3 left-0 right-0 text-center text-xs text-white/60">
+        {scanning ? "Scanning for QR code…" : "Starting camera…"}
+      </p>
+      <style>{`
+        @keyframes scanLine {
+          0% { transform: translateY(-60px); }
+          50% { transform: translateY(60px); }
+          100% { transform: translateY(-60px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export function TicketScanner() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [cameraMode, setCameraMode] = useState(false);
   const { toast } = useToast();
   const { accessStatus, managedVendors } = useAccessCheck();
 
@@ -226,28 +345,93 @@ export function TicketScanner() {
         )}
       </header>
 
-      <form onSubmit={scan} className="rounded-3xl glass-card-strong p-8 space-y-4">
-        <div>
-          <label className="text-sm font-medium mb-1 block">Ticket code</label>
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="RV-000042"
-            className="bg-black/40 border-white/10 text-xl tracking-widest font-mono uppercase"
-            autoFocus
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <p className="text-xs text-muted-foreground mt-1">Format: RV-XXXXXX (the number from the guest's ticket)</p>
-        </div>
-        <Button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="w-full bg-gradient-to-br from-red-600 to-red-800 border-0 text-base py-3 gap-2"
+      {/* Mode toggle */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setCameraMode(false)}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            !cameraMode ? "bg-primary border-primary text-primary-foreground" : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20"
+          }`}
         >
-          {loading ? "Checking…" : <><ScanLine className="h-5 w-5" />Validate ticket</>}
-        </Button>
-      </form>
+          <ScanLine className="h-4 w-4" /> Type code
+        </button>
+        <button
+          onClick={() => { setCameraMode(true); setResult(null); }}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            cameraMode ? "bg-primary border-primary text-primary-foreground" : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20"
+          }`}
+        >
+          <Camera className="h-4 w-4" /> Camera scan
+        </button>
+      </div>
+
+      {cameraMode ? (
+        <div className="rounded-3xl glass-card-strong p-6 space-y-4">
+          <p className="text-sm text-muted-foreground text-center">Point your camera at a QR code on the guest's ticket</p>
+          <CameraScanner
+            onDetect={(code) => {
+              const cleaned = code.trim().toUpperCase();
+              setInput(cleaned);
+              setCameraMode(false);
+              setResult(null);
+              // Trigger scan with detected code directly
+              (async () => {
+                setLoading(true);
+                try {
+                  const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
+                  const res = await fetch("/api/partner/scan-ticket", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: JSON.stringify({ code: cleaned }),
+                  });
+                  if (res.ok) {
+                    setResult(await res.json() as ScanSuccess);
+                  } else {
+                    const json = await res.json() as Record<string, unknown>;
+                    const errCode = typeof json.code === "string" ? json.code : "UNKNOWN";
+                    const message = typeof json.message === "string" ? json.message : `Error ${res.status}`;
+                    if (errCode === "ALREADY_CHECKED_IN") {
+                      setResult({ code: "ALREADY_CHECKED_IN", message, checkedInAt: typeof json.checkedInAt === "string" ? json.checkedInAt : null, booking: json.booking as BookingData });
+                    } else {
+                      setResult({ code: errCode, message });
+                      toast({ title: "Scan failed", description: message, variant: "destructive" });
+                    }
+                  }
+                } catch {
+                  setResult({ code: "NETWORK_ERROR", message: "Network error. Check your connection." });
+                  toast({ title: "Scan failed", description: "Network error. Check your connection.", variant: "destructive" });
+                } finally {
+                  setLoading(false);
+                }
+              })();
+            }}
+          />
+        </div>
+      ) : (
+        <form onSubmit={scan} className="rounded-3xl glass-card-strong p-8 space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Ticket code</label>
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="RV-000042"
+              className="bg-black/40 border-white/10 text-xl tracking-widest font-mono uppercase"
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Format: RV-XXXXXX (the number from the guest's ticket)</p>
+          </div>
+          <Button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="w-full bg-gradient-to-br from-red-600 to-red-800 border-0 text-base py-3 gap-2"
+          >
+            {loading ? "Checking…" : <><ScanLine className="h-5 w-5" />Validate ticket</>}
+          </Button>
+        </form>
+      )}
 
       {result && (
         <div className={`mt-6 rounded-3xl overflow-hidden border ${

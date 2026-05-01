@@ -429,12 +429,15 @@ export default function ProfileScreen() {
           ...(user.role === "user"
             ? [{ icon: "business-outline" as const, label: t("profile.become_partner"), onPress: () => router.push("/become-vendor") }]
             : []),
+          { icon: "notifications-outline" as const, label: "Notifications", onPress: () => router.push("/notifications") },
           { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings") },
           { icon: "heart-outline" as const, label: t("profile.wishlist"), onPress: () => router.push("/(tabs)/wishlist") },
           { icon: "search-outline" as const, label: t("profile.explore_events"), onPress: () => router.push("/(tabs)/explore") },
           { icon: "newspaper-outline" as const, label: t("profile.blog_stories"), onPress: () => router.push("/blogs") },
           { icon: "star-outline" as const, label: t("profile.subscription_premium"), onPress: () => router.push("/subscription") },
           { icon: "language-outline" as const, label: t("profile.language"), onPress: () => setLangModal(true) },
+          { icon: "document-text-outline" as const, label: "Terms of Service", onPress: () => router.push("/terms") },
+          { icon: "shield-checkmark-outline" as const, label: "Privacy Policy", onPress: () => router.push("/privacy") },
           {
             icon: "log-out-outline" as const,
             label: t("profile.sign_out"),

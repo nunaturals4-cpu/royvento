@@ -31,26 +31,66 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 export function Bookings() {
   const { t } = useTranslation();
   const { data: bookings = [], isLoading, refetch } = useListMyBookings();
+  const [view, setView] = useState<"upcoming" | "past">("upcoming");
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const filtered = (bookings as any[]).filter((b) => {
+    if (!b.bookingDate) return view === "upcoming";
+    const d = new Date(b.bookingDate);
+    return view === "upcoming" ? d >= today : d < today;
+  });
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
-      <header className="mb-10">
+      <header className="mb-8">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">{t("bookings.your_account")}</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">{t("bookings.title")}</h1>
         <p className="mt-2 text-muted-foreground">{t("bookings.subtitle")}</p>
       </header>
 
+      {/* Upcoming / Past toggle */}
+      <div className="flex gap-2 mb-8">
+        <button
+          onClick={() => setView("upcoming")}
+          className={`px-5 py-2 rounded-full text-sm font-medium border transition-colors ${
+            view === "upcoming"
+              ? "bg-primary border-primary text-primary-foreground"
+              : "bg-transparent border-white/10 text-muted-foreground hover:border-white/20"
+          }`}
+        >
+          Upcoming
+        </button>
+        <button
+          onClick={() => setView("past")}
+          className={`px-5 py-2 rounded-full text-sm font-medium border transition-colors ${
+            view === "past"
+              ? "bg-primary border-primary text-primary-foreground"
+              : "bg-transparent border-white/10 text-muted-foreground hover:border-white/20"
+          }`}
+        >
+          Past
+        </button>
+      </div>
+
       {isLoading ? (
         <p className="text-muted-foreground">{t("common.loading")}</p>
-      ) : bookings.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="rounded-3xl glass-card p-16 text-center">
-          <p className="font-serif text-2xl mb-2">{t("bookings.no_bookings")}</p>
-          <p className="text-muted-foreground mb-6">{t("bookings.no_bookings_sub")}</p>
-          <Link href="/explore"><Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">{t("bookings.explore")}</Button></Link>
+          <p className="font-serif text-2xl mb-2">
+            {view === "upcoming" ? "No upcoming bookings" : "No past bookings"}
+          </p>
+          <p className="text-muted-foreground mb-6">
+            {view === "upcoming" ? t("bookings.no_bookings_sub") : "Your completed bookings will appear here."}
+          </p>
+          {view === "upcoming" && (
+            <Link href="/explore"><Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">{t("bookings.explore")}</Button></Link>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
-          {bookings.map((b: any) => <BookingCard key={b.id} b={b} onRefetch={refetch} />)}
+          {filtered.map((b: any) => <BookingCard key={b.id} b={b} onRefetch={refetch} />)}
         </div>
       )}
     </div>

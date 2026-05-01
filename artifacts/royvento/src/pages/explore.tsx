@@ -70,6 +70,8 @@ export function Explore() {
       .finally(() => setLoading(false));
   }, [search, budget, stateF, city, country]);
 
+  const [visibleCount, setVisibleCount] = useState(18);
+
   const events = useMemo(() => {
     let result = minRating === "any" ? rawEvents : rawEvents.filter((e) => e.rating >= Number(minRating));
     if (freeEntry) {
@@ -78,9 +80,12 @@ export function Explore() {
     return result;
   }, [rawEvents, minRating, freeEntry]);
 
+  const visibleEvents = useMemo(() => events.slice(0, visibleCount), [events, visibleCount]);
+
   const clear = () => {
     setSearch(""); setMinRating("any");
     setBudget("any"); setCountry(""); setStateF(""); setCity(""); setFreeEntry(false);
+    setVisibleCount(18);
   };
 
   return (
@@ -168,9 +173,24 @@ export function Explore() {
           <p className="text-muted-foreground">{t("explore.no_match_sub")}</p>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((e) => <EventCard key={e.id} event={e} />)}
-        </div>
+        <>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {visibleEvents.map((e) => <EventCard key={e.id} event={e} />)}
+          </div>
+          {visibleCount < events.length && (
+            <div className="flex justify-center mt-10">
+              <button
+                onClick={() => setVisibleCount((c) => c + 18)}
+                className="px-8 py-3 rounded-full border border-white/10 text-sm font-medium text-muted-foreground hover:border-white/20 hover:text-foreground transition-colors"
+              >
+                Load more ({events.length - visibleCount} remaining)
+              </button>
+            </div>
+          )}
+          {visibleCount >= events.length && events.length > 18 && (
+            <p className="text-center text-xs text-muted-foreground mt-8">All {events.length} results shown</p>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
+  customFetch,
   useGetVendor,
   useListEvents,
   useListVendorReviews,
 } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
@@ -23,6 +25,121 @@ import { EventCard } from "@/components/EventCard";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
+
+interface DrinkPlan {
+  id: number;
+  type: string;
+  productName: string;
+  gender: string;
+  price: number;
+  days: string[];
+  timeFrom: string;
+  timeTo: string;
+  description: string;
+  lineItems: { name: string; qty: number; discountedPrice: number }[] | null;
+}
+
+function DrinkPlansSection({ vendorId }: { vendorId: number }) {
+  const colors = useColors();
+  const { data: plans } = useQuery<DrinkPlan[]>({
+    queryKey: ["vendorDrinkPlans", vendorId],
+    queryFn: () => customFetch<DrinkPlan[]>(`/api/vendors/${vendorId}/drink-plans`),
+    enabled: !!vendorId,
+  });
+
+  if (!plans || plans.length === 0) return null;
+
+  const TYPE_LABEL: Record<string, string> = {
+    welcome: "Welcome Drink",
+    unlimited: "Unlimited",
+    ticket: "Ticket Plan",
+    custom: "Custom",
+  };
+
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Ionicons name="wine-outline" size={16} color={colors.primary} />
+        <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: colors.foreground }}>Drink Plans</Text>
+      </View>
+      {plans.map((plan) => (
+        <View
+          key={plan.id}
+          style={{
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.card,
+            padding: 14,
+            gap: 8,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ backgroundColor: colors.primary + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
+                  {TYPE_LABEL[plan.type] ?? plan.type}
+                </Text>
+              </View>
+              {plan.gender === "female" && (
+                <View style={{ backgroundColor: "#ec489920", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#ec4899" }}>Ladies</Text>
+                </View>
+              )}
+            </View>
+            {plan.price > 0 && (
+              <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                ₹{plan.price.toLocaleString("en-IN")}
+              </Text>
+            )}
+          </View>
+
+          {plan.productName ? (
+            <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{plan.productName}</Text>
+          ) : null}
+
+          {plan.description ? (
+            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 19 }}>
+              {plan.description}
+            </Text>
+          ) : null}
+
+          {plan.days && plan.days.length > 0 && (
+            <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+              {plan.days.map((d) => (
+                <View key={d} style={{ backgroundColor: colors.muted, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{d}</Text>
+                </View>
+              ))}
+              {(plan.timeFrom || plan.timeTo) && (
+                <View style={{ backgroundColor: colors.muted, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
+                    {plan.timeFrom}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {plan.lineItems && plan.lineItems.length > 0 && (
+            <View style={{ gap: 4, marginTop: 4 }}>
+              {plan.lineItems.map((item, i) => (
+                <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                    {item.qty}× {item.name}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
+                    ₹{item.discountedPrice.toLocaleString("en-IN")}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function PartnerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -267,6 +384,9 @@ export default function PartnerDetailScreen() {
             />
           </View>
         ) : null}
+
+        {/* Drink Plans */}
+        <DrinkPlansSection vendorId={vendorId} />
 
         {/* Reviews */}
         {(reviews ?? []).length > 0 ? (
