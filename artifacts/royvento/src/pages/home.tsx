@@ -259,13 +259,13 @@ export function Home() {
           <div className="absolute -top-20 -right-20 h-80 w-80 rounded-full bg-primary/30 blur-3xl pointer-events-none" />
           <div className="relative">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-5">
-              <Crown className="h-3.5 w-3.5" /> Royvento Premium
+              <Crown className="h-3.5 w-3.5" /> {t("home.premium_badge")}
             </div>
             <h2 className="font-serif text-3xl md:text-5xl tracking-tight italic leading-tight">
-              Host an event <br />people will write home about.
+              {t("home.premium_heading")}
             </h2>
             <p className="mt-5 text-white/70 max-w-xl leading-relaxed">
-              Subscribe for early-access drops, members-only pubs, complimentary upgrades, and partner concierge. From {formatINR(200)} for personal hosts and {formatINR(999)} for partners.
+              {t("home.premium_sub")}
             </p>
           </div>
           <div className="relative flex flex-col gap-3">

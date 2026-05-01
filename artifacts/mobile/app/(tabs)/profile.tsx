@@ -182,16 +182,16 @@ export default function ProfileScreen() {
           </LinearGradient>
           <Text style={[styles.signInTitle, { color: colors.foreground }]}>{t("profile.welcome_title")}</Text>
           <Text style={[styles.signInSub, { color: colors.mutedForeground }]}>
-            Sign in to manage bookings, wishlists, and more
+            {t("profile.sign_in_sub")}
           </Text>
           <Pressable
             style={[styles.signInBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.push("/(auth)/login")}
           >
-            <Text style={[styles.signInBtnText, { color: colors.primaryForeground }]}>Sign In</Text>
+            <Text style={[styles.signInBtnText, { color: colors.primaryForeground }]}>{t("auth.sign_in")}</Text>
           </Pressable>
           <Pressable onPress={() => router.push("/(auth)/register")}>
-            <Text style={[styles.registerLink, { color: colors.primary }]}>Create account</Text>
+            <Text style={[styles.registerLink, { color: colors.primary }]}>{t("auth.create_account")}</Text>
           </Pressable>
         </View>
       </View>
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
         <View style={{ position: "relative" }}>
           <Pressable
             onPress={handlePickAndSaveImage}
-            accessibilityLabel="Change profile photo"
+            accessibilityLabel={t("profile.change_photo")}
           >
             {user.profileImage ? (
               <Image source={{ uri: user.profileImage }} style={[styles.avatar, { backgroundColor: colors.muted }]} contentFit="cover" />
@@ -243,7 +243,7 @@ export default function ProfileScreen() {
               setEditProfileImage(user.profileImage ?? "");
               setEditModal(true);
             }}
-            accessibilityLabel="Edit profile"
+            accessibilityLabel={t("profile.edit_profile")}
           >
             <Ionicons name="pencil" size={12} color={colors.primary} />
           </Pressable>
@@ -307,12 +307,12 @@ export default function ProfileScreen() {
               </View>
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={[styles.couponDetail, { color: colors.mutedForeground }]}>
-                  {`${c.discountPercent}% off`}
+                  {t("profile.percent_off", { percent: c.discountPercent })}
                 </Text>
                 {c.vendorName && c.vendorId ? (
                   <Pressable onPress={() => router.push(`/partner/${c.vendorId}` as any)}>
                     <Text style={{ fontSize: 10, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>
-                      {c.vendorName} only ↗
+                      {t("profile.vendor_only", { vendor: c.vendorName })} ↗
                     </Text>
                   </Pressable>
                 ) : null}

@@ -189,7 +189,10 @@
     "upload_failed_desc": "ಫೋಟೋ ಅಪ್‌ಲೋಡ್ ಆಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "name_placeholder": "ನಿಮ್ಮ ಹೆಸರು",
     "about_placeholder": "ನಿಮ್ಮ ಬಗ್ಗೆ ಬರೆಯಿರಿ…",
-    "sign_out_title": "ಸೈನ್ ಔಟ್"
+    "sign_out_title": "ಸೈನ್ ಔಟ್",
+    "sign_in_sub": "ಬುಕಿಂಗ್, ವಿಷ್‌ಲಿಸ್ಟ್ ಮತ್ತು ಹೆಚ್ಚಿನದನ್ನು ನಿರ್ವಹಿಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ",
+    "percent_off": "%{percent}% ರಿಯಾಯಿತಿ",
+    "vendor_only": "ಕೇವಲ %{vendor}"
   },
   "bookings": {
     "title": "ನನ್ನ ಬುಕಿಂಗ್‌ಗಳು",

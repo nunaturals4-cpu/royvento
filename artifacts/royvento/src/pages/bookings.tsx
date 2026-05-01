@@ -102,9 +102,9 @@ function BookingCard({ b, onRefetch }: { b: any; onRefetch: () => void }) {
             {b.pubMode === "ticket" && (b.ticketWomen || b.ticketMen || b.ticketCouple) ? (
               <p className="text-sm text-muted-foreground">
                 {t("bookings.ticket_badge")}:
-                {b.ticketWomen ? ` ${b.ticketWomen}× Women` : ""}
-                {b.ticketMen ? ` ${b.ticketMen}× Men` : ""}
-                {b.ticketCouple ? ` ${b.ticketCouple}× Couple` : ""}
+                {b.ticketWomen ? ` ${b.ticketWomen}× ${t("bookings.women")}` : ""}
+                {b.ticketMen ? ` ${b.ticketMen}× ${t("bookings.men")}` : ""}
+                {b.ticketCouple ? ` ${b.ticketCouple}× ${t("bookings.couple")}` : ""}
               </p>
             ) : null}
             {b.pubMode === "event" && b.selectedPubEvent && (
@@ -298,9 +298,9 @@ function PremiumTicket({ b }: { b: any }) {
     }
 
     const ticketBreakdown = [
-      b.ticketWomen ? `${b.ticketWomen}\u00d7 Women` : "",
-      b.ticketMen ? `${b.ticketMen}\u00d7 Men` : "",
-      b.ticketCouple ? `${b.ticketCouple}\u00d7 Couple` : "",
+      b.ticketWomen ? `${b.ticketWomen}\u00d7 ${t("bookings.women")}` : "",
+      b.ticketMen ? `${b.ticketMen}\u00d7 ${t("bookings.men")}` : "",
+      b.ticketCouple ? `${b.ticketCouple}\u00d7 ${t("bookings.couple")}` : "",
     ].filter(Boolean).map(esc).join(" &middot; ");
 
     w.document.write(`<!doctype html><html><head>
@@ -405,9 +405,9 @@ function PremiumTicket({ b }: { b: any }) {
   };
 
   const ticketBreakdownParts = [
-    b.ticketWomen ? `${b.ticketWomen}× Women` : "",
-    b.ticketMen ? `${b.ticketMen}× Men` : "",
-    b.ticketCouple ? `${b.ticketCouple}× Couple` : "",
+    b.ticketWomen ? `${b.ticketWomen}× ${t("bookings.women")}` : "",
+    b.ticketMen ? `${b.ticketMen}× ${t("bookings.men")}` : "",
+    b.ticketCouple ? `${b.ticketCouple}× ${t("bookings.couple")}` : "",
   ].filter(Boolean);
 
   return (
@@ -418,10 +418,10 @@ function PremiumTicket({ b }: { b: any }) {
         </p>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={printTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
-            <Printer className="h-3.5 w-3.5" />Print
+            <Printer className="h-3.5 w-3.5" />{t("bookings.print")}
           </Button>
           <Button size="sm" onClick={printTicket} className="gap-1.5 bg-gradient-to-br from-amber-600 to-amber-800 border-0 text-black font-semibold hover:from-amber-500 hover:to-amber-700">
-            <Download className="h-3.5 w-3.5" />PDF
+            <Download className="h-3.5 w-3.5" />{t("bookings.pdf")}
           </Button>
         </div>
       </div>

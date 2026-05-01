@@ -57,11 +57,11 @@ export function Pubs() {
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="max-w-3xl mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
-          <Wine className="h-3.5 w-3.5" /> Nightlife
+          <Wine className="h-3.5 w-3.5" /> {t("pubs.nightlife_badge")}
         </p>
         <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pubs.title")}</h1>
         <p className="mt-4 text-white/60 leading-relaxed">
-          Hand-picked nightlife venues — book a table for tickets or a private event evening.
+          {t("pubs.subtitle")}
         </p>
       </header>
 

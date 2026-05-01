@@ -189,7 +189,10 @@
     "upload_failed_desc": "फ़ोटो अपलोड नहीं हो सकी। पुनः प्रयास करें।",
     "name_placeholder": "आपका नाम",
     "about_placeholder": "अपने बारे में लिखें…",
-    "sign_out_title": "साइन आउट"
+    "sign_out_title": "साइन आउट",
+    "sign_in_sub": "बुकिंग, विशलिस्ट और अधिक प्रबंधित करने के लिए साइन इन करें",
+    "percent_off": "%{percent}% की छूट",
+    "vendor_only": "केवल %{vendor}"
   },
   "bookings": {
     "title": "मेरी बुकिंग",

@@ -189,7 +189,10 @@
     "upload_failed_desc": "ফটো আপলোড হয়নি। আবার চেষ্টা করুন।",
     "name_placeholder": "আপনার নাম",
     "about_placeholder": "নিজের সম্পর্কে লিখুন…",
-    "sign_out_title": "সাইন আউট"
+    "sign_out_title": "সাইন আউট",
+    "sign_in_sub": "বুকিং, উইশলিস্ট এবং আরও পরিচালনা করতে সাইন ইন করুন",
+    "percent_off": "%{percent}% ছাড়",
+    "vendor_only": "শুধুমাত্র %{vendor}"
   },
   "bookings": {
     "title": "আমার বুকিং",

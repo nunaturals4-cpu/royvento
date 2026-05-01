@@ -88,7 +88,10 @@
     "view_all_events": "View all events",
     "view_all_pubs": "View all pubs",
     "no_events": "No events found",
-    "no_pubs": "No pubs found"
+    "no_pubs": "No pubs found",
+    "premium_badge": "Royvento Premium",
+    "premium_heading": "Host an event people will write home about.",
+    "premium_sub": "Subscribe for early-access drops, members-only pubs, complimentary upgrades, and partner concierge."
   },
   "explore": {
     "eyebrow": "Explore",
@@ -112,7 +115,9 @@
     "all_cities": "All cities",
     "no_results": "No pubs found",
     "filters": "Filters",
-    "clear_all": "Clear all"
+    "clear_all": "Clear all",
+    "nightlife_badge": "Nightlife",
+    "subtitle": "Hand-picked nightlife venues — book a table for tickets or a private event evening."
   },
   "events": {
     "book_now": "Book now",
@@ -239,7 +244,12 @@
     "cancel_failed": "Failed to cancel",
     "cancel_failed_desc": "Something went wrong. Please try again.",
     "download_ticket": "Download ticket",
-    "cancel": "Cancel booking"
+    "cancel": "Cancel booking",
+    "print": "Print",
+    "pdf": "PDF",
+    "women": "Women",
+    "men": "Men",
+    "couple": "Couple"
   },
   "common": {
     "loading": "Loading…",
