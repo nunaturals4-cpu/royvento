@@ -4,7 +4,7 @@ export function Footer() {
   return (
     <footer className="border-t bg-card mt-24">
       <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-4">
-        <div className="md:col-span-2 space-y-3">
+        <div className="md:col-span-1 space-y-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
@@ -30,11 +30,22 @@ export function Footer() {
             <li><Link href="/login" className="hover:text-foreground">Partner Login</Link></li>
           </ul>
         </div>
+        <div className="space-y-2">
+          <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground">Legal</h4>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li><Link href="/terms" className="hover:text-foreground">Terms &amp; Conditions</Link></li>
+            <li><Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
+          </ul>
+        </div>
       </div>
       <div className="border-t">
         <div className="container mx-auto px-4 md:px-6 py-5 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>© {new Date().getFullYear()} Royvento. Crafted with care.</span>
-          <span className="font-serif italic">Designed for hosts who notice the details.</span>
+          <div className="flex items-center gap-4">
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <span className="font-serif italic">Designed for hosts who notice the details.</span>
+          </div>
         </div>
       </div>
     </footer>

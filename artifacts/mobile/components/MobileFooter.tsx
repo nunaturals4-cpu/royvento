@@ -44,6 +44,17 @@ export function MobileFooter() {
         </View>
       </View>
 
+      {/* Legal */}
+      <View style={styles.legalRow}>
+        <Pressable onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/terms`)}>
+          <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>Terms &amp; Conditions</Text>
+        </Pressable>
+        <Text style={[styles.legalSep, { color: colors.mutedForeground }]}>·</Text>
+        <Pressable onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/privacy`)}>
+          <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>Privacy Policy</Text>
+        </Pressable>
+      </View>
+
       {/* Divider + copyright */}
       <View style={[styles.divider, { borderTopColor: colors.border }]} />
       <View style={styles.bottom}>
@@ -130,5 +141,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     fontStyle: "italic",
+  },
+  legalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  legalLink: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    textDecorationLine: "underline",
+  },
+  legalSep: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
 });

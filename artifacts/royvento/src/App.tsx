@@ -33,6 +33,8 @@ import { Wishlist } from "@/pages/wishlist";
 import { ForgotPassword } from "@/pages/forgot-password";
 import { ResetPassword } from "@/pages/reset-password";
 import { PaymentResult } from "@/pages/payment-result";
+import { Terms } from "@/pages/terms";
+import { Privacy } from "@/pages/privacy";
 
 import { RequireAuth } from "@/components/RequireAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -83,6 +85,8 @@ function Router() {
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/payment-result" component={PaymentResult} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/privacy" component={Privacy} />
 
           <Route path="/wishlist">
             {() => <RequireAuth><Wishlist /></RequireAuth>}
