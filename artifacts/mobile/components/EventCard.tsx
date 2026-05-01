@@ -125,12 +125,18 @@ export function EventCard({
           ) : null}
         </View>
 
-        {/* Bottom-right: drink deal — sole occupant of this corner in non-compact mode */}
-        {hasDrinkPlans && !compact ? (
-          <View style={[styles.drinkBadge, { backgroundColor: colors.primary }]}>
-            <Ionicons name="wine-outline" size={9} color={colors.primaryForeground} />
-            <Text style={[styles.drinkBadgeText, { color: colors.primaryForeground }]}>Drink deal</Text>
-          </View>
+        {/* Bottom-right: drink deal — in compact mode shows icon-only pill to fit the 90px image */}
+        {hasDrinkPlans ? (
+          compact ? (
+            <View style={[styles.drinkBadgeCompact, { backgroundColor: colors.primary }]}>
+              <Ionicons name="wine-outline" size={9} color={colors.primaryForeground} />
+            </View>
+          ) : (
+            <View style={[styles.drinkBadge, { backgroundColor: colors.primary }]}>
+              <Ionicons name="wine-outline" size={9} color={colors.primaryForeground} />
+              <Text style={[styles.drinkBadgeText, { color: colors.primaryForeground }]}>Drink deal</Text>
+            </View>
+          )
         ) : null}
       </View>
 
@@ -142,12 +148,6 @@ export function EventCard({
           >
             {title}
           </Text>
-          {/* In compact mode show a small drink deal icon next to the title */}
-          {hasDrinkPlans && compact ? (
-            <View style={[styles.drinkPillCompact, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
-              <Ionicons name="wine-outline" size={8} color={colors.primary} />
-            </View>
-          ) : null}
         </View>
         {location ? (
           <View style={styles.row}>
@@ -324,16 +324,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
+  drinkBadgeCompact: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    borderRadius: 5,
+    padding: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   drinkBadgeText: {
     fontSize: 9,
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 0.4,
-  },
-  drinkPillCompact: {
-    borderRadius: 4,
-    padding: 3,
-    borderWidth: 1,
-    alignSelf: "center",
   },
 });
