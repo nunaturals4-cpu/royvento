@@ -13,8 +13,13 @@ function getFromAddress(): string {
 
 function getAppUrl(): string {
   if (process.env["APP_URL"]) return process.env["APP_URL"];
-  const domain = process.env["REPLIT_DEV_DOMAIN"];
-  if (domain) return `https://${domain}`;
+  const productionDomains = process.env["REPLIT_DOMAINS"];
+  if (productionDomains) {
+    const domain = productionDomains.split(",")[0]?.trim();
+    if (domain) return `https://${domain}`;
+  }
+  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
+  if (devDomain) return `https://${devDomain}`;
   return "http://localhost:3000";
 }
 
