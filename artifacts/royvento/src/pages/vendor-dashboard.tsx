@@ -2424,6 +2424,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const [type, setType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
   const [productName, setProductName] = useState("");
@@ -2433,6 +2435,18 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [description, setDescription] = useState("");
+
+  const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
+  const [editProductName, setEditProductName] = useState("");
+  const [editGender, setEditGender] = useState<"all" | "female">("all");
+  const [editPrice, setEditPrice] = useState("0");
+  const [editDays, setEditDays] = useState<string[]>([]);
+  const [editTimeFrom, setEditTimeFrom] = useState("");
+  const [editTimeTo, setEditTimeTo] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+
+  const errMsg = (err: unknown): string =>
+    err instanceof Error ? err.message : typeof err === "string" ? err : "Please try again.";
 
   const fetchPlans = async () => {
     try {
@@ -2451,10 +2465,27 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const toggleDay = (day: string) =>
     setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
+  const toggleEditDay = (day: string) =>
+    setEditDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+
   const resetForm = () => {
     setType("welcome"); setProductName(""); setGender("all"); setPrice("0");
     setDays([]); setTimeFrom(""); setTimeTo(""); setDescription("");
   };
+
+  const startEdit = (plan: DrinkPlan) => {
+    setEditingId(plan.id);
+    setEditType(plan.type as typeof editType);
+    setEditProductName(plan.productName);
+    setEditGender(plan.gender as typeof editGender);
+    setEditPrice(String(plan.price / 100));
+    setEditDays(plan.days);
+    setEditTimeFrom(plan.timeFrom);
+    setEditTimeTo(plan.timeTo);
+    setEditDescription(plan.description);
+  };
+
+  const cancelEdit = () => setEditingId(null);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2471,10 +2502,33 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       toast({ title: "Drink plan added" });
       resetForm();
       await fetchPlans();
-    } catch (err: any) {
-      toast({ title: "Failed to add plan", description: err?.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Failed to add plan", description: errMsg(err), variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProductName.trim()) {
+      toast({ title: "Product name is required", variant: "destructive" }); return;
+    }
+    const priceInt = Math.max(0, Math.round(parseFloat(editPrice || "0") * 100));
+    setEditSaving(true);
+    try {
+      const updated: DrinkPlan = await apiPatch(`/api/vendors/me/drink-plans/${editingId}`, {
+        type: editType, productName: editProductName.trim(), gender: editGender,
+        price: priceInt, days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
+        description: editDescription.trim(),
+      });
+      setPlans((prev) => prev.map((p) => p.id === editingId ? updated : p));
+      setEditingId(null);
+      toast({ title: "Drink plan updated" });
+    } catch (err: unknown) {
+      toast({ title: "Failed to update plan", description: errMsg(err), variant: "destructive" });
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -2484,8 +2538,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       await apiDelete(`/api/vendors/me/drink-plans/${planId}`);
       setPlans((prev) => prev.filter((p) => p.id !== planId));
       toast({ title: "Drink plan removed" });
-    } catch (err: any) {
-      toast({ title: "Failed to remove plan", description: err?.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Failed to remove plan", description: errMsg(err), variant: "destructive" });
     } finally {
       setDeleting(null);
     }
@@ -2624,50 +2678,123 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         ) : (
           <div className="space-y-3">
             {plans.map((plan) => (
-              <div key={plan.id} className="flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-black/20 px-5 py-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold">{plan.productName}</span>
-                    <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
-                      {planTypeLabel(plan.type)}
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      plan.price === 0
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-white/5 text-muted-foreground border border-white/10"
-                    }`}>
-                      {fmtPrice(plan.price)}
-                    </span>
-                    {plan.gender === "female" && (
-                      <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">
-                        Female only
-                      </span>
-                    )}
+              <div key={plan.id} className="rounded-xl border border-white/10 bg-black/20 overflow-hidden">
+                {editingId === plan.id ? (
+                  <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
+                    <h4 className="text-sm font-semibold text-primary">Editing plan</h4>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Plan type</Label>
+                        <Select value={editType} onValueChange={(v) => setEditType(v as typeof editType)}>
+                          <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {PLAN_TYPES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Product / offer name</Label>
+                        <Input value={editProductName} onChange={(e) => setEditProductName(e.target.value)} className="bg-black/40 border-white/10" />
+                      </div>
+                      <div>
+                        <Label>Applicable gender</Label>
+                        <Select value={editGender} onValueChange={(v) => setEditGender(v as typeof editGender)}>
+                          <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All guests</SelectItem>
+                            <SelectItem value="female">Female guests only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Price <span className="text-muted-foreground text-xs">(₹0 for free)</span></Label>
+                        <div className="relative">
+                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <Input type="number" min="0" step="1" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="bg-black/40 border-white/10 pl-8" />
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="mb-2 block">Applicable days</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {PLAN_DAYS.map((day) => (
+                            <button key={day} type="button" onClick={() => toggleEditDay(day)}
+                              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${editDays.includes(day) ? "bg-primary text-primary-foreground border-primary" : "border-white/15 text-muted-foreground hover:bg-white/5"}`}>
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Valid from</Label>
+                        <Input type="time" value={editTimeFrom} onChange={(e) => setEditTimeFrom(e.target.value)} className="bg-black/40 border-white/10" />
+                      </div>
+                      <div>
+                        <Label>Valid until</Label>
+                        <Input type="time" value={editTimeTo} onChange={(e) => setEditTimeTo(e.target.value)} className="bg-black/40 border-white/10" />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label>Description</Label>
+                        <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className="bg-black/40 border-white/10 resize-none" maxLength={500} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button type="submit" disabled={editSaving} size="sm">{editSaving ? "Saving…" : "Save changes"}</Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>Cancel</Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex items-start justify-between gap-4 px-5 py-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold">{plan.productName}</span>
+                        <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
+                          {planTypeLabel(plan.type)}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          plan.price === 0
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            : "bg-white/5 text-muted-foreground border border-white/10"
+                        }`}>
+                          {fmtPrice(plan.price)}
+                        </span>
+                        {plan.gender === "female" && (
+                          <span className="rounded-full bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 text-[10px] text-pink-400 font-medium">
+                            Female only
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {plan.days.length > 0 && <span>{plan.days.join(", ")}</span>}
+                        {plan.timeFrom && plan.timeTo && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {fmtTime(plan.timeFrom)} – {fmtTime(plan.timeTo)}
+                          </span>
+                        )}
+                        {plan.description && <span className="italic text-muted-foreground/70">{plan.description}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(plan)}
+                        className="rounded-lg border border-white/15 p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
+                        title="Edit plan"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(plan.id)}
+                        disabled={deleting === plan.id}
+                        className="rounded-lg border border-destructive/30 p-2 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                        title="Remove plan"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    {plan.days.length > 0 && (
-                      <span>{plan.days.join(", ")}</span>
-                    )}
-                    {plan.timeFrom && plan.timeTo && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {fmtTime(plan.timeFrom)} – {fmtTime(plan.timeTo)}
-                      </span>
-                    )}
-                    {plan.description && (
-                      <span className="italic text-muted-foreground/70">{plan.description}</span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(plan.id)}
-                  disabled={deleting === plan.id}
-                  className="shrink-0 rounded-lg border border-destructive/30 p-2 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                  title="Remove plan"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                )}
               </div>
             ))}
           </div>

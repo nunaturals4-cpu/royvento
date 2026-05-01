@@ -402,6 +402,24 @@ router.post("/vendors/me/drink-plans", requireAuth(["vendor"]), async (req, res)
   res.json(plan);
 });
 
+router.patch("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const planId = Number(req.params["planId"]);
+  if (!Number.isFinite(planId)) { res.status(400).json({ error: "Invalid plan id" }); return; }
+  const vendor = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
+  const parsed = DrinkPlanBody.partial().safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
+  const [updated] = await db
+    .update(drinkPlansTable)
+    .set(parsed.data)
+    .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, vendor[0].id)))
+    .returning();
+  if (!updated) { res.status(404).json({ error: "Plan not found" }); return; }
+  res.json(updated);
+});
+
 router.delete("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
