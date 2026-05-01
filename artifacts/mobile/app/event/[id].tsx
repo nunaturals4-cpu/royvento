@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
 interface EventVendor {
@@ -113,6 +114,7 @@ function TickerCounter({
 }
 
 export default function EventDetailScreen() {
+  const { t } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -213,11 +215,11 @@ export default function EventDetailScreen() {
       if (result.valid) {
         setCouponState({ code: couponInput.trim().toUpperCase(), discountPercent: result.discountPercent });
       } else {
-        setCouponError("Coupon is not valid");
+        setCouponError(t("events.coupon_invalid"));
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
-      setCouponError(err?.message ?? "Invalid coupon");
+      setCouponError(err?.message ?? t("events.coupon_invalid"));
     } finally {
       setCouponLoading(false);
     }
@@ -277,9 +279,9 @@ export default function EventDetailScreen() {
         setShowBooking(false);
         qc.invalidateQueries({ queryKey: getListMyBookingsQueryKey() });
         Alert.alert(
-          "Booking Confirmed!",
-          "Your booking is confirmed. View your ticket in the Bookings tab.",
-          [{ text: "View Bookings", onPress: () => router.push("/(tabs)/bookings") }, { text: "OK" }],
+          t("events.booking_confirmed"),
+          t("events.booking_confirmed_desc"),
+          [{ text: t("events.view_bookings_btn"), onPress: () => router.push("/(tabs)/bookings") }, { text: "OK" }],
         );
       },
       onError: (err: Error) => {
@@ -287,8 +289,8 @@ export default function EventDetailScreen() {
         const msg = err?.message ?? "Something went wrong";
         const isUnconfigured = msg.toLowerCase().includes("online payments are not set up") || msg.includes("PHONEPE_UNCONFIGURED");
         Alert.alert(
-          isUnconfigured ? "Online Payments Not Available" : "Booking Failed",
-          isUnconfigured ? "Online payments are not set up yet — please choose Pay at Venue." : msg,
+          isUnconfigured ? t("events.online_pay_unavailable") : t("events.booking_failed"),
+          isUnconfigured ? t("events.online_pay_unavailable_desc") : msg,
         );
       },
     },
@@ -297,13 +299,13 @@ export default function EventDetailScreen() {
   const handleBook = () => {
     if (!user) { router.push("/(auth)/login"); return; }
     const today = new Date().toISOString().slice(0, 10);
-    if (bookingDate < today) { Alert.alert("Invalid Date", "Booking date must be today or in the future."); return; }
+    if (bookingDate < today) { Alert.alert(t("events.invalid_date"), t("events.date_future")); return; }
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
-      Alert.alert("Add Tickets", "Please select at least one ticket to proceed.");
+      Alert.alert(t("events.add_tickets"), t("events.add_tickets_desc"));
       return;
     }
     if (isPub && pubMode === "event" && (!parseInt(guests) || parseInt(guests) < 10)) {
-      Alert.alert("Minimum Guests", "Group bookings require at least 10 guests.");
+      Alert.alert(t("events.min_guests"), t("events.min_guests_desc"));
       return;
     }
 
@@ -350,7 +352,7 @@ export default function EventDetailScreen() {
   if (!event) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
-        <Text style={{ color: colors.mutedForeground }}>Event not found</Text>
+        <Text style={{ color: colors.mutedForeground }}>{t("events.not_found")}</Text>
       </View>
     );
   }
@@ -415,7 +417,7 @@ export default function EventDetailScreen() {
             </View>
             {isPub && (
               <View style={[styles.catBadge, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={[styles.catText, { color: colors.mutedForeground }]}>Pub</Text>
+                <Text style={[styles.catText, { color: colors.mutedForeground }]}>{t("events.pub_label")}</Text>
               </View>
             )}
             {avgRating ? (
@@ -438,7 +440,7 @@ export default function EventDetailScreen() {
                 <Ionicons name="location" size={16} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.locationLabel, { color: colors.mutedForeground }]}>Location</Text>
+                <Text style={[styles.locationLabel, { color: colors.mutedForeground }]}>{t("events.location_label")}</Text>
                 <Text style={[styles.locationText, { color: colors.foreground }]} numberOfLines={2}>
                   {vendor?.address ||
                     [
@@ -451,7 +453,7 @@ export default function EventDetailScreen() {
               </View>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Text style={{ fontSize: 11, color: colors.primary, fontFamily: "Inter_500Medium" }}>Open in Maps</Text>
+              <Text style={{ fontSize: 11, color: colors.primary, fontFamily: "Inter_500Medium" }}>{t("events.open_in_maps")}</Text>
               <Ionicons name="open-outline" size={13} color={colors.primary} />
             </View>
           </Pressable>
@@ -459,7 +461,7 @@ export default function EventDetailScreen() {
           {/* Price */}
           {basePrice > 0 && !isPub ? (
             <View style={[styles.priceRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-              <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Starting from</Text>
+              <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>{t("events.starting_from")}</Text>
               <Text style={[styles.priceValue, { color: colors.primary }]}>{formatINR(basePrice)}</Text>
             </View>
           ) : null}
@@ -468,9 +470,9 @@ export default function EventDetailScreen() {
           {isPub && (priceWomen > 0 || priceMen > 0) ? (
             <View style={[styles.pubPricing, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               {[
-                { label: "Women", p: priceWomen },
-                { label: "Men", p: priceMen },
-                { label: "Couple", p: priceCouple },
+                { label: t("events.women"), p: priceWomen },
+                { label: t("events.men"), p: priceMen },
+                { label: t("events.couple"), p: priceCouple },
               ].filter((x) => x.p > 0).map((x) => (
                 <View key={x.label} style={styles.pubPriceItem}>
                   <Text style={[styles.pubPriceLabel, { color: colors.mutedForeground }]}>{x.label}</Text>
@@ -488,21 +490,21 @@ export default function EventDetailScreen() {
               <View style={[styles.freeEntryBox, { backgroundColor: "#052e16", borderColor: "#16a34a44" }]}>
                 <View style={styles.freeEntryHeader}>
                   <View style={[styles.freeEntryDot, { backgroundColor: "#22c55e" }]} />
-                  <Text style={[styles.freeEntryTitle, { color: "#4ade80" }]}>Free Entry</Text>
+                  <Text style={[styles.freeEntryTitle, { color: "#4ade80" }]}>{t("events.free_entry")}</Text>
                 </View>
                 {fer.genders.length > 0 && (
                   <Text style={[styles.freeEntryLine, { color: "#86efac" }]}>
-                    For: {fer.genders.join(", ")}
+                    {t("events.free_for", { genders: fer.genders.join(", ") })}
                   </Text>
                 )}
                 {fer.days.length > 0 && (
                   <Text style={[styles.freeEntryLine, { color: "#86efac" }]}>
-                    Days: {fer.days.join(", ")}
+                    {t("events.free_days", { days: fer.days.join(", ") })}
                   </Text>
                 )}
                 {fer.beforeTime && (
                   <Text style={[styles.freeEntryLine, { color: "#86efac" }]}>
-                    Entry before: {fer.beforeTime}
+                    {t("events.free_before", { time: fer.beforeTime })}
                   </Text>
                 )}
               </View>
@@ -512,7 +514,7 @@ export default function EventDetailScreen() {
           {/* Description */}
           {event.description ? (
             <View style={{ gap: 6 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.about_section")}</Text>
               <Text style={[styles.description, { color: colors.mutedForeground }]}>{event.description}</Text>
             </View>
           ) : null}
@@ -520,7 +522,7 @@ export default function EventDetailScreen() {
           {/* Day hours (pub) */}
           {vendor?.dayHours && Object.keys(vendor.dayHours).length > 0 ? (
             <View style={{ gap: 8 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Opening Hours</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.opening_hours")}</Text>
               <View style={[{ borderRadius: 12, borderWidth: 1, overflow: "hidden", borderColor: colors.border }]}>
                 {Object.entries(vendor.dayHours).map(([day, times], i) => (
                   <View
@@ -541,7 +543,7 @@ export default function EventDetailScreen() {
                         {fmtTime(times.open)} – {fmtTime(times.close)}
                       </Text>
                     ) : (
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, fontStyle: "italic" }}>Closed</Text>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, fontStyle: "italic" }}>{t("events.closed_label")}</Text>
                     )}
                   </View>
                 ))}
@@ -549,14 +551,14 @@ export default function EventDetailScreen() {
             </View>
           ) : vendor?.openDays && vendor.openDays.length > 0 ? (
             <View style={{ gap: 6 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Opening Days</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.open_days")}</Text>
               <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.openDays.join(", ")}</Text>
             </View>
           ) : null}
 
           {eventAnnouncements.length > 0 ? (
             <View style={{ gap: 10 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Announcements</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.announcements")}</Text>
               {eventAnnouncements.map((ann) => (
                 <View
                   key={ann.id}
@@ -589,7 +591,7 @@ export default function EventDetailScreen() {
 
           {isPub && similarPubs.length > 0 ? (
             <View style={{ gap: 10 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Similar Pubs Nearby</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.similar_pubs")}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
                 <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 12 }}>
                   {similarPubs.map((pub: any) => (
@@ -626,7 +628,7 @@ export default function EventDetailScreen() {
                   onPress={() => router.push(`/(tabs)/explore?city=${encodeURIComponent(eventCity)}&type=pub` as never)}
                   style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4 }}
                 >
-                  <Text style={{ fontSize: 13, color: colors.primary }}>See all in {eventCity}</Text>
+                  <Text style={{ fontSize: 13, color: colors.primary }}>{t("events.see_all_in_city", { city: eventCity })}</Text>
                   <Ionicons name="arrow-forward" size={13} color={colors.primary} />
                 </Pressable>
               ) : null}
@@ -637,19 +639,19 @@ export default function EventDetailScreen() {
         {/* ─── Booking form ─── */}
         {showBooking ? (
           <View style={[styles.bookingForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Book This Event</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.book_this")}</Text>
 
             {/* Open-days note */}
             {vendor?.openDays && vendor.openDays.length > 0 ? (
               <View style={[styles.openDaysRow, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}>
                 <Ionicons name="calendar-outline" size={14} color={colors.primary} />
-                <Text style={[styles.openDaysText, { color: colors.primary }]}>Open: {vendor.openDays.join(", ")}</Text>
+                <Text style={[styles.openDaysText, { color: colors.primary }]}>{t("events.open_days_note", { days: vendor.openDays.join(", ") })}</Text>
               </View>
             ) : null}
 
             {/* Date picker */}
             <View style={styles.field}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Booking Date</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.booking_date")}</Text>
               <TouchableOpacity
                 style={[styles.fieldInput, styles.datePickerBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
                 onPress={() => setShowDatePicker(true)}
@@ -678,7 +680,7 @@ export default function EventDetailScreen() {
               <>
                 {/* Booking type toggle */}
                 <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Booking type</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.booking_type")}</Text>
                   <View style={styles.modeRow}>
                     {(["ticket", "event"] as const).map((m) => (
                       <Pressable
@@ -695,7 +697,7 @@ export default function EventDetailScreen() {
                           color={pubMode === m ? colors.primary : colors.mutedForeground}
                         />
                         <Text style={[styles.modeBtnText, { color: pubMode === m ? colors.primary : colors.mutedForeground }]}>
-                          {m === "ticket" ? "Buy tickets" : "Group / corporate"}
+                          {m === "ticket" ? t("events.buy_tickets") : t("events.group_booking")}
                         </Text>
                       </Pressable>
                     ))}
@@ -705,17 +707,17 @@ export default function EventDetailScreen() {
                 {/* Ticket counters — ticket mode */}
                 {pubMode === "ticket" && (
                   <View style={[styles.pubTickets, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>Ticket counts</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("events.ticket_counts")}</Text>
                     {priceWomen > 0 && (
-                      <TickerCounter label="Women" value={ticketWomen} price={priceWomen} onChange={setTicketWomen}
+                      <TickerCounter label={t("events.women")} value={ticketWomen} price={priceWomen} onChange={setTicketWomen}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
                     {priceMen > 0 && (
-                      <TickerCounter label="Men" value={ticketMen} price={priceMen} onChange={setTicketMen}
+                      <TickerCounter label={t("events.men")} value={ticketMen} price={priceMen} onChange={setTicketMen}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
                     {priceCouple > 0 && (
-                      <TickerCounter label="Couple" value={ticketCouple} price={priceCouple} onChange={setTicketCouple}
+                      <TickerCounter label={t("events.couple")} value={ticketCouple} price={priceCouple} onChange={setTicketCouple}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
                   </View>
@@ -725,7 +727,7 @@ export default function EventDetailScreen() {
                 {pubMode === "event" && (
                   <>
                     <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Occasion</Text>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.occasion_label")}</Text>
                       <View style={styles.occasionGrid}>
                         {(["farewell", "office-party", "casual-party", "birthday", "others"] as const).map((occ) => (
                           <Pressable
@@ -737,14 +739,14 @@ export default function EventDetailScreen() {
                             ]}
                           >
                             <Text style={[styles.occasionChipText, { color: occasion === occ ? colors.primary : colors.mutedForeground }]}>
-                              {occ === "office-party" ? "Office Party" : occ === "casual-party" ? "Casual Party" : occ.charAt(0).toUpperCase() + occ.slice(1)}
+                              {occ === "farewell" ? t("events.occ_farewell") : occ === "office-party" ? t("events.occ_office_party") : occ === "casual-party" ? t("events.occ_casual_party") : occ === "birthday" ? t("events.occ_birthday") : t("events.occ_others")}
                             </Text>
                           </Pressable>
                         ))}
                       </View>
                     </View>
                     <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Guests <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular" }}>(min 10)</Text></Text>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.guests_field")} <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular" }}>{t("events.guests_min_10")}</Text></Text>
                       <TextInput
                         style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                         value={guests}
@@ -759,19 +761,19 @@ export default function EventDetailScreen() {
 
                 {/* Booking under name */}
                 <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Booking under name</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.booking_name")}</Text>
                   <TextInput
                     style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                     value={personName}
                     onChangeText={setPersonName}
-                    placeholder="Name on the booking"
+                    placeholder={t("events.name_on_booking")}
                     placeholderTextColor={colors.mutedForeground}
                   />
                 </View>
               </>
             ) : (
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Guests</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.guests_field")}</Text>
                 <TextInput
                   style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                   value={guests}
@@ -785,7 +787,7 @@ export default function EventDetailScreen() {
 
             {/* Phone */}
             <View style={styles.field}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Contact Phone</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.contact_phone")}</Text>
               <TextInput
                 style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                 value={phone}
@@ -798,12 +800,12 @@ export default function EventDetailScreen() {
 
             {/* Coupon code */}
             <View style={styles.field}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Coupon Code</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.coupon_code_field")}</Text>
               <View style={styles.couponRow}>
                 <TextInput
                   style={[styles.fieldInput, styles.couponInput, { backgroundColor: colors.muted, borderColor: couponState ? "#22c55e" : colors.border, color: colors.foreground }]}
                   value={couponInput}
-                  onChangeText={(t) => { setCouponInput(t); setCouponState(null); setCouponError(""); }}
+                  onChangeText={(inp) => { setCouponInput(inp); setCouponState(null); setCouponError(""); }}
                   placeholder="Enter code"
                   placeholderTextColor={colors.mutedForeground}
                   autoCapitalize="characters"
@@ -816,14 +818,14 @@ export default function EventDetailScreen() {
                   {couponLoading ? (
                     <ActivityIndicator size="small" color={colors.primaryForeground} />
                   ) : (
-                    <Text style={[styles.couponBtnText, { color: colors.primaryForeground }]}>Apply</Text>
+                    <Text style={[styles.couponBtnText, { color: colors.primaryForeground }]}>{t("events.apply_coupon")}</Text>
                   )}
                 </TouchableOpacity>
               </View>
               {couponState && (
                 <View style={styles.couponSuccess}>
                   <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
-                  <Text style={[styles.couponSuccessText, { color: "#22c55e" }]}>{couponState.discountPercent}% off applied!</Text>
+                  <Text style={[styles.couponSuccessText, { color: "#22c55e" }]}>{t("events.coupon_pct_off", { pct: couponState.discountPercent })}</Text>
                 </View>
               )}
               {couponError ? <Text style={[styles.couponErrorText, { color: "#ef4444" }]}>{couponError}</Text> : null}
@@ -832,19 +834,19 @@ export default function EventDetailScreen() {
             {/* Points redemption */}
             {(discountInfo?.points ?? 0) > 0 ? (
               <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Loyalty Points</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.loyalty_points")}</Text>
                 <View style={[styles.pointsBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
                     <Ionicons name="diamond-outline" size={14} color={colors.primary} />
                     <Text style={[styles.pointsAvail, { color: colors.foreground }]}>
-                      {discountInfo!.points} points available (≈{formatINR(discountInfo!.points * 0.10)})
+                      {t("events.pts_available", { n: discountInfo!.points })} (≈{formatINR(discountInfo!.points * 0.10)})
                     </Text>
                   </View>
                   <View style={styles.couponRow}>
                     <TextInput
                       style={[styles.fieldInput, styles.couponInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
                       value={pointsInput}
-                      onChangeText={(t) => setPointsInput(t.replace(/\D/g, ""))}
+                      onChangeText={(inp) => setPointsInput(inp.replace(/\D/g, ""))}
                       placeholder="0"
                       placeholderTextColor={colors.mutedForeground}
                       keyboardType="number-pad"
@@ -853,12 +855,12 @@ export default function EventDetailScreen() {
                       style={[styles.couponBtn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }]}
                       onPress={() => setPointsInput(String(pointsAvail))}
                     >
-                      <Text style={[styles.couponBtnText, { color: colors.foreground }]}>Max</Text>
+                      <Text style={[styles.couponBtnText, { color: colors.foreground }]}>{t("events.max_btn")}</Text>
                     </TouchableOpacity>
                   </View>
                   {pointsApplied > 0 && (
                     <Text style={[styles.couponSuccessText, { color: colors.primary, marginTop: 4 }]}>
-                      −{formatINR(pointsApplied * POINTS_RUPEE_RATE)} deducted
+                      {t("events.pts_deducted", { amount: formatINR(pointsApplied * POINTS_RUPEE_RATE) })}
                     </Text>
                   )}
                 </View>
@@ -867,12 +869,12 @@ export default function EventDetailScreen() {
 
             {/* Notes */}
             <View style={styles.field}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Notes (optional)</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.notes_optional")}</Text>
               <TextInput
                 style={[styles.fieldInput, styles.fieldTextArea, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
                 value={notes}
                 onChangeText={setNotes}
-                placeholder="Any special requests…"
+                placeholder={t("events.notes_placeholder")}
                 placeholderTextColor={colors.mutedForeground}
                 multiline
                 numberOfLines={3}
@@ -881,7 +883,7 @@ export default function EventDetailScreen() {
 
             {/* Payment method toggle */}
             <View style={styles.field}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Payment Method</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.payment_method")}</Text>
               <View style={[styles.payToggle, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 {(["cod", "online"] as const).map((m) => (
                   <TouchableOpacity
@@ -895,7 +897,7 @@ export default function EventDetailScreen() {
                       color={paymentMethod === m ? colors.primaryForeground : colors.mutedForeground}
                     />
                     <Text style={[styles.payOptionText, { color: paymentMethod === m ? colors.primaryForeground : colors.mutedForeground }]}>
-                      {m === "cod" ? "Pay at Venue" : "Pay Online"}
+                      {m === "cod" ? t("events.pay_venue") : t("events.pay_online_label")}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -906,25 +908,25 @@ export default function EventDetailScreen() {
             {subtotal > 0 ? (
               <View style={[styles.summary, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Subtotal</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{t("events.subtotal_label")}</Text>
                   <Text style={[styles.summaryVal, { color: colors.foreground }]}>{formatINR(subtotal)}</Text>
                 </View>
                 {discount > 0 && (
                   <View style={styles.summaryRow}>
                     <Text style={[styles.summaryLabel, { color: "#22c55e" }]}>
-                      {couponState ? `Coupon (${couponState.discountPercent}%)` : `New User (${newUserPercent}%)`}
+                      {couponState ? t("events.discount_coupon_pct", { pct: couponState.discountPercent }) : t("events.new_user_pct", { pct: newUserPercent })}
                     </Text>
                     <Text style={[styles.summaryVal, { color: "#22c55e" }]}>−{formatINR(discount)}</Text>
                   </View>
                 )}
                 {pointsApplied > 0 && (
                   <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: colors.primary }]}>Points</Text>
+                    <Text style={[styles.summaryLabel, { color: colors.primary }]}>{t("events.points_label")}</Text>
                     <Text style={[styles.summaryVal, { color: colors.primary }]}>−{formatINR(pointsApplied * POINTS_RUPEE_RATE)}</Text>
                   </View>
                 )}
                 <View style={[styles.summaryRow, styles.summaryTotal]}>
-                  <Text style={[styles.summaryLabel, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>Total</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>{t("events.total_label")}</Text>
                   <Text style={[styles.summaryVal, { color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 18 }]}>{formatINR(finalTotal)}</Text>
                 </View>
               </View>
@@ -935,7 +937,7 @@ export default function EventDetailScreen() {
                 style={[styles.cancelBtn, { borderColor: colors.border }]}
                 onPress={() => setShowBooking(false)}
               >
-                <Text style={[styles.cancelBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, { color: colors.mutedForeground }]}>{t("events.cancel_btn")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitBtn, { backgroundColor: colors.primary }, bookingMutation.isPending && { opacity: 0.7 }]}
@@ -946,7 +948,7 @@ export default function EventDetailScreen() {
                   <ActivityIndicator color={colors.primaryForeground} />
                 ) : (
                   <Text style={[styles.submitBtnText, { color: colors.primaryForeground }]}>
-                    {paymentMethod === "online" ? "Pay & Confirm" : "Confirm"}
+                    {paymentMethod === "online" ? t("events.pay_confirm_btn") : t("events.confirm_btn")}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -969,7 +971,7 @@ export default function EventDetailScreen() {
             }}
           >
             <Ionicons name="calendar" size={18} color={colors.primaryForeground} />
-            <Text style={[styles.bookBtnText, { color: colors.primaryForeground }]}>Book Now</Text>
+            <Text style={[styles.bookBtnText, { color: colors.primaryForeground }]}>{t("events.book_now_btn")}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -992,9 +994,9 @@ export default function EventDetailScreen() {
             <View style={[styles.modalIconWrap, { backgroundColor: colors.primary + "18" }]}>
               <Ionicons name="ticket-outline" size={32} color={colors.primary} />
             </View>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Sign in to complete your booking</Text>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>{t("events.sign_in_book_title")}</Text>
             <Text style={[styles.modalBody, { color: colors.mutedForeground }]}>
-              Create an account or sign in to book this event and manage your tickets.
+              {t("events.sign_in_book_body")}
             </Text>
             <TouchableOpacity
               style={[styles.modalPrimaryBtn, { backgroundColor: colors.primary }]}
@@ -1004,7 +1006,7 @@ export default function EventDetailScreen() {
               }}
             >
               <Ionicons name="log-in-outline" size={18} color={colors.primaryForeground} />
-              <Text style={[styles.modalPrimaryBtnText, { color: colors.primaryForeground }]}>Sign In</Text>
+              <Text style={[styles.modalPrimaryBtnText, { color: colors.primaryForeground }]}>{t("events.sign_in_btn")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modalSecondaryBtn, { borderColor: colors.border }]}
@@ -1013,10 +1015,10 @@ export default function EventDetailScreen() {
                 router.push({ pathname: "/(auth)/register", params: { returnTo: `/event/${eventId}` } });
               }}
             >
-              <Text style={[styles.modalSecondaryBtnText, { color: colors.foreground }]}>Create an Account</Text>
+              <Text style={[styles.modalSecondaryBtnText, { color: colors.foreground }]}>{t("events.create_account_btn")}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowSignInModal(false)} style={{ marginTop: 4 }}>
-              <Text style={[styles.modalDismiss, { color: colors.mutedForeground }]}>Maybe later</Text>
+              <Text style={[styles.modalDismiss, { color: colors.mutedForeground }]}>{t("events.maybe_later")}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

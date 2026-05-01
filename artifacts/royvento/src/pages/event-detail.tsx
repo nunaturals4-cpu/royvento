@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetEvent,
@@ -23,6 +24,7 @@ interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
 
 export function EventDetail() {
+  const { t } = useTranslation();
   const params = useParams();
   const id = Number(params["id"]);
   const [, setLocation] = useLocation();
@@ -85,12 +87,12 @@ export function EventDetail() {
 
   const addToWishlist = useMutation({
     mutationFn: () => apiPost("/api/wishlist", { eventId: id }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: "Added to wishlist" }); },
-    onError: () => toast({ title: "Could not add to wishlist", variant: "destructive" } as any),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: t("events.wishlist_added") }); },
+    onError: () => toast({ title: t("events.wishlist_add_error"), variant: "destructive" } as any),
   });
   const removeFromWishlist = useMutation({
     mutationFn: () => apiDelete(`/api/wishlist/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: "Removed from wishlist" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: t("events.wishlist_removed") }); },
   });
 
   const { data: similarPubs = [] } = useQuery<any[]>({
@@ -111,7 +113,7 @@ export function EventDetail() {
   }, [me?.user?.name]);
 
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
-  if (!event) return <div className="container mx-auto px-4 py-20">Event not found.</div>;
+  if (!event) return <div className="container mx-auto px-4 py-20">{t("events.not_found")}</div>;
 
   const ev = event as any;
   const blockedDates = new Set(
@@ -170,7 +172,7 @@ export function EventDetail() {
 
   const validateCoupon = async () => {
     if (!me?.user) {
-      toast({ title: "Log in to use coupons", variant: "destructive" });
+      toast({ title: t("events.login_coupons"), variant: "destructive" });
       return;
     }
     if (!couponInput.trim()) return;
@@ -181,35 +183,35 @@ export function EventDetail() {
       );
       if (r.valid) {
         setCouponState({ valid: true, discountPercent: r.discountPercent, code: couponInput.trim().toUpperCase() });
-        toast({ title: `Coupon applied`, description: `${r.discountPercent}% off your booking.` });
+        toast({ title: t("events.coupon_applied_title"), description: t("events.coupon_applied_pct", { pct: r.discountPercent }) });
       }
     } catch (e: any) {
       setCouponState(null);
-      toast({ title: "Invalid coupon", description: e?.message, variant: "destructive" });
+      toast({ title: t("events.coupon_invalid"), description: e?.message, variant: "destructive" });
     }
   };
 
   const handleBook = async () => {
     if (!me?.user) {
-      toast({ title: "Please log in to book", variant: "destructive" });
+      toast({ title: t("events.login_to_book"), variant: "destructive" });
       setLocation("/login");
       return;
     }
     if (!date) {
-      toast({ title: "Please select a date", variant: "destructive" });
+      toast({ title: t("events.select_date"), variant: "destructive" });
       return;
     }
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
-      toast({ title: "Add at least one ticket", variant: "destructive" });
+      toast({ title: t("events.add_tickets"), variant: "destructive" });
       return;
     }
 
     if (isPub && phone && !/^\d{10}$/.test(phone)) {
-      toast({ title: "Invalid phone number", description: "Please enter a 10-digit mobile number.", variant: "destructive" });
+      toast({ title: t("events.invalid_phone"), description: t("events.phone_desc"), variant: "destructive" });
       return;
     }
     if (isClosedDay) {
-      toast({ title: `${ev.vendor?.businessName ?? "This venue"} is closed on ${selectedDayName}s`, description: "Please pick a date that falls on an open day.", variant: "destructive" });
+      toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" });
       return;
     }
     setBooking(true);
@@ -236,11 +238,11 @@ export function EventDetail() {
           : {}),
       });
       if (result?.redirectUrl) {
-        toast({ title: "Redirecting to payment…", description: "You will be taken to PhonePe to complete your payment." });
+        toast({ title: t("events.redirecting_payment"), description: t("events.phonepe_desc") });
         window.location.href = result.redirectUrl;
         return;
       }
-      toast({ title: "Booking confirmed!", description: "Your booking is confirmed. Check your dashboard for details." });
+      toast({ title: t("events.booking_confirmed"), description: t("events.booking_confirmed_desc") });
       setLocation("/dashboard/bookings");
     } catch (e: any) {
       const errMsg: string = e?.message ?? "Try again.";
@@ -249,9 +251,9 @@ export function EventDetail() {
         errMsg.toLowerCase().includes("online payments are not set up")
       );
       if (isPhonePeUnconfigured) {
-        toast({ title: "Online payments not available", description: "Online payments are not set up yet — please choose Pay at Venue.", variant: "destructive" });
+        toast({ title: t("events.online_pay_unavailable"), description: t("events.online_pay_unavailable_desc"), variant: "destructive" });
       } else {
-        toast({ title: "Booking failed", description: errMsg, variant: "destructive" });
+        toast({ title: t("events.booking_failed"), description: errMsg, variant: "destructive" });
       }
     } finally {
       setBooking(false);
@@ -264,8 +266,8 @@ export function EventDetail() {
     createReview.mutate(
       { data: { eventId: event.id, vendorId: event.vendor.id, rating: reviewRating, comment: reviewComment } },
       {
-        onSuccess: () => { toast({ title: "Review posted" }); setReviewComment(""); refetchReviews(); },
-        onError: (e: any) => toast({ title: "Failed to post", description: e?.message, variant: "destructive" }),
+        onSuccess: () => { toast({ title: t("events.review_posted") }); setReviewComment(""); refetchReviews(); },
+        onError: (e: any) => toast({ title: t("events.review_failed"), description: e?.message, variant: "destructive" }),
       },
     );
   };
@@ -295,7 +297,7 @@ export function EventDetail() {
             <Badge className="bg-white/10 border-white/10 text-white backdrop-blur">{event.category}</Badge>
             {(event as any).type === "pub" && <Badge className="bg-primary/30 text-primary-foreground border-primary/30">Pub</Badge>}
             {(event as any).popular && (
-              <Badge className="bg-primary border-0 text-primary-foreground">★ Popular</Badge>
+              <Badge className="bg-primary border-0 text-primary-foreground">{t("events.popular_badge")}</Badge>
             )}
           </div>
           <div className="flex items-start justify-between gap-4">
@@ -309,7 +311,7 @@ export function EventDetail() {
               <button
                 onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()}
                 disabled={addToWishlist.isPending || removeFromWishlist.isPending}
-                aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                aria-label={inWishlist ? t("events.remove_wishlist") : t("events.add_wishlist")}
                 className="mt-2 shrink-0 p-2.5 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 transition-colors"
               >
                 <Heart className={`h-6 w-6 transition-colors ${inWishlist ? "fill-primary text-primary" : "text-white"}`} />
@@ -357,7 +359,7 @@ export function EventDetail() {
 
       <div className="container mx-auto px-4 md:px-6 pt-12">
         <section className="pb-10">
-          <h2 className="font-serif text-3xl mb-3 accent-underline inline-block">About this event</h2>
+          <h2 className="font-serif text-3xl mb-3 accent-underline inline-block">{t("events.about_section")}</h2>
           <p className="text-white/70 leading-relaxed whitespace-pre-line mt-4">{event.description}</p>
         </section>
         <div className="grid lg:grid-cols-[1.7fr_1fr] gap-10 pb-12">
@@ -372,21 +374,21 @@ export function EventDetail() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary border border-primary/30 rounded-full px-2 py-0.5 transition-colors"
               >
-                <ExternalLink className="h-3 w-3" /> Open in Maps
+                <ExternalLink className="h-3 w-3" /> {t("events.open_maps")}
               </a>
             </div>
-            <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Up to {event.capacity} guests</div>
-            <div className="flex items-center gap-2"><Star className="h-4 w-4 fill-primary text-primary" />{event.rating > 0 ? `${event.rating.toFixed(1)} (${event.reviewCount})` : "New"}</div>
+            <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" />{t("events.capacity", { n: event.capacity })}</div>
+            <div className="flex items-center gap-2"><Star className="h-4 w-4 fill-primary text-primary" />{event.rating > 0 ? `${event.rating.toFixed(1)} (${event.reviewCount})` : t("events.new_venue")}</div>
           </div>
 
           {isPub && (ev.pubEventTypes as string[] | undefined)?.length ? (
             <div className="flex flex-wrap gap-2">
-              {(ev.pubEventTypes as string[]).map((t: string) => (
+              {(ev.pubEventTypes as string[]).map((evType: string) => (
                 <span
-                  key={t}
+                  key={evType}
                   className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
                 >
-                  {t}
+                  {evType}
                 </span>
               ))}
             </div>
@@ -398,22 +400,22 @@ export function EventDetail() {
               <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-5 space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                  <h3 className="font-semibold text-emerald-400 text-sm uppercase tracking-wide">Free Entry Available</h3>
+                  <h3 className="font-semibold text-emerald-400 text-sm uppercase tracking-wide">{t("events.free_entry_available")}</h3>
                 </div>
                 <div className="flex flex-wrap gap-3 text-sm text-white/70">
                   {fer.genders.length > 0 && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-300 text-xs font-medium">
-                      For: {fer.genders.join(", ")}
+                      {t("events.free_for", { genders: fer.genders.join(", ") })}
                     </span>
                   )}
                   {fer.days.length > 0 && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-white/60 text-xs">
-                      Days: {fer.days.join(", ")}
+                      {t("events.free_days", { days: fer.days.join(", ") })}
                     </span>
                   )}
                   {fer.beforeTime && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-white/60 text-xs">
-                      Before {fer.beforeTime}
+                      {t("events.free_before", { time: fer.beforeTime })}
                     </span>
                   )}
                 </div>
@@ -448,21 +450,21 @@ export function EventDetail() {
             return (
               <section>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-serif text-3xl accent-underline inline-block">Opening Hours</h2>
+                  <h2 className="font-serif text-3xl accent-underline inline-block">{t("events.opening_hours")}</h2>
                   <div className="flex items-center gap-3">
                     {todayTimes && (
                       <span className="hidden sm:block text-sm text-white/50 tabular-nums">
-                        Today: <span className="text-white/90 font-medium">{fmt(todayTimes.open)} – {fmt(todayTimes.close)}</span>
+                        {t("events.today_tag")}: <span className="text-white/90 font-medium">{fmt(todayTimes.open)} – {fmt(todayTimes.close)}</span>
                       </span>
                     )}
                     {isOpenNow ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-500">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                        Open now
+                        {t("events.open_now")}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-400">
-                        Closed now
+                        {t("events.closed_now")}
                       </span>
                     )}
                   </div>
@@ -470,22 +472,22 @@ export function EventDetail() {
                 {todayTimes && (
                   <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
                     <Clock className="h-4 w-4 text-primary shrink-0" />
-                    <span className="text-sm text-white/60">Today ({DAY_FULL_h[todayKey]}):</span>
+                    <span className="text-sm text-white/60">{t("events.today_tag")} ({DAY_FULL_h[todayKey]}):</span>
                     <span className="font-semibold text-primary tabular-nums">
                       {fmt(todayTimes.open)} – {fmt(todayTimes.close)}
                       {toMin(todayTimes.close) < toMin(todayTimes.open) && (
-                        <span className="ml-1.5 text-xs text-white/40 font-normal">↪ next day</span>
+                        <span className="ml-1.5 text-xs text-white/40 font-normal">{t("events.next_day")}</span>
                       )}
                     </span>
                     <span className="ml-auto">
                       {isOpenNow ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-500">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                          Open now
+                          {t("events.open_now")}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-400">
-                          Closed now
+                          {t("events.closed_now")}
                         </span>
                       )}
                     </span>
@@ -515,7 +517,7 @@ export function EventDetail() {
                               </span>
                               {isToday && (
                                 <span className="shrink-0 text-[10px] font-semibold text-primary/70 uppercase tracking-wider border border-primary/30 rounded px-1 py-px">
-                                  today
+                                  {t("events.today_tag")}
                                 </span>
                               )}
                             </span>
@@ -529,7 +531,7 @@ export function EventDetail() {
                                 <>
                                   {fmt(times.open)} – {fmt(times.close)}
                                   {isOvernight && (
-                                    <span className="ml-1 text-white/30 text-[10px]">↪ next day</span>
+                                    <span className="ml-1 text-white/30 text-[10px]">{t("events.next_day")}</span>
                                   )}
                                 </>
                               ) : "–"}
@@ -548,7 +550,7 @@ export function EventDetail() {
             <section>
               <h2 className="font-serif text-3xl mb-5 accent-underline inline-block flex items-center gap-2">
                 <Navigation className="h-6 w-6 text-primary" />
-                Find us
+                {t("events.find_us")}
               </h2>
               <iframe
                 title="Venue location"
@@ -564,14 +566,14 @@ export function EventDetail() {
                 className="inline-flex items-center gap-1.5 mt-2 text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <Navigation className="h-3.5 w-3.5" />
-                {vendorAddress} — Open in Google Maps ↗
+                {vendorAddress} — {t("events.open_google_maps")} ↗
               </a>
             </section>
           )}
 
           {isPub && announcements.length > 0 && (
             <section>
-              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">Announcements</h2>
+              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">{t("events.announcements")}</h2>
               <div className="space-y-4 mt-4">
                 {announcements.map((a: any) => (
                   <div key={a.id} className="rounded-xl glass-card p-5 flex gap-4">
@@ -595,9 +597,9 @@ export function EventDetail() {
           )}
 
           <section>
-            <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">Reviews</h2>
+            <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">{t("events.reviews_section")}</h2>
             {reviews.length === 0 ? (
-              <p className="text-muted-foreground text-sm mt-4">No reviews yet — be the first.</p>
+              <p className="text-muted-foreground text-sm mt-4">{t("events.no_reviews")}</p>
             ) : (
               <div className="space-y-4 mt-4">
                 {reviews.map((r: any) => (
@@ -615,7 +617,7 @@ export function EventDetail() {
                           <p className="font-medium text-sm truncate">{r.userName}</p>
                           {r.verifiedBooking && (
                             <span className="inline-flex items-center gap-1 text-[10px] text-green-400 font-medium">
-                              <BadgeCheck className="h-3 w-3" /> Verified booking
+                              <BadgeCheck className="h-3 w-3" /> {t("events.verified_booking")}
                             </span>
                           )}
                         </div>
@@ -634,7 +636,7 @@ export function EventDetail() {
 
             {me?.user && (
               <div className="mt-8 rounded-2xl glass-card-strong p-6 space-y-3">
-                <p className="font-serif text-xl">Leave a review</p>
+                <p className="font-serif text-xl">{t("events.leave_review")}</p>
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button key={n} type="button" onClick={() => setReviewRating(n)}>
@@ -642,15 +644,15 @@ export function EventDetail() {
                     </button>
                   ))}
                 </div>
-                <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="Share your experience…" className="bg-black/40 border-white/10" />
-                <Button onClick={handleReview} disabled={createReview.isPending || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Post review</Button>
+                <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder={t("events.review_placeholder")} className="bg-black/40 border-white/10" />
+                <Button onClick={handleReview} disabled={createReview.isPending || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">{t("events.post_review")}</Button>
               </div>
             )}
           </section>
 
           {similarPubs.length > 0 && (
             <section>
-              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">Similar Pubs Nearby</h2>
+              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">{t("events.similar_pubs")}</h2>
               <div className="grid gap-4 sm:grid-cols-3">
                 {similarPubs.map((pub: any) => (
                   <Link key={pub.id} href={`/events/${pub.id}`}>
@@ -676,7 +678,7 @@ export function EventDetail() {
                     href={`/pubs?city=${encodeURIComponent((event as any).city)}`}
                     className="text-sm text-primary hover:underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
                   >
-                    See all pubs in {(event as any).city} →
+                    {t("events.see_all_city", { city: (event as any).city })} →
                   </Link>
                 </div>
               )}
@@ -686,26 +688,26 @@ export function EventDetail() {
 
         <aside className="lg:sticky lg:top-24 lg:self-start space-y-4 order-first lg:order-none">
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Starting at</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
             <p className="font-serif text-5xl mt-1">{startingAt > 0 ? formatINR(startingAt) : "—"}</p>
             <p className="text-xs text-muted-foreground mb-3">
-              {isPub ? "lowest entry price" : "per person · per event"}
+              {isPub ? t("events.lowest_entry") : t("events.per_person_event")}
             </p>
 
             {isPub && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0 || (dayPricingMap && Object.keys(dayPricingMap).length > 0)) && (
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-5 space-y-2">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Entry prices{dayPricingMap && Object.keys(dayPricingMap).length > 0 ? " by day" : ""}
+                  {dayPricingMap && Object.keys(dayPricingMap).length > 0 ? t("events.entry_prices_by_day") : t("events.entry_prices")}
                 </p>
                 {dayPricingMap && Object.keys(dayPricingMap).length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-white/10 text-white/40">
-                          <th className="text-left pb-1 font-medium">Day</th>
-                          <th className="text-right pb-1 font-medium">Women</th>
-                          <th className="text-right pb-1 font-medium">Men</th>
-                          <th className="text-right pb-1 font-medium">Couple</th>
+                          <th className="text-left pb-1 font-medium">{t("events.day_col")}</th>
+                          <th className="text-right pb-1 font-medium">{t("events.women")}</th>
+                          <th className="text-right pb-1 font-medium">{t("events.men")}</th>
+                          <th className="text-right pb-1 font-medium">{t("events.couple")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -731,19 +733,19 @@ export function EventDetail() {
                   <>
                     {Number(ev.priceWomen) > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/70">Women</span>
+                        <span className="text-white/70">{t("events.women")}</span>
                         <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceWomen))}</span>
                       </div>
                     )}
                     {Number(ev.priceMen) > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/70">Men</span>
+                        <span className="text-white/70">{t("events.men")}</span>
                         <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceMen))}</span>
                       </div>
                     )}
                     {Number(ev.priceCouple) > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/70">Couple</span>
+                        <span className="text-white/70">{t("events.couple")}</span>
                         <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceCouple))}</span>
                       </div>
                     )}
@@ -755,13 +757,13 @@ export function EventDetail() {
             {discountInfo?.isNewUser && (
               <div className="mb-4 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs flex items-center gap-2 text-primary">
                 <Sparkle className="h-3.5 w-3.5" />
-                New-member: {discountInfo.bookingDiscountPercent}% off this booking
+                {t("events.new_member_discount", { pct: discountInfo.bookingDiscountPercent })}
               </div>
             )}
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="bdate">Date</Label>
+                <Label htmlFor="bdate">{t("events.date_label")}</Label>
                 <Input
                   id="bdate"
                   type="date"
@@ -772,7 +774,7 @@ export function EventDetail() {
                 />
                 {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
                   <p className="text-xs text-muted-foreground mt-1.5">
-                    Open: {vendorOpenDays.join(", ")}
+                    {t("events.open_days_note", { days: vendorOpenDays.join(", ") })}
                   </p>
                 )}
               </div>
@@ -780,7 +782,7 @@ export function EventDetail() {
               {isPub ? (
                 <>
                   <div>
-                    <Label className="flex items-center gap-1.5"><Wine className="h-3.5 w-3.5 text-primary" />Booking type</Label>
+                    <Label className="flex items-center gap-1.5"><Wine className="h-3.5 w-3.5 text-primary" />{t("events.booking_type")}</Label>
                     <RadioGroup
                       value={pubMode}
                       onValueChange={(v) => setPubMode(v as "ticket" | "event")}
@@ -788,54 +790,54 @@ export function EventDetail() {
                     >
                       <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer ${pubMode === "ticket" ? "border-primary bg-primary/10" : "border-white/10"}`}>
                         <RadioGroupItem value="ticket" />
-                        <span className="text-sm">Buy tickets</span>
+                        <span className="text-sm">{t("events.buy_tickets")}</span>
                       </label>
                       <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer ${pubMode === "event" ? "border-primary bg-primary/10" : "border-white/10"}`}>
                         <RadioGroupItem value="event" />
-                        <span className="text-sm">Group or corporate booking</span>
+                        <span className="text-sm">{t("events.group_booking")}</span>
                       </label>
                     </RadioGroup>
                   </div>
 
                   {pubMode === "ticket" && (
                     <div className="space-y-2 rounded-xl border border-white/10 p-3">
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground">Ticket counts</p>
-                      <TicketRow label="Women" price={effectiveWomen} value={ticketWomen} onChange={setTicketWomen} />
-                      <TicketRow label="Men" price={effectiveMen} value={ticketMen} onChange={setTicketMen} />
-                      <TicketRow label="Couple" price={effectiveCouple} value={ticketCouple} onChange={setTicketCouple} />
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.ticket_counts")}</p>
+                      <TicketRow label={t("events.women")} price={effectiveWomen} value={ticketWomen} onChange={setTicketWomen} />
+                      <TicketRow label={t("events.men")} price={effectiveMen} value={ticketMen} onChange={setTicketMen} />
+                      <TicketRow label={t("events.couple")} price={effectiveCouple} value={ticketCouple} onChange={setTicketCouple} />
                     </div>
                   )}
 
                   {pubMode === "event" && (
                     <>
                       <div>
-                        <Label htmlFor="occasion">Occasion</Label>
+                        <Label htmlFor="occasion">{t("events.occasion_label")}</Label>
                         <Select value={occasion} onValueChange={setOccasion}>
                           <SelectTrigger id="occasion" className="bg-black/40 border-white/10 mt-1">
-                            <SelectValue placeholder="Select occasion…" />
+                            <SelectValue placeholder={t("events.select_occasion")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="farewell">Farewell</SelectItem>
-                            <SelectItem value="office-party">Office Party</SelectItem>
-                            <SelectItem value="casual-party">Casual Party</SelectItem>
-                            <SelectItem value="birthday">Birthday</SelectItem>
-                            <SelectItem value="others">Others</SelectItem>
+                            <SelectItem value="farewell">{t("events.occ_farewell")}</SelectItem>
+                            <SelectItem value="office-party">{t("events.occ_office_party")}</SelectItem>
+                            <SelectItem value="casual-party">{t("events.occ_casual_party")}</SelectItem>
+                            <SelectItem value="birthday">{t("events.occ_birthday")}</SelectItem>
+                            <SelectItem value="others">{t("events.occ_others")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <Label htmlFor="guests">Guests <span className="text-muted-foreground font-normal text-xs">(min 10)</span></Label>
+                        <Label htmlFor="guests">{t("events.guests_field")} <span className="text-muted-foreground font-normal text-xs">{t("events.guests_min_10")}</span></Label>
                         <Input id="guests" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
                       </div>
                     </>
                   )}
 
                   <div>
-                    <Label htmlFor="pname">Booking under name</Label>
-                    <Input id="pname" value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="Name on the booking" className="bg-black/40 border-white/10 mt-1" />
+                    <Label htmlFor="pname">{t("events.booking_name")}</Label>
+                    <Input id="pname" value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder={t("events.name_on_booking")} className="bg-black/40 border-white/10 mt-1" />
                   </div>
                   <div>
-                    <Label htmlFor="pphone">Phone number</Label>
+                    <Label htmlFor="pphone">{t("events.phone_number")}</Label>
                     <Input
                       id="pphone"
                       type="tel"
@@ -843,32 +845,32 @@ export function EventDetail() {
                       maxLength={10}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                      placeholder="10-digit mobile number"
+                      placeholder={t("events.phone_placeholder")}
                       className="bg-black/40 border-white/10 mt-1"
                     />
                     {phone.length > 0 && phone.length < 10 && (
-                      <p className="text-xs text-destructive mt-1">Enter a valid 10-digit number</p>
+                      <p className="text-xs text-destructive mt-1">{t("events.phone_validation")}</p>
                     )}
                   </div>
                 </>
               ) : (
                 <>
                   <div>
-                    <Label htmlFor="etype">Event type</Label>
+                    <Label htmlFor="etype">{t("events.event_type_label")}</Label>
                     <Select value={eventType} onValueChange={setEventType}>
                       <SelectTrigger id="etype" className="bg-black/40 border-white/10 mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {EVENT_TYPES.map((t) => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        {EVENT_TYPES.map((evT) => (
+                          <SelectItem key={evT.value} value={evT.value}>{evT.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="budget">Budget range</Label>
+                    <Label htmlFor="budget">{t("events.budget_range")}</Label>
                     <Select value={budget} onValueChange={setBudget}>
                       <SelectTrigger id="budget" className="bg-black/40 border-white/10 mt-1">
-                        <SelectValue placeholder="Optional" />
+                        <SelectValue placeholder={t("events.optional_label")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="any">— select —</SelectItem>
@@ -879,7 +881,7 @@ export function EventDetail() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="guests">Guests</Label>
+                    <Label htmlFor="guests">{t("events.guests_field")}</Label>
                     <Input id="guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
                   </div>
                 </>
@@ -889,7 +891,7 @@ export function EventDetail() {
                 <div>
                   <Label htmlFor="ppoints" className="flex items-center gap-1.5">
                     <Coins className="h-3.5 w-3.5 text-primary" />
-                    Use points (100 pts = ₹10) — {discountInfo?.points ?? 0} available
+                    {t("events.use_points_avail", { n: discountInfo?.points ?? 0 })}
                   </Label>
                   <Input
                     id="ppoints"
@@ -906,12 +908,12 @@ export function EventDetail() {
               {/* Coupon — login gated */}
               <div>
                 <Label className="flex items-center gap-1">
-                  <Tag className="h-3.5 w-3.5 text-primary" /> Coupon code
+                  <Tag className="h-3.5 w-3.5 text-primary" /> {t("events.coupon_code_label")}
                   {!me?.user && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
                 </Label>
                 {!me?.user ? (
                   <p className="text-xs text-muted-foreground mt-1">
-                    <Link href="/login" className="text-primary hover:underline">Log in</Link> to apply a coupon and unlock 10% off.
+                    <Link href="/login" className="text-primary hover:underline">{t("events.log_in_link")}</Link> {t("events.coupon_login_hint")}
                   </p>
                 ) : (
                   <>
@@ -922,10 +924,10 @@ export function EventDetail() {
                         placeholder="RV-XXXXXX"
                         className="bg-black/40 border-white/10"
                       />
-                      <Button type="button" variant="outline" onClick={validateCoupon} className="border-white/15">Apply</Button>
+                      <Button type="button" variant="outline" onClick={validateCoupon} className="border-white/15">{t("events.apply_coupon")}</Button>
                     </div>
                     {couponState?.valid && (
-                      <p className="text-xs text-green-400 mt-1">✓ {couponState.discountPercent}% off applied</p>
+                      <p className="text-xs text-green-400 mt-1">✓ {t("events.coupon_pct_off", { pct: couponState.discountPercent })}</p>
                     )}
                     {myCoupons.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -946,40 +948,40 @@ export function EventDetail() {
               </div>
 
               <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything we should know?" className="bg-black/40 border-white/10 mt-1" />
+                <Label htmlFor="notes">{t("events.notes_label")}</Label>
+                <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("events.notes_placeholder")} className="bg-black/40 border-white/10 mt-1" />
               </div>
               <div className="space-y-1.5 border-t border-white/10 pt-3 text-sm">
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Subtotal</span>
+                  <span>{t("events.subtotal_label")}</span>
                   <span>{formatINRExact(subtotal)}</span>
                 </div>
                 {couponDiscount > 0 && couponDiscount === discount && (
                   <div className="flex items-center justify-between text-green-400">
-                    <span>Coupon</span>
+                    <span>{t("events.coupon_label")}</span>
                     <span>– {formatINRExact(couponDiscount)}</span>
                   </div>
                 )}
                 {newUserDiscount > 0 && newUserDiscount === discount && couponDiscount < newUserDiscount && (
                   <div className="flex items-center justify-between text-green-400">
-                    <span>New-member {newUserPercent}% off</span>
+                    <span>{t("events.new_member_pct_off", { pct: newUserPercent })}</span>
                     <span>– {formatINRExact(newUserDiscount)}</span>
                   </div>
                 )}
                 {pointsApplied > 0 && (
                   <div className="flex items-center justify-between text-primary">
-                    <span>Points</span>
+                    <span>{t("events.points_label")}</span>
                     <span>– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between font-semibold text-lg pt-1">
-                  <span>Total</span>
+                  <span>{t("events.total_label")}</span>
                   <span>{formatINRExact(finalTotal)}</span>
                 </div>
               </div>
               {/* Payment method selector */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Payment Method</Label>
+                <Label className="text-sm font-medium">{t("events.payment_method")}</Label>
                 <RadioGroup
                   value={paymentMethod}
                   onValueChange={(v) => setPaymentMethod(v as "cod" | "online")}
@@ -991,7 +993,7 @@ export function EventDetail() {
                   >
                     <RadioGroupItem id="pay-cod" value="cod" className="sr-only" />
                     <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "cod" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
-                    <span>Pay at Venue (COD)</span>
+                    <span>{t("events.pay_cod")}</span>
                   </Label>
                   <Label
                     htmlFor="pay-online"
@@ -999,26 +1001,26 @@ export function EventDetail() {
                   >
                     <RadioGroupItem id="pay-online" value="online" className="sr-only" />
                     <span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "online" ? "border-primary bg-primary" : "border-muted-foreground"}`} />
-                    <span>Pay Online (PhonePe)</span>
+                    <span>{t("events.pay_online_phonepe")}</span>
                   </Label>
                 </RadioGroup>
                 {paymentMethod === "cod" && (
-                  <p className="text-xs text-muted-foreground">Your booking is confirmed instantly. Pay at the venue on the day.</p>
+                  <p className="text-xs text-muted-foreground">{t("events.cod_hint")}</p>
                 )}
                 {paymentMethod === "online" && (
-                  <p className="text-xs text-muted-foreground">You will be redirected to PhonePe to pay securely online.</p>
+                  <p className="text-xs text-muted-foreground">{t("events.online_hint")}</p>
                 )}
               </div>
               <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12" size="lg" onClick={handleBook} disabled={booking}>
                 <CalIcon className="h-4 w-4 mr-2" />
-                {booking ? "Booking…" : paymentMethod === "cod" ? "Confirm Booking" : "Pay & Book"}
+                {booking ? t("events.booking_processing") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
               </Button>
             </div>
           </div>
 
           {availability.length > 0 && (
             <div className="rounded-3xl glass-card p-6">
-              <p className="font-serif text-lg mb-3">Calendar</p>
+              <p className="font-serif text-lg mb-3">{t("events.calendar_section")}</p>
               <div className="grid grid-cols-7 gap-1 text-xs">
                 {availability.slice(0, 28).map((a) => (
                   <div
