@@ -3,7 +3,9 @@ import {
   customFetch,
   useListEvents,
   useListFeaturedEvents,
+  useListVendorDrinkOffers,
 } from "@workspace/api-client-react";
+import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -11,6 +13,7 @@ import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -50,6 +53,16 @@ interface RecentAnnouncement {
   eventTitle: string;
 }
 
+function getPlanSummary(plan: DrinkPlanSummary): string {
+  if (plan.type === "welcome") return plan.gender === "female" ? "Free welcome drink · Ladies" : "Free welcome drink · All guests";
+  if (plan.type === "unlimited") return plan.gender === "female" ? "Unlimited drinks · Ladies" : "Unlimited drinks · All guests";
+  if (plan.type === "ticket") {
+    const count = (plan.lineItems ?? []).filter((i: { name?: string }) => i.name).length;
+    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} included with ticket` : "Drinks included with ticket";
+  }
+  return plan.productName || "Drink offer";
+}
+
 function sortCityFirst<T extends { location?: string | null }>(
   items: T[],
   city: string
@@ -77,6 +90,7 @@ export default function HomeScreen() {
 
   const featured = useListFeaturedEvents();
   const popular = useListEvents({ category: "Pubs" });
+  const { data: drinkOffers = [] } = useListVendorDrinkOffers();
   const { data: announcements } = useQuery<RecentAnnouncement[]>({
     queryKey: ["announcements", "recent"],
     queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/recent"),
@@ -249,6 +263,59 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 ) : null}
+              </Pressable>
+            )}
+          />
+        </Section>
+      )}
+
+      {/* Drink Deals */}
+      {drinkOffers.length > 0 && (
+        <Section title="Drink Deals" icon="wine-outline" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
+          <FlatList
+            horizontal
+            data={drinkOffers as VendorDrinkOffer[]}
+            keyExtractor={(item) => String(item.vendorId)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.drinkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => router.push(`/partner/${item.vendorId}` as never)}
+              >
+                <View style={styles.drinkCardImage}>
+                  {item.coverImageUrl ? (
+                    <Image
+                      source={{ uri: item.coverImageUrl }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.drinkCardImagePlaceholder, { backgroundColor: colors.muted }]}>
+                      <Ionicons name="wine-outline" size={22} color={colors.mutedForeground} />
+                    </View>
+                  )}
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.65)"]}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <Text style={styles.drinkCardName} numberOfLines={1}>{item.vendorName}</Text>
+                </View>
+                <View style={styles.drinkCardBody}>
+                  {item.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
+                    <View key={i} style={styles.drinkPlanRow}>
+                      <View style={[styles.drinkDot, { backgroundColor: colors.primary }]} />
+                      <Text style={[styles.drinkPlanText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                        {getPlanSummary(plan)}
+                      </Text>
+                    </View>
+                  ))}
+                  {item.plans.length > 2 && (
+                    <Text style={[styles.drinkMoreText, { color: colors.mutedForeground }]}>
+                      +{item.plans.length - 2} more
+                    </Text>
+                  )}
+                </View>
               </Pressable>
             )}
           />
@@ -547,5 +614,54 @@ const styles = StyleSheet.create({
   announcementDate: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
+  },
+  drinkCard: {
+    width: 200,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  drinkCardImage: {
+    height: 110,
+    position: "relative",
+    justifyContent: "flex-end",
+    overflow: "hidden",
+  },
+  drinkCardImagePlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  drinkCardName: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+  },
+  drinkCardBody: {
+    padding: 10,
+    gap: 5,
+  },
+  drinkPlanRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  drinkDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
+  drinkPlanText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    flex: 1,
+  },
+  drinkMoreText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
   },
 });

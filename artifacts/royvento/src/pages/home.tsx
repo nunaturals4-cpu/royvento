@@ -165,10 +165,10 @@ export function Home() {
               Browse pubs <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
             {drinkOffers.map((offer: VendorDrinkOffer) => (
-              <Link key={offer.vendorId} href={`/vendors/${offer.vendorId}`}>
-                <div className="glass-card rounded-2xl overflow-hidden flex-shrink-0 w-64 hover:bg-white/5 transition-colors cursor-pointer lift-3d">
+              <Link key={offer.vendorId} href={`/vendors/${offer.vendorId}`} className="snap-start flex-shrink-0">
+                <div className="glass-card rounded-2xl overflow-hidden w-60 sm:w-64 hover:bg-white/5 transition-colors cursor-pointer lift-3d h-full">
                   <div className="h-36 bg-white/5 relative overflow-hidden">
                     {offer.coverImageUrl ? (
                       <img src={offer.coverImageUrl} alt={offer.vendorName} className="h-full w-full object-cover" />
@@ -178,9 +178,11 @@ export function Home() {
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-2 left-3 right-3">
+                      <h3 className="font-serif text-sm font-semibold tracking-tight text-white drop-shadow truncate">{offer.vendorName}</h3>
+                    </div>
                   </div>
-                  <div className="p-4">
-                    <h3 className="font-serif text-base font-semibold tracking-tight mb-2 truncate">{offer.vendorName}</h3>
+                  <div className="p-3.5">
                     <div className="flex flex-col gap-1.5">
                       {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
                         <span key={i} className="text-xs text-white/65 flex items-center gap-1.5">
