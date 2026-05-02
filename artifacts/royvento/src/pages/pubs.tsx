@@ -93,7 +93,7 @@ export function Pubs() {
   const displayedPubs = useMemo(() => {
     let list = pubs;
     if (hasDrinkDeal && !drinkPlanType) list = list.filter((p) => p.hasDrinkPlans);
-    if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true);
+    if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true && (p.freeEntryRules?.days?.length ?? 0) > 0);
     return list;
   }, [pubs, hasDrinkDeal, drinkPlanType, freeEntry]);
 
@@ -146,7 +146,7 @@ export function Pubs() {
             />
             <Label htmlFor="free-entry-pubs" className="flex items-center gap-1.5 cursor-pointer select-none">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
-              <span className="text-sm">Free Entry</span>
+              <span className="text-sm">{t("events.free_entry_label")}</span>
             </Label>
           </div>
 
@@ -159,7 +159,7 @@ export function Pubs() {
             />
             <Label htmlFor="has-drink-deal" className="flex items-center gap-1.5 cursor-pointer select-none">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />
-              <span className="text-sm">Drink Deal</span>
+              <span className="text-sm">{t("events.drink_deals")}</span>
             </Label>
           </div>
         </div>
