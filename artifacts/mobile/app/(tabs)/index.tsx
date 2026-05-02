@@ -230,49 +230,6 @@ export default function HomeScreen() {
         </Section>
       )}
 
-      {/* Announcements */}
-      {(announcements?.length ?? 0) > 0 && (
-        <Section title={t("home.whats_on")} icon="megaphone-outline">
-          <FlatList
-            horizontal
-            data={announcements}
-            keyExtractor={(item) => String(item.id)}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.row}
-            renderItem={({ item }) => (
-              <Pressable
-                style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => item.eventId ? router.push(`/event/${item.eventId}` as never) : undefined}
-              >
-                <View style={[styles.announcementBadge, { backgroundColor: colors.primary + "22" }]}>
-                  <Ionicons name="megaphone-outline" size={13} color={colors.primary} />
-                  <Text style={[styles.announcementVenue, { color: colors.primary }]} numberOfLines={1}>
-                    {item.vendorName}
-                  </Text>
-                </View>
-                <Text style={[styles.announcementTitle, { color: colors.foreground }]} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                {item.body ? (
-                  <Text style={[styles.announcementBody, { color: colors.mutedForeground }]} numberOfLines={2}>
-                    {item.body}
-                  </Text>
-                ) : null}
-                {item.announceDate ? (
-                  <View style={styles.announcementDateRow}>
-                    <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
-                    <Text style={[styles.announcementDate, { color: colors.mutedForeground }]}>
-                      {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                      {item.announceTime ? `  ·  ${item.announceTime}` : ""}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            )}
-          />
-        </Section>
-      )}
-
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (
         <Section title={t("events.drink_deals")} icon="wine-outline" onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
@@ -346,6 +303,49 @@ export default function HomeScreen() {
                     <Ionicons name="arrow-forward" size={14} color={colors.primary} />
                   </View>
                 </View>
+              </Pressable>
+            )}
+          />
+        </Section>
+      )}
+
+      {/* Announcements */}
+      {(announcements?.length ?? 0) > 0 && (
+        <Section title={t("home.whats_on")} icon="megaphone-outline">
+          <FlatList
+            horizontal
+            data={announcements}
+            keyExtractor={(item) => String(item.id)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => item.eventId ? router.push(`/event/${item.eventId}` as never) : undefined}
+              >
+                <View style={[styles.announcementBadge, { backgroundColor: colors.primary + "22" }]}>
+                  <Ionicons name="megaphone-outline" size={13} color={colors.primary} />
+                  <Text style={[styles.announcementVenue, { color: colors.primary }]} numberOfLines={1}>
+                    {item.vendorName}
+                  </Text>
+                </View>
+                <Text style={[styles.announcementTitle, { color: colors.foreground }]} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                {item.body ? (
+                  <Text style={[styles.announcementBody, { color: colors.mutedForeground }]} numberOfLines={2}>
+                    {item.body}
+                  </Text>
+                ) : null}
+                {item.announceDate ? (
+                  <View style={styles.announcementDateRow}>
+                    <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
+                    <Text style={[styles.announcementDate, { color: colors.mutedForeground }]}>
+                      {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      {item.announceTime ? `  ·  ${item.announceTime}` : ""}
+                    </Text>
+                  </View>
+                ) : null}
               </Pressable>
             )}
           />

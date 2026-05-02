@@ -124,16 +124,26 @@ export function Explore() {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Select value={minRating} onValueChange={setMinRating}>
-              <SelectTrigger className="h-11 bg-black/40 border-white/10"><SelectValue placeholder={t("explore.rating")} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">{t("explore.any_rating")}</SelectItem>
-                <SelectItem value="3">3★ &amp; up</SelectItem>
-                <SelectItem value="4">4★ &amp; up</SelectItem>
-                <SelectItem value="4.5">4.5★ &amp; up</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {([
+              { value: "any", label: t("explore.any_rating") },
+              { value: "3", label: "3★+" },
+              { value: "3.5", label: "3.5★+" },
+              { value: "4", label: "4★+" },
+              { value: "4.5", label: "4.5★+" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setMinRating(opt.value)}
+                className={`h-11 px-3.5 rounded-lg border text-sm font-medium transition-colors ${
+                  minRating === opt.value
+                    ? "bg-primary/20 border-primary/60 text-primary"
+                    : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
         <div className="mt-3">

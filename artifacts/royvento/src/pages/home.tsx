@@ -344,9 +344,9 @@ export function Home() {
         <div className="flex items-end justify-between mb-8">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5" /> {t("home.pubs_label")}
+              <Sparkles className="h-3.5 w-3.5" /> Handpicked for you
             </p>
-            <h2 className="font-serif text-3xl md:text-5xl tracking-tight">{t("home.pubs_title")}</h2>
+            <h2 className="font-serif text-3xl md:text-5xl tracking-tight">Featured Events</h2>
           </div>
           <Link href="/explore" className="text-sm text-white/60 hover:text-white hidden md:flex items-center gap-1">
             {t("home.view_all")} <ArrowRight className="h-4 w-4" />
