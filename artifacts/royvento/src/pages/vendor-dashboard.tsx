@@ -1549,6 +1549,11 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
   const totalRevenue = confirmed.reduce((s: number, b: any) => s + ((b.finalPrice ?? b.totalPrice) ?? 0), 0);
   const totalGuests = confirmed.reduce((s: number, b: any) => s + ((b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0)), 0);
 
+  const countConfirmed = filtered.filter((b) => b.status === "confirmed").length;
+  const countCompleted = filtered.filter((b) => b.status === "completed").length;
+  const countCancelled = filtered.filter((b) => b.status === "cancelled").length;
+  const countPending = filtered.filter((b) => b.status === "pending").length;
+
   const monthMap: Record<string, number> = {};
   confirmed.forEach((b) => {
     const month = (b.bookingDate as string).slice(0, 7);
@@ -1604,6 +1609,43 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
         <Stat icon={Users} label="Guests" value={String(totalGuests)} />
         <Stat icon={IndianRupee} label="Revenue" value={formatINR(totalRevenue)} />
       </div>
+
+      {/* Status breakdown row */}
+      {totalBookings > 0 && (
+        <div className="rounded-2xl glass-card p-4">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Status breakdown</p>
+          <div className="flex flex-wrap gap-3">
+            {countConfirmed > 0 && (
+              <div className="flex items-center gap-2 rounded-xl bg-green-500/10 border border-green-500/20 px-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                <span className="text-xs text-muted-foreground">Confirmed</span>
+                <span className="text-sm font-semibold text-green-300 tabular-nums">{countConfirmed}</span>
+              </div>
+            )}
+            {countCompleted > 0 && (
+              <div className="flex items-center gap-2 rounded-xl bg-blue-500/10 border border-blue-500/20 px-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                <span className="text-xs text-muted-foreground">Completed</span>
+                <span className="text-sm font-semibold text-blue-300 tabular-nums">{countCompleted}</span>
+              </div>
+            )}
+            {countCancelled > 0 && (
+              <div className="flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                <span className="text-xs text-muted-foreground">Cancelled</span>
+                <span className="text-sm font-semibold text-red-300 tabular-nums">{countCancelled}</span>
+              </div>
+            )}
+            {countPending > 0 && (
+              <div className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-xs text-muted-foreground">Pending</span>
+                <span className="text-sm font-semibold text-amber-300 tabular-nums">{countPending}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {bookings.length === 0 ? (
         <div className="rounded-3xl glass-card p-10 text-center">
