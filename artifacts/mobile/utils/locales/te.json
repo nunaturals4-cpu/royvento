@@ -78,7 +78,16 @@
     "send_reset_link": "రీసెట్ లింక్ పంపండి",
     "check_inbox": "మీ ఇన్‌బాక్స్ తనిఖీ చేయండి",
     "check_inbox_sub": "%{email} కోసం ఖాతా ఉంటే, త్వరలో రీసెట్ లింక్ వస్తుంది.",
-    "back_to_sign_in": "సైన్ ఇన్‌కు తిరిగి వెళ్ళండి"
+    "back_to_sign_in": "సైన్ ఇన్‌కు తిరిగి వెళ్ళండి",
+    "verify_email_title": "Check your email",
+    "verify_email_sub": "We've sent a verification link to %{email}. Click it to activate your account.",
+    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
+    "resend_verification": "Resend verification email",
+    "resend_sending": "Sending…",
+    "resend_success": "Verification email sent",
+    "resend_error": "Could not resend — please try again",
+    "email_not_verified": "Email not verified",
+    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
   },
   "home": {
     "hero_eyebrow": "భారతదేశంలో అగ్రశ్రేణి పబ్ బుకింగ్ ప్లాట్‌ఫారమ్",

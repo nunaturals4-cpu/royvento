@@ -67,7 +67,16 @@
     "check_inbox_web": "ਆਪਣਾ ਇਨਬਾਕਸ ਦੇਖੋ",
     "check_inbox_sub_web": "ਜੇ {{email}} Royvento ਤੇ ਦਰਜ ਹੈ, ਤਾਂ ਤੁਹਾਨੂੰ ਜਲਦੀ ਰੀਸੈੱਟ ਲਿੰਕ ਮਿਲੇਗਾ।",
     "error": "ਗਲਤੀ",
-    "email_address": "ਈਮੇਲ ਪਤਾ"
+    "email_address": "ਈਮੇਲ ਪਤਾ",
+    "verify_email_title": "Check your email",
+    "verify_email_sub": "We've sent a verification link to {{email}}. Click it to activate your account.",
+    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
+    "resend_verification": "Resend verification email",
+    "resend_sending": "Sending…",
+    "resend_success": "Verification email sent",
+    "resend_error": "Could not resend — please try again",
+    "email_not_verified": "Email not verified",
+    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
   },
   "home": {
     "hero_eyebrow": "ਭਾਰਤ ਦਾ ਪ੍ਰਮੁੱਖ ਪੱਬ ਬੁਕਿੰਗ ਪਲੇਟਫਾਰਮ",

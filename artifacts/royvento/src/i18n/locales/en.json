@@ -67,7 +67,16 @@
     "check_inbox_web": "Check your inbox",
     "check_inbox_sub_web": "If {{email}} is registered on Royvento, you will receive a password reset link shortly.",
     "error": "Error",
-    "email_address": "Email address"
+    "email_address": "Email address",
+    "verify_email_title": "Check your email",
+    "verify_email_sub": "We've sent a verification link to {{email}}. Click it to activate your account.",
+    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
+    "resend_verification": "Resend verification email",
+    "resend_sending": "Sending…",
+    "resend_success": "Verification email sent",
+    "resend_error": "Could not resend — please try again",
+    "email_not_verified": "Email not verified",
+    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
   },
   "home": {
     "hero_eyebrow": "India's premier pub booking platform",

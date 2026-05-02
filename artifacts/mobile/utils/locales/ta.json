@@ -78,7 +78,16 @@
     "send_reset_link": "மீட்டமை இணைப்பு அனுப்பு",
     "check_inbox": "உங்கள் இன்பாக்ஸ் சரிபார்க்கவும்",
     "check_inbox_sub": "%{email} க்கான கணக்கு இருந்தால், விரைவில் மீட்டமை இணைப்பு கிடைக்கும்.",
-    "back_to_sign_in": "உள்நுழைவுக்கு திரும்பு"
+    "back_to_sign_in": "உள்நுழைவுக்கு திரும்பு",
+    "verify_email_title": "Check your email",
+    "verify_email_sub": "We've sent a verification link to %{email}. Click it to activate your account.",
+    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
+    "resend_verification": "Resend verification email",
+    "resend_sending": "Sending…",
+    "resend_success": "Verification email sent",
+    "resend_error": "Could not resend — please try again",
+    "email_not_verified": "Email not verified",
+    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
   },
   "home": {
     "hero_eyebrow": "இந்தியாவின் முன்னணி பப் முன்பதிவு தளம்",

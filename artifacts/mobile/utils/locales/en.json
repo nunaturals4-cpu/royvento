@@ -78,7 +78,16 @@
     "send_reset_link": "Send Reset Link",
     "check_inbox": "Check your inbox",
     "check_inbox_sub": "If an account exists for %{email}, you'll receive a reset link shortly.",
-    "back_to_sign_in": "Back to Sign In"
+    "back_to_sign_in": "Back to Sign In",
+    "verify_email_title": "Check your email",
+    "verify_email_sub": "We've sent a verification link to %{email}. Click it to activate your account.",
+    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
+    "resend_verification": "Resend verification email",
+    "resend_sending": "Sending…",
+    "resend_success": "Verification email sent",
+    "resend_error": "Could not resend — please try again",
+    "email_not_verified": "Email not verified",
+    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
   },
   "home": {
     "hero_eyebrow": "India's premier pub booking platform",

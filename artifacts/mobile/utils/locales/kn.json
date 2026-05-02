@@ -78,7 +78,16 @@
     "send_reset_link": "ಮರುಹೊಂದಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ",
     "check_inbox": "ನಿಮ್ಮ ಇನ್‌ಬಾಕ್ಸ್ ಪರಿಶೀಲಿಸಿ",
     "check_inbox_sub": "%{email} ಗಾಗಿ ಖಾತೆ ಇದ್ದರೆ, ಶೀಘ್ರದಲ್ಲೇ ಮರುಹೊಂದಿಕೆ ಲಿಂಕ್ ಪಡೆಯುತ್ತೀರಿ.",
-    "back_to_sign_in": "ಸೈನ್ ಇನ್‌ಗೆ ಹಿಂತಿರುಗಿ"
+    "back_to_sign_in": "ಸೈನ್ ಇನ್‌ಗೆ ಹಿಂತಿರುಗಿ",
+    "verify_email_title": "Check your email",
+    "verify_email_sub": "We've sent a verification link to %{email}. Click it to activate your account.",
+    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
+    "resend_verification": "Resend verification email",
+    "resend_sending": "Sending…",
+    "resend_success": "Verification email sent",
+    "resend_error": "Could not resend — please try again",
+    "email_not_verified": "Email not verified",
+    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
   },
   "home": {
     "hero_eyebrow": "ಭಾರತದ ಪ್ರಮುಖ ಪಬ್ ಬುಕಿಂಗ್ ಪ್ಲಾಟ್‌ಫಾರ್ಮ್",
