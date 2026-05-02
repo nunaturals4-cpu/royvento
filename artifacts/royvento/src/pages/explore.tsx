@@ -76,7 +76,7 @@ export function Explore() {
     setBudget("any"); setCountry(""); setStateF(""); setCity(""); setFreeEntry(false);
   };
 
-  const hasFilters = search || country || stateF || city || budget !== "any" || freeEntry;
+  const hasFilters = search || country || stateF || city || budget !== "any" || freeEntry || minRating !== "any";
 
   const filteredEvents = useMemo(() => {
     if (minRating === "any") return allEvents;
