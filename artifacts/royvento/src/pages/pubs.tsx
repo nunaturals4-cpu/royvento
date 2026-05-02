@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearch } from "wouter";
 import { EventCard } from "@/components/EventCard";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Search, Wine, X } from "lucide-react";
-import { apiGet, BUDGET_RANGES } from "@/lib/api";
+import { apiGet } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -11,7 +13,7 @@ import { cn } from "@/lib/utils";
 const DRINK_DEAL_OPTIONS = [
   { value: "welcome", label: "Welcome Drink" },
   { value: "unlimited", label: "Unlimited" },
-  { value: "ticket", label: "Included with Ticket" },
+  { value: "ticket", label: "Incl. with Ticket" },
   { value: "custom", label: "Custom Deal" },
 ] as const;
 
@@ -52,6 +54,8 @@ export function Pubs() {
   const [city, setCity] = useState(() => new URLSearchParams(searchStr).get("city") ?? "");
   const [pricePreset, setPricePreset] = useState<number | null>(null);
   const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
+  const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
+  const [freeEntry, setFreeEntry] = useState(false);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,7 +85,31 @@ export function Pubs() {
       .finally(() => setLoading(false));
   }, [search, country, stateF, city, pricePreset, drinkPlanType]);
 
-  const hasFilters = search || country || stateF || city || pricePreset !== null || drinkPlanType;
+  function toggleHasDrinkDeal(val: boolean) {
+    setHasDrinkDeal(val);
+    if (!val) setDrinkPlanType("");
+  }
+
+  const displayedPubs = useMemo(() => {
+    let list = pubs;
+    if (hasDrinkDeal && !drinkPlanType) list = list.filter((p) => p.hasDrinkPlans);
+    if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true);
+    return list;
+  }, [pubs, hasDrinkDeal, drinkPlanType, freeEntry]);
+
+  const hasFilters =
+    search || country || stateF || city || pricePreset !== null || drinkPlanType || hasDrinkDeal || freeEntry;
+
+  function clearAll() {
+    setSearch("");
+    setCountry("");
+    setStateF("");
+    setCity("");
+    setPricePreset(null);
+    setDrinkPlanType("");
+    setHasDrinkDeal(false);
+    setFreeEntry(false);
+  }
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
@@ -96,6 +124,7 @@ export function Pubs() {
       </header>
 
       <div className="rounded-3xl glass-card p-5 md:p-6 mb-8 space-y-4">
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -106,37 +135,57 @@ export function Pubs() {
           />
         </div>
 
-        {/* Drink Deal filter chips */}
-        <div>
-          <p className="text-xs text-muted-foreground mb-2 font-medium">Drink Deal</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setDrinkPlanType("")}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                drinkPlanType === ""
-                  ? "bg-primary border-primary text-primary-foreground"
-                  : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
-              )}
-            >
-              Any deal
-            </button>
-            {DRINK_DEAL_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setDrinkPlanType(drinkPlanType === opt.value ? "" : opt.value)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                  drinkPlanType === opt.value
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
+        {/* Quick-toggle row: Free Entry + Drink Deal */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {/* Free Entry toggle */}
+          <div className="flex items-center gap-2.5">
+            <Switch
+              id="free-entry-pubs"
+              checked={freeEntry}
+              onCheckedChange={setFreeEntry}
+            />
+            <Label htmlFor="free-entry-pubs" className="flex items-center gap-1.5 cursor-pointer select-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
+              <span className="text-sm">Free Entry</span>
+            </Label>
+          </div>
+
+          {/* Has Drink Deal toggle */}
+          <div className="flex items-center gap-2.5">
+            <Switch
+              id="has-drink-deal"
+              checked={hasDrinkDeal}
+              onCheckedChange={toggleHasDrinkDeal}
+            />
+            <Label htmlFor="has-drink-deal" className="flex items-center gap-1.5 cursor-pointer select-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />
+              <span className="text-sm">Drink Deal</span>
+            </Label>
           </div>
         </div>
+
+        {/* Deal-type chips — only visible when Drink Deal toggle is on */}
+        {hasDrinkDeal && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Deal type</p>
+            <div className="flex flex-wrap gap-2">
+              {DRINK_DEAL_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setDrinkPlanType(drinkPlanType === opt.value ? "" : opt.value)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                    drinkPlanType === opt.value
+                      ? "bg-primary border-primary text-primary-foreground"
+                      : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Price range preset chips */}
         <div>
@@ -183,7 +232,7 @@ export function Pubs() {
 
         {hasFilters && (
           <button
-            onClick={() => { setSearch(""); setCountry(""); setStateF(""); setCity(""); setPricePreset(null); setDrinkPlanType(""); }}
+            onClick={clearAll}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <X className="h-3 w-3" /> Clear all filters
@@ -193,13 +242,21 @@ export function Pubs() {
 
       {loading ? (
         <p className="text-muted-foreground">{t("common.loading")}</p>
-      ) : pubs.length === 0 ? (
+      ) : displayedPubs.length === 0 ? (
         <div className="rounded-3xl glass-card p-16 text-center">
           <p className="font-serif text-2xl mb-2">{t("pubs.no_results")}</p>
+          {hasFilters && (
+            <button
+              onClick={clearAll}
+              className="mt-4 text-sm text-primary hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {pubs.map((p) => <EventCard key={p.id} event={p} />)}
+          {displayedPubs.map((p) => <EventCard key={p.id} event={p} />)}
         </div>
       )}
     </div>
