@@ -1,6 +1,19 @@
 import { Resend } from "resend";
 import twilio from "twilio";
 
+// ─── Required / optional environment variables ───────────────────────────────
+//
+//  RESEND_API_KEY                      (secret)  Resend API key for sending emails.
+//                                                If absent, emails are printed to console (dev mode).
+//  RESEND_FROM_EMAIL                   (optional) "From" address, e.g. "Royvento <hello@example.com>".
+//                                                Defaults to "Royvento <onboarding@resend.dev>".
+//  RESEND_FORGOT_PASSWORD_TEMPLATE_ID  (optional) Resend template ID for the password-reset email.
+//                                                When set, the template is used with variables:
+//                                                  first_name, reset_link.
+//                                                When absent, a plain-text fallback is sent instead.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 function getResendClient(): Resend | null {
   const key = process.env["RESEND_API_KEY"];
   if (!key) return null;
@@ -106,12 +119,39 @@ export async function sendPasswordResetEmail(params: {
   token: string;
 }): Promise<void> {
   const resetUrl = `${getAppUrl()}/reset-password?token=${params.token}`;
+  const firstName = params.toName.split(" ")[0];
+  const templateId = process.env["RESEND_FORGOT_PASSWORD_TEMPLATE_ID"];
+
+  if (templateId) {
+    const client = getResendClient();
+    if (client) {
+      const toAddress = `${params.toName} <${params.to}>`;
+      const { error } = await client.emails.send({
+        from: getFromAddress(),
+        to: [toAddress],
+        template: {
+          id: templateId,
+          variables: {
+            first_name: firstName,
+            reset_link: resetUrl,
+          },
+        },
+      });
+      if (error) {
+        console.error("[notifications] Failed to send templated password reset email:", error);
+      } else {
+        console.log(`[notifications] Sent templated "Password Reset" to ${params.to}`);
+      }
+      return;
+    }
+  }
+
   await deliver("Password Reset", {
     to: params.to,
     toName: params.toName,
     subject: "Reset your Royvento password",
     body: [
-      `Hi ${params.toName.split(" ")[0]},`,
+      `Hi ${firstName},`,
       ``,
       `We received a request to reset the password for your Royvento account.`,
       ``,
