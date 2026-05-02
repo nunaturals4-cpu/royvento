@@ -124,6 +124,12 @@ export async function sendPasswordResetEmail(params: {
 
   if (templateId) {
     const client = getResendClient();
+    if (!client) {
+      console.warn(
+        "[notifications] RESEND_FORGOT_PASSWORD_TEMPLATE_ID is set but RESEND_API_KEY is missing — " +
+          "falling back to plain-text email. Set RESEND_API_KEY to use the template.",
+      );
+    }
     if (client) {
       const toAddress = `${params.toName} <${params.to}>`;
       const { error } = await client.emails.send({
