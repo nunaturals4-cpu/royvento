@@ -31,6 +31,7 @@ export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
@@ -54,7 +55,12 @@ export default function RegisterScreen() {
       return;
     }
     registerMutation.mutate({
-      data: { name: name.trim(), email: email.trim(), password },
+      data: {
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        ...(referralCode.trim() ? { referralCode: referralCode.trim().toUpperCase() } : {}),
+      },
     });
   };
 
@@ -225,6 +231,28 @@ export default function RegisterScreen() {
                 />
               </Pressable>
             </View>
+          </View>
+
+          <View style={styles.field}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.referral_code")}</Text>
+              <Text style={[styles.label, { color: colors.mutedForeground, opacity: 0.6, textTransform: "none" }]}>{t("auth.optional")}</Text>
+            </View>
+            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Ionicons name="gift-outline" size={16} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.input, { color: colors.foreground }]}
+                value={referralCode}
+                onChangeText={(v) => setReferralCode(v.toUpperCase())}
+                placeholder="e.g. ROYVENTO50"
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            </View>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2, fontFamily: "Inter_400Regular" }}>
+              {t("auth.referral_earn_note")}
+            </Text>
           </View>
 
           <TouchableOpacity

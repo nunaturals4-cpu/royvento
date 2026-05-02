@@ -54,6 +54,20 @@ interface ReferralData {
   referralPoints: number;
 }
 
+interface DiscountInfo {
+  isNewUser: boolean;
+  daysLeft: number;
+  bookingDiscountPercent: number;
+  subscriptionDiscountPercent: number;
+  points: number;
+}
+
+interface Invitation {
+  id: number;
+  vendorName: string;
+  createdAt: string;
+}
+
 interface Coupon {
   id: number;
   code: string;
@@ -154,6 +168,41 @@ export default function ProfileScreen() {
     queryFn: () => customFetch<Coupon[]>("/api/coupons/me"),
     enabled: !!user,
   });
+
+  const discountQuery = useQuery<DiscountInfo>({
+    queryKey: ["discounts-me"],
+    queryFn: () => customFetch<DiscountInfo>("/api/users/me/discounts"),
+    enabled: !!user,
+  });
+
+  const invitationsQuery = useQuery<Invitation[]>({
+    queryKey: ["manager-invitations"],
+    queryFn: () => customFetch<Invitation[]>("/api/manager/invitations"),
+    enabled: !!user,
+  });
+
+  const [actingInv, setActingInv] = useState<number | null>(null);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+
+  React.useEffect(() => {
+    if (invitationsQuery.data) setInvitations(invitationsQuery.data);
+  }, [invitationsQuery.data]);
+
+  const respondToInvitation = async (id: number, action: "accept" | "reject") => {
+    setActingInv(id);
+    try {
+      await customFetch(`/api/manager/invitations/${id}/${action}`, { method: "POST" });
+      setInvitations((prev) => prev.filter((inv) => inv.id !== id));
+      Alert.alert(
+        action === "accept" ? "Invitation accepted!" : "Invitation declined",
+        action === "accept" ? "You can now scan tickets for this venue." : "",
+      );
+    } catch {
+      Alert.alert(t("common.error"), "Failed to respond to invitation.");
+    } finally {
+      setActingInv(null);
+    }
+  };
 
   const handleSave = () => {
     if (!editName.trim()) { Alert.alert(t("profile.name_required")); return; }
@@ -258,6 +307,7 @@ export default function ProfileScreen() {
 
   const referral = referralQuery.data;
   const coupons = couponQuery.data ?? [];
+  const discountInfo = discountQuery.data ?? null;
 
   return (
     <ScrollView
@@ -322,6 +372,78 @@ export default function ProfileScreen() {
           </Text>
         </View>
       </LinearGradient>
+
+      {/* Scanner Invitations */}
+      {invitations.length > 0 && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Ionicons name="notifications-outline" size={18} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Scanner invitations</Text>
+          </View>
+          {invitations.map((inv) => (
+            <View
+              key={inv.id}
+              style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 4 }}
+            >
+              <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginBottom: 2 }}>
+                {inv.vendorName}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, marginBottom: 10 }}>
+                Invited you as a ticket scanner manager
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.quickBtn, { flex: 1, backgroundColor: colors.primary, borderColor: colors.primary, flexDirection: "row", justifyContent: "center", paddingVertical: 10 }]}
+                  onPress={() => respondToInvitation(inv.id, "accept")}
+                  disabled={actingInv === inv.id}
+                >
+                  {actingInv === inv.id ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground }}>Accept</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickBtn, { flex: 1, backgroundColor: colors.muted, borderColor: colors.border, flexDirection: "row", justifyContent: "center", paddingVertical: 10 }]}
+                  onPress={() => respondToInvitation(inv.id, "reject")}
+                  disabled={actingInv === inv.id}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Decline</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Welcome Perks */}
+      {discountInfo?.isNewUser && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Welcome perks</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: colors.mutedForeground, marginBottom: 10 }}>
+            {"You're a new member! Enjoy these for the next "}{discountInfo.daysLeft}{discountInfo.daysLeft === 1 ? " day:" : " days:"}
+          </Text>
+          <View style={{ gap: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
+              <Text style={{ fontSize: 13, color: colors.foreground, fontFamily: "Inter_400Regular" }}>
+                <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>{discountInfo.bookingDiscountPercent}% off</Text>
+                {" "}any booking
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Ionicons name="checkmark-circle-outline" size={14} color={colors.primary} />
+              <Text style={{ fontSize: 13, color: colors.foreground, fontFamily: "Inter_400Regular" }}>
+                <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>{discountInfo.subscriptionDiscountPercent}% off</Text>
+                {" "}a subscription plan
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Referral Card */}
       {referral ? (
