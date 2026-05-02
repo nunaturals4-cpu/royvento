@@ -138,7 +138,7 @@ export async function sendPasswordResetEmail(params: {
         template: {
           id: templateId,
           variables: {
-            first_name: firstName,
+            firstname: firstName,
             reset_link: resetUrl,
           },
         },
