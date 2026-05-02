@@ -18,14 +18,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
+import { customFetch } from "@workspace/api-client-react";
 
 export default function RegisterScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
   const { t } = useLanguage();
   const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const returnTo = typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") ? rawReturnTo : undefined;
@@ -33,13 +32,14 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [resendBusy, setResendBusy] = useState(false);
 
   const registerMutation = useRegister({
     mutation: {
-      onSuccess: async (data) => {
+      onSuccess: async (_data, variables) => {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await login(data.token, data.user as import("@/context/AuthContext").AuthUser);
-        router.replace(returnTo ? (returnTo as never) : "/(tabs)");
+        setPendingEmail((variables as any)?.data?.email ?? email);
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -57,6 +57,85 @@ export default function RegisterScreen() {
       data: { name: name.trim(), email: email.trim(), password },
     });
   };
+
+  const handleResend = async () => {
+    setResendBusy(true);
+    try {
+      await customFetch("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email: pendingEmail }),
+        headers: { "Content-Type": "application/json" },
+      });
+      Alert.alert(t("auth.resend_success"), "");
+    } catch {
+      Alert.alert(t("auth.resend_error"), "");
+    } finally {
+      setResendBusy(false);
+    }
+  };
+
+  // ── Pending verification screen ──
+  if (pendingEmail) {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView
+          style={{ flex: 1, backgroundColor: colors.background }}
+          contentContainerStyle={[
+            styles.container,
+            {
+              paddingTop: insets.top + (Platform.OS === "web" ? 67 : 24),
+              paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 40),
+              alignItems: "center",
+            },
+          ]}
+        >
+          <View style={styles.header}>
+            <LinearGradient
+              colors={[colors.primary, colors.goldLight ?? "#e8c050"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.logoWrap}
+            >
+              <Ionicons name="mail" size={28} color={colors.primaryForeground} />
+            </LinearGradient>
+            <Text style={[styles.brand, { color: colors.primary }]}>Royvento</Text>
+          </View>
+
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, alignItems: "center" }]}>
+            <Text style={[styles.cardTitle, { color: colors.foreground, textAlign: "center" }]}>
+              {t("auth.verify_email_title")}
+            </Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 14, textAlign: "center", lineHeight: 22, marginBottom: 8 }}>
+              {t("auth.verify_email_sub", { email: pendingEmail })}
+            </Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: "center", lineHeight: 20, marginBottom: 20 }}>
+              {t("auth.verify_email_hint")}
+            </Text>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }, resendBusy && { opacity: 0.7 }]}
+              onPress={handleResend}
+              disabled={resendBusy}
+            >
+              {resendBusy ? (
+                <ActivityIndicator color={colors.foreground} />
+              ) : (
+                <Text style={[styles.btnText, { color: colors.foreground }]}>{t("auth.resend_verification")}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+              {t("auth.already_have_account")}{" "}
+            </Text>
+            <Pressable onPress={() => router.push(returnTo ? { pathname: "/(auth)/login", params: { returnTo } } : "/(auth)/login")}>
+              <Text style={[styles.link, { color: colors.primary }]}>{t("auth.sign_in_link")}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView

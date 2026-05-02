@@ -55,8 +55,11 @@ function OAuthErrorHandler() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get("error");
-    if (!error) return;
-    if (error === "google_not_configured") {
+    const verified = params.get("verified");
+    if (!error && !verified) return;
+    if (verified === "1") {
+      toast({ title: "Email verified!", description: "Welcome to Royvento. You're now logged in." });
+    } else if (error === "google_not_configured") {
       toast({ title: "Google sign-in not configured", description: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable.", variant: "destructive" });
     } else if (error === "google_auth_failed") {
       toast({ title: "Google sign-in failed", description: "Something went wrong. Please try again or sign in with email.", variant: "destructive" });

@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, CheckCircle } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 
@@ -18,9 +17,10 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const qc = useQueryClient();
   const [googleEnabled, setGoogleEnabled] = useState(false);
 
   useEffect(() => {
@@ -38,18 +38,30 @@ export function Register() {
     e.preventDefault();
     setBusy(true);
     try {
-      const data = await apiPost<{ token?: string; user: { name: string; role: string } }>(
-        "/api/auth/register",
-        { name, email, password, phone, referralCode: referralCode.trim().toUpperCase() },
-      );
-      if (data.token) localStorage.setItem("royvento_token", data.token);
-      qc.invalidateQueries();
-      toast({ title: t("auth.welcome") });
-      setLocation("/");
+      await apiPost("/api/auth/register", {
+        name,
+        email,
+        password,
+        phone,
+        referralCode: referralCode.trim().toUpperCase(),
+      });
+      setPendingEmail(email);
     } catch (err: any) {
       toast({ title: t("common.error"), description: err?.message, variant: "destructive" });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    setResendBusy(true);
+    try {
+      await apiPost("/api/auth/resend-verification", { email: pendingEmail });
+      toast({ title: t("auth.resend_success") });
+    } catch {
+      toast({ title: t("auth.resend_error"), variant: "destructive" });
+    } finally {
+      setResendBusy(false);
     }
   };
 
@@ -63,6 +75,40 @@ export function Register() {
     }
     window.location.href = "/api/auth/google/start";
   };
+
+  // ── Pending verification screen ──
+  if (pendingEmail) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-20">
+        <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring text-center">
+          <div className="flex justify-center mb-6">
+            <div className="rounded-full bg-primary/10 p-4">
+              <Mail className="h-10 w-10 text-primary" />
+            </div>
+          </div>
+          <h1 className="font-serif text-3xl tracking-tight mb-3">{t("auth.verify_email_title")}</h1>
+          <p className="text-muted-foreground mb-2">
+            {t("auth.verify_email_sub", { email: pendingEmail })}
+          </p>
+          <p className="text-sm text-muted-foreground mb-8">
+            {t("auth.verify_email_hint")}
+          </p>
+          <Button
+            variant="outline"
+            className="w-full border-white/15 hover:bg-white/5 mb-4"
+            onClick={resend}
+            disabled={resendBusy}
+          >
+            {resendBusy ? t("auth.resend_sending") : t("auth.resend_verification")}
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            {t("auth.already_have_account")}{" "}
+            <Link href="/login" className="text-primary hover:underline">{t("auth.sign_in_link")}</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-20">

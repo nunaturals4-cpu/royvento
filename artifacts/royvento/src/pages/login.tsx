@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff } from "lucide-react";
-import { apiGet } from "@/lib/api";
+import { Eye, EyeOff, MailWarning } from "lucide-react";
+import { apiGet, apiPost } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 
 export function Login() {
@@ -15,6 +15,8 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [resendBusy, setResendBusy] = useState(false);
   const [, setLocation] = useLocation();
   const login = useLogin();
   const { toast } = useToast();
@@ -27,8 +29,21 @@ export function Login() {
       .catch(() => {});
   }, []);
 
+  const resend = async () => {
+    setResendBusy(true);
+    try {
+      await apiPost("/api/auth/resend-verification", { email: unverifiedEmail });
+      toast({ title: t("auth.resend_success") });
+    } catch {
+      toast({ title: t("auth.resend_error"), variant: "destructive" });
+    } finally {
+      setResendBusy(false);
+    }
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    setUnverifiedEmail("");
     login.mutate(
       { data: { email, password } },
       {
@@ -38,8 +53,13 @@ export function Login() {
           toast({ title: `${t("auth.welcome_back")}, ${data.user.name.split(" ")[0]}` });
           setLocation("/");
         },
-        onError: (err: any) =>
-          toast({ title: t("common.error"), description: err?.message ?? "Check your credentials.", variant: "destructive" }),
+        onError: (err: any) => {
+          if (err?.code === "EMAIL_NOT_VERIFIED" || err?.message?.includes("EMAIL_NOT_VERIFIED") || err?.message?.includes("verify your email")) {
+            setUnverifiedEmail(email);
+          } else {
+            toast({ title: t("common.error"), description: err?.message ?? "Check your credentials.", variant: "destructive" });
+          }
+        },
       },
     );
   };
@@ -60,6 +80,28 @@ export function Login() {
       <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring">
         <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">{t("auth.welcome_back")}</p>
         <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">{t("auth.sign_in_to")}</h1>
+
+        {/* Email not verified banner */}
+        {unverifiedEmail && (
+          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="flex gap-3 items-start">
+              <MailWarning className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-300 mb-1">{t("auth.email_not_verified")}</p>
+                <p className="text-xs text-amber-200/80 mb-3">{t("auth.email_not_verified_desc")}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 h-8 text-xs"
+                  onClick={resend}
+                  disabled={resendBusy}
+                >
+                  {resendBusy ? t("auth.resend_sending") : t("auth.resend_verification")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Button
           type="button"

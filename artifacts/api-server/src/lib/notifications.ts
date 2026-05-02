@@ -209,6 +209,49 @@ function fmtINR(n: number): string {
   return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
+// ─── Email Verification ───────────────────────────────────────────────────────
+
+export async function sendEmailVerificationEmail(params: {
+  to: string;
+  toName: string;
+  token: string;
+}): Promise<void> {
+  const verifyUrl = `${getAppUrl()}/api/auth/verify-email?token=${params.token}`;
+  const firstName = params.toName.split(" ")[0];
+
+  const html = layout(`
+    ${greeting(firstName)}
+    ${para("Thanks for signing up for Royvento! One quick step — please verify your email address to activate your account.")}
+    ${para("Click the button below to verify. This link expires in 24 hours.")}
+    ${btn("Verify My Email", verifyUrl)}
+    ${divider()}
+    <p style="margin:0;color:#888888;font-size:13px;">If you didn't create a Royvento account, you can safely ignore this email.</p>
+    ${signature()}
+  `);
+
+  const text = [
+    `Hi ${firstName},`,
+    ``,
+    `Thanks for signing up for Royvento! Please verify your email address to activate your account.`,
+    ``,
+    `Click the link below (valid for 24 hours):`,
+    ``,
+    `  ${verifyUrl}`,
+    ``,
+    `If you didn't create a Royvento account, you can safely ignore this email.`,
+    ``,
+    `— The Royvento team`,
+  ].join("\n");
+
+  await deliver("Email Verification", {
+    to: params.to,
+    toName: params.toName,
+    subject: "Verify your Royvento email address",
+    text,
+    html,
+  });
+}
+
 // ─── Forgot-password ──────────────────────────────────────────────────────────
 
 export async function sendPasswordResetEmail(params: {

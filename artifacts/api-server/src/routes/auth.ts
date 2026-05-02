@@ -13,12 +13,20 @@ import {
   userToPublic,
   type Role,
 } from "../lib/auth";
-import { sendPasswordResetEmail, sendWelcomeEmail } from "../lib/notifications";
+import {
+  sendPasswordResetEmail,
+  sendWelcomeEmail,
+  sendEmailVerificationEmail,
+} from "../lib/notifications";
 
 const router: IRouter = Router();
 
 function genReferralCode(): string {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+function genVerifyToken(): string {
+  return randomBytes(32).toString("hex");
 }
 
 const RegisterBodyExt = z.object({
@@ -78,6 +86,10 @@ router.post("/auth/register", async (req, res) => {
   }
   if (!myCode) myCode = genReferralCode() + Date.now().toString(36).slice(-2).toUpperCase();
 
+  // Generate email verification token (24 h)
+  const verifyToken = genVerifyToken();
+  const verifyExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   const passwordHash = await hashPassword(password);
   const [created] = await db
     .insert(usersTable)
@@ -89,6 +101,9 @@ router.post("/auth/register", async (req, res) => {
       phone: phone ?? "",
       referralCode: myCode,
       referredBy,
+      emailVerified: false,
+      emailVerifyToken: verifyToken,
+      emailVerifyExpiry: verifyExpiry,
     })
     .returning();
   if (!created) {
@@ -109,9 +124,19 @@ router.post("/auth/register", async (req, res) => {
     }
   }
 
-  const token = signToken({ userId: created.id, role: safeRole });
-  setAuthCookie(res, token);
-  res.json({ token, user: userToPublic(created) });
+  // Send verification email (fire-and-forget)
+  sendEmailVerificationEmail({
+    to: created.email,
+    toName: created.name,
+    token: verifyToken,
+  }).catch((err) => {
+    console.error("Failed to send verification email:", err);
+  });
+
+  res.json({
+    ok: true,
+    message: "Account created! Please check your email and click the verification link to log in.",
+  });
 });
 
 router.post("/auth/login", async (req, res) => {
@@ -136,6 +161,13 @@ router.post("/auth/login", async (req, res) => {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
+  if (!u.emailVerified) {
+    res.status(403).json({
+      error: "EMAIL_NOT_VERIFIED",
+      message: "Please verify your email address before logging in. Check your inbox for the verification link.",
+    });
+    return;
+  }
   const token = signToken({ userId: u.id, role: u.role as Role });
   setAuthCookie(res, token);
   res.json({ token, user: userToPublic(u) });
@@ -150,6 +182,82 @@ router.get("/auth/me", async (req, res) => {
   const user = await loadUserFromRequest(req);
   res.json({ user });
 });
+
+// ─── Email verification ────────────────────────────────────────────────────────
+
+router.get("/auth/verify-email", async (req, res) => {
+  const { token } = req.query as Record<string, string>;
+  if (!token) {
+    res.status(400).send("Missing token.");
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.emailVerifyToken, token))
+    .limit(1);
+  const user = rows[0];
+  if (!user || !user.emailVerifyExpiry || user.emailVerifyExpiry < new Date()) {
+    res.status(400).send("This verification link is invalid or has expired. Please request a new one.");
+    return;
+  }
+  // Mark verified and clear token
+  await db
+    .update(usersTable)
+    .set({ emailVerified: true, emailVerifyToken: "", emailVerifyExpiry: null })
+    .where(eq(usersTable.id, user.id));
+
+  // Issue auth session so user is logged in immediately
+  const jwtToken = signToken({ userId: user.id, role: user.role as Role });
+  setAuthCookie(res, jwtToken);
+
+  // Send welcome email (fire-and-forget)
+  sendWelcomeEmail({ to: user.email, toName: user.name }).catch((err) => {
+    console.error("Failed to send welcome email after verification:", err);
+  });
+
+  // Redirect back to app with success flag
+  const base = req.headers.origin ?? "";
+  const redirectBase = base || "";
+  res.redirect(`${redirectBase}/?verified=1`);
+});
+
+const ResendVerificationBody = z.object({ email: z.string().email() });
+
+router.post("/auth/resend-verification", async (req, res) => {
+  const parsed = ResendVerificationBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid email" });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, parsed.data.email))
+    .limit(1);
+  const user = rows[0];
+  // Always return ok to avoid revealing whether email is registered
+  if (!user || user.emailVerified) {
+    res.json({ ok: true, message: "If that email is pending verification, a new link has been sent." });
+    return;
+  }
+  const verifyToken = genVerifyToken();
+  const verifyExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await db
+    .update(usersTable)
+    .set({ emailVerifyToken: verifyToken, emailVerifyExpiry: verifyExpiry })
+    .where(eq(usersTable.id, user.id));
+  sendEmailVerificationEmail({
+    to: user.email,
+    toName: user.name,
+    token: verifyToken,
+  }).catch((err) => {
+    console.error("Failed to resend verification email:", err);
+  });
+  res.json({ ok: true, message: "If that email is pending verification, a new link has been sent." });
+});
+
+// ─── Google OAuth ──────────────────────────────────────────────────────────────
 
 function getGoogleCallbackUrl(): string {
   if (process.env["GOOGLE_CALLBACK_URL"]) return process.env["GOOGLE_CALLBACK_URL"];
@@ -280,9 +388,9 @@ router.get("/auth/google/callback", async (req, res) => {
       if (emailRows[0]) {
         await db
           .update(usersTable)
-          .set({ googleId: profile.sub })
+          .set({ googleId: profile.sub, emailVerified: true })
           .where(eq(usersTable.id, emailRows[0].id));
-        user = { ...emailRows[0], googleId: profile.sub };
+        user = { ...emailRows[0], googleId: profile.sub, emailVerified: true };
       }
     }
 
@@ -310,6 +418,7 @@ router.get("/auth/google/callback", async (req, res) => {
           referralCode: myCode,
           googleId: profile.sub,
           profileImage: profile.picture ?? "",
+          emailVerified: true,
         })
         .returning();
 
@@ -318,7 +427,6 @@ router.get("/auth/google/callback", async (req, res) => {
         return;
       }
       user = created;
-      // Send welcome email to newly created Google user (fire-and-forget)
       sendWelcomeEmail({ to: user.email, toName: user.name }).catch((err) => {
         console.error("Failed to send Google sign-up welcome email:", err);
       });
@@ -347,12 +455,11 @@ router.post("/auth/forgot-password", async (req, res) => {
     .where(eq(usersTable.email, parsed.data.email))
     .limit(1);
   if (!rows[0]) {
-    // Don't reveal if email exists
     res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
     return;
   }
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  const expiry = new Date(Date.now() + 3600 * 1000); // 1 hour
+  const expiry = new Date(Date.now() + 3600 * 1000);
   await db
     .update(usersTable)
     .set({ resetToken: token, resetTokenExpiry: expiry })
@@ -459,9 +566,9 @@ router.post("/auth/google/mobile", async (req, res) => {
       if (emailRows[0]) {
         await db
           .update(usersTable)
-          .set({ googleId: info.sub })
+          .set({ googleId: info.sub, emailVerified: true })
           .where(eq(usersTable.id, emailRows[0].id));
-        user = { ...emailRows[0], googleId: info.sub };
+        user = { ...emailRows[0], googleId: info.sub, emailVerified: true };
       }
     }
 
@@ -489,6 +596,7 @@ router.post("/auth/google/mobile", async (req, res) => {
           referralCode: myCode,
           googleId: info.sub,
           profileImage: info.picture ?? "",
+          emailVerified: true,
         })
         .returning();
 

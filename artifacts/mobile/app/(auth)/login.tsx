@@ -86,7 +86,15 @@ export default function LoginScreen() {
       },
       onError: (err: Error) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert(t("auth.login_failed"), err?.message ?? t("auth.invalid_credentials"));
+        const msg = err?.message ?? "";
+        if (msg.includes("EMAIL_NOT_VERIFIED") || msg.includes("verify your email")) {
+          Alert.alert(
+            t("auth.email_not_verified"),
+            t("auth.email_not_verified_desc"),
+          );
+        } else {
+          Alert.alert(t("auth.login_failed"), msg || t("auth.invalid_credentials"));
+        }
       },
     },
   });
