@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import rateLimit from "express-rate-limit";
 import { db, usersTable, referralsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -20,6 +21,40 @@ import {
 } from "../lib/notifications";
 
 const router: IRouter = Router();
+
+// ─── Rate limiters ─────────────────────────────────────────────────────────────
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many login attempts — please wait a few minutes before trying again." },
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many accounts created from this IP address — please try again later." },
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many password reset requests — please try again later." },
+});
+
+const resendVerificationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many resend requests — please try again later." },
+});
 
 function genReferralCode(): string {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -43,7 +78,7 @@ const LoginBodyExt = z.object({
   password: z.string().min(1),
 });
 
-router.post("/auth/register", async (req, res) => {
+router.post("/auth/register", registerLimiter, async (req, res) => {
   const parsed = RegisterBodyExt.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error });
@@ -139,7 +174,7 @@ router.post("/auth/register", async (req, res) => {
   });
 });
 
-router.post("/auth/login", async (req, res) => {
+router.post("/auth/login", loginLimiter, async (req, res) => {
   const parsed = LoginBodyExt.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input" });
@@ -224,7 +259,7 @@ router.get("/auth/verify-email", async (req, res) => {
 
 const ResendVerificationBody = z.object({ email: z.string().email() });
 
-router.post("/auth/resend-verification", async (req, res) => {
+router.post("/auth/resend-verification", resendVerificationLimiter, async (req, res) => {
   const parsed = ResendVerificationBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid email" });
@@ -443,7 +478,7 @@ router.get("/auth/google/callback", async (req, res) => {
 
 const ForgotPasswordBody = z.object({ email: z.string().email() });
 
-router.post("/auth/forgot-password", async (req, res) => {
+router.post("/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
   const parsed = ForgotPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid email" });
