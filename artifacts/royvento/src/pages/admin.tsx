@@ -114,25 +114,24 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
   );
 }
 
-type AnalyticsPreset = "30d" | "90d" | "12m" | "custom";
+type AnalyticsPreset = "today" | "7d" | "30d" | "3m" | "6m" | "custom";
 
 function toDateStr(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
 function Analytics() {
-  const [preset, setPreset] = useState<AnalyticsPreset>("12m");
+  const [preset, setPreset] = useState<AnalyticsPreset>("30d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
   const now = new Date();
   const computedRange = (() => {
-    if (preset === "30d") return { startDate: toDateStr(new Date(now.getTime() - 30 * 86400000)), endDate: toDateStr(now) };
-    if (preset === "90d") return { startDate: toDateStr(new Date(now.getTime() - 90 * 86400000)), endDate: toDateStr(now) };
-    if (preset === "12m") {
-      const s = new Date(now); s.setFullYear(s.getFullYear() - 1); s.setDate(1);
-      return { startDate: toDateStr(s), endDate: toDateStr(now) };
-    }
+    if (preset === "today") return { startDate: toDateStr(now), endDate: toDateStr(now) };
+    if (preset === "7d") return { startDate: toDateStr(new Date(now.getTime() - 6 * 86400000)), endDate: toDateStr(now) };
+    if (preset === "30d") return { startDate: toDateStr(new Date(now.getTime() - 29 * 86400000)), endDate: toDateStr(now) };
+    if (preset === "3m") return { startDate: toDateStr(new Date(now.getTime() - 89 * 86400000)), endDate: toDateStr(now) };
+    if (preset === "6m") return { startDate: toDateStr(new Date(now.getTime() - 179 * 86400000)), endDate: toDateStr(now) };
     return {
       startDate: customStart || undefined,
       endDate: customEnd || undefined,
@@ -157,10 +156,12 @@ function Analytics() {
   const monthlyChartMax = Math.max(...(adminData.monthlyRevenue ?? []).map((m) => m.revenue), 1);
 
   const presetLabel: Record<AnalyticsPreset, string> = {
+    today: "Today",
+    "7d": "Last 7 days",
     "30d": "Last 30 days",
-    "90d": "Last 90 days",
-    "12m": "Last 12 months",
-    "custom": "Custom range",
+    "3m": "Last 3 months",
+    "6m": "Last 6 months",
+    custom: "Custom range",
   };
 
   return (
@@ -174,9 +175,11 @@ function Analytics() {
               <SelectValue>{presetLabel[preset]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
               <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-              <SelectItem value="12m">Last 12 months</SelectItem>
+              <SelectItem value="3m">Last 3 months</SelectItem>
+              <SelectItem value="6m">Last 6 months</SelectItem>
               <SelectItem value="custom">Custom range</SelectItem>
             </SelectContent>
           </Select>
@@ -193,8 +196,8 @@ function Analytics() {
             </div>
           </>
         )}
-        {(preset !== "12m" || customStart || customEnd) && (
-          <Button variant="outline" size="sm" onClick={() => { setPreset("12m"); setCustomStart(""); setCustomEnd(""); }}>
+        {(preset !== "30d" || customStart || customEnd) && (
+          <Button variant="outline" size="sm" onClick={() => { setPreset("30d"); setCustomStart(""); setCustomEnd(""); }}>
             Clear
           </Button>
         )}
@@ -210,8 +213,8 @@ function Analytics() {
         <Stat icon={Clock} label="Pending approval" value={String(data.pendingVendors)} />
         <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
         <Stat icon={IndianRupee} label="Revenue" value={formatINR(data.totalRevenue)} />
-        <Stat icon={Banknote} label="COD / Pay at venue" value={formatINR((adminData as any).codRevenue ?? 0)} />
-        <Stat icon={CreditCard} label="Online payments" value={formatINR((adminData as any).onlineRevenue ?? 0)} />
+        <Stat icon={Banknote} label="COD / Pay at venue" value={formatINR(data.codRevenue)} />
+        <Stat icon={CreditCard} label="Online payments" value={formatINR(data.onlineRevenue)} />
       </div>
 
       {/* Platform ticket breakdown */}

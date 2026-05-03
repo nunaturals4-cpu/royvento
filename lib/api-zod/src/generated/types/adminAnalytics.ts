@@ -17,6 +17,8 @@ export interface AdminAnalytics {
   totalEvents: number;
   totalBookings: number;
   totalRevenue: number;
+  codRevenue: number;
+  onlineRevenue: number;
   bookingsByStatus: AdminAnalyticsBookingsByStatusItem[];
   recentBookings: Booking[];
   topVendors: AdminAnalyticsTopVendorsItem[];

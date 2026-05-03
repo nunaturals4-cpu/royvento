@@ -1948,6 +1948,8 @@ export const GetAdminAnalyticsResponse = zod.object({
   totalEvents: zod.number(),
   totalBookings: zod.number(),
   totalRevenue: zod.number(),
+  codRevenue: zod.number(),
+  onlineRevenue: zod.number(),
   bookingsByStatus: zod.array(
     zod.object({
       status: zod.string(),

@@ -668,13 +668,18 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     }
   }
 
-  // Daily revenue — last 30 days (keys are the exact 30 UTC dates)
+  // Daily revenue — bucketed over selected range (capped at 90 days to keep response small)
   const dailyMap = new Map<string, number>();
-  // Pre-fill all 30 days with zero
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    const key = d.toISOString().slice(0, 10);
-    dailyMap.set(key, 0);
+  const chartEnd = rangeEnd ?? now;
+  const chartStart = rangeStart ?? new Date(chartEnd.getTime() - 29 * 24 * 60 * 60 * 1000);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const totalDays = Math.round((chartEnd.getTime() - chartStart.getTime()) / dayMs) + 1;
+  const cappedDays = Math.min(totalDays, 90);
+  const effectiveStart = new Date(chartEnd.getTime() - (cappedDays - 1) * dayMs);
+  effectiveStart.setUTCHours(0, 0, 0, 0);
+  for (let i = 0; i < cappedDays; i++) {
+    const d = new Date(effectiveStart.getTime() + i * dayMs);
+    dailyMap.set(d.toISOString().slice(0, 10), 0);
   }
   for (const b of allBookings) {
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
