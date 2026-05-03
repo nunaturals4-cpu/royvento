@@ -219,7 +219,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     const { uploadURL, objectPath } = await res.json();
     const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
     if (!put.ok) throw new Error("Upload failed");
-    return `/api/storage${objectPath}`;
+    return `${window.location.origin}/api/storage${objectPath}`;
   };
 
   const uploadDanceFloorPhoto = async (file: File): Promise<string> => {
