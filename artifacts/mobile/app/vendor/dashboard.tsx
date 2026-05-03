@@ -587,7 +587,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
               </View>
               {/* Drinks discount label */}
               <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DRINKS OFFER LABEL (optional)</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DRINKS DISCOUNT LABEL (optional)</Text>
                 <TextInput
                   value={form.drinksOfferLabel}
                   onChangeText={(v) => setForm((p) => ({ ...p, drinksOfferLabel: v }))}
