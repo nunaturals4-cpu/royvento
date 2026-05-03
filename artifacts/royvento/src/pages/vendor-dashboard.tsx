@@ -780,7 +780,7 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h2 className="font-serif text-2xl">Your events &amp; pubs</h2>
         {!hasPub && (
-          <Button onClick={() => { setShow((s) => !s); setEditingId(null); }} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
+          <Button onClick={() => setShow((s) => !s)} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
             {showForm ? "Close" : "+ New listing"}
           </Button>
         )}
