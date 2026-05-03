@@ -11,6 +11,7 @@ import {
   useGetAdminLeads,
   useGetAdminLeadsSummary,
   useGetAdminCheckinReport,
+  useListVendors,
   importGooglePub,
 } from "@workspace/api-client-react";
 import type { ImportGooglePubResponse } from "@workspace/api-client-react";
@@ -2113,13 +2114,18 @@ function BookingReport() {
 
 // ── Attendance Report ─────────────────────────────────────────────────────────
 
+type AttendanceSortKey = "id" | "userName" | "vendorName" | "bookingDate" | "guests" | "checkedIn";
+
 function AttendanceReport() {
   const [vendorId, setVendorId] = useState<string>("all");
   const [date, setDate] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<"all" | "checkedIn" | "notArrived">("all");
   const [page, setPage] = useState<number>(1);
-  const { data: partnerSummary } = useGetAdminBookingsPartnerSummary();
-  const vendors = partnerSummary ?? [];
+  const [sortKey, setSortKey] = useState<AttendanceSortKey>("bookingDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const { data: allVendors } = useListVendors({ limit: 500 } as Parameters<typeof useListVendors>[0]);
+  const vendors = allVendors ?? [];
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -2132,10 +2138,28 @@ function AttendanceReport() {
 
   const { data: report, isLoading } = useGetAdminCheckinReport(params);
 
-  const rows = report?.rows ?? [];
+  const rawRows = report?.rows ?? [];
   const stats = report?.stats ?? { total: 0, checkedIn: 0, notArrived: 0 };
   const totalPages = report?.totalPages ?? 0;
   const attendanceRate = stats.total > 0 ? Math.round((stats.checkedIn / stats.total) * 100) : 0;
+
+  const rows = [...rawRows].sort((a, b) => {
+    let av: string | number = a[sortKey] as string | number ?? "";
+    let bv: string | number = b[sortKey] as string | number ?? "";
+    if (typeof av === "boolean") av = av ? 1 : 0;
+    if (typeof bv === "boolean") bv = bv ? 1 : 0;
+    if (av < bv) return sortDir === "asc" ? -1 : 1;
+    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (key: AttendanceSortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
+  const SortIcon = ({ k }: { k: AttendanceSortKey }) =>
+    sortKey === k ? <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span> : <span className="ml-1 opacity-20">↕</span>;
 
   const resetFilters = () => { setVendorId("all"); setDate(""); setStatusFilter("all"); setPage(1); };
   const hasFilters = vendorId !== "all" || date || statusFilter !== "all";
@@ -2153,7 +2177,7 @@ function AttendanceReport() {
             <SelectContent>
               <SelectItem value="all">All partners</SelectItem>
               {vendors.map((v) => (
-                <SelectItem key={v.vendorId} value={String(v.vendorId)}>{v.vendorName ?? v.vendorId}</SelectItem>
+                <SelectItem key={v.id} value={String(v.id)}>{v.businessName}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -2243,15 +2267,15 @@ function AttendanceReport() {
             <table className="w-full text-sm min-w-[900px]">
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
                 <tr>
-                  <th className="text-left py-2 pr-3">ID</th>
-                  <th className="text-left py-2 pr-3">Guest</th>
+                  <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("id")}>ID<SortIcon k="id" /></th>
+                  <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("userName")}>Guest<SortIcon k="userName" /></th>
                   <th className="text-left py-2 pr-3">Email</th>
                   <th className="text-left py-2 pr-3">Phone</th>
-                  <th className="text-left py-2 pr-3">Partner</th>
+                  <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("vendorName")}>Partner<SortIcon k="vendorName" /></th>
                   <th className="text-left py-2 pr-3">Event</th>
-                  <th className="text-left py-2 pr-3">Booking date</th>
-                  <th className="text-right py-2 pr-3">Party</th>
-                  <th className="text-left py-2 pr-3">Status</th>
+                  <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("bookingDate")}>Booking date<SortIcon k="bookingDate" /></th>
+                  <th className="text-right py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("guests")}>Party<SortIcon k="guests" /></th>
+                  <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("checkedIn")}>Status<SortIcon k="checkedIn" /></th>
                   <th className="text-left py-2">Check-in time</th>
                 </tr>
               </thead>
