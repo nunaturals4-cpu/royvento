@@ -118,6 +118,27 @@ router.get("/announcements/recent", async (_req, res) => {
   return res.json(rows.rows);
 });
 
+router.get("/vendors/:vendorId/announcements", async (req, res) => {
+  const vendorId = Number(req.params["vendorId"]);
+  if (!Number.isFinite(vendorId)) return res.status(400).json({ error: "Invalid id" });
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await db
+    .select()
+    .from(announcementsTable)
+    .where(
+      and(
+        eq(announcementsTable.vendorId, vendorId),
+        or(
+          eq(announcementsTable.announceDate, ""),
+          sql`${announcementsTable.announceDate} >= ${today}`,
+        ),
+      ),
+    )
+    .orderBy(desc(announcementsTable.createdAt))
+    .limit(5);
+  return res.json(rows);
+});
+
 router.get("/events/:eventId/announcements", async (req, res) => {
   const eventId = Number(req.params["eventId"]);
   if (!Number.isFinite(eventId)) return res.status(400).json({ error: "Invalid id" });

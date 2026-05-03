@@ -37,6 +37,75 @@ interface DrinkPlan {
   timeTo: string;
   description: string;
   lineItems: { name: string; qty: number; discountedPrice: number }[] | null;
+  drinksOfferLabel?: string;
+  foodDiscountLabel?: string;
+}
+
+interface VendorAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+}
+
+function OffersStrip({ vendorId }: { vendorId: number }) {
+  const colors = useColors();
+  const { data: plans } = useQuery<DrinkPlan[]>({
+    queryKey: ["vendorDrinkPlans", vendorId],
+    queryFn: () => customFetch<DrinkPlan[]>(`/api/vendors/${vendorId}/drink-plans`),
+    enabled: !!vendorId,
+  });
+  const { data: announcements } = useQuery<VendorAnnouncement[]>({
+    queryKey: ["vendorAnnouncements", vendorId],
+    queryFn: () => customFetch<VendorAnnouncement[]>(`/api/vendors/${vendorId}/announcements`),
+    enabled: !!vendorId,
+  });
+
+  const planCards = (plans ?? []).filter((p) => p.drinksOfferLabel || p.foodDiscountLabel);
+  const annoCards = announcements ?? [];
+  if (planCards.length === 0 && annoCards.length === 0) return null;
+
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Ionicons name="pricetag-outline" size={14} color={colors.primary} />
+        <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground, textTransform: "uppercase", letterSpacing: 0.6 }}>Today's Deals</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
+        <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 10 }}>
+          {planCards.map((plan) => {
+            const TYPE_LABEL: Record<string, string> = { welcome: "Welcome Drink", unlimited: "Unlimited", ticket: "Ticket", custom: "Custom" };
+            return (
+              <View key={plan.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.primary + "40", backgroundColor: colors.primary + "10", padding: 12, minWidth: 160, gap: 5 }}>
+                <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{TYPE_LABEL[plan.type] ?? plan.type}</Text>
+                {plan.drinksOfferLabel ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <Ionicons name="wine-outline" size={12} color={colors.primary} />
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, flexShrink: 1 }}>{plan.drinksOfferLabel}</Text>
+                  </View>
+                ) : null}
+                {plan.foodDiscountLabel ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <Ionicons name="restaurant-outline" size={12} color="#f59e0b" />
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, flexShrink: 1 }}>{plan.foodDiscountLabel}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+          {annoCards.map((a) => (
+            <View key={a.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: "#f59e0b40", backgroundColor: "#f59e0b10", padding: 12, minWidth: 160, maxWidth: 220, gap: 5 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <Ionicons name="megaphone-outline" size={12} color="#f59e0b" />
+                <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5 }}>Announcement</Text>
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground }} numberOfLines={2}>{a.title}</Text>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
 function DrinkPlansSection({ vendorId }: { vendorId: number }) {
@@ -133,6 +202,23 @@ function DrinkPlansSection({ vendorId }: { vendorId: number }) {
                   </Text>
                 </View>
               ))}
+            </View>
+          )}
+
+          {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+              {plan.drinksOfferLabel ? (
+                <View style={{ backgroundColor: colors.primary + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Ionicons name="wine-outline" size={11} color={colors.primary} />
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary }}>{plan.drinksOfferLabel}</Text>
+                </View>
+              ) : null}
+              {plan.foodDiscountLabel ? (
+                <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Ionicons name="restaurant-outline" size={11} color="#f59e0b" />
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#f59e0b" }}>{plan.foodDiscountLabel}</Text>
+                </View>
+              ) : null}
             </View>
           )}
         </View>
@@ -408,6 +494,9 @@ export default function PartnerDetailScreen() {
             />
           </View>
         ) : null}
+
+        {/* Offers Strip */}
+        <OffersStrip vendorId={vendorId} />
 
         {/* Drink Plans */}
         <DrinkPlansSection vendorId={vendorId} />

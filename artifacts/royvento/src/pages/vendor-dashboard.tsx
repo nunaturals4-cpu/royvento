@@ -2637,6 +2637,8 @@ interface DrinkPlan {
   id: number; vendorId: number; type: string; productName: string; gender: string;
   price: number; days: string[]; timeFrom: string; timeTo: string; description: string; createdAt: string;
   lineItems?: DrinkPlanLineItem[] | null;
+  drinksOfferLabel?: string;
+  foodDiscountLabel?: string;
 }
 
 const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: 0 });
@@ -2652,12 +2654,16 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   // Add form — Free Entry section
   const [freeEntryChecked, setFreeEntryChecked] = useState(false);
-  const [feDrinkType, setFeDrinkType] = useState<"welcome" | "unlimited">("welcome");
+  const [feDrinkTypes, setFeDrinkTypes] = useState<string[]>(["welcome"]);
   const [feGender, setFeGender] = useState<"all" | "female">("all");
+  const [feDrinksOffer, setFeDrinksOffer] = useState("");
+  const [feFoodDiscount, setFeFoodDiscount] = useState("");
 
   // Add form — Included with Ticket section
   const [ticketChecked, setTicketChecked] = useState(false);
   const [ticketItems, setTicketItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
+  const [ticketDrinksOffer, setTicketDrinksOffer] = useState("");
+  const [ticketFoodDiscount, setTicketFoodDiscount] = useState("");
 
   // Common fields for add form
   const [days, setDays] = useState<string[]>([]);
@@ -2674,6 +2680,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [editTimeFrom, setEditTimeFrom] = useState("");
   const [editTimeTo, setEditTimeTo] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editDrinksOffer, setEditDrinksOffer] = useState("");
+  const [editFoodDiscount, setEditFoodDiscount] = useState("");
 
   const errMsg = (err: unknown): string =>
     err instanceof Error ? err.message : typeof err === "string" ? err : "Please try again.";
@@ -2699,8 +2707,10 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
   const resetForm = () => {
-    setFreeEntryChecked(false); setFeDrinkType("welcome"); setFeGender("all");
+    setFreeEntryChecked(false); setFeDrinkTypes(["welcome"]); setFeGender("all");
+    setFeDrinksOffer(""); setFeFoodDiscount("");
     setTicketChecked(false); setTicketItems([emptyItem()]);
+    setTicketDrinksOffer(""); setTicketFoodDiscount("");
     setDays([]); setTimeFrom(""); setTimeTo(""); setDescription("");
   };
 
@@ -2714,6 +2724,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditTimeFrom(plan.timeFrom);
     setEditTimeTo(plan.timeTo);
     setEditDescription(plan.description);
+    setEditDrinksOffer(plan.drinksOfferLabel ?? "");
+    setEditFoodDiscount(plan.foodDiscountLabel ?? "");
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -2723,6 +2735,9 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     if (!freeEntryChecked && !ticketChecked) {
       toast({ title: "Select at least one plan type", variant: "destructive" }); return;
     }
+    if (freeEntryChecked && feDrinkTypes.length === 0) {
+      toast({ title: "Select at least one drink type for free entry", variant: "destructive" }); return;
+    }
     if (ticketChecked && ticketItems.some((i) => !i.name.trim())) {
       toast({ title: "Each ticket item must have a name", variant: "destructive" }); return;
     }
@@ -2730,15 +2745,24 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     try {
       const common = { days, timeFrom, timeTo, description: description.trim() };
       if (freeEntryChecked) {
-        await apiPost("/api/vendors/me/drink-plans", {
-          type: feDrinkType, productName: feDrinkType === "welcome" ? "Free Drink" : "Unlimited Drinks",
-          gender: feGender, price: 0, ...common,
-        });
+        for (const drinkType of feDrinkTypes) {
+          await apiPost("/api/vendors/me/drink-plans", {
+            type: drinkType,
+            productName: drinkType === "welcome" ? "Free Drink" : "Unlimited Drinks",
+            gender: feGender, price: 0,
+            drinksOfferLabel: feDrinksOffer.trim(),
+            foodDiscountLabel: feFoodDiscount.trim(),
+            ...common,
+          });
+        }
       }
       if (ticketChecked) {
         await apiPost("/api/vendors/me/drink-plans", {
           type: "ticket", productName: "Included with Ticket", gender: "all", price: 0,
-          lineItems: ticketItems.filter((i) => i.name.trim()), ...common,
+          lineItems: ticketItems.filter((i) => i.name.trim()),
+          drinksOfferLabel: ticketDrinksOffer.trim(),
+          foodDiscountLabel: ticketFoodDiscount.trim(),
+          ...common,
         });
       }
       toast({ title: "Drink plan(s) added" });
@@ -2770,6 +2794,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         ...(isTicket ? { lineItems: filledTicketItems } : {}),
         days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
         description: editDescription.trim(),
+        drinksOfferLabel: editDrinksOffer.trim(),
+        foodDiscountLabel: editFoodDiscount.trim(),
       });
       setPlans((prev) => prev.map((p) => p.id === editingId ? updated : p));
       setEditingId(null);
@@ -2883,29 +2909,45 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
               <span className="font-semibold text-sm">Free Entry</span>
             </label>
             {freeEntryChecked && (
-              <div className="mt-4 grid sm:grid-cols-2 gap-4 pl-7">
-                <div>
-                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Drink type</Label>
-                  <div className="flex gap-3">
-                    {([["welcome", "Free Drink"], ["unlimited", "Unlimited Drinks"]] as const).map(([val, label]) => (
-                      <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
-                        <input type="radio" name="feDrinkType" value={val} checked={feDrinkType === val}
-                          onChange={() => setFeDrinkType(val)} className="accent-primary" />
-                        {label}
-                      </label>
-                    ))}
+              <div className="mt-4 space-y-4 pl-7">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Drink type <span className="normal-case text-muted-foreground/60">(select one or both)</span></Label>
+                    <div className="flex gap-3">
+                      {([["welcome", "Free Drink"], ["unlimited", "Unlimited Drinks"]] as const).map(([val, label]) => (
+                        <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
+                          <input type="checkbox" value={val}
+                            checked={feDrinkTypes.includes(val)}
+                            onChange={(e) => setFeDrinkTypes((prev) => e.target.checked ? [...prev, val] : prev.filter((t) => t !== val))}
+                            className="h-4 w-4 accent-primary" />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
+                    <div className="flex gap-3">
+                      {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
+                        <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
+                          <input type="radio" name="feGender" value={val} checked={feGender === val}
+                            onChange={() => setFeGender(val)} className="accent-primary" />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">For guests</Label>
-                  <div className="flex gap-3">
-                    {([["all", "All Guests"], ["female", "Girls Only"]] as const).map(([val, label]) => (
-                      <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
-                        <input type="radio" name="feGender" value={val} checked={feGender === val}
-                          onChange={() => setFeGender(val)} className="accent-primary" />
-                        {label}
-                      </label>
-                    ))}
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks offer label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input value={feDrinksOffer} onChange={(e) => setFeDrinksOffer(e.target.value)}
+                      placeholder="e.g. 2+1 on cocktails" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Food discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input value={feFoodDiscount} onChange={(e) => setFeFoodDiscount(e.target.value)}
+                      placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
                   </div>
                 </div>
               </div>
@@ -2924,11 +2966,25 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
               <span className="font-semibold text-sm">Included with Ticket</span>
             </label>
             {ticketChecked && (
-              <div className="mt-4 pl-7">
-                <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
-                  Items included <span className="normal-case text-muted-foreground/60">(name, quantity, discounted price)</span>
-                </Label>
-                <LineItemsEditor items={ticketItems} onChange={setTicketItems} />
+              <div className="mt-4 pl-7 space-y-3">
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
+                    Items included <span className="normal-case text-muted-foreground/60">(name, quantity, discounted price)</span>
+                  </Label>
+                  <LineItemsEditor items={ticketItems} onChange={setTicketItems} />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks offer label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input value={ticketDrinksOffer} onChange={(e) => setTicketDrinksOffer(e.target.value)}
+                      placeholder="e.g. 1 beer included" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Food discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Input value={ticketFoodDiscount} onChange={(e) => setTicketFoodDiscount(e.target.value)}
+                      placeholder="e.g. 15% off food" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -3038,6 +3094,16 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                       <div>
                         <Label>Valid until</Label>
                         <Input type="time" value={editTimeTo} onChange={(e) => setEditTimeTo(e.target.value)} className="bg-black/40 border-white/10" />
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1">Drinks offer label <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                        <Input value={editDrinksOffer} onChange={(e) => setEditDrinksOffer(e.target.value)}
+                          placeholder="e.g. 2+1 on cocktails" className="bg-black/40 border-white/10" maxLength={255} />
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1">Food discount label <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                        <Input value={editFoodDiscount} onChange={(e) => setEditFoodDiscount(e.target.value)}
+                          placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10" maxLength={255} />
                       </div>
                       <div className="sm:col-span-2">
                         <Label>Description</Label>

@@ -173,6 +173,8 @@ interface DrinkPlan {
   timeTo: string;
   description: string;
   lineItems: { name: string; qty: number; discountedPrice: number }[] | null;
+  drinksOfferLabel?: string;
+  foodDiscountLabel?: string;
 }
 
 const PLAN_TYPES = ["welcome", "unlimited", "ticket", "custom"] as const;
@@ -187,6 +189,8 @@ interface DrinkPlanFormState {
   timeFrom: string;
   timeTo: string;
   description: string;
+  drinksOfferLabel: string;
+  foodDiscountLabel: string;
 }
 
 const BLANK_PLAN: DrinkPlanFormState = {
@@ -198,6 +202,8 @@ const BLANK_PLAN: DrinkPlanFormState = {
   timeFrom: "",
   timeTo: "",
   description: "",
+  drinksOfferLabel: "",
+  foodDiscountLabel: "",
 };
 
 function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: ReturnType<typeof useColors> }) {
@@ -225,6 +231,8 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
         timeFrom: form.timeFrom.trim(),
         timeTo: form.timeTo.trim(),
         description: form.description.trim(),
+        drinksOfferLabel: form.drinksOfferLabel.trim(),
+        foodDiscountLabel: form.foodDiscountLabel.trim(),
       };
       if (editId) {
         await customFetch(`/api/vendors/me/drink-plans/${editId}`, {
@@ -319,6 +327,8 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   timeFrom: plan.timeFrom,
                   timeTo: plan.timeTo,
                   description: plan.description,
+                  drinksOfferLabel: plan.drinksOfferLabel ?? "",
+                  foodDiscountLabel: plan.foodDiscountLabel ?? "",
                 });
                 setEditId(plan.id);
                 setShowForm(true);
@@ -336,6 +346,20 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
             {plan.days.length > 0 && <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{plan.days.join(", ")}</Text>}
             {plan.price > 0 && <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>₹{plan.price.toLocaleString("en-IN")}</Text>}
           </View>
+          {(plan.drinksOfferLabel || plan.foodDiscountLabel) ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {plan.drinksOfferLabel ? (
+                <View style={{ backgroundColor: colors.primary + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.primary }}>🍸 {plan.drinksOfferLabel}</Text>
+                </View>
+              ) : null}
+              {plan.foodDiscountLabel ? (
+                <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#f59e0b" }}>🍽️ {plan.foodDiscountLabel}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       ))}
 
@@ -438,6 +462,30 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   multiline
                   numberOfLines={3}
                   style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20, textAlignVertical: "top", minHeight: 70 }}
+                />
+              </View>
+              {/* Drinks offer label */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DRINKS OFFER LABEL (optional)</Text>
+                <TextInput
+                  value={form.drinksOfferLabel}
+                  onChangeText={(v) => setForm((p) => ({ ...p, drinksOfferLabel: v }))}
+                  placeholder="e.g. 2+1 on cocktails"
+                  placeholderTextColor={colors.mutedForeground}
+                  maxLength={255}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                />
+              </View>
+              {/* Food discount label */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FOOD DISCOUNT LABEL (optional)</Text>
+                <TextInput
+                  value={form.foodDiscountLabel}
+                  onChangeText={(v) => setForm((p) => ({ ...p, foodDiscountLabel: v }))}
+                  placeholder="e.g. 20% off starters"
+                  placeholderTextColor={colors.mutedForeground}
+                  maxLength={255}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
                 />
               </View>
             </ScrollView>

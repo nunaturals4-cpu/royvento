@@ -454,6 +454,8 @@ const DrinkPlanBody = z.object({
   timeTo: z.string().refine((v) => v === "" || HH_MM_RE.test(v), { message: "timeTo must be HH:MM or empty" }).default(""),
   description: z.string().max(500).default(""),
   lineItems: z.array(DrinkPlanLineItem).nullable().optional(),
+  drinksOfferLabel: z.string().max(255).optional().default(""),
+  foodDiscountLabel: z.string().max(255).optional().default(""),
 });
 
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {

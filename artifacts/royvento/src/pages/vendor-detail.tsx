@@ -7,8 +7,17 @@ import {
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { EventCard } from "@/components/EventCard";
-import { Star, MapPin, Navigation, Clock, GlassWater, Music2 } from "lucide-react";
+import { Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell } from "lucide-react";
 import { apiGet } from "@/lib/api";
+
+interface Announcement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  imageUrl: string;
+}
 
 interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number; }
 
@@ -16,6 +25,8 @@ interface DrinkPlan {
   id: number; type: string; productName: string; gender: string;
   price: number; days: string[]; timeFrom: string; timeTo: string; description: string;
   lineItems?: DrinkPlanLineItem[] | null;
+  drinksOfferLabel?: string;
+  foodDiscountLabel?: string;
 }
 
 const PLAN_TYPE_LABELS: Record<string, string> = {
@@ -32,11 +43,15 @@ export function VendorDetail() {
   const { data: reviews = [] } = useListVendorReviews(id);
   const { data: allEvents = [] } = useListEvents();
   const [drinkPlans, setDrinkPlans] = useState<DrinkPlan[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   useEffect(() => {
     if (!id) return;
     apiGet<DrinkPlan[]>(`/api/vendors/${id}/drink-plans`)
       .then(setDrinkPlans)
+      .catch(() => {});
+    apiGet<Announcement[]>(`/api/vendors/${id}/announcements`)
+      .then(setAnnouncements)
       .catch(() => {});
   }, [id]);
 
@@ -91,6 +106,49 @@ export function VendorDetail() {
           </div>
         </div>
       </div>
+
+    {/* Offers & Deals Strip */}
+    {(drinkPlans.some((p) => p.drinksOfferLabel || p.foodDiscountLabel) || announcements.length > 0) && (
+      <div className="border-y border-primary/10 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-4">
+        <div className="container mx-auto px-4 md:px-6 flex items-center gap-4">
+          <span className="shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-primary uppercase tracking-widest">
+            <GlassWater className="h-3.5 w-3.5" />
+            Today's Deals
+          </span>
+          <div className="flex gap-3 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {drinkPlans
+              .filter((p) => p.drinksOfferLabel || p.foodDiscountLabel)
+              .map((plan) => (
+                <div key={plan.id} className="shrink-0 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 min-w-[160px] space-y-1">
+                  <span className="block text-[10px] font-semibold text-primary uppercase tracking-wider">
+                    {PLAN_TYPE_LABELS[plan.type] ?? plan.type}
+                  </span>
+                  {plan.drinksOfferLabel && (
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      <GlassWater className="h-3 w-3 text-primary shrink-0" />
+                      {plan.drinksOfferLabel}
+                    </span>
+                  )}
+                  {plan.foodDiscountLabel && (
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      <Utensils className="h-3 w-3 text-amber-400 shrink-0" />
+                      {plan.foodDiscountLabel}
+                    </span>
+                  )}
+                </div>
+              ))}
+            {announcements.map((a) => (
+              <div key={a.id} className="shrink-0 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 min-w-[160px] max-w-[220px] space-y-1">
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-500 uppercase tracking-wider">
+                  <Bell className="h-3 w-3" /> Announcement
+                </span>
+                <span className="block text-sm font-medium text-foreground line-clamp-2">{a.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
 
       <div className="container mx-auto px-4 md:px-6 py-12 space-y-14">
         <section>
@@ -387,6 +445,22 @@ export function VendorDetail() {
                       </span>
                     )}
                   </div>
+                  {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {plan.drinksOfferLabel && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-primary/8 border border-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
+                          <GlassWater className="h-3 w-3 shrink-0" />
+                          {plan.drinksOfferLabel}
+                        </span>
+                      )}
+                      {plan.foodDiscountLabel && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500/8 border border-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-400">
+                          <Utensils className="h-3 w-3 shrink-0" />
+                          {plan.foodDiscountLabel}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {plan.description && (
                     <p className="text-xs text-muted-foreground/80 leading-relaxed">{plan.description}</p>
                   )}
