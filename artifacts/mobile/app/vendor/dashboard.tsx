@@ -2303,37 +2303,78 @@ export default function VendorDashboardScreen() {
   // ─── ANALYTICS TAB ───────────────────────────────────────────────────────────
   type AnalyticsResult = {
     totalEarnings: number; monthEarnings: number;
+    codRevenue: number; onlineRevenue: number;
     totalWomen: number; totalMen: number; totalCouple: number;
     perEvent: { eventId: number; eventTitle: string; bookingCount: number; revenue: number }[];
     dailyRevenue: { date: string; revenue: number }[];
   };
+  type AnalyticsPresetMobile = "today" | "7d" | "30d" | "3m" | "6m";
   const [analyticsData, setAnalyticsData] = useState<AnalyticsResult | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsPreset, setAnalyticsPreset] = useState<AnalyticsPresetMobile>("30d");
 
-  const fetchAnalytics = useCallback(() => {
+  function buildAnalyticsParams(p: AnalyticsPresetMobile) {
+    const now = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const today = fmt(now);
+    if (p === "today") return `from=${today}&to=${today}`;
+    if (p === "7d") return `from=${fmt(new Date(now.getTime() - 6 * 86400000))}&to=${today}`;
+    if (p === "30d") return `from=${fmt(new Date(now.getTime() - 29 * 86400000))}&to=${today}`;
+    if (p === "3m") return `from=${fmt(new Date(now.getTime() - 89 * 86400000))}&to=${today}`;
+    return `from=${fmt(new Date(now.getTime() - 179 * 86400000))}&to=${today}`;
+  }
+
+  const fetchAnalytics = useCallback((p: AnalyticsPresetMobile = analyticsPreset) => {
     setAnalyticsLoading(true);
-    customFetch<AnalyticsResult>("/api/partner/analytics")
+    customFetch<AnalyticsResult>(`/api/partner/analytics?${buildAnalyticsParams(p)}`)
       .then((d) => setAnalyticsData(d))
       .catch(() => {})
       .finally(() => setAnalyticsLoading(false));
-  }, []);
+  }, [analyticsPreset]);
 
   useEffect(() => {
     if (activeTab === "analytics") fetchAnalytics();
-  }, [activeTab]);
+  }, [activeTab, analyticsPreset]);
+
+  const PRESET_LABELS_MOBILE: Record<AnalyticsPresetMobile, string> = {
+    today: "Today", "7d": "7 Days", "30d": "30 Days", "3m": "3 Months", "6m": "6 Months",
+  };
 
   function renderAnalytics() {
     if (analyticsLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
     const a = analyticsData;
     const kpis = [
-      { label: "Total Revenue", value: `₹${(a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "cash-outline" as const, color: colors.primary },
-      { label: "This Month", value: `₹${(a?.monthEarnings ?? 0).toLocaleString("en-IN")}`, icon: "trending-up-outline" as const, color: "#22c55e" },
-      { label: "Women Tickets", value: String(a?.totalWomen ?? 0), icon: "person-outline" as const, color: "#ec4899" },
-      { label: "Men Tickets", value: String(a?.totalMen ?? 0), icon: "person-outline" as const, color: "#3b82f6" },
-      { label: "Couple Tickets", value: String(a?.totalCouple ?? 0), icon: "people-outline" as const, color: "#8b5cf6" },
+      { label: "Total", value: `₹${(a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "cash-outline" as const, color: colors.primary },
+      { label: "Pay at Venue", value: `₹${(a?.codRevenue ?? 0).toLocaleString("en-IN")}`, icon: "wallet-outline" as const, color: "#f59e0b" },
+      { label: "Online", value: `₹${(a?.onlineRevenue ?? 0).toLocaleString("en-IN")}`, icon: "card-outline" as const, color: "#22c55e" },
+      { label: "Women", value: String(a?.totalWomen ?? 0), icon: "person-outline" as const, color: "#ec4899" },
+      { label: "Men", value: String(a?.totalMen ?? 0), icon: "person-outline" as const, color: "#3b82f6" },
+      { label: "Couples", value: String(a?.totalCouple ?? 0), icon: "people-outline" as const, color: "#8b5cf6" },
     ];
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        {/* Time-range presets */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          {(["today", "7d", "30d", "3m", "6m"] as AnalyticsPresetMobile[]).map((p) => (
+            <TouchableOpacity
+              key={p}
+              onPress={() => setAnalyticsPreset(p)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                backgroundColor: analyticsPreset === p ? colors.primary : colors.muted,
+                borderWidth: 1,
+                borderColor: analyticsPreset === p ? colors.primary : colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: analyticsPreset === p ? colors.primaryForeground : colors.mutedForeground }}>
+                {PRESET_LABELS_MOBILE[p]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>REVENUE OVERVIEW</Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {kpis.map((k) => (

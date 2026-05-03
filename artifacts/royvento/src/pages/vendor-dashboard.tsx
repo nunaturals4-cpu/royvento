@@ -23,6 +23,7 @@ import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck,
+  Banknote, CreditCard,
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -2289,6 +2290,8 @@ function AnnouncementsPanel() {
 interface AnalyticsData {
   totalEarnings: number;
   monthEarnings: number;
+  codRevenue: number;
+  onlineRevenue: number;
   perEvent: {
     eventId: number;
     eventTitle: string;
@@ -2304,17 +2307,43 @@ interface AnalyticsData {
   totalCouple: number;
 }
 
+type AnalyticsPreset = "today" | "7d" | "30d" | "3m" | "6m" | "custom";
+
+function toAnalyticsDateStr(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
 function AnalyticsPanel() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [preset, setPreset] = useState<AnalyticsPreset>("30d");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
-  useEffect(() => {
+  function buildParams() {
+    const now = new Date();
+    if (preset === "today") return { from: toAnalyticsDateStr(now), to: toAnalyticsDateStr(now) };
+    if (preset === "7d") return { from: toAnalyticsDateStr(new Date(now.getTime() - 6 * 86400000)), to: toAnalyticsDateStr(now) };
+    if (preset === "30d") return { from: toAnalyticsDateStr(new Date(now.getTime() - 29 * 86400000)), to: toAnalyticsDateStr(now) };
+    if (preset === "3m") return { from: toAnalyticsDateStr(new Date(now.getTime() - 89 * 86400000)), to: toAnalyticsDateStr(now) };
+    if (preset === "6m") return { from: toAnalyticsDateStr(new Date(now.getTime() - 179 * 86400000)), to: toAnalyticsDateStr(now) };
+    return { from: customFrom || undefined, to: customTo || undefined };
+  }
+
+  function load() {
     setLoading(true);
-    apiGet<AnalyticsData>("/api/partner/analytics")
+    const { from, to } = buildParams();
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    const qStr = qs.toString();
+    apiGet<AnalyticsData>(`/api/partner/analytics${qStr ? `?${qStr}` : ""}`)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { load(); }, [preset, customFrom, customTo]);
 
   if (loading) {
     return <p className="text-muted-foreground py-8 text-center">Loading analytics…</p>;
@@ -2327,13 +2356,47 @@ function AnalyticsPanel() {
   const hasData = data.totalEarnings > 0 || data.perEvent.length > 0;
 
   const chartMax = Math.max(...data.dailyRevenue.map((d) => d.revenue), 1);
-  const monthName = new Date().toLocaleString("en-IN", { month: "long" });
   const hasTickets = (data.totalWomen + data.totalMen + data.totalCouple) > 0;
+
+  const PRESET_LABELS: Record<AnalyticsPreset, string> = {
+    today: "Today", "7d": "Last 7 days", "30d": "Last 30 days",
+    "3m": "Last 3 months", "6m": "Last 6 months", custom: "Custom",
+  };
 
   return (
     <div className="space-y-6">
+      {/* Time-range filter */}
+      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Time range</p>
+          <div className="flex flex-wrap gap-2">
+            {(["today", "7d", "30d", "3m", "6m", "custom"] as AnalyticsPreset[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPreset(p)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${preset === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+              >
+                {PRESET_LABELS[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+        {preset === "custom" && (
+          <div className="flex gap-3 items-end">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">From</p>
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm" max={customTo || toAnalyticsDateStr(new Date())} />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">To</p>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm" min={customFrom} max={toAnalyticsDateStr(new Date())} />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Earnings summary cards */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-3 gap-4">
         <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
           <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
             <IndianRupee className="h-5 w-5 text-primary" />
@@ -2345,13 +2408,23 @@ function AnalyticsPanel() {
           </div>
         </div>
         <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-            <TrendingUp className="h-5 w-5 text-primary" />
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+            <Banknote className="h-5 w-5 text-amber-400" />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">This month ({monthName})</p>
-            <p className="stat-number text-3xl">{formatINR(data.monthEarnings)}</p>
-            <p className="text-xs text-muted-foreground mt-1">month-to-date</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Pay at venue (COD)</p>
+            <p className="stat-number text-3xl text-amber-300">{formatINR(data.codRevenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">cash / pay-at-door</p>
+          </div>
+        </div>
+        <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <CreditCard className="h-5 w-5 text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Online payments</p>
+            <p className="stat-number text-3xl text-emerald-300">{formatINR(data.onlineRevenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">paid via gateway</p>
           </div>
         </div>
       </div>

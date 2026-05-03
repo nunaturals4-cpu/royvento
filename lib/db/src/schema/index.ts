@@ -176,6 +176,7 @@ export const bookingsTable = pgTable(
     checkedIn: boolean("checked_in").notNull().default(false),
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
     arrivalTime: varchar("arrival_time", { length: 8 }),
+    paymentMethod: varchar("payment_method", { length: 10 }).notNull().default("online"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

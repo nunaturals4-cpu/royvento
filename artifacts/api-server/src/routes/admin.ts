@@ -56,14 +56,26 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
         ),
     ]);
 
-  const revenueRow = await db
-    .select({
-      total: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
-    })
-    .from(bookingsTable)
-    .where(
-      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
-    );
+  const [revenueRow, paymentSplitRows] = await Promise.all([
+    db
+      .select({
+        total: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
+      })
+      .from(bookingsTable)
+      .where(
+        sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+      ),
+    db
+      .select({
+        paymentMethod: bookingsTable.paymentMethod,
+        total: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
+      })
+      .from(bookingsTable)
+      .where(
+        sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+      )
+      .groupBy(bookingsTable.paymentMethod),
+  ]);
 
   const statusCounts = await db
     .select({
@@ -199,6 +211,9 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, revenue]) => ({ date, revenue }));
 
+  const codRevenue = Number(paymentSplitRows.find((r) => r.paymentMethod === "cod")?.total ?? 0);
+  const onlineRevenue = Number(paymentSplitRows.find((r) => r.paymentMethod === "online")?.total ?? 0);
+
   const allVendors = await db.select().from(vendorsTable);
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
   const perVendor = Array.from(perVendorMap.values())
@@ -271,6 +286,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalEvents: eventsCount[0]?.c ?? 0,
     totalBookings: bookingsCount[0]?.c ?? 0,
     totalRevenue: Number(revenueRow[0]?.total ?? 0),
+    codRevenue,
+    onlineRevenue,
     bookingsByStatus: statusCounts.map((s) => ({
       status: s.status,
       count: s.count,

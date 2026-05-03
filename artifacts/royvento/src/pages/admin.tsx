@@ -30,7 +30,7 @@ import {
   Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
-  Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift,
+  Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -204,12 +204,14 @@ function Analytics() {
         <p className="text-muted-foreground">Loading…</p>
       ) : !data ? null : (
       <>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         <Stat icon={Users} label="New users" value={String(data.totalUsers)} />
         <Stat icon={Briefcase} label="New partners" value={String(data.totalVendors)} />
         <Stat icon={Clock} label="Pending approval" value={String(data.pendingVendors)} />
         <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
         <Stat icon={IndianRupee} label="Revenue" value={formatINR(data.totalRevenue)} />
+        <Stat icon={Banknote} label="COD / Pay at venue" value={formatINR((adminData as any).codRevenue ?? 0)} />
+        <Stat icon={CreditCard} label="Online payments" value={formatINR((adminData as any).onlineRevenue ?? 0)} />
       </div>
 
       {/* Platform ticket breakdown */}

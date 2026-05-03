@@ -16,7 +16,7 @@ import {
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
-import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateBookingStatusBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
@@ -336,6 +336,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       pointsUsed,
       arrivalTime: parsed.data.arrivalTime || null,
       approvedBy: usePhonePe ? "" : "auto",
+      paymentMethod: wantsOnline ? "online" : "cod",
     })
     .returning();
   if (!b) {
@@ -603,6 +604,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const vendor = vRows[0];
   if (!vendor) { res.json({ totalEarnings: 0, monthEarnings: 0, perEvent: [], dailyRevenue: [], totalWomen: 0, totalMen: 0, totalCouple: 0 }); return; }
 
+  const fromStr = req.query["from"] as string | undefined;
+  const toStr = req.query["to"] as string | undefined;
+  const rangeStart = fromStr ? new Date(`${fromStr}T00:00:00Z`) : undefined;
+  const rangeEnd = toStr ? new Date(`${toStr}T23:59:59Z`) : undefined;
+
   const allBookings = await db
     .select()
     .from(bookingsTable)
@@ -610,6 +616,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       and(
         eq(bookingsTable.vendorId, vendor.id),
         inArray(bookingsTable.status, ["confirmed", "completed"]),
+        rangeStart ? gte(bookingsTable.createdAt, rangeStart) : undefined,
+        rangeEnd ? lte(bookingsTable.createdAt, rangeEnd) : undefined,
       ),
     );
 
@@ -618,10 +626,14 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   let totalEarnings = 0;
   let monthEarnings = 0;
+  let codRevenue = 0;
+  let onlineRevenue = 0;
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
     totalEarnings += fp;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += fp;
+    if (b.paymentMethod === "cod") codRevenue += fp;
+    else onlineRevenue += fp;
   }
 
   // Per-event breakdown
@@ -682,6 +694,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   res.json({
     totalEarnings: Math.round(totalEarnings),
     monthEarnings: Math.round(monthEarnings),
+    codRevenue: Math.round(codRevenue),
+    onlineRevenue: Math.round(onlineRevenue),
     perEvent: perEventArr,
     dailyRevenue,
     totalWomen,
