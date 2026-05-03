@@ -594,6 +594,8 @@ export default function ProfileScreen() {
           { icon: "search-outline" as const, label: t("profile.explore_events"), onPress: () => router.push("/(tabs)/explore") },
           { icon: "newspaper-outline" as const, label: t("profile.blog_stories"), onPress: () => router.push("/blogs") },
           { icon: "star-outline" as const, label: t("profile.subscription_premium"), onPress: () => router.push("/subscription") },
+          { icon: "wine-outline" as const, label: "Pub Drink Offers", onPress: () => router.push("/pub-offers") },
+          { icon: "headset-outline" as const, label: "Contact & Help", onPress: () => router.push("/contact") },
           { icon: "language-outline" as const, label: t("profile.language"), onPress: () => setLangModal(true) },
           { icon: "document-text-outline" as const, label: "Terms of Service", onPress: () => router.push("/terms") },
           { icon: "shield-checkmark-outline" as const, label: "Privacy Policy", onPress: () => router.push("/privacy") },
