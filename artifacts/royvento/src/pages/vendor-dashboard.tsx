@@ -1559,10 +1559,11 @@ export function VendorListingEditPage() {
   const [, params] = useRoute("/dashboard/vendor/listings/:id/edit");
   const eventId = params ? Number(params.id) : null;
   const [, navigate] = useLocation();
-  const { data: vendorData } = useGetMyVendor();
+  const { data: vendorData, isLoading: vendorLoading } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
-  const { data: events = [] } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
+  const { data: events = [], isLoading: eventsLoading } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
   const event = (events as any[]).find((e: any) => e.id === eventId) ?? null;
+  const loading = vendorLoading || eventsLoading;
 
   const goBack = () => navigate("/dashboard/vendor?tab=events");
 
@@ -1578,10 +1579,10 @@ export function VendorListingEditPage() {
         </button>
       </div>
       <h1 className="font-serif text-3xl mb-8">Edit listing</h1>
-      {!event ? (
-        <div className="text-muted-foreground text-sm py-10 text-center">
-          {vendor ? "Listing not found." : "Loading…"}
-        </div>
+      {loading ? (
+        <div className="text-muted-foreground text-sm py-10 text-center">Loading…</div>
+      ) : !event ? (
+        <div className="text-muted-foreground text-sm py-10 text-center">Listing not found.</div>
       ) : (
         <div className="rounded-3xl glass-card-strong p-6">
           <EditListingForm event={event} onBack={goBack} onSaved={goBack} />
