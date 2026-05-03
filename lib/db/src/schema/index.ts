@@ -174,6 +174,7 @@ export const bookingsTable = pgTable(
     rejectionReason: text("rejection_reason"),
     checkedIn: boolean("checked_in").notNull().default(false),
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+    arrivalTime: varchar("arrival_time", { length: 8 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

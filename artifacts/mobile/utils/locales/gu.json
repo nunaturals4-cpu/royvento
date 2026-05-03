@@ -246,6 +246,8 @@
     "free_entry_form_notice": "મફત પ્રવેશ – આ તારીખ માટે કોઈ ચુકવણી જરૂરી નથી.",
     "free_for": "માટે: %{genders}",
     "group_booking": "ગ્રૂપ અથવા કૉર્પોરેટ બુકિંગ",
+    "table_booking": "ટેબલ બુકિંગ",
+    "arrival_time": "અપેક્ષિત આગમન સમય",
     "guests": "મહેમાન",
     "guests_field": "મહેમાન",
     "guests_min10": "મહેમાન (ઓછામાં ઓછા 10)",

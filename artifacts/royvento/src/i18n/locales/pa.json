@@ -226,6 +226,8 @@
     "open_days_note": "ਖੁੱਲ੍ਹੇ: {{days}}",
     "booking_type": "ਬੁਕਿੰਗ ਦੀ ਕਿਸਮ",
     "group_booking": "ਸਮੂਹ ਜਾਂ ਕਾਰਪੋਰੇਟ ਬੁਕਿੰਗ",
+    "table_booking": "ਟੇਬਲ ਬੁਕਿੰਗ",
+    "arrival_time": "ਅਨੁਮਾਨਿਤ ਆਗਮਨ ਸਮਾਂ",
     "ticket_counts": "ਟਿਕਟਾਂ ਦੀ ਗਿਣਤੀ",
     "occasion_label": "ਮੌਕਾ",
     "select_occasion": "ਮੌਕਾ ਚੁਣੋ…",

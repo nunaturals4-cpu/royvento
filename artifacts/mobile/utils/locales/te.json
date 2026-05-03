@@ -246,6 +246,8 @@
     "free_entry_form_notice": "ఉచిత ప్రవేశం – ఈ తేదీకి చెల్లింపు అవసరం లేదు.",
     "free_for": "కోసం: %{genders}",
     "group_booking": "గ్రూప్ లేదా కార్పొరేట్ బుకింగ్",
+    "table_booking": "టేబుల్ బుకింగ్",
+    "arrival_time": "ఆగమన అంచనా సమయం",
     "guests": "అతిథులు",
     "guests_field": "అతిథులు",
     "guests_min10": "అతిథులు (కనీసం 10)",

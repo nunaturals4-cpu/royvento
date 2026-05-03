@@ -226,6 +226,8 @@
     "open_days_note": "திறந்த: {{days}}",
     "booking_type": "முன்பதிவு வகை",
     "group_booking": "குழு அல்லது கார்பொரேட் முன்பதிவு",
+    "table_booking": "டேபிள் முன்பதிவு",
+    "arrival_time": "எதிர்பார்க்கப்படும் வருகை நேரம்",
     "ticket_counts": "டிக்கெட் எண்ணிக்கை",
     "occasion_label": "சந்தர்ப்பம்",
     "select_occasion": "சந்தர்ப்பம் தேர்ந்தெடுக்கவும்…",

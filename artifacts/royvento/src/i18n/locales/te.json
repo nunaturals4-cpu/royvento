@@ -226,6 +226,8 @@
     "open_days_note": "తెరిచిన: {{days}}",
     "booking_type": "బుకింగ్ రకం",
     "group_booking": "గ్రూప్ లేదా కార్పొరేట్ బుకింగ్",
+    "table_booking": "టేబుల్ బుకింగ్",
+    "arrival_time": "ఆగమన అంచనా సమయం",
     "ticket_counts": "టికెట్ సంఖ్యలు",
     "occasion_label": "సందర్భం",
     "select_occasion": "సందర్భం ఎంచుకోండి…",

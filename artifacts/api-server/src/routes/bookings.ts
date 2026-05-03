@@ -60,6 +60,7 @@ const CreateBookingBody = z.object({
   pointsToUse: z.number().int().nonnegative().optional().default(0),
   paymentMethod: z.enum(["cod", "online"]).optional().default("online"),
   callbackScheme: z.enum(["royvento"]).optional(),
+  arrivalTime: z.string().optional().default(""),
 });
 
 const router: IRouter = Router();
@@ -91,6 +92,7 @@ interface BookingRow {
   rejectionReason: string | null;
   checkedIn: boolean;
   checkedInAt: Date | null;
+  arrivalTime: string | null;
   createdAt: Date;
 }
 
@@ -138,6 +140,7 @@ async function serializeBookings(rows: BookingRow[]) {
       rejectionReason: b.rejectionReason ?? null,
       checkedIn: b.checkedIn,
       checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
+      arrivalTime: b.arrivalTime ?? "",
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",
@@ -331,6 +334,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       personName: parsed.data.personName || user.name,
       phone: parsed.data.phone ?? "",
       pointsUsed,
+      arrivalTime: parsed.data.arrivalTime || null,
       approvedBy: usePhonePe ? "" : "auto",
     })
     .returning();

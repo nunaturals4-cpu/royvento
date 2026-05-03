@@ -93,6 +93,7 @@ export function EventDetail() {
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
   const [occasion, setOccasion] = useState("");
+  const [arrivalTime, setArrivalTime] = useState("");
   const [pointsToUse, setPointsToUse] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
   const [agreedTerms, setAgreedTerms] = useState(false);
@@ -234,6 +235,10 @@ export function EventDetail() {
       toast({ title: t("events.add_tickets"), variant: "destructive" });
       return;
     }
+    if (isPub && pubMode === "event" && !arrivalTime) {
+      toast({ title: t("events.arrival_time"), description: "Please enter the expected arrival time.", variant: "destructive" });
+      return;
+    }
 
     if (isPub && phone && !/^\d{10}$/.test(phone)) {
       toast({ title: t("events.invalid_phone"), description: t("events.phone_desc"), variant: "destructive" });
@@ -271,6 +276,7 @@ export function EventDetail() {
               ticketWomen, ticketMen, ticketCouple,
               selectedPubEvent: "",
               notes: pubMode === "event" ? occasion : notes,
+              arrivalTime: pubMode === "event" ? arrivalTime : undefined,
             }
           : {}),
       });
@@ -896,7 +902,7 @@ export function EventDetail() {
                       </label>
                       <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer ${pubMode === "event" ? "border-primary bg-primary/10" : "border-white/10"}`}>
                         <RadioGroupItem value="event" />
-                        <span className="text-sm">{t("events.group_booking")}</span>
+                        <span className="text-sm">{t("events.table_booking")}</span>
                       </label>
                     </RadioGroup>
                   </div>
@@ -930,6 +936,17 @@ export function EventDetail() {
                       <div>
                         <Label htmlFor="guests">{t("events.guests_field")} <span className="text-muted-foreground font-normal text-xs">{t("events.guests_min_10")}</span></Label>
                         <Input id="guests" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
+                      </div>
+                      <div>
+                        <Label htmlFor="arrival-time">{t("events.arrival_time")} <span className="text-red-400 text-xs ml-1">*</span></Label>
+                        <input
+                          id="arrival-time"
+                          type="time"
+                          value={arrivalTime}
+                          onChange={(e) => setArrivalTime(e.target.value)}
+                          required
+                          className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm mt-1 text-foreground [color-scheme:dark]"
+                        />
                       </div>
                     </>
                   )}

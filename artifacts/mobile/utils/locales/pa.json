@@ -246,6 +246,8 @@
     "free_entry_form_notice": "ਮੁਫ਼ਤ ਦਾਖਲਾ – ਇਸ ਤਾਰੀਖ ਲਈ ਕੋਈ ਭੁਗਤਾਨ ਜ਼ਰੂਰੀ ਨਹੀਂ।",
     "free_for": "ਲਈ: %{genders}",
     "group_booking": "ਸਮੂਹ ਜਾਂ ਕਾਰਪੋਰੇਟ ਬੁਕਿੰਗ",
+    "table_booking": "ਟੇਬਲ ਬੁਕਿੰਗ",
+    "arrival_time": "ਅਨੁਮਾਨਿਤ ਆਗਮਨ ਸਮਾਂ",
     "guests": "ਮਹਿਮਾਨ",
     "guests_field": "ਮਹਿਮਾਨ",
     "guests_min10": "ਮਹਿਮਾਨ (ਘੱਟੋ ਘੱਟ 10)",

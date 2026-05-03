@@ -1447,6 +1447,9 @@ export default function VendorDashboardScreen() {
                   {b.phone ? (
                     <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{b.phone}</Text>
                   ) : null}
+                  {b.pubMode === "event" && b.arrivalTime ? (
+                    <Text style={[styles.cardSub, { color: colors.primary }]}>⏰ Arrival: {b.arrivalTime}</Text>
+                  ) : null}
                 </View>
                 <View style={[styles.badge, { backgroundColor: statusStyle.bg }]}>
                   <Text style={[styles.badgeText, { color: statusStyle.text }]}>{b.status}</Text>

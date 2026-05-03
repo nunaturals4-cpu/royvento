@@ -246,6 +246,8 @@
     "free_entry_form_notice": "বিনামূল্যে প্রবেশ – এই তারিখের জন্য কোনো পেমেন্ট প্রয়োজন নেই।",
     "free_for": "জন্য: %{genders}",
     "group_booking": "গ্রুপ বা কর্পোরেট বুকিং",
+    "table_booking": "টেবিল বুকিং",
+    "arrival_time": "প্রত্যাশিত আগমনের সময়",
     "guests": "অতিথি",
     "guests_field": "অতিথি",
     "guests_min10": "অতিথি (কমপক্ষে ১০)",

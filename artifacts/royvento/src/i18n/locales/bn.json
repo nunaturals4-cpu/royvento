@@ -226,6 +226,8 @@
     "open_days_note": "খোলা: {{days}}",
     "booking_type": "বুকিংয়ের ধরন",
     "group_booking": "গ্রুপ বা কর্পোরেট বুকিং",
+    "table_booking": "টেবিল বুকিং",
+    "arrival_time": "প্রত্যাশিত আগমনের সময়",
     "ticket_counts": "টিকিটের সংখ্যা",
     "occasion_label": "উপলক্ষ",
     "select_occasion": "উপলক্ষ বেছে নিন…",

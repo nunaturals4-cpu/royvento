@@ -226,6 +226,8 @@
     "open_days_note": "Open: {{days}}",
     "booking_type": "Booking type",
     "group_booking": "Group or corporate booking",
+    "table_booking": "Table booking",
+    "arrival_time": "Expected arrival time",
     "ticket_counts": "Ticket counts",
     "occasion_label": "Occasion",
     "select_occasion": "Select occasion…",

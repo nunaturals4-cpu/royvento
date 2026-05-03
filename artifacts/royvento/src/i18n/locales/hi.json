@@ -226,6 +226,8 @@
     "open_days_note": "खुले: {{days}}",
     "booking_type": "बुकिंग का प्रकार",
     "group_booking": "समूह या कॉर्पोरेट बुकिंग",
+    "table_booking": "टेबल बुकिंग",
+    "arrival_time": "अपेक्षित आगमन समय",
     "ticket_counts": "टिकट की संख्या",
     "occasion_label": "अवसर",
     "select_occasion": "अवसर चुनें…",

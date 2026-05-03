@@ -226,6 +226,8 @@
     "open_days_note": "ತೆರೆದ: {{days}}",
     "booking_type": "ಬುಕಿಂಗ್ ಪ್ರಕಾರ",
     "group_booking": "ಗುಂಪು ಅಥವಾ ಕಾರ್ಪೊರೇಟ್ ಬುಕಿಂಗ್",
+    "table_booking": "ಟೇಬಲ್ ಬುಕಿಂಗ್",
+    "arrival_time": "ನಿರೀಕ್ಷಿತ ಆಗಮನ ಸಮಯ",
     "ticket_counts": "ಟಿಕೆಟ್ ಸಂಖ್ಯೆ",
     "occasion_label": "ಸಂದರ್ಭ",
     "select_occasion": "ಸಂದರ್ಭ ಆಯ್ಕೆ ಮಾಡಿ…",

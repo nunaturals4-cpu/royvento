@@ -226,6 +226,8 @@
     "open_days_note": "ખુલ્લા: {{days}}",
     "booking_type": "બુકિંગ પ્રકાર",
     "group_booking": "ગ્રૂપ અથવા કૉર્પોરેટ બુકિંગ",
+    "table_booking": "ટેબલ બુકિંગ",
+    "arrival_time": "અપેક્ષિત આગમન સમય",
     "ticket_counts": "ટિકિટ સંખ્યા",
     "occasion_label": "પ્રસંગ",
     "select_occasion": "પ્રસંગ પસંદ કરો…",

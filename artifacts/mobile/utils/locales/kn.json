@@ -246,6 +246,8 @@
     "free_entry_form_notice": "ಉಚಿತ ಪ್ರವೇಶ – ಈ ದಿನಾಂಕಕ್ಕೆ ಯಾವುದೇ ಪಾವತಿ ಅಗತ್ಯವಿಲ್ಲ.",
     "free_for": "ಗಾಗಿ: %{genders}",
     "group_booking": "ಗುಂಪು ಅಥವಾ ಕಾರ್ಪೊರೇಟ್ ಬುಕಿಂಗ್",
+    "table_booking": "ಟೇಬಲ್ ಬುಕಿಂಗ್",
+    "arrival_time": "ನಿರೀಕ್ಷಿತ ಆಗಮನ ಸಮಯ",
     "guests": "ಅತಿಥಿಗಳು",
     "guests_field": "ಅತಿಥಿಗಳು",
     "guests_min10": "ಅತಿಥಿಗಳು (ಕನಿಷ್ಠ 10)",

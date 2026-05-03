@@ -246,6 +246,8 @@
     "drink_ticket_generic": "Drinks included with ticket",
     "drink_offer_generic": "Drink offer",
     "group_booking": "Group or corporate booking",
+    "table_booking": "Table booking",
+    "arrival_time": "Expected arrival time",
     "guests": "guests",
     "guests_field": "Guests",
     "guests_min10": "Guests (min 10)",

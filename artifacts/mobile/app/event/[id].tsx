@@ -155,6 +155,7 @@ export default function EventDetailScreen() {
   const [occasion, setOccasion] = useState("farewell");
   const [expandedDrinkPlans, setExpandedDrinkPlans] = useState<Set<number>>(new Set());
   const [personName, setPersonName] = useState("");
+  const [arrivalTime, setArrivalTime] = useState("");
 
   const bookingDate = bookingDateObj.toISOString().slice(0, 10);
 
@@ -335,6 +336,10 @@ export default function EventDetailScreen() {
       Alert.alert(t("events.min_guests"), t("events.min_guests_desc"));
       return;
     }
+    if (isPub && pubMode === "event" && !arrivalTime.trim()) {
+      Alert.alert(t("events.arrival_time"), "Please enter the expected arrival time (HH:MM).");
+      return;
+    }
 
     if (!agreedTerms) {
       Alert.alert("Consent required", "Please agree to the Terms & Conditions and Privacy Policy to continue.");
@@ -368,6 +373,7 @@ export default function EventDetailScreen() {
         payload.guests = parseInt(guests) || 10;
         payload.notes = occasion;
         payload.selectedPubEvent = "";
+        payload.arrivalTime = arrivalTime.trim();
       }
     } else {
       payload.guests = parseInt(guests) || 1;
@@ -806,7 +812,7 @@ export default function EventDetailScreen() {
                           color={pubMode === m ? colors.primary : colors.mutedForeground}
                         />
                         <Text style={[styles.modeBtnText, { color: pubMode === m ? colors.primary : colors.mutedForeground }]}>
-                          {m === "ticket" ? t("events.buy_tickets") : t("events.group_booking")}
+                          {m === "ticket" ? t("events.buy_tickets") : t("events.table_booking")}
                         </Text>
                       </Pressable>
                     ))}
@@ -863,6 +869,18 @@ export default function EventDetailScreen() {
                         placeholder="10"
                         placeholderTextColor={colors.mutedForeground}
                         keyboardType="number-pad"
+                      />
+                    </View>
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.arrival_time")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
+                      <TextInput
+                        style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                        value={arrivalTime}
+                        onChangeText={setArrivalTime}
+                        placeholder="HH:MM"
+                        placeholderTextColor={colors.mutedForeground}
+                        keyboardType="numbers-and-punctuation"
+                        maxLength={5}
                       />
                     </View>
                   </>
