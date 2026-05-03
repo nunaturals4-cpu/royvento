@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch, useRoute } from "wouter";
 import {
   useGetMyVendor,
   useCreateMyVendor,
@@ -55,6 +55,8 @@ interface Lead {
 }
 
 export function VendorDashboard() {
+  const search = useSearch();
+  const initialTab = new URLSearchParams(search).get("tab") ?? "overview";
   const { data: vendorData, refetch: refetchVendor } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
   const { data: events = [], refetch: refetchEvents } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
@@ -82,7 +84,7 @@ export function VendorDashboard() {
           <p className="text-muted-foreground">Your partner profile is being prepared. Please refresh in a moment or contact support if this persists.</p>
         </div>
       ) : (
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs defaultValue={initialTab} className="space-y-6">
           <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
             <TabsTrigger value="overview">Profile</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
@@ -757,7 +759,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
 
 function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events: any[]; refetchEvents: () => void }) {
   const [showForm, setShow] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [, navigate] = useLocation();
   const del = useDeleteEvent();
   const { toast } = useToast();
 
@@ -843,7 +845,7 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
                       {e.type === "pub" ? `from ${formatINR(e.startingPrice ?? e.price)}` : formatINR(e.price)}
                     </span>
                     <div className="flex items-center gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => setEditingId(e.id)}>
+                      <Button size="icon" variant="ghost" onClick={() => navigate(`/dashboard/vendor/listings/${e.id}/edit`)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
@@ -873,13 +875,6 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
         </div>
       )}
 
-      {editingId != null && (
-        <EditEventModal
-          event={events.find((e: any) => e.id === editingId)!}
-          onClose={() => setEditingId(null)}
-          onSaved={() => { setEditingId(null); refetchEvents(); }}
-        />
-      )}
     </div>
   );
 }
@@ -1261,7 +1256,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   );
 }
 
-function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () => void; onSaved: () => void }) {
+function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   const [imageUrl, setImageUrl] = useState(event.imageUrl ?? "");
@@ -1359,9 +1354,8 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
     setPubEventTypes((arr) => arr.includes(t) ? arr.filter((x) => x !== t) : [...arr, t]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <form onSubmit={save} className="bg-card border border-white/10 rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-3 my-auto" onClick={(e) => e.stopPropagation()}>
-        <p className="font-serif text-2xl">Edit listing</p>
+    <form onSubmit={save} className="space-y-4">
+        <p className="font-serif text-2xl sr-only">Edit listing</p>
         <div><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" /></div>
         <div><Label>Description</Label><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
         <div>
@@ -1553,11 +1547,46 @@ function EditEventModal({ event, onClose, onSaved }: { event: any; onClose: () =
             </div>
           </>
         )}
-        <div className="flex gap-2 justify-end">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Save</Button>
+        <div className="flex gap-3 justify-end pt-2 border-t border-white/10">
+          <Button type="button" variant="outline" onClick={onBack}>Cancel</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Save changes</Button>
         </div>
-      </form>
+    </form>
+  );
+}
+
+export function VendorListingEditPage() {
+  const [, params] = useRoute("/dashboard/vendor/listings/:id/edit");
+  const eventId = params ? Number(params.id) : null;
+  const [, navigate] = useLocation();
+  const { data: vendorData } = useGetMyVendor();
+  const vendor = (vendorData?.vendor ?? null) as any;
+  const { data: events = [] } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
+  const event = (events as any[]).find((e: any) => e.id === eventId) ?? null;
+
+  const goBack = () => navigate("/dashboard/vendor?tab=events");
+
+  return (
+    <div className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">
+      <div className="flex items-center gap-3 mb-8">
+        <button
+          type="button"
+          onClick={goBack}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" /> Back to listings
+        </button>
+      </div>
+      <h1 className="font-serif text-3xl mb-8">Edit listing</h1>
+      {!event ? (
+        <div className="text-muted-foreground text-sm py-10 text-center">
+          {vendor ? "Listing not found." : "Loading…"}
+        </div>
+      ) : (
+        <div className="rounded-3xl glass-card-strong p-6">
+          <EditListingForm event={event} onBack={goBack} onSaved={goBack} />
+        </div>
+      )}
     </div>
   );
 }
