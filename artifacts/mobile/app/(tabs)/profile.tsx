@@ -199,7 +199,7 @@ export default function ProfileScreen() {
         action === "accept" ? t("profile.invitation_accepted_desc") : "",
       );
     } catch {
-      Alert.alert(t("common.error"), t("profile.invitation_error"));
+      Alert.alert(t("common.error"), t("bookings.invitation_error"));
     } finally {
       setActingInv(null);
     }
