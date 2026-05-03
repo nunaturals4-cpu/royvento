@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiPatch, apiGet, apiPost, fileToDataUrl } from "@/lib/api";
-import { CalendarCheck, Sparkles, Tag, Crown, Gift, Sparkle, Copy, Upload, Bell, ScanLine } from "lucide-react";
+import { CalendarCheck, Sparkles, Tag, Crown, Gift, Sparkle, Copy, Upload, Bell, ScanLine, Share2 } from "lucide-react";
 
 interface VendorRequest {
   id: number;
@@ -97,6 +97,26 @@ export function Profile() {
       toast({ title: "Referral link copied" });
     } catch {
       toast({ title: "Copy failed", description: url });
+    }
+  };
+
+  const shareReferral = async () => {
+    if (!referrals?.code) return;
+    const url = `${window.location.origin}${import.meta.env.BASE_URL}register?ref=${referrals.code}`;
+    const text = `Join me on Royvento and get rewards! Sign up with my link: ${url}`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Join Royvento", text, url });
+      } catch {
+        // user cancelled — no-op
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast({ title: "Referral link copied" });
+      } catch {
+        toast({ title: "Copy failed", description: url });
+      }
     }
   };
 
@@ -242,6 +262,9 @@ export function Profile() {
                 <code className="px-3 py-2 rounded-lg bg-black/40 border border-white/10 font-mono text-sm tracking-wider flex-1 text-center">{referrals.code}</code>
                 <Button size="icon" variant="outline" onClick={copyReferral} aria-label="Copy referral link">
                   <Copy className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="outline" onClick={shareReferral} aria-label="Share referral link">
+                  <Share2 className="h-4 w-4" />
                 </Button>
               </div>
               <div className="mt-4 flex items-center justify-between text-sm">

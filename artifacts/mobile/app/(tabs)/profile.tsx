@@ -13,6 +13,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -459,12 +460,29 @@ export default function ProfileScreen() {
                 {t("profile.pts_conversion")}
               </Text>
             </View>
-            <TouchableOpacity
-              style={[styles.copyBtn, { backgroundColor: colors.muted }]}
-              onPress={() => Alert.alert(t("profile.code_copied"), `${t("profile.share_code")}: ${referral.code}`)}
-            >
-              <Ionicons name="copy-outline" size={16} color={colors.primary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.copyBtn, { backgroundColor: colors.muted }]}
+                onPress={() => Alert.alert(t("profile.code_copied"), `${t("profile.share_code")}: ${referral.code}`)}
+              >
+                <Ionicons name="copy-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.copyBtn, { backgroundColor: colors.muted }]}
+                onPress={async () => {
+                  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com";
+                  const url = `https://${domain}/register?ref=${referral.code}`;
+                  const message = `Join me on Royvento and get rewards! Sign up with my link: ${url}`;
+                  try {
+                    await Share.share({ message, url });
+                  } catch {
+                    // user cancelled — no-op
+                  }
+                }}
+              >
+                <Ionicons name="share-social-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       ) : null}

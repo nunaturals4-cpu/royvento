@@ -1431,8 +1431,8 @@ export default function VendorDashboardScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
         onRefresh={bookingsQ.refetch}
         refreshing={bookingsQ.isLoading}
-        renderItem={({ item: b }) => {
-          const statusStyle = STATUS_COLORS[b.status ?? "pending"] ?? STATUS_COLORS.pending!;
+        renderItem={({ item: b }: { item: any }) => {
+          const statusStyle = STATUS_COLORS[(b.status as string) ?? "pending"] ?? STATUS_COLORS.pending!;
           return (
             <View style={[styles.bookingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.cardHeader}>
