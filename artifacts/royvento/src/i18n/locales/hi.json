@@ -136,7 +136,10 @@
     "browse_pubs": "पब देखें",
     "whats_on": "क्या चल रहा है",
     "book_now": "अभी बुक करें",
-    "view_venue": "वेन्यू देखें"
+    "view_venue": "वेन्यू देखें",
+    "prev_slide": "पिछली घोषणा",
+    "next_slide": "अगली घोषणा",
+    "go_to_slide": "स्लाइड {{n}} पर जाएँ"
   },
   "pubs": {
     "title": "पब और क्लब",

@@ -136,7 +136,10 @@
     "browse_pubs": "Browse pubs",
     "whats_on": "What's On",
     "book_now": "Book now",
-    "view_venue": "View venue"
+    "view_venue": "View venue",
+    "prev_slide": "Previous announcement",
+    "next_slide": "Next announcement",
+    "go_to_slide": "Go to slide {{n}}"
   },
   "pubs": {
     "title": "Pubs & Clubs",

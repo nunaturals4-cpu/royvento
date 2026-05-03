@@ -136,7 +136,10 @@
     "browse_pubs": "ਪੱਬ ਦੇਖੋ",
     "whats_on": "ਕੀ ਹੋ ਰਿਹਾ ਹੈ",
     "book_now": "ਹੁਣੇ ਬੁੱਕ ਕਰੋ",
-    "view_venue": "ਸਥਾਨ ਦੇਖੋ"
+    "view_venue": "ਸਥਾਨ ਦੇਖੋ",
+    "prev_slide": "ਪਿਛਲਾ ਐਲਾਨ",
+    "next_slide": "ਅਗਲਾ ਐਲਾਨ",
+    "go_to_slide": "ਸਲਾਇਡ {{n}} ਤੇ ਜਾਓ"
   },
   "pubs": {
     "title": "ਪੱਬ ਅਤੇ ਕਲੱਬ",

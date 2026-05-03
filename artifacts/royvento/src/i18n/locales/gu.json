@@ -136,7 +136,10 @@
     "browse_pubs": "પબ જુઓ",
     "whats_on": "શું ચાલી રહ્યું છે",
     "book_now": "હવે બુક કરો",
-    "view_venue": "સ્થળ જુઓ"
+    "view_venue": "સ્થળ જુઓ",
+    "prev_slide": "પાછળની જાહેરાત",
+    "next_slide": "આગળની જાહેરાત",
+    "go_to_slide": "સ્લાઇડ {{n}} પર જાઓ"
   },
   "pubs": {
     "title": "પબ અને ક્લબ",

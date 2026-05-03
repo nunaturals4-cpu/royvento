@@ -136,7 +136,10 @@
     "browse_pubs": "পাব দেখুন",
     "whats_on": "কী চলছে",
     "book_now": "এখনই বুক করুন",
-    "view_venue": "ভেন্যু দেখুন"
+    "view_venue": "ভেন্যু দেখুন",
+    "prev_slide": "আগের ঘোষণা",
+    "next_slide": "পরের ঘোষণা",
+    "go_to_slide": "স্লাইড {{n}}-এ যান"
   },
   "pubs": {
     "title": "পাব ও ক্লাব",

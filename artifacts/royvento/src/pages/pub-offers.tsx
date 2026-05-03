@@ -183,11 +183,12 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
             )}
 
             <div className="mt-1">
-              <Link href={href}>
-                <button className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm px-5 py-2.5 rounded-xl transition-all red-glow">
-                  {t("pub_offers.book_now")}
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+              <Link
+                href={href}
+                className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm px-5 py-2.5 rounded-xl transition-all red-glow"
+              >
+                {t("pub_offers.book_now")}
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -214,14 +215,14 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
           <>
             <button
               onClick={prev}
-              aria-label="Previous announcement"
+              aria-label={t("pub_offers.prev_slide")}
               className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/40 hover:bg-black/70 border border-white/10 flex items-center justify-center transition-all backdrop-blur-sm"
             >
               <ChevronLeft className="h-4 w-4 text-white" />
             </button>
             <button
               onClick={next}
-              aria-label="Next announcement"
+              aria-label={t("pub_offers.next_slide")}
               className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/40 hover:bg-black/70 border border-white/10 flex items-center justify-center transition-all backdrop-blur-sm"
             >
               <ChevronRight className="h-4 w-4 text-white" />
@@ -233,7 +234,7 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
                 <button
                   key={i}
                   onClick={() => goTo(i)}
-                  aria-label={`Go to slide ${i + 1}`}
+                  aria-label={t("pub_offers.go_to_slide", { n: i + 1 })}
                   className={`rounded-full transition-all duration-300 ${
                     i === current
                       ? "w-6 h-2 bg-primary"
