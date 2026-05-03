@@ -420,7 +420,9 @@
     "invitation_accept": "গ্রহণ করুন",
     "invitation_decline": "প্রত্যাখ্যান করুন",
     "welcome_perks_title": "স্বাগত সুবিধা",
-    "welcome_perks_sub": "আপনি নতুন সদস্য! পরবর্তী %{days} দিন এগুলি উপভোগ করুন:"
+    "welcome_perks_sub": "আপনি নতুন সদস্য! পরবর্তী %{days} দিন এগুলি উপভোগ করুন:",
+    "pub_drink_offers": "Pub Drink Offers",
+    "contact_help": "Contact & Help"
   },
   "bookings": {
     "title": "আমার বুকিং",
@@ -531,6 +533,7 @@
     "title": "Grab Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
-    "no_deals_sub": "Check back soon — new deals are added regularly"
+    "no_deals_sub": "Check back soon — new deals are added regularly",
+    "view_all_offers": "View all pub offers"
   }
 }

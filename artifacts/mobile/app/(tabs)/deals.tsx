@@ -340,6 +340,13 @@ export default function DealsScreen() {
                   </Text>
                 </View>
               )}
+              <Pressable
+                style={styles.viewAllBtn}
+                onPress={() => router.push("/pub-offers" as never)}
+              >
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>{t("deals.view_all_offers")}</Text>
+                <Ionicons name="arrow-forward" size={12} color={colors.primary} />
+              </Pressable>
             </View>
 
             {drinkOffers.length === 0 ? (
@@ -512,6 +519,16 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   countText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  viewAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginLeft: "auto",
+  },
+  viewAllText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },

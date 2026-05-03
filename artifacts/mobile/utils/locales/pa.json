@@ -420,7 +420,9 @@
     "invitation_accept": "ਸਵੀਕਾਰ ਕਰੋ",
     "invitation_decline": "ਅਸਵੀਕਾਰ ਕਰੋ",
     "welcome_perks_title": "ਸੁਆਗਤ ਲਾਭ",
-    "welcome_perks_sub": "ਤੁਸੀਂ ਨਵੇਂ ਮੈਂਬਰ ਹੋ! ਅਗਲੇ %{days} ਦਿਨ(ਾਂ) ਇਹਨਾਂ ਦਾ ਆਨੰਦ ਲਓ:"
+    "welcome_perks_sub": "ਤੁਸੀਂ ਨਵੇਂ ਮੈਂਬਰ ਹੋ! ਅਗਲੇ %{days} ਦਿਨ(ਾਂ) ਇਹਨਾਂ ਦਾ ਆਨੰਦ ਲਓ:",
+    "pub_drink_offers": "Pub Drink Offers",
+    "contact_help": "Contact & Help"
   },
   "bookings": {
     "title": "ਮੇਰੀਆਂ ਬੁਕਿੰਗਾਂ",
@@ -531,6 +533,7 @@
     "title": "Grab Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
-    "no_deals_sub": "Check back soon — new deals are added regularly"
+    "no_deals_sub": "Check back soon — new deals are added regularly",
+    "view_all_offers": "View all pub offers"
   }
 }

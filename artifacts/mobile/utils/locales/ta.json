@@ -420,7 +420,9 @@
     "invitation_accept": "ஏற்கவும்",
     "invitation_decline": "மறுக்கவும்",
     "welcome_perks_title": "வரவேற்பு சலுகைகள்",
-    "welcome_perks_sub": "நீங்கள் புதிய உறுப்பினர்! அடுத்த %{days} நாள்(கள்) இவற்றை அனுபவியுங்கள்:"
+    "welcome_perks_sub": "நீங்கள் புதிய உறுப்பினர்! அடுத்த %{days} நாள்(கள்) இவற்றை அனுபவியுங்கள்:",
+    "pub_drink_offers": "Pub Drink Offers",
+    "contact_help": "Contact & Help"
   },
   "bookings": {
     "title": "என் முன்பதிவுகள்",
@@ -531,6 +533,7 @@
     "title": "Grab Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
-    "no_deals_sub": "Check back soon — new deals are added regularly"
+    "no_deals_sub": "Check back soon — new deals are added regularly",
+    "view_all_offers": "View all pub offers"
   }
 }

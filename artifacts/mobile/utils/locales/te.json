@@ -420,7 +420,9 @@
     "invitation_accept": "అంగీకరించు",
     "invitation_decline": "తిరస్కరించు",
     "welcome_perks_title": "స్వాగత ప్రయోజనాలు",
-    "welcome_perks_sub": "మీరు కొత్త సభ్యుడు! తర్వాత %{days} రోజు(లు) వీటిని ఆనందించండి:"
+    "welcome_perks_sub": "మీరు కొత్త సభ్యుడు! తర్వాత %{days} రోజు(లు) వీటిని ఆనందించండి:",
+    "pub_drink_offers": "Pub Drink Offers",
+    "contact_help": "Contact & Help"
   },
   "bookings": {
     "title": "నా బుకింగ్‌లు",
@@ -531,6 +533,7 @@
     "title": "Grab Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
-    "no_deals_sub": "Check back soon — new deals are added regularly"
+    "no_deals_sub": "Check back soon — new deals are added regularly",
+    "view_all_offers": "View all pub offers"
   }
 }

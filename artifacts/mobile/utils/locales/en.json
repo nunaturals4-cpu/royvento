@@ -420,7 +420,9 @@
     "invitation_accept": "Accept",
     "invitation_decline": "Decline",
     "welcome_perks_title": "Welcome perks",
-    "welcome_perks_sub": "You're a new member! Enjoy these for the next %{days} day(s):"
+    "welcome_perks_sub": "You're a new member! Enjoy these for the next %{days} day(s):",
+    "pub_drink_offers": "Pub Drink Offers",
+    "contact_help": "Contact & Help"
   },
   "bookings": {
     "title": "My Bookings",
@@ -506,7 +508,8 @@
     "title": "Grab Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
-    "no_deals_sub": "Check back soon — new deals are added regularly"
+    "no_deals_sub": "Check back soon — new deals are added regularly",
+    "view_all_offers": "View all pub offers"
   },
   "common": {
     "loading": "Loading…",
