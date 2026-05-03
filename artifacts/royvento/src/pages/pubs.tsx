@@ -88,6 +88,11 @@ function PubOffersSection({
 
   return (
     <div className="mb-8 space-y-5">
+      <div className="flex items-center gap-3">
+        <h2 className="font-serif text-2xl tracking-tight">Pub Offers</h2>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
       {/* Drink Deals track */}
       {hasDeals && (
         <div>
