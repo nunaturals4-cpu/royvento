@@ -1,6 +1,9 @@
 import { Link } from "wouter";
-import { useEffect, useState } from "react";
-import { ArrowRight, Calendar, Clock, GlassWater, Megaphone, Star, Ticket, Wine } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import {
+  ArrowRight, Calendar, Clock, GlassWater, Megaphone,
+  Star, Ticket, Wine, ChevronLeft, ChevronRight,
+} from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { useListVendorDrinkOffers } from "@workspace/api-client-react";
@@ -15,7 +18,24 @@ interface Announcement {
   vendorName: string;
   eventId: number;
   vendorId: number;
+  coverImageUrl?: string;
 }
+
+const SLIDE_GRADIENTS = [
+  "from-rose-900/80 via-black/60 to-black/90",
+  "from-violet-900/80 via-black/60 to-black/90",
+  "from-amber-900/80 via-black/60 to-black/90",
+  "from-teal-900/80 via-black/60 to-black/90",
+  "from-indigo-900/80 via-black/60 to-black/90",
+];
+
+const BADGE_COLORS = [
+  "bg-rose-500/20 text-rose-300 border-rose-500/30",
+  "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  "bg-teal-500/20 text-teal-300 border-teal-500/30",
+  "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+];
 
 function getPlanLabel(plan: DrinkPlanSummary): string {
   if (plan.type === "welcome") return "Free welcome drink";
@@ -31,6 +51,181 @@ function PlanIcon({ type }: { type: string }) {
   if (type === "unlimited") return <GlassWater className="h-3 w-3 text-primary" />;
   if (type === "ticket") return <Ticket className="h-3 w-3 text-primary" />;
   return <Star className="h-3 w-3 text-primary" />;
+}
+
+function AnnouncementSlider({ announcements }: { announcements: Announcement[] }) {
+  const { t } = useTranslation();
+  const [current, setCurrent] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const prev = useCallback(
+    () => setCurrent((i) => (i - 1 + announcements.length) % announcements.length),
+    [announcements.length],
+  );
+  const next = useCallback(
+    () => setCurrent((i) => (i + 1) % announcements.length),
+    [announcements.length],
+  );
+
+  useEffect(() => {
+    if (announcements.length <= 1 || isPaused) return;
+    const timer = setInterval(next, 5000);
+    return () => clearInterval(timer);
+  }, [announcements.length, isPaused, next]);
+
+  const a = announcements[current];
+  const grad = SLIDE_GRADIENTS[current % SLIDE_GRADIENTS.length];
+  const badgeCls = BADGE_COLORS[current % BADGE_COLORS.length];
+  const href = a.eventId ? `/events/${a.eventId}` : `/vendors/${a.vendorId}`;
+
+  return (
+    <section
+      className="mb-12"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <Megaphone className="h-4 w-4 text-primary" />
+          <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">
+            {t("pub_offers.whats_on")}
+          </span>
+        </div>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
+      <div className="relative w-full rounded-3xl overflow-hidden" style={{ minHeight: 360 }}>
+        {/* Blurred background image */}
+        <div className="absolute inset-0">
+          {a.coverImageUrl ? (
+            <img
+              src={a.coverImageUrl}
+              alt=""
+              className="h-full w-full object-cover scale-110 blur-md opacity-30"
+              aria-hidden
+            />
+          ) : (
+            <div className={`h-full w-full bg-gradient-to-br ${grad} opacity-80`} />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
+        </div>
+
+        {/* Slide content */}
+        <div className="relative z-10 flex items-center gap-6 md:gap-12 p-8 md:p-12 lg:p-16 min-h-[360px]">
+          {/* Left: text */}
+          <div className="flex-1 flex flex-col justify-center gap-4 min-w-0">
+            {/* Venue badge */}
+            <div
+              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 ${badgeCls}`}
+            >
+              <Megaphone className="h-3 w-3 flex-shrink-0" />
+              <span className="text-xs font-semibold uppercase tracking-wider truncate max-w-[200px]">
+                {a.vendorName}
+              </span>
+            </div>
+
+            {/* Title */}
+            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight text-white leading-tight">
+              {a.title}
+            </h2>
+
+            {/* Body */}
+            <p className="text-white/65 text-sm md:text-base leading-relaxed line-clamp-3 max-w-lg">
+              {a.body}
+            </p>
+
+            {/* Date / time */}
+            {(a.announceDate || a.announceTime) && (
+              <div className="flex items-center gap-4 text-xs text-white/45">
+                {a.announceDate && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {new Date(a.announceDate).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                )}
+                {a.announceTime && (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    {a.announceTime}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* CTA */}
+            <div className="mt-2">
+              <Link href={href}>
+                <button className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm px-5 py-2.5 rounded-xl transition-all red-glow">
+                  {t("pub_offers.book_now")}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Right: image card */}
+          <div className="hidden md:flex flex-shrink-0 w-52 lg:w-64 xl:w-72 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+            {a.coverImageUrl ? (
+              <img
+                src={a.coverImageUrl}
+                alt={a.title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div
+                className={`h-full w-full flex flex-col items-center justify-center bg-gradient-to-br ${grad} gap-3`}
+              >
+                <Megaphone className="h-10 w-10 text-white/30" />
+                <span className="text-white/40 text-xs font-medium text-center px-4">
+                  {a.vendorName}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Arrows */}
+        {announcements.length > 1 && (
+          <>
+            <button
+              onClick={prev}
+              aria-label="Previous announcement"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/40 hover:bg-black/70 border border-white/10 flex items-center justify-center transition-all backdrop-blur-sm"
+            >
+              <ChevronLeft className="h-4 w-4 text-white" />
+            </button>
+            <button
+              onClick={next}
+              aria-label="Next announcement"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/40 hover:bg-black/70 border border-white/10 flex items-center justify-center transition-all backdrop-blur-sm"
+            >
+              <ChevronRight className="h-4 w-4 text-white" />
+            </button>
+
+            {/* Dots */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+              {announcements.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrent(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                  className={`rounded-full transition-all duration-300 ${
+                    i === current
+                      ? "w-6 h-2 bg-primary"
+                      : "w-2 h-2 bg-white/30 hover:bg-white/60"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export function PubOffers() {
@@ -62,6 +257,9 @@ export function PubOffers() {
           <p className="font-serif text-2xl mb-2 text-muted-foreground">{t("common.loading")}</p>
         </div>
       )}
+
+      {/* Hero Announcement Slider */}
+      {hasAnnouncements && <AnnouncementSlider announcements={announcements} />}
 
       {/* Drink Deals */}
       {hasDeals && (
@@ -132,49 +330,6 @@ export function PubOffers() {
                       </span>
                       <ArrowRight className="h-3 w-3 text-primary" />
                     </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* What's On — Announcements */}
-      {hasAnnouncements && (
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex items-center gap-2">
-              <Megaphone className="h-4 w-4 text-primary" />
-              <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">{t("pub_offers.whats_on")}</span>
-            </div>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
-          <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
-            {announcements.map((a) => (
-              <Link key={a.id} href={a.eventId ? `/events/${a.eventId}` : `/vendors/${a.vendorId}`} className="snap-start flex-shrink-0 md:flex-shrink">
-                <div className="glass-card rounded-2xl p-5 cursor-pointer hover:bg-white/5 transition-colors w-64 md:w-auto">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 rounded-lg bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">
-                      <Megaphone className="h-3 w-3" />
-                    </div>
-                    <span className="text-[10px] font-medium text-primary/90 uppercase tracking-wider truncate">{a.vendorName}</span>
-                  </div>
-                  <h3 className="font-serif text-base leading-snug tracking-tight mb-1.5 line-clamp-1">{a.title}</h3>
-                  <p className="text-xs text-white/55 leading-relaxed line-clamp-2 mb-3">{a.body}</p>
-                  <div className="flex items-center gap-3 text-[10px] text-white/40">
-                    {a.announceDate && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                      </span>
-                    )}
-                    {a.announceTime && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {a.announceTime}
-                      </span>
-                    )}
                   </div>
                 </div>
               </Link>
