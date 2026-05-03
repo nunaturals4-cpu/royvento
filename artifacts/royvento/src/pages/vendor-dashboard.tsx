@@ -23,7 +23,7 @@ import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck,
-  Banknote, CreditCard,
+  Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -118,7 +118,7 @@ export function VendorDashboard() {
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
           <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
-          <TabsContent value="leads"><LeadsPanel /></TabsContent>
+          <TabsContent value="leads"><LeadsPanel bookings={bookings} /></TabsContent>
           <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
           <TabsContent value="managers"><ManagersPanel /></TabsContent>
         </Tabs>
@@ -2709,7 +2709,182 @@ function ManagersPanel() {
   );
 }
 
-function LeadsPanel() {
+const PAGE_SIZE = 15;
+
+function LeadBookingTable({ bookings }: { bookings: any[] }) {
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const q = search.trim().toLowerCase();
+  const filtered = bookings.filter((b) => {
+    if (!q) return true;
+    return (
+      (b.userName ?? "").toLowerCase().includes(q) ||
+      (b.personName ?? "").toLowerCase().includes(q) ||
+      (b.userEmail ?? "").toLowerCase().includes(q) ||
+      (b.eventTitle ?? "").toLowerCase().includes(q) ||
+      (b.ticketCode ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const sorted = [...filtered].sort((a, b) => b.id - a.id);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const rows = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const statusColor = (s: string) => {
+    if (s === "confirmed" || s === "completed") return "text-green-400";
+    if (s === "cancelled") return "text-red-400";
+    return "text-amber-400";
+  };
+
+  return (
+    <div className="rounded-3xl glass-card-strong p-6 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-serif text-xl flex items-center gap-2">
+          <CalendarCheck className="h-5 w-5 text-primary" />
+          Booking Report
+        </p>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search by name, event or ticket code…"
+            className="pl-8 pr-3 py-1.5 text-sm rounded-lg bg-black/40 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 w-64"
+          />
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4">
+          {search ? "No bookings match your search." : "No bookings yet."}
+        </p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[860px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-3">#</th>
+                  <th className="text-left py-2 pr-3">Event / Pub</th>
+                  <th className="text-left py-2 pr-3">Customer</th>
+                  <th className="text-left py-2 pr-3">Date</th>
+                  <th className="text-left py-2 pr-3">Mode</th>
+                  <th className="text-right py-2 pr-3">Tickets</th>
+                  <th className="text-right py-2 pr-3">Price</th>
+                  <th className="text-left py-2 pr-3">Payment</th>
+                  <th className="text-left py-2 pr-3">Status</th>
+                  <th className="text-left py-2 pr-3">Ticket Code</th>
+                  <th className="text-left py-2">Check-in</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((b: any) => {
+                  const name = b.userName || b.personName || "—";
+                  const email = b.userEmail || "";
+                  const tickets = [
+                    b.ticketWomen > 0 ? `${b.ticketWomen}W` : null,
+                    b.ticketMen > 0 ? `${b.ticketMen}M` : null,
+                    b.ticketCouple > 0 ? `${b.ticketCouple}C` : null,
+                  ].filter(Boolean).join(" ") || (b.guests ? `${b.guests}g` : "—");
+                  const paid = b.finalPrice ?? b.totalPrice ?? 0;
+                  const original = b.discountAmount > 0 ? b.totalPrice : null;
+                  const payLabel = b.paymentMethod === "cod" ? "COD" : b.paymentMethod === "online" ? "Online" : (b.paymentMethod ?? "—");
+                  const mode = b.pubMode === "ticket" ? "Ticket" : b.pubMode === "event" ? "Table / Event" : (b.pubMode ?? "—");
+                  return (
+                    <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
+                      <td className="py-2.5 pr-3 max-w-[130px] truncate">{b.eventTitle || "—"}</td>
+                      <td className="py-2.5 pr-3">
+                        <span className="font-medium">{name}</span>
+                        {email && <span className="block text-xs text-muted-foreground">{email}</span>}
+                      </td>
+                      <td className="py-2.5 pr-3 tabular-nums text-muted-foreground whitespace-nowrap">
+                        {b.bookingDate
+                          ? new Date(b.bookingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })
+                          : "—"}
+                      </td>
+                      <td className="py-2.5 pr-3 text-muted-foreground text-xs">{mode}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
+                        {b.ticketWomen > 0 && <span className="text-pink-400 mr-1">{b.ticketWomen}W</span>}
+                        {b.ticketMen > 0 && <span className="text-blue-400 mr-1">{b.ticketMen}M</span>}
+                        {b.ticketCouple > 0 && <span className="text-purple-400">{b.ticketCouple}C</span>}
+                        {b.ticketWomen === 0 && b.ticketMen === 0 && b.ticketCouple === 0 && (
+                          <span className="text-muted-foreground">{b.guests ?? "—"}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right whitespace-nowrap">
+                        <span className="font-medium text-primary">{formatINR(paid)}</span>
+                        {original && <span className="block text-xs text-muted-foreground line-through">{formatINR(original)}</span>}
+                      </td>
+                      <td className="py-2.5 pr-3 text-xs text-muted-foreground whitespace-nowrap">{payLabel}</td>
+                      <td className="py-2.5 pr-3">
+                        <span className={`text-xs font-medium capitalize ${statusColor(b.status)}`}>{b.status}</span>
+                      </td>
+                      <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground">{b.ticketCode || "—"}</td>
+                      <td className="py-2.5">
+                        {b.checkedIn ? (
+                          <span className="flex items-center gap-1 text-green-400 text-xs whitespace-nowrap">
+                            <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                            {b.checkedInAt
+                              ? new Date(b.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+                              : "Yes"}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+              <p className="text-xs text-muted-foreground">
+                Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, sorted.length)} of {sorted.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  className="p-1.5 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  const p = totalPages <= 7 ? i + 1 : safePage <= 4 ? i + 1 : safePage >= totalPages - 3 ? totalPages - 6 + i : safePage - 3 + i;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-7 h-7 text-xs rounded ${p === safePage ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-white/10 text-muted-foreground"}`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  className="p-1.5 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function LeadsPanel({ bookings }: { bookings: any[] }) {
   const [data, setData] = useState<Lead | null>(null);
   const [sentCodes, setSentCodes] = useState<Record<number, string>>({});
   const [sendingId, setSendingId] = useState<number | null>(null);
@@ -2859,6 +3034,7 @@ function LeadsPanel() {
           </table>
         )}
       </div>
+      <LeadBookingTable bookings={bookings} />
     </div>
   );
 }
