@@ -371,7 +371,7 @@
     "invitation_accept": "ಸ್ವೀಕರಿಸಿ",
     "invitation_decline": "ತಿರಸ್ಕರಿಸಿ",
     "welcome_perks_title": "ಸ್ವಾಗತ ಪ್ರಯೋಜನಗಳು",
-    "welcome_perks_sub": "ನೀವು ಹೊಸ ಸದಸ್ಯ! ಮುಂದಿನ %{days} ದಿನ(ಗಳು) ಇವನ್ನು ಆನಂದಿಸಿ:"
+    "welcome_perks_sub": "ನೀವು ಹೊಸ ಸದಸ್ಯ! ಮುಂದಿನ {{days}} ದಿನ(ಗಳು) ಇವನ್ನು ಆನಂದಿಸಿ:"
   },
   "bookings": {
     "title": "ನನ್ನ ಬುಕಿಂಗ್‌ಗಳು",

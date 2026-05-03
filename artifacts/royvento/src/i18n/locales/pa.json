@@ -371,7 +371,7 @@
     "invitation_accept": "ਸਵੀਕਾਰ ਕਰੋ",
     "invitation_decline": "ਅਸਵੀਕਾਰ ਕਰੋ",
     "welcome_perks_title": "ਸੁਆਗਤ ਲਾਭ",
-    "welcome_perks_sub": "ਤੁਸੀਂ ਨਵੇਂ ਮੈਂਬਰ ਹੋ! ਅਗਲੇ %{days} ਦਿਨ(ਾਂ) ਇਹਨਾਂ ਦਾ ਆਨੰਦ ਲਓ:"
+    "welcome_perks_sub": "ਤੁਸੀਂ ਨਵੇਂ ਮੈਂਬਰ ਹੋ! ਅਗਲੇ {{days}} ਦਿਨ(ਾਂ) ਇਹਨਾਂ ਦਾ ਆਨੰਦ ਲਓ:"
   },
   "bookings": {
     "title": "ਮੇਰੀਆਂ ਬੁਕਿੰਗਾਂ",

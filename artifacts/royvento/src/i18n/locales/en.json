@@ -371,7 +371,7 @@
     "invitation_accept": "Accept",
     "invitation_decline": "Decline",
     "welcome_perks_title": "Welcome perks",
-    "welcome_perks_sub": "You're a new member! Enjoy these for the next %{days} day(s):"
+    "welcome_perks_sub": "You're a new member! Enjoy these for the next {{days}} day(s):"
   },
   "bookings": {
     "title": "My Bookings",

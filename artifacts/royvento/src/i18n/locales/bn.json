@@ -371,7 +371,7 @@
     "invitation_accept": "গ্রহণ করুন",
     "invitation_decline": "প্রত্যাখ্যান করুন",
     "welcome_perks_title": "স্বাগত সুবিধা",
-    "welcome_perks_sub": "আপনি নতুন সদস্য! পরবর্তী %{days} দিন এগুলি উপভোগ করুন:"
+    "welcome_perks_sub": "আপনি নতুন সদস্য! পরবর্তী {{days}} দিন এগুলি উপভোগ করুন:"
   },
   "bookings": {
     "title": "আমার বুকিং",

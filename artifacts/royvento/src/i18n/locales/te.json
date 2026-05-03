@@ -371,7 +371,7 @@
     "invitation_accept": "అంగీకరించు",
     "invitation_decline": "తిరస్కరించు",
     "welcome_perks_title": "స్వాగత ప్రయోజనాలు",
-    "welcome_perks_sub": "మీరు కొత్త సభ్యుడు! తర్వాత %{days} రోజు(లు) వీటిని ఆనందించండి:"
+    "welcome_perks_sub": "మీరు కొత్త సభ్యుడు! తర్వాత {{days}} రోజు(లు) వీటిని ఆనందించండి:"
   },
   "bookings": {
     "title": "నా బుకింగ్‌లు",
