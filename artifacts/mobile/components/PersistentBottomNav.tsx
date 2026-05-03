@@ -32,11 +32,11 @@ const TABS: Tab[] = [
     matchPaths: ["/(tabs)/explore", "/explore"],
   },
   {
-    labelKey: "nav.wishlist",
-    icon: "heart-outline",
-    iconFocused: "heart",
-    route: "/(tabs)/wishlist",
-    matchPaths: ["/(tabs)/wishlist", "/wishlist"],
+    labelKey: "nav.deals",
+    icon: "pricetags-outline",
+    iconFocused: "pricetags",
+    route: "/(tabs)/deals",
+    matchPaths: ["/(tabs)/deals", "/deals"],
   },
   {
     labelKey: "nav.bookings",

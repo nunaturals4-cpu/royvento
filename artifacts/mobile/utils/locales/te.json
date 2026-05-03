@@ -27,7 +27,8 @@
     "bookings": "బుకింగ్‌లు",
     "partners": "భాగస్వాములు",
     "partner": "భాగస్వామి",
-    "profile": "ప్రొఫైల్"
+    "profile": "ప్రొఫైల్",
+    "deals": "Deals"
   },
   "auth": {
     "welcome_back": "తిరిగి స్వాగతం",
@@ -525,5 +526,11 @@
     "ta": "தமிழ்",
     "pa": "ਪੰਜਾਬੀ",
     "gu": "ગુજરાતી"
+  },
+  "deals": {
+    "title": "Grab Deals",
+    "subtitle": "Exclusive offers & announcements",
+    "no_deals": "No drink deals right now",
+    "no_deals_sub": "Check back soon — new deals are added regularly"
   }
 }

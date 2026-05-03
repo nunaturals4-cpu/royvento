@@ -64,6 +64,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="deals"
+        options={{
+          title: t("nav.deals"),
+          tabBarIcon: ({ color, focused }) =>
+            tabBarIcon(focused, color, "tag.fill", "tag", "pricetags", "pricetags-outline"),
+        }}
+      />
+      <Tabs.Screen
         name="wishlist"
         options={{
           title: t("nav.wishlist"),

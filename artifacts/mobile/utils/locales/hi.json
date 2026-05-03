@@ -27,7 +27,8 @@
     "bookings": "बुकिंग",
     "partners": "भागीदार",
     "partner": "भागीदार",
-    "profile": "प्रोफ़ाइल"
+    "profile": "प्रोफ़ाइल",
+    "deals": "Deals"
   },
   "auth": {
     "welcome_back": "वापसी पर स्वागत है",
@@ -525,5 +526,11 @@
     "ta": "தமிழ்",
     "pa": "ਪੰਜਾਬੀ",
     "gu": "ગુજરાતી"
+  },
+  "deals": {
+    "title": "Grab Deals",
+    "subtitle": "Exclusive offers & announcements",
+    "no_deals": "No drink deals right now",
+    "no_deals_sub": "Check back soon — new deals are added regularly"
   }
 }

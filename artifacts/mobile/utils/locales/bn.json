@@ -27,7 +27,8 @@
     "bookings": "বুকিং",
     "partners": "অংশীদার",
     "partner": "অংশীদার",
-    "profile": "প্রোফাইল"
+    "profile": "প্রোফাইল",
+    "deals": "Deals"
   },
   "auth": {
     "welcome_back": "স্বাগতম",
@@ -525,5 +526,11 @@
     "ta": "தமிழ்",
     "pa": "ਪੰਜਾਬੀ",
     "gu": "ગુજરાતી"
+  },
+  "deals": {
+    "title": "Grab Deals",
+    "subtitle": "Exclusive offers & announcements",
+    "no_deals": "No drink deals right now",
+    "no_deals_sub": "Check back soon — new deals are added regularly"
   }
 }
