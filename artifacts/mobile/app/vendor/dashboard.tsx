@@ -1029,9 +1029,15 @@ export default function VendorDashboardScreen() {
       setProfAddressQuery(vendor.address ?? "");
       setProfDanceFloor(vendor.danceFloor ?? "");
       setProfDanceFloorPhotos(Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []);
-      setProfMenuUrl(vendor.menuUrl ?? "");
       const raw = (vendor as unknown as Record<string, unknown>)["menuUrls"];
-      setProfMenuUrls(Array.isArray(raw) ? (raw as string[]) : []);
+      const existingUrls: string[] = Array.isArray(raw) ? (raw as string[]) : [];
+      const legacyUrl = vendor.menuUrl ?? "";
+      const mergedUrls =
+        legacyUrl && !existingUrls.includes(legacyUrl)
+          ? [legacyUrl, ...existingUrls]
+          : existingUrls;
+      setProfMenuUrls(mergedUrls);
+      setProfMenuUrl("");
     }
   }, [vendor?.id]);
 
@@ -1079,7 +1085,7 @@ export default function VendorDashboardScreen() {
           dayHours: dayHoursPayload,
           danceFloor: profDanceFloor || null,
           danceFloorPhotos: profDanceFloorPhotos,
-          menuUrl: profMenuUrl,
+          menuUrl: "",
           menuUrls: profMenuUrls,
         }),
       });

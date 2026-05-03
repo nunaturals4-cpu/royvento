@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, partnerMediaTable, vendorsTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -165,6 +165,46 @@ router.patch(
       .where(eq(vendorsTable.id, vendor.id))
       .returning();
     return res.json(v);
+  },
+);
+
+const DeleteMenuFileBody = z.object({
+  url: z.string().min(1),
+});
+
+/**
+ * DELETE /partner/menu-file
+ *
+ * Remove a specific URL from the vendor's menuUrls array.
+ * Also clears the legacy menuUrl field if it matches.
+ * Only accessible by authenticated vendors.
+ */
+router.delete(
+  "/partner/menu-file",
+  requireAuth(["vendor"]),
+  async (req, res) => {
+    const user = await loadUserFromRequest(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    const vendor = await getMyVendor(user.id);
+    if (!vendor)
+      return res.status(400).json({ error: "Partner profile required" });
+
+    const parsed = DeleteMenuFileBody.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({ error: "Missing or invalid url" });
+
+    const { url } = parsed.data;
+
+    const [updated] = await db
+      .update(vendorsTable)
+      .set({
+        menuUrls: sql`array_remove(${vendorsTable.menuUrls}, ${url}::text)`,
+        menuUrl: sql`CASE WHEN ${vendorsTable.menuUrl} = ${url} THEN '' ELSE ${vendorsTable.menuUrl} END`,
+      })
+      .where(eq(vendorsTable.id, vendor.id))
+      .returning();
+
+    return res.json(updated);
   },
 );
 
