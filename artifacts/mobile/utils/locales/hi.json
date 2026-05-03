@@ -242,7 +242,7 @@
     "drink_ticket_items_one": "1 item included with ticket",
     "drink_ticket_items_other": "%{count} items included with ticket",
     "drink_ticket_generic": "Drinks included with ticket",
-    "drink_offer_generic": "Drink offer",
+    "drink_offer_generic": "Drinks discount",
     "free_entry_form_notice": "निःशुल्क प्रवेश – इस तारीख के लिए कोई भुगतान आवश्यक नहीं है।",
     "free_for": "के लिए: %{genders}",
     "group_booking": "समूह या कॉर्पोरेट बुकिंग",

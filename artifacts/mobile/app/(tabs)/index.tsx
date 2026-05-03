@@ -60,7 +60,7 @@ function getPlanLabel(plan: DrinkPlanSummary): string {
     const count = (plan.lineItems ?? []).filter((i: { name?: string }) => i.name).length;
     return count > 0 ? `${count} item${count !== 1 ? "s" : ""} with ticket` : "Drinks with ticket";
   }
-  return plan.productName || "Drink offer";
+  return plan.productName || "Drinks discount";
 }
 
 function sortCityFirst<T extends { location?: string | null }>(

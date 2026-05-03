@@ -3030,7 +3030,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks offer label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input value={feDrinksOffer} onChange={(e) => setFeDrinksOffer(e.target.value)}
                       placeholder="e.g. 2+1 on cocktails" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
                   </div>
@@ -3065,7 +3065,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks offer label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input value={ticketDrinksOffer} onChange={(e) => setTicketDrinksOffer(e.target.value)}
                       placeholder="e.g. 1 beer included" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
                   </div>
@@ -3186,7 +3186,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                         <Input type="time" value={editTimeTo} onChange={(e) => setEditTimeTo(e.target.value)} className="bg-black/40 border-white/10" />
                       </div>
                       <div>
-                        <Label className="flex items-center gap-1">Drinks offer label <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                        <Label className="flex items-center gap-1">Drinks discount label <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
                         <Input value={editDrinksOffer} onChange={(e) => setEditDrinksOffer(e.target.value)}
                           placeholder="e.g. 2+1 on cocktails" className="bg-black/40 border-white/10" maxLength={255} />
                       </div>

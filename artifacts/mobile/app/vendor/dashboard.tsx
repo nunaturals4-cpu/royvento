@@ -585,7 +585,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20, textAlignVertical: "top", minHeight: 70 }}
                 />
               </View>
-              {/* Drinks offer label */}
+              {/* Drinks discount label */}
               <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DRINKS OFFER LABEL (optional)</Text>
                 <TextInput
