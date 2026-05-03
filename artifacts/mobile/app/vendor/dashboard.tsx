@@ -926,6 +926,8 @@ export default function VendorDashboardScreen() {
   const [profDanceFloor, setProfDanceFloor] = useState<string>("");
   const [profDanceFloorPhotos, setProfDanceFloorPhotos] = useState<string[]>([]);
   const [uploadingDfPhoto, setUploadingDfPhoto] = useState(false);
+  const [profMenuUrl, setProfMenuUrl] = useState("");
+  const [uploadingMenu, setUploadingMenu] = useState(false);
   const [profAddress, setProfAddress] = useState("");
   const [profAddressQuery, setProfAddressQuery] = useState("");
   const [addrSuggestions, setAddrSuggestions] = useState<{ place_id: string; description: string; types: string[] }[]>([]);
@@ -978,6 +980,7 @@ export default function VendorDashboardScreen() {
       setProfAddressQuery(vendor.address ?? "");
       setProfDanceFloor(vendor.danceFloor ?? "");
       setProfDanceFloorPhotos(Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []);
+      setProfMenuUrl((vendor as any).menuUrl ?? "");
     }
   }, [vendor?.id]);
 
@@ -1025,6 +1028,7 @@ export default function VendorDashboardScreen() {
           dayHours: dayHoursPayload,
           danceFloor: profDanceFloor || null,
           danceFloorPhotos: profDanceFloorPhotos,
+          menuUrl: profMenuUrl,
         }),
       });
       if (profPhone.trim()) {
@@ -1927,6 +1931,57 @@ export default function VendorDashboardScreen() {
               </Text>
             </View>
           )}
+
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>PUB MENU</Text>
+
+          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, gap: 10 }]}>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Menu file (PDF or image, optional)</Text>
+            <TouchableOpacity
+              disabled={uploadingMenu}
+              onPress={async () => {
+                try {
+                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
+                  if (result.canceled) return;
+                  const asset = result.assets[0];
+                  if (!asset) return;
+                  setUploadingMenu(true);
+                  const url = await uploadImageToStorage(asset.uri);
+                  setProfMenuUrl(url);
+                } catch {
+                  Alert.alert("Upload failed", "Could not upload menu file.");
+                } finally {
+                  setUploadingMenu(false);
+                }
+              }}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 8,
+                borderRadius: 10, borderWidth: 1,
+                borderColor: uploadingMenu ? colors.border : colors.primary + "60",
+                paddingHorizontal: 12, paddingVertical: 10,
+                backgroundColor: colors.muted + "60",
+                opacity: uploadingMenu ? 0.6 : 1,
+              }}
+            >
+              {uploadingMenu
+                ? <ActivityIndicator size="small" color={colors.primary} />
+                : <Ionicons name="document-attach-outline" size={16} color={colors.primary} />
+              }
+              <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: uploadingMenu ? colors.mutedForeground : colors.primary }}>
+                {uploadingMenu ? "Uploading…" : profMenuUrl ? "Replace menu file" : "Upload menu file"}
+              </Text>
+            </TouchableOpacity>
+            {profMenuUrl ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <TouchableOpacity onPress={() => Linking.openURL(profMenuUrl)} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Ionicons name="open-outline" size={13} color={colors.primary} />
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary }}>View current menu</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setProfMenuUrl("")}>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
 
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>CONTACT INFO</Text>
 

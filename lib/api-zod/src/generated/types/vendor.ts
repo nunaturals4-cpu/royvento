@@ -33,4 +33,5 @@ export interface Vendor {
   freeEntryRules?: FreeEntryRules | null;
   danceFloor?: VendorDanceFloor;
   danceFloorPhotos?: string[] | null;
+  menuUrl?: string;
 }

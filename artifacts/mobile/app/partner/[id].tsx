@@ -332,6 +332,17 @@ export default function PartnerDetailScreen() {
               </Text>
             </Pressable>
           ) : null}
+          {(vendor as any).menuUrl ? (
+            <Pressable
+              style={[styles.row, { marginTop: 4 }]}
+              onPress={() => Linking.openURL((vendor as any).menuUrl)}
+            >
+              <Ionicons name="document-text-outline" size={14} color={colors.primary} />
+              <Text style={[styles.location, { color: colors.primary, textDecorationLine: "underline" }]}>
+                View Menu
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {/* About */}

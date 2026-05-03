@@ -189,6 +189,8 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [suggestions, setSuggestions] = useState<PlacesSuggestion[]>([]);
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [menuUrl, setMenuUrl] = useState(vendor.menuUrl ?? "");
+  const [uploadingMenu, setUploadingMenu] = useState(false);
   const [descError, setDescError] = useState("");
   const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>(() => {
     const initial = parseDayHours(vendor.dayHours);
@@ -202,6 +204,20 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   });
   const update = useUpdateMyVendor();
   const { toast } = useToast();
+
+  const uploadMenuFile = async (file: File): Promise<string> => {
+    const res = await fetch("/api/storage/uploads/request-url", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+    });
+    if (!res.ok) throw new Error("Could not get upload URL");
+    const { uploadURL, objectPath } = await res.json();
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    if (!put.ok) throw new Error("Upload failed");
+    return `/api/storage${objectPath}`;
+  };
 
   const uploadDanceFloorPhoto = async (file: File): Promise<string> => {
     const res = await fetch("/api/storage/uploads/request-url", {
@@ -316,6 +332,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               state: stateF, city, country, address, openDays, dayHours: dayHoursPayload,
               danceFloor: danceFloor || null,
               danceFloorPhotos,
+              menuUrl,
             });
             toast({ title: "Profile updated" });
             onSaved();
@@ -329,8 +346,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   };
 
   return (
-    <div className="grid lg:grid-cols-[1fr_auto] gap-6">
-      <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
+    <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <Label>Business name</Label>
@@ -685,25 +701,54 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           </div>
           <p className="text-xs text-muted-foreground mt-3">Toggle each day on or off. If closing time is earlier than opening time it is treated as an overnight schedule (e.g. 10 pm – 2 am).</p>
         </div>
+        <div>
+          <Label className="flex items-center gap-1.5 mb-2">
+            <Upload className="h-3.5 w-3.5 text-primary" />
+            Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, optional)</span>
+          </Label>
+          <div className="flex items-center gap-3">
+            <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition-colors ${uploadingMenu ? "opacity-50 pointer-events-none border-white/10 bg-black/20" : "border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"}`}>
+              {uploadingMenu ? (
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+              <span className="text-muted-foreground">{uploadingMenu ? "Uploading…" : "Choose file"}</span>
+              <input
+                type="file"
+                accept="application/pdf,image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingMenu(true);
+                  try {
+                    const url = await uploadMenuFile(file);
+                    setMenuUrl(url);
+                    toast({ title: "Menu uploaded" });
+                  } catch {
+                    toast({ title: "Menu upload failed", variant: "destructive" });
+                  } finally {
+                    setUploadingMenu(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </label>
+            {menuUrl && (
+              <div className="flex items-center gap-2">
+                <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                  View menu
+                </a>
+                <button type="button" onClick={() => setMenuUrl("")} className="text-xs text-muted-foreground hover:text-destructive">Remove</button>
+              </div>
+            )}
+          </div>
+        </div>
         <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
           {update.isPending ? "Saving…" : "Save profile"}
         </Button>
-      </form>
-      <aside className="rounded-3xl glass-card p-6 lg:w-72 h-fit space-y-3">
-        <p className="font-serif text-xl">{businessName}</p>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant={vendor.status === "approved" ? "default" : "secondary"}>{vendor.status}</Badge>
-          <Badge variant="outline">{vendor.category}</Badge>
-          {vendor.isPremium && <Badge className="bg-primary text-primary-foreground border-0">Premium</Badge>}
-        </div>
-        {(city || stateF) && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <MapPin className="h-3 w-3" /> {city}{stateF && `, ${stateF}`}
-          </p>
-        )}
-        {country && <p className="text-xs text-muted-foreground">{country}</p>}
-      </aside>
-    </div>
+    </form>
   );
 }
 
@@ -956,11 +1001,6 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
         <p className="font-serif text-lg">{vendor.businessName}</p>
       </div>
       <div className="grid md:grid-cols-2 gap-3">
-        <div>
-          <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
-          <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
-          {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-28 object-cover" />}
-        </div>
         <div>
           <Label>City</Label>
           <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)}>

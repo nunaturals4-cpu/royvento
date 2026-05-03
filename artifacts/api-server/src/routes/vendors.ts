@@ -33,6 +33,7 @@ interface VendorRow {
   dayHours?: string | null;
   danceFloor?: string | null;
   danceFloorPhotos?: string[] | null;
+  menuUrl?: string | null;
   status: string;
   isPremium?: boolean;
   approvedAt?: Date | null;
@@ -96,6 +97,7 @@ async function serializeVendor(v: VendorRow) {
     freeEntryRules,
     danceFloor: v.danceFloor ?? null,
     danceFloorPhotos: v.danceFloorPhotos ?? null,
+    menuUrl: v.menuUrl ?? "",
   };
 }
 
@@ -158,6 +160,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       freeEntryRules: freeEntryByVendor.get(v.id) ?? null,
       danceFloor: v.danceFloor ?? null,
       danceFloorPhotos: v.danceFloorPhotos ?? null,
+      menuUrl: v.menuUrl ?? "",
     };
   });
 }
@@ -288,6 +291,7 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     "bannerImage",
     "coverImageUrl",
     "portfolioImages",
+    "menuUrl",
   ] as const) {
     const val = parsed.data[k];
     if (val !== undefined) updates[k] = val;

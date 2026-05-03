@@ -149,6 +149,7 @@ export interface Vendor {
   freeEntryRules?: FreeEntryRules | null;
   danceFloor?: VendorDanceFloor;
   danceFloorPhotos?: string[] | null;
+  menuUrl?: string;
 }
 
 export interface MyVendorResponse {
@@ -179,6 +180,7 @@ export interface UpdateVendorBody {
   bannerImage?: string;
   coverImageUrl?: string;
   portfolioImages?: string[];
+  menuUrl?: string;
 }
 
 export type EventDayPricing = {
