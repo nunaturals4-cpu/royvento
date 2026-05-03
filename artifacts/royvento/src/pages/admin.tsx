@@ -2240,41 +2240,48 @@ function AttendanceReport() {
             {statusFilter === "checkedIn" ? "Checked-in guests" : statusFilter === "notArrived" ? "Not-arrived guests" : "All confirmed guests"}
           </h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
+            <table className="w-full text-sm min-w-[900px]">
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
                 <tr>
                   <th className="text-left py-2 pr-3">ID</th>
                   <th className="text-left py-2 pr-3">Guest</th>
+                  <th className="text-left py-2 pr-3">Email</th>
+                  <th className="text-left py-2 pr-3">Phone</th>
                   <th className="text-left py-2 pr-3">Partner</th>
                   <th className="text-left py-2 pr-3">Event</th>
                   <th className="text-left py-2 pr-3">Booking date</th>
                   <th className="text-right py-2 pr-3">Party</th>
-                  <th className="text-left py-2">Check-in</th>
+                  <th className="text-left py-2 pr-3">Status</th>
+                  <th className="text-left py-2">Check-in time</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((b) => (
                   <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
-                    <td className="py-2.5 pr-3">
-                      <span className="font-medium">{b.userName || "—"}</span>
-                      {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
-                    </td>
+                    <td className="py-2.5 pr-3 font-medium">{b.userName || "—"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.userEmail || "—"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.phone || "—"}</td>
                     <td className="py-2.5 pr-3 text-muted-foreground">{b.vendorName || "—"}</td>
                     <td className="py-2.5 pr-3 text-muted-foreground max-w-[140px] truncate">{b.eventTitle || "—"}</td>
                     <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-muted-foreground">
                       {b.guests || (b.ticketWomen + b.ticketMen + b.ticketCouple) || "—"}
                     </td>
-                    <td className="py-2.5">
+                    <td className="py-2.5 pr-3">
                       {b.checkedIn ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">Checked In</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Not Arrived</span>
+                      )}
+                    </td>
+                    <td className="py-2.5">
+                      {b.checkedIn && b.checkedInAt ? (
                         <span className="text-xs font-medium text-green-400">
-                          {b.checkedInAt
-                            ? new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
-                            : "Yes"}
+                          {new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Not arrived</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                   </tr>

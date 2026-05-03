@@ -719,39 +719,42 @@ router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => 
   const eventIdParam = req.query["eventId"] ? Number(req.query["eventId"]) : null;
   const statusParam = (req.query["status"] as string | undefined) ?? "all";
 
-  const conditions: ReturnType<typeof sql>[] = [];
+  // Base conditions (vendor / date / event scope) — used for stats
+  const baseConditions: ReturnType<typeof sql>[] = [];
   if (vendorIdParam && Number.isFinite(vendorIdParam))
-    conditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
+    baseConditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
   if (dateParam)
-    conditions.push(sql`${bookingsTable.bookingDate} = ${dateParam}`);
+    baseConditions.push(sql`${bookingsTable.bookingDate} = ${dateParam}`);
   if (eventIdParam && Number.isFinite(eventIdParam))
-    conditions.push(sql`${bookingsTable.eventId} = ${eventIdParam}`);
+    baseConditions.push(sql`${bookingsTable.eventId} = ${eventIdParam}`);
+  baseConditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
 
-  if (statusParam === "checkedIn") {
-    conditions.push(sql`${bookingsTable.checkedIn} = true`);
-    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
-  } else if (statusParam === "notArrived") {
-    conditions.push(sql`${bookingsTable.checkedIn} = false`);
-    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
-  } else {
-    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
-  }
+  const baseWhereSQL = sql.join(baseConditions, sql` AND `);
 
-  const whereSQL = conditions.length > 0 ? sql.join(conditions, sql` AND `) : undefined;
+  // Row-level conditions: base + optional checkedIn filter
+  const rowConditions = [...baseConditions];
+  if (statusParam === "checkedIn")
+    rowConditions.push(sql`${bookingsTable.checkedIn} = true`);
+  else if (statusParam === "notArrived")
+    rowConditions.push(sql`${bookingsTable.checkedIn} = false`);
+
+  const rowsWhereSQL = sql.join(rowConditions, sql` AND `);
 
   const [countRow, statsRows, rows] = await Promise.all([
-    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(whereSQL),
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(rowsWhereSQL),
     db.select({
+      total: sql<number>`count(*)::int`,
       checkedInCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
       notArrivedCount: sql<number>`coalesce(sum(case when not ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
-    }).from(bookingsTable).where(whereSQL),
-    db.select().from(bookingsTable).where(whereSQL)
+    }).from(bookingsTable).where(baseWhereSQL),
+    db.select().from(bookingsTable).where(rowsWhereSQL)
       .orderBy(desc(bookingsTable.bookingDate), desc(bookingsTable.id))
       .limit(CHECKIN_PAGE_SIZE).offset(offset),
   ]);
 
-  const total = countRow[0]?.c ?? 0;
-  const totalPages = Math.ceil(total / CHECKIN_PAGE_SIZE);
+  const total = statsRows[0]?.total ?? 0;
+  const rowTotal = countRow[0]?.c ?? 0;
+  const totalPages = Math.ceil(rowTotal / CHECKIN_PAGE_SIZE);
   const checkedInCount = statsRows[0]?.checkedInCount ?? 0;
   const notArrivedCount = statsRows[0]?.notArrivedCount ?? 0;
 

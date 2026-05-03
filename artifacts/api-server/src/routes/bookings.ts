@@ -726,34 +726,39 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
   const eventIdParam = req.query["eventId"] ? Number(req.query["eventId"]) : null;
   const statusParam = (req.query["status"] as string | undefined) ?? "all";
 
-  const conditions = [eq(bookingsTable.vendorId, vendor.id)];
-  if (dateParam) conditions.push(eq(bookingsTable.bookingDate, dateParam));
-  if (eventIdParam && Number.isFinite(eventIdParam)) conditions.push(eq(bookingsTable.eventId, eventIdParam));
-  if (statusParam === "checkedIn") {
-    conditions.push(eq(bookingsTable.checkedIn, true));
-    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
-  } else if (statusParam === "notArrived") {
-    conditions.push(eq(bookingsTable.checkedIn, false));
-    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
-  } else {
-    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
-  }
+  // Base conditions (vendor / date / event scope) — used for stats
+  const baseConditions = [
+    eq(bookingsTable.vendorId, vendor.id),
+    sql`${bookingsTable.status} IN ('confirmed','completed')`,
+  ];
+  if (dateParam) baseConditions.push(eq(bookingsTable.bookingDate, dateParam) as ReturnType<typeof sql>);
+  if (eventIdParam && Number.isFinite(eventIdParam)) baseConditions.push(eq(bookingsTable.eventId, eventIdParam) as ReturnType<typeof sql>);
 
-  const where = and(...conditions);
+  // Row-level conditions: base + optional checkedIn filter
+  const rowConditions = [...baseConditions];
+  if (statusParam === "checkedIn")
+    rowConditions.push(eq(bookingsTable.checkedIn, true) as ReturnType<typeof sql>);
+  else if (statusParam === "notArrived")
+    rowConditions.push(eq(bookingsTable.checkedIn, false) as ReturnType<typeof sql>);
+
+  const baseWhere = and(...baseConditions);
+  const rowsWhere = and(...rowConditions);
 
   const [countRow, statsRow, rows] = await Promise.all([
-    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(where),
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(rowsWhere),
     db.select({
+      total: sql<number>`count(*)::int`,
       checkedInCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
       notArrivedCount: sql<number>`coalesce(sum(case when not ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
-    }).from(bookingsTable).where(where),
-    db.select().from(bookingsTable).where(where)
+    }).from(bookingsTable).where(baseWhere),
+    db.select().from(bookingsTable).where(rowsWhere)
       .orderBy(desc(bookingsTable.bookingDate), desc(bookingsTable.id))
       .limit(PARTNER_CHECKIN_PAGE_SIZE).offset(offset),
   ]);
 
-  const total = countRow[0]?.c ?? 0;
-  const totalPages = Math.ceil(total / PARTNER_CHECKIN_PAGE_SIZE);
+  const total = statsRow[0]?.total ?? 0;
+  const rowTotal = countRow[0]?.c ?? 0;
+  const totalPages = Math.ceil(rowTotal / PARTNER_CHECKIN_PAGE_SIZE);
   const checkedInCount = statsRow[0]?.checkedInCount ?? 0;
   const notArrivedCount = statsRow[0]?.notArrivedCount ?? 0;
 

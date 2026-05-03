@@ -2717,7 +2717,7 @@ export default function VendorDashboardScreen() {
   }
 
   // ─── Attendance tab ───────────────────────────────────────────────────────────
-  const [attendanceDate, setAttendanceDate] = useState<string>("");
+  const [attendanceDate, setAttendanceDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [attendanceStatus, setAttendanceStatus] = useState<"all" | "checkedIn" | "notArrived">("all");
   const [attendancePage, setAttendancePage] = useState<number>(1);
   const [showAttendanceDatePicker, setShowAttendanceDatePicker] = useState(false);
@@ -2820,20 +2820,24 @@ export default function VendorDashboardScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{b.userName || "—"}</Text>
-                {b.phone ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{b.phone}</Text> : null}
+                {b.userEmail ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>{b.userEmail}</Text> : null}
+                {b.phone ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>{b.phone}</Text> : null}
                 <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
                   {b.eventTitle} · {b.bookingDate}
                 </Text>
                 {b.guests > 0 ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>Party of {b.guests}</Text> : null}
               </View>
-              <View style={{ alignItems: "flex-end" }}>
-                {b.checkedIn ? (
-                  <Text style={{ color: "#22c55e", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
-                    {b.checkedInAt ? new Date(b.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "In"}
+              <View style={{ alignItems: "flex-end", gap: 4 }}>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, backgroundColor: b.checkedIn ? "#22c55e20" : "#f59e0b20" }}>
+                  <Text style={{ color: b.checkedIn ? "#22c55e" : "#f59e0b", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+                    {b.checkedIn ? "Checked In" : "Not Arrived"}
                   </Text>
-                ) : (
-                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>Not arrived</Text>
-                )}
+                </View>
+                {b.checkedIn && b.checkedInAt ? (
+                  <Text style={{ color: "#22c55e", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                    {new Date(b.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                ) : null}
               </View>
             </View>
           ))
