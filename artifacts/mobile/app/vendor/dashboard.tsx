@@ -975,6 +975,7 @@ export default function VendorDashboardScreen() {
   const [profDanceFloorPhotos, setProfDanceFloorPhotos] = useState<string[]>([]);
   const [uploadingDfPhoto, setUploadingDfPhoto] = useState(false);
   const [profMenuUrl, setProfMenuUrl] = useState("");
+  const [profMenuUrls, setProfMenuUrls] = useState<string[]>([]);
   const [uploadingMenu, setUploadingMenu] = useState(false);
   const [profAddress, setProfAddress] = useState("");
   const [profAddressQuery, setProfAddressQuery] = useState("");
@@ -1029,6 +1030,8 @@ export default function VendorDashboardScreen() {
       setProfDanceFloor(vendor.danceFloor ?? "");
       setProfDanceFloorPhotos(Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []);
       setProfMenuUrl(vendor.menuUrl ?? "");
+      const raw = (vendor as unknown as Record<string, unknown>)["menuUrls"];
+      setProfMenuUrls(Array.isArray(raw) ? (raw as string[]) : []);
     }
   }, [vendor?.id]);
 
@@ -1077,6 +1080,7 @@ export default function VendorDashboardScreen() {
           danceFloor: profDanceFloor || null,
           danceFloorPhotos: profDanceFloorPhotos,
           menuUrl: profMenuUrl,
+          menuUrls: profMenuUrls,
         }),
       });
       if (profPhone.trim()) {
@@ -1983,91 +1987,111 @@ export default function VendorDashboardScreen() {
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>PUB MENU</Text>
 
           <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, gap: 10 }]}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Menu file (PDF or image, optional)</Text>
-            <TouchableOpacity
-              disabled={uploadingMenu}
-              onPress={() => {
-                Alert.alert("Upload Menu", "Choose file type", [
-                  {
-                    text: "Image (JPG / PNG)",
-                    onPress: async () => {
-                      try {
-                        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
-                        if (result.canceled) return;
-                        const asset = result.assets[0];
-                        if (!asset) return;
-                        setUploadingMenu(true);
-                        const filename = asset.uri.split("/").pop() ?? "menu.jpg";
-                        const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-                        const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
-                        const contentType = mimeMap[ext] ?? "image/jpeg";
-                        const url = await uploadMenuFileToStorage(asset.uri, filename, contentType);
-                        setProfMenuUrl(url);
-                      } catch {
-                        Alert.alert("Upload failed", "Could not upload menu image.");
-                      } finally {
-                        setUploadingMenu(false);
-                      }
-                    },
-                  },
-                  {
-                    text: "PDF",
-                    onPress: async () => {
-                      try {
-                        const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
-                        if (result.canceled) return;
-                        const asset = result.assets[0];
-                        if (!asset) return;
-                        setUploadingMenu(true);
-                        const filename = asset.name ?? "menu.pdf";
-                        const url = await uploadMenuFileToStorage(asset.uri, filename, "application/pdf");
-                        setProfMenuUrl(url);
-                      } catch {
-                        Alert.alert("Upload failed", "Could not upload menu PDF.");
-                      } finally {
-                        setUploadingMenu(false);
-                      }
-                    },
-                  },
-                  { text: "Cancel", style: "cancel" },
-                ]);
-              }}
-              style={{
-                flexDirection: "row", alignItems: "center", gap: 8,
-                borderRadius: 10, borderWidth: 1,
-                borderColor: uploadingMenu ? colors.border : colors.primary + "60",
-                paddingHorizontal: 12, paddingVertical: 10,
-                backgroundColor: colors.muted + "60",
-                opacity: uploadingMenu ? 0.6 : 1,
-              }}
-            >
-              {uploadingMenu
-                ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Ionicons name="document-attach-outline" size={16} color={colors.primary} />
-              }
-              <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: uploadingMenu ? colors.mutedForeground : colors.primary }}>
-                {uploadingMenu ? "Uploading…" : profMenuUrl ? "Replace menu file" : "Upload menu file"}
-              </Text>
-            </TouchableOpacity>
-            {profMenuUrl ? (
-              <View style={{ gap: 6 }}>
-                {profMenuUrl.toLowerCase().includes(".pdf") && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#22c55e" }}>PDF uploaded</Text>
-                  </View>
-                )}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <TouchableOpacity onPress={() => Linking.openURL(profMenuUrl)} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Ionicons name="open-outline" size={13} color={colors.primary} />
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary }}>View current menu</Text>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Menu files (PDF or image, up to 5)</Text>
+
+            {/* Uploaded menu files list */}
+            {profMenuUrls.map((url, idx) => {
+              const isPdf = url.toLowerCase().includes(".pdf");
+              const filename = url.split("/").pop()?.split("?")[0] ?? `Menu ${idx + 1}`;
+              return (
+                <View
+                  key={idx}
+                  style={{
+                    flexDirection: "row", alignItems: "center", gap: 8,
+                    borderRadius: 10, borderWidth: 1, borderColor: colors.border,
+                    paddingHorizontal: 12, paddingVertical: 10,
+                    backgroundColor: colors.muted + "40",
+                  }}
+                >
+                  <Ionicons name={isPdf ? "document-text-outline" : "image-outline"} size={15} color={colors.mutedForeground} />
+                  <Text
+                    numberOfLines={1}
+                    style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}
+                  >
+                    {filename}
+                  </Text>
+                  <TouchableOpacity onPress={() => Linking.openURL(url)} style={{ padding: 4 }}>
+                    <Ionicons name="open-outline" size={15} color={colors.primary} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setProfMenuUrl("")}>
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Remove</Text>
+                  <TouchableOpacity
+                    onPress={() => setProfMenuUrls((prev) => prev.filter((_, i) => i !== idx))}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="trash-outline" size={15} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
-              </View>
-            ) : null}
+              );
+            })}
+
+            {/* Add menu file button — hidden when 5 files uploaded */}
+            {profMenuUrls.length < 5 && (
+              <TouchableOpacity
+                disabled={uploadingMenu}
+                onPress={() => {
+                  Alert.alert("Add Menu File", "Choose file type", [
+                    {
+                      text: "Image (JPG / PNG / WebP)",
+                      onPress: async () => {
+                        try {
+                          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
+                          if (result.canceled) return;
+                          const asset = result.assets[0];
+                          if (!asset) return;
+                          setUploadingMenu(true);
+                          const filename = asset.uri.split("/").pop() ?? "menu.jpg";
+                          const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+                          const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+                          const contentType = mimeMap[ext] ?? "image/jpeg";
+                          const url = await uploadMenuFileToStorage(asset.uri, filename, contentType);
+                          setProfMenuUrls((prev) => [...prev, url]);
+                        } catch {
+                          Alert.alert("Upload failed", "Could not upload menu image.");
+                        } finally {
+                          setUploadingMenu(false);
+                        }
+                      },
+                    },
+                    {
+                      text: "PDF",
+                      onPress: async () => {
+                        try {
+                          const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+                          if (result.canceled) return;
+                          const asset = result.assets[0];
+                          if (!asset) return;
+                          setUploadingMenu(true);
+                          const filename = asset.name ?? "menu.pdf";
+                          const url = await uploadMenuFileToStorage(asset.uri, filename, "application/pdf");
+                          setProfMenuUrls((prev) => [...prev, url]);
+                        } catch {
+                          Alert.alert("Upload failed", "Could not upload menu PDF.");
+                        } finally {
+                          setUploadingMenu(false);
+                        }
+                      },
+                    },
+                    { text: "Cancel", style: "cancel" },
+                  ]);
+                }}
+                style={{
+                  flexDirection: "row", alignItems: "center", gap: 8,
+                  borderRadius: 10, borderWidth: 1,
+                  borderStyle: "dashed",
+                  borderColor: uploadingMenu ? colors.border : colors.primary + "60",
+                  paddingHorizontal: 12, paddingVertical: 10,
+                  backgroundColor: colors.muted + "30",
+                  opacity: uploadingMenu ? 0.6 : 1,
+                }}
+              >
+                {uploadingMenu
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                }
+                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: uploadingMenu ? colors.mutedForeground : colors.primary }}>
+                  {uploadingMenu ? "Uploading…" : "Add menu file"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>CONTACT INFO</Text>

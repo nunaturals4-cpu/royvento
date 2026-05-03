@@ -336,17 +336,29 @@ export default function PartnerDetailScreen() {
               </Text>
             </Pressable>
           ) : null}
-          {vendor.menuUrl ? (
-            <Pressable
-              style={[styles.row, { marginTop: 4 }]}
-              onPress={() => Linking.openURL(vendor.menuUrl!)}
-            >
-              <Ionicons name="document-text-outline" size={14} color={colors.primary} />
-              <Text style={[styles.location, { color: colors.primary, textDecorationLine: "underline" }]}>
-                View Menu
-              </Text>
-            </Pressable>
-          ) : null}
+          {(() => {
+            const rawUrls = (vendor as unknown as Record<string, unknown>)["menuUrls"];
+            const menuUrlsArr: string[] = Array.isArray(rawUrls) ? (rawUrls as string[]) : [];
+            const legacyUrl = vendor.menuUrl && !menuUrlsArr.includes(vendor.menuUrl) ? vendor.menuUrl : null;
+            const allMenus = [...menuUrlsArr, ...(legacyUrl ? [legacyUrl] : [])];
+            if (allMenus.length === 0) return null;
+            return (
+              <View style={{ gap: 6, marginTop: 4 }}>
+                {allMenus.map((url, idx) => (
+                  <Pressable
+                    key={idx}
+                    style={styles.row}
+                    onPress={() => Linking.openURL(url)}
+                  >
+                    <Ionicons name="document-text-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.location, { color: colors.primary, textDecorationLine: "underline" }]}>
+                      {allMenus.length === 1 ? "View Menu" : `View Menu ${idx + 1}`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            );
+          })()}
         </View>
 
         {/* About */}
