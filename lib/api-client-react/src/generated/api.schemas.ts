@@ -275,6 +275,13 @@ export interface Booking {
   phone: string;
   /** Vendor-specific scannable ticket code (e.g. BLCK-000042-F9) */
   ticketCode?: string;
+  /** Booking mode for pub events: 'ticket' or 'event' (table booking) */
+  pubMode?: string;
+  /** Expected arrival time for table bookings (HH:MM, 24h format) */
+  arrivalTime?: string | null;
+  personName?: string;
+  checkedIn?: boolean;
+  checkedInAt?: string | null;
 }
 
 /**

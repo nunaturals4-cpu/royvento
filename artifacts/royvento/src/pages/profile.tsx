@@ -107,6 +107,7 @@ export function Profile() {
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ title: "Join Royvento", text, url });
+        toast({ title: "Shared!" });
       } catch {
         // user cancelled — no-op
       }

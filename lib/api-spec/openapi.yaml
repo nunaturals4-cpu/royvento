@@ -1709,6 +1709,20 @@ components:
         ticketCode:
           type: string
           description: Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)
+        pubMode:
+          type: string
+          description: "Booking mode for pub events: 'ticket' or 'event' (table booking)"
+        arrivalTime:
+          type: string
+          nullable: true
+          description: "Expected arrival time for table bookings (HH:MM, 24h format)"
+        personName:
+          type: string
+        checkedIn:
+          type: boolean
+        checkedInAt:
+          type: string
+          nullable: true
       required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail, phone]
 
     CreateBookingBody:

@@ -1329,6 +1329,19 @@ export const CreateBookingResponse = zod.object({
     .string()
     .optional()
     .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
+  pubMode: zod
+    .string()
+    .optional()
+    .describe(
+      "Booking mode for pub events: 'ticket' or 'event' (table booking)",
+    ),
+  arrivalTime: zod
+    .string()
+    .nullish()
+    .describe("Expected arrival time for table bookings (HH:MM, 24h format)"),
+  personName: zod.string().optional(),
+  checkedIn: zod.boolean().optional(),
+  checkedInAt: zod.string().nullish(),
 });
 
 /**
@@ -1356,6 +1369,19 @@ export const ListMyBookingsResponseItem = zod.object({
     .string()
     .optional()
     .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
+  pubMode: zod
+    .string()
+    .optional()
+    .describe(
+      "Booking mode for pub events: 'ticket' or 'event' (table booking)",
+    ),
+  arrivalTime: zod
+    .string()
+    .nullish()
+    .describe("Expected arrival time for table bookings (HH:MM, 24h format)"),
+  personName: zod.string().optional(),
+  checkedIn: zod.boolean().optional(),
+  checkedInAt: zod.string().nullish(),
 });
 export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 
@@ -1384,6 +1410,19 @@ export const ListVendorBookingsResponseItem = zod.object({
     .string()
     .optional()
     .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
+  pubMode: zod
+    .string()
+    .optional()
+    .describe(
+      "Booking mode for pub events: 'ticket' or 'event' (table booking)",
+    ),
+  arrivalTime: zod
+    .string()
+    .nullish()
+    .describe("Expected arrival time for table bookings (HH:MM, 24h format)"),
+  personName: zod.string().optional(),
+  checkedIn: zod.boolean().optional(),
+  checkedInAt: zod.string().nullish(),
 });
 export const ListVendorBookingsResponse = zod.array(
   ListVendorBookingsResponseItem,
@@ -1434,6 +1473,19 @@ export const UpdateBookingStatusResponse = zod.object({
     .string()
     .optional()
     .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
+  pubMode: zod
+    .string()
+    .optional()
+    .describe(
+      "Booking mode for pub events: 'ticket' or 'event' (table booking)",
+    ),
+  arrivalTime: zod
+    .string()
+    .nullish()
+    .describe("Expected arrival time for table bookings (HH:MM, 24h format)"),
+  personName: zod.string().optional(),
+  checkedIn: zod.boolean().optional(),
+  checkedInAt: zod.string().nullish(),
 });
 
 /**
@@ -1917,6 +1969,21 @@ export const GetAdminAnalyticsResponse = zod.object({
         .describe(
           "Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)",
         ),
+      pubMode: zod
+        .string()
+        .optional()
+        .describe(
+          "Booking mode for pub events: 'ticket' or 'event' (table booking)",
+        ),
+      arrivalTime: zod
+        .string()
+        .nullish()
+        .describe(
+          "Expected arrival time for table bookings (HH:MM, 24h format)",
+        ),
+      personName: zod.string().optional(),
+      checkedIn: zod.boolean().optional(),
+      checkedInAt: zod.string().nullish(),
     }),
   ),
   topVendors: zod.array(
