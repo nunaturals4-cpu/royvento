@@ -10,6 +10,7 @@ import {
   useGetAdminBookingsPartnerSummary,
   useGetAdminLeads,
   useGetAdminLeadsSummary,
+  useGetAdminCheckinReport,
   importGooglePub,
 } from "@workspace/api-client-react";
 import type { ImportGooglePubResponse } from "@workspace/api-client-react";
@@ -2114,40 +2115,30 @@ function BookingReport() {
 
 function AttendanceReport() {
   const [vendorId, setVendorId] = useState<string>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [date, setDate] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "checkedIn" | "notArrived">("all");
   const [page, setPage] = useState<number>(1);
   const { data: partnerSummary } = useGetAdminBookingsPartnerSummary();
   const vendors = partnerSummary ?? [];
 
-  const params = {
-    ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
-    ...(startDate ? { startDate } : {}),
-    ...(endDate ? { endDate } : {}),
-    checkedIn: "true",
-    page,
-  } as Parameters<typeof useGetAdminBookingsReport>[0];
-
-  const { data: report, isLoading } = useGetAdminBookingsReport(params);
-
-  const allParams = {
-    ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
-    ...(startDate ? { startDate } : {}),
-    ...(endDate ? { endDate } : {}),
-    page: 1,
-  } as Parameters<typeof useGetAdminBookingsReport>[0];
-
-  const { data: allReport } = useGetAdminBookingsReport(allParams);
-
-  const checkedIn = report?.total ?? 0;
-  const totalBookings = allReport?.total ?? 0;
-  const bookings = report?.bookings ?? [];
-  const totalPages = report?.totalPages ?? 0;
-  const attendanceRate = totalBookings > 0 ? Math.round((checkedIn / totalBookings) * 100) : 0;
-
   const today = new Date().toISOString().slice(0, 10);
 
-  const resetFilters = () => { setVendorId("all"); setStartDate(""); setEndDate(""); setPage(1); };
+  const params = {
+    ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
+    ...(date ? { date } : {}),
+    ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+    page,
+  } as Parameters<typeof useGetAdminCheckinReport>[0];
+
+  const { data: report, isLoading } = useGetAdminCheckinReport(params);
+
+  const rows = report?.rows ?? [];
+  const stats = report?.stats ?? { total: 0, checkedIn: 0, notArrived: 0 };
+  const totalPages = report?.totalPages ?? 0;
+  const attendanceRate = stats.total > 0 ? Math.round((stats.checkedIn / stats.total) * 100) : 0;
+
+  const resetFilters = () => { setVendorId("all"); setDate(""); setStatusFilter("all"); setPage(1); };
+  const hasFilters = vendorId !== "all" || date || statusFilter !== "all";
 
   return (
     <div className="space-y-6">
@@ -2168,20 +2159,41 @@ function AttendanceReport() {
           </Select>
         </div>
         <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">From (booking date)</Label>
-          <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="w-40" max={endDate || today} />
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Booking date</Label>
+          <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setPage(1); }} className="w-44" max={today} />
         </div>
-        <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">To</Label>
-          <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="w-40" min={startDate} max={today} />
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Status</Label>
+          <div className="flex gap-1">
+            {(["all", "checkedIn", "notArrived"] as const).map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant={statusFilter === s ? "default" : "outline"}
+                onClick={() => { setStatusFilter(s); setPage(1); }}
+                className="text-xs capitalize"
+              >
+                {s === "all" ? "All" : s === "checkedIn" ? "Checked In" : "Not Arrived"}
+              </Button>
+            ))}
+          </div>
         </div>
-        {(vendorId !== "all" || startDate || endDate) && (
+        {hasFilters && (
           <Button variant="outline" size="sm" onClick={resetFilters}>Clear</Button>
         )}
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="rounded-2xl glass-card p-5 lift-3d">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Expected</span>
+            <div className="w-9 h-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+              <CalendarCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="stat-number text-3xl">{stats.total.toLocaleString()}</p>
+        </div>
         <div className="rounded-2xl glass-card p-5 lift-3d">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs uppercase tracking-wider text-muted-foreground">Checked in</span>
@@ -2189,16 +2201,16 @@ function AttendanceReport() {
               <UserCheck className="h-4 w-4" />
             </div>
           </div>
-          <p className="stat-number text-3xl text-green-300">{checkedIn.toLocaleString()}</p>
+          <p className="stat-number text-3xl text-green-300">{stats.checkedIn.toLocaleString()}</p>
         </div>
         <div className="rounded-2xl glass-card p-5 lift-3d">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Total bookings</span>
-            <div className="w-9 h-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
-              <CalendarCheck className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Not arrived</span>
+            <div className="w-9 h-9 rounded-lg bg-red-600/15 text-red-400 flex items-center justify-center">
+              <UserX className="h-4 w-4" />
             </div>
           </div>
-          <p className="stat-number text-3xl">{totalBookings.toLocaleString()}</p>
+          <p className="stat-number text-3xl text-red-300">{stats.notArrived.toLocaleString()}</p>
         </div>
         <div className={`rounded-2xl glass-card p-5 lift-3d ${attendanceRate >= 70 ? "border-green-500/20" : attendanceRate >= 40 ? "border-amber-500/20" : ""}`}>
           <div className="flex items-center justify-between mb-3">
@@ -2216,17 +2228,19 @@ function AttendanceReport() {
       {/* Table */}
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
-      ) : bookings.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="rounded-3xl glass-card p-10 text-center">
           <CheckCircle className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-30" />
-          <p className="font-serif text-2xl mb-2">No check-ins found</p>
-          <p className="text-muted-foreground text-sm">Try adjusting the filters to see check-in data.</p>
+          <p className="font-serif text-2xl mb-2">No records found</p>
+          <p className="text-muted-foreground text-sm">Try adjusting the filters to see attendance data.</p>
         </div>
       ) : (
         <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-4">Checked-in guests</h3>
+          <h3 className="font-serif text-xl mb-4">
+            {statusFilter === "checkedIn" ? "Checked-in guests" : statusFilter === "notArrived" ? "Not-arrived guests" : "All confirmed guests"}
+          </h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
+            <table className="w-full text-sm min-w-[700px]">
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
                 <tr>
                   <th className="text-left py-2 pr-3">ID</th>
@@ -2234,26 +2248,34 @@ function AttendanceReport() {
                   <th className="text-left py-2 pr-3">Partner</th>
                   <th className="text-left py-2 pr-3">Event</th>
                   <th className="text-left py-2 pr-3">Booking date</th>
-                  <th className="text-left py-2">Checked in at</th>
+                  <th className="text-right py-2 pr-3">Party</th>
+                  <th className="text-left py-2">Check-in</th>
                 </tr>
               </thead>
               <tbody>
-                {bookings.map((b: any) => (
+                {rows.map((b) => (
                   <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
                     <td className="py-2.5 pr-3">
-                      <span className="font-medium">{b.personName || b.userName || "—"}</span>
+                      <span className="font-medium">{b.userName || "—"}</span>
                       {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
                     </td>
                     <td className="py-2.5 pr-3 text-muted-foreground">{b.vendorName || "—"}</td>
                     <td className="py-2.5 pr-3 text-muted-foreground max-w-[140px] truncate">{b.eventTitle || "—"}</td>
                     <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-muted-foreground">
+                      {b.guests || (b.ticketWomen + b.ticketMen + b.ticketCouple) || "—"}
+                    </td>
                     <td className="py-2.5">
-                      <span className="text-xs font-medium text-green-400">
-                        {b.checkedInAt
-                          ? new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
-                          : "Yes"}
-                      </span>
+                      {b.checkedIn ? (
+                        <span className="text-xs font-medium text-green-400">
+                          {b.checkedInAt
+                            ? new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+                            : "Yes"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not arrived</span>
+                      )}
                     </td>
                   </tr>
                 ))}

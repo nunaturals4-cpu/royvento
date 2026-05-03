@@ -500,6 +500,41 @@ export interface AdminBookingReportResponse {
   totalPages: number;
 }
 
+export interface AttendanceReportRow {
+  id: number;
+  vendorId: number;
+  vendorName: string;
+  eventId: number;
+  eventTitle: string;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  phone: string;
+  bookingDate: string;
+  guests: number;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  status: string;
+  checkedIn: boolean;
+  checkedInAt?: string | null;
+  arrivalTime?: string | null;
+}
+
+export interface AttendanceStats {
+  total: number;
+  checkedIn: number;
+  notArrived: number;
+}
+
+export interface AttendanceReportResponse {
+  rows: AttendanceReportRow[];
+  stats: AttendanceStats;
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export interface AdminPartnerSummary {
   vendorId: number;
   vendorName: string;
@@ -804,6 +839,22 @@ export type GetBookingTicketCode200 = {
   ticketCode: string;
 };
 
+export type GetPartnerCheckinReportParams = {
+  page?: number;
+  date?: string;
+  eventId?: number;
+  status?: GetPartnerCheckinReportStatus;
+};
+
+export type GetPartnerCheckinReportStatus =
+  (typeof GetPartnerCheckinReportStatus)[keyof typeof GetPartnerCheckinReportStatus];
+
+export const GetPartnerCheckinReportStatus = {
+  all: "all",
+  checkedIn: "checkedIn",
+  notArrived: "notArrived",
+} as const;
+
 export type GetAdminBookingsReportParams = {
   page?: number;
   vendorId?: number;
@@ -815,7 +866,25 @@ export type GetAdminBookingsReportParams = {
   search?: string;
   sortBy?: string;
   bookingType?: string;
+  checkedIn?: string;
 };
+
+export type GetAdminCheckinReportParams = {
+  page?: number;
+  vendorId?: number;
+  date?: string;
+  eventId?: number;
+  status?: GetAdminCheckinReportStatus;
+};
+
+export type GetAdminCheckinReportStatus =
+  (typeof GetAdminCheckinReportStatus)[keyof typeof GetAdminCheckinReportStatus];
+
+export const GetAdminCheckinReportStatus = {
+  all: "all",
+  checkedIn: "checkedIn",
+  notArrived: "notArrived",
+} as const;
 
 export type GetAdminLeadsParams = {
   page?: number;

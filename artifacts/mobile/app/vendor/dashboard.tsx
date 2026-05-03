@@ -9,6 +9,7 @@ import {
   useCreateEvent,
   useDeleteEvent,
   useGetMyVendor,
+  useGetPartnerCheckinReport,
   useListMyVendorEvents,
   useListVendorBookings,
   useUpdateBookingStatus,
@@ -16,6 +17,7 @@ import {
   useUpdateMyVendor,
   type FreeEntryRulesGendersItem,
   type FreeEntryRulesDaysItem,
+  type AttendanceReportRow,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
@@ -46,7 +48,7 @@ import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads";
+type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads" | "attendance";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending:   { bg: "#f59e0b20", text: "#f59e0b" },
@@ -2714,6 +2716,149 @@ export default function VendorDashboardScreen() {
     return <AdsTab colors={colors} />;
   }
 
+  // ─── Attendance tab ───────────────────────────────────────────────────────────
+  const [attendanceDate, setAttendanceDate] = useState<string>("");
+  const [attendanceStatus, setAttendanceStatus] = useState<"all" | "checkedIn" | "notArrived">("all");
+  const [attendancePage, setAttendancePage] = useState<number>(1);
+  const [showAttendanceDatePicker, setShowAttendanceDatePicker] = useState(false);
+
+  const attendanceParams = {
+    ...(attendanceDate ? { date: attendanceDate } : {}),
+    ...(attendanceStatus !== "all" ? { status: attendanceStatus } : {}),
+    page: attendancePage,
+  };
+
+  const { data: attendanceReport, isLoading: attendanceLoading } = useGetPartnerCheckinReport(
+    attendanceParams,
+    { query: { enabled: activeTab === "attendance" } },
+  );
+
+  const attendanceRows = attendanceReport?.rows ?? [];
+  const attendanceStats = attendanceReport?.stats ?? { total: 0, checkedIn: 0, notArrived: 0 };
+  const attendanceTotalPages = attendanceReport?.totalPages ?? 0;
+  const attendanceRate = attendanceStats.total > 0
+    ? Math.round((attendanceStats.checkedIn / attendanceStats.total) * 100) : 0;
+
+  function renderAttendance() {
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
+        {/* Date filter */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <TouchableOpacity
+            onPress={() => setShowAttendanceDatePicker(true)}
+            style={[{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1 }, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Ionicons name="calendar-outline" size={16} color={colors.mutedForeground} />
+            <Text style={{ color: attendanceDate ? colors.foreground : colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, flex: 1 }}>
+              {attendanceDate || "All dates"}
+            </Text>
+          </TouchableOpacity>
+          {attendanceDate ? (
+            <TouchableOpacity onPress={() => { setAttendanceDate(""); setAttendancePage(1); }}>
+              <Ionicons name="close-circle" size={22} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {showAttendanceDatePicker && (
+          <DateTimePicker
+            value={attendanceDate ? new Date(attendanceDate + "T00:00:00") : new Date()}
+            mode="date"
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            maximumDate={new Date()}
+            onChange={(_event, d) => {
+              setShowAttendanceDatePicker(false);
+              if (d) { setAttendanceDate(d.toISOString().slice(0, 10)); setAttendancePage(1); }
+            }}
+          />
+        )}
+
+        {/* Status toggle */}
+        <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
+          {(["all", "checkedIn", "notArrived"] as const).map((s) => (
+            <TouchableOpacity
+              key={s}
+              onPress={() => { setAttendanceStatus(s); setAttendancePage(1); }}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, backgroundColor: attendanceStatus === s ? colors.primary : colors.muted, borderColor: attendanceStatus === s ? colors.primary : colors.border }}
+            >
+              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: attendanceStatus === s ? colors.primaryForeground : colors.mutedForeground }}>
+                {s === "all" ? "All" : s === "checkedIn" ? "Checked In" : "Not Arrived"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Stats row */}
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+          {[
+            { label: "Expected", value: attendanceStats.total, color: colors.foreground, bg: colors.card },
+            { label: "Checked in", value: attendanceStats.checkedIn, color: "#22c55e", bg: "#22c55e18" },
+            { label: "Not arrived", value: attendanceStats.notArrived, color: "#ef4444", bg: "#ef444418" },
+            { label: "Rate", value: `${attendanceRate}%`, color: attendanceRate >= 70 ? "#22c55e" : attendanceRate >= 40 ? "#f59e0b" : "#ef4444", bg: colors.card },
+          ].map((s) => (
+            <View key={s.label} style={{ flex: 1, borderRadius: 12, padding: 10, alignItems: "center", backgroundColor: s.bg, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: s.color, fontFamily: "Inter_700Bold", fontSize: 16 }}>{s.value}</Text>
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 10, marginTop: 2, textAlign: "center" }}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Guest list */}
+        {attendanceLoading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+        ) : attendanceRows.length === 0 ? (
+          <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
+            <Ionicons name="people-outline" size={40} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
+              {attendanceDate ? "No confirmed bookings for this date." : "Select a date to view attendance."}
+            </Text>
+          </View>
+        ) : (
+          attendanceRows.map((b) => (
+            <View key={b.id} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "flex-start", gap: 10 }]}>
+              <View style={[{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginTop: 2 }, { backgroundColor: b.checkedIn ? "#22c55e20" : colors.muted }]}>
+                <Ionicons name={b.checkedIn ? "checkmark-circle" : "time-outline"} size={20} color={b.checkedIn ? "#22c55e" : colors.mutedForeground} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{b.userName || "—"}</Text>
+                {b.phone ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{b.phone}</Text> : null}
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
+                  {b.eventTitle} · {b.bookingDate}
+                </Text>
+                {b.guests > 0 ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>Party of {b.guests}</Text> : null}
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                {b.checkedIn ? (
+                  <Text style={{ color: "#22c55e", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                    {b.checkedInAt ? new Date(b.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "In"}
+                  </Text>
+                ) : (
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>Not arrived</Text>
+                )}
+              </View>
+            </View>
+          ))
+        )}
+
+        {/* Pagination */}
+        {attendanceTotalPages > 1 && (
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12, paddingHorizontal: 4 }}>
+            <TouchableOpacity onPress={() => setAttendancePage((p) => Math.max(1, p - 1))} disabled={attendancePage <= 1}
+              style={{ opacity: attendancePage <= 1 ? 0.4 : 1 }}>
+              <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>← Prev</Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular" }}>
+              {attendancePage} / {attendanceTotalPages}
+            </Text>
+            <TouchableOpacity onPress={() => setAttendancePage((p) => Math.min(attendanceTotalPages, p + 1))} disabled={attendancePage >= attendanceTotalPages}
+              style={{ opacity: attendancePage >= attendanceTotalPages ? 0.4 : 1 }}>
+              <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Next →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    );
+  }
+
   // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -2750,6 +2895,7 @@ export default function VendorDashboardScreen() {
             { key: "drinkplans",    icon: "wine-outline",             label: "Drink Plans" },
             { key: "ads",           icon: "megaphone-outline",        label: "Ads" },
             { key: "analytics",     icon: "bar-chart-outline",        label: "Analytics" },
+            { key: "attendance",    icon: "checkmark-circle-outline", label: "Attendance" },
             { key: "announcements", icon: "flag-outline",             label: "Announcements" },
             { key: "leads",         icon: "people-outline",           label: "Leads" },
             { key: "profile",       icon: "person-outline",           label: "Profile" },
@@ -2776,6 +2922,7 @@ export default function VendorDashboardScreen() {
       {activeTab === "drinkplans"     && renderDrinkPlans()}
       {activeTab === "ads"            && renderAds()}
       {activeTab === "analytics"      && renderAnalytics()}
+      {activeTab === "attendance"     && renderAttendance()}
       {activeTab === "announcements"  && renderAnnouncements()}
       {activeTab === "leads"          && renderLeads()}
       {activeTab === "profile"        && renderProfile()}

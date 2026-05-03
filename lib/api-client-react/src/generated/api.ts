@@ -24,6 +24,7 @@ import type {
   AdminLeadsResponse,
   AdminLeadsSummary,
   AdminPartnerSummary,
+  AttendanceReportResponse,
   AuthResponse,
   Availability,
   Booking,
@@ -37,9 +38,11 @@ import type {
   EventDetail,
   GetAdminAnalyticsParams,
   GetAdminBookingsReportParams,
+  GetAdminCheckinReportParams,
   GetAdminLeadsParams,
   GetAdminLeadsSummaryParams,
   GetBookingTicketCode200,
+  GetPartnerCheckinReportParams,
   HealthStatus,
   ImportGooglePubBody,
   ImportGooglePubResponse,
@@ -3649,6 +3652,109 @@ export const useDeleteAvailability = <
 };
 
 /**
+ * @summary Attendance / check-in report for the authenticated vendor
+ */
+export const getGetPartnerCheckinReportUrl = (
+  params?: GetPartnerCheckinReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/partner/checkin-report?${stringifiedParams}`
+    : `/api/partner/checkin-report`;
+};
+
+export const getPartnerCheckinReport = async (
+  params?: GetPartnerCheckinReportParams,
+  options?: RequestInit,
+): Promise<AttendanceReportResponse> => {
+  return customFetch<AttendanceReportResponse>(
+    getGetPartnerCheckinReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPartnerCheckinReportQueryKey = (
+  params?: GetPartnerCheckinReportParams,
+) => {
+  return [`/api/partner/checkin-report`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetPartnerCheckinReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerCheckinReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPartnerCheckinReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPartnerCheckinReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPartnerCheckinReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPartnerCheckinReport>>
+  > = ({ signal }) =>
+    getPartnerCheckinReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerCheckinReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerCheckinReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerCheckinReport>>
+>;
+export type GetPartnerCheckinReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Attendance / check-in report for the authenticated vendor
+ */
+
+export function useGetPartnerCheckinReport<
+  TData = Awaited<ReturnType<typeof getPartnerCheckinReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPartnerCheckinReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPartnerCheckinReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerCheckinReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary List all events with popular-since tracking (admin)
  */
 export const getGetAdminEventsUrl = () => {
@@ -4161,6 +4267,109 @@ export function useGetAdminBookingsReport<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetAdminBookingsReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Attendance / check-in report (admin)
+ */
+export const getGetAdminCheckinReportUrl = (
+  params?: GetAdminCheckinReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/checkin-report?${stringifiedParams}`
+    : `/api/admin/checkin-report`;
+};
+
+export const getAdminCheckinReport = async (
+  params?: GetAdminCheckinReportParams,
+  options?: RequestInit,
+): Promise<AttendanceReportResponse> => {
+  return customFetch<AttendanceReportResponse>(
+    getGetAdminCheckinReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAdminCheckinReportQueryKey = (
+  params?: GetAdminCheckinReportParams,
+) => {
+  return [`/api/admin/checkin-report`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAdminCheckinReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminCheckinReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminCheckinReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminCheckinReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminCheckinReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminCheckinReport>>
+  > = ({ signal }) =>
+    getAdminCheckinReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminCheckinReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminCheckinReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminCheckinReport>>
+>;
+export type GetAdminCheckinReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Attendance / check-in report (admin)
+ */
+
+export function useGetAdminCheckinReport<
+  TData = Awaited<ReturnType<typeof getAdminCheckinReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminCheckinReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminCheckinReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminCheckinReportQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

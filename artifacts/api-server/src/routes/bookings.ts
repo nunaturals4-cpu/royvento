@@ -709,6 +709,98 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   });
 });
 
+// Partner attendance / check-in report
+const PARTNER_CHECKIN_PAGE_SIZE = 50;
+
+router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  const vendor = vRows[0];
+  if (!vendor) { res.json({ rows: [], stats: { total: 0, checkedIn: 0, notArrived: 0 }, total: 0, page: 1, totalPages: 0 }); return; }
+
+  const page = Math.max(1, Number(req.query["page"]) || 1);
+  const offset = (page - 1) * PARTNER_CHECKIN_PAGE_SIZE;
+  const dateParam = req.query["date"] as string | undefined;
+  const eventIdParam = req.query["eventId"] ? Number(req.query["eventId"]) : null;
+  const statusParam = (req.query["status"] as string | undefined) ?? "all";
+
+  const conditions = [eq(bookingsTable.vendorId, vendor.id)];
+  if (dateParam) conditions.push(eq(bookingsTable.bookingDate, dateParam));
+  if (eventIdParam && Number.isFinite(eventIdParam)) conditions.push(eq(bookingsTable.eventId, eventIdParam));
+  if (statusParam === "checkedIn") {
+    conditions.push(eq(bookingsTable.checkedIn, true));
+    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
+  } else if (statusParam === "notArrived") {
+    conditions.push(eq(bookingsTable.checkedIn, false));
+    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
+  } else {
+    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
+  }
+
+  const where = and(...conditions);
+
+  const [countRow, statsRow, rows] = await Promise.all([
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(where),
+    db.select({
+      checkedInCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
+      notArrivedCount: sql<number>`coalesce(sum(case when not ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
+    }).from(bookingsTable).where(where),
+    db.select().from(bookingsTable).where(where)
+      .orderBy(desc(bookingsTable.bookingDate), desc(bookingsTable.id))
+      .limit(PARTNER_CHECKIN_PAGE_SIZE).offset(offset),
+  ]);
+
+  const total = countRow[0]?.c ?? 0;
+  const totalPages = Math.ceil(total / PARTNER_CHECKIN_PAGE_SIZE);
+  const checkedInCount = statsRow[0]?.checkedInCount ?? 0;
+  const notArrivedCount = statsRow[0]?.notArrivedCount ?? 0;
+
+  const eventIds = [...new Set(rows.map((r) => r.eventId))];
+  const userIds = [...new Set(rows.map((r) => r.userId))];
+
+  const [events, users] = await Promise.all([
+    eventIds.length > 0 ? db.select({ id: eventsTable.id, title: eventsTable.title }).from(eventsTable).where(inArray(eventsTable.id, eventIds)) : [],
+    userIds.length > 0 ? db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, phone: sql<string>`coalesce(phone,'')` }).from(usersTable).where(inArray(usersTable.id, userIds)) : [],
+  ]);
+
+  const eventMap = new Map(events.map((e) => [e.id, e.title]));
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  const attendanceRows = rows.map((b) => {
+    const u = userMap.get(b.userId);
+    return {
+      id: b.id,
+      vendorId: b.vendorId,
+      vendorName: vendor.businessName,
+      eventId: b.eventId,
+      eventTitle: eventMap.get(b.eventId) ?? "",
+      userId: b.userId,
+      userName: u?.name ?? "",
+      userEmail: u?.email ?? "",
+      phone: u?.phone ?? "",
+      bookingDate: b.bookingDate,
+      guests: b.guests,
+      ticketWomen: b.ticketWomen,
+      ticketMen: b.ticketMen,
+      ticketCouple: b.ticketCouple,
+      status: b.status,
+      checkedIn: b.checkedIn,
+      checkedInAt: b.checkedInAt?.toISOString() ?? null,
+      arrivalTime: b.arrivalTime ?? null,
+    };
+  });
+
+  res.json({
+    rows: attendanceRows,
+    stats: { total, checkedIn: checkedInCount, notArrived: notArrivedCount },
+    total,
+    page,
+    totalPages,
+  });
+});
+
 router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) {

@@ -706,6 +706,101 @@ router.get("/admin/bookings/partner-summary", requireAuth(["admin"]), async (_re
   );
 });
 
+// ── Admin Attendance / Check-in Report ──────────────────────────────────────
+
+const CHECKIN_PAGE_SIZE = 50;
+
+router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => {
+  const page = Math.max(1, Number(req.query["page"]) || 1);
+  const offset = (page - 1) * CHECKIN_PAGE_SIZE;
+
+  const vendorIdParam = req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const dateParam = req.query["date"] as string | undefined;
+  const eventIdParam = req.query["eventId"] ? Number(req.query["eventId"]) : null;
+  const statusParam = (req.query["status"] as string | undefined) ?? "all";
+
+  const conditions: ReturnType<typeof sql>[] = [];
+  if (vendorIdParam && Number.isFinite(vendorIdParam))
+    conditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
+  if (dateParam)
+    conditions.push(sql`${bookingsTable.bookingDate} = ${dateParam}`);
+  if (eventIdParam && Number.isFinite(eventIdParam))
+    conditions.push(sql`${bookingsTable.eventId} = ${eventIdParam}`);
+
+  if (statusParam === "checkedIn") {
+    conditions.push(sql`${bookingsTable.checkedIn} = true`);
+    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
+  } else if (statusParam === "notArrived") {
+    conditions.push(sql`${bookingsTable.checkedIn} = false`);
+    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
+  } else {
+    conditions.push(sql`${bookingsTable.status} IN ('confirmed','completed')`);
+  }
+
+  const whereSQL = conditions.length > 0 ? sql.join(conditions, sql` AND `) : undefined;
+
+  const [countRow, statsRows, rows] = await Promise.all([
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(whereSQL),
+    db.select({
+      checkedInCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
+      notArrivedCount: sql<number>`coalesce(sum(case when not ${bookingsTable.checkedIn} then 1 else 0 end),0)::int`,
+    }).from(bookingsTable).where(whereSQL),
+    db.select().from(bookingsTable).where(whereSQL)
+      .orderBy(desc(bookingsTable.bookingDate), desc(bookingsTable.id))
+      .limit(CHECKIN_PAGE_SIZE).offset(offset),
+  ]);
+
+  const total = countRow[0]?.c ?? 0;
+  const totalPages = Math.ceil(total / CHECKIN_PAGE_SIZE);
+  const checkedInCount = statsRows[0]?.checkedInCount ?? 0;
+  const notArrivedCount = statsRows[0]?.notArrivedCount ?? 0;
+
+  const enriched = await enrichBookingRows(rows);
+
+  const eventIds = [...new Set(rows.map((r) => r.eventId))];
+  const userIds = [...new Set(rows.map((r) => r.userId))];
+  const vendorIds = [...new Set(rows.map((r) => r.vendorId))];
+
+  const [events, users, vendors] = await Promise.all([
+    eventIds.length > 0 ? db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)) : [],
+    userIds.length > 0 ? db.select({ id: usersTable.id, phone: sql<string>`coalesce(phone,'')` }).from(usersTable).where(inArray(usersTable.id, userIds)) : [],
+    vendorIds.length > 0 ? db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName }).from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)) : [],
+  ]);
+
+  const phoneMap = new Map(users.map((u) => [u.id, u.phone]));
+  const vMapLocal = new Map(vendors.map((v) => [v.id, v.businessName]));
+  const eventMap = new Map(events.map((e) => [e.id, e.title]));
+
+  const attendanceRows = rows.map((b, i) => ({
+    id: b.id,
+    vendorId: b.vendorId,
+    vendorName: vMapLocal.get(b.vendorId) ?? `Partner #${b.vendorId}`,
+    eventId: b.eventId,
+    eventTitle: eventMap.get(b.eventId) ?? "",
+    userId: b.userId,
+    userName: enriched[i]?.userName ?? "",
+    userEmail: enriched[i]?.userEmail ?? "",
+    phone: phoneMap.get(b.userId) ?? "",
+    bookingDate: b.bookingDate,
+    guests: b.guests,
+    ticketWomen: b.ticketWomen,
+    ticketMen: b.ticketMen,
+    ticketCouple: b.ticketCouple,
+    status: b.status,
+    checkedIn: b.checkedIn,
+    checkedInAt: b.checkedInAt?.toISOString() ?? null,
+    arrivalTime: b.arrivalTime ?? null,
+  }));
+
+  res.json({
+    rows: attendanceRows,
+    stats: { total, checkedIn: checkedInCount, notArrived: notArrivedCount },
+    total,
+    page,
+    totalPages,
+  });
+});
+
 // ── Admin CRM & Leads ────────────────────────────────────────────────────────
 
 router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {

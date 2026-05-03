@@ -1636,6 +1636,49 @@ export const DeleteAvailabilityResponse = zod.object({
 });
 
 /**
+ * @summary Attendance / check-in report for the authenticated vendor
+ */
+export const GetPartnerCheckinReportQueryParams = zod.object({
+  page: zod.coerce.number().optional(),
+  date: zod.coerce.string().optional(),
+  eventId: zod.coerce.number().optional(),
+  status: zod.enum(["all", "checkedIn", "notArrived"]).optional(),
+});
+
+export const GetPartnerCheckinReportResponse = zod.object({
+  rows: zod.array(
+    zod.object({
+      id: zod.number(),
+      vendorId: zod.number(),
+      vendorName: zod.string(),
+      eventId: zod.number(),
+      eventTitle: zod.string(),
+      userId: zod.number(),
+      userName: zod.string(),
+      userEmail: zod.string(),
+      phone: zod.string(),
+      bookingDate: zod.string(),
+      guests: zod.number(),
+      ticketWomen: zod.number(),
+      ticketMen: zod.number(),
+      ticketCouple: zod.number(),
+      status: zod.string(),
+      checkedIn: zod.boolean(),
+      checkedInAt: zod.string().nullish(),
+      arrivalTime: zod.string().nullish(),
+    }),
+  ),
+  stats: zod.object({
+    total: zod.number(),
+    checkedIn: zod.number(),
+    notArrived: zod.number(),
+  }),
+  total: zod.number(),
+  page: zod.number(),
+  totalPages: zod.number(),
+});
+
+/**
  * @summary List all events with popular-since tracking (admin)
  */
 export const GetAdminEventsResponseItem = zod.object({
@@ -1820,6 +1863,7 @@ export const GetAdminBookingsReportQueryParams = zod.object({
   search: zod.coerce.string().optional(),
   sortBy: zod.coerce.string().optional(),
   bookingType: zod.coerce.string().optional(),
+  checkedIn: zod.coerce.string().optional(),
 });
 
 export const GetAdminBookingsReportResponse = zod.object({
@@ -1851,6 +1895,50 @@ export const GetAdminBookingsReportResponse = zod.object({
       createdAt: zod.string(),
     }),
   ),
+  total: zod.number(),
+  page: zod.number(),
+  totalPages: zod.number(),
+});
+
+/**
+ * @summary Attendance / check-in report (admin)
+ */
+export const GetAdminCheckinReportQueryParams = zod.object({
+  page: zod.coerce.number().optional(),
+  vendorId: zod.coerce.number().optional(),
+  date: zod.coerce.string().optional(),
+  eventId: zod.coerce.number().optional(),
+  status: zod.enum(["all", "checkedIn", "notArrived"]).optional(),
+});
+
+export const GetAdminCheckinReportResponse = zod.object({
+  rows: zod.array(
+    zod.object({
+      id: zod.number(),
+      vendorId: zod.number(),
+      vendorName: zod.string(),
+      eventId: zod.number(),
+      eventTitle: zod.string(),
+      userId: zod.number(),
+      userName: zod.string(),
+      userEmail: zod.string(),
+      phone: zod.string(),
+      bookingDate: zod.string(),
+      guests: zod.number(),
+      ticketWomen: zod.number(),
+      ticketMen: zod.number(),
+      ticketCouple: zod.number(),
+      status: zod.string(),
+      checkedIn: zod.boolean(),
+      checkedInAt: zod.string().nullish(),
+      arrivalTime: zod.string().nullish(),
+    }),
+  ),
+  stats: zod.object({
+    total: zod.number(),
+    checkedIn: zod.number(),
+    notArrived: zod.number(),
+  }),
   total: zod.number(),
   page: zod.number(),
   totalPages: zod.number(),

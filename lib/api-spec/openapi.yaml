@@ -914,6 +914,41 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
+  /partner/checkin-report:
+    get:
+      operationId: getPartnerCheckinReport
+      tags: [bookings]
+      summary: Attendance / check-in report for the authenticated vendor
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, checkedIn, notArrived]
+      responses:
+        "200":
+          description: Attendance report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceReportResponse"
+
   /admin/events:
     get:
       operationId: getAdminEvents
@@ -1089,6 +1124,11 @@ paths:
           required: false
           schema:
             type: string
+        - name: checkedIn
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Booking report
@@ -1096,6 +1136,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminBookingReportResponse"
+
+  /admin/checkin-report:
+    get:
+      operationId: getAdminCheckinReport
+      tags: [admin]
+      summary: Attendance / check-in report (admin)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: vendorId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: eventId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, checkedIn, notArrived]
+      responses:
+        "200":
+          description: Attendance report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceReportResponse"
 
   /admin/bookings/partner-summary:
     get:
@@ -2097,6 +2177,77 @@ components:
         totalPages:
           type: integer
       required: [bookings, total, page, totalPages]
+
+    AttendanceReportRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        vendorName:
+          type: string
+        eventId:
+          type: integer
+        eventTitle:
+          type: string
+        userId:
+          type: integer
+        userName:
+          type: string
+        userEmail:
+          type: string
+        phone:
+          type: string
+        bookingDate:
+          type: string
+        guests:
+          type: integer
+        ticketWomen:
+          type: integer
+        ticketMen:
+          type: integer
+        ticketCouple:
+          type: integer
+        status:
+          type: string
+        checkedIn:
+          type: boolean
+        checkedInAt:
+          type: string
+          nullable: true
+        arrivalTime:
+          type: string
+          nullable: true
+      required: [id, vendorId, vendorName, eventId, eventTitle, userId, userName, userEmail, phone, bookingDate, guests, ticketWomen, ticketMen, ticketCouple, status, checkedIn]
+
+    AttendanceStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        checkedIn:
+          type: integer
+        notArrived:
+          type: integer
+      required: [total, checkedIn, notArrived]
+
+    AttendanceReportResponse:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttendanceReportRow"
+        stats:
+          $ref: "#/components/schemas/AttendanceStats"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [rows, stats, total, page, totalPages]
 
     AdminPartnerSummary:
       type: object

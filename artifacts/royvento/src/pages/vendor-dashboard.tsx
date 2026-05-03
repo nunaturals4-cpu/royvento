@@ -8,6 +8,7 @@ import {
   useCreateEvent,
   useDeleteEvent,
   useListVendorBookings,
+  useGetPartnerCheckinReport,
 } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck,
-  Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight,
+  Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX,
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -103,6 +104,9 @@ export function VendorDashboard() {
             <TabsTrigger value="drinkplans">
               <GlassWater className="h-3.5 w-3.5 mr-1 text-primary" /> Drink Plans
             </TabsTrigger>
+            <TabsTrigger value="attendance">
+              <UserCheck className="h-3.5 w-3.5 mr-1 text-primary" /> Attendance
+            </TabsTrigger>
             <TabsTrigger value="managers">
               <Users className="h-3.5 w-3.5 mr-1 text-primary" /> Managers
             </TabsTrigger>
@@ -122,6 +126,7 @@ export function VendorDashboard() {
           <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
           <TabsContent value="leads"><LeadsPanel bookings={bookings} /></TabsContent>
           <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
+          <TabsContent value="attendance"><AttendancePanel /></TabsContent>
           <TabsContent value="managers"><ManagersPanel /></TabsContent>
         </Tabs>
       )}
@@ -1915,79 +1920,6 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
             </div>
           )}
 
-          {/* Check-in attendance section */}
-          {(() => {
-            const confirmedForAttendance = filtered.filter((b: any) => b.status === "confirmed" || b.status === "completed");
-            const checkedInList = confirmedForAttendance.filter((b: any) => b.checkedIn);
-            const attendanceRate = confirmedForAttendance.length > 0
-              ? Math.round((checkedInList.length / confirmedForAttendance.length) * 100) : 0;
-            return (
-              <div className="rounded-2xl glass-card p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-serif text-xl flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-400" /> Check-in Attendance
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Checked in</p>
-                    <p className="text-2xl font-bold tabular-nums text-green-300">{checkedInList.length}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Expected</p>
-                    <p className="text-2xl font-bold tabular-nums">{confirmedForAttendance.length}</p>
-                  </div>
-                  <div className={`rounded-xl px-4 py-3 border ${attendanceRate >= 70 ? "bg-green-500/10 border-green-500/20" : attendanceRate >= 40 ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"}`}>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Attendance rate</p>
-                    <p className={`text-2xl font-bold tabular-nums ${attendanceRate >= 70 ? "text-green-300" : attendanceRate >= 40 ? "text-amber-300" : "text-red-300"}`}>{attendanceRate}%</p>
-                  </div>
-                </div>
-                {checkedInList.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[520px]">
-                      <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
-                        <tr>
-                          <th className="text-left py-2 pr-3">Guest</th>
-                          <th className="text-left py-2 pr-3">Event</th>
-                          <th className="text-left py-2 pr-3">Booking date</th>
-                          <th className="text-left py-2">Checked in at</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...checkedInList]
-                          .sort((a: any, b: any) => (b.checkedInAt ?? "").localeCompare(a.checkedInAt ?? ""))
-                          .slice(0, 20)
-                          .map((b: any) => (
-                            <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="py-2.5 pr-3">
-                                <span className="font-medium">{b.personName || "—"}</span>
-                                {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
-                              </td>
-                              <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
-                              <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
-                              <td className="py-2.5">
-                                <span className="text-xs font-medium text-green-400">
-                                  {b.checkedInAt
-                                    ? new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
-                                    : "Yes"}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                    {checkedInList.length > 20 && (
-                      <p className="text-xs text-muted-foreground mt-2">Showing 20 of {checkedInList.length} checked-in guests.</p>
-                    )}
-                  </div>
-                )}
-                {checkedInList.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No guests have checked in during this period.</p>
-                )}
-              </div>
-            );
-          })()}
-
           {perEvent.length > 0 && (
             <div className="rounded-2xl glass-card p-6">
               <h3 className="font-serif text-xl mb-4">Revenue by event</h3>
@@ -2123,6 +2055,168 @@ function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function AttendancePanel() {
+  const [date, setDate] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "checkedIn" | "notArrived">("all");
+  const [page, setPage] = useState<number>(1);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const params = {
+    ...(date ? { date } : {}),
+    ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+    page,
+  } as Parameters<typeof useGetPartnerCheckinReport>[0];
+
+  const { data: report, isLoading } = useGetPartnerCheckinReport(params);
+
+  const rows = report?.rows ?? [];
+  const stats = report?.stats ?? { total: 0, checkedIn: 0, notArrived: 0 };
+  const totalPages = report?.totalPages ?? 0;
+  const attendanceRate = stats.total > 0 ? Math.round((stats.checkedIn / stats.total) * 100) : 0;
+
+  const hasFilters = date || statusFilter !== "all";
+  const resetFilters = () => { setDate(""); setStatusFilter("all"); setPage(1); };
+
+  return (
+    <div className="space-y-6">
+      {/* Filter bar */}
+      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Booking date</Label>
+          <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setPage(1); }} className="w-44" max={today} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Status</Label>
+          <div className="flex gap-1">
+            {(["all", "checkedIn", "notArrived"] as const).map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant={statusFilter === s ? "default" : "outline"}
+                onClick={() => { setStatusFilter(s); setPage(1); }}
+                className="text-xs"
+              >
+                {s === "all" ? "All" : s === "checkedIn" ? "Checked In" : "Not Arrived"}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {hasFilters && (
+          <Button variant="outline" size="sm" onClick={resetFilters}>Clear</Button>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="rounded-2xl glass-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Expected</span>
+            <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+              <CalendarCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold tabular-nums">{stats.total}</p>
+        </div>
+        <div className="rounded-2xl glass-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Checked in</span>
+            <div className="w-8 h-8 rounded-lg bg-green-600/15 text-green-400 flex items-center justify-center">
+              <UserCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold tabular-nums text-green-300">{stats.checkedIn}</p>
+        </div>
+        <div className="rounded-2xl glass-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Not arrived</span>
+            <div className="w-8 h-8 rounded-lg bg-red-600/15 text-red-400 flex items-center justify-center">
+              <UserX className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold tabular-nums text-red-300">{stats.notArrived}</p>
+        </div>
+        <div className={`rounded-2xl glass-card p-5 ${attendanceRate >= 70 ? "border-green-500/20" : attendanceRate >= 40 ? "border-amber-500/20" : ""}`}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Rate</span>
+            <div className="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+          </div>
+          <p className={`text-2xl font-bold tabular-nums ${attendanceRate >= 70 ? "text-green-300" : attendanceRate >= 40 ? "text-amber-300" : "text-red-300"}`}>
+            {attendanceRate}%
+          </p>
+        </div>
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      ) : rows.length === 0 ? (
+        <div className="rounded-3xl glass-card p-10 text-center">
+          <CheckCircle className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-30" />
+          <p className="font-serif text-2xl mb-2">No records found</p>
+          <p className="text-muted-foreground text-sm">
+            {date ? "No confirmed bookings for this date." : "Select a date to view attendance for a specific day."}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-2xl glass-card p-6">
+          <h3 className="font-serif text-xl mb-4">
+            {statusFilter === "checkedIn" ? "Checked-in guests" : statusFilter === "notArrived" ? "Not-arrived guests" : "All confirmed guests"}
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-3">Guest</th>
+                  <th className="text-left py-2 pr-3">Event</th>
+                  <th className="text-left py-2 pr-3">Date</th>
+                  <th className="text-right py-2 pr-3">Party</th>
+                  <th className="text-left py-2">Check-in</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((b) => (
+                  <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-2.5 pr-3">
+                      <span className="font-medium">{b.userName || "—"}</span>
+                      {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
+                    </td>
+                    <td className="py-2.5 pr-3 text-muted-foreground max-w-[140px] truncate">{b.eventTitle || "—"}</td>
+                    <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-muted-foreground">
+                      {b.guests || (b.ticketWomen + b.ticketMen + b.ticketCouple) || "—"}
+                    </td>
+                    <td className="py-2.5">
+                      {b.checkedIn ? (
+                        <span className="text-xs font-medium text-green-400">
+                          {b.checkedInAt
+                            ? new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+                            : "Yes"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not arrived</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</Button>
+              <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
