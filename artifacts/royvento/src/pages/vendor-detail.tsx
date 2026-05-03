@@ -27,6 +27,7 @@ interface DrinkPlan {
   lineItems?: DrinkPlanLineItem[] | null;
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
+  validUntil?: string | null;
 }
 
 const PLAN_TYPE_LABELS: Record<string, string> = {
@@ -118,7 +119,7 @@ export function VendorDetail() {
       </div>
 
     {/* Offers & Deals Strip */}
-    {(drinkPlans.some((p) => p.drinksOfferLabel || p.foodDiscountLabel) || announcements.length > 0) && (
+    {(drinkPlans.some((p) => (p.drinksOfferLabel || p.foodDiscountLabel) && (!p.validUntil || p.validUntil >= new Date().toISOString().slice(0, 10))) || announcements.length > 0) && (
       <div className="border-y border-primary/10 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-4">
         <div className="container mx-auto px-4 md:px-6 flex items-center gap-4">
           <span className="shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-primary uppercase tracking-widest">
@@ -127,7 +128,7 @@ export function VendorDetail() {
           </span>
           <div className="flex gap-3 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {drinkPlans
-              .filter((p) => p.drinksOfferLabel || p.foodDiscountLabel)
+              .filter((p) => (p.drinksOfferLabel || p.foodDiscountLabel) && (!p.validUntil || p.validUntil >= new Date().toISOString().slice(0, 10)))
               .map((plan) => (
                 <div key={plan.id} className="shrink-0 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 min-w-[160px] space-y-1">
                   <span className="block text-[10px] font-semibold text-primary uppercase tracking-wider">

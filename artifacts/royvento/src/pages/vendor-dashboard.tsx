@@ -2799,6 +2799,7 @@ interface DrinkPlan {
   lineItems?: DrinkPlanLineItem[] | null;
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
+  validUntil?: string | null;
 }
 
 const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: 0 });
@@ -2842,6 +2843,9 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [editDescription, setEditDescription] = useState("");
   const [editDrinksOffer, setEditDrinksOffer] = useState("");
   const [editFoodDiscount, setEditFoodDiscount] = useState("");
+  const [feValidUntil, setFeValidUntil] = useState("");
+  const [ticketValidUntil, setTicketValidUntil] = useState("");
+  const [editValidUntil, setEditValidUntil] = useState("");
 
   const errMsg = (err: unknown): string =>
     err instanceof Error ? err.message : typeof err === "string" ? err : "Please try again.";
@@ -2868,9 +2872,9 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   const resetForm = () => {
     setFreeEntryChecked(false); setFeDrinkTypes(["welcome"]); setFeGender("all");
-    setFeDrinksOffer(""); setFeFoodDiscount("");
+    setFeDrinksOffer(""); setFeFoodDiscount(""); setFeValidUntil("");
     setTicketChecked(false); setTicketItems([emptyItem()]);
-    setTicketDrinksOffer(""); setTicketFoodDiscount("");
+    setTicketDrinksOffer(""); setTicketFoodDiscount(""); setTicketValidUntil("");
     setDays([]); setTimeFrom(""); setTimeTo(""); setDescription("");
   };
 
@@ -2886,6 +2890,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditDescription(plan.description);
     setEditDrinksOffer(plan.drinksOfferLabel ?? "");
     setEditFoodDiscount(plan.foodDiscountLabel ?? "");
+    setEditValidUntil(plan.validUntil ?? "");
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -2912,6 +2917,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
             gender: feGender, price: 0,
             drinksOfferLabel: feDrinksOffer.trim(),
             foodDiscountLabel: feFoodDiscount.trim(),
+            validUntil: feValidUntil || null,
             ...common,
           });
         }
@@ -2922,6 +2928,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
           lineItems: ticketItems.filter((i) => i.name.trim()),
           drinksOfferLabel: ticketDrinksOffer.trim(),
           foodDiscountLabel: ticketFoodDiscount.trim(),
+          validUntil: ticketValidUntil || null,
           ...common,
         });
       }
@@ -2956,6 +2963,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         description: editDescription.trim(),
         drinksOfferLabel: editDrinksOffer.trim(),
         foodDiscountLabel: editFoodDiscount.trim(),
+        validUntil: editValidUntil || null,
       });
       setPlans((prev) => prev.map((p) => p.id === editingId ? updated : p));
       setEditingId(null);
@@ -3109,6 +3117,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Input value={feFoodDiscount} onChange={(e) => setFeFoodDiscount(e.target.value)}
                       placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
                   </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Offer valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after this date)</span></Label>
+                    <Input type="date" value={feValidUntil} onChange={(e) => setFeValidUntil(e.target.value)}
+                      className="bg-black/40 border-white/10 text-sm" />
+                  </div>
                 </div>
               </div>
             )}
@@ -3143,6 +3156,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Food discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input value={ticketFoodDiscount} onChange={(e) => setTicketFoodDiscount(e.target.value)}
                       placeholder="e.g. 15% off food" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Offer valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after this date)</span></Label>
+                    <Input type="date" value={ticketValidUntil} onChange={(e) => setTicketValidUntil(e.target.value)}
+                      className="bg-black/40 border-white/10 text-sm" />
                   </div>
                 </div>
               </div>
@@ -3265,6 +3283,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                         <Input value={editFoodDiscount} onChange={(e) => setEditFoodDiscount(e.target.value)}
                           placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10" maxLength={255} />
                       </div>
+                      <div>
+                        <Label className="flex items-center gap-1">Offer valid until <span className="text-muted-foreground text-xs font-normal">(optional — auto-hides after this date)</span></Label>
+                        <Input type="date" value={editValidUntil} onChange={(e) => setEditValidUntil(e.target.value)}
+                          className="bg-black/40 border-white/10" />
+                      </div>
                       <div className="sm:col-span-2">
                         <Label>Description</Label>
                         <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className="bg-black/40 border-white/10 resize-none" maxLength={500} />
@@ -3296,6 +3319,17 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                           <span className="rounded-full bg-white/5 text-muted-foreground border border-white/10 px-2 py-0.5 text-[10px] font-medium">
                             ₹{(plan.price / 100).toFixed(0)}
                           </span>
+                        )}
+                        {plan.validUntil && (
+                          plan.validUntil < new Date().toISOString().slice(0, 10) ? (
+                            <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-[10px] text-red-400 font-medium">
+                              Expired {plan.validUntil}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[10px] text-amber-400 font-medium">
+                              Until {plan.validUntil}
+                            </span>
+                          )
                         )}
                       </div>
                       {/* Show legacy productName when there are no line items */}

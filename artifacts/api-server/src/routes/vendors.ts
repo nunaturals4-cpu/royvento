@@ -460,6 +460,7 @@ const DrinkPlanBody = z.object({
   lineItems: z.array(DrinkPlanLineItem).nullable().optional(),
   drinksOfferLabel: z.string().max(255).optional().default(""),
   foodDiscountLabel: z.string().max(255).optional().default(""),
+  validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {

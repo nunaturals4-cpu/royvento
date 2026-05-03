@@ -556,6 +556,7 @@ export const drinkPlansTable = pgTable(
     lineItems: jsonb("line_items").$type<Array<{ name: string; qty: number; discountedPrice: number }>>(),
     drinksOfferLabel: varchar("drinks_offer_label", { length: 255 }).notNull().default(""),
     foodDiscountLabel: varchar("food_discount_label", { length: 255 }).notNull().default(""),
+    validUntil: date("valid_until"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

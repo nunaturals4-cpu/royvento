@@ -39,6 +39,7 @@ interface DrinkPlan {
   lineItems: { name: string; qty: number; discountedPrice: number }[] | null;
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
+  validUntil?: string | null;
 }
 
 interface VendorAnnouncement {
@@ -61,7 +62,8 @@ function OffersStrip({ vendorId }: { vendorId: number }) {
     enabled: !!vendorId,
   });
 
-  const planCards = (plans ?? []).filter((p) => p.drinksOfferLabel || p.foodDiscountLabel);
+  const today = new Date().toISOString().slice(0, 10);
+  const planCards = (plans ?? []).filter((p) => (p.drinksOfferLabel || p.foodDiscountLabel) && (!p.validUntil || p.validUntil >= today));
   const annoCards = announcements ?? [];
   if (planCards.length === 0 && annoCards.length === 0) return null;
 

@@ -203,6 +203,7 @@ interface DrinkPlan {
   lineItems: { name: string; qty: number; discountedPrice: number }[] | null;
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
+  validUntil?: string | null;
 }
 
 const PLAN_TYPES = ["welcome", "unlimited", "ticket", "custom"] as const;
@@ -219,6 +220,7 @@ interface DrinkPlanFormState {
   description: string;
   drinksOfferLabel: string;
   foodDiscountLabel: string;
+  validUntil: string;
 }
 
 const BLANK_PLAN: DrinkPlanFormState = {
@@ -232,6 +234,7 @@ const BLANK_PLAN: DrinkPlanFormState = {
   description: "",
   drinksOfferLabel: "",
   foodDiscountLabel: "",
+  validUntil: "",
 };
 
 function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: ReturnType<typeof useColors> }) {
@@ -264,6 +267,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
         description: form.description.trim(),
         drinksOfferLabel: form.drinksOfferLabel.trim(),
         foodDiscountLabel: form.foodDiscountLabel.trim(),
+        validUntil: form.validUntil.trim() || null,
       };
       if (editId) {
         await customFetch(`/api/vendors/me/drink-plans/${editId}`, {
@@ -292,6 +296,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
               description: form.description.trim(),
               drinksOfferLabel: form.drinksOfferLabel.trim(),
               foodDiscountLabel: form.foodDiscountLabel.trim(),
+              validUntil: form.validUntil.trim() || null,
             }),
           });
         }
@@ -385,6 +390,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   description: plan.description,
                   drinksOfferLabel: plan.drinksOfferLabel ?? "",
                   foodDiscountLabel: plan.foodDiscountLabel ?? "",
+                  validUntil: plan.validUntil ?? "",
                 });
                 setEditId(plan.id);
                 setShowForm(true);
@@ -607,6 +613,18 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   placeholder="e.g. 20% off starters"
                   placeholderTextColor={colors.mutedForeground}
                   maxLength={255}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                />
+              </View>
+              {/* Valid until date */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>OFFER VALID UNTIL (optional — YYYY-MM-DD)</Text>
+                <TextInput
+                  value={form.validUntil}
+                  onChangeText={(v) => setForm((p) => ({ ...p, validUntil: v }))}
+                  placeholder="e.g. 2025-12-31"
+                  placeholderTextColor={colors.mutedForeground}
+                  maxLength={10}
                   style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
                 />
               </View>
