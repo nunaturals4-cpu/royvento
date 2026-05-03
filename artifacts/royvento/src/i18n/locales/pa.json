@@ -68,15 +68,15 @@
     "check_inbox_sub_web": "ਜੇ {{email}} Royvento ਤੇ ਦਰਜ ਹੈ, ਤਾਂ ਤੁਹਾਨੂੰ ਜਲਦੀ ਰੀਸੈੱਟ ਲਿੰਕ ਮਿਲੇਗਾ।",
     "error": "ਗਲਤੀ",
     "email_address": "ਈਮੇਲ ਪਤਾ",
-    "verify_email_title": "Check your email",
-    "verify_email_sub": "We've sent a verification link to {{email}}. Click it to activate your account.",
-    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
-    "resend_verification": "Resend verification email",
-    "resend_sending": "Sending…",
-    "resend_success": "Verification email sent",
-    "resend_error": "Could not resend — please try again",
-    "email_not_verified": "Email not verified",
-    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
+    "verify_email_title": "ਆਪਣੀ ਈਮੇਲ ਜਾਂਚੋ",
+    "verify_email_sub": "{{email}} 'ਤੇ ਇੱਕ ਪੁਸ਼ਟੀਕਰਨ ਲਿੰਕ ਭੇਜਿਆ ਗਿਆ ਹੈ। ਆਪਣਾ ਖਾਤਾ ਸਰਗਰਮ ਕਰਨ ਲਈ ਇਸ 'ਤੇ ਕਲਿੱਕ ਕਰੋ।",
+    "verify_email_hint": "ਪ੍ਰਾਪਤ ਨਹੀਂ ਹੋਇਆ? ਆਪਣਾ ਸਪੈਮ ਫੋਲਡਰ ਜਾਂਚੋ ਜਾਂ ਹੇਠਾਂ ਦਿੱਤੇ ਬਟਨ ਦੀ ਵਰਤੋਂ ਕਰੋ।",
+    "resend_verification": "ਪੁਸ਼ਟੀਕਰਨ ਈਮੇਲ ਦੁਬਾਰਾ ਭੇਜੋ",
+    "resend_sending": "ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+    "resend_success": "ਪੁਸ਼ਟੀਕਰਨ ਈਮੇਲ ਭੇਜੀ ਗਈ",
+    "resend_error": "ਦੁਬਾਰਾ ਨਹੀਂ ਭੇਜ ਸਕਿਆ — ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+    "email_not_verified": "ਈਮੇਲ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋਈ",
+    "email_not_verified_desc": "ਲੌਗ ਇਨ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਈਮੇਲ ਪਤਾ ਪੁਸ਼ਟੀ ਕਰੋ। ਪੁਸ਼ਟੀਕਰਨ ਲਿੰਕ ਲਈ ਇਨਬਾਕਸ ਦੇਖੋ।"
   },
   "home": {
     "hero_eyebrow": "ਭਾਰਤ ਦਾ ਪ੍ਰਮੁੱਖ ਪੱਬ ਬੁਕਿੰਗ ਪਲੇਟਫਾਰਮ",
@@ -362,7 +362,16 @@
     "upload_failed_desc": "ਫੋਟੋ ਅਪਲੋਡ ਨਹੀਂ ਹੋਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "name_placeholder": "ਤੁਹਾਡਾ ਨਾਮ",
     "about_placeholder": "ਆਪਣੇ ਬਾਰੇ ਲਿਖੋ…",
-    "sign_out_title": "ਸਾਈਨ ਆਉਟ"
+    "sign_out_title": "ਸਾਈਨ ਆਉਟ",
+    "scanner_invitations_title": "ਸਕੈਨਰ ਸੱਦੇ",
+    "scanner_invitations_desc": "ਟਿਕਟ ਸਕੈਨਰ ਮੈਨੇਜਰ ਵਜੋਂ ਸੱਦਾ ਦਿੱਤਾ",
+    "invitation_accepted": "ਸੱਦਾ ਸਵੀਕਾਰ!",
+    "invitation_accepted_desc": "ਹੁਣ ਤੁਸੀਂ ਇਸ ਸਥਾਨ ਲਈ ਟਿਕਟਾਂ ਸਕੈਨ ਕਰ ਸਕਦੇ ਹੋ।",
+    "invitation_declined": "ਸੱਦਾ ਅਸਵੀਕਾਰ",
+    "invitation_accept": "ਸਵੀਕਾਰ ਕਰੋ",
+    "invitation_decline": "ਅਸਵੀਕਾਰ ਕਰੋ",
+    "welcome_perks_title": "ਸੁਆਗਤ ਲਾਭ",
+    "welcome_perks_sub": "ਤੁਸੀਂ ਨਵੇਂ ਮੈਂਬਰ ਹੋ! ਅਗਲੇ %{days} ਦਿਨ(ਾਂ) ਇਹਨਾਂ ਦਾ ਆਨੰਦ ਲਓ:"
   },
   "bookings": {
     "title": "ਮੇਰੀਆਂ ਬੁਕਿੰਗਾਂ",

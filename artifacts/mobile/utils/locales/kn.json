@@ -79,15 +79,15 @@
     "check_inbox": "ನಿಮ್ಮ ಇನ್‌ಬಾಕ್ಸ್ ಪರಿಶೀಲಿಸಿ",
     "check_inbox_sub": "%{email} ಗಾಗಿ ಖಾತೆ ಇದ್ದರೆ, ಶೀಘ್ರದಲ್ಲೇ ಮರುಹೊಂದಿಕೆ ಲಿಂಕ್ ಪಡೆಯುತ್ತೀರಿ.",
     "back_to_sign_in": "ಸೈನ್ ಇನ್‌ಗೆ ಹಿಂತಿರುಗಿ",
-    "verify_email_title": "Check your email",
-    "verify_email_sub": "We've sent a verification link to %{email}. Click it to activate your account.",
-    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
-    "resend_verification": "Resend verification email",
-    "resend_sending": "Sending…",
-    "resend_success": "Verification email sent",
-    "resend_error": "Could not resend — please try again",
-    "email_not_verified": "Email not verified",
-    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
+    "verify_email_title": "ನಿಮ್ಮ ಇಮೇಲ್ ತಪಾಸಿಸಿ",
+    "verify_email_sub": "%{email} ಗೆ ಪರಿಶೀಲನಾ ಲಿಂಕ್ ಕಳುಹಿಸಲಾಗಿದೆ. ನಿಮ್ಮ ಖಾತೆಯನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ಅದರ ಮೇಲೆ ಕ್ಲಿಕ್ ಮಾಡಿ.",
+    "verify_email_hint": "ಸ್ವೀಕರಿಸಲಿಲ್ಲವೇ? ನಿಮ್ಮ ಸ್ಪ್ಯಾಮ್ ಫೋಲ್ಡರ್ ಪರಿಶೀಲಿಸಿ ಅಥವಾ ಕೆಳಗಿನ ಬಟನ್ ಬಳಸಿ.",
+    "resend_verification": "ಪರಿಶೀಲನಾ ಇಮೇಲ್ ಮತ್ತೆ ಕಳುಹಿಸಿ",
+    "resend_sending": "ಕಳುಹಿಸುತ್ತಿದ್ದೇವೆ…",
+    "resend_success": "ಪರಿಶೀಲನಾ ಇಮೇಲ್ ಕಳುಹಿಸಲಾಗಿದೆ",
+    "resend_error": "ಮತ್ತೆ ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+    "email_not_verified": "ಇಮೇಲ್ ಪರಿಶೀಲಿಸಲಾಗಿಲ್ಲ",
+    "email_not_verified_desc": "ಲಾಗ್ ಇನ್ ಮಾಡುವ ಮೊದಲು ನಿಮ್ಮ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ಪರಿಶೀಲಿಸಿ. ಇನ್‌ಬಾಕ್ಸ್‌ನಲ್ಲಿ ಪರಿಶೀಲನಾ ಲಿಂಕ್ ಹುಡುಕಿ."
   },
   "home": {
     "hero_eyebrow": "ಭಾರತದ ಪ್ರಮುಖ ಪಬ್ ಬುಕಿಂಗ್ ಪ್ಲಾಟ್‌ಫಾರ್ಮ್",
@@ -409,7 +409,16 @@
     "percent_off": "%{percent}% ರಿಯಾಯಿತಿ",
     "vendor_only": "ಕೇವಲ %{vendor}",
     "referral_stats": "%{count} ರೆಫರಲ್ · %{points} ಪಾಯಿಂಟ್",
-    "pts_conversion": "100 pts = ₹10"
+    "pts_conversion": "100 pts = ₹10",
+    "scanner_invitations_title": "ಸ್ಕ್ಯಾನರ್ ಆಹ್ವಾನಗಳು",
+    "scanner_invitations_desc": "ಟಿಕೆಟ್ ಸ್ಕ್ಯಾನರ್ ಮ್ಯಾನೇಜರ್ ಆಗಿ ಆಹ್ವಾನಿಸಲಾಗಿದೆ",
+    "invitation_accepted": "ಆಹ್ವಾನ ಸ್ವೀಕರಿಸಲಾಗಿದೆ!",
+    "invitation_accepted_desc": "ಈಗ ನೀವು ಈ ಸ್ಥಳಕ್ಕೆ ಟಿಕೆಟ್‌ಗಳನ್ನು ಸ್ಕ್ಯಾನ್ ಮಾಡಬಹುದು.",
+    "invitation_declined": "ಆಹ್ವಾನ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
+    "invitation_accept": "ಸ್ವೀಕರಿಸಿ",
+    "invitation_decline": "ತಿರಸ್ಕರಿಸಿ",
+    "welcome_perks_title": "ಸ್ವಾಗತ ಪ್ರಯೋಜನಗಳು",
+    "welcome_perks_sub": "ನೀವು ಹೊಸ ಸದಸ್ಯ! ಮುಂದಿನ %{days} ದಿನ(ಗಳು) ಇವನ್ನು ಆನಂದಿಸಿ:"
   },
   "bookings": {
     "title": "ನನ್ನ ಬುಕಿಂಗ್‌ಗಳು",

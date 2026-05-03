@@ -68,15 +68,15 @@
     "check_inbox_sub_web": "{{email}} Royvento లో నమోదైతే, త్వరలో రీసెట్ లింక్ వస్తుంది.",
     "error": "లోపం",
     "email_address": "ఇమెయిల్ చిరునామా",
-    "verify_email_title": "Check your email",
-    "verify_email_sub": "We've sent a verification link to {{email}}. Click it to activate your account.",
-    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
-    "resend_verification": "Resend verification email",
-    "resend_sending": "Sending…",
-    "resend_success": "Verification email sent",
-    "resend_error": "Could not resend — please try again",
-    "email_not_verified": "Email not verified",
-    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
+    "verify_email_title": "మీ ఇమెయిల్ తనిఖీ చేయండి",
+    "verify_email_sub": "{{email}} కి ధృవీకరణ లింక్ పంపబడింది. మీ ఖాతాను సక్రియం చేయడానికి దాన్ని క్లిక్ చేయండి.",
+    "verify_email_hint": "అందలేదా? మీ స్పామ్ ఫోల్డర్ తనిఖీ చేయండి లేదా క్రింద బటన్ ఉపయోగించండి.",
+    "resend_verification": "ధృవీకరణ ఇమెయిల్ మళ్ళీ పంపండి",
+    "resend_sending": "పంపుతున్నాము…",
+    "resend_success": "ధృవీకరణ ఇమెయిల్ పంపబడింది",
+    "resend_error": "మళ్ళీ పంపడం సాధ్యపడలేదు — దయచేసి మళ్ళీ ప్రయత్నించండి",
+    "email_not_verified": "ఇమెయిల్ ధృవీకరించబడలేదు",
+    "email_not_verified_desc": "లాగిన్ చేయడానికి ముందు మీ ఇమెయిల్ చిరునామాను ధృవీకరించండి. ధృవీకరణ లింక్ కోసం ఇన్‌బాక్స్ చూడండి."
   },
   "home": {
     "hero_eyebrow": "భారతదేశంలో అగ్రశ్రేణి పబ్ బుకింగ్ ప్లాట్‌ఫారమ్",
@@ -362,7 +362,16 @@
     "upload_failed_desc": "ఫోటో అప్‌లోడ్ కాలేదు. మళ్ళీ ప్రయత్నించండి.",
     "name_placeholder": "మీ పేరు",
     "about_placeholder": "మీ గురించి రాయండి…",
-    "sign_out_title": "సైన్ అవుట్"
+    "sign_out_title": "సైన్ అవుట్",
+    "scanner_invitations_title": "స్కానర్ ఆహ్వానాలు",
+    "scanner_invitations_desc": "టికెట్ స్కానర్ మేనేజర్‌గా ఆహ్వానించబడ్డారు",
+    "invitation_accepted": "ఆహ్వానం అంగీకరించబడింది!",
+    "invitation_accepted_desc": "ఇప్పుడు మీరు ఈ వేదిక కోసం టికెట్లు స్కాన్ చేయవచ్చు.",
+    "invitation_declined": "ఆహ్వానం తిరస్కరించబడింది",
+    "invitation_accept": "అంగీకరించు",
+    "invitation_decline": "తిరస్కరించు",
+    "welcome_perks_title": "స్వాగత ప్రయోజనాలు",
+    "welcome_perks_sub": "మీరు కొత్త సభ్యుడు! తర్వాత %{days} రోజు(లు) వీటిని ఆనందించండి:"
   },
   "bookings": {
     "title": "నా బుకింగ్‌లు",

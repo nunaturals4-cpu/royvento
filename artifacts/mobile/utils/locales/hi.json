@@ -79,15 +79,15 @@
     "check_inbox": "अपना इनबॉक्स देखें",
     "check_inbox_sub": "अगर %{email} के लिए कोई खाता है, तो आपको जल्द ही रीसेट लिंक मिलेगा।",
     "back_to_sign_in": "साइन इन पर वापस जाएं",
-    "verify_email_title": "Check your email",
-    "verify_email_sub": "We've sent a verification link to %{email}. Click it to activate your account.",
-    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
-    "resend_verification": "Resend verification email",
-    "resend_sending": "Sending…",
-    "resend_success": "Verification email sent",
-    "resend_error": "Could not resend — please try again",
-    "email_not_verified": "Email not verified",
-    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
+    "verify_email_title": "अपना ईमेल देखें",
+    "verify_email_sub": "हमने %{email} पर एक सत्यापन लिंक भेजा है। अपना खाता सक्रिय करने के लिए उस पर क्लिक करें।",
+    "verify_email_hint": "प्राप्त नहीं हुआ? अपने स्पैम फ़ोल्डर की जाँच करें या नीचे दिए बटन का उपयोग करें।",
+    "resend_verification": "सत्यापन ईमेल पुनः भेजें",
+    "resend_sending": "भेज रहे हैं…",
+    "resend_success": "सत्यापन ईमेल भेजा गया",
+    "resend_error": "पुनः भेज नहीं सका — कृपया पुनः प्रयास करें",
+    "email_not_verified": "ईमेल सत्यापित नहीं",
+    "email_not_verified_desc": "लॉग इन करने से पहले कृपया अपना ईमेल पता सत्यापित करें। सत्यापन लिंक के लिए इनबॉक्स देखें।"
   },
   "home": {
     "hero_eyebrow": "भारत का प्रमुख पब बुकिंग प्लेटफॉर्म",
@@ -409,7 +409,16 @@
     "percent_off": "%{percent}% की छूट",
     "vendor_only": "केवल %{vendor}",
     "referral_stats": "%{count} रेफरल · %{points} पॉइंट",
-    "pts_conversion": "100 pts = ₹10"
+    "pts_conversion": "100 pts = ₹10",
+    "scanner_invitations_title": "स्कैनर आमंत्रण",
+    "scanner_invitations_desc": "आपको टिकट स्कैनर प्रबंधक के रूप में आमंत्रित किया",
+    "invitation_accepted": "आमंत्रण स्वीकार!",
+    "invitation_accepted_desc": "अब आप इस स्थान के लिए टिकट स्कैन कर सकते हैं।",
+    "invitation_declined": "आमंत्रण अस्वीकार",
+    "invitation_accept": "स्वीकार करें",
+    "invitation_decline": "अस्वीकार करें",
+    "welcome_perks_title": "स्वागत लाभ",
+    "welcome_perks_sub": "आप नए सदस्य हैं! अगले %{days} दिन(ों) के लिए इनका आनंद लें:"
   },
   "bookings": {
     "title": "मेरी बुकिंग",

@@ -409,7 +409,16 @@
     "percent_off": "%{percent}% off",
     "vendor_only": "%{vendor} only",
     "referral_stats": "%{count} referrals · %{points} points",
-    "pts_conversion": "100 pts = ₹10"
+    "pts_conversion": "100 pts = ₹10",
+    "scanner_invitations_title": "Scanner invitations",
+    "scanner_invitations_desc": "Invited you as a ticket scanner manager",
+    "invitation_accepted": "Invitation accepted!",
+    "invitation_accepted_desc": "You can now scan tickets for this venue.",
+    "invitation_declined": "Invitation declined",
+    "invitation_accept": "Accept",
+    "invitation_decline": "Decline",
+    "welcome_perks_title": "Welcome perks",
+    "welcome_perks_sub": "You're a new member! Enjoy these for the next %{days} day(s):"
   },
   "bookings": {
     "title": "My Bookings",

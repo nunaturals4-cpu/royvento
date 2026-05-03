@@ -195,11 +195,11 @@ export default function ProfileScreen() {
       await customFetch(`/api/manager/invitations/${id}/${action}`, { method: "POST" });
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
       Alert.alert(
-        action === "accept" ? "Invitation accepted!" : "Invitation declined",
-        action === "accept" ? "You can now scan tickets for this venue." : "",
+        action === "accept" ? t("profile.invitation_accepted") : t("profile.invitation_declined"),
+        action === "accept" ? t("profile.invitation_accepted_desc") : "",
       );
     } catch {
-      Alert.alert(t("common.error"), "Failed to respond to invitation.");
+      Alert.alert(t("common.error"), t("profile.invitation_error"));
     } finally {
       setActingInv(null);
     }
@@ -379,7 +379,7 @@ export default function ProfileScreen() {
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <Ionicons name="notifications-outline" size={18} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Scanner invitations</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("profile.scanner_invitations_title")}</Text>
           </View>
           {invitations.map((inv) => (
             <View
@@ -390,7 +390,7 @@ export default function ProfileScreen() {
                 {inv.vendorName}
               </Text>
               <Text style={{ fontSize: 12, color: colors.mutedForeground, marginBottom: 10 }}>
-                Invited you as a ticket scanner manager
+                {t("profile.scanner_invitations_desc")}
               </Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity
@@ -401,7 +401,7 @@ export default function ProfileScreen() {
                   {actingInv === inv.id ? (
                     <ActivityIndicator size="small" color={colors.primaryForeground} />
                   ) : (
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground }}>Accept</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground }}>{t("profile.invitation_accept")}</Text>
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -409,7 +409,7 @@ export default function ProfileScreen() {
                   onPress={() => respondToInvitation(inv.id, "reject")}
                   disabled={actingInv === inv.id}
                 >
-                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Decline</Text>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>{t("profile.invitation_decline")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -422,10 +422,10 @@ export default function ProfileScreen() {
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Welcome perks</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("profile.welcome_perks_title")}</Text>
           </View>
           <Text style={{ fontSize: 13, color: colors.mutedForeground, marginBottom: 10 }}>
-            {"You're a new member! Enjoy these for the next "}{discountInfo.daysLeft}{discountInfo.daysLeft === 1 ? " day:" : " days:"}
+            {t("profile.welcome_perks_sub", { days: discountInfo.daysLeft })}
           </Text>
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>

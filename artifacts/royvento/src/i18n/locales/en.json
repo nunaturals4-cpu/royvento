@@ -362,7 +362,16 @@
     "upload_failed_desc": "Could not upload photo.",
     "name_placeholder": "Your name",
     "about_placeholder": "Tell others a bit about yourself…",
-    "sign_out_title": "Sign Out"
+    "sign_out_title": "Sign Out",
+    "scanner_invitations_title": "Scanner invitations",
+    "scanner_invitations_desc": "Invited you as a ticket scanner manager",
+    "invitation_accepted": "Invitation accepted!",
+    "invitation_accepted_desc": "You can now scan tickets for this venue.",
+    "invitation_declined": "Invitation declined",
+    "invitation_accept": "Accept",
+    "invitation_decline": "Decline",
+    "welcome_perks_title": "Welcome perks",
+    "welcome_perks_sub": "You're a new member! Enjoy these for the next %{days} day(s):"
   },
   "bookings": {
     "title": "My Bookings",

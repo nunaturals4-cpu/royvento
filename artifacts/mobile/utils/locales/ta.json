@@ -79,15 +79,15 @@
     "check_inbox": "உங்கள் இன்பாக்ஸ் சரிபார்க்கவும்",
     "check_inbox_sub": "%{email} க்கான கணக்கு இருந்தால், விரைவில் மீட்டமை இணைப்பு கிடைக்கும்.",
     "back_to_sign_in": "உள்நுழைவுக்கு திரும்பு",
-    "verify_email_title": "Check your email",
-    "verify_email_sub": "We've sent a verification link to %{email}. Click it to activate your account.",
-    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
-    "resend_verification": "Resend verification email",
-    "resend_sending": "Sending…",
-    "resend_success": "Verification email sent",
-    "resend_error": "Could not resend — please try again",
-    "email_not_verified": "Email not verified",
-    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
+    "verify_email_title": "உங்கள் மின்னஞ்சலைச் சரிபாருங்கள்",
+    "verify_email_sub": "%{email} க்கு சரிபார்ப்பு இணைப்பு அனுப்பப்பட்டது. உங்கள் கணக்கை செயல்படுத்த அதை கிளிக் செய்யுங்கள்.",
+    "verify_email_hint": "பெறவில்லையா? உங்கள் ஸ்பேம் கோப்புறையை சரிபாருங்கள் அல்லது கீழே உள்ள பொத்தானைப் பயன்படுத்துங்கள்.",
+    "resend_verification": "சரிபார்ப்பு மின்னஞ்சலை மீண்டும் அனுப்பு",
+    "resend_sending": "அனுப்புகிறோம்…",
+    "resend_success": "சரிபார்ப்பு மின்னஞ்சல் அனுப்பப்பட்டது",
+    "resend_error": "மீண்டும் அனுப்ப முடியவில்லை — மீண்டும் முயற்சிக்கவும்",
+    "email_not_verified": "மின்னஞ்சல் சரிபார்க்கப்படவில்லை",
+    "email_not_verified_desc": "உள்நுழைவதற்கு முன் உங்கள் மின்னஞ்சல் முகவரியை சரிபாருங்கள். சரிபார்ப்பு இணைப்பிற்காக உங்கள் இன்பாக்ஸை சரிபாருங்கள்."
   },
   "home": {
     "hero_eyebrow": "இந்தியாவின் முன்னணி பப் முன்பதிவு தளம்",
@@ -409,7 +409,16 @@
     "percent_off": "%{percent}% தள்ளுபடி",
     "vendor_only": "%{vendor} மட்டும்",
     "referral_stats": "%{count} பரிந்துரைகள் · %{points} புள்ளிகள்",
-    "pts_conversion": "100 pts = ₹10"
+    "pts_conversion": "100 pts = ₹10",
+    "scanner_invitations_title": "ஸ்கேனர் அழைப்புகள்",
+    "scanner_invitations_desc": "டிக்கெட் ஸ்கேனர் மேலாளராக அழைக்கப்பட்டீர்கள்",
+    "invitation_accepted": "அழைப்பு ஏற்கப்பட்டது!",
+    "invitation_accepted_desc": "இப்போது இந்த இடத்திற்கான டிக்கெட்களை ஸ்கேன் செய்யலாம்.",
+    "invitation_declined": "அழைப்பு நிராகரிக்கப்பட்டது",
+    "invitation_accept": "ஏற்கவும்",
+    "invitation_decline": "மறுக்கவும்",
+    "welcome_perks_title": "வரவேற்பு சலுகைகள்",
+    "welcome_perks_sub": "நீங்கள் புதிய உறுப்பினர்! அடுத்த %{days} நாள்(கள்) இவற்றை அனுபவியுங்கள்:"
   },
   "bookings": {
     "title": "என் முன்பதிவுகள்",

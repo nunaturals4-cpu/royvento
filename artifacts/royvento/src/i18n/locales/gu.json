@@ -68,15 +68,15 @@
     "check_inbox_sub_web": "જો {{email}} Royvento પર નોંધાયેલું હೌय, તો ટூંક સમયમાં રીસેટ લિંક મળશે.",
     "error": "ભૂલ",
     "email_address": "ઇમેઇલ સરનામું",
-    "verify_email_title": "Check your email",
-    "verify_email_sub": "We've sent a verification link to {{email}}. Click it to activate your account.",
-    "verify_email_hint": "Didn't receive it? Check your spam folder or use the button below.",
-    "resend_verification": "Resend verification email",
-    "resend_sending": "Sending…",
-    "resend_success": "Verification email sent",
-    "resend_error": "Could not resend — please try again",
-    "email_not_verified": "Email not verified",
-    "email_not_verified_desc": "Please verify your email address before logging in. Check your inbox for the verification link."
+    "verify_email_title": "તમારો ઇ-મેઇલ તપાસો",
+    "verify_email_sub": "{{email}} પર ચકાસણી લિંક મોકલ્યો છે. તમારું ખાતું સક્રિય કરવા ક્લિક કરો.",
+    "verify_email_hint": "મળ્યું નહિ? તમારો સ્પૅમ ફોલ્ડર તપાસો અથવા નીચેનો બટન ઉપયોગ કરો.",
+    "resend_verification": "ચકાસણી ઇ-મેઇલ ફરી મોકલો",
+    "resend_sending": "મોકલી રહ્યા છીએ…",
+    "resend_success": "ચકાસણી ઇ-મેઇલ મોકલ્યો",
+    "resend_error": "ફરી મોકલ નહ્યું — ફરી પ્રયાસ કરો",
+    "email_not_verified": "ઇ-મેઇલ ચકાસાઈ નથી",
+    "email_not_verified_desc": "લૉગ ઇન કરતા પહેલા તમારું ઇ-મેઇલ સરનામું ચકાસો. ચકાસણી લિંક માટે ઇન્બૉક્સ તપાસો."
   },
   "home": {
     "hero_eyebrow": "ભારતનો અગ્રણી પબ બુકિંગ પ્લેટફોર્મ",
@@ -362,7 +362,16 @@
     "upload_failed_desc": "ફોટો અપલોડ ન થઈ. ફરી પ્રયાસ કરો.",
     "name_placeholder": "તમારું નામ",
     "about_placeholder": "તમારા વિશે લખો…",
-    "sign_out_title": "સાઇન આઉટ"
+    "sign_out_title": "સાઇન આઉટ",
+    "scanner_invitations_title": "સ્કેનર આમંત્રણ",
+    "scanner_invitations_desc": "ટિકિટ સ્કેનર મેનેજર તરીકે આમંત્રિત",
+    "invitation_accepted": "આમંત્રણ સ્વીકાર!",
+    "invitation_accepted_desc": "હવે તમે આ સ્થળ માટે ટિકિટ સ્કૅન કરી શકો છો.",
+    "invitation_declined": "આમંત્રણ નામંજૂર",
+    "invitation_accept": "સ્વીકારો",
+    "invitation_decline": "નામંજૂર",
+    "welcome_perks_title": "સ્વાગત લાભ",
+    "welcome_perks_sub": "તમે નવા સભ્ય છો! આગામી %{days} દિવસ(ો) આ માણો:"
   },
   "bookings": {
     "title": "મારી બુકિંગ",
