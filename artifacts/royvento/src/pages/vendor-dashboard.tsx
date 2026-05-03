@@ -2476,7 +2476,7 @@ function AnalyticsPanel() {
       {/* Daily revenue chart */}
       {data.dailyRevenue.some((d) => d.revenue > 0) && (
         <div className="rounded-3xl glass-card-strong p-6">
-          <p className="font-serif text-xl mb-5">Revenue — last 30 days</p>
+          <p className="font-serif text-xl mb-5">Revenue — {PRESET_LABELS[preset].toLowerCase()}</p>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={data.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
