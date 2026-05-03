@@ -51,9 +51,9 @@ export function PubOffers() {
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
           <Wine className="h-3.5 w-3.5" /> {t("nav.pub_offers")}
         </p>
-        <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">Deals & Announcements</h1>
+        <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pub_offers.title")}</h1>
         <p className="mt-4 text-white/60 leading-relaxed">
-          Exclusive drink deals and the latest news straight from our partner venues.
+          {t("pub_offers.subtitle")}
         </p>
       </header>
 
@@ -69,12 +69,12 @@ export function PubOffers() {
           <div className="flex items-center gap-3 mb-6">
             <div className="flex items-center gap-2">
               <GlassWater className="h-4 w-4 text-primary" />
-              <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">Drink Deals</span>
+              <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">{t("pub_offers.drink_deals")}</span>
             </div>
             <div className="flex-1 h-px bg-white/10" />
             <Link href="/pubs">
               <span className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
-                Browse pubs <ArrowRight className="h-3 w-3" />
+                {t("pub_offers.browse_pubs")} <ArrowRight className="h-3 w-3" />
               </span>
             </Link>
           </div>
@@ -128,7 +128,7 @@ export function PubOffers() {
                     </div>
                     <div className="rounded-lg bg-primary/10 border border-primary/25 px-3 py-1.5 flex items-center justify-between group-hover:bg-primary/20 transition-colors mt-auto">
                       <span className="text-xs font-semibold text-primary">
-                        {offer.pubEventId ? "Book now" : "View venue"}
+                        {offer.pubEventId ? t("pub_offers.book_now") : t("pub_offers.view_venue")}
                       </span>
                       <ArrowRight className="h-3 w-3 text-primary" />
                     </div>
@@ -146,7 +146,7 @@ export function PubOffers() {
           <div className="flex items-center gap-3 mb-6">
             <div className="flex items-center gap-2">
               <Megaphone className="h-4 w-4 text-primary" />
-              <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">What's On</span>
+              <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">{t("pub_offers.whats_on")}</span>
             </div>
             <div className="flex-1 h-px bg-white/10" />
           </div>

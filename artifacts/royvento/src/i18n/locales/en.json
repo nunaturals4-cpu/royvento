@@ -129,6 +129,15 @@
     "no_match_sub": "Try a different filter or search term.",
     "free_entry": "Free Entry only"
   },
+  "pub_offers": {
+    "title": "Deals & Announcements",
+    "subtitle": "Exclusive drink deals and the latest news straight from our partner venues.",
+    "drink_deals": "Drink Deals",
+    "browse_pubs": "Browse pubs",
+    "whats_on": "What's On",
+    "book_now": "Book now",
+    "view_venue": "View venue"
+  },
   "pubs": {
     "title": "Pubs & Clubs",
     "search_placeholder": "Search pubs, clubs…",
