@@ -444,11 +444,15 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                             <TouchableOpacity
                               key={val}
                               onPress={() => {
-                                setFreeEntryTypes((prev) =>
-                                  prev.includes(val) ? prev.filter((t) => t !== val) : [...prev, val]
-                                );
-                                if (!freeEntryTypes.includes(val) || freeEntryTypes.length > 1) {
-                                  setForm((p) => ({ ...p, type: freeEntryTypes.includes(val) ? (freeEntryTypes.find(t => t !== val) as DrinkPlanFormState["type"] ?? "welcome") : val as DrinkPlanFormState["type"] }));
+                                const next = freeEntryTypes.includes(val)
+                                  ? freeEntryTypes.filter((t) => t !== val)
+                                  : [...freeEntryTypes, val];
+                                setFreeEntryTypes(next);
+                                if (next.length === 0) {
+                                  // Collapse free-entry section when all unchecked
+                                  setForm((p) => ({ ...p, type: "ticket" }));
+                                } else {
+                                  setForm((p) => ({ ...p, type: next[0] as DrinkPlanFormState["type"] }));
                                 }
                               }}
                               style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
@@ -478,17 +482,19 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   </View>
                 </View>
               )}
-              {/* Product name */}
-              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRODUCT NAME</Text>
-                <TextInput
-                  value={form.productName}
-                  onChangeText={(v) => setForm((p) => ({ ...p, productName: v }))}
-                  placeholder="e.g. House Beer, Cocktails"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
-                />
-              </View>
+              {/* Product name — hidden for free-entry add mode since name is auto-set */}
+              {(!(!editId && (form.type === "welcome" || form.type === "unlimited"))) && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRODUCT NAME</Text>
+                  <TextInput
+                    value={form.productName}
+                    onChangeText={(v) => setForm((p) => ({ ...p, productName: v }))}
+                    placeholder="e.g. House Beer, Cocktails"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                  />
+                </View>
+              )}
               {/* Gender */}
               <View style={{ gap: 6 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FOR</Text>
