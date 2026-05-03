@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch, useUpdateMe } from "@workspace/api-client-react";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -184,6 +185,7 @@ export default function ProfileScreen() {
 
   const [actingInv, setActingInv] = useState<number | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   React.useEffect(() => {
     if (invitationsQuery.data) setInvitations(invitationsQuery.data);
@@ -460,28 +462,39 @@ export default function ProfileScreen() {
                 {t("profile.pts_conversion")}
               </Text>
             </View>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity
-                style={[styles.copyBtn, { backgroundColor: colors.muted }]}
-                onPress={() => Alert.alert(t("profile.code_copied"), `${t("profile.share_code")}: ${referral.code}`)}
-              >
-                <Ionicons name="copy-outline" size={16} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.copyBtn, { backgroundColor: colors.muted }]}
-                onPress={async () => {
-                  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com";
-                  const url = `https://${domain}/register?ref=${referral.code}`;
-                  const message = `Join me on Royvento and get rewards! Sign up with my link: ${url}`;
-                  try {
-                    await Share.share({ message, url });
-                  } catch {
-                    // user cancelled — no-op
-                  }
-                }}
-              >
-                <Ionicons name="share-social-outline" size={16} color={colors.primary} />
-              </TouchableOpacity>
+            <View style={{ alignItems: "flex-end", gap: 6 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.copyBtn, { backgroundColor: colors.muted }]}
+                  onPress={async () => {
+                    const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com";
+                    const url = `https://${domain}/register?ref=${referral.code}`;
+                    await Clipboard.setStringAsync(url);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                >
+                  <Ionicons name={linkCopied ? "checkmark-outline" : "copy-outline"} size={16} color={linkCopied ? "#22c55e" : colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.copyBtn, { backgroundColor: colors.muted }]}
+                  onPress={async () => {
+                    const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com";
+                    const url = `https://${domain}/register?ref=${referral.code}`;
+                    const message = `Join me on Royvento and get rewards! Sign up with my link: ${url}`;
+                    try {
+                      await Share.share({ message, url });
+                    } catch {
+                      // user cancelled — no-op
+                    }
+                  }}
+                >
+                  <Ionicons name="share-social-outline" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+              {linkCopied && (
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#22c55e" }}>Link copied!</Text>
+              )}
             </View>
           </View>
         </View>
