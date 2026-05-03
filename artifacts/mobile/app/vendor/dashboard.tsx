@@ -28,6 +28,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -2029,14 +2030,22 @@ export default function VendorDashboardScreen() {
               </Text>
             </TouchableOpacity>
             {profMenuUrl ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <TouchableOpacity onPress={() => Linking.openURL(profMenuUrl)} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <Ionicons name="open-outline" size={13} color={colors.primary} />
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary }}>View current menu</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setProfMenuUrl("")}>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Remove</Text>
-                </TouchableOpacity>
+              <View style={{ gap: 6 }}>
+                {profMenuUrl.toLowerCase().includes(".pdf") && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#22c55e" }}>PDF uploaded</Text>
+                  </View>
+                )}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <TouchableOpacity onPress={() => Linking.openURL(profMenuUrl)} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="open-outline" size={13} color={colors.primary} />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary }}>View current menu</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setProfMenuUrl("")}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : null}
           </View>
