@@ -602,7 +602,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
 
   const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
   const vendor = vRows[0];
-  if (!vendor) { res.json({ totalEarnings: 0, monthEarnings: 0, perEvent: [], dailyRevenue: [], totalWomen: 0, totalMen: 0, totalCouple: 0 }); return; }
+  if (!vendor) { res.json({ totalEarnings: 0, monthEarnings: 0, codRevenue: 0, onlineRevenue: 0, perEvent: [], dailyRevenue: [], totalWomen: 0, totalMen: 0, totalCouple: 0 }); return; }
 
   const fromStr = req.query["from"] as string | undefined;
   const toStr = req.query["to"] as string | undefined;

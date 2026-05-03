@@ -2388,11 +2388,11 @@ export default function VendorDashboardScreen() {
           ))}
         </View>
         {(a?.dailyRevenue ?? []).length > 0 && (() => {
-          const daily = (a?.dailyRevenue ?? []).slice(-14);
+          const daily = a?.dailyRevenue ?? [];
           const max = Math.max(...daily.map((d) => d.revenue), 1);
           return (
             <>
-              <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DAILY REVENUE (LAST 14 DAYS)</Text>
+              <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DAILY REVENUE</Text>
               <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 12 }]}>
                 <View style={{ flexDirection: "row", alignItems: "flex-end", height: 60, gap: 3 }}>
                   {daily.map((d) => (
