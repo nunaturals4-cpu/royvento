@@ -30,23 +30,13 @@ import {
 } from "recharts";
 import {
   apiGet, apiPost, apiDelete, apiPatch,
-  EVENT_CATEGORIES, INDIAN_STATES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
+  EVENT_CATEGORIES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
 } from "@/lib/api";
+import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const CATEGORIES = [...EVENT_CATEGORIES];
 const EVENT_KIND = ["event", "pub"] as const;
-
-const COUNTRIES = ["India", "United States", "United Kingdom", "United Arab Emirates", "Singapore", "Australia", "Canada", "Other"];
-
-const INDIAN_CITIES = [
-  "Agra", "Ahmedabad", "Amritsar", "Aurangabad", "Bengaluru", "Bhopal", "Bhubaneswar",
-  "Chandigarh", "Chennai", "Coimbatore", "Dehradun", "Delhi", "Guwahati", "Gwalior",
-  "Hyderabad", "Indore", "Jaipur", "Jamshedpur", "Jodhpur", "Kochi", "Kolkata",
-  "Lucknow", "Ludhiana", "Madurai", "Mangaluru", "Mumbai", "Mysuru", "Nagpur",
-  "Nashik", "Noida", "Patna", "Pune", "Raipur", "Rajkot", "Ranchi", "Surat",
-  "Thiruvananthapuram", "Udaipur", "Vadodara", "Varanasi", "Vijayawada", "Visakhapatnam",
-];
 
 
 interface BlockedDate {
@@ -356,32 +346,32 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             <Label>Business name</Label>
             <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
           </div>
+          <div className="md:col-span-2">
+            <Label>Country</Label>
+            <Select value={country || "India"} onValueChange={(v) => { setCountry(v); setStateF(""); setCity(""); }}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {COUNTRY_NAMES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>State / Region</Label>
+            <Select value={stateF || "any"} onValueChange={(v) => { setStateF(v === "any" ? "" : v); setCity(""); }}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select state —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">— select —</SelectItem>
+                {getStates(country).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <Label>City</Label>
-            <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)}>
+            <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)} disabled={!stateF}>
               <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="any">— select —</SelectItem>
-                {INDIAN_CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>State</Label>
-            <Select value={stateF || "any"} onValueChange={(v) => setStateF(v === "any" ? "" : v)}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">— select —</SelectItem>
-                {INDIAN_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-2">
-            <Label>Country</Label>
-            <Select value={country || "India"} onValueChange={setCountry}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {getCities(country, stateF).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -1005,32 +995,32 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
         <p className="font-serif text-lg">{vendor.businessName}</p>
       </div>
       <div className="grid md:grid-cols-2 gap-3">
+        <div className="md:col-span-2">
+          <Label>Country</Label>
+          <Select value={country || "India"} onValueChange={(v) => { setCountry(v); setStateF(""); setCity(""); }}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {COUNTRY_NAMES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>State / Region</Label>
+          <Select value={stateF || "any"} onValueChange={(v) => { setStateF(v === "any" ? "" : v); setCity(""); }}>
+            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select state —" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">— select —</SelectItem>
+              {getStates(country).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <div>
           <Label>City</Label>
-          <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)}>
+          <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)} disabled={!stateF}>
             <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="any">— select —</SelectItem>
-              {INDIAN_CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>State</Label>
-          <Select value={stateF || "any"} onValueChange={(v) => setStateF(v === "any" ? "" : v)}>
-            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="—" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="any">— select —</SelectItem>
-              {INDIAN_STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Country</Label>
-          <Select value={country || "India"} onValueChange={setCountry}>
-            <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {getCities(country, stateF).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
