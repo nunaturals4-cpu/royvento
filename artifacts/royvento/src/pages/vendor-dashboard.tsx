@@ -2784,11 +2784,6 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                 {rows.map((b: any) => {
                   const name = b.userName || b.personName || "—";
                   const email = b.userEmail || "";
-                  const tickets = [
-                    b.ticketWomen > 0 ? `${b.ticketWomen}W` : null,
-                    b.ticketMen > 0 ? `${b.ticketMen}M` : null,
-                    b.ticketCouple > 0 ? `${b.ticketCouple}C` : null,
-                  ].filter(Boolean).join(" ") || (b.guests ? `${b.guests}g` : "—");
                   const paid = b.finalPrice ?? b.totalPrice ?? 0;
                   const original = b.discountAmount > 0 ? b.totalPrice : null;
                   const payLabel = b.paymentMethod === "cod" ? "COD" : b.paymentMethod === "online" ? "Online" : (b.paymentMethod ?? "—");
@@ -2808,10 +2803,10 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                       </td>
                       <td className="py-2.5 pr-3 text-muted-foreground text-xs">{mode}</td>
                       <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
-                        {b.ticketWomen > 0 && <span className="text-pink-400 mr-1">{b.ticketWomen}W</span>}
-                        {b.ticketMen > 0 && <span className="text-blue-400 mr-1">{b.ticketMen}M</span>}
-                        {b.ticketCouple > 0 && <span className="text-purple-400">{b.ticketCouple}C</span>}
-                        {b.ticketWomen === 0 && b.ticketMen === 0 && b.ticketCouple === 0 && (
+                        {(b.ticketWomen ?? 0) > 0 && <span className="text-pink-400 mr-1">{b.ticketWomen}W</span>}
+                        {(b.ticketMen ?? 0) > 0 && <span className="text-blue-400 mr-1">{b.ticketMen}M</span>}
+                        {(b.ticketCouple ?? 0) > 0 && <span className="text-purple-400">{b.ticketCouple}C</span>}
+                        {!((b.ticketWomen ?? 0) > 0) && !((b.ticketMen ?? 0) > 0) && !((b.ticketCouple ?? 0) > 0) && (
                           <span className="text-muted-foreground">{b.guests ?? "—"}</span>
                         )}
                       </td>
