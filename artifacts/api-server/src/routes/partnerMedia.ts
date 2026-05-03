@@ -117,6 +117,7 @@ const UpdatePartnerProfileBody = z.object({
   danceFloor: z.enum(["dedicated", "general", "none"]).nullable().optional(),
   danceFloorPhotos: z.array(z.string().min(1)).optional(),
   menuUrl: z.string().optional(),
+  menuUrls: z.array(z.string()).optional(),
 });
 
 router.patch(
@@ -156,6 +157,8 @@ router.patch(
       updates["danceFloorPhotos"] = parsed.data.danceFloorPhotos;
     if (parsed.data.menuUrl !== undefined)
       updates["menuUrl"] = parsed.data.menuUrl;
+    if (parsed.data.menuUrls !== undefined)
+      updates["menuUrls"] = parsed.data.menuUrls;
     const [v] = await db
       .update(vendorsTable)
       .set(updates)

@@ -183,6 +183,11 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [menuUrl, setMenuUrl] = useState(vendor.menuUrl ?? "");
+  const [menuUrls, setMenuUrls] = useState<string[]>(
+    Array.isArray(vendor.menuUrls) && vendor.menuUrls.length > 0
+      ? vendor.menuUrls
+      : vendor.menuUrl ? [vendor.menuUrl] : []
+  );
   const [uploadingMenu, setUploadingMenu] = useState(false);
   const [descError, setDescError] = useState("");
   const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>(() => {
@@ -328,7 +333,8 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               state: stateF, city, country, address, openDays, dayHours: dayHoursPayload,
               danceFloor: danceFloor || null,
               danceFloorPhotos,
-              menuUrl,
+              menuUrl: menuUrls[0] ?? "",
+              menuUrls,
             });
             toast({ title: "Profile updated" });
             onSaved();
@@ -709,44 +715,57 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
         <div>
           <Label className="flex items-center gap-1.5 mb-2">
             <Upload className="h-3.5 w-3.5 text-primary" />
-            Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, optional)</span>
+            Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
           </Label>
-          <div className="flex items-center gap-3">
-            <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition-colors ${uploadingMenu ? "opacity-50 pointer-events-none border-white/10 bg-black/20" : "border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"}`}>
-              {uploadingMenu ? (
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-              )}
-              <span className="text-muted-foreground">{uploadingMenu ? "Uploading…" : "Choose file"}</span>
-              <input
-                type="file"
-                accept="application/pdf,image/*"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploadingMenu(true);
-                  try {
-                    const url = await uploadMenuFile(file);
-                    setMenuUrl(url);
-                    toast({ title: "Menu uploaded" });
-                  } catch {
-                    toast({ title: "Menu upload failed", variant: "destructive" });
-                  } finally {
-                    setUploadingMenu(false);
-                    e.target.value = "";
-                  }
-                }}
-              />
-            </label>
-            {menuUrl && (
-              <div className="flex items-center gap-2">
-                <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
-                  View menu
-                </a>
-                <button type="button" onClick={() => setMenuUrl("")} className="text-xs text-muted-foreground hover:text-destructive">Remove</button>
+          <div className="space-y-2">
+            {menuUrls.length > 0 && (
+              <div className="space-y-1.5">
+                {menuUrls.map((url, idx) => (
+                  <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">
+                      Menu {idx + 1}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setMenuUrls((prev) => prev.filter((_, i) => i !== idx))}
+                      className="text-xs text-muted-foreground hover:text-destructive shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
+            )}
+            {menuUrls.length < 5 && (
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition-colors ${uploadingMenu ? "opacity-50 pointer-events-none border-white/10 bg-black/20" : "border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"}`}>
+                {uploadingMenu ? (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+                <span className="text-muted-foreground text-xs">{uploadingMenu ? "Uploading…" : `Add menu file (${menuUrls.length}/5)`}</span>
+                <input
+                  type="file"
+                  accept="application/pdf,image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingMenu(true);
+                    try {
+                      const url = await uploadMenuFile(file);
+                      setMenuUrls((prev) => [...prev, url]);
+                      setMenuUrl(url);
+                      toast({ title: "Menu uploaded" });
+                    } catch {
+                      toast({ title: "Menu upload failed", variant: "destructive" });
+                    } finally {
+                      setUploadingMenu(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              </label>
             )}
           </div>
         </div>
@@ -1895,6 +1914,79 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
               </div>
             </div>
           )}
+
+          {/* Check-in attendance section */}
+          {(() => {
+            const confirmedForAttendance = filtered.filter((b: any) => b.status === "confirmed" || b.status === "completed");
+            const checkedInList = confirmedForAttendance.filter((b: any) => b.checkedIn);
+            const attendanceRate = confirmedForAttendance.length > 0
+              ? Math.round((checkedInList.length / confirmedForAttendance.length) * 100) : 0;
+            return (
+              <div className="rounded-2xl glass-card p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif text-xl flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-400" /> Check-in Attendance
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Checked in</p>
+                    <p className="text-2xl font-bold tabular-nums text-green-300">{checkedInList.length}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Expected</p>
+                    <p className="text-2xl font-bold tabular-nums">{confirmedForAttendance.length}</p>
+                  </div>
+                  <div className={`rounded-xl px-4 py-3 border ${attendanceRate >= 70 ? "bg-green-500/10 border-green-500/20" : attendanceRate >= 40 ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"}`}>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Attendance rate</p>
+                    <p className={`text-2xl font-bold tabular-nums ${attendanceRate >= 70 ? "text-green-300" : attendanceRate >= 40 ? "text-amber-300" : "text-red-300"}`}>{attendanceRate}%</p>
+                  </div>
+                </div>
+                {checkedInList.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[520px]">
+                      <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                        <tr>
+                          <th className="text-left py-2 pr-3">Guest</th>
+                          <th className="text-left py-2 pr-3">Event</th>
+                          <th className="text-left py-2 pr-3">Booking date</th>
+                          <th className="text-left py-2">Checked in at</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...checkedInList]
+                          .sort((a: any, b: any) => (b.checkedInAt ?? "").localeCompare(a.checkedInAt ?? ""))
+                          .slice(0, 20)
+                          .map((b: any) => (
+                            <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                              <td className="py-2.5 pr-3">
+                                <span className="font-medium">{b.personName || "—"}</span>
+                                {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
+                              </td>
+                              <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
+                              <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
+                              <td className="py-2.5">
+                                <span className="text-xs font-medium text-green-400">
+                                  {b.checkedInAt
+                                    ? new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+                                    : "Yes"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                    {checkedInList.length > 20 && (
+                      <p className="text-xs text-muted-foreground mt-2">Showing 20 of {checkedInList.length} checked-in guests.</p>
+                    )}
+                  </div>
+                )}
+                {checkedInList.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No guests have checked in during this period.</p>
+                )}
+              </div>
+            );
+          })()}
 
           {perEvent.length > 0 && (
             <div className="rounded-2xl glass-card p-6">

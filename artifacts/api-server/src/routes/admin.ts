@@ -616,6 +616,7 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
   const bookingTypeParam = req.query["bookingType"] as string | undefined;
   const searchParam = (req.query["search"] as string | undefined)?.trim().toLowerCase();
   const sortBy = req.query["sortBy"] as string | undefined;
+  const checkedInParam = req.query["checkedIn"] as string | undefined;
 
   const conditions: ReturnType<typeof sql>[] = [];
   if (vendorIdParam && Number.isFinite(vendorIdParam))
@@ -634,6 +635,8 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
     conditions.push(sql`${bookingsTable.pubMode} = 'ticket'`);
   else if (bookingTypeParam === "group")
     conditions.push(sql`${bookingsTable.pubMode} IN ('event', '')`);
+  if (checkedInParam === "true") conditions.push(sql`${bookingsTable.checkedIn} = true`);
+  else if (checkedInParam === "false") conditions.push(sql`${bookingsTable.checkedIn} = false`);
 
   if (searchParam) {
     const likeStr = `%${searchParam}%`;

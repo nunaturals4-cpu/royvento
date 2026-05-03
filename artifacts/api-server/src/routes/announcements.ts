@@ -98,6 +98,7 @@ router.get("/announcements/recent", async (_req, res) => {
       a.announce_date AS "announceDate",
       a.announce_time AS "announceTime",
       a.image_url     AS "imageUrl",
+      COALESCE(NULLIF(a.image_url, ''), v.cover_image_url) AS "coverImageUrl",
       a.vendor_id     AS "vendorId",
       a.created_at    AS "createdAt",
       v.business_name AS "vendorName",

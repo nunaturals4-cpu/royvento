@@ -34,6 +34,7 @@ interface VendorRow {
   danceFloor?: string | null;
   danceFloorPhotos?: string[] | null;
   menuUrl?: string | null;
+  menuUrls?: string[] | null;
   status: string;
   isPremium?: boolean;
   approvedAt?: Date | null;
@@ -98,6 +99,7 @@ async function serializeVendor(v: VendorRow) {
     danceFloor: v.danceFloor ?? null,
     danceFloorPhotos: v.danceFloorPhotos ?? null,
     menuUrl: v.menuUrl ?? "",
+    menuUrls: v.menuUrls ?? [],
   };
 }
 
@@ -161,6 +163,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       danceFloor: v.danceFloor ?? null,
       danceFloorPhotos: v.danceFloorPhotos ?? null,
       menuUrl: v.menuUrl ?? "",
+      menuUrls: v.menuUrls ?? [],
     };
   });
 }

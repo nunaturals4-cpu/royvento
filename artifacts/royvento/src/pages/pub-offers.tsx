@@ -271,7 +271,6 @@ export function PubOffers() {
             <Wine className="h-3.5 w-3.5" /> {t("nav.pub_offers")}
           </p>
           <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pub_offers.title")}</h1>
-          <p className="mt-4 text-white/60 leading-relaxed">{t("pub_offers.subtitle")}</p>
         </header>
       </div>
 

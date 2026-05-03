@@ -77,6 +77,7 @@ export const vendorsTable = pgTable(
     danceFloor: varchar("dance_floor", { length: 20 }),
     danceFloorPhotos: text("dance_floor_photos").array(),
     menuUrl: text("menu_url").notNull().default(""),
+    menuUrls: text("menu_urls").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

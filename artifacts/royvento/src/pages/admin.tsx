@@ -78,6 +78,7 @@ export function AdminPanel() {
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="blogs">Blogs</TabsTrigger>
           <TabsTrigger value="booking-report">Booking Report</TabsTrigger>
+          <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
         </TabsList>
@@ -93,6 +94,7 @@ export function AdminPanel() {
         <TabsContent value="users"><UsersPanel /></TabsContent>
         <TabsContent value="blogs"><BlogsAdmin /></TabsContent>
         <TabsContent value="booking-report"><BookingReport /></TabsContent>
+        <TabsContent value="attendance"><AttendanceReport /></TabsContent>
         <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
         <TabsContent value="import-pub"><ImportPubFromGoogle /></TabsContent>
       </Tabs>
@@ -2100,6 +2102,169 @@ function BookingReport() {
               >
                 Next →
               </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Attendance Report ─────────────────────────────────────────────────────────
+
+function AttendanceReport() {
+  const [vendorId, setVendorId] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
+  const { data: partnerSummary } = useGetAdminBookingsPartnerSummary();
+  const vendors = partnerSummary ?? [];
+
+  const params = {
+    ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+    checkedIn: "true",
+    page,
+  } as Parameters<typeof useGetAdminBookingsReport>[0];
+
+  const { data: report, isLoading } = useGetAdminBookingsReport(params);
+
+  const allParams = {
+    ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+    page: 1,
+  } as Parameters<typeof useGetAdminBookingsReport>[0];
+
+  const { data: allReport } = useGetAdminBookingsReport(allParams);
+
+  const checkedIn = report?.total ?? 0;
+  const totalBookings = allReport?.total ?? 0;
+  const bookings = report?.bookings ?? [];
+  const totalPages = report?.totalPages ?? 0;
+  const attendanceRate = totalBookings > 0 ? Math.round((checkedIn / totalBookings) * 100) : 0;
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const resetFilters = () => { setVendorId("all"); setStartDate(""); setEndDate(""); setPage(1); };
+
+  return (
+    <div className="space-y-6">
+      {/* Filter bar */}
+      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Partner</Label>
+          <Select value={vendorId} onValueChange={(v) => { setVendorId(v); setPage(1); }}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="All partners" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All partners</SelectItem>
+              {vendors.map((v) => (
+                <SelectItem key={v.vendorId} value={String(v.vendorId)}>{v.vendorName ?? v.vendorId}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">From (booking date)</Label>
+          <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="w-40" max={endDate || today} />
+        </div>
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">To</Label>
+          <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="w-40" min={startDate} max={today} />
+        </div>
+        {(vendorId !== "all" || startDate || endDate) && (
+          <Button variant="outline" size="sm" onClick={resetFilters}>Clear</Button>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-2xl glass-card p-5 lift-3d">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Checked in</span>
+            <div className="w-9 h-9 rounded-lg bg-green-600/15 text-green-400 flex items-center justify-center">
+              <UserCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="stat-number text-3xl text-green-300">{checkedIn.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl glass-card p-5 lift-3d">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Total bookings</span>
+            <div className="w-9 h-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+              <CalendarCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="stat-number text-3xl">{totalBookings.toLocaleString()}</p>
+        </div>
+        <div className={`rounded-2xl glass-card p-5 lift-3d ${attendanceRate >= 70 ? "border-green-500/20" : attendanceRate >= 40 ? "border-amber-500/20" : ""}`}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Attendance rate</span>
+            <div className="w-9 h-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+          </div>
+          <p className={`stat-number text-3xl ${attendanceRate >= 70 ? "text-green-300" : attendanceRate >= 40 ? "text-amber-300" : "text-red-300"}`}>
+            {attendanceRate}%
+          </p>
+        </div>
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      ) : bookings.length === 0 ? (
+        <div className="rounded-3xl glass-card p-10 text-center">
+          <CheckCircle className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-30" />
+          <p className="font-serif text-2xl mb-2">No check-ins found</p>
+          <p className="text-muted-foreground text-sm">Try adjusting the filters to see check-in data.</p>
+        </div>
+      ) : (
+        <div className="rounded-2xl glass-card p-6">
+          <h3 className="font-serif text-xl mb-4">Checked-in guests</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-3">ID</th>
+                  <th className="text-left py-2 pr-3">Guest</th>
+                  <th className="text-left py-2 pr-3">Partner</th>
+                  <th className="text-left py-2 pr-3">Event</th>
+                  <th className="text-left py-2 pr-3">Booking date</th>
+                  <th className="text-left py-2">Checked in at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bookings.map((b: any) => (
+                  <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
+                    <td className="py-2.5 pr-3">
+                      <span className="font-medium">{b.personName || b.userName || "—"}</span>
+                      {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
+                    </td>
+                    <td className="py-2.5 pr-3 text-muted-foreground">{b.vendorName || "—"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground max-w-[140px] truncate">{b.eventTitle || "—"}</td>
+                    <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
+                    <td className="py-2.5">
+                      <span className="text-xs font-medium text-green-400">
+                        {b.checkedInAt
+                          ? new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+                          : "Yes"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</Button>
+              <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</Button>
             </div>
           )}
         </div>
