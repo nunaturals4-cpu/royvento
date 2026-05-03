@@ -456,7 +456,7 @@ export function VendorDetail() {
                       </span>
                     )}
                   </div>
-                  {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (
+                  {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (!plan.validUntil || plan.validUntil >= new Date().toISOString().slice(0, 10)) && (
                     <div className="flex flex-wrap gap-2 mt-1">
                       {plan.drinksOfferLabel && (
                         <span className="inline-flex items-center gap-1 rounded-lg bg-primary/8 border border-primary/15 px-2.5 py-1 text-xs font-medium text-primary">

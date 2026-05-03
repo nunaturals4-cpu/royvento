@@ -120,6 +120,8 @@ function DrinkPlansSection({ vendorId }: { vendorId: number }) {
 
   if (!plans || plans.length === 0) return null;
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const TYPE_LABEL: Record<string, string> = {
     welcome: "Welcome Drink",
     unlimited: "Unlimited",
@@ -207,7 +209,7 @@ function DrinkPlansSection({ vendorId }: { vendorId: number }) {
             </View>
           )}
 
-          {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (
+          {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (!plan.validUntil || plan.validUntil >= today) && (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
               {plan.drinksOfferLabel ? (
                 <View style={{ backgroundColor: colors.primary + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
