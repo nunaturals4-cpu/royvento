@@ -164,6 +164,7 @@ export function Navbar() {
             <nav className="hidden lg:flex items-center gap-6 text-sm font-medium">
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.home")}</Link>
               <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pubs")}</Link>
+              <Link href="/pub-offers" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pub_offers")}</Link>
               <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.blog")}</Link>
               <Link href="/subscription" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                 <Crown className="h-3.5 w-3.5 text-primary" /> {t("nav.premium")}
@@ -384,6 +385,7 @@ export function Navbar() {
                 {[
                   { href: "/", label: t("nav.home") },
                   { href: "/pubs", label: t("nav.pubs") },
+                  { href: "/pub-offers", label: t("nav.pub_offers") },
                   { href: "/blogs", label: t("nav.blog") },
                 ].map(({ href, label }) => (
                   <Link

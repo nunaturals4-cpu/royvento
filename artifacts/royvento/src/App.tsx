@@ -14,6 +14,7 @@ import { AiChatWidget } from "@/components/AiChatWidget";
 import { Home } from "@/pages/home";
 import { Explore } from "@/pages/explore";
 import { Pubs } from "@/pages/pubs";
+import { PubOffers } from "@/pages/pub-offers";
 import { Vendors } from "@/pages/vendors";
 import { EventDetail } from "@/pages/event-detail";
 import { VendorDetail } from "@/pages/vendor-detail";
@@ -80,6 +81,7 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/explore" component={Explore} />
           <Route path="/pubs" component={Pubs} />
+          <Route path="/pub-offers" component={PubOffers} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/partners" component={Vendors} />
           <Route path="/events/:id" component={EventDetail} />
