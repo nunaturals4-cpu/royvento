@@ -1697,6 +1697,53 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
           )}
 
           {/* Per-event table */}
+          {filtered.length > 0 && (
+            <div className="rounded-2xl glass-card p-6">
+              <h3 className="font-serif text-xl mb-4">All bookings</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                    <tr>
+                      <th className="text-left py-2 pr-3">ID</th>
+                      <th className="text-left py-2 pr-3">Date</th>
+                      <th className="text-left py-2 pr-3">Guest</th>
+                      <th className="text-left py-2 pr-3">Event</th>
+                      <th className="text-left py-2 pr-3">Mode</th>
+                      <th className="text-left py-2 pr-3">Arrival</th>
+                      <th className="text-right py-2 pr-3">Guests</th>
+                      <th className="text-left py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...filtered].sort((a: any, b: any) => b.id - a.id).map((b: any) => (
+                      <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
+                        <td className="py-2.5 pr-3 tabular-nums">{b.bookingDate}</td>
+                        <td className="py-2.5 pr-3">
+                          <span className="font-medium">{b.personName || "—"}</span>
+                          {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
+                        </td>
+                        <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
+                        <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
+                        <td className="py-2.5 pr-3">
+                          {b.pubMode === "event" && b.arrivalTime
+                            ? <span className="text-primary font-medium">{b.arrivalTime}</span>
+                            : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums">{b.guests ?? "—"}</td>
+                        <td className="py-2.5">
+                          <span className={`text-xs font-medium capitalize ${b.status === "confirmed" || b.status === "completed" ? "text-green-400" : b.status === "cancelled" ? "text-red-400" : "text-amber-400"}`}>
+                            {b.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {perEvent.length > 0 && (
             <div className="rounded-2xl glass-card p-6">
               <h3 className="font-serif text-xl mb-4">Revenue by event</h3>
