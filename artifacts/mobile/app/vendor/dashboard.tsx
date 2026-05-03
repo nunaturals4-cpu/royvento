@@ -210,6 +210,8 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<DrinkPlanFormState>({ ...BLANK_PLAN });
+  // Multi-select drink types for free-entry plans (add mode only)
+  const [freeEntryTypes, setFreeEntryTypes] = useState<string[]>(["welcome"]);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
@@ -221,9 +223,10 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
 
   async function savePlan() {
     setSaving(true);
+    const isFreeEntryAdd = !editId && (freeEntryTypes.includes("welcome") || freeEntryTypes.includes("unlimited"))
+      && (form.type === "welcome" || form.type === "unlimited");
     try {
-      const body = {
-        type: form.type,
+      const commonBody = {
         productName: form.productName.trim(),
         gender: form.gender,
         price: parseInt(form.price) || 0,
@@ -238,19 +241,44 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
         await customFetch(`/api/vendors/me/drink-plans/${editId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ type: form.type, ...commonBody }),
         });
+      } else if (isFreeEntryAdd) {
+        if (freeEntryTypes.length === 0) {
+          Alert.alert("Select at least one free-entry drink type");
+          setSaving(false);
+          return;
+        }
+        for (const drinkType of freeEntryTypes) {
+          await customFetch("/api/vendors/me/drink-plans", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: drinkType,
+              productName: drinkType === "welcome" ? "Free Drink" : "Unlimited Drinks",
+              gender: form.gender,
+              price: 0,
+              days: form.days,
+              timeFrom: form.timeFrom.trim(),
+              timeTo: form.timeTo.trim(),
+              description: form.description.trim(),
+              drinksOfferLabel: form.drinksOfferLabel.trim(),
+              foodDiscountLabel: form.foodDiscountLabel.trim(),
+            }),
+          });
+        }
       } else {
         await customFetch("/api/vendors/me/drink-plans", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ type: form.type, ...commonBody }),
         });
       }
       qc.invalidateQueries({ queryKey: ["myDrinkPlans"] });
       setShowForm(false);
       setEditId(null);
       setForm({ ...BLANK_PLAN });
+      setFreeEntryTypes(["welcome"]);
     } catch {
       Alert.alert("Error", "Failed to save drink plan.");
     } finally {
@@ -377,19 +405,79 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
             <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 80 }}>
               {/* Type */}
-              <View style={{ gap: 6 }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PLAN TYPE</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {PLAN_TYPES.map((t) => (
-                    <TouchableOpacity key={t} onPress={() => setForm((p) => ({ ...p, type: t }))}
-                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.type === t ? colors.primary : colors.muted, borderColor: form.type === t ? colors.primary : colors.border }}>
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.type === t ? colors.primaryForeground : colors.mutedForeground }}>
-                        {TYPE_LABEL[t]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+              {editId ? (
+                /* Edit mode: single-select among all 4 types */
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PLAN TYPE</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {PLAN_TYPES.map((t) => (
+                      <TouchableOpacity key={t} onPress={() => setForm((p) => ({ ...p, type: t }))}
+                        style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.type === t ? colors.primary : colors.muted, borderColor: form.type === t ? colors.primary : colors.border }}>
+                        <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.type === t ? colors.primaryForeground : colors.mutedForeground }}>
+                          {TYPE_LABEL[t]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              ) : (
+                /* Add mode: Free Entry multi-select + Ticket/Custom single-select */
+                <View style={{ gap: 10 }}>
+                  {/* Free Entry section */}
+                  <View style={{ borderRadius: 14, borderWidth: 1, borderColor: (form.type === "welcome" || form.type === "unlimited") ? colors.primary + "60" : colors.border, backgroundColor: (form.type === "welcome" || form.type === "unlimited") ? colors.primary + "08" : colors.card, padding: 12, gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => setForm((p) => ({ ...p, type: p.type === "welcome" || p.type === "unlimited" ? "ticket" : "welcome" }))}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                    >
+                      <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1.5, borderColor: (form.type === "welcome" || form.type === "unlimited") ? colors.primary : colors.border, backgroundColor: (form.type === "welcome" || form.type === "unlimited") ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>
+                        {(form.type === "welcome" || form.type === "unlimited") && (
+                          <Ionicons name="checkmark" size={12} color={colors.primaryForeground} />
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Free Entry</Text>
+                    </TouchableOpacity>
+                    {(form.type === "welcome" || form.type === "unlimited") && (
+                      <View style={{ paddingLeft: 28, gap: 8 }}>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DRINK TYPE (select one or both)</Text>
+                        <View style={{ flexDirection: "row", gap: 12 }}>
+                          {([["welcome", "Free Drink"], ["unlimited", "Unlimited Drinks"]] as const).map(([val, label]) => (
+                            <TouchableOpacity
+                              key={val}
+                              onPress={() => {
+                                setFreeEntryTypes((prev) =>
+                                  prev.includes(val) ? prev.filter((t) => t !== val) : [...prev, val]
+                                );
+                                if (!freeEntryTypes.includes(val) || freeEntryTypes.length > 1) {
+                                  setForm((p) => ({ ...p, type: freeEntryTypes.includes(val) ? (freeEntryTypes.find(t => t !== val) as DrinkPlanFormState["type"] ?? "welcome") : val as DrinkPlanFormState["type"] }));
+                                }
+                              }}
+                              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                            >
+                              <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: freeEntryTypes.includes(val) ? colors.primary : colors.border, backgroundColor: freeEntryTypes.includes(val) ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>
+                                {freeEntryTypes.includes(val) && (
+                                  <Ionicons name="checkmark" size={11} color={colors.primaryForeground} />
+                                )}
+                              </View>
+                              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{label}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                  {/* Ticket / Custom */}
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {(["ticket", "custom"] as const).map((t) => (
+                      <TouchableOpacity key={t} onPress={() => setForm((p) => ({ ...p, type: t }))}
+                        style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.type === t ? colors.primary : colors.muted, borderColor: form.type === t ? colors.primary : colors.border }}>
+                        <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.type === t ? colors.primaryForeground : colors.mutedForeground }}>
+                          {TYPE_LABEL[t]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
               {/* Product name */}
               <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRODUCT NAME</Text>
