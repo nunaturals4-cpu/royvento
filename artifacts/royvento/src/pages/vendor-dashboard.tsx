@@ -1597,6 +1597,8 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
   const countCancelled = filtered.filter((b) => b.status === "cancelled").length;
   const countPending = filtered.filter((b) => b.status === "pending").length;
 
+  const cancellationRate = totalBookings > 0 ? Math.round((countCancelled / totalBookings) * 100) : 0;
+
   const monthMap: Record<string, number> = {};
   confirmed.forEach((b) => {
     const month = (b.bookingDate as string).slice(0, 7);
@@ -1605,6 +1607,20 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
   const monthlyData = Object.entries(monthMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, revenue]) => ({ month, revenue }));
+
+  const trendMap: Record<string, { confirmed: number; cancelled: number }> = {};
+  filtered.forEach((b) => {
+    const month = (b.bookingDate as string).slice(0, 7);
+    if (!trendMap[month]) trendMap[month] = { confirmed: 0, cancelled: 0 };
+    if (b.status === "confirmed" || b.status === "completed") {
+      trendMap[month].confirmed += 1;
+    } else if (b.status === "cancelled") {
+      trendMap[month].cancelled += 1;
+    }
+  });
+  const monthlyTrendData = Object.entries(trendMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, counts]) => ({ month, confirmed: counts.confirmed, cancelled: counts.cancelled }));
 
   const eventMap: Record<number, { eventId: number; eventTitle: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }> = {};
   confirmed.forEach((b) => {
@@ -1656,7 +1672,15 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
       {/* Status breakdown row */}
       {totalBookings > 0 && (
         <div className="rounded-2xl glass-card p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Status breakdown</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Status breakdown</p>
+            <div className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${cancellationRate >= 20 ? "bg-red-500/15 border-red-500/30" : cancellationRate >= 10 ? "bg-amber-500/15 border-amber-500/30" : "bg-green-500/15 border-green-500/30"}`}>
+              <span className="text-xs text-muted-foreground">Cancellation rate</span>
+              <span className={`text-sm font-bold tabular-nums ${cancellationRate >= 20 ? "text-red-300" : cancellationRate >= 10 ? "text-amber-300" : "text-green-300"}`}>
+                {cancellationRate}%
+              </span>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-2 rounded-xl bg-green-500/10 border border-green-500/20 px-3 py-2">
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
@@ -1698,6 +1722,52 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
         </div>
       ) : (
         <>
+          {/* Cancellation rate trend chart */}
+          {monthlyTrendData.length >= 2 && (
+            <div className="rounded-2xl glass-card p-6">
+              <h3 className="font-serif text-xl mb-1">Cancellation rate trend</h3>
+              <p className="text-xs text-muted-foreground mb-5">Confirmed vs cancelled bookings per month — spot drop-off patterns early</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={monthlyTrendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickFormatter={(m: string) => {
+                      const [y, mo] = m.split("-");
+                      return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+                    }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    allowDecimals={false}
+                    width={28}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", fontSize: "12px" }}
+                    labelFormatter={(label: string) => {
+                      const [y, mo] = label.split("-");
+                      return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+                    }}
+                    formatter={(v: number, name: string) => [v, name === "confirmed" ? "Confirmed / completed" : "Cancelled"]}
+                  />
+                  <Bar dataKey="confirmed" name="confirmed" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="cancelled" name="cancelled" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="flex items-center gap-6 mt-3 justify-center">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-green-500 shrink-0" />
+                  <span className="text-xs text-muted-foreground">Confirmed / completed</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm bg-red-500 shrink-0" />
+                  <span className="text-xs text-muted-foreground">Cancelled</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Monthly revenue bar chart */}
           {monthlyData.length > 0 && (
             <div className="rounded-2xl glass-card p-6">
