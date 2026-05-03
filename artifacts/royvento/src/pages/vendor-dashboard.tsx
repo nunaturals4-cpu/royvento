@@ -339,6 +339,15 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     );
   };
 
+  const profileStateOpts = (() => {
+    const list = getStates(country);
+    return stateF && !list.includes(stateF) ? [stateF, ...list] : list;
+  })();
+  const profileCityOpts = (() => {
+    const list = getCities(country, stateF);
+    return city && !list.includes(city) ? [city, ...list] : list;
+  })();
+
   return (
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
@@ -361,7 +370,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select state —" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="any">— select —</SelectItem>
-                {getStates(country).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {profileStateOpts.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -371,7 +380,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
               <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="any">— select —</SelectItem>
-                {getCities(country, stateF).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {profileCityOpts.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -988,6 +997,15 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
     );
   };
 
+  const eventStateOpts = (() => {
+    const list = getStates(country);
+    return stateF && !list.includes(stateF) ? [stateF, ...list] : list;
+  })();
+  const eventCityOpts = (() => {
+    const list = getCities(country, stateF);
+    return city && !list.includes(city) ? [city, ...list] : list;
+  })();
+
   return (
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
       <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-2">
@@ -1010,7 +1028,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
             <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select state —" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="any">— select —</SelectItem>
-              {getStates(country).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {eventStateOpts.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -1020,7 +1038,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
             <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="any">— select —</SelectItem>
-              {getCities(country, stateF).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {eventCityOpts.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
