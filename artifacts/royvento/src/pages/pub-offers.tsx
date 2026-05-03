@@ -18,7 +18,7 @@ interface Announcement {
   vendorName: string;
   eventId: number;
   vendorId: number;
-  coverImageUrl?: string;
+  imageUrl?: string;
 }
 
 const SLIDE_GRADIENTS = [
@@ -127,9 +127,9 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
       <div className="relative w-full overflow-hidden mt-4" style={{ minHeight: 400 }}>
         {/* Blurred background */}
         <div className="absolute inset-0">
-          {a.coverImageUrl ? (
+          {a.imageUrl ? (
             <img
-              src={a.coverImageUrl}
+              src={a.imageUrl}
               alt=""
               aria-hidden
               className="h-full w-full object-cover scale-110 blur-xl opacity-25"
@@ -195,8 +195,8 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
 
           {/* Right: image card */}
           <div className="hidden md:flex flex-shrink-0 w-52 lg:w-64 xl:w-72 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
-            {a.coverImageUrl ? (
-              <img src={a.coverImageUrl} alt={a.title} className="h-full w-full object-cover" />
+            {a.imageUrl ? (
+              <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover" />
             ) : (
               <div
                 className={`h-full w-full flex flex-col items-center justify-center bg-gradient-to-br ${grad} gap-3`}
