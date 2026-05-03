@@ -18,6 +18,7 @@ import {
   type FreeEntryRulesDaysItem,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
+import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -106,6 +107,32 @@ async function requestPresignedUrl(name: string, size: number, contentType: stri
       body: JSON.stringify({ name, size, contentType }),
     },
   );
+}
+
+async function requestMenuPresignedUrl(name: string, size: number, contentType: string) {
+  return customFetch<{ uploadURL: string; objectPath: string }>(
+    "/api/partner/menu-upload",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, size, contentType }),
+    },
+  );
+}
+
+async function uploadMenuFileToStorage(localUri: string, filename: string, contentType: string): Promise<string> {
+  const fileRes = await fetch(localUri);
+  const blob = await fileRes.blob();
+  const size = blob.size || 1;
+  const { uploadURL, objectPath } = await requestMenuPresignedUrl(filename, size, contentType);
+  await fetch(uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: blob,
+  });
+  const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
 }
 
 async function uploadImageToStorage(localUri: string): Promise<string> {
@@ -724,7 +751,7 @@ export default function VendorDashboardScreen() {
 
   // ─── Data hooks ─────────────────────────────────────────────────────────────
   const vendorQuery = useGetMyVendor();
-  const vendor = (vendorQuery.data as any)?.vendor ?? null;
+  const vendor = vendorQuery.data?.vendor ?? null;
 
   const bookingsQ = useListVendorBookings({
     query: { queryKey: getListVendorBookingsQueryKey(), enabled: isVendorOrAdmin },
@@ -980,7 +1007,7 @@ export default function VendorDashboardScreen() {
       setProfAddressQuery(vendor.address ?? "");
       setProfDanceFloor(vendor.danceFloor ?? "");
       setProfDanceFloorPhotos(Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []);
-      setProfMenuUrl((vendor as any).menuUrl ?? "");
+      setProfMenuUrl(vendor.menuUrl ?? "");
     }
   }, [vendor?.id]);
 
@@ -1938,20 +1965,51 @@ export default function VendorDashboardScreen() {
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Menu file (PDF or image, optional)</Text>
             <TouchableOpacity
               disabled={uploadingMenu}
-              onPress={async () => {
-                try {
-                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
-                  if (result.canceled) return;
-                  const asset = result.assets[0];
-                  if (!asset) return;
-                  setUploadingMenu(true);
-                  const url = await uploadImageToStorage(asset.uri);
-                  setProfMenuUrl(url);
-                } catch {
-                  Alert.alert("Upload failed", "Could not upload menu file.");
-                } finally {
-                  setUploadingMenu(false);
-                }
+              onPress={() => {
+                Alert.alert("Upload Menu", "Choose file type", [
+                  {
+                    text: "Image (JPG / PNG)",
+                    onPress: async () => {
+                      try {
+                        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
+                        if (result.canceled) return;
+                        const asset = result.assets[0];
+                        if (!asset) return;
+                        setUploadingMenu(true);
+                        const filename = asset.uri.split("/").pop() ?? "menu.jpg";
+                        const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+                        const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+                        const contentType = mimeMap[ext] ?? "image/jpeg";
+                        const url = await uploadMenuFileToStorage(asset.uri, filename, contentType);
+                        setProfMenuUrl(url);
+                      } catch {
+                        Alert.alert("Upload failed", "Could not upload menu image.");
+                      } finally {
+                        setUploadingMenu(false);
+                      }
+                    },
+                  },
+                  {
+                    text: "PDF",
+                    onPress: async () => {
+                      try {
+                        const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+                        if (result.canceled) return;
+                        const asset = result.assets[0];
+                        if (!asset) return;
+                        setUploadingMenu(true);
+                        const filename = asset.name ?? "menu.pdf";
+                        const url = await uploadMenuFileToStorage(asset.uri, filename, "application/pdf");
+                        setProfMenuUrl(url);
+                      } catch {
+                        Alert.alert("Upload failed", "Could not upload menu PDF.");
+                      } finally {
+                        setUploadingMenu(false);
+                      }
+                    },
+                  },
+                  { text: "Cancel", style: "cancel" },
+                ]);
               }}
               style={{
                 flexDirection: "row", alignItems: "center", gap: 8,

@@ -3,6 +3,7 @@ import { db, partnerMediaTable, vendorsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router: IRouter = Router();
 
@@ -161,6 +162,62 @@ router.patch(
       .where(eq(vendorsTable.id, vendor.id))
       .returning();
     return res.json(v);
+  },
+);
+
+const objectStorageService = new ObjectStorageService();
+
+const ALLOWED_MENU_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+const MAX_MENU_BYTES = 20 * 1024 * 1024; // 20 MB
+
+const MenuUploadRequestBody = z.object({
+  name: z.string().min(1),
+  size: z.number().int().positive(),
+  contentType: z.string().min(1),
+});
+
+/**
+ * POST /partner/menu-upload
+ *
+ * Request a presigned upload URL for a vendor menu file (PDF or image).
+ * Only accessible by authenticated vendors.
+ */
+router.post(
+  "/partner/menu-upload",
+  requireAuth(["vendor"]),
+  async (req, res) => {
+    const user = await loadUserFromRequest(req);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    const vendor = await getMyVendor(user.id);
+    if (!vendor)
+      return res.status(400).json({ error: "Partner profile required" });
+
+    const parsed = MenuUploadRequestBody.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({ error: "Missing or invalid required fields" });
+
+    const { name, size, contentType } = parsed.data;
+
+    if (!ALLOWED_MENU_TYPES.includes(contentType))
+      return res
+        .status(400)
+        .json({ error: "Only PDF, JPEG, PNG, and WebP files are allowed" });
+    if (size > MAX_MENU_BYTES)
+      return res.status(400).json({ error: "Menu file must be under 20 MB" });
+
+    try {
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath, metadata: { name, size, contentType } });
+    } catch (error) {
+      req.log.error({ err: error }, "Error generating menu upload URL");
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
   },
 );
 

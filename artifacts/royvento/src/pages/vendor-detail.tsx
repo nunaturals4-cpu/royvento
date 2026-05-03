@@ -103,9 +103,9 @@ export function VendorDetail() {
               <Star className="h-4 w-4 fill-primary text-primary" />
               {vendor.rating > 0 ? `${vendor.rating.toFixed(1)} (${vendor.reviewCount} reviews)` : "Newly listed"}
             </span>
-            {(vendor as any).menuUrl && (
+            {vendor.menuUrl && (
               <a
-                href={(vendor as any).menuUrl}
+                href={vendor.menuUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1 text-sm text-primary hover:bg-primary/20 transition-colors"

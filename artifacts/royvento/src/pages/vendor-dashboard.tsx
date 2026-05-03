@@ -206,13 +206,16 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const { toast } = useToast();
 
   const uploadMenuFile = async (file: File): Promise<string> => {
-    const res = await fetch("/api/storage/uploads/request-url", {
+    const res = await fetch("/api/partner/menu-upload", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
     });
-    if (!res.ok) throw new Error("Could not get upload URL");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error ?? "Could not get upload URL");
+    }
     const { uploadURL, objectPath } = await res.json();
     const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
     if (!put.ok) throw new Error("Upload failed");
