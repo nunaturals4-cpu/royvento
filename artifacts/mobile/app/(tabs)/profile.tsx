@@ -6,7 +6,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -186,6 +186,11 @@ export default function ProfileScreen() {
   const [actingInv, setActingInv] = useState<number | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [linkCopied, setLinkCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => { if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current); };
+  }, []);
 
   React.useEffect(() => {
     if (invitationsQuery.data) setInvitations(invitationsQuery.data);
@@ -470,8 +475,9 @@ export default function ProfileScreen() {
                     const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com";
                     const url = `https://${domain}/register?ref=${referral.code}`;
                     await Clipboard.setStringAsync(url);
+                    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
                     setLinkCopied(true);
-                    setTimeout(() => setLinkCopied(false), 2000);
+                    copyTimeoutRef.current = setTimeout(() => setLinkCopied(false), 2000);
                   }}
                 >
                   <Ionicons name={linkCopied ? "checkmark-outline" : "copy-outline"} size={16} color={linkCopied ? "#22c55e" : colors.primary} />
@@ -493,7 +499,7 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
               {linkCopied && (
-                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#22c55e" }}>Link copied!</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#22c55e" }}>{t("profile.link_copied")}</Text>
               )}
             </View>
           </View>
