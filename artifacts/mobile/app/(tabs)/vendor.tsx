@@ -42,8 +42,8 @@ export default function VendorTabScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const isVendorOrAdmin = user?.role === "vendor" || user?.role === "admin";
-  const bookings = useListVendorBookings({ query: { queryKey: getListVendorBookingsQueryKey(), enabled: isVendorOrAdmin } });
-  const events = useListMyVendorEvents({ query: { queryKey: getListMyVendorEventsQueryKey(), enabled: isVendorOrAdmin } });
+  const bookings = useListVendorBookings(undefined, { query: { queryKey: getListVendorBookingsQueryKey(), enabled: isVendorOrAdmin } });
+  const events = useListMyVendorEvents(undefined, { query: { queryKey: getListMyVendorEventsQueryKey(), enabled: isVendorOrAdmin } });
 
   const updateStatus = useUpdateBookingStatus({
     mutation: {
@@ -67,8 +67,8 @@ export default function VendorTabScreen() {
     );
   }
 
-  const pending = (bookings.data ?? []).filter((b) => b.status === "pending");
-  const all = bookings.data ?? [];
+  const pending = (bookings.data?.data ?? []).filter((b) => b.status === "pending");
+  const all = bookings.data?.data ?? [];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -84,7 +84,7 @@ export default function VendorTabScreen() {
           {[
             { icon: "hourglass-outline" as const, value: pending.length, label: "Pending" },
             { icon: "checkmark-circle-outline" as const, value: all.filter((b) => b.status === "confirmed").length, label: "Confirmed" },
-            { icon: "calendar-outline" as const, value: (events.data ?? []).length, label: "Events" },
+            { icon: "calendar-outline" as const, value: (events.data?.data ?? []).length, label: "Events" },
           ].map((s) => (
             <View key={s.label} style={[styles.stat, { backgroundColor: colors.muted }]}>
               <Ionicons name={s.icon} size={18} color={colors.primary} />
@@ -182,7 +182,7 @@ export default function VendorTabScreen() {
       ) : (
         events.isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
-        ) : (events.data ?? []).length === 0 ? (
+        ) : (events.data?.data ?? []).length === 0 ? (
           <EmptyState
             icon="calendar-outline"
             title="No events yet"
@@ -190,12 +190,12 @@ export default function VendorTabScreen() {
           />
         ) : (
           <FlatList
-            data={events.data}
+            data={events.data?.data}
             keyExtractor={(e) => String(e.id)}
             contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 34 : 80 }]}
             onRefresh={events.refetch}
             refreshing={events.isLoading}
-            scrollEnabled={!!(events.data?.length)}
+            scrollEnabled={!!(events.data?.data?.length)}
             renderItem={({ item: e }) => (
               <Pressable
                 onPress={() => router.push(`/event/${e.id}`)}
