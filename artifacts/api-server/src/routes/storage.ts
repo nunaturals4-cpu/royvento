@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
-import { randomUUID, createHmac, timingSafeEqual } from "crypto";
+import { randomUUID } from "crypto";
 import express from "express";
 import {
   RequestUploadUrlBody,
@@ -9,57 +9,14 @@ import {
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { compressImage } from "../lib/imageCompressor";
 import { requireAuth } from "../lib/auth";
+import { verifyUploadToken, buildServerUploadUrl } from "../lib/uploadToken";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
-const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const UPLOAD_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
-function uploadSecret(): string {
-  return process.env.SESSION_SECRET ?? "royvento-dev-secret";
-}
-
-function signUploadToken(uuid: string, maxBytes: number, contentType: string, expiresAt: number): string {
-  const payload = `${uuid}:${maxBytes}:${contentType}:${expiresAt}`;
-  return createHmac("sha256", uploadSecret()).update(payload).digest("hex");
-}
-
-function verifyUploadToken(
-  uuid: string,
-  maxBytes: number,
-  contentType: string,
-  expiresAt: number,
-  token: string,
-): boolean {
-  try {
-    const expected = Buffer.from(signUploadToken(uuid, maxBytes, contentType, expiresAt), "hex");
-    const provided = Buffer.from(token, "hex");
-    if (expected.length !== provided.length) return false;
-    return timingSafeEqual(expected, provided);
-  } catch {
-    return false;
-  }
-}
-
-function buildServerUploadUrl(req: Request, uuid: string, size: number, contentType: string): string {
-  const host =
-    req.get("x-forwarded-host") ??
-    req.get("host") ??
-    process.env.REPLIT_DEV_DOMAIN ??
-    "localhost";
-  const proto = (req.get("x-forwarded-proto") ?? "https").split(",")[0].trim();
-  const expiresAt = Date.now() + UPLOAD_TTL_MS;
-  const token = signUploadToken(uuid, size, contentType, expiresAt);
-  const qs = new URLSearchParams({
-    token,
-    expires: String(expiresAt),
-    size: String(size),
-    type: contentType,
-  });
-  return `${proto}://${host}/api/storage/uploads/file/${uuid}?${qs}`;
-}
 
 /**
  * POST /storage/uploads/request-url
@@ -78,7 +35,7 @@ router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, 
   const { name, size, contentType } = parsed.data;
 
   if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
-    res.status(400).json({ error: "Only JPEG, PNG and WebP images are allowed" });
+    res.status(400).json({ error: "Only JPEG, PNG, WebP, and GIF images are allowed" });
     return;
   }
   if (size > MAX_UPLOAD_BYTES) {

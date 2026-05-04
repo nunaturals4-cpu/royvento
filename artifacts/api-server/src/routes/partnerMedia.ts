@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
+import { randomUUID } from "crypto";
 import { db, partnerMediaTable, vendorsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { buildServerUploadUrl } from "../lib/uploadToken";
 
 const router: IRouter = Router();
 
@@ -210,13 +212,15 @@ router.delete(
 
 const objectStorageService = new ObjectStorageService();
 
-const ALLOWED_MENU_TYPES = [
-  "application/pdf",
+const ALLOWED_MENU_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
-];
-const MAX_MENU_BYTES = 20 * 1024 * 1024; // 20 MB
+  "image/gif",
+]);
+const ALLOWED_MENU_TYPES = ["application/pdf", ...ALLOWED_MENU_IMAGE_TYPES];
+const MAX_MENU_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB — same cap as managed proxy
+const MAX_MENU_BYTES = 20 * 1024 * 1024; // 20 MB — PDF cap
 
 const MenuUploadRequestBody = z.object({
   name: z.string().min(1),
@@ -227,8 +231,12 @@ const MenuUploadRequestBody = z.object({
 /**
  * POST /partner/menu-upload
  *
- * Request a presigned upload URL for a vendor menu file (PDF or image).
+ * Request an upload URL for a vendor menu file (PDF or image).
  * Only accessible by authenticated vendors.
+ *
+ * - Image files (JPEG, PNG, WebP) are routed through the server-side proxy
+ *   so they get compressed to WebP before storage.
+ * - PDF files receive a direct GCS presigned URL and are stored as-is.
  */
 router.post(
   "/partner/menu-upload",
@@ -249,14 +257,28 @@ router.post(
     if (!ALLOWED_MENU_TYPES.includes(contentType))
       return res
         .status(400)
-        .json({ error: "Only PDF, JPEG, PNG, and WebP files are allowed" });
-    if (size > MAX_MENU_BYTES)
-      return res.status(400).json({ error: "Menu file must be under 20 MB" });
+        .json({ error: "Only PDF, JPEG, PNG, WebP, and GIF files are allowed" });
+
+    const isImage = ALLOWED_MENU_IMAGE_TYPES.has(contentType);
+    const maxBytes = isImage ? MAX_MENU_IMAGE_BYTES : MAX_MENU_BYTES;
+    if (size > maxBytes)
+      return res.status(400).json({
+        error: isImage ? "Image must be under 8 MB" : "Menu file must be under 20 MB",
+      });
 
     try {
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      res.json({ uploadURL, objectPath, metadata: { name, size, contentType } });
+      if (isImage) {
+        // Route image uploads through the server-side proxy so compression is applied.
+        const uuid = randomUUID();
+        const objectPath = `/objects/uploads/${uuid}`;
+        const uploadURL = buildServerUploadUrl(req, uuid, size, contentType);
+        res.json({ uploadURL, objectPath, metadata: { name, size, contentType } });
+      } else {
+        // PDF files bypass compression and go directly to GCS.
+        const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+        const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+        res.json({ uploadURL, objectPath, metadata: { name, size, contentType } });
+      }
     } catch (error) {
       req.log.error({ err: error }, "Error generating menu upload URL");
       res.status(500).json({ error: "Failed to generate upload URL" });
