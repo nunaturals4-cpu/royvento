@@ -694,7 +694,7 @@ export async function sendUpcomingDeletionWarningEmail(
     ${greeting(firstName)}
     ${para(
       `As part of our regular maintenance, Royvento automatically removes event listings 30 days after their event date. ` +
-        `${count} of your past ${eventWord} will be deleted in approximately ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"}.`,
+        `${count} of ${esc(params.vendorName)}'s past ${eventWord} will be deleted in approximately ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"}.`,
     )}
     ${eventListTable}
     ${para(
@@ -717,7 +717,7 @@ export async function sendUpcomingDeletionWarningEmail(
     `Hi ${firstName},`,
     ``,
     `As part of our regular maintenance, Royvento automatically removes event listings 30 days after their event date.`,
-    `${count} of your past ${eventWord} will be deleted in approximately ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"}:`,
+    `${count} of ${params.vendorName}'s past ${eventWord} will be deleted in approximately ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"}:`,
     ``,
     ...eventLines,
     ``,
