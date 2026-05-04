@@ -34,6 +34,7 @@ import {
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line,
@@ -3199,20 +3200,13 @@ function AnnouncementSliderRow({
           )}
         </p>
       </div>
-      <button
-        onClick={() => onToggle(item)}
+      <Switch
+        checked={item.isFeaturedSlider}
+        onCheckedChange={() => onToggle(item)}
         disabled={toggling === item.id}
         aria-label={item.isFeaturedSlider ? "Remove from slider" : "Add to slider"}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none disabled:opacity-50 ${
-          item.isFeaturedSlider ? "bg-amber-400" : "bg-white/20"
-        }`}
-      >
-        <span
-          className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${
-            item.isFeaturedSlider ? "translate-x-5" : "translate-x-0.5"
-          }`}
-        />
-      </button>
+        className={item.isFeaturedSlider ? "data-[state=checked]:bg-amber-400" : ""}
+      />
     </div>
   );
 }
