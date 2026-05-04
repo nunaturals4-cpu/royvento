@@ -3276,7 +3276,7 @@ function CommissionsAdmin() {
         ticketRate: ticket,
         tableBookingRate: table,
       });
-      toast({ title: "Commission rates saved" });
+      toast({ title: "Commission fees saved" });
       await Promise.all([loadRates(), loadReport()]);
     } catch (e: any) {
       toast({ title: "Failed to save", description: e?.message, variant: "destructive" });

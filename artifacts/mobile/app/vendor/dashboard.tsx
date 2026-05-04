@@ -2518,7 +2518,7 @@ export default function VendorDashboardScreen() {
         <View style={[styles.field, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8, borderWidth: 1.5 }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
             <Ionicons name="information-circle-outline" size={16} color="#f59e0b" />
-            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>Commission rates applied to your bookings</Text>
+            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>Platform fees applied to your bookings</Text>
           </View>
           {[
             { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0", unit: "/person" },
@@ -2528,7 +2528,9 @@ export default function VendorDashboardScreen() {
             <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{r.label}</Text>
               <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>₹{Number(r.value).toFixed(0)}{r.unit}</Text>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>
+                  {`₹${Number(r.value) % 1 === 0 ? Number(r.value).toFixed(0) : Number(r.value).toFixed(2)}${r.unit}`}
+                </Text>
               </View>
             </View>
           ))}
