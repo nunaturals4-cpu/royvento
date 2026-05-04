@@ -51,8 +51,9 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
           qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
           Alert.alert("Review submitted", "Thanks for your feedback!");
         },
-        onError: (e: any) => {
-          Alert.alert("Could not submit", e?.message ?? "Please try again.");
+        onError: (e: unknown) => {
+          const msg = e instanceof Error ? e.message : "Please try again.";
+          Alert.alert("Could not submit", msg);
         },
       },
     );
