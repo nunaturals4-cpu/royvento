@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { Crown } from "lucide-react";
 
 export function Footer() {
   return (
@@ -28,6 +29,12 @@ export function Footer() {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li><Link href="/register" className="hover:text-foreground">Become a Partner</Link></li>
             <li><Link href="/login" className="hover:text-foreground">Partner Login</Link></li>
+            <li>
+              <Link href="/subscription" className="hover:text-foreground flex items-center gap-1.5">
+                <Crown className="h-3.5 w-3.5 text-primary" />
+                Premium
+              </Link>
+            </li>
           </ul>
         </div>
         <div className="space-y-2">

@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
-import { Crown, Search, Bell, Menu, X as XIcon, MapPin, ChevronDown } from "lucide-react";
+import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Palette, Check } from "lucide-react";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
@@ -24,54 +24,49 @@ interface Notification {
   createdAt: string;
 }
 
-const THEMES: { id: Theme; label: string; color: string; bg: string }[] = [
-  { id: "noir", label: "Midnight Noir", color: "#dc2626", bg: "#0D0D0D" },
-  { id: "gold", label: "Royal Gold",    color: "#D4A017", bg: "#111016" },
-  { id: "frost", label: "Arctic Frost", color: "#00a3e0", bg: "#F7F8FA" },
-  { id: "dusk",  label: "Velvet Dusk",  color: "#dc5078", bg: "#0E0B14" },
+const THEMES: { id: Theme; label: string; color: string }[] = [
+  { id: "noir", label: "Midnight Noir", color: "#dc2626" },
+  { id: "gold", label: "Royal Gold",    color: "#D4A017" },
+  { id: "dusk", label: "Velvet Dusk",   color: "#dc5078" },
 ];
 
 function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
-  const [tooltip, setTooltip] = useState<string | null>(null);
+  const current = THEMES.find((t) => t.id === theme) ?? THEMES[0]!;
 
   return (
-    <div className="flex items-center gap-1.5" role="group" aria-label="Theme switcher">
-      {THEMES.map((t) => {
-        const isActive = theme === t.id;
-        return (
-          <div key={t.id} className="relative">
-            <button
-              onClick={() => setTheme(t.id)}
-              onMouseEnter={() => setTooltip(t.id)}
-              onMouseLeave={() => setTooltip(null)}
-              aria-label={`Switch to ${t.label} theme`}
-              aria-pressed={isActive}
-              className="relative h-6 w-6 rounded-full transition-transform duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center gap-1.5 h-9 px-2.5 rounded-md border border-border bg-card/60 hover:border-primary/40 hover:bg-card/80 transition-colors text-sm"
+          aria-label="Change theme"
+        >
+          <span
+            className="h-3.5 w-3.5 rounded-full shrink-0"
+            style={{ background: current.color }}
+          />
+          <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44 glass-card-strong">
+        <DropdownMenuLabel className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Theme</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {THEMES.map((t) => (
+          <DropdownMenuItem
+            key={t.id}
+            onClick={() => setTheme(t.id)}
+            className="flex items-center gap-2.5 cursor-pointer"
+          >
+            <span
+              className="h-3.5 w-3.5 rounded-full shrink-0"
               style={{ background: t.color }}
-            >
-              {isActive && (
-                <span
-                  className="absolute inset-0 rounded-full pointer-events-none"
-                  style={{ boxShadow: `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${t.color}` }}
-                />
-              )}
-              <span
-                className="absolute inset-0 rounded-full opacity-30"
-                style={{ background: `radial-gradient(circle at 35% 35%, rgba(255,255,255,0.6), transparent 70%)` }}
-              />
-            </button>
-            {tooltip === t.id && (
-              <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none whitespace-nowrap">
-                <div className="glass-card-strong text-xs px-2 py-1 rounded-md text-foreground font-medium shadow-lg border border-border">
-                  {t.label}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+            />
+            <span className="flex-1">{t.label}</span>
+            {theme === t.id && <Check className="h-3.5 w-3.5 text-primary" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -166,9 +161,6 @@ export function Navbar() {
               <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pubs")}</Link>
               <Link href="/pub-offers" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pub_offers")}</Link>
               <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.blog")}</Link>
-              <Link href="/subscription" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                <Crown className="h-3.5 w-3.5 text-primary" /> {t("nav.premium")}
-              </Link>
             </nav>
           </div>
 
@@ -397,13 +389,6 @@ export function Navbar() {
                     {label}
                   </Link>
                 ))}
-                <Link
-                  href="/subscription"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-1.5 py-3 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-border/40"
-                >
-                  <Crown className="h-4 w-4 text-primary" /> {t("nav.premium")}
-                </Link>
               </nav>
 
               {/* Theme switcher */}

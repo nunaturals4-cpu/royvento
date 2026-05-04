@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-export type Theme = "noir" | "gold" | "frost" | "dusk";
+export type Theme = "noir" | "gold" | "dusk";
 const STORAGE_KEY = "royvento_theme";
 
 interface Ctx { theme: Theme; setTheme: (t: Theme) => void; }
@@ -9,11 +9,7 @@ const ThemeContext = createContext<Ctx | null>(null);
 function applyTheme(t: Theme) {
   const root = document.documentElement;
   root.dataset["theme"] = t;
-  if (t === "frost") {
-    root.classList.remove("dark");
-  } else {
-    root.classList.add("dark");
-  }
+  root.classList.add("dark");
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -21,9 +17,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return "noir";
     try {
       const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-      if (stored === "noir" || stored === "gold" || stored === "frost" || stored === "dusk") return stored;
-      const legacy = localStorage.getItem(STORAGE_KEY);
-      if (legacy === "light") return "frost";
+      if (stored === "noir" || stored === "gold" || stored === "dusk") return stored;
     } catch {}
     return "noir";
   });
