@@ -2090,6 +2090,8 @@ components:
           nullable: true
         approvalStatus:
           type: string
+        retainForever:
+          type: boolean
         partnerName:
           type: string
         createdAt:
@@ -2108,6 +2110,8 @@ components:
         rejectionReason:
           type: string
           nullable: true
+        retainForever:
+          type: boolean
 
     AdminBookingRow:
       type: object

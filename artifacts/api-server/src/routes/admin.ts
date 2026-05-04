@@ -330,6 +330,7 @@ router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
       popular: e.popular,
       popularSince: e.popularSince ? e.popularSince.toISOString() : null,
       approvalStatus: e.approvalStatus,
+      retainForever: e.retainForever,
       partnerName: vMap.get(e.vendorId)?.businessName ?? "",
       createdAt: e.createdAt.toISOString(),
     })),
@@ -379,6 +380,7 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     updates["popularSince"] = body["popular"] ? new Date() : null;
   }
   if (typeof body["featured"] === "boolean") updates["featured"] = body["featured"];
+  if (typeof body["retainForever"] === "boolean") updates["retainForever"] = body["retainForever"];
   if (typeof body["approvalStatus"] === "string") {
     const status = body["approvalStatus"];
     if (!["approved", "rejected", "pending"].includes(status)) {

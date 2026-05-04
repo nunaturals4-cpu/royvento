@@ -19,6 +19,7 @@ export interface AdminEvent {
   popular?: boolean;
   popularSince?: Date | null;
   approvalStatus?: string;
+  retainForever?: boolean;
   partnerName?: string;
   createdAt?: Date;
 }

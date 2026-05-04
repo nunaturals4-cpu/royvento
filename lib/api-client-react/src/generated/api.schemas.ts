@@ -455,6 +455,7 @@ export interface AdminEvent {
   popular?: boolean;
   popularSince?: string | null;
   approvalStatus?: string;
+  retainForever?: boolean;
   partnerName?: string;
   createdAt?: string;
 }
@@ -464,6 +465,7 @@ export interface PatchAdminEventBody {
   featured?: boolean;
   approvalStatus?: string;
   rejectionReason?: string | null;
+  retainForever?: boolean;
 }
 
 export interface AdminBookingRow {

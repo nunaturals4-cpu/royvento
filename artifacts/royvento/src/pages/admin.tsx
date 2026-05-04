@@ -660,6 +660,7 @@ interface AdminEvent {
   popularSince: string | null;
   approvalStatus: string;
   imageUrl: string;
+  retainForever: boolean;
 }
 
 interface PendingEvent {
@@ -848,6 +849,16 @@ function EventsAdmin() {
     }
   };
 
+  const toggleRetain = async (e: AdminEvent) => {
+    try {
+      await apiPatch(`/api/admin/events/${e.id}`, { retainForever: !e.retainForever });
+      toast({ title: e.retainForever ? "Retention removed" : "Event retained forever" });
+      load();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    }
+  };
+
   const uniqueTypes = Array.from(new Set(items.map((e) => e.type).filter(Boolean))).sort();
   const uniquePartners = Array.from(new Set(items.map((e) => e.partnerName).filter(Boolean))).sort();
 
@@ -919,6 +930,7 @@ function EventsAdmin() {
                 <th className="text-right p-3">Price</th>
                 <th className="text-center p-3">Status</th>
                 <th className="text-center p-3">Popular Since</th>
+                <th className="text-center p-3">Retain</th>
                 <th className="text-right p-3"></th>
               </tr>
             </thead>
@@ -944,6 +956,15 @@ function EventsAdmin() {
                       className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.popular ? "bg-amber-600/30 text-amber-200" : "bg-white/5 text-white/40"}`}
                     >
                       ★ {popularDays(e.popular ? e.popularSince : null)}
+                    </button>
+                  </td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => toggleRetain(e)}
+                      title={e.retainForever ? "Click to allow cleanup deletion" : "Click to protect from cleanup deletion"}
+                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.retainForever ? "bg-blue-600/30 text-blue-200" : "bg-white/5 text-white/40"}`}
+                    >
+                      {e.retainForever ? "🔒 Kept" : "–"}
                     </button>
                   </td>
                   <td className="p-3 text-right">

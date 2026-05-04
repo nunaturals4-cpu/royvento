@@ -37,6 +37,7 @@ export async function deletePastEvents(): Promise<void> {
         and(
           sql`${eventsTable.eventDate} IS NOT NULL`,
           lt(eventsTable.eventDate, cutoffStr),
+          eq(eventsTable.retainForever, false),
         ),
       );
 

@@ -1694,6 +1694,7 @@ export const GetAdminEventsResponseItem = zod.object({
   popular: zod.boolean().optional(),
   popularSince: zod.coerce.date().nullish(),
   approvalStatus: zod.string().optional(),
+  retainForever: zod.boolean().optional(),
   partnerName: zod.string().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -1711,6 +1712,7 @@ export const PatchAdminEventBody = zod.object({
   featured: zod.boolean().optional(),
   approvalStatus: zod.string().optional(),
   rejectionReason: zod.string().nullish(),
+  retainForever: zod.boolean().optional(),
 });
 
 export const PatchAdminEventResponse = zod.object({

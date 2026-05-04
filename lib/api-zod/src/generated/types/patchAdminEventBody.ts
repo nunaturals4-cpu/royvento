@@ -11,4 +11,5 @@ export interface PatchAdminEventBody {
   featured?: boolean;
   approvalStatus?: string;
   rejectionReason?: string | null;
+  retainForever?: boolean;
 }
