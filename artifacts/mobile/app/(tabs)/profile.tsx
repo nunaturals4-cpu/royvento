@@ -544,34 +544,36 @@ export default function ProfileScreen() {
               No transactions yet
             </Text>
           ) : (
-            pointsHistory.history.slice(0, 8).map((entry) => {
-              const earned = entry.type === "earned";
-              return (
-                <View
-                  key={entry.key}
-                  style={{ flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, gap: 10 }}
-                >
-                  <View style={[{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: earned ? "#22c55e20" : "#ef444420" }]}>
-                    <Ionicons
-                      name={earned ? "arrow-up-circle-outline" : "arrow-down-circle-outline"}
-                      size={18}
-                      color={earned ? "#22c55e" : "#ef4444"}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground }} numberOfLines={1}>
-                      {entry.label}
+            <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              {pointsHistory.history.map((entry) => {
+                const earned = entry.type === "earned";
+                return (
+                  <View
+                    key={entry.key}
+                    style={{ flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, gap: 10, marginBottom: 2 }}
+                  >
+                    <View style={[{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: earned ? "#22c55e20" : "#ef444420" }]}>
+                      <Ionicons
+                        name={earned ? "arrow-up-circle-outline" : "arrow-down-circle-outline"}
+                        size={18}
+                        color={earned ? "#22c55e" : "#ef4444"}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground }} numberOfLines={1}>
+                        {entry.label}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
+                        {new Date(entry.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: earned ? "#22c55e" : "#ef4444" }}>
+                      {earned ? "+" : "−"}{Math.abs(entry.points)}
                     </Text>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
-                      {new Date(entry.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </Text>
                   </View>
-                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: earned ? "#22c55e" : "#ef4444" }}>
-                    {earned ? "+" : "−"}{Math.abs(entry.points)}
-                  </Text>
-                </View>
-              );
-            })
+                );
+              })}
+            </ScrollView>
           )}
         </View>
       )}
