@@ -34,6 +34,7 @@ export const usersTable = pgTable(
     emailVerifyToken: varchar("email_verify_token", { length: 255 }).notNull().default(""),
     emailVerifyExpiry: timestamp("email_verify_expiry", { withTimezone: true }),
     pushToken: text("push_token").notNull().default(""),
+    webPushSubscription: text("web_push_subscription"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

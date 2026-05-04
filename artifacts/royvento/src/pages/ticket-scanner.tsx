@@ -3,7 +3,7 @@ import jsQR from "jsqr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 
 interface BookingData {
@@ -142,6 +142,8 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
   const rafRef = useRef<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -182,11 +184,30 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setScanning(true);
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        const caps = (videoTrack.getCapabilities as (() => Record<string, unknown>) | undefined)?.();
+        if (caps?.torch) setTorchSupported(true);
+      }
       rafRef.current = requestAnimationFrame(scanFrame);
     } catch {
       setError("Camera access denied. Please allow camera permission and try again.");
     }
   }, [scanFrame]);
+
+  const toggleTorch = useCallback(async () => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await (track.applyConstraints as (c: unknown) => Promise<void>)({ advanced: [{ torch: next }] });
+      setTorchOn(next);
+    } catch {
+      setTorchSupported(false);
+    }
+  }, [torchOn]);
 
   useEffect(() => {
     startCamera();
@@ -238,6 +259,15 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
           )}
         </div>
       </div>
+      {torchSupported && (
+        <button
+          onClick={toggleTorch}
+          aria-label={torchOn ? "Turn off torch" : "Turn on torch"}
+          className="absolute top-3 right-3 rounded-full p-2 bg-black/60 border border-white/20 text-white hover:bg-black/80 transition-colors z-10"
+        >
+          {torchOn ? <Zap className="h-4 w-4 text-yellow-300" /> : <ZapOff className="h-4 w-4 text-white/60" />}
+        </button>
+      )}
       <p className="absolute bottom-3 left-0 right-0 text-center text-xs text-white/60">
         {scanning ? "Scanning for QR code…" : "Starting camera…"}
       </p>

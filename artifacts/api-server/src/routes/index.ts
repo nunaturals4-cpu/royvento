@@ -26,6 +26,7 @@ import storageRouter from "./storage";
 import paymentsRouter from "./payments";
 import managersRouter from "./managers";
 import placesRouter from "./places";
+import webPushRouter from "./webPush";
 
 const router: IRouter = Router();
 
@@ -56,5 +57,6 @@ router.use(storageRouter);
 router.use(paymentsRouter);
 router.use(managersRouter);
 router.use(placesRouter);
+router.use(webPushRouter);
 
 export default router;

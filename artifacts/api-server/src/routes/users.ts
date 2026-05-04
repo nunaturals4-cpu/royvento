@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, referralsTable, bookingsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateUserRoleBody } from "@workspace/api-zod";
@@ -81,6 +81,63 @@ router.patch(
     res.json(userToPublic(updated));
   },
 );
+
+router.get("/users/me/points-history", requireAuth(), async (req, res) => {
+  const me = await loadUserFromRequest(req);
+  if (!me) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [earned, spent] = await Promise.all([
+    db
+      .select({
+        id: referralsTable.id,
+        points: referralsTable.pointsAwarded,
+        createdAt: referralsTable.completedAt,
+      })
+      .from(referralsTable)
+      .where(eq(referralsTable.referrerId, me.id))
+      .orderBy(desc(referralsTable.completedAt)),
+    db
+      .select({
+        id: bookingsTable.id,
+        points: bookingsTable.pointsUsed,
+        createdAt: bookingsTable.createdAt,
+      })
+      .from(bookingsTable)
+      .where(eq(bookingsTable.userId, me.id))
+      .orderBy(desc(bookingsTable.createdAt)),
+  ]);
+
+  type HistoryEntry = {
+    key: string;
+    type: "earned" | "spent";
+    points: number;
+    label: string;
+    date: string;
+  };
+
+  const history: HistoryEntry[] = [
+    ...earned
+      .filter((r) => r.points > 0 && r.createdAt)
+      .map((r) => ({
+        key: `earned-${r.id}`,
+        type: "earned" as const,
+        points: r.points,
+        label: "Referral bonus",
+        date: r.createdAt!.toISOString(),
+      })),
+    ...spent
+      .filter((r) => r.points > 0)
+      .map((r) => ({
+        key: `spent-${r.id}`,
+        type: "spent" as const,
+        points: r.points,
+        label: `Booking #${r.id}`,
+        date: r.createdAt.toISOString(),
+      })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  res.json({ balance: me.points, history });
+});
 
 router.delete("/users/:userId", requireAuth(["admin"]), async (req, res) => {
   const userId = Number(req.params["userId"]);

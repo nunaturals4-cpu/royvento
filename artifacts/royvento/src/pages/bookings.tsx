@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download, AlertCircle } from "lucide-react";
+import { Calendar, Users, Tag, Wine, Ticket as TicketIcon, Printer, Download, AlertCircle, Share2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatINR, formatINRExact, apiPatch } from "@/lib/api";
@@ -348,8 +348,27 @@ function TicketField({ label, value }: { label: string; value: React.ReactNode }
 
 function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+
+  const shareTicket = async () => {
+    const text = `My ticket to ${b.eventTitle} at ${b.vendorName} (${b.bookingDate}) — Code: ${ticketCode}`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: `Ticket: ${b.eventTitle}`, text });
+        return;
+      } catch {
+        // user cancelled or share failed — fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Ticket details copied to clipboard" });
+    } catch {
+      toast({ title: "Copy failed", description: text });
+    }
+  };
 
   const printTicket = async () => {
     const esc = (v: unknown): string =>
@@ -496,6 +515,9 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
           <TicketIcon className="h-3.5 w-3.5" /> {t("bookings.your_ticket")}
         </p>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={shareTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
+            <Share2 className="h-3.5 w-3.5" />Share
+          </Button>
           <Button size="sm" variant="outline" onClick={printTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
             <Printer className="h-3.5 w-3.5" />{t("bookings.print")}
           </Button>

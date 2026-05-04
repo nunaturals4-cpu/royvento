@@ -50,3 +50,4 @@ channel = "stable-25_05"
 
 [userenv.shared]
 RESEND_FROM_EMAIL = "Royvento <royvento@royvento.com>"
+VAPID_PUBLIC_KEY = "BKvgL950R9ydip_K15JmRudEzfSj1vtgNCrQmq07p-T2PQSlspfcSQ739hvMaDSVGB4-eWe7DhbJt4EcF5cG3Go"
