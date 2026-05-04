@@ -172,9 +172,6 @@ const DANCE_FLOOR_OPTIONS = [
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
-  const [stateF, setStateF] = useState(vendor.state ?? "");
-  const [city, setCity] = useState(vendor.city ?? "");
-  const [country, setCountry] = useState(vendor.country || "India");
   const [descError, setDescError] = useState("");
   const update = useUpdateMyVendor();
   const { toast } = useToast();
@@ -186,8 +183,10 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       return;
     }
     setDescError("");
+    const city = vendor.city ?? "";
+    const stateF = vendor.state ?? "";
     update.mutate(
-      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, country, state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
+      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, country: vendor.country || "India", state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: () => {
           toast({ title: "Profile updated" });
@@ -198,51 +197,11 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     );
   };
 
-  const profileStateOpts = (() => {
-    const list = getStates(country);
-    return stateF && !list.includes(stateF) ? [stateF, ...list] : list;
-  })();
-  const profileCityOpts = (() => {
-    const list = getCities(country, stateF);
-    return city && !list.includes(city) ? [city, ...list] : list;
-  })();
-
   return (
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <Label>Business name</Label>
-            <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Country</Label>
-            <Select value={country || "India"} onValueChange={(v) => { setCountry(v); setStateF(""); setCity(""); }}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COUNTRY_NAMES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>State / Region</Label>
-            <Select value={stateF || "any"} onValueChange={(v) => { setStateF(v === "any" ? "" : v); setCity(""); }}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select state —" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">— select —</SelectItem>
-                {profileStateOpts.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>City</Label>
-            <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)} disabled={!stateF}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">— select —</SelectItem>
-                {profileCityOpts.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+        <div>
+          <Label>Business name</Label>
+          <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
         </div>
         <div>
           <Label>Description <span className="text-muted-foreground text-xs">(min 300 characters)</span></Label>
