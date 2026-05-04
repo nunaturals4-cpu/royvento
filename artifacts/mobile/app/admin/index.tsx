@@ -1,6 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
   customFetch,
+  getGetAdminAnalyticsQueryKey,
+  getGetAdminBookingsReportQueryKey,
+  getGetAdminLeadsSummaryQueryKey,
   useGetAdminAnalytics,
   useGetAdminBookingsReport,
   useGetAdminLeadsSummary,
@@ -905,9 +908,9 @@ export default function AdminPanelScreen() {
   const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
 
   // ─── ANALYTICS ─────────────────────────────────────────────────────────────
-  const analyticsQ = useGetAdminAnalytics({}, { query: { enabled: activeTab === "analytics" } });
-  const leadsQ = useGetAdminLeadsSummary({}, { query: { enabled: activeTab === "analytics" } });
-  const bookingsReportQ = useGetAdminBookingsReport({}, { query: { enabled: activeTab === "analytics" } });
+  const analyticsQ = useGetAdminAnalytics({}, { query: { queryKey: getGetAdminAnalyticsQueryKey({}), enabled: activeTab === "analytics" } });
+  const leadsQ = useGetAdminLeadsSummary({}, { query: { queryKey: getGetAdminLeadsSummaryQueryKey({}), enabled: activeTab === "analytics" } });
+  const bookingsReportQ = useGetAdminBookingsReport({}, { query: { queryKey: getGetAdminBookingsReportQueryKey({}), enabled: activeTab === "analytics" } });
 
   // ─── VENDORS & VENDOR REQUESTS ──────────────────────────────────────────────
   const [vendors, setVendors] = useState<AdminVendor[]>([]);

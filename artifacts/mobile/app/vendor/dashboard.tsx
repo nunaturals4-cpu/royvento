@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   customFetch,
   getGetMyVendorQueryKey,
+  getGetPartnerCheckinReportQueryKey,
   useCreateEvent,
   useDeleteEvent,
   useGetMyVendor,
@@ -92,6 +93,7 @@ interface VendorEvent {
   price: number;
   capacity: number;
   imageUrl: string;
+  approvalStatus: string;
   freeEntryRules?: FreeEntryRules | null;
 }
 
@@ -2848,7 +2850,7 @@ export default function VendorDashboardScreen() {
 
   const { data: attendanceReport, isLoading: attendanceLoading } = useGetPartnerCheckinReport(
     attendanceParams,
-    { query: { enabled: activeTab === "attendance" } },
+    { query: { queryKey: getGetPartnerCheckinReportQueryKey(attendanceParams), enabled: activeTab === "attendance" } },
   );
 
   const attendanceRows = attendanceReport?.rows ?? [];

@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useListEvents } from "@workspace/api-client-react";
-import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -139,8 +138,17 @@ export default function PubsScreen() {
           refreshControl={<RefreshControl refreshing={eventsQuery.isRefetching} onRefresh={() => eventsQuery.refetch()} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <EventCard
-              event={item}
-              onPress={() => router.push({ pathname: "/event/[id]", params: { id: item.id } })}
+              id={item.id}
+              title={item.title}
+              imageUrl={item.imageUrl}
+              location={item.location}
+              price={item.price}
+              category={item.category}
+              type={item.type}
+              rating={item.rating}
+              reviewCount={item.reviewCount}
+              freeEntryRules={item.freeEntryRules}
+              hasDrinkPlans={item.hasDrinkPlans}
             />
           )}
         />
