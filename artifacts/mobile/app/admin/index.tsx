@@ -399,7 +399,7 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                   <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{v.businessName}</Text>
                   {hasRateError && (
                     <View style={{ borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: "#ef444420" }}>
-                      <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#ef4444" }}>RATE LOAD FAILED</Text>
+                      <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#ef4444" }}>FEE LOAD FAILED</Text>
                     </View>
                   )}
                 </View>
@@ -565,10 +565,10 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
               </View>
             </TouchableOpacity>
 
-            {/* Expanded: applied rates + individual bookings */}
+            {/* Expanded: applied fees + individual bookings */}
             {isExpanded && (
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
-                {/* Applied rates row */}
+                {/* Applied fees row */}
                 <View style={{ flexDirection: "row", gap: 8, padding: 12, backgroundColor: colors.muted + "60" }}>
                   <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, marginRight: 4 }}>Fees:</Text>
                   {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
