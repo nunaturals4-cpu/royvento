@@ -45,7 +45,7 @@ import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads" | "attendance";
+type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads" | "attendance" | "banking";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending:   { bg: "#f59e0b20", text: "#f59e0b" },
@@ -3122,6 +3122,7 @@ export default function VendorDashboardScreen() {
             { key: "profile",       icon: "person-outline",           label: "Profile" },
             { key: "calendar",      icon: "calendar-clear-outline",   label: "Calendar" },
             { key: "managers",      icon: "person-add-outline",       label: "Managers" },
+            { key: "banking",       icon: "card-outline",             label: "Banking" },
           ] as const).map((t) => (
             <TouchableOpacity
               key={t.key}
@@ -3149,6 +3150,7 @@ export default function VendorDashboardScreen() {
       {activeTab === "profile"        && renderProfile()}
       {activeTab === "calendar"       && renderCalendar()}
       {activeTab === "managers"       && renderManagers()}
+      {activeTab === "banking"        && <BankingTab colors={colors} />}
 
       {/* ── Create Event Modal ── */}
       <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">
@@ -3319,3 +3321,181 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   chip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
 });
+
+// ─── BankingTab ───────────────────────────────────────────────────────────────
+
+interface BankingDetails { accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string; }
+interface SettlementRequest { id: number; amount: string; status: string; adminNote: string; requestedAt: string; }
+
+function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [banking, setBanking] = useState<BankingDetails | null>(null);
+  const [form, setForm] = useState<BankingDetails>({ accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "" });
+  const [saving, setSaving] = useState(false);
+  const [requests, setRequests] = useState<SettlementRequest[]>([]);
+  const [loadingBanking, setLoadingBanking] = useState(true);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [reqAmount, setReqAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadData() {
+    setLoadingBanking(true);
+    setLoadingRequests(true);
+    try {
+      const b = await customFetch<BankingDetails | null>("/api/partner/banking-details");
+      if (b) { setBanking(b); setForm(b); }
+    } catch { /* not saved yet */ } finally { setLoadingBanking(false); }
+    try {
+      const r = await customFetch<SettlementRequest[]>("/api/partner/settlement/requests");
+      setRequests(r ?? []);
+    } catch { /* ignore */ } finally { setLoadingRequests(false); }
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  async function saveBanking() {
+    if (!/^[A-Z0-9]{11}$/.test(form.ifscCode)) { setError("IFSC must be 11 uppercase alphanumeric characters."); return; }
+    if (!form.accountHolderName.trim() || !form.bankName.trim() || !form.accountNumber.trim()) { setError("All fields are required."); return; }
+    setError(null); setSaving(true);
+    try {
+      const saved = await customFetch<BankingDetails>("/api/partner/banking-details", { method: "PUT", body: JSON.stringify(form) });
+      setBanking(saved);
+    } catch (e: any) { setError(e?.message ?? "Failed to save"); } finally { setSaving(false); }
+  }
+
+  async function submitRequest() {
+    const amount = parseFloat(reqAmount);
+    if (!amount || amount <= 0) { setError("Enter a valid amount."); return; }
+    setError(null); setSubmitting(true);
+    try {
+      const created = await customFetch<SettlementRequest>("/api/partner/settlement/request", { method: "POST", body: JSON.stringify({ amount }) });
+      setRequests((prev) => [created, ...prev]);
+      setShowModal(false); setReqAmount("");
+    } catch (e: any) { setError(e?.message ?? "Failed to submit"); } finally { setSubmitting(false); }
+  }
+
+  function statusColor(status: string) {
+    if (status === "approved") return { bg: "#22c55e20", text: "#22c55e" };
+    if (status === "rejected") return { bg: "#ef444420", text: "#ef4444" };
+    return { bg: "#f59e0b20", text: "#f59e0b" };
+  }
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} showsVerticalScrollIndicator={false}>
+      {/* Banking Details */}
+      <View style={{ backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 14 }}>
+        <Text style={{ fontFamily: "Inter_700Bold", fontSize: 16, color: colors.foreground }}>Bank Account Details</Text>
+        {loadingBanking ? (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>Loading…</Text>
+        ) : (
+          <>
+            {[
+              { label: "Account Holder Name", key: "accountHolderName" as const, placeholder: "Full name as per bank records" },
+              { label: "Bank Name", key: "bankName" as const, placeholder: "e.g. HDFC Bank" },
+              { label: "Account Number", key: "accountNumber" as const, placeholder: "Bank account number" },
+              { label: "IFSC Code", key: "ifscCode" as const, placeholder: "e.g. HDFC0001234", upper: true },
+            ].map((f) => (
+              <View key={f.key} style={{ gap: 4 }}>
+                <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.mutedForeground }}>{f.label}</Text>
+                <TextInput
+                  value={form[f.key]}
+                  onChangeText={(v) => setForm((prev) => ({ ...prev, [f.key]: f.upper ? v.toUpperCase() : v }))}
+                  placeholder={f.placeholder}
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize={f.upper ? "characters" : "words"}
+                  style={{ backgroundColor: colors.muted, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, fontFamily: "Inter_400Regular", fontSize: 14, color: colors.foreground }}
+                />
+              </View>
+            ))}
+            {error && <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 12 }}>{error}</Text>}
+            <TouchableOpacity
+              onPress={saveBanking}
+              disabled={saving}
+              style={{ backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: "center" }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                {saving ? "Saving…" : banking ? "Update Banking Details" : "Save Banking Details"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      {/* Settlement Requests */}
+      <View style={{ backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={{ fontFamily: "Inter_700Bold", fontSize: 16, color: colors.foreground }}>Settlement Requests</Text>
+          {banking && (
+            <TouchableOpacity
+              onPress={() => { setError(null); setShowModal(true); }}
+              style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>+ Request</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {!banking && <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>Save your banking details above before requesting a settlement.</Text>}
+        {loadingRequests ? (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>Loading…</Text>
+        ) : requests.length === 0 && banking ? (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>No settlement requests yet.</Text>
+        ) : (
+          requests.map((r) => {
+            const sc = statusColor(r.status);
+            return (
+              <View key={r.id} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, gap: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground }}>{new Date(r.requestedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ backgroundColor: sc.bg, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 }}>
+                      <Text style={{ color: sc.text, fontFamily: "Inter_600SemiBold", fontSize: 11, textTransform: "capitalize" }}>{r.status}</Text>
+                    </View>
+                    <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: colors.primary }}>₹{Number(r.amount).toLocaleString("en-IN")}</Text>
+                  </View>
+                </View>
+                {r.adminNote ? <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground }}>{r.adminNote}</Text> : null}
+              </View>
+            );
+          })
+        )}
+      </View>
+
+      {/* Request Modal */}
+      <Modal visible={showModal} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 24 }}>
+          <View style={{ backgroundColor: colors.card, borderRadius: 20, padding: 24, width: "100%", gap: 16 }}>
+            <Text style={{ fontFamily: "Inter_700Bold", fontSize: 17, color: colors.foreground }}>Request Settlement</Text>
+            <View style={{ gap: 4 }}>
+              <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.mutedForeground }}>Amount (₹)</Text>
+              <TextInput
+                value={reqAmount}
+                onChangeText={setReqAmount}
+                placeholder="Enter amount"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="numeric"
+                style={{ backgroundColor: colors.muted, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, fontFamily: "Inter_400Regular", fontSize: 14, color: colors.foreground }}
+              />
+            </View>
+            {error && <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 12 }}>{error}</Text>}
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => { setShowModal(false); setReqAmount(""); setError(null); }}
+                style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 12, alignItems: "center" }}
+              >
+                <Text style={{ fontFamily: "Inter_500Medium", fontSize: 14, color: colors.foreground }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={submitRequest}
+                disabled={submitting}
+                style={{ flex: 2, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: "center" }}
+              >
+                <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>{submitting ? "Submitting…" : "Submit"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}

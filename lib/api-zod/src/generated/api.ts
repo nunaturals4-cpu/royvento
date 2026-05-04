@@ -1863,6 +1863,85 @@ export const GetPartnerCheckinReportResponse = zod.object({
 });
 
 /**
+ * @summary Get banking details for the authenticated partner vendor
+ */
+export const GetPartnerBankingDetailsResponse = zod
+  .object({
+    id: zod.number(),
+    vendorId: zod.number(),
+    accountHolderName: zod.string(),
+    bankName: zod.string(),
+    accountNumber: zod.string(),
+    ifscCode: zod.string(),
+    updatedAt: zod.string().optional(),
+  })
+  .nullable();
+
+/**
+ * @summary Create or update banking details for the authenticated partner vendor
+ */
+
+export const savePartnerBankingDetailsBodyAccountNumberMin = 5;
+
+export const savePartnerBankingDetailsBodyIfscCodeRegExp = new RegExp(
+  "^[A-Z0-9]{11}$",
+);
+
+export const SavePartnerBankingDetailsBody = zod.object({
+  accountHolderName: zod.string().min(1),
+  bankName: zod.string().min(1),
+  accountNumber: zod
+    .string()
+    .min(savePartnerBankingDetailsBodyAccountNumberMin),
+  ifscCode: zod.string().regex(savePartnerBankingDetailsBodyIfscCodeRegExp),
+});
+
+export const SavePartnerBankingDetailsResponse = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  accountHolderName: zod.string(),
+  bankName: zod.string(),
+  accountNumber: zod.string(),
+  ifscCode: zod.string(),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary List settlement requests for the authenticated partner vendor
+ */
+export const ListPartnerSettlementRequestsResponseItem = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  amount: zod.string().describe("Decimal amount as string"),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string(),
+  requestedAt: zod.string(),
+  processedAt: zod.string().nullish(),
+});
+export const ListPartnerSettlementRequestsResponse = zod.array(
+  ListPartnerSettlementRequestsResponseItem,
+);
+
+/**
+ * @summary Submit a new settlement request
+ */
+export const createPartnerSettlementRequestBodyAmountMin = 0.01;
+
+export const CreatePartnerSettlementRequestBody = zod.object({
+  amount: zod.number().min(createPartnerSettlementRequestBodyAmountMin),
+});
+
+export const CreatePartnerSettlementRequestResponse = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  amount: zod.string().describe("Decimal amount as string"),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string(),
+  requestedAt: zod.string(),
+  processedAt: zod.string().nullish(),
+});
+
+/**
  * @summary List all events with popular-since tracking (admin)
  */
 export const GetAdminEventsResponseItem = zod.object({
@@ -2436,6 +2515,77 @@ export const GetAdminAnalyticsResponse = zod.object({
       totalPages: zod.number(),
     })
     .optional(),
+});
+
+/**
+ * @summary List all settlement requests (admin)
+ */
+export const ListAdminSettlementRequestsQueryParams = zod.object({
+  status: zod.enum(["pending", "approved", "rejected"]).optional(),
+});
+
+export const ListAdminSettlementRequestsResponseItem = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  businessName: zod.string().nullish(),
+  city: zod.string().nullish(),
+  amount: zod.string(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string(),
+  requestedAt: zod.string(),
+  processedAt: zod.string().nullish(),
+  bankingDetails: zod
+    .object({
+      id: zod.number(),
+      vendorId: zod.number(),
+      accountHolderName: zod.string(),
+      bankName: zod.string(),
+      accountNumber: zod.string(),
+      ifscCode: zod.string(),
+      updatedAt: zod.string().optional(),
+    })
+    .nullish(),
+});
+export const ListAdminSettlementRequestsResponse = zod.array(
+  ListAdminSettlementRequestsResponseItem,
+);
+
+/**
+ * @summary Approve a settlement request (admin)
+ */
+export const ApproveSettlementRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveSettlementRequestResponse = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  amount: zod.string().describe("Decimal amount as string"),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string(),
+  requestedAt: zod.string(),
+  processedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Reject a settlement request with optional note (admin)
+ */
+export const RejectSettlementRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RejectSettlementRequestBody = zod.object({
+  note: zod.string().optional(),
+});
+
+export const RejectSettlementRequestResponse = zod.object({
+  id: zod.number(),
+  vendorId: zod.number(),
+  amount: zod.string().describe("Decimal amount as string"),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string(),
+  requestedAt: zod.string(),
+  processedAt: zod.string().nullish(),
 });
 
 /**

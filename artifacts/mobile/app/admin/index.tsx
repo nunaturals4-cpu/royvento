@@ -28,7 +28,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions" | "settlements";
 
 interface ContactMessage {
   id: number;
@@ -214,6 +214,161 @@ interface AdminBlog {
   slug: string;
   published: boolean;
   createdAt: string;
+}
+
+// ─── AdminSettlementsTab ──────────────────────────────────────────────────────
+
+interface AdminSettlementRow {
+  id: number;
+  vendorId: number;
+  businessName: string | null;
+  city: string | null;
+  amount: string;
+  status: string;
+  adminNote: string;
+  requestedAt: string;
+  processedAt: string | null;
+  bankingDetails: { accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string; } | null;
+}
+
+function AdminSettlementsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [requests, setRequests] = useState<AdminSettlementRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [processing, setProcessing] = useState<number | null>(null);
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectNote, setRejectNote] = useState("");
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const qs = statusFilter !== "all" ? `?status=${statusFilter}` : "";
+      const rows = await customFetch<AdminSettlementRow[]>(`/api/admin/settlement-requests${qs}`);
+      setRequests(rows ?? []);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }
+
+  useEffect(() => { loadData(); }, [statusFilter]);
+
+  async function approve(id: number) {
+    setProcessing(id);
+    try {
+      await customFetch(`/api/admin/settlement-requests/${id}/approve`, { method: "POST" });
+      await loadData();
+    } catch { /* ignore */ } finally { setProcessing(null); }
+  }
+
+  async function reject(id: number) {
+    setProcessing(id);
+    try {
+      await customFetch(`/api/admin/settlement-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ note: rejectNote }) });
+      setRejectingId(null); setRejectNote("");
+      await loadData();
+    } catch { /* ignore */ } finally { setProcessing(null); }
+  }
+
+  const FILTERS: Array<typeof statusFilter> = ["all", "pending", "approved", "rejected"];
+
+  function statusColor(status: string) {
+    if (status === "approved") return { bg: "#22c55e20", text: "#22c55e" };
+    if (status === "rejected") return { bg: "#ef444420", text: "#ef4444" };
+    return { bg: "#f59e0b20", text: "#f59e0b" };
+  }
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} showsVerticalScrollIndicator={false}>
+      {/* Filter row */}
+      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+        {FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f}
+            onPress={() => setStatusFilter(f)}
+            style={{ borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: statusFilter === f ? colors.primary : colors.muted, borderWidth: 1, borderColor: statusFilter === f ? colors.primary : colors.border }}
+          >
+            <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: statusFilter === f ? colors.primaryForeground : colors.foreground, textTransform: "capitalize" }}>{f}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading ? (
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>Loading…</Text>
+      ) : requests.length === 0 ? (
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>No settlement requests found.</Text>
+      ) : (
+        requests.map((r) => {
+          const sc = statusColor(r.status);
+          return (
+            <View key={r.id} style={{ backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: colors.foreground }}>{r.businessName ?? `Vendor #${r.vendorId}`}</Text>
+                  {r.city ? <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground }}>{r.city}</Text> : null}
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <View style={{ backgroundColor: sc.bg, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ color: sc.text, fontFamily: "Inter_600SemiBold", fontSize: 11, textTransform: "capitalize" }}>{r.status}</Text>
+                  </View>
+                  <Text style={{ fontFamily: "Inter_700Bold", fontSize: 15, color: colors.primary }}>₹{Number(r.amount).toLocaleString("en-IN")}</Text>
+                </View>
+              </View>
+
+              {r.bankingDetails && (
+                <View style={{ backgroundColor: colors.muted, borderRadius: 10, padding: 10, gap: 3 }}>
+                  {[
+                    { label: "Holder", value: r.bankingDetails.accountHolderName },
+                    { label: "Bank", value: r.bankingDetails.bankName },
+                    { label: "Account", value: r.bankingDetails.accountNumber },
+                    { label: "IFSC", value: r.bankingDetails.ifscCode },
+                  ].map((f) => (
+                    <Text key={f.label} style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground }}>
+                      <Text style={{ fontFamily: "Inter_500Medium", color: colors.foreground }}>{f.label}: </Text>{f.value}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: colors.mutedForeground }}>
+                Requested: {new Date(r.requestedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                {r.adminNote ? `  ·  ${r.adminNote}` : ""}
+              </Text>
+
+              {r.status === "pending" && (
+                rejectingId === r.id ? (
+                  <View style={{ gap: 8 }}>
+                    <TextInput
+                      value={rejectNote}
+                      onChangeText={setRejectNote}
+                      placeholder="Rejection reason (optional)"
+                      placeholderTextColor={colors.mutedForeground}
+                      multiline
+                      style={{ backgroundColor: colors.muted, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 10, fontFamily: "Inter_400Regular", fontSize: 13, color: colors.foreground, minHeight: 60 }}
+                    />
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <TouchableOpacity onPress={() => { setRejectingId(null); setRejectNote(""); }} style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 10, alignItems: "center" }}>
+                        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.foreground }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => reject(r.id)} disabled={processing === r.id} style={{ flex: 2, backgroundColor: "#ef4444", borderRadius: 10, paddingVertical: 10, alignItems: "center" }}>
+                        <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{processing === r.id ? "Rejecting…" : "Confirm Reject"}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity onPress={() => setRejectingId(r.id)} style={{ flex: 1, borderWidth: 1, borderColor: "#ef444440", borderRadius: 10, paddingVertical: 10, alignItems: "center" }}>
+                      <Text style={{ color: "#ef4444", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => approve(r.id)} disabled={processing === r.id} style={{ flex: 2, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 10, alignItems: "center" }}>
+                      <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{processing === r.id ? "Approving…" : "Approve"}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              )}
+            </View>
+          );
+        })
+      )}
+    </ScrollView>
+  );
 }
 
 // ─── AdminCommissionsTab ──────────────────────────────────────────────────────
@@ -2558,6 +2713,7 @@ export default function AdminPanelScreen() {
     { key: "crm-leads" as AdminTab, icon: "person-add-outline" as const, label: "CRM" },
     { key: "import-pub" as AdminTab, icon: "cloud-download-outline" as const, label: "Import" },
     { key: "commissions" as AdminTab, icon: "cash-outline" as const, label: "Commissions" },
+    { key: "settlements" as AdminTab, icon: "card-outline" as const, label: "Settlements" },
   ];
 
   if (!user || user.role !== "admin") {
@@ -2624,6 +2780,7 @@ export default function AdminPanelScreen() {
       {activeTab === "crm-leads" && renderCrmLeads()}
       {activeTab === "import-pub" && renderImportPub()}
       {activeTab === "commissions" && <AdminCommissionsTab colors={colors} />}
+      {activeTab === "settlements" && <AdminSettlementsTab colors={colors} />}
     </View>
   );
 }

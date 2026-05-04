@@ -24,6 +24,7 @@ import type {
   AdminLeadsResponse,
   AdminLeadsSummary,
   AdminPartnerSummary,
+  AdminSettlementRequest,
   AttendanceReportResponse,
   AuthResponse,
   Availability,
@@ -32,6 +33,7 @@ import type {
   CreateBookingBody,
   CreateEventBody,
   CreateReviewBody,
+  CreateSettlementRequestBody,
   CreateVendorBody,
   DrinkPlan,
   DrinkPlanBody,
@@ -49,6 +51,7 @@ import type {
   HealthStatus,
   ImportGooglePubBody,
   ImportGooglePubResponse,
+  ListAdminSettlementRequestsParams,
   ListEventsParams,
   ListMyVendorEvents200,
   ListMyVendorEventsParams,
@@ -66,11 +69,14 @@ import type {
   PreviewGooglePubBody,
   PreviewGooglePubResponse,
   RegisterBody,
+  RejectSettlementBody,
   Review,
+  SaveBankingDetailsBody,
   ScanTicketBody,
   ScanTicketResult,
   SetAvailabilityBody,
   SetVendorCommissionBody,
+  SettlementRequest,
   UpdateBookingStatusBody,
   UpdateEventBody,
   UpdateMeBody,
@@ -80,6 +86,7 @@ import type {
   UploadUrlResponse,
   User,
   Vendor,
+  VendorBankingDetails,
   VendorCommission,
   VendorDrinkOffer,
   WishlistAddResponse,
@@ -4076,6 +4083,342 @@ export function useGetPartnerCheckinReport<
 }
 
 /**
+ * @summary Get banking details for the authenticated partner vendor
+ */
+export const getGetPartnerBankingDetailsUrl = () => {
+  return `/api/partner/banking-details`;
+};
+
+export const getPartnerBankingDetails = async (
+  options?: RequestInit,
+): Promise<VendorBankingDetails | null> => {
+  return customFetch<VendorBankingDetails | null>(
+    getGetPartnerBankingDetailsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPartnerBankingDetailsQueryKey = () => {
+  return [`/api/partner/banking-details`] as const;
+};
+
+export const getGetPartnerBankingDetailsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerBankingDetails>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerBankingDetails>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPartnerBankingDetailsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPartnerBankingDetails>>
+  > = ({ signal }) => getPartnerBankingDetails({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerBankingDetails>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerBankingDetailsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerBankingDetails>>
+>;
+export type GetPartnerBankingDetailsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get banking details for the authenticated partner vendor
+ */
+
+export function useGetPartnerBankingDetails<
+  TData = Awaited<ReturnType<typeof getPartnerBankingDetails>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerBankingDetails>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerBankingDetailsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create or update banking details for the authenticated partner vendor
+ */
+export const getSavePartnerBankingDetailsUrl = () => {
+  return `/api/partner/banking-details`;
+};
+
+export const savePartnerBankingDetails = async (
+  saveBankingDetailsBody: SaveBankingDetailsBody,
+  options?: RequestInit,
+): Promise<VendorBankingDetails> => {
+  return customFetch<VendorBankingDetails>(getSavePartnerBankingDetailsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveBankingDetailsBody),
+  });
+};
+
+export const getSavePartnerBankingDetailsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof savePartnerBankingDetails>>,
+    TError,
+    { data: BodyType<SaveBankingDetailsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof savePartnerBankingDetails>>,
+  TError,
+  { data: BodyType<SaveBankingDetailsBody> },
+  TContext
+> => {
+  const mutationKey = ["savePartnerBankingDetails"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof savePartnerBankingDetails>>,
+    { data: BodyType<SaveBankingDetailsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return savePartnerBankingDetails(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SavePartnerBankingDetailsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof savePartnerBankingDetails>>
+>;
+export type SavePartnerBankingDetailsMutationBody =
+  BodyType<SaveBankingDetailsBody>;
+export type SavePartnerBankingDetailsMutationError = ErrorType<void>;
+
+/**
+ * @summary Create or update banking details for the authenticated partner vendor
+ */
+export const useSavePartnerBankingDetails = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof savePartnerBankingDetails>>,
+    TError,
+    { data: BodyType<SaveBankingDetailsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof savePartnerBankingDetails>>,
+  TError,
+  { data: BodyType<SaveBankingDetailsBody> },
+  TContext
+> => {
+  return useMutation(getSavePartnerBankingDetailsMutationOptions(options));
+};
+
+/**
+ * @summary List settlement requests for the authenticated partner vendor
+ */
+export const getListPartnerSettlementRequestsUrl = () => {
+  return `/api/partner/settlement/requests`;
+};
+
+export const listPartnerSettlementRequests = async (
+  options?: RequestInit,
+): Promise<SettlementRequest[]> => {
+  return customFetch<SettlementRequest[]>(
+    getListPartnerSettlementRequestsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListPartnerSettlementRequestsQueryKey = () => {
+  return [`/api/partner/settlement/requests`] as const;
+};
+
+export const getListPartnerSettlementRequestsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPartnerSettlementRequests>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPartnerSettlementRequests>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPartnerSettlementRequestsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPartnerSettlementRequests>>
+  > = ({ signal }) =>
+    listPartnerSettlementRequests({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPartnerSettlementRequests>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPartnerSettlementRequestsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPartnerSettlementRequests>>
+>;
+export type ListPartnerSettlementRequestsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List settlement requests for the authenticated partner vendor
+ */
+
+export function useListPartnerSettlementRequests<
+  TData = Awaited<ReturnType<typeof listPartnerSettlementRequests>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPartnerSettlementRequests>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPartnerSettlementRequestsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit a new settlement request
+ */
+export const getCreatePartnerSettlementRequestUrl = () => {
+  return `/api/partner/settlement/request`;
+};
+
+export const createPartnerSettlementRequest = async (
+  createSettlementRequestBody: CreateSettlementRequestBody,
+  options?: RequestInit,
+): Promise<SettlementRequest> => {
+  return customFetch<SettlementRequest>(
+    getCreatePartnerSettlementRequestUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createSettlementRequestBody),
+    },
+  );
+};
+
+export const getCreatePartnerSettlementRequestMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPartnerSettlementRequest>>,
+    TError,
+    { data: BodyType<CreateSettlementRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPartnerSettlementRequest>>,
+  TError,
+  { data: BodyType<CreateSettlementRequestBody> },
+  TContext
+> => {
+  const mutationKey = ["createPartnerSettlementRequest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPartnerSettlementRequest>>,
+    { data: BodyType<CreateSettlementRequestBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPartnerSettlementRequest(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePartnerSettlementRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPartnerSettlementRequest>>
+>;
+export type CreatePartnerSettlementRequestMutationBody =
+  BodyType<CreateSettlementRequestBody>;
+export type CreatePartnerSettlementRequestMutationError = ErrorType<void>;
+
+/**
+ * @summary Submit a new settlement request
+ */
+export const useCreatePartnerSettlementRequest = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPartnerSettlementRequest>>,
+    TError,
+    { data: BodyType<CreateSettlementRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPartnerSettlementRequest>>,
+  TError,
+  { data: BodyType<CreateSettlementRequestBody> },
+  TContext
+> => {
+  return useMutation(getCreatePartnerSettlementRequestMutationOptions(options));
+};
+
+/**
  * @summary List all events with popular-since tracking (admin)
  */
 export const getGetAdminEventsUrl = () => {
@@ -5343,6 +5686,287 @@ export function useGetAdminAnalytics<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List all settlement requests (admin)
+ */
+export const getListAdminSettlementRequestsUrl = (
+  params?: ListAdminSettlementRequestsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/settlement-requests?${stringifiedParams}`
+    : `/api/admin/settlement-requests`;
+};
+
+export const listAdminSettlementRequests = async (
+  params?: ListAdminSettlementRequestsParams,
+  options?: RequestInit,
+): Promise<AdminSettlementRequest[]> => {
+  return customFetch<AdminSettlementRequest[]>(
+    getListAdminSettlementRequestsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListAdminSettlementRequestsQueryKey = (
+  params?: ListAdminSettlementRequestsParams,
+) => {
+  return [
+    `/api/admin/settlement-requests`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListAdminSettlementRequestsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminSettlementRequests>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminSettlementRequestsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminSettlementRequests>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAdminSettlementRequestsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAdminSettlementRequests>>
+  > = ({ signal }) =>
+    listAdminSettlementRequests(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminSettlementRequests>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAdminSettlementRequestsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminSettlementRequests>>
+>;
+export type ListAdminSettlementRequestsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all settlement requests (admin)
+ */
+
+export function useListAdminSettlementRequests<
+  TData = Awaited<ReturnType<typeof listAdminSettlementRequests>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAdminSettlementRequestsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAdminSettlementRequests>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAdminSettlementRequestsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Approve a settlement request (admin)
+ */
+export const getApproveSettlementRequestUrl = (id: number) => {
+  return `/api/admin/settlement-requests/${id}/approve`;
+};
+
+export const approveSettlementRequest = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SettlementRequest> => {
+  return customFetch<SettlementRequest>(getApproveSettlementRequestUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getApproveSettlementRequestMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveSettlementRequest>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveSettlementRequest>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["approveSettlementRequest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveSettlementRequest>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return approveSettlementRequest(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveSettlementRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveSettlementRequest>>
+>;
+
+export type ApproveSettlementRequestMutationError = ErrorType<void>;
+
+/**
+ * @summary Approve a settlement request (admin)
+ */
+export const useApproveSettlementRequest = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveSettlementRequest>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveSettlementRequest>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getApproveSettlementRequestMutationOptions(options));
+};
+
+/**
+ * @summary Reject a settlement request with optional note (admin)
+ */
+export const getRejectSettlementRequestUrl = (id: number) => {
+  return `/api/admin/settlement-requests/${id}/reject`;
+};
+
+export const rejectSettlementRequest = async (
+  id: number,
+  rejectSettlementBody?: RejectSettlementBody,
+  options?: RequestInit,
+): Promise<SettlementRequest> => {
+  return customFetch<SettlementRequest>(getRejectSettlementRequestUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(rejectSettlementBody),
+  });
+};
+
+export const getRejectSettlementRequestMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectSettlementRequest>>,
+    TError,
+    { id: number; data: BodyType<RejectSettlementBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rejectSettlementRequest>>,
+  TError,
+  { id: number; data: BodyType<RejectSettlementBody> },
+  TContext
+> => {
+  const mutationKey = ["rejectSettlementRequest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rejectSettlementRequest>>,
+    { id: number; data: BodyType<RejectSettlementBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return rejectSettlementRequest(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RejectSettlementRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rejectSettlementRequest>>
+>;
+export type RejectSettlementRequestMutationBody =
+  BodyType<RejectSettlementBody>;
+export type RejectSettlementRequestMutationError = ErrorType<void>;
+
+/**
+ * @summary Reject a settlement request with optional note (admin)
+ */
+export const useRejectSettlementRequest = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectSettlementRequest>>,
+    TError,
+    { id: number; data: BodyType<RejectSettlementBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rejectSettlementRequest>>,
+  TError,
+  { id: number; data: BodyType<RejectSettlementBody> },
+  TContext
+> => {
+  return useMutation(getRejectSettlementRequestMutationOptions(options));
+};
 
 /**
  * @summary Get the current user's wishlist

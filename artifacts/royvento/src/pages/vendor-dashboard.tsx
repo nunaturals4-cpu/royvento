@@ -31,7 +31,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
-  apiGet, apiPost, apiDelete, apiPatch,
+  apiGet, apiPost, apiDelete, apiPatch, apiPut,
   EVENT_CATEGORIES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
 } from "@/lib/api";
 import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
@@ -113,6 +113,9 @@ export function VendorDashboard() {
             <TabsTrigger value="managers">
               <Users className="h-3.5 w-3.5 mr-1 text-primary" /> Managers
             </TabsTrigger>
+            <TabsTrigger value="banking">
+              <Banknote className="h-3.5 w-3.5 mr-1 text-primary" /> Banking &amp; Settlement
+            </TabsTrigger>
             <Link href="/dashboard/vendor/scanner">
               <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors">
                 <ScanLine className="h-3.5 w-3.5" /> Ticket scanner
@@ -132,6 +135,7 @@ export function VendorDashboard() {
           <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
           <TabsContent value="attendance"><AttendancePanel /></TabsContent>
           <TabsContent value="managers"><ManagersPanel /></TabsContent>
+          <TabsContent value="banking"><BankingPanel /></TabsContent>
         </Tabs>
       )}
     </div>
@@ -3959,6 +3963,191 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function BankingPanel() {
+  const { toast } = useToast();
+  const [banking, setBanking] = useState<{ accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string } | null>(null);
+  const [form, setForm] = useState({ accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "" });
+  const [saving, setSaving] = useState(false);
+  const [loadingBanking, setLoadingBanking] = useState(true);
+  const [requests, setRequests] = useState<Array<{ id: number; amount: string; status: string; adminNote: string; requestedAt: string }>>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestAmount, setRequestAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function loadData() {
+    setLoadingBanking(true);
+    setLoadingRequests(true);
+    try {
+      const b = await apiGet<{ accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string } | null>("/api/partner/banking-details");
+      if (b) {
+        setBanking(b);
+        setForm({ accountHolderName: b.accountHolderName, bankName: b.bankName, accountNumber: b.accountNumber, ifscCode: b.ifscCode });
+      }
+    } catch {
+      // not saved yet
+    } finally {
+      setLoadingBanking(false);
+    }
+    try {
+      const r = await apiGet<Array<{ id: number; amount: string; status: string; adminNote: string; requestedAt: string }>>("/api/partner/settlement/requests");
+      setRequests(r ?? []);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingRequests(false);
+    }
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  async function saveBanking(e: React.FormEvent) {
+    e.preventDefault();
+    if (!/^[A-Z0-9]{11}$/.test(form.ifscCode)) {
+      toast({ title: "Invalid IFSC", description: "IFSC must be 11 uppercase alphanumeric characters.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await apiPut<{ accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string }>("/api/partner/banking-details", form);
+      setBanking(saved);
+      toast({ title: "Banking details saved" });
+    } catch {
+      toast({ title: "Failed to save banking details", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitRequest(e: React.FormEvent) {
+    e.preventDefault();
+    const amount = parseFloat(requestAmount);
+    if (!amount || amount <= 0) {
+      toast({ title: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const created = await apiPost<{ id: number; amount: string; status: string; adminNote: string; requestedAt: string }>("/api/partner/settlement/request", { amount });
+      setRequests((prev) => [created, ...prev]);
+      setShowRequestModal(false);
+      setRequestAmount("");
+      toast({ title: "Settlement request submitted" });
+    } catch (err: any) {
+      toast({ title: (err as any)?.message ?? "Failed to submit request", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function statusBadge(status: string) {
+    if (status === "approved") return <span className="rounded-full bg-green-500/15 text-green-400 border border-green-500/30 px-2 py-0.5 text-[11px] font-medium">Approved</span>;
+    if (status === "rejected") return <span className="rounded-full bg-red-500/15 text-red-400 border border-red-500/30 px-2 py-0.5 text-[11px] font-medium">Rejected</span>;
+    return <span className="rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium">Pending</span>;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="rounded-2xl glass-card p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <Banknote className="h-5 w-5 text-primary" />
+          <h2 className="font-serif text-xl">Bank Account Details</h2>
+        </div>
+        {loadingBanking ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : (
+          <form onSubmit={saveBanking} className="space-y-4 max-w-lg">
+            <div className="space-y-1.5">
+              <Label>Account Holder Name</Label>
+              <Input value={form.accountHolderName} onChange={(e) => setForm((f) => ({ ...f, accountHolderName: e.target.value }))} required placeholder="Full name as per bank records" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bank Name</Label>
+              <Input value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} required placeholder="e.g. HDFC Bank" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Account Number</Label>
+              <Input value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} required placeholder="Bank account number" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>IFSC Code</Label>
+              <Input value={form.ifscCode} onChange={(e) => setForm((f) => ({ ...f, ifscCode: e.target.value.toUpperCase() }))} required placeholder="e.g. HDFC0001234" maxLength={11} className="uppercase" />
+              <p className="text-xs text-muted-foreground">11 alphanumeric characters</p>
+            </div>
+            <Button type="submit" disabled={saving} className="gap-2">
+              <CreditCard className="h-4 w-4" />
+              {saving ? "Saving…" : banking ? "Update Banking Details" : "Save Banking Details"}
+            </Button>
+          </form>
+        )}
+      </div>
+
+      <div className="rounded-2xl glass-card p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <IndianRupee className="h-5 w-5 text-primary" />
+            <h2 className="font-serif text-xl">Settlement Requests</h2>
+          </div>
+          {banking && (
+            <Button size="sm" onClick={() => setShowRequestModal(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Request Settlement
+            </Button>
+          )}
+        </div>
+        {!banking && (
+          <p className="text-sm text-muted-foreground">Save your banking details above before requesting a settlement.</p>
+        )}
+        {loadingRequests ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : requests.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{banking ? "No settlement requests yet." : ""}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-4">Date</th>
+                  <th className="text-right py-2 px-2">Amount</th>
+                  <th className="text-center py-2 px-2">Status</th>
+                  <th className="text-left py-2 pl-2">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((r) => (
+                  <tr key={r.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-3 pr-4 text-muted-foreground">{new Date(r.requestedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                    <td className="text-right px-2 tabular-nums font-medium text-primary">{formatINR(Number(r.amount))}</td>
+                    <td className="text-center px-2">{statusBadge(r.status)}</td>
+                    <td className="text-left pl-2 text-muted-foreground text-xs">{r.adminNote || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowRequestModal(false)}>
+          <div className="rounded-2xl glass-card p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-lg mb-4">Request Settlement</h3>
+            <form onSubmit={submitRequest} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Amount (₹)</Label>
+                <Input type="number" min="1" step="0.01" value={requestAmount} onChange={(e) => setRequestAmount(e.target.value)} placeholder="Enter amount" required />
+              </div>
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowRequestModal(false)}>Cancel</Button>
+                <Button type="submit" disabled={submitting} className="flex-1">{submitting ? "Submitting…" : "Submit Request"}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

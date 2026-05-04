@@ -1071,6 +1071,75 @@ paths:
               schema:
                 $ref: "#/components/schemas/AttendanceReportResponse"
 
+  /partner/banking-details:
+    get:
+      operationId: getPartnerBankingDetails
+      tags: [bookings]
+      summary: Get banking details for the authenticated partner vendor
+      responses:
+        "200":
+          description: Banking details (or null if not saved yet)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorBankingDetails"
+                nullable: true
+    put:
+      operationId: savePartnerBankingDetails
+      tags: [bookings]
+      summary: Create or update banking details for the authenticated partner vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveBankingDetailsBody"
+      responses:
+        "200":
+          description: Saved banking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorBankingDetails"
+        "400":
+          description: Validation error
+
+  /partner/settlement/requests:
+    get:
+      operationId: listPartnerSettlementRequests
+      tags: [bookings]
+      summary: List settlement requests for the authenticated partner vendor
+      responses:
+        "200":
+          description: Settlement requests list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SettlementRequest"
+
+  /partner/settlement/request:
+    post:
+      operationId: createPartnerSettlementRequest
+      tags: [bookings]
+      summary: Submit a new settlement request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSettlementRequestBody"
+      responses:
+        "200":
+          description: Created settlement request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementRequest"
+        "400":
+          description: Validation error or banking details not saved
+
   /admin/events:
     get:
       operationId: getAdminEvents
@@ -1491,6 +1560,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminAnalytics"
+
+  /admin/settlement-requests:
+    get:
+      operationId: listAdminSettlementRequests
+      tags: [admin]
+      summary: List all settlement requests (admin)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        "200":
+          description: Settlement requests with vendor and banking details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminSettlementRequest"
+
+  /admin/settlement-requests/{id}/approve:
+    post:
+      operationId: approveSettlementRequest
+      tags: [admin]
+      summary: Approve a settlement request (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated settlement request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementRequest"
+        "404":
+          description: Not found
+        "409":
+          description: Already processed
+
+  /admin/settlement-requests/{id}/reject:
+    post:
+      operationId: rejectSettlementRequest
+      tags: [admin]
+      summary: Reject a settlement request with optional note (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectSettlementBody"
+      responses:
+        "200":
+          description: Updated settlement request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementRequest"
+        "404":
+          description: Not found
+        "409":
+          description: Already processed
 
   /wishlist:
     get:
@@ -3164,3 +3307,105 @@ components:
           $ref: "#/components/schemas/ScanTicketBooking"
           nullable: true
       required: [code]
+
+    VendorBankingDetails:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        accountHolderName:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        ifscCode:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, vendorId, accountHolderName, bankName, accountNumber, ifscCode]
+
+    SaveBankingDetailsBody:
+      type: object
+      properties:
+        accountHolderName:
+          type: string
+          minLength: 1
+        bankName:
+          type: string
+          minLength: 1
+        accountNumber:
+          type: string
+          minLength: 5
+        ifscCode:
+          type: string
+          pattern: '^[A-Z0-9]{11}$'
+      required: [accountHolderName, bankName, accountNumber, ifscCode]
+
+    SettlementRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        amount:
+          type: string
+          description: Decimal amount as string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        adminNote:
+          type: string
+        requestedAt:
+          type: string
+        processedAt:
+          type: string
+          nullable: true
+      required: [id, vendorId, amount, status, adminNote, requestedAt]
+
+    CreateSettlementRequestBody:
+      type: object
+      properties:
+        amount:
+          type: number
+          minimum: 0.01
+      required: [amount]
+
+    AdminSettlementRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        businessName:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        amount:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        adminNote:
+          type: string
+        requestedAt:
+          type: string
+        processedAt:
+          type: string
+          nullable: true
+        bankingDetails:
+          $ref: "#/components/schemas/VendorBankingDetails"
+          nullable: true
+      required: [id, vendorId, amount, status, adminNote, requestedAt]
+
+    RejectSettlementBody:
+      type: object
+      properties:
+        note:
+          type: string

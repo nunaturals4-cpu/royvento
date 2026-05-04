@@ -999,6 +999,78 @@ export interface ScanTicketResult {
   booking?: ScanTicketBooking | null;
 }
 
+export interface VendorBankingDetails {
+  id: number;
+  vendorId: number;
+  accountHolderName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  updatedAt?: string;
+}
+
+export interface SaveBankingDetailsBody {
+  /** @minLength 1 */
+  accountHolderName: string;
+  /** @minLength 1 */
+  bankName: string;
+  /** @minLength 5 */
+  accountNumber: string;
+  /** @pattern ^[A-Z0-9]{11}$ */
+  ifscCode: string;
+}
+
+export type SettlementRequestStatus =
+  (typeof SettlementRequestStatus)[keyof typeof SettlementRequestStatus];
+
+export const SettlementRequestStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface SettlementRequest {
+  id: number;
+  vendorId: number;
+  /** Decimal amount as string */
+  amount: string;
+  status: SettlementRequestStatus;
+  adminNote: string;
+  requestedAt: string;
+  processedAt?: string | null;
+}
+
+export interface CreateSettlementRequestBody {
+  /** @minimum 0.01 */
+  amount: number;
+}
+
+export type AdminSettlementRequestStatus =
+  (typeof AdminSettlementRequestStatus)[keyof typeof AdminSettlementRequestStatus];
+
+export const AdminSettlementRequestStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface AdminSettlementRequest {
+  id: number;
+  vendorId: number;
+  businessName?: string | null;
+  city?: string | null;
+  amount: string;
+  status: AdminSettlementRequestStatus;
+  adminNote: string;
+  requestedAt: string;
+  processedAt?: string | null;
+  bankingDetails?: VendorBankingDetails | null;
+}
+
+export interface RejectSettlementBody {
+  note?: string;
+}
+
 export type ListVendorsParams = {
   category?: string;
   country?: string;
@@ -1187,3 +1259,16 @@ export type GetAdminAnalyticsParams = {
   page?: number;
   limit?: number;
 };
+
+export type ListAdminSettlementRequestsParams = {
+  status?: ListAdminSettlementRequestsStatus;
+};
+
+export type ListAdminSettlementRequestsStatus =
+  (typeof ListAdminSettlementRequestsStatus)[keyof typeof ListAdminSettlementRequestsStatus];
+
+export const ListAdminSettlementRequestsStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;

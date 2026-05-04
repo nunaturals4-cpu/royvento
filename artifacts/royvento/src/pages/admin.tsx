@@ -88,6 +88,7 @@ export function AdminPanel() {
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
           <TabsTrigger value="commissions"><Percent className="h-3.5 w-3.5 mr-1" />Commissions</TabsTrigger>
+          <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
@@ -106,6 +107,7 @@ export function AdminPanel() {
         <TabsContent value="import-pub"><ImportPubFromGoogle /></TabsContent>
         <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
         <TabsContent value="commissions"><CommissionsAdmin /></TabsContent>
+        <TabsContent value="settlements"><SettlementsAdmin /></TabsContent>
       </Tabs>
     </div>
   );
@@ -3625,6 +3627,169 @@ function AnnouncementSliderRow({
         aria-label={item.isFeaturedSlider ? "Remove from slider" : "Add to slider"}
         className={item.isFeaturedSlider ? "data-[state=checked]:bg-amber-400" : ""}
       />
+    </div>
+  );
+}
+
+interface AdminSettlementRow {
+  id: number;
+  vendorId: number;
+  businessName: string | null;
+  city: string | null;
+  amount: string;
+  status: string;
+  adminNote: string;
+  requestedAt: string;
+  processedAt: string | null;
+  bankingDetails: {
+    accountHolderName: string;
+    bankName: string;
+    accountNumber: string;
+    ifscCode: string;
+  } | null;
+}
+
+function SettlementsAdmin() {
+  const { toast } = useToast();
+  const [requests, setRequests] = useState<AdminSettlementRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectNote, setRejectNote] = useState("");
+  const [processing, setProcessing] = useState<number | null>(null);
+
+  async function loadRequests() {
+    setLoading(true);
+    try {
+      const qs = statusFilter !== "all" ? `?status=${statusFilter}` : "";
+      const rows = await apiGet<AdminSettlementRow[]>(`/api/admin/settlement-requests${qs}`);
+      setRequests(rows ?? []);
+    } catch {
+      toast({ title: "Failed to load settlement requests", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadRequests(); }, [statusFilter]);
+
+  async function approve(id: number) {
+    setProcessing(id);
+    try {
+      await apiPost(`/api/admin/settlement-requests/${id}/approve`);
+      await loadRequests();
+      toast({ title: "Settlement approved" });
+    } catch {
+      toast({ title: "Failed to approve", variant: "destructive" });
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  async function reject(id: number) {
+    setProcessing(id);
+    try {
+      await apiPost(`/api/admin/settlement-requests/${id}/reject`, { note: rejectNote });
+      setRejectingId(null);
+      setRejectNote("");
+      await loadRequests();
+      toast({ title: "Settlement rejected" });
+    } catch {
+      toast({ title: "Failed to reject", variant: "destructive" });
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  function statusBadge(status: string) {
+    if (status === "approved") return <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Approved</Badge>;
+    if (status === "rejected") return <Badge className="bg-red-500/20 text-red-300 border-red-500/30">Rejected</Badge>;
+    return <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">Pending</Badge>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl glass-card p-6">
+        <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Banknote className="h-5 w-5 text-primary" />
+            <h2 className="font-serif text-xl">Settlement Requests</h2>
+          </div>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {loading ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : requests.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No settlement requests found.</p>
+        ) : (
+          <div className="space-y-4">
+            {requests.map((r) => (
+              <div key={r.id} className="rounded-xl border border-white/10 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="font-medium">{r.businessName ?? `Vendor #${r.vendorId}`}</p>
+                    {r.city && <p className="text-xs text-muted-foreground">{r.city}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {statusBadge(r.status)}
+                    <span className="text-primary font-semibold tabular-nums">{formatINR(Number(r.amount))}</span>
+                  </div>
+                </div>
+                {r.bankingDetails && (
+                  <div className="rounded-lg bg-white/5 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
+                    <p><span className="text-foreground/70 font-medium">Account Holder:</span> {r.bankingDetails.accountHolderName}</p>
+                    <p><span className="text-foreground/70 font-medium">Bank:</span> {r.bankingDetails.bankName}</p>
+                    <p><span className="text-foreground/70 font-medium">Account No:</span> {r.bankingDetails.accountNumber}</p>
+                    <p><span className="text-foreground/70 font-medium">IFSC:</span> {r.bankingDetails.ifscCode}</p>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground flex-wrap">
+                  <span>Requested: {new Date(r.requestedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                  {r.processedAt && <span>Processed: {new Date(r.processedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>}
+                  {r.adminNote && <span className="text-amber-400">Note: {r.adminNote}</span>}
+                </div>
+                {r.status === "pending" && (
+                  rejectingId === r.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        className="w-full rounded-lg bg-white/5 border border-white/10 p-2 text-sm resize-none min-h-[60px] focus:outline-none"
+                        placeholder="Rejection reason (optional)"
+                        value={rejectNote}
+                        onChange={(e) => setRejectNote(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setRejectingId(null); setRejectNote(""); }}>Cancel</Button>
+                        <Button size="sm" variant="destructive" disabled={processing === r.id} onClick={() => reject(r.id)}>
+                          {processing === r.id ? "Rejecting…" : "Confirm Reject"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="gap-1.5 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50" onClick={() => setRejectingId(r.id)}>
+                        <XCircle className="h-3.5 w-3.5" /> Reject
+                      </Button>
+                      <Button size="sm" className="gap-1.5" disabled={processing === r.id} onClick={() => approve(r.id)}>
+                        <CheckCircle className="h-3.5 w-3.5" /> {processing === r.id ? "Approving…" : "Approve"}
+                      </Button>
+                    </div>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

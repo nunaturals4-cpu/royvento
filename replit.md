@@ -195,6 +195,22 @@ Five features ported from mobile to the web app:
   - `VAPID_PUBLIC_KEY` — set as a shared env var (generate with `web-push` if rotating)
   - `VAPID_PRIVATE_KEY` — must be added as a Replit secret (generate alongside public key)
 
+## Partner banking details & settlement requests (Task #408, May 2026)
+- DB: `vendorBankingDetailsTable` (accountHolderName, bankName, accountNumber, ifscCode — one per vendor) and `settlementRequestsTable` (amount, status pending/approved/rejected, adminNote, requestedAt, processedAt). Migration `0019_banking_settlement.sql` applied.
+- API routes (`artifacts/api-server/src/routes/partnerBanking.ts`):
+  - `GET /api/partner/banking-details` — fetch saved bank account
+  - `PUT /api/partner/banking-details` — create or update bank account (IFSC validated `^[A-Z0-9]{11}$`)
+  - `GET /api/partner/settlement/requests` — list own settlement requests
+  - `POST /api/partner/settlement/request` — create settlement request (requires banking details saved first)
+  - `GET /api/admin/settlement-requests?status=` — admin: list all requests with banking details + vendor info
+  - `POST /api/admin/settlement-requests/:id/approve` — admin: approve (sets processedAt, notifies vendor)
+  - `POST /api/admin/settlement-requests/:id/reject` — admin: reject with optional note (notifies vendor)
+- Web vendor dashboard: new "Banking & Settlement" tab (`BankingPanel`) — form for bank account + list of past requests with request modal
+- Web admin panel: new "Settlements" tab (`SettlementsAdmin`) — filterable list of all requests with inline approve/reject (including rejection reason textarea)
+- Mobile vendor dashboard: new "Banking" tab (`BankingTab`) — same form + request list + modal
+- Mobile admin: new "Settlements" tab (`AdminSettlementsTab`) — filter chips + cards with approve/reject actions
+- OpenAPI spec updated; codegen re-run (React Query hooks + Zod schemas regenerated)
+
 ## Common tasks
 - Regenerate API client: `pnpm --filter @workspace/api-spec run codegen`
 - Push DB schema: `pnpm --filter @workspace/db run push`

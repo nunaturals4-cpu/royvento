@@ -588,3 +588,40 @@ export const vendorCommissionsTable = pgTable(
 );
 
 export type VendorCommission = typeof vendorCommissionsTable.$inferSelect;
+
+export const vendorBankingDetailsTable = pgTable(
+  "vendor_banking_details",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull().references(() => vendorsTable.id, { onDelete: "cascade" }),
+    accountHolderName: varchar("account_holder_name", { length: 255 }).notNull().default(""),
+    bankName: varchar("bank_name", { length: 255 }).notNull().default(""),
+    accountNumber: varchar("account_number", { length: 50 }).notNull().default(""),
+    ifscCode: varchar("ifsc_code", { length: 20 }).notNull().default(""),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: uniqueIndex("vbd_vendor_idx").on(t.vendorId),
+  }),
+);
+
+export type VendorBankingDetails = typeof vendorBankingDetailsTable.$inferSelect;
+
+export const settlementRequestsTable = pgTable(
+  "settlement_requests",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull().references(() => vendorsTable.id, { onDelete: "cascade" }),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    adminNote: text("admin_note").notNull().default(""),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => ({
+    vendorIdx: index("sr_vendor_idx").on(t.vendorId),
+    statusIdx: index("sr_status_idx").on(t.status),
+  }),
+);
+
+export type SettlementRequest = typeof settlementRequestsTable.$inferSelect;
