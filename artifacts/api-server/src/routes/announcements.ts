@@ -4,6 +4,9 @@ import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
 import { sendWebPushToUser } from "./webPush";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const objectStorage = new ObjectStorageService();
 
 const router: IRouter = Router();
 
@@ -115,9 +118,16 @@ router.delete("/partner/announcements/:id", requireAuth(["vendor"]), async (req,
   if (!vendor) return res.status(403).json({ error: "No partner profile" });
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const existing = await db
+    .select({ imageUrl: announcementsTable.imageUrl })
+    .from(announcementsTable)
+    .where(and(eq(announcementsTable.id, id), eq(announcementsTable.vendorId, vendor.id)))
+    .limit(1);
+  const imageUrl = existing[0]?.imageUrl;
   await db
     .delete(announcementsTable)
     .where(and(eq(announcementsTable.id, id), eq(announcementsTable.vendorId, vendor.id)));
+  if (imageUrl) { try { await objectStorage.deleteObject(imageUrl); } catch {} }
   return res.json({ ok: true });
 });
 

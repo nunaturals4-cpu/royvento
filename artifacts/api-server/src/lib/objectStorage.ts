@@ -178,6 +178,40 @@ export class ObjectStorageService {
     return `/objects/${entityId}`;
   }
 
+  async deleteObject(imageUrl: string): Promise<void> {
+    if (!imageUrl) return;
+    try {
+      // Normalise GCS URLs first. normalizeObjectEntityPath returns an /objects/…
+      // path only when the URL lives under PRIVATE_OBJECT_DIR; otherwise it returns
+      // the raw pathname, which will be rejected below.
+      let path = imageUrl.startsWith("https://storage.googleapis.com/")
+        ? this.normalizeObjectEntityPath(imageUrl)
+        : imageUrl;
+
+      // Only delete files that are managed internal objects (/objects/…).
+      // Reject arbitrary GCS URLs and raw bucket paths — they may reference files
+      // outside our controlled directory and could be vendor-supplied.
+      if (!path.startsWith("/objects/")) return;
+
+      const parts = path.slice(1).split("/");
+      const entityId = parts.slice(1).join("/");
+      if (!entityId) return;
+
+      let entityDir = this.getPrivateObjectDir();
+      if (!entityDir.endsWith("/")) {
+        entityDir = `${entityDir}/`;
+      }
+      const fullPath = `${entityDir}${entityId}`;
+      const { bucketName, objectName } = parseObjectPath(fullPath);
+      if (!bucketName || !objectName) return;
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      await bucket.file(objectName).delete({ ignoreNotFound: true });
+    } catch {
+      // best-effort — swallow all errors so caller is never blocked
+    }
+  }
+
 }
 
 function parseObjectPath(path: string): {

@@ -4,6 +4,9 @@ import { eq, desc, and, ilike, sql, gte, lte, or, inArray } from "drizzle-orm";
 import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { getEventRatings } from "../lib/aggregates";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const objectStorage = new ObjectStorageService();
 
 const router: IRouter = Router();
 
@@ -585,7 +588,9 @@ router.delete("/events/:eventId", requireAuth(), async (req, res) => {
     return;
   }
   if (user.role === "admin") {
+    const imageUrl = evt.imageUrl;
     await db.delete(eventsTable).where(eq(eventsTable.id, id));
+    if (imageUrl) { try { await objectStorage.deleteObject(imageUrl); } catch {} }
     res.json({ ok: true });
     return;
   }
@@ -599,7 +604,9 @@ router.delete("/events/:eventId", requireAuth(), async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
+  const imageUrl = evt.imageUrl;
   await db.delete(eventsTable).where(eq(eventsTable.id, id));
+  if (imageUrl) { try { await objectStorage.deleteObject(imageUrl); } catch {} }
   res.json({ ok: true });
 });
 
