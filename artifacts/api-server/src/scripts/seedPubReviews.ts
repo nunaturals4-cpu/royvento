@@ -2,16 +2,6 @@ import { db, usersTable, eventsTable, reviewsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
-const REVIEWER_EMAILS = [
-  "seed.reviewer.001@royvento.in",
-  "seed.reviewer.002@royvento.in",
-  "seed.reviewer.003@royvento.in",
-  "seed.reviewer.004@royvento.in",
-  "seed.reviewer.005@royvento.in",
-  "seed.reviewer.006@royvento.in",
-  "seed.reviewer.007@royvento.in",
-];
-
 const REVIEWER_NAMES = [
   "Arjun Mehta",
   "Priya Sharma",
@@ -34,39 +24,26 @@ const COMMENTS = [
   "Incredible ambience and attentive staff. Highly recommend for a special night out.",
 ];
 
-async function ensureReviewers() {
-  const passwordHash = await bcrypt.hash("Seed@Reviewer#2024!", 10);
-  const reviewers: (typeof usersTable.$inferSelect)[] = [];
-
-  for (let i = 0; i < REVIEWER_EMAILS.length; i++) {
-    const email = REVIEWER_EMAILS[i]!;
-    let user = (
-      await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1)
-    )[0];
-    if (!user) {
-      const referralCode = `SEEDREV${String(i + 1).padStart(3, "0")}`;
-      [user] = await db
-        .insert(usersTable)
-        .values({
-          email,
-          passwordHash,
-          name: REVIEWER_NAMES[i]!,
-          role: "user",
-          phone: "",
-          referralCode,
-        })
-        .returning();
-    }
-    if (user) reviewers.push(user);
+async function ensureUser(
+  email: string,
+  referralCode: string,
+  name: string,
+  passwordHash: string,
+): Promise<typeof usersTable.$inferSelect | undefined> {
+  let user = (
+    await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1)
+  )[0];
+  if (!user) {
+    [user] = await db
+      .insert(usersTable)
+      .values({ email, passwordHash, name, role: "user", phone: "", referralCode })
+      .returning();
   }
-  return reviewers;
+  return user;
 }
 
 async function main() {
   console.log("Seeding pub reviews...");
-
-  const reviewers = await ensureReviewers();
-  console.log(`Ensured ${reviewers.length} reviewer accounts.`);
 
   const pubs = await db
     .select()
@@ -75,30 +52,48 @@ async function main() {
 
   console.log(`Found ${pubs.length} approved pub events.`);
 
+  // Group events by vendorId so we can slot users per (vendor, eventIndex).
+  // The DB has a unique constraint on (userId, vendorId), so each user can only
+  // review a given vendor once. To give every event its own 7 reviews we create
+  // 7 seed users per event slot: seed.rv.<vendorId>.<eventIndex>.<reviewerIndex>
+  const byVendor = new Map<number, (typeof pubs)[number][]>();
+  for (const pub of pubs) {
+    const list = byVendor.get(pub.vendorId) ?? [];
+    list.push(pub);
+    byVendor.set(pub.vendorId, list);
+  }
+
+  const passwordHash = await bcrypt.hash("Seed@Reviewer#2024!", 10);
   let inserted = 0;
   let skipped = 0;
 
-  for (const pub of pubs) {
-    for (let i = 0; i < reviewers.length; i++) {
-      const reviewer = reviewers[i];
-      if (!reviewer) continue;
+  for (const [vendorId, events] of byVendor) {
+    for (let ei = 0; ei < events.length; ei++) {
+      const event = events[ei]!;
+      for (let ri = 0; ri < 7; ri++) {
+        // Email and referralCode are scoped to (vendorId, eventIndex, reviewerIndex)
+        // so (userId, vendorId) is always unique across all events for this vendor.
+        const email = `seed.rv.${vendorId}.${ei}.${ri}@royvento.in`;
+        const referralCode = `SRV${vendorId}E${ei}R${ri}`;
+        const name = REVIEWER_NAMES[ri % REVIEWER_NAMES.length]!;
 
-      const result = await db
-        .insert(reviewsTable)
-        .values({
-          userId: reviewer.id,
-          eventId: pub.id,
-          vendorId: pub.vendorId,
-          rating: RATINGS[i] ?? 4,
-          comment: COMMENTS[i] ?? "Great pub!",
-        })
-        .onConflictDoNothing()
-        .returning();
+        const user = await ensureUser(email, referralCode, name, passwordHash);
+        if (!user) continue;
 
-      if (result.length > 0) {
-        inserted++;
-      } else {
-        skipped++;
+        const result = await db
+          .insert(reviewsTable)
+          .values({
+            userId: user.id,
+            eventId: event.id,
+            vendorId: event.vendorId,
+            rating: RATINGS[ri % RATINGS.length] ?? 4,
+            comment: COMMENTS[ri % COMMENTS.length] ?? "Great pub!",
+          })
+          .onConflictDoNothing()
+          .returning();
+
+        if (result.length > 0) inserted++;
+        else skipped++;
       }
     }
   }
