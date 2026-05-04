@@ -5,6 +5,7 @@ import {
   useListEvents,
   useListVendorReviews,
 } from "@workspace/api-client-react";
+import { ReviewForm } from "@/components/ReviewForm";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -24,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventCard } from "@/components/EventCard";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 interface DrinkPlan {
@@ -235,6 +237,7 @@ export default function PartnerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const vendorId = Number(id);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
@@ -539,7 +542,7 @@ export default function PartnerDetailScreen() {
                     <Ionicons name="person" size={14} color={colors.mutedForeground} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.reviewerName, { color: colors.foreground }]}>Customer</Text>
+                    <Text style={[styles.reviewerName, { color: colors.foreground }]}>{r.userName || "Customer"}</Text>
                     <View style={{ flexDirection: "row", gap: 2 }}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Ionicons key={i} name={i < r.rating ? "star" : "star-outline"} size={11} color={colors.primary} />
@@ -554,6 +557,9 @@ export default function PartnerDetailScreen() {
             ))}
           </View>
         ) : null}
+
+        {/* Review submission form — shown only to logged-in users */}
+        <ReviewForm user={user} reviews={reviews} vendorId={vendorId} />
       </View>
 
       <MobileFooter />

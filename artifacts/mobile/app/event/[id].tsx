@@ -13,6 +13,7 @@ import {
   useListVendorDrinkPlans,
   useRemoveFromWishlist,
 } from "@workspace/api-client-react";
+import { ReviewForm } from "@/components/ReviewForm";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -738,6 +739,38 @@ export default function EventDetailScreen() {
                 </Pressable>
               ) : null}
             </View>
+          ) : null}
+
+          {/* Reviews */}
+          {(reviews ?? []).length > 0 ? (
+            <View style={{ gap: 10 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
+              {(reviews ?? []).slice(0, 5).map((r) => (
+                <View key={r.id} style={[styles.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.reviewHeader}>
+                    <View style={[styles.reviewAvatar, { backgroundColor: colors.muted }]}>
+                      <Ionicons name="person" size={14} color={colors.mutedForeground} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.reviewerName, { color: colors.foreground }]}>{r.userName || "Customer"}</Text>
+                      <View style={{ flexDirection: "row", gap: 2 }}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Ionicons key={i} name={i < r.rating ? "star" : "star-outline"} size={11} color={colors.primary} />
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                  {r.comment ? (
+                    <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Review submission form — shown only to logged-in users */}
+          {vendor?.id ? (
+            <ReviewForm user={user} reviews={reviews} eventId={eventId} vendorId={vendor.id} />
           ) : null}
         </View>
 
