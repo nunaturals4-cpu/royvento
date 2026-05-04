@@ -47,6 +47,8 @@ import type {
   ImportGooglePubBody,
   ImportGooglePubResponse,
   ListEventsParams,
+  ListVendorBookings200,
+  ListVendorBookingsParams,
   ListVendorsParams,
   LoginBody,
   MeResponse,
@@ -2719,41 +2721,60 @@ export function useListMyBookings<
 /**
  * @summary Bookings received by the current vendor
  */
-export const getListVendorBookingsUrl = () => {
-  return `/api/bookings/vendor`;
+export const getListVendorBookingsUrl = (params?: ListVendorBookingsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/bookings/vendor?${stringifiedParams}`
+    : `/api/bookings/vendor`;
 };
 
 export const listVendorBookings = async (
+  params?: ListVendorBookingsParams,
   options?: RequestInit,
-): Promise<Booking[]> => {
-  return customFetch<Booking[]>(getListVendorBookingsUrl(), {
+): Promise<ListVendorBookings200> => {
+  return customFetch<ListVendorBookings200>(getListVendorBookingsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListVendorBookingsQueryKey = () => {
-  return [`/api/bookings/vendor`] as const;
+export const getListVendorBookingsQueryKey = (
+  params?: ListVendorBookingsParams,
+) => {
+  return [`/api/bookings/vendor`, ...(params ? [params] : [])] as const;
 };
 
 export const getListVendorBookingsQueryOptions = <
   TData = Awaited<ReturnType<typeof listVendorBookings>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listVendorBookings>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListVendorBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVendorBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListVendorBookingsQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getListVendorBookingsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listVendorBookings>>
-  > = ({ signal }) => listVendorBookings({ signal, ...requestOptions });
+  > = ({ signal }) => listVendorBookings(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listVendorBookings>>,
@@ -2774,15 +2795,18 @@ export type ListVendorBookingsQueryError = ErrorType<unknown>;
 export function useListVendorBookings<
   TData = Awaited<ReturnType<typeof listVendorBookings>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listVendorBookings>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListVendorBookingsQueryOptions(options);
+>(
+  params?: ListVendorBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVendorBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVendorBookingsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

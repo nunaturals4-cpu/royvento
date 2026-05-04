@@ -837,6 +837,18 @@ export const ListEventsDrinkPlanType = {
   custom: "custom",
 } as const;
 
+export type ListVendorBookingsParams = {
+  page?: number;
+  limit?: number;
+};
+
+export type ListVendorBookings200 = {
+  data: Booking[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
 export type GetBookingTicketCode200 = {
   ticketCode: string;
 };

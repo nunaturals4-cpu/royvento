@@ -5,13 +5,11 @@ import {
   customFetch,
   getGetMyVendorQueryKey,
   getListMyVendorEventsQueryKey,
-  getListVendorBookingsQueryKey,
   useCreateEvent,
   useDeleteEvent,
   useGetMyVendor,
   useGetPartnerCheckinReport,
   useListMyVendorEvents,
-  useListVendorBookings,
   useUpdateBookingStatus,
   useUpdateEvent,
   useUpdateMyVendor,
@@ -774,9 +772,32 @@ export default function VendorDashboardScreen() {
   const vendorQuery = useGetMyVendor();
   const vendor = vendorQuery.data?.vendor ?? null;
 
-  const bookingsQ = useListVendorBookings({
-    query: { queryKey: getListVendorBookingsQueryKey(), enabled: isVendorOrAdmin },
-  });
+  const BOOKING_PAGE_LIMIT = 20;
+  const [bookingItems, setBookingItems] = useState<any[]>([]);
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingTotal, setBookingTotal] = useState(0);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingFetching, setBookingFetching] = useState(false);
+
+  const loadBookings = useCallback(async (pg: number, reset = false) => {
+    if (pg === 1) setBookingLoading(true);
+    else setBookingFetching(true);
+    try {
+      const resp = await customFetch<{ data: any[]; total: number; page: number; totalPages: number }>(
+        `/api/bookings/vendor?page=${pg}&limit=${BOOKING_PAGE_LIMIT}`,
+      );
+      const newItems = (resp as any)?.data ?? [];
+      setBookingTotal((resp as any)?.total ?? 0);
+      setBookingItems((prev) => (reset || pg === 1) ? newItems : [...prev, ...newItems]);
+      setBookingPage(pg);
+    } catch {
+      // silent
+    } finally {
+      setBookingLoading(false);
+      setBookingFetching(false);
+    }
+  }, []);
+
   const eventsQ = useListMyVendorEvents({
     query: { queryKey: getListMyVendorEventsQueryKey(), enabled: isVendorOrAdmin },
   });
@@ -784,10 +805,20 @@ export default function VendorDashboardScreen() {
     mutation: {
       onSuccess: () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        bookingsQ.refetch();
+        loadBookings(1, true);
       },
     },
   });
+
+  useEffect(() => {
+    if (isVendorOrAdmin) loadBookings(1, true);
+  }, [isVendorOrAdmin, loadBookings]);
+
+  const onBookingEndReached = useCallback(() => {
+    const hasMore = bookingItems.length < bookingTotal;
+    if (!hasMore || bookingFetching || bookingLoading) return;
+    loadBookings(bookingPage + 1);
+  }, [bookingItems.length, bookingTotal, bookingFetching, bookingLoading, bookingPage, loadBookings]);
 
   // ─── Create event ────────────────────────────────────────────────────────────
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1254,8 +1285,8 @@ export default function VendorDashboardScreen() {
     );
   }
 
-  const pending = (bookingsQ.data ?? []).filter((b) => b.status === "pending");
-  const allBookings = bookingsQ.data ?? [];
+  const pending = bookingItems.filter((b) => b.status === "pending");
+  const allBookings = bookingItems;
 
   // ─── Reusable event form ─────────────────────────────────────────────────────
   function EventFormFields({
@@ -1482,17 +1513,20 @@ export default function VendorDashboardScreen() {
   // ─── TAB RENDERERS ────────────────────────────────────────────────────────────
 
   function renderBookings() {
-    if (bookingsQ.isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
-    if (allBookings.length === 0) return (
+    if (bookingLoading && bookingItems.length === 0) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
+    if (bookingItems.length === 0) return (
       <EmptyState icon="ticket-outline" title="No bookings yet" subtitle="Customer booking requests will appear here" />
     );
     return (
       <FlatList
-        data={allBookings}
+        data={bookingItems}
         keyExtractor={(b) => String(b.id)}
         contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
-        onRefresh={bookingsQ.refetch}
-        refreshing={bookingsQ.isLoading}
+        onRefresh={() => loadBookings(1, true)}
+        refreshing={bookingLoading && bookingItems.length > 0}
+        onEndReached={onBookingEndReached}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={bookingFetching ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} /> : null}
         renderItem={({ item: b }) => {
           const statusStyle = STATUS_COLORS[b.status ?? "pending"] ?? STATUS_COLORS.pending!;
           return (

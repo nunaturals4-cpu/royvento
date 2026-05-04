@@ -1398,45 +1398,61 @@ export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 /**
  * @summary Bookings received by the current vendor
  */
-export const ListVendorBookingsResponseItem = zod.object({
-  id: zod.number(),
-  eventId: zod.number(),
-  userId: zod.number(),
-  vendorId: zod.number(),
-  bookingDate: zod.string(),
-  guests: zod.number(),
-  totalPrice: zod.number(),
-  notes: zod.string(),
-  status: zod.enum(["pending", "confirmed", "cancelled", "completed"]),
-  createdAt: zod.string(),
-  eventTitle: zod.string(),
-  eventImage: zod.string(),
-  vendorName: zod.string(),
-  userName: zod.string(),
-  userEmail: zod.string(),
-  rejectionReason: zod.string().nullish(),
-  phone: zod.string(),
-  ticketCode: zod
-    .string()
-    .optional()
-    .describe("Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)"),
-  pubMode: zod
-    .string()
-    .optional()
-    .describe(
-      "Booking mode for pub events: 'ticket' or 'event' (table booking)",
-    ),
-  arrivalTime: zod
-    .string()
-    .nullish()
-    .describe("Expected arrival time for table bookings (HH:MM, 24h format)"),
-  personName: zod.string().optional(),
-  checkedIn: zod.boolean().optional(),
-  checkedInAt: zod.string().nullish(),
+export const listVendorBookingsQueryPageDefault = 1;
+export const listVendorBookingsQueryLimitDefault = 20;
+
+export const ListVendorBookingsQueryParams = zod.object({
+  page: zod.coerce.number().default(listVendorBookingsQueryPageDefault),
+  limit: zod.coerce.number().default(listVendorBookingsQueryLimitDefault),
 });
-export const ListVendorBookingsResponse = zod.array(
-  ListVendorBookingsResponseItem,
-);
+
+export const ListVendorBookingsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      eventId: zod.number(),
+      userId: zod.number(),
+      vendorId: zod.number(),
+      bookingDate: zod.string(),
+      guests: zod.number(),
+      totalPrice: zod.number(),
+      notes: zod.string(),
+      status: zod.enum(["pending", "confirmed", "cancelled", "completed"]),
+      createdAt: zod.string(),
+      eventTitle: zod.string(),
+      eventImage: zod.string(),
+      vendorName: zod.string(),
+      userName: zod.string(),
+      userEmail: zod.string(),
+      rejectionReason: zod.string().nullish(),
+      phone: zod.string(),
+      ticketCode: zod
+        .string()
+        .optional()
+        .describe(
+          "Vendor-specific scannable ticket code (e.g. BLCK-000042-F9)",
+        ),
+      pubMode: zod
+        .string()
+        .optional()
+        .describe(
+          "Booking mode for pub events: 'ticket' or 'event' (table booking)",
+        ),
+      arrivalTime: zod
+        .string()
+        .nullish()
+        .describe(
+          "Expected arrival time for table bookings (HH:MM, 24h format)",
+        ),
+      personName: zod.string().optional(),
+      checkedIn: zod.boolean().optional(),
+      checkedInAt: zod.string().nullish(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  totalPages: zod.number(),
+});
 
 /**
  * @summary Get the vendor-specific ticket code for a booking

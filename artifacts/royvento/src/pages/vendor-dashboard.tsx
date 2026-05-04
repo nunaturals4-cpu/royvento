@@ -61,7 +61,11 @@ export function VendorDashboard() {
   const { data: vendorData, refetch: refetchVendor } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
   const { data: events = [], refetch: refetchEvents } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
-  const { data: bookings = [], refetch: refetchBookings } = useListVendorBookings({ query: { enabled: !!vendor } as any });
+  const { data: bookingsResp, refetch: refetchBookings } = useListVendorBookings(
+    { page: 1, limit: 500 },
+    { query: { enabled: !!vendor } as any },
+  );
+  const bookings = bookingsResp?.data ?? [];
 
   const hasPub = (events as any[]).some((e: any) => e.type === "pub");
 
@@ -1636,8 +1640,11 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
   );
 }
 
+const BR_PAGE_SIZE = 20;
+
 function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refetch: () => void }) {
   const [preset, setPreset] = useState<ReportPreset>("12m");
+  const [bookTablePage, setBookTablePage] = useState(1);
 
   const now = new Date();
   const startDate = (() => {
@@ -1706,13 +1713,18 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
     "12m": "Last 12 months",
   };
 
+  const sortedFiltered = [...filtered].sort((a: any, b: any) => b.id - a.id);
+  const brTotalPages = Math.max(1, Math.ceil(sortedFiltered.length / BR_PAGE_SIZE));
+  const safeBrPage = Math.min(bookTablePage, brTotalPages);
+  const brPageRows = sortedFiltered.slice((safeBrPage - 1) * BR_PAGE_SIZE, safeBrPage * BR_PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       {/* Date preset picker */}
       <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
         <div>
           <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Time range</Label>
-          <Select value={preset} onValueChange={(v) => setPreset(v as ReportPreset)}>
+          <Select value={preset} onValueChange={(v) => { setPreset(v as ReportPreset); setBookTablePage(1); }}>
             <SelectTrigger className="w-44">
               <SelectValue>{presetLabel[preset]}</SelectValue>
             </SelectTrigger>
@@ -1872,10 +1884,15 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
             </div>
           )}
 
-          {/* Per-event table */}
+          {/* All bookings table with pagination */}
           {filtered.length > 0 && (
             <div className="rounded-2xl glass-card p-6">
-              <h3 className="font-serif text-xl mb-4">All bookings</h3>
+              <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                <h3 className="font-serif text-xl">All bookings</h3>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {sortedFiltered.length} booking{sortedFiltered.length !== 1 ? "s" : ""}
+                </span>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[640px]">
                   <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
@@ -1891,7 +1908,7 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
                     </tr>
                   </thead>
                   <tbody>
-                    {[...filtered].sort((a: any, b: any) => b.id - a.id).map((b: any) => (
+                    {brPageRows.map((b: any) => (
                       <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                         <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
                         <td className="py-2.5 pr-3 tabular-nums">{b.bookingDate}</td>
@@ -1917,6 +1934,15 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
                   </tbody>
                 </table>
               </div>
+              {brTotalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+                  <Button variant="outline" size="sm" disabled={safeBrPage <= 1} onClick={() => setBookTablePage((p) => p - 1)}>← Prev</Button>
+                  <span className="text-xs text-muted-foreground">
+                    {(safeBrPage - 1) * BR_PAGE_SIZE + 1}–{Math.min(safeBrPage * BR_PAGE_SIZE, sortedFiltered.length)} of {sortedFiltered.length}
+                  </span>
+                  <Button variant="outline" size="sm" disabled={safeBrPage >= brTotalPages} onClick={() => setBookTablePage((p) => p + 1)}>Next →</Button>
+                </div>
+              )}
             </div>
           )}
 

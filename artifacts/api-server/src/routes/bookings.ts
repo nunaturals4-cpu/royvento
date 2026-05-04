@@ -807,15 +807,35 @@ router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
     .limit(1);
   const vendor = vRows[0];
   if (!vendor) {
-    res.json([]);
+    res.json({ data: [], total: 0, page: 1, totalPages: 0 });
     return;
   }
+
+  const rawPage = parseInt(String(req.query["page"] ?? "1"), 10);
+  const rawLimit = parseInt(String(req.query["limit"] ?? "20"), 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 && rawLimit <= 1000 ? rawLimit : 20;
+  const offset = (page - 1) * limit;
+
+  const where = eq(bookingsTable.vendorId, vendor.id);
+
+  const [countRow] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(bookingsTable)
+    .where(where);
+
+  const total = countRow?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
   const rows = await db
     .select()
     .from(bookingsTable)
-    .where(eq(bookingsTable.vendorId, vendor.id))
-    .orderBy(desc(bookingsTable.createdAt));
-  res.json(await serializeBookings(rows));
+    .where(where)
+    .orderBy(desc(bookingsTable.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  res.json({ data: await serializeBookings(rows), total, page, totalPages });
 });
 
 router.patch(

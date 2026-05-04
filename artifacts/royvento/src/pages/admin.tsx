@@ -124,10 +124,14 @@ function toDateStr(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+const ADMIN_PER_VENDOR_PAGE_SIZE = 10;
+const ADMIN_VENDOR_PAGE_SIZE = 10;
+
 function Analytics() {
   const [preset, setPreset] = useState<AnalyticsPreset>("30d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [perVendorPage, setPerVendorPage] = useState(1);
 
   const now = new Date();
   const computedRange = (() => {
@@ -378,37 +382,50 @@ function Analytics() {
       </div>
 
       {/* Ticket sales by venue */}
-      {(adminData.perVendor ?? []).length > 0 && (
-        <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-4">Ticket sales by venue</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[520px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
-                <tr>
-                  <th className="text-left py-2 pr-4">Venue</th>
-                  <th className="text-right py-2 px-2">Bookings</th>
-                  <th className="text-right py-2 px-2 text-pink-300">Women</th>
-                  <th className="text-right py-2 px-2 text-blue-300">Men</th>
-                  <th className="text-right py-2 px-2 text-purple-300">Couples</th>
-                  <th className="text-right py-2 pl-2">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(adminData.perVendor ?? []).map((row) => (
-                  <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="py-3 pr-4 font-medium">{row.vendorName}</td>
-                    <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
-                    <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
-                    <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
-                    <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
-                    <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
+      {(adminData.perVendor ?? []).length > 0 && (() => {
+        const pvAll = adminData.perVendor ?? [];
+        const pvTotalPages = Math.max(1, Math.ceil(pvAll.length / ADMIN_PER_VENDOR_PAGE_SIZE));
+        const safePvPage = Math.min(perVendorPage, pvTotalPages);
+        const pvRows = pvAll.slice((safePvPage - 1) * ADMIN_PER_VENDOR_PAGE_SIZE, safePvPage * ADMIN_PER_VENDOR_PAGE_SIZE);
+        return (
+          <div className="rounded-2xl glass-card p-6">
+            <h3 className="font-serif text-xl mb-4">Ticket sales by venue</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[520px]">
+                <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                  <tr>
+                    <th className="text-left py-2 pr-4">Venue</th>
+                    <th className="text-right py-2 px-2">Bookings</th>
+                    <th className="text-right py-2 px-2 text-pink-300">Women</th>
+                    <th className="text-right py-2 px-2 text-blue-300">Men</th>
+                    <th className="text-right py-2 px-2 text-purple-300">Couples</th>
+                    <th className="text-right py-2 pl-2">Revenue</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pvRows.map((row) => (
+                    <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-3 pr-4 font-medium">{row.vendorName}</td>
+                      <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
+                      <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
+                      <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
+                      <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
+                      <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pvTotalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+                <Button variant="outline" size="sm" disabled={safePvPage <= 1} onClick={() => setPerVendorPage((p) => p - 1)}>← Prev</Button>
+                <span className="text-xs text-muted-foreground">Page {safePvPage} of {pvTotalPages} · {pvAll.length} venues</span>
+                <Button variant="outline" size="sm" disabled={safePvPage >= pvTotalPages} onClick={() => setPerVendorPage((p) => p + 1)}>Next →</Button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="rounded-2xl glass-card p-6">
         <h3 className="font-serif text-xl mb-4">Recent bookings</h3>
@@ -461,6 +478,7 @@ function statusColor(s: string) {
 function AllVendorsAdmin() {
   const [vendors, setVendors] = useState<AdminVendor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<AdminVendor>>({});
   const [saving, setSaving] = useState(false);
@@ -510,10 +528,14 @@ function AllVendorsAdmin() {
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
   if (vendors.length === 0) return <p className="text-muted-foreground">No partners found.</p>;
 
+  const vendorTotalPages = Math.max(1, Math.ceil(vendors.length / ADMIN_VENDOR_PAGE_SIZE));
+  const safeVendorPage = Math.min(page, vendorTotalPages);
+  const pageVendors = vendors.slice((safeVendorPage - 1) * ADMIN_VENDOR_PAGE_SIZE, safeVendorPage * ADMIN_VENDOR_PAGE_SIZE);
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{vendors.length} partner{vendors.length !== 1 ? "s" : ""} total</p>
-      {vendors.map((v) => (
+      {pageVendors.map((v) => (
         <div key={v.id} className="rounded-2xl glass-card overflow-hidden">
           <div className="flex flex-col md:flex-row">
             {v.bannerImage && (
@@ -641,6 +663,13 @@ function AllVendorsAdmin() {
           )}
         </div>
       ))}
+      {vendorTotalPages > 1 && (
+        <div className="flex items-center justify-between pt-4 border-t border-white/10">
+          <Button variant="outline" size="sm" disabled={safeVendorPage <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</Button>
+          <span className="text-xs text-muted-foreground">Page {safeVendorPage} of {vendorTotalPages}</span>
+          <Button variant="outline" size="sm" disabled={safeVendorPage >= vendorTotalPages} onClick={() => setPage((p) => p + 1)}>Next →</Button>
+        </div>
+      )}
     </div>
   );
 }
