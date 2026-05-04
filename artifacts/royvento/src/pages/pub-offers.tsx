@@ -112,17 +112,6 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Section label — inside container padding */}
-      <div className="flex items-center gap-3 mb-0 px-4 md:px-6 container mx-auto">
-        <div className="flex items-center gap-2">
-          <Megaphone className="h-4 w-4 text-primary" />
-          <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">
-            {t("pub_offers.whats_on")}
-          </span>
-        </div>
-        <div className="flex-1 h-px bg-white/10" />
-      </div>
-
       {/* Full-bleed hero slider */}
       <div className="relative w-full overflow-hidden mt-4" style={{ minHeight: 400 }}>
         {/* Blurred background */}
@@ -267,10 +256,6 @@ export function PubOffers() {
       {/* Page header — contained */}
       <div className="container mx-auto px-4 md:px-6 pt-14 pb-10">
         <header className="max-w-3xl">
-          <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
-            <Wine className="h-3.5 w-3.5" /> {t("nav.pub_offers")}
-          </p>
-          <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pub_offers.title")}</h1>
         </header>
       </div>
 
