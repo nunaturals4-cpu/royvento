@@ -23,9 +23,10 @@ interface ReviewFormProps {
   reviews: Review[] | undefined;
   eventId?: number;
   vendorId: number;
+  isEligible: boolean;
 }
 
-export function ReviewForm({ user, reviews, eventId, vendorId }: ReviewFormProps) {
+export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: ReviewFormProps) {
   const colors = useColors();
   const qc = useQueryClient();
   const createReview = useCreateReview();
@@ -75,7 +76,33 @@ export function ReviewForm({ user, reviews, eventId, vendorId }: ReviewFormProps
         </Text>
       </View>
 
-      {hasDuplicate ? (
+      {!isEligible ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            padding: 12,
+            borderRadius: 10,
+            backgroundColor: colors.muted,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Ionicons name="ticket-outline" size={16} color={colors.mutedForeground} />
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: "Inter_400Regular",
+              color: colors.mutedForeground,
+              flex: 1,
+              lineHeight: 18,
+            }}
+          >
+            You need to book this to leave a review.
+          </Text>
+        </View>
+      ) : hasDuplicate ? (
         <View
           style={{
             flexDirection: "row",

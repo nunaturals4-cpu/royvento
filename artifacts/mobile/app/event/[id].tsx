@@ -10,6 +10,7 @@ import {
   useGetEvent,
   useGetWishlist,
   useListEventReviews,
+  useListMyBookings,
   useListVendorDrinkPlans,
   useRemoveFromWishlist,
 } from "@workspace/api-client-react";
@@ -162,6 +163,9 @@ export default function EventDetailScreen() {
 
   const wishlistQuery = useGetWishlist({ query: { queryKey: getGetWishlistQueryKey(), enabled: !!user } });
   const isWishlisted = wishlistQuery.data?.some((w) => w.id === eventId) ?? false;
+
+  const { data: myBookings } = useListMyBookings({ query: { queryKey: getListMyBookingsQueryKey(), enabled: !!user } });
+  const hasEventBooking = (myBookings ?? []).some((b) => b.eventId === eventId);
 
   const addMutation = useAddToWishlist({
     mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }) },
@@ -768,9 +772,15 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
-          {/* Review submission form — shown only to logged-in users */}
+          {/* Review submission form — shown only to logged-in users with a booking */}
           {vendor?.id ? (
-            <ReviewForm user={user} reviews={reviews} eventId={eventId} vendorId={vendor.id} />
+            <ReviewForm
+              user={user}
+              reviews={reviews}
+              eventId={eventId}
+              vendorId={vendor.id}
+              isEligible={hasEventBooking}
+            />
           ) : null}
         </View>
 

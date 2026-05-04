@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
   customFetch,
+  getListMyBookingsQueryKey,
   useGetVendor,
   useListEvents,
+  useListMyBookings,
   useListVendorReviews,
 } from "@workspace/api-client-react";
 import { ReviewForm } from "@/components/ReviewForm";
@@ -244,6 +246,8 @@ export default function PartnerDetailScreen() {
   const { data: vendor, isLoading } = useGetVendor(vendorId);
   const { data: reviews } = useListVendorReviews(vendorId);
   const { data: events } = useListEvents();
+  const { data: myBookings } = useListMyBookings({ query: { queryKey: getListMyBookingsQueryKey(), enabled: !!user } });
+  const hasVendorBooking = (myBookings ?? []).some((b) => b.vendorId === vendorId);
 
   const vendorEvents = (events ?? []).filter((e) => e.vendorId === vendorId);
   const avgRating = reviews?.length
@@ -558,8 +562,13 @@ export default function PartnerDetailScreen() {
           </View>
         ) : null}
 
-        {/* Review submission form — shown only to logged-in users */}
-        <ReviewForm user={user} reviews={reviews} vendorId={vendorId} />
+        {/* Review submission form — shown only to logged-in users with a booking */}
+        <ReviewForm
+          user={user}
+          reviews={reviews}
+          vendorId={vendorId}
+          isEligible={hasVendorBooking}
+        />
       </View>
 
       <MobileFooter />
