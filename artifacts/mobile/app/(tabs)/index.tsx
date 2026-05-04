@@ -284,30 +284,37 @@ export default function HomeScreen() {
             contentContainerStyle={styles.row}
             renderItem={({ item }) => (
               <Pressable
-                style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[styles.announcementCard, { backgroundColor: "#18181c", borderColor: "rgba(212,175,55,0.18)" }]}
                 onPress={() => item.eventId ? router.push(`/event/${item.eventId}` as never) : undefined}
               >
-                <View style={[styles.announcementBadge, { backgroundColor: colors.primary + "22" }]}>
-                  <Ionicons name="megaphone-outline" size={13} color={colors.primary} />
-                  <Text style={[styles.announcementVenue, { color: colors.primary }]} numberOfLines={1}>
+                <View style={[styles.announcementBadge, { backgroundColor: "rgba(212,175,55,0.15)" }]}>
+                  <Ionicons name="megaphone-outline" size={13} color="#D4AF37" />
+                  <Text style={[styles.announcementVenue, { color: "#D4AF37" }]} numberOfLines={1}>
                     {item.vendorName}
                   </Text>
                 </View>
-                <Text style={[styles.announcementTitle, { color: colors.foreground }]} numberOfLines={2}>
+                <Text style={[styles.announcementTitle, { color: "#fff" }]} numberOfLines={2}>
                   {item.title}
                 </Text>
                 {item.body ? (
-                  <Text style={[styles.announcementBody, { color: colors.mutedForeground }]} numberOfLines={2}>
+                  <Text style={[styles.announcementBody, { color: "rgba(255,255,255,0.55)" }]} numberOfLines={2}>
                     {item.body}
                   </Text>
                 ) : null}
                 {item.announceDate ? (
-                  <View style={styles.announcementDateRow}>
-                    <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
-                    <Text style={[styles.announcementDate, { color: colors.mutedForeground }]}>
+                  <View style={[styles.announcementDateRow, { borderTopColor: "rgba(255,255,255,0.08)", borderTopWidth: 1, marginTop: 4, paddingTop: 8 }]}>
+                    <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.4)" />
+                    <Text style={[styles.announcementDate, { color: "rgba(255,255,255,0.4)" }]}>
                       {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                      {item.announceTime ? `  ·  ${item.announceTime}` : ""}
                     </Text>
+                    {item.announceTime ? (
+                      <>
+                        <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.4)" style={{ marginLeft: 8 }} />
+                        <Text style={[styles.announcementDate, { color: "rgba(255,255,255,0.4)" }]}>
+                          {item.announceTime}
+                        </Text>
+                      </>
+                    ) : null}
                   </View>
                 ) : null}
               </Pressable>
@@ -447,11 +454,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   announcementCard: {
-    width: 220,
-    borderRadius: 14,
+    width: 248,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 14,
-    gap: 6,
+    padding: 16,
+    gap: 8,
   },
   announcementBadge: {
     flexDirection: "row",
