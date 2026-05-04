@@ -1,3 +1,22 @@
+/**
+ * seedPubReviews.ts — Seed realistic fake reviews for every approved pub event.
+ *
+ * DESIGN NOTE — why supplemental accounts exist:
+ * The `reviews` table has a unique constraint on (userId, vendorId), meaning a
+ * user can only review a given vendor once — not once per event. With only 7
+ * canonical seed reviewers, vendors that have multiple approved pub events can
+ * only receive reviews on their first (lowest-id) event before the constraint
+ * blocks further inserts for the same reviewer+vendor pair.
+ *
+ * To guarantee every pub listing card shows a rating, the script falls back to
+ * supplemental per-event accounts (seed.reviewer.ev<eventId>.r<ri>@royvento.in)
+ * whenever a canonical reviewer's insert is blocked by conflict. For vendors with
+ * a single pub event the 7 canonical accounts are used exclusively. Supplemental
+ * accounts are only created when the current schema makes them necessary.
+ *
+ * The script is idempotent: all inserts use ON CONFLICT DO NOTHING and reviewer
+ * accounts are looked up by email before creation, so reruns are safe.
+ */
 import { db, usersTable, eventsTable, reviewsTable } from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
