@@ -2,17 +2,22 @@ import { db, usersTable, eventsTable, reviewsTable } from "@workspace/db";
 import { and, asc, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
-const REVIEWER_NAMES = [
-  "Arjun Mehta",
-  "Priya Sharma",
-  "Rohan Das",
-  "Kavya Reddy",
-  "Siddharth Nair",
-  "Ananya Iyer",
-  "Vikram Bose",
+/**
+ * Exactly 7 deterministic seed reviewer accounts.
+ * Emails follow the required `seed.reviewer.NNN@royvento.in` pattern.
+ * Unique referral codes (SEEDREV001-007) satisfy the users_referral_code_idx constraint.
+ */
+const SEED_REVIEWERS = [
+  { email: "seed.reviewer.001@royvento.in", name: "Arjun Mehta",    code: "SEEDREV001" },
+  { email: "seed.reviewer.002@royvento.in", name: "Priya Sharma",   code: "SEEDREV002" },
+  { email: "seed.reviewer.003@royvento.in", name: "Rohan Das",      code: "SEEDREV003" },
+  { email: "seed.reviewer.004@royvento.in", name: "Kavya Reddy",    code: "SEEDREV004" },
+  { email: "seed.reviewer.005@royvento.in", name: "Siddharth Nair", code: "SEEDREV005" },
+  { email: "seed.reviewer.006@royvento.in", name: "Ananya Iyer",    code: "SEEDREV006" },
+  { email: "seed.reviewer.007@royvento.in", name: "Vikram Bose",    code: "SEEDREV007" },
 ];
 
-const RATINGS = [4, 5, 4, 5, 5, 4, 4];
+const RATINGS  = [4, 5, 4, 5, 5, 4, 4];
 
 const COMMENTS = [
   "Amazing vibe and great cocktails! Will definitely come back.",
@@ -24,48 +29,38 @@ const COMMENTS = [
   "Incredible ambience and attentive staff. Highly recommend for a special night out.",
 ];
 
-/**
- * Return or create a seed reviewer account for a specific event slot.
- *
- * Identity is keyed on stable (eventId, reviewerIndex) — eventId is immutable
- * so the mapping is deterministic across reruns regardless of query order.
- *
- * The DB unique constraint is on (userId, vendorId), not (userId, eventId).
- * To guarantee exactly 7 reviews per event, even when a vendor has multiple
- * pub events, we need 7 distinct (userId, vendorId) pairs per event. Scoping
- * reviewer identity to eventId achieves this without touching the schema.
- */
-async function ensureReviewer(
-  eventId: number,
-  ri: number,
-  passwordHash: string,
-): Promise<typeof usersTable.$inferSelect | undefined> {
-  const email = `seed.reviewer.ev${eventId}.r${ri}@royvento.in`;
-  const referralCode = `SREV${eventId}R${ri}`;
-
-  let user = (
-    await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1)
-  )[0];
-  if (!user) {
-    [user] = await db
-      .insert(usersTable)
-      .values({
-        email,
-        passwordHash,
-        name: REVIEWER_NAMES[ri % REVIEWER_NAMES.length]!,
-        role: "user",
-        phone: "",
-        referralCode,
-      })
-      .returning();
+async function ensureReviewers(passwordHash: string) {
+  const users: (typeof usersTable.$inferSelect)[] = [];
+  for (const r of SEED_REVIEWERS) {
+    let user = (
+      await db.select().from(usersTable).where(eq(usersTable.email, r.email)).limit(1)
+    )[0];
+    if (!user) {
+      [user] = await db
+        .insert(usersTable)
+        .values({
+          email: r.email,
+          passwordHash,
+          name: r.name,
+          role: "user",
+          phone: "",
+          referralCode: r.code,
+        })
+        .returning();
+    }
+    if (user) users.push(user);
   }
-  return user;
+  return users;
 }
 
 async function main() {
   console.log("Seeding pub reviews…");
 
-  // Stable ordering makes iteration deterministic across reruns.
+  const passwordHash = await bcrypt.hash("Seed@Reviewer#2024!", 10);
+  const reviewers = await ensureReviewers(passwordHash);
+  console.log(`Ensured ${reviewers.length} reviewer accounts.`);
+
+  // Order by id so the primary (lowest-id) event per vendor is stable across reruns.
   const pubs = await db
     .select()
     .from(eventsTable)
@@ -74,15 +69,18 @@ async function main() {
 
   console.log(`Found ${pubs.length} approved pub events.`);
 
-  const passwordHash = await bcrypt.hash("Seed@Reviewer#2024!", 10);
+  // The DB unique constraint is on (userId, vendorId): each reviewer can leave one
+  // review per vendor. When a vendor has multiple pub events, only the primary
+  // (lowest id) event can receive all 7 reviews — subsequent events for the same
+  // vendor are skipped by conflict guard (ON CONFLICT DO NOTHING).
+  // This is the correct behaviour for 7 global reviewers: each pub/vendor gets 7
+  // seed reviews anchored to its earliest approved event.
   let inserted = 0;
   let skipped = 0;
 
   for (const event of pubs) {
-    for (let ri = 0; ri < 7; ri++) {
-      const reviewer = await ensureReviewer(event.id, ri, passwordHash);
-      if (!reviewer) continue;
-
+    for (let ri = 0; ri < reviewers.length; ri++) {
+      const reviewer = reviewers[ri]!;
       const result = await db
         .insert(reviewsTable)
         .values({
