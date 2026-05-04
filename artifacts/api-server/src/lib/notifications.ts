@@ -651,6 +651,95 @@ export interface CustomerCancelledNotification {
   cancellationReason: string;
 }
 
+// ─── Upcoming event deletion warning ──────────────────────────────────────────
+
+export interface UpcomingDeletionWarning {
+  to: string;
+  toName: string;
+  vendorName: string;
+  events: { id: number; title: string; eventDate: string }[];
+  daysLeft: number;
+}
+
+export async function sendUpcomingDeletionWarningEmail(
+  params: UpcomingDeletionWarning,
+): Promise<void> {
+  const firstName = params.toName.split(" ")[0];
+  const dashboardUrl = `${getAppUrl()}/dashboard/vendor`;
+  const count = params.events.length;
+  const eventWord = count === 1 ? "event" : "events";
+
+  const eventListHtml = params.events
+    .map(
+      (e) =>
+        `<tr>
+          <td style="padding:8px 16px;color:#1a1a1a;font-size:13px;font-weight:600;">${esc(e.title)}</td>
+          <td style="padding:8px 16px;color:#666666;font-size:13px;white-space:nowrap;">${e.eventDate ? fmtDate(e.eventDate) : "—"}</td>
+        </tr>`,
+    )
+    .join(
+      `<tr><td colspan="2" style="padding:0 16px;"><div style="border-top:1px solid #eeeeee;"></div></td></tr>`,
+    );
+
+  const eventListTable = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f7f7f7;border-radius:8px;margin:20px 0;">
+    <tr>
+      <th style="padding:8px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#888888;">Event</th>
+      <th style="padding:8px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#888888;">Date</th>
+    </tr>
+    <tr><td colspan="2" style="padding:0 16px;"><div style="border-top:1px solid #dddddd;"></div></td></tr>
+    ${eventListHtml}
+  </table>`;
+
+  const html = layout(`
+    ${greeting(firstName)}
+    ${para(
+      `As part of our regular maintenance, Royvento automatically removes event listings 30 days after their event date. ` +
+        `${count} of your past ${eventWord} will be deleted in approximately ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"}.`,
+    )}
+    ${eventListTable}
+    ${para(
+      "If you need to keep a record of attendance, revenue, or booking details for any of these events, " +
+        "please log in to your partner dashboard and export the data before the deadline.",
+    )}
+    ${btn("Open Partner Dashboard", dashboardUrl)}
+    ${divider()}
+    <p style="margin:0;color:#888888;font-size:13px;">
+      This is an automated reminder. If you have questions, please contact Royvento support.
+    </p>
+    ${signature(false)}
+  `);
+
+  const eventLines = params.events.map(
+    (e) => `  • ${e.title} (${e.eventDate ? fmtDate(e.eventDate) : "date unknown"})`,
+  );
+
+  const text = [
+    `Hi ${firstName},`,
+    ``,
+    `As part of our regular maintenance, Royvento automatically removes event listings 30 days after their event date.`,
+    `${count} of your past ${eventWord} will be deleted in approximately ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"}:`,
+    ``,
+    ...eventLines,
+    ``,
+    `If you need to keep a record of attendance, revenue, or booking details for any of these events,`,
+    `please log in to your partner dashboard and export the data before the deadline.`,
+    ``,
+    `  ${dashboardUrl}`,
+    ``,
+    `This is an automated reminder. If you have questions, please contact Royvento support.`,
+    ``,
+    `— Royvento`,
+  ].join("\n");
+
+  await deliver("Upcoming Event Deletion Warning (to partner)", {
+    to: params.to,
+    toName: params.toName,
+    subject: `Action needed: ${count} past ${eventWord} will be removed in ~${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"}`,
+    text,
+    html,
+  });
+}
+
 export async function sendCustomerCancelledBookingEmail(
   b: CustomerCancelledNotification,
 ): Promise<void> {

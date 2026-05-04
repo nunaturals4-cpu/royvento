@@ -1,7 +1,8 @@
-import { db, eventsTable, announcementsTable } from "@workspace/db";
-import { and, ne, sql, lt } from "drizzle-orm";
+import { db, eventsTable, announcementsTable, vendorsTable, usersTable } from "@workspace/db";
+import { and, ne, sql, lt, gte, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { sendUpcomingDeletionWarningEmail } from "../lib/notifications";
 
 const objectStorage = new ObjectStorageService();
 
@@ -94,7 +95,100 @@ export async function deleteExpiredAnnouncements(): Promise<void> {
   }
 }
 
+/**
+ * Emails each partner whose events are 23–24 days past their event date —
+ * i.e., will be auto-deleted in roughly 6–7 days by the 30-day cleanup rule.
+ * Runs once per day so each vendor gets at most one warning email per window.
+ */
+export async function warnPartnersAboutUpcomingDeletion(): Promise<void> {
+  try {
+    const warningHigh = new Date();
+    warningHigh.setDate(warningHigh.getDate() - 23);
+    const warningLow = new Date();
+    warningLow.setDate(warningLow.getDate() - 24);
+
+    const highStr = warningHigh.toISOString().slice(0, 10);
+    const lowStr = warningLow.toISOString().slice(0, 10);
+
+    const rows = await db
+      .select({
+        eventId: eventsTable.id,
+        eventTitle: eventsTable.title,
+        eventDate: eventsTable.eventDate,
+        vendorId: vendorsTable.id,
+        vendorName: vendorsTable.businessName,
+        ownerEmail: usersTable.email,
+        ownerName: usersTable.name,
+      })
+      .from(eventsTable)
+      .innerJoin(vendorsTable, eq(eventsTable.vendorId, vendorsTable.id))
+      .innerJoin(usersTable, eq(vendorsTable.userId, usersTable.id))
+      .where(
+        and(
+          sql`${eventsTable.eventDate} IS NOT NULL`,
+          gte(eventsTable.eventDate, lowStr),
+          lt(eventsTable.eventDate, highStr),
+        ),
+      );
+
+    if (rows.length === 0) return;
+
+    type VendorGroup = {
+      vendorName: string;
+      ownerEmail: string;
+      ownerName: string;
+      events: { id: number; title: string; eventDate: string }[];
+    };
+    const byVendor = new Map<number, VendorGroup>();
+
+    for (const row of rows) {
+      let group = byVendor.get(row.vendorId);
+      if (!group) {
+        group = {
+          vendorName: row.vendorName,
+          ownerEmail: row.ownerEmail,
+          ownerName: row.ownerName,
+          events: [],
+        };
+        byVendor.set(row.vendorId, group);
+      }
+      group.events.push({
+        id: row.eventId,
+        title: row.eventTitle,
+        eventDate: row.eventDate ?? "",
+      });
+    }
+
+    let emailsSent = 0;
+    let emailsFailed = 0;
+
+    for (const [vendorId, group] of byVendor) {
+      try {
+        await sendUpcomingDeletionWarningEmail({
+          to: group.ownerEmail,
+          toName: group.ownerName,
+          vendorName: group.vendorName,
+          events: group.events,
+          daysLeft: 7,
+        });
+        emailsSent++;
+      } catch (err) {
+        emailsFailed++;
+        logger.warn({ err, vendorId }, "Cleanup: failed to send deletion warning email");
+      }
+    }
+
+    logger.info(
+      { eventCount: rows.length, emailsSent, emailsFailed },
+      "Cleanup: sent upcoming deletion warnings",
+    );
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to run upcoming deletion warnings");
+  }
+}
+
 export async function runCleanup(): Promise<void> {
+  await warnPartnersAboutUpcomingDeletion();
   await deletePastEvents();
   await deleteExpiredAnnouncements();
 }
