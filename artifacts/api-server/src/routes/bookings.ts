@@ -26,7 +26,6 @@ import {
   sendBookingCreatedEmails,
   sendBookingStatusEmail,
   sendCustomerCancelledBookingEmail,
-  sendTicketScannedEmail,
 } from "../lib/notifications";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 
@@ -1692,36 +1691,6 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     } catch (err) {
       req.log.error({ err, couponCode: updated.couponCode }, "Failed to mark coupon used at scan time");
     }
-  }
-
-  // Fire-and-forget ticket-scanned email to the customer
-  try {
-    const customerRows = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, updated.userId))
-      .limit(1);
-    const customer = customerRows[0];
-    const eRows = await db
-      .select()
-      .from(eventsTable)
-      .where(eq(eventsTable.id, updated.eventId))
-      .limit(1);
-    const evt = eRows[0];
-    if (customer && evt) {
-      sendTicketScannedEmail({
-        to: customer.email,
-        toName: customer.name,
-        bookingId: updated.id,
-        eventTitle: evt.title,
-        vendorName: out?.vendorName ?? "this venue",
-        checkedInAt: now,
-      }).catch((err) => {
-        console.error("Failed to send ticket-scanned email:", err);
-      });
-    }
-  } catch (err) {
-    console.error("Failed to trigger ticket-scanned email:", err);
   }
 
   const okComm = calcScanCommission(updated);

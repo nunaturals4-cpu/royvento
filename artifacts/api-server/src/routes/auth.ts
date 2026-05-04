@@ -16,7 +16,6 @@ import {
 } from "../lib/auth";
 import {
   sendPasswordResetEmail,
-  sendWelcomeEmail,
   sendEmailVerificationEmail,
 } from "../lib/notifications";
 
@@ -246,10 +245,6 @@ router.get("/auth/verify-email", async (req, res) => {
   const jwtToken = signToken({ userId: user.id, role: user.role as Role });
   setAuthCookie(res, jwtToken);
 
-  // Send welcome email (fire-and-forget)
-  sendWelcomeEmail({ to: user.email, toName: user.name }).catch((err) => {
-    console.error("Failed to send welcome email after verification:", err);
-  });
 
   // Redirect back to app with success flag
   const base = req.headers.origin ?? "";
@@ -462,9 +457,6 @@ router.get("/auth/google/callback", async (req, res) => {
         return;
       }
       user = created;
-      sendWelcomeEmail({ to: user.email, toName: user.name }).catch((err) => {
-        console.error("Failed to send Google sign-up welcome email:", err);
-      });
     }
 
     const token = signToken({ userId: user.id, role: user.role as Role });
@@ -640,7 +632,6 @@ router.post("/auth/google/mobile", async (req, res) => {
         return;
       }
       user = created;
-      sendWelcomeEmail({ to: user.email, toName: user.name }).catch(() => {});
     }
 
     const token = signToken({ userId: user.id, role: user.role as Role });
