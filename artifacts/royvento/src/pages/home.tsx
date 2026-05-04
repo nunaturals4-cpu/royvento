@@ -271,18 +271,18 @@ export function Home() {
           <div className="container mx-auto px-4 md:px-6 relative">
             <div className="mb-10">
               <p className="text-xs uppercase tracking-[0.2em] text-amber-400 mb-3 flex items-center gap-2">
-                <Megaphone className="h-3.5 w-3.5" /> Fresh from the venues
+                <Megaphone className="h-3.5 w-3.5" /> {t("home.announcements_label")}
               </p>
               <h2 className="font-serif text-4xl md:text-6xl tracking-tight leading-none">
-                What's On
+                {t("home.announcements_title")}
               </h2>
               <div className="mt-3 h-px w-24 bg-gradient-to-r from-amber-400/60 to-transparent" />
             </div>
 
             <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
-              {announcements.map((a) => (
-                <Link key={a.id} href={a.eventId ? `/events/${a.eventId}` : "#"} className="snap-start flex-shrink-0">
-                  <div className="rounded-2xl border border-white/10 bg-zinc-900/90 p-5 cursor-pointer hover:bg-zinc-800/90 transition-colors w-72 sm:w-80 flex flex-col gap-3 h-full">
+              {announcements.map((a) => {
+                const cardInner = (
+                  <div className="rounded-2xl border border-white/10 bg-zinc-900/90 p-5 hover:bg-zinc-800/90 transition-colors w-72 sm:w-80 flex flex-col gap-3 h-full">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center flex-shrink-0">
                         <Megaphone className="h-3.5 w-3.5 text-amber-400" />
@@ -304,8 +304,13 @@ export function Home() {
                       )}
                     </div>
                   </div>
-                </Link>
-              ))}
+                );
+                return a.eventId ? (
+                  <Link key={a.id} href={`/events/${a.eventId}`} className="snap-start flex-shrink-0 cursor-pointer">{cardInner}</Link>
+                ) : (
+                  <div key={a.id} className="snap-start flex-shrink-0">{cardInner}</div>
+                );
+              })}
             </div>
           </div>
         </section>
