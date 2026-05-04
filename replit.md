@@ -160,6 +160,41 @@ Full feature parity with web app. New screens and features in `artifacts/mobile/
   - Success state shows pub name, address, phone, website, opening hours table, and cover photo
 - OpenAPI spec updated + codegen rerun: `importGooglePub` mutation hook available in `@workspace/api-client-react`
 
+## Web mobile-feature parity (Task #349, May 2026)
+Five features ported from mobile to the web app:
+
+### Scanner Managers UI (vendor dashboard)
+- Already existed as `ManagersPanel` in `artifacts/royvento/src/pages/vendor-dashboard.tsx`
+- Invite-by-email form + manager table with status and remove button ("Managers" tab)
+
+### Torch Toggle (ticket scanner)
+- `CameraScanner` in `artifacts/royvento/src/pages/ticket-scanner.tsx` detects torch capability via `track.getCapabilities().torch`
+- A ⚡ button appears in the top-right corner of the camera view only when the device supports it
+- Uses `track.applyConstraints({ advanced: [{ torch: true/false }] })`
+
+### Share Ticket (bookings page)
+- `PremiumTicket` in `artifacts/royvento/src/pages/bookings.tsx` now has a **Share** button alongside Print/PDF
+- Uses `navigator.share()` (native share sheet on mobile browsers) with clipboard fallback
+
+### Points History (profile page)
+- New API endpoint `GET /api/users/me/points-history` in `artifacts/api-server/src/routes/users.ts`
+  - Queries referrals (earned) and bookings (spent) and returns a unified sorted timeline
+- Profile sidebar (`artifacts/royvento/src/pages/profile.tsx`) now shows a **Points history** card with balance and activity log (↑ earned, ↓ spent with dates)
+
+### Web Push Notifications
+- Service worker registered at `artifacts/royvento/public/sw.js` (handles `push` and `notificationclick` events)
+- Registered in `artifacts/royvento/src/main.tsx` on page load
+- `usersTable` gains `web_push_subscription text` column (nullable) — migrated via `pnpm --filter @workspace/db run push`
+- New router `artifacts/api-server/src/routes/webPush.ts`:
+  - `GET /api/push/vapid-public-key` — returns public key for client subscription
+  - `POST /api/push/subscribe` — saves PushSubscription JSON to user row
+  - `DELETE /api/push/subscribe` — clears subscription
+  - `sendWebPushToUser(userId, payload)` — exported helper for other routes to dispatch notifications
+- Profile sidebar shows an **Enable notifications** toggle (only when browser supports Push API)
+- **Required secrets:**
+  - `VAPID_PUBLIC_KEY` — already set as shared env var: `BKvgL950R9ydip_K15JmRudEzfSj1vtgNCrQmq07p-T2PQSlspfcSQ739hvMaDSVGB4-eWe7DhbJt4EcF5cG3Go`
+  - `VAPID_PRIVATE_KEY` — must be added as a Replit secret (value: `aP-9hv5H-rs9Fka5CixvYX43229M3lfF_2m-yXDsRjk`)
+
 ## Common tasks
 - Regenerate API client: `pnpm --filter @workspace/api-spec run codegen`
 - Push DB schema: `pnpm --filter @workspace/db run push`
