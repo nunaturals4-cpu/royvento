@@ -25,6 +25,8 @@ const AnnouncementBody = z.object({
   announceDate: z.string().optional().default(""),
   announceTime: z.string().optional().default(""),
   imageUrl: z.string().optional().default(""),
+  genre: z.string().optional().default(""),
+  eventType: z.string().optional().default(""),
 });
 
 router.get("/partner/announcements", requireAuth(["vendor"]), async (req, res) => {
@@ -56,6 +58,8 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
       announceDate: parsed.data.announceDate,
       announceTime: parsed.data.announceTime,
       imageUrl: parsed.data.imageUrl,
+      genre: parsed.data.genre,
+      eventType: parsed.data.eventType,
     })
     .returning();
 
@@ -144,6 +148,8 @@ router.get("/announcements/recent", async (_req, res) => {
       COALESCE(NULLIF(a.image_url, ''), v.cover_image_url) AS "coverImageUrl",
       a.vendor_id     AS "vendorId",
       a.created_at    AS "createdAt",
+      a.genre         AS "genre",
+      a.event_type    AS "eventType",
       v.business_name AS "vendorName",
       COALESCE(
         a.event_id,

@@ -69,6 +69,9 @@ const EVENT_CATEGORIES = [
   "Festival", "Concert", "Brand Activation", "Pubs",
 ];
 
+const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
+const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
+
 interface BlockedDate {
   id: number;
   date: string;
@@ -2665,14 +2668,19 @@ export default function VendorDashboardScreen() {
     announceDate: string;
     announceTime: string;
     imageUrl: string;
+    genre: string;
+    eventType: string;
     createdAt: string;
   }
+  const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", genre: "", eventType: "" };
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [annLoading, setAnnLoading] = useState(false);
   const [showAnnModal, setShowAnnModal] = useState(false);
-  const [annForm, setAnnForm] = useState({ title: "", body: "", announceDate: "", announceTime: "" });
+  const [annForm, setAnnForm] = useState(emptyAnnForm);
   const [annSubmitting, setAnnSubmitting] = useState(false);
   const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
+  const [annGenreFilter, setAnnGenreFilter] = useState("");
+  const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
 
   const fetchAnnouncements = useCallback(() => {
     setAnnLoading(true);
@@ -2705,7 +2713,7 @@ export default function VendorDashboardScreen() {
       }
       setShowAnnModal(false);
       setEditingAnn(null);
-      setAnnForm({ title: "", body: "", announceDate: "", announceTime: "" });
+      setAnnForm(emptyAnnForm);
       fetchAnnouncements();
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -2729,27 +2737,60 @@ export default function VendorDashboardScreen() {
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
         <TouchableOpacity
           style={[styles.createBtn, { backgroundColor: colors.primary }]}
-          onPress={() => { setEditingAnn(null); setAnnForm({ title: "", body: "", announceDate: "", announceTime: "" }); setShowAnnModal(true); }}
+          onPress={() => { setEditingAnn(null); setAnnForm(emptyAnnForm); setShowAnnModal(true); }}
         >
           <Ionicons name="add" size={18} color={colors.primaryForeground} />
           <Text style={[styles.createBtnText, { color: colors.primaryForeground }]}>New Announcement</Text>
         </TouchableOpacity>
+
+        {/* Genre filter chips */}
+        <View style={{ marginBottom: 4 }}>
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold", fontSize: 12, marginBottom: 6 }}>Genre</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+            {["", ...ANN_GENRES].map((g) => (
+              <TouchableOpacity
+                key={g || "all"}
+                onPress={() => setAnnGenreFilter(g)}
+                style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annGenreFilter === g ? colors.primary : colors.border, backgroundColor: annGenreFilter === g ? colors.primary + "18" : colors.card }}
+              >
+                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annGenreFilter === g ? colors.primary : colors.mutedForeground }}>{g || "All"}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Event Type filter chips */}
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold", fontSize: 12, marginBottom: 6 }}>Event Type</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+            {["", ...ANN_EVENT_TYPES].map((et) => (
+              <TouchableOpacity
+                key={et || "all"}
+                onPress={() => setAnnEventTypeFilter(et)}
+                style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annEventTypeFilter === et ? colors.primary : colors.border, backgroundColor: annEventTypeFilter === et ? colors.primary + "18" : colors.card }}
+              >
+                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annEventTypeFilter === et ? colors.primary : colors.mutedForeground }}>{et || "All"}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {annLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
-        ) : announcements.length === 0 ? (
+        ) : announcements.filter((a) => (!annGenreFilter || a.genre === annGenreFilter) && (!annEventTypeFilter || a.eventType === annEventTypeFilter)).length === 0 ? (
           <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
             <Ionicons name="megaphone-outline" size={40} color={colors.mutedForeground} />
             <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
-              No announcements yet. Create one to notify your customers.
+              {annGenreFilter || annEventTypeFilter ? "No announcements match these filters." : "No announcements yet. Create one to notify your customers."}
             </Text>
           </View>
         ) : (
-          announcements.map((a) => (
+          announcements.filter((a) => (!annGenreFilter || a.genre === annGenreFilter) && (!annEventTypeFilter || a.eventType === annEventTypeFilter)).map((a) => (
             <View key={a.id} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                 <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14, flex: 1 }}>{a.title}</Text>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <TouchableOpacity onPress={() => { setEditingAnn(a); setAnnForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime }); setShowAnnModal(true); }}>
+                  <TouchableOpacity onPress={() => { setEditingAnn(a); setAnnForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, genre: a.genre ?? "", eventType: a.eventType ?? "" }); setShowAnnModal(true); }}>
                     <Ionicons name="pencil-outline" size={16} color={colors.primary} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => Alert.alert("Delete?", `Delete "${a.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteAnnouncement(a.id) }])}>
@@ -2758,6 +2799,12 @@ export default function VendorDashboardScreen() {
                 </View>
               </View>
               {a.body ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 2 }} numberOfLines={2}>{a.body}</Text> : null}
+              {(a.genre || a.eventType) ? (
+                <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                  {a.genre ? <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: colors.primary + "18" }}><Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.primary }}>{a.genre}</Text></View> : null}
+                  {a.eventType ? <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: colors.muted }}><Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{a.eventType}</Text></View> : null}
+                </View>
+              ) : null}
               {a.announceDate ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
                   <Ionicons name="calendar-outline" size={12} color={colors.mutedForeground} />
@@ -2801,6 +2848,38 @@ export default function VendorDashboardScreen() {
                   />
                 </View>
               ))}
+
+              {/* Genre picker */}
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Genre</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {["", ...ANN_GENRES].map((g) => (
+                    <TouchableOpacity
+                      key={g || "none"}
+                      onPress={() => setAnnForm((p) => ({ ...p, genre: g }))}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: annForm.genre === g ? colors.primary : colors.border, backgroundColor: annForm.genre === g ? colors.primary + "18" : colors.card }}
+                    >
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: annForm.genre === g ? colors.primary : colors.mutedForeground }}>{g || "None"}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Event Type picker */}
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Event Type</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {["", ...ANN_EVENT_TYPES].map((et) => (
+                    <TouchableOpacity
+                      key={et || "none"}
+                      onPress={() => setAnnForm((p) => ({ ...p, eventType: et }))}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: annForm.eventType === et ? colors.primary : colors.border, backgroundColor: annForm.eventType === et ? colors.primary + "18" : colors.card }}
+                    >
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: annForm.eventType === et ? colors.primary : colors.mutedForeground }}>{et || "None"}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             </ScrollView>
           </View>
         </Modal>

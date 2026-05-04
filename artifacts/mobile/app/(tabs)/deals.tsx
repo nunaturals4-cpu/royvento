@@ -33,6 +33,16 @@ import { useLanguage } from "@/context/LanguageContext";
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const ANNOUNCEMENT_CARD_WIDTH = SCREEN_WIDTH - 40;
 
+const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
+const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
+const DEAL_TYPES = ["welcome", "unlimited", "ticket", "discount"] as const;
+const DEAL_TYPE_LABELS: Record<string, string> = {
+  welcome: "Welcome Drink",
+  unlimited: "Unlimited",
+  ticket: "With Ticket",
+  discount: "Discount",
+};
+
 interface RecentAnnouncement {
   id: number;
   title: string;
@@ -44,6 +54,8 @@ interface RecentAnnouncement {
   vendorName: string;
   eventId: number;
   eventTitle: string;
+  genre: string;
+  eventType: string;
 }
 
 function getPlanLabel(plan: DrinkPlanSummary): string {
@@ -267,6 +279,11 @@ export default function DealsScreen() {
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
+  const [annGenreFilter, setAnnGenreFilter] = useState("");
+  const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
+  const [dealTypeFilter, setDealTypeFilter] = useState("");
+  const [dealGenderFilter, setDealGenderFilter] = useState("");
+
   const { data: drinkOffers = [], isLoading: dealsLoading, refetch: refetchDeals, isRefetching: isRefetchingDeals } = useListVendorDrinkOffers();
   const { data: announcements = [], isLoading: annLoading, refetch: refetchAnn } = useQuery<RecentAnnouncement[]>({
     queryKey: ["announcements", "recent"],
@@ -281,6 +298,21 @@ export default function DealsScreen() {
     refetchDeals();
     refetchAnn();
   }
+
+  const filteredAnnouncements = announcements.filter((a) => {
+    if (annGenreFilter && a.genre !== annGenreFilter) return false;
+    if (annEventTypeFilter && a.eventType !== annEventTypeFilter) return false;
+    return true;
+  });
+
+  const filteredDeals = (drinkOffers as VendorDrinkOffer[]).filter((offer) => {
+    if (!dealTypeFilter && !dealGenderFilter) return true;
+    return offer.plans.some((p) => {
+      const typeMatch = !dealTypeFilter || p.type === dealTypeFilter;
+      const genderMatch = !dealGenderFilter || (dealGenderFilter === "female" ? p.gender === "female" : p.gender !== "female");
+      return typeMatch && genderMatch;
+    });
+  });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -323,7 +355,42 @@ export default function DealsScreen() {
         >
           {/* Announcement Slider */}
           {announcements.length > 0 && (
-            <AnnouncementSlider announcements={announcements} />
+            <View>
+              {/* Announcement filter chips */}
+              <View style={{ paddingHorizontal: 20, paddingTop: 12, gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <Ionicons name="musical-notes-outline" size={13} color={colors.mutedForeground} />
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Genre</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+                  {["", ...ANN_GENRES].map((g) => (
+                    <Pressable
+                      key={g || "all"}
+                      onPress={() => setAnnGenreFilter(g === annGenreFilter ? "" : g)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annGenreFilter === g ? colors.primary : colors.border, backgroundColor: annGenreFilter === g ? colors.primary + "18" : colors.card }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annGenreFilter === g ? colors.primary : colors.mutedForeground }}>{g || "All"}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Event Type</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 4 }}>
+                  {["", ...ANN_EVENT_TYPES].map((et) => (
+                    <Pressable
+                      key={et || "all"}
+                      onPress={() => setAnnEventTypeFilter(et === annEventTypeFilter ? "" : et)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annEventTypeFilter === et ? colors.primary : colors.border, backgroundColor: annEventTypeFilter === et ? colors.primary + "18" : colors.card }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annEventTypeFilter === et ? colors.primary : colors.mutedForeground }}>{et || "All"}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+              <AnnouncementSlider announcements={filteredAnnouncements} />
+            </View>
           )}
 
           {/* Drink Deals */}
@@ -333,10 +400,10 @@ export default function DealsScreen() {
               <Text style={[styles.dealsSectionTitle, { color: colors.foreground }]}>
                 {t("events.drink_deals")}
               </Text>
-              {drinkOffers.length > 0 && (
+              {filteredDeals.length > 0 && (
                 <View style={[styles.countBadge, { backgroundColor: colors.primary + "18" }]}>
                   <Text style={[styles.countText, { color: colors.primary }]}>
-                    {drinkOffers.length}
+                    {filteredDeals.length}
                   </Text>
                 </View>
               )}
@@ -349,7 +416,41 @@ export default function DealsScreen() {
               </Pressable>
             </View>
 
-            {drinkOffers.length === 0 ? (
+            {/* Deal Type filter chips */}
+            <View style={{ gap: 8, marginBottom: 14 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="pricetag-outline" size={13} color={colors.mutedForeground} />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Deal Type</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+                {(["", ...DEAL_TYPES] as string[]).map((dt) => (
+                  <Pressable
+                    key={dt || "all"}
+                    onPress={() => setDealTypeFilter(dt === dealTypeFilter ? "" : dt)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: dealTypeFilter === dt ? colors.primary : colors.border, backgroundColor: dealTypeFilter === dt ? colors.primary + "18" : colors.card }}
+                  >
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: dealTypeFilter === dt ? colors.primary : colors.mutedForeground }}>{dt ? DEAL_TYPE_LABELS[dt] : "All"}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="people-outline" size={13} color={colors.mutedForeground} />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>For</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+                {[{ key: "", label: "Everyone" }, { key: "female", label: "Ladies" }, { key: "other", label: "Mixed / All" }].map((opt) => (
+                  <Pressable
+                    key={opt.key || "all"}
+                    onPress={() => setDealGenderFilter(opt.key === dealGenderFilter ? "" : opt.key)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: dealGenderFilter === opt.key ? colors.primary : colors.border, backgroundColor: dealGenderFilter === opt.key ? colors.primary + "18" : colors.card }}
+                  >
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: dealGenderFilter === opt.key ? colors.primary : colors.mutedForeground }}>{opt.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+
+            {filteredDeals.length === 0 ? (
               <EmptyState
                 icon="wine-outline"
                 title={t("deals.no_deals")}
@@ -357,7 +458,7 @@ export default function DealsScreen() {
               />
             ) : (
               <FlatList
-                data={drinkOffers as VendorDrinkOffer[]}
+                data={filteredDeals}
                 keyExtractor={(item) => String(item.vendorId)}
                 scrollEnabled={false}
                 contentContainerStyle={styles.dealsList}

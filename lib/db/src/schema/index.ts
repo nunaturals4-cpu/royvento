@@ -494,6 +494,8 @@ export const announcementsTable = pgTable(
     announceTime: varchar("announce_time", { length: 20 }).notNull().default(""),
     imageUrl: text("image_url").notNull().default(""),
     isFeaturedSlider: boolean("is_featured_slider").notNull().default(false),
+    genre: varchar("genre", { length: 100 }).notNull().default(""),
+    eventType: varchar("event_type", { length: 100 }).notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
