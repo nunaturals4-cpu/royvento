@@ -353,20 +353,21 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
 
   const shareTicket = async () => {
-    const text = `My ticket to ${b.eventTitle} at ${b.vendorName} (${b.bookingDate}) — Code: ${ticketCode}`;
+    const url = `${window.location.origin}${import.meta.env.BASE_URL}dashboard/bookings`;
+    const text = `My ticket to ${b.eventTitle} at ${b.vendorName} on ${b.bookingDate} — Code: ${ticketCode}`;
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: `Ticket: ${b.eventTitle}`, text });
+        await navigator.share({ title: `Ticket: ${b.eventTitle}`, text, url });
         return;
       } catch {
         // user cancelled or share failed — fall through to clipboard
       }
     }
     try {
-      await navigator.clipboard.writeText(text);
-      toast({ title: "Ticket details copied to clipboard" });
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      toast({ title: "Ticket link copied to clipboard" });
     } catch {
-      toast({ title: "Copy failed", description: text });
+      toast({ title: "Copy failed", description: url });
     }
   };
 

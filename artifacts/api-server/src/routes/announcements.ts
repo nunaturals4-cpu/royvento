@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, announcementsTable, vendorsTable, eventsTable } from "@workspace/db";
-import { eq, desc, and, or, sql } from "drizzle-orm";
+import { db, announcementsTable, vendorsTable, eventsTable, bookingsTable, usersTable } from "@workspace/db";
+import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
+import { sendWebPushToUser } from "./webPush";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 
@@ -54,6 +55,38 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
       imageUrl: parsed.data.imageUrl,
     })
     .returning();
+
+  // Notify all users with confirmed/completed bookings for this vendor's events
+  setImmediate(async () => {
+    try {
+      const eventRows = await db
+        .select({ id: eventsTable.id })
+        .from(eventsTable)
+        .where(eq(eventsTable.vendorId, vendor.id));
+      const eventIds = eventRows.map((e) => e.id);
+      if (eventIds.length === 0) return;
+      const bookingRows = await db
+        .selectDistinct({ userId: bookingsTable.userId })
+        .from(bookingsTable)
+        .where(
+          and(
+            inArray(bookingsTable.eventId, eventIds),
+            inArray(bookingsTable.status, ["confirmed", "completed"]),
+          ),
+        );
+      for (const { userId } of bookingRows) {
+        sendWebPushToUser(userId, {
+          title: `${vendor.businessName}: ${parsed.data.title}`,
+          body: parsed.data.body || parsed.data.title,
+          url: `/`,
+          tag: `announcement-${row?.id ?? Date.now()}`,
+        }).catch(() => {});
+      }
+    } catch {
+      // non-critical — ignore errors
+    }
+  });
+
   return res.json(row);
 });
 

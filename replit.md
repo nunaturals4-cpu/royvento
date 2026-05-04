@@ -192,8 +192,8 @@ Five features ported from mobile to the web app:
   - `sendWebPushToUser(userId, payload)` — exported helper for other routes to dispatch notifications
 - Profile sidebar shows an **Enable notifications** toggle (only when browser supports Push API)
 - **Required secrets:**
-  - `VAPID_PUBLIC_KEY` — already set as shared env var: `BKvgL950R9ydip_K15JmRudEzfSj1vtgNCrQmq07p-T2PQSlspfcSQ739hvMaDSVGB4-eWe7DhbJt4EcF5cG3Go`
-  - `VAPID_PRIVATE_KEY` — must be added as a Replit secret (value: `aP-9hv5H-rs9Fka5CixvYX43229M3lfF_2m-yXDsRjk`)
+  - `VAPID_PUBLIC_KEY` — set as a shared env var (generate with `web-push` if rotating)
+  - `VAPID_PRIVATE_KEY` — must be added as a Replit secret (generate alongside public key)
 
 ## Common tasks
 - Regenerate API client: `pnpm --filter @workspace/api-spec run codegen`

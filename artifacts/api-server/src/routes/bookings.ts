@@ -15,6 +15,7 @@ import {
   vendorManagersTable,
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
+import { sendWebPushToUser } from "./webPush";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -513,6 +514,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       title: "Booking confirmed!",
       message: `Your booking for "${out?.eventTitle ?? evt.title}" is confirmed. See you there!`,
     });
+    sendWebPushToUser(user.id, {
+      title: "Booking confirmed!",
+      body: `Your booking for "${out?.eventTitle ?? evt.title}" is confirmed. See you there!`,
+      url: "/dashboard/bookings",
+      tag: `booking-${out?.id ?? bookingId}`,
+    }).catch(() => {});
   } catch (err) {
     console.error("Failed to create booking confirmation notification:", err);
   }
@@ -1022,6 +1029,12 @@ router.patch(
               },
             ]).catch(() => {});
           }
+          sendWebPushToUser(b.userId, {
+            title: notifTitle,
+            body: notifMessage,
+            url: "/dashboard/bookings",
+            tag: `booking-status-${b.id}`,
+          }).catch(() => {});
         }
       } catch (err) {
         console.error("Failed to create notification:", err);
@@ -1281,6 +1294,12 @@ router.patch(
             title: notifTitle,
             message: notifMessage,
           });
+          sendWebPushToUser(b.userId, {
+            title: notifTitle,
+            body: notifMessage,
+            url: "/dashboard/bookings",
+            tag: `booking-status-${b.id}`,
+          }).catch(() => {});
         }
       } catch (err) {
         console.error("Failed to create notification (admin path):", err);
