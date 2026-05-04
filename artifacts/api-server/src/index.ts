@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { db, announcementsTable } from "@workspace/db";
-import { and, ne, sql } from "drizzle-orm";
+import { runCleanup } from "./jobs/cleanup";
+import cron from "node-cron";
 
 const rawPort = process.env["PORT"];
 
@@ -17,26 +17,6 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-async function deleteExpiredAnnouncements() {
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const result = await db
-      .delete(announcementsTable)
-      .where(
-        and(
-          ne(announcementsTable.announceDate, ""),
-          sql`${announcementsTable.announceDate} < ${today}`,
-        ),
-      )
-      .returning({ id: announcementsTable.id });
-    if (result.length > 0) {
-      logger.info({ count: result.length }, "Deleted expired announcements");
-    }
-  } catch (err) {
-    logger.error({ err }, "Failed to delete expired announcements");
-  }
-}
-
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -45,6 +25,10 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
-  deleteExpiredAnnouncements();
-  setInterval(deleteExpiredAnnouncements, 60 * 60 * 1000);
+  runCleanup();
+
+  cron.schedule("0 2 * * *", () => {
+    logger.info("Running daily cleanup job");
+    runCleanup();
+  });
 });
