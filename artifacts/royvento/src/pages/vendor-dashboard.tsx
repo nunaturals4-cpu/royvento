@@ -25,7 +25,7 @@ import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck,
-  Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX,
+  Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent,
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -2492,11 +2492,33 @@ function AnnouncementsPanel() {
   );
 }
 
+interface AnalyticsTypeSummary {
+  count: number;
+  grossRevenue: number;
+  commissionAmount: number;
+  netRevenue: number;
+}
+
 interface AnalyticsData {
   totalEarnings: number;
   monthEarnings: number;
   codRevenue: number;
   onlineRevenue: number;
+  grossEarnings: number;
+  netEarnings: number;
+  totalCommission: number;
+  codCommission: number;
+  onlineCommission: number;
+  commissionRates: {
+    freeEntryRate: string;
+    ticketRate: string;
+    tableBookingRate: string;
+  };
+  commissionSummary: {
+    freeEntry: AnalyticsTypeSummary;
+    ticket: AnalyticsTypeSummary;
+    table: AnalyticsTypeSummary;
+  };
   perEvent: {
     eventId: number;
     eventTitle: string;
@@ -2507,6 +2529,7 @@ interface AnalyticsData {
     revenue: number;
   }[];
   dailyRevenue: { date: string; revenue: number }[];
+  dailyCommission: { date: string; commission: number }[];
   totalWomen: number;
   totalMen: number;
   totalCouple: number;
@@ -2775,6 +2798,113 @@ function AnalyticsPanel() {
               )}
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Commission breakdown */}
+      {data.commissionRates && (
+        <div className="rounded-3xl glass-card-strong p-6 space-y-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <Percent className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-serif text-xl">Platform commission</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Fees deducted by the platform from your gross earnings.</p>
+            </div>
+          </div>
+
+          {/* Applied rates */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Free Entry rate</p>
+              <p className="text-2xl font-semibold tabular-nums">{data.commissionRates.freeEntryRate}%</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Ticket rate</p>
+              <p className="text-2xl font-semibold tabular-nums">{data.commissionRates.ticketRate}%</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Table Booking rate</p>
+              <p className="text-2xl font-semibold tabular-nums">{data.commissionRates.tableBookingRate}%</p>
+            </div>
+          </div>
+
+          {/* Gross → Net summary — only shown when there are actual earnings */}
+          {data.grossEarnings > 0 && (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Gross earnings</p>
+                <p className="stat-number text-2xl">{formatINR(data.grossEarnings)}</p>
+                <p className="text-xs text-muted-foreground mt-1">before platform fee</p>
+              </div>
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Platform fee</p>
+                <p className="stat-number text-2xl text-red-400">−{formatINR(data.totalCommission)}</p>
+                <p className="text-xs text-muted-foreground mt-1">deducted by Royvento</p>
+              </div>
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net earnings</p>
+                <p className="stat-number text-2xl text-emerald-300">{formatINR(data.netEarnings)}</p>
+                <p className="text-xs text-muted-foreground mt-1">after platform fee</p>
+              </div>
+            </div>
+          )}
+
+          {/* Per-type breakdown */}
+          {(() => {
+            const cs = data.commissionSummary;
+            const types: { key: keyof typeof cs; label: string }[] = [
+              { key: "freeEntry", label: "Free Entry" },
+              { key: "ticket", label: "Ticket" },
+              { key: "table", label: "Table Booking" },
+            ];
+            const active = types.filter((t) => cs[t.key].count > 0);
+            if (active.length === 0) return null;
+            return (
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Breakdown by booking type</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[480px]">
+                    <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                      <tr>
+                        <th className="text-left py-2 pr-4">Type</th>
+                        <th className="text-right py-2 px-2">Bookings</th>
+                        <th className="text-right py-2 px-2">Gross</th>
+                        <th className="text-right py-2 px-2">Commission</th>
+                        <th className="text-right py-2 pl-2">Net</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {active.map(({ key, label }) => {
+                        const row = cs[key];
+                        return (
+                          <tr key={key} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                            <td className="py-3 pr-4 font-medium">{label}</td>
+                            <td className="text-right px-2 tabular-nums">{row.count}</td>
+                            <td className="text-right px-2 tabular-nums">{formatINR(row.grossRevenue)}</td>
+                            <td className="text-right px-2 tabular-nums text-red-400">−{formatINR(row.commissionAmount)}</td>
+                            <td className="text-right pl-2 tabular-nums text-emerald-300 font-medium">{formatINR(row.netRevenue)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {active.length > 1 && (
+                      <tfoot className="border-t border-white/15 text-xs">
+                        <tr>
+                          <td className="py-2 pr-4 font-semibold text-foreground">Total</td>
+                          <td className="text-right px-2 font-semibold tabular-nums">{active.reduce((s, t) => s + cs[t.key].count, 0)}</td>
+                          <td className="text-right px-2 font-semibold tabular-nums">{formatINR(active.reduce((s, t) => s + cs[t.key].grossRevenue, 0))}</td>
+                          <td className="text-right px-2 text-red-400 font-semibold tabular-nums">−{formatINR(active.reduce((s, t) => s + cs[t.key].commissionAmount, 0))}</td>
+                          <td className="text-right pl-2 text-emerald-300 font-semibold tabular-nums">{formatINR(active.reduce((s, t) => s + cs[t.key].netRevenue, 0))}</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

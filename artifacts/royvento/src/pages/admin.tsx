@@ -33,6 +33,7 @@ import {
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
+  Percent, Save,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -42,7 +43,7 @@ import {
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation, useSearch } from "wouter";
-import { apiGet, apiPost, apiDelete, apiPatch, formatINR } from "@/lib/api";
+import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR } from "@/lib/api";
 
 export function AdminPanel() {
   const search = useSearch();
@@ -86,6 +87,7 @@ export function AdminPanel() {
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
+          <TabsTrigger value="commissions"><Percent className="h-3.5 w-3.5 mr-1" />Commissions</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
@@ -103,6 +105,7 @@ export function AdminPanel() {
         <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
         <TabsContent value="import-pub"><ImportPubFromGoogle /></TabsContent>
         <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
+        <TabsContent value="commissions"><CommissionsAdmin /></TabsContent>
       </Tabs>
     </div>
   );
@@ -3152,6 +3155,416 @@ function AnnouncementSliderAdmin() {
                     <AnnouncementSliderRow key={a.id} item={a} toggling={toggling} onToggle={toggle} />
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Commissions ─────────────────────────────────────────────────────────────
+
+interface CommissionRates {
+  freeEntryRate: string;
+  ticketRate: string;
+  tableBookingRate: string;
+}
+
+interface CommissionBookingLine {
+  id: number;
+  finalPrice: number;
+  bookingType: "free_entry" | "ticket" | "table";
+  commissionRate: number;
+  commissionAmount: number;
+  createdAt: string;
+}
+
+interface CommissionVendorRow {
+  vendorId: number;
+  businessName: string;
+  city: string;
+  appliedRates: CommissionRates;
+  totalBookings: number;
+  totalRevenue: number;
+  totalCommission: number;
+  freeEntryCount: number;
+  freeEntryRevenue: number;
+  freeEntryCommission: number;
+  ticketCount: number;
+  ticketRevenue: number;
+  ticketCommission: number;
+  tableCount: number;
+  tableRevenue: number;
+  tableCommission: number;
+  bookings: CommissionBookingLine[];
+}
+
+interface CommissionReport {
+  rows: CommissionVendorRow[];
+  totals: { totalBookings: number; totalRevenue: number; totalCommission: number };
+}
+
+function CommissionsAdmin() {
+  const { toast } = useToast();
+
+  // Rate editor state
+  const [ratesReport, setRatesReport] = useState<CommissionReport | null>(null);
+  const [ratesLoading, setRatesLoading] = useState(true);
+  const [rateEdits, setRateEdits] = useState<Record<number, CommissionRates>>({});
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  // Commission report state
+  const [reportFrom, setReportFrom] = useState("");
+  const [reportTo, setReportTo] = useState("");
+  const [report, setReport] = useState<CommissionReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [expandedVendors, setExpandedVendors] = useState<Set<number>>(new Set());
+
+  const loadRates = async () => {
+    setRatesLoading(true);
+    try {
+      const data = await apiGet<CommissionReport>("/api/admin/commission-report");
+      setRatesReport(data);
+      const edits: Record<number, CommissionRates> = {};
+      for (const row of data.rows) {
+        edits[row.vendorId] = { ...row.appliedRates };
+      }
+      setRateEdits(edits);
+    } catch (e: any) {
+      toast({ title: "Failed to load commission data", description: e?.message, variant: "destructive" });
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  const loadReport = async () => {
+    setReportLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (reportFrom) qs.set("from", reportFrom);
+      if (reportTo) qs.set("to", reportTo);
+      const data = await apiGet<CommissionReport>(`/api/admin/commission-report${qs.toString() ? `?${qs}` : ""}`);
+      setReport(data);
+    } catch (e: any) {
+      toast({ title: "Failed to load report", description: e?.message, variant: "destructive" });
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  useEffect(() => { loadRates(); }, []);
+
+  useEffect(() => { loadReport(); }, [reportFrom, reportTo]);
+
+  const saveRates = async (vendorId: number) => {
+    const rates = rateEdits[vendorId];
+    if (!rates) return;
+    const free = Number(rates.freeEntryRate);
+    const ticket = Number(rates.ticketRate);
+    const table = Number(rates.tableBookingRate);
+    if ([free, ticket, table].some((n) => !Number.isFinite(n) || n < 0 || n > 100)) {
+      toast({ title: "Rates must be between 0 and 100", variant: "destructive" });
+      return;
+    }
+    setSavingId(vendorId);
+    try {
+      await apiPut(`/api/admin/vendors/${vendorId}/commission`, {
+        freeEntryRate: free,
+        ticketRate: ticket,
+        tableBookingRate: table,
+      });
+      toast({ title: "Commission rates saved" });
+      await Promise.all([loadRates(), loadReport()]);
+    } catch (e: any) {
+      toast({ title: "Failed to save", description: e?.message, variant: "destructive" });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const updateRate = (vendorId: number, field: keyof CommissionRates, value: string) => {
+    setRateEdits((prev) => ({
+      ...prev,
+      [vendorId]: { ...prev[vendorId], [field]: value },
+    }));
+  };
+
+  const toggleVendor = (vendorId: number) => {
+    setExpandedVendors((prev) => {
+      const next = new Set(prev);
+      if (next.has(vendorId)) next.delete(vendorId);
+      else next.add(vendorId);
+      return next;
+    });
+  };
+
+  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table") => {
+    if (t === "free_entry") return "Free Entry";
+    if (t === "ticket") return "Ticket";
+    return "Table";
+  };
+
+  return (
+    <div className="space-y-8">
+
+      {/* ── Rate management ────────────────────────────────────────────── */}
+      <div className="rounded-2xl glass-card p-6">
+        <div className="flex items-start gap-3 mb-6">
+          <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 red-ring">
+            <Percent className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-serif text-2xl">Commission rates per partner</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Set the platform fee (%) applied to each booking type for every approved vendor.</p>
+          </div>
+        </div>
+
+        {ratesLoading ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : !ratesReport || ratesReport.rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No approved partners found.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[680px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-4">Partner</th>
+                  <th className="text-right py-2 px-3">Free Entry %</th>
+                  <th className="text-right py-2 px-3">Ticket %</th>
+                  <th className="text-right py-2 px-3">Table Booking %</th>
+                  <th className="text-right py-2 pl-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {ratesReport.rows.map((row) => {
+                  const edits = rateEdits[row.vendorId] ?? row.appliedRates;
+                  const dirty =
+                    edits.freeEntryRate !== row.appliedRates.freeEntryRate ||
+                    edits.ticketRate !== row.appliedRates.ticketRate ||
+                    edits.tableBookingRate !== row.appliedRates.tableBookingRate;
+                  return (
+                    <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-3 pr-4">
+                        <p className="font-medium">{row.businessName}</p>
+                        {row.city && <p className="text-xs text-muted-foreground">{row.city}</p>}
+                      </td>
+                      <td className="py-2 px-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          value={edits.freeEntryRate}
+                          onChange={(e) => updateRate(row.vendorId, "freeEntryRate", e.target.value)}
+                          className="w-20 text-right h-8 text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          value={edits.ticketRate}
+                          onChange={(e) => updateRate(row.vendorId, "ticketRate", e.target.value)}
+                          className="w-20 text-right h-8 text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          value={edits.tableBookingRate}
+                          onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}
+                          className="w-20 text-right h-8 text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="py-2 pl-3 text-right">
+                        <Button
+                          size="sm"
+                          disabled={!dirty || savingId === row.vendorId}
+                          onClick={() => saveRates(row.vendorId)}
+                          className="text-xs h-8 px-3"
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          {savingId === row.vendorId ? "Saving…" : "Save"}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Commission report ───────────────────────────────────────────── */}
+      <div className="rounded-2xl glass-card p-6">
+        <div className="flex items-start gap-3 mb-6">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <TrendingUp className="h-4 w-4 text-emerald-400" />
+          </div>
+          <div>
+            <h2 className="font-serif text-2xl">Commission report</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Platform earnings from confirmed and completed bookings.</p>
+          </div>
+        </div>
+
+        {/* Date filter */}
+        <div className="flex flex-wrap items-end gap-4 mb-6 p-4 rounded-xl bg-white/[0.03] border border-white/8">
+          <div>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">From</Label>
+            <Input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="w-40" max={reportTo || undefined} />
+          </div>
+          <div>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">To</Label>
+            <Input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="w-40" min={reportFrom || undefined} />
+          </div>
+          {(reportFrom || reportTo) && (
+            <Button variant="outline" size="sm" onClick={() => { setReportFrom(""); setReportTo(""); }}>Clear dates</Button>
+          )}
+        </div>
+
+        {reportLoading ? (
+          <p className="text-muted-foreground text-sm">Loading report…</p>
+        ) : !report ? null : (
+          <div className="space-y-6">
+            {/* Platform totals */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total bookings</p>
+                <p className="stat-number text-2xl">{report.totals.totalBookings}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Gross revenue</p>
+                <p className="stat-number text-2xl">{formatINR(report.totals.totalRevenue)}</p>
+              </div>
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Platform commission</p>
+                <p className="stat-number text-2xl text-primary">{formatINR(report.totals.totalCommission)}</p>
+              </div>
+            </div>
+
+            {/* Per-vendor rows */}
+            {report.rows.filter((r) => r.totalBookings > 0).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No bookings in this date range.</p>
+            ) : (
+              <div className="space-y-2">
+                {report.rows.filter((r) => r.totalBookings > 0).map((row) => {
+                  const expanded = expandedVendors.has(row.vendorId);
+                  return (
+                    <div key={row.vendorId} className="rounded-xl border border-white/10 overflow-hidden">
+                      {/* Vendor summary row */}
+                      <button
+                        onClick={() => toggleVendor(row.vendorId)}
+                        className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> · {row.city}</span> : ""}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Rates: FE {row.appliedRates.freeEntryRate}% / Ticket {row.appliedRates.ticketRate}% / Table {row.appliedRates.tableBookingRate}%
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-6 tabular-nums text-sm shrink-0">
+                          <span className="text-muted-foreground">{row.totalBookings} booking{row.totalBookings !== 1 ? "s" : ""}</span>
+                          <span>{formatINR(row.totalRevenue)}</span>
+                          <span className="text-primary font-semibold">{formatINR(row.totalCommission)}</span>
+                          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                        </div>
+                      </button>
+
+                      {/* Expanded breakdown */}
+                      {expanded && (
+                        <div className="border-t border-white/8 bg-white/[0.02] px-4 py-3 space-y-4">
+                          {/* Type breakdown */}
+                          {(row.freeEntryCount > 0 || row.ticketCount > 0 || row.tableCount > 0) && (
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">By booking type</p>
+                              <table className="w-full text-xs">
+                                <thead className="text-muted-foreground">
+                                  <tr>
+                                    <th className="text-left py-1 pr-3">Type</th>
+                                    <th className="text-right py-1 px-2">Count</th>
+                                    <th className="text-right py-1 px-2">Gross</th>
+                                    <th className="text-right py-1 px-2">Rate</th>
+                                    <th className="text-right py-1 pl-2">Commission</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {row.freeEntryCount > 0 && (
+                                    <tr className="border-t border-white/5">
+                                      <td className="py-1.5 pr-3">Free Entry</td>
+                                      <td className="text-right px-2">{row.freeEntryCount}</td>
+                                      <td className="text-right px-2">{formatINR(row.freeEntryRevenue)}</td>
+                                      <td className="text-right px-2">{row.appliedRates.freeEntryRate}%</td>
+                                      <td className="text-right pl-2 text-primary">{formatINR(row.freeEntryCommission)}</td>
+                                    </tr>
+                                  )}
+                                  {row.ticketCount > 0 && (
+                                    <tr className="border-t border-white/5">
+                                      <td className="py-1.5 pr-3">Ticket</td>
+                                      <td className="text-right px-2">{row.ticketCount}</td>
+                                      <td className="text-right px-2">{formatINR(row.ticketRevenue)}</td>
+                                      <td className="text-right px-2">{row.appliedRates.ticketRate}%</td>
+                                      <td className="text-right pl-2 text-primary">{formatINR(row.ticketCommission)}</td>
+                                    </tr>
+                                  )}
+                                  {row.tableCount > 0 && (
+                                    <tr className="border-t border-white/5">
+                                      <td className="py-1.5 pr-3">Table Booking</td>
+                                      <td className="text-right px-2">{row.tableCount}</td>
+                                      <td className="text-right px-2">{formatINR(row.tableRevenue)}</td>
+                                      <td className="text-right px-2">{row.appliedRates.tableBookingRate}%</td>
+                                      <td className="text-right pl-2 text-primary">{formatINR(row.tableCommission)}</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Individual booking lines */}
+                          {row.bookings.length > 0 && (
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Individual bookings</p>
+                              <table className="w-full text-xs">
+                                <thead className="text-muted-foreground">
+                                  <tr>
+                                    <th className="text-left py-1 pr-3">Booking #</th>
+                                    <th className="text-left py-1 pr-3">Date</th>
+                                    <th className="text-left py-1 pr-3">Type</th>
+                                    <th className="text-right py-1 px-2">Price</th>
+                                    <th className="text-right py-1 px-2">Rate</th>
+                                    <th className="text-right py-1 pl-2">Commission</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {row.bookings.map((b) => (
+                                    <tr key={b.id} className="border-t border-white/5">
+                                      <td className="py-1.5 pr-3 text-muted-foreground">#{b.id}</td>
+                                      <td className="py-1.5 pr-3 text-muted-foreground">
+                                        {new Date(b.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                                      </td>
+                                      <td className="py-1.5 pr-3">{bookingTypeLabel(b.bookingType)}</td>
+                                      <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
+                                      <td className="text-right px-2">{b.commissionRate.toFixed(2)}%</td>
+                                      <td className="text-right pl-2 text-primary">{formatINR(b.commissionAmount)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

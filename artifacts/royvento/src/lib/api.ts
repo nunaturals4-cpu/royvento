@@ -59,6 +59,16 @@ export async function apiDelete<T>(path: string): Promise<T> {
   return handle<T>(res);
 }
 
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  return handle<T>(res);
+}
+
 export const EVENT_TYPES = [
   { value: "wedding", label: "Wedding" },
   { value: "birthday", label: "Birthday" },
