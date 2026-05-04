@@ -1478,7 +1478,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     ...(to ? [lte(bookingsTable.createdAt, to)] : []),
   ];
 
-  const [bookings, commissions, vendors] = await Promise.all([
+  const [bookings, commissions, approvedVendors] = await Promise.all([
     db
       .select({
         id: bookingsTable.id,
@@ -1494,11 +1494,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       .from(bookingsTable)
       .where(and(...whereConditions)),
     db.select().from(vendorCommissionsTable),
-    db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city }).from(vendorsTable),
+    db
+      .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.status, "approved")),
   ]);
 
   const commissionMap = new Map(commissions.map((c) => [c.vendorId, c]));
-  const vendorMap = new Map(vendors.map((v) => [v.id, v]));
 
   type BookingLineItem = {
     id: number;
@@ -1531,6 +1533,34 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
 
   const summaryMap = new Map<number, VendorSummary>();
 
+  // Pre-populate every approved vendor so zero-booking pubs still appear in report
+  for (const v of approvedVendors) {
+    const vendorRates = commissionMap.get(v.id);
+    summaryMap.set(v.id, {
+      vendorId: v.id,
+      businessName: v.businessName,
+      city: v.city ?? "",
+      appliedRates: {
+        freeEntryRate: vendorRates?.freeEntryRate ?? "0",
+        ticketRate: vendorRates?.ticketRate ?? "0",
+        tableBookingRate: vendorRates?.tableBookingRate ?? "0",
+      },
+      totalBookings: 0,
+      totalRevenue: 0,
+      totalCommission: 0,
+      freeEntryCount: 0,
+      freeEntryRevenue: 0,
+      freeEntryCommission: 0,
+      ticketCount: 0,
+      ticketRevenue: 0,
+      ticketCommission: 0,
+      tableCount: 0,
+      tableRevenue: 0,
+      tableCommission: 0,
+      bookings: [],
+    });
+  }
+
   for (const b of bookings) {
     const price = Number(b.finalPrice);
     const rates = commissionMap.get(b.vendorId);
@@ -1557,33 +1587,8 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
 
     const commissionAmount = price * commissionRate;
 
-    if (!summaryMap.has(b.vendorId)) {
-      const vendor = vendorMap.get(b.vendorId);
-      const vendorRates = commissionMap.get(b.vendorId);
-      summaryMap.set(b.vendorId, {
-        vendorId: b.vendorId,
-        businessName: vendor?.businessName ?? `Vendor #${b.vendorId}`,
-        city: vendor?.city ?? "",
-        appliedRates: {
-          freeEntryRate: vendorRates?.freeEntryRate ?? "0",
-          ticketRate: vendorRates?.ticketRate ?? "0",
-          tableBookingRate: vendorRates?.tableBookingRate ?? "0",
-        },
-        totalBookings: 0,
-        totalRevenue: 0,
-        totalCommission: 0,
-        freeEntryCount: 0,
-        freeEntryRevenue: 0,
-        freeEntryCommission: 0,
-        ticketCount: 0,
-        ticketRevenue: 0,
-        ticketCommission: 0,
-        tableCount: 0,
-        tableRevenue: 0,
-        tableCommission: 0,
-        bookings: [],
-      });
-    }
+    // Skip bookings from vendors not in the approved list
+    if (!summaryMap.has(b.vendorId)) continue;
 
     const s = summaryMap.get(b.vendorId)!;
     s.totalBookings += 1;
