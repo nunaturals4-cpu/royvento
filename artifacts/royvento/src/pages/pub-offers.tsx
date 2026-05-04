@@ -19,7 +19,18 @@ interface Announcement {
   eventId: number;
   vendorId: number;
   imageUrl?: string;
+  genre: string;
+  eventType: string;
 }
+
+const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
+const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
+const DEAL_TYPE_LABELS: Record<string, string> = {
+  welcome: "Welcome Drink",
+  unlimited: "Unlimited",
+  ticket: "With Ticket",
+  discount: "Discount",
+};
 
 const SLIDE_GRADIENTS = [
   "from-rose-900 via-rose-950 to-black",
@@ -244,6 +255,11 @@ export function PubOffers() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
 
+  const [annGenreFilter, setAnnGenreFilter] = useState("");
+  const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
+  const [dealTypeFilter, setDealTypeFilter] = useState("");
+  const [dealGenderFilter, setDealGenderFilter] = useState("");
+
   useEffect(() => {
     apiGet<Announcement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
   }, []);
@@ -252,6 +268,21 @@ export function PubOffers() {
   useEffect(() => {
     apiGet<Announcement[]>("/api/announcements/slider").then(setSliderAnnouncements).catch(() => {});
   }, []);
+
+  const filteredAnnouncements = announcements.filter((a) => {
+    if (annGenreFilter && a.genre !== annGenreFilter) return false;
+    if (annEventTypeFilter && a.eventType !== annEventTypeFilter) return false;
+    return true;
+  });
+
+  const filteredDeals = (drinkOffers as VendorDrinkOffer[]).filter((offer) => {
+    if (!dealTypeFilter && !dealGenderFilter) return true;
+    return offer.plans.some((p) => {
+      const typeMatch = !dealTypeFilter || p.type === dealTypeFilter;
+      const genderMatch = !dealGenderFilter || (dealGenderFilter === "female" ? p.gender === "female" : p.gender !== "female");
+      return typeMatch && genderMatch;
+    });
+  });
 
   const hasDeals = (drinkOffers as VendorDrinkOffer[]).length > 0;
   const hasSlider = sliderAnnouncements.length > 0;
@@ -274,7 +305,7 @@ export function PubOffers() {
       {hasDeals && (
         <div className="container mx-auto px-4 md:px-6">
           <section>
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <GlassWater className="h-4 w-4 text-primary" />
                 <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">
@@ -288,8 +319,42 @@ export function PubOffers() {
                 </span>
               </Link>
             </div>
+
+            {/* Deal Type filter */}
+            <div className="mb-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Deal Type</p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(["", "welcome", "unlimited", "ticket", "discount"] as string[]).map((dt) => (
+                  <button
+                    key={dt || "all"}
+                    type="button"
+                    onClick={() => setDealTypeFilter(dt === dealTypeFilter ? "" : dt)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${dealTypeFilter === dt ? "bg-primary/20 border-primary text-primary" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"}`}
+                  >
+                    {dt ? DEAL_TYPE_LABELS[dt] : "All"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">For</p>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {[{ key: "", label: "Everyone" }, { key: "female", label: "Ladies" }, { key: "other", label: "Mixed / All" }].map((opt) => (
+                  <button
+                    key={opt.key || "all"}
+                    type="button"
+                    onClick={() => setDealGenderFilter(opt.key === dealGenderFilter ? "" : opt.key)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${dealGenderFilter === opt.key ? "bg-primary/20 border-primary text-primary" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {filteredDeals.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No deals match these filters.</p>
+            ) : (
             <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-3 lg:grid-cols-4 md:overflow-visible">
-              {(drinkOffers as VendorDrinkOffer[]).map((offer: VendorDrinkOffer) => (
+              {filteredDeals.map((offer: VendorDrinkOffer) => (
                 <Link
                   key={offer.vendorId}
                   href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
@@ -353,6 +418,7 @@ export function PubOffers() {
                 </Link>
               ))}
             </div>
+            )}
           </section>
         </div>
       )}
@@ -360,7 +426,7 @@ export function PubOffers() {
       {/* What's On — horizontal card row */}
       {hasAnnouncements && (
         <div className="container mx-auto px-4 md:px-6 mt-12">
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center gap-2">
               <Megaphone className="h-4 w-4 text-amber-400" />
               <span className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold">
@@ -369,8 +435,46 @@ export function PubOffers() {
             </div>
             <div className="flex-1 h-px bg-white/10" />
           </div>
+
+          {/* Announcement filters */}
+          <div className="mb-4 space-y-3">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Genre</p>
+              <div className="flex flex-wrap gap-2">
+                {["", ...ANN_GENRES].map((g) => (
+                  <button
+                    key={g || "all"}
+                    type="button"
+                    onClick={() => setAnnGenreFilter(g === annGenreFilter ? "" : g)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${annGenreFilter === g ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"}`}
+                  >
+                    {g || "All"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Event Type</p>
+              <div className="flex flex-wrap gap-2">
+                {["", ...ANN_EVENT_TYPES].map((et) => (
+                  <button
+                    key={et || "all"}
+                    type="button"
+                    onClick={() => setAnnEventTypeFilter(et === annEventTypeFilter ? "" : et)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${annEventTypeFilter === et ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"}`}
+                  >
+                    {et || "All"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {filteredAnnouncements.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No announcements match these filters.</p>
+          ) : (
           <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
-            {announcements.map((a) => {
+            {filteredAnnouncements.map((a) => {
               const cardInner = (
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/90 p-5 hover:bg-zinc-800/90 transition-colors w-72 sm:w-80 flex flex-col gap-3 h-full">
                   <div className="flex items-center gap-2">
@@ -416,6 +520,7 @@ export function PubOffers() {
               );
             })}
           </div>
+          )}
         </div>
       )}
     </div>

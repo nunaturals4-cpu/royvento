@@ -2261,15 +2261,24 @@ interface Announcement {
   announceDate: string;
   announceTime: string;
   imageUrl: string;
+  genre: string;
+  eventType: string;
   createdAt: string;
 }
+
+const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
+const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
+
+const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "" };
 
 function AnnouncementsPanel() {
   const { toast } = useToast();
   const [items, setItems] = useState<Announcement[]>([]);
   const [editing, setEditing] = useState<Announcement | null>(null);
-  const [form, setForm] = useState({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
+  const [form, setForm] = useState(emptyAnnForm);
   const [saving, setSaving] = useState(false);
+  const [annGenreFilter, setAnnGenreFilter] = useState("");
+  const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -2290,13 +2299,13 @@ function AnnouncementsPanel() {
     setEditing(null);
     setImageFile(null);
     setImagePreview("");
-    setForm({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
+    setForm(emptyAnnForm);
   };
   const openEdit = (a: Announcement) => {
     setEditing(a);
     setImageFile(null);
     setImagePreview(a.imageUrl || "");
-    setForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl });
+    setForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl, genre: a.genre ?? "", eventType: a.eventType ?? "" });
   };
 
   const applyFile = (file: File) => {
@@ -2371,7 +2380,7 @@ function AnnouncementsPanel() {
       setEditing(null);
       setImageFile(null);
       setImagePreview("");
-      setForm({ title: "", body: "", announceDate: "", announceTime: "", imageUrl: "" });
+      setForm(emptyAnnForm);
       load();
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
@@ -2415,6 +2424,41 @@ function AnnouncementsPanel() {
             <Input id="ann-time" type="time" value={form.announceTime} onChange={(e) => setForm((f) => ({ ...f, announceTime: e.target.value }))} className="bg-black/40 border-white/10 mt-1" />
           </div>
         </div>
+
+        {/* Genre picker */}
+        <div>
+          <Label className="mb-2 block">Genre</Label>
+          <div className="flex flex-wrap gap-2">
+            {["", ...ANN_GENRES].map((g) => (
+              <button
+                key={g || "none"}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, genre: g }))}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${form.genre === g ? "bg-primary/20 border-primary text-primary" : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/70"}`}
+              >
+                {g || "None"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Event Type picker */}
+        <div>
+          <Label className="mb-2 block">Event Type</Label>
+          <div className="flex flex-wrap gap-2">
+            {["", ...ANN_EVENT_TYPES].map((et) => (
+              <button
+                key={et || "none"}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, eventType: et }))}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${form.eventType === et ? "bg-primary/20 border-primary text-primary" : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/70"}`}
+              >
+                {et || "None"}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div>
           <Label>Image (optional)</Label>
           {imagePreview ? (
@@ -2459,17 +2503,60 @@ function AnnouncementsPanel() {
         </div>
       </div>
 
-      <div className="rounded-3xl glass-card p-6">
-        <p className="font-serif text-xl mb-3">Your announcements</p>
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No announcements yet. Create one to notify your audience.</p>
+      <div className="rounded-3xl glass-card p-6 flex flex-col gap-4">
+        <p className="font-serif text-xl">Your announcements</p>
+
+        {/* Genre filter chips */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Genre</p>
+          <div className="flex flex-wrap gap-1.5">
+            {["", ...ANN_GENRES].map((g) => (
+              <button
+                key={g || "all"}
+                type="button"
+                onClick={() => setAnnGenreFilter(g === annGenreFilter ? "" : g)}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${annGenreFilter === g ? "bg-primary/20 border-primary text-primary" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"}`}
+              >
+                {g || "All"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Event Type filter chips */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Event Type</p>
+          <div className="flex flex-wrap gap-1.5">
+            {["", ...ANN_EVENT_TYPES].map((et) => (
+              <button
+                key={et || "all"}
+                type="button"
+                onClick={() => setAnnEventTypeFilter(et === annEventTypeFilter ? "" : et)}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${annEventTypeFilter === et ? "bg-primary/20 border-primary text-primary" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"}`}
+              >
+                {et || "All"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {items.filter((a) => (!annGenreFilter || a.genre === annGenreFilter) && (!annEventTypeFilter || a.eventType === annEventTypeFilter)).length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {annGenreFilter || annEventTypeFilter ? "No announcements match these filters." : "No announcements yet. Create one to notify your audience."}
+          </p>
         ) : (
           <div className="space-y-3">
-            {items.map((a) => (
+            {items.filter((a) => (!annGenreFilter || a.genre === annGenreFilter) && (!annEventTypeFilter || a.eventType === annEventTypeFilter)).map((a) => (
               <div key={a.id} className="rounded-xl border border-white/10 p-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white truncate">{a.title}</p>
+                    {(a.genre || a.eventType) && (
+                      <div className="flex gap-1.5 mt-1 flex-wrap">
+                        {a.genre && <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/15 text-primary border border-primary/25">{a.genre}</span>}
+                        {a.eventType && <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/5 text-white/50 border border-white/10">{a.eventType}</span>}
+                      </div>
+                    )}
                     {a.announceDate && (
                       <p className="text-xs text-primary mt-0.5">
                         {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
