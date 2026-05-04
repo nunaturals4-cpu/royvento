@@ -249,7 +249,6 @@ function ListingEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [suggestions, setSuggestions] = useState<PlacesSuggestion[]>([]);
   const [showSugg, setShowSugg] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [menuUrl, setMenuUrl] = useState(vendor.menuUrl ?? "");
   const [menuUrls, setMenuUrls] = useState<string[]>(
     Array.isArray(vendor.menuUrls) && vendor.menuUrls.length > 0
       ? vendor.menuUrls
@@ -746,7 +745,6 @@ function ListingEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
                   try {
                     const url = await uploadMenuFile(file);
                     setMenuUrls((prev) => [...prev, url]);
-                    setMenuUrl(url);
                     toast({ title: "Menu uploaded" });
                   } catch {
                     toast({ title: "Menu upload failed", variant: "destructive" });
