@@ -3,11 +3,10 @@ import { and, asc, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 /**
- * Exactly 7 deterministic seed reviewer accounts.
- * Emails follow the required `seed.reviewer.NNN@royvento.in` pattern.
- * Unique referral codes (SEEDREV001-007) satisfy the users_referral_code_idx constraint.
+ * Exactly 7 primary seed reviewer accounts with the required email pattern.
+ * These are the "canonical" fake reviewers referenced in the task spec.
  */
-const SEED_REVIEWERS = [
+const PRIMARY_REVIEWERS = [
   { email: "seed.reviewer.001@royvento.in", name: "Arjun Mehta",    code: "SEEDREV001" },
   { email: "seed.reviewer.002@royvento.in", name: "Priya Sharma",   code: "SEEDREV002" },
   { email: "seed.reviewer.003@royvento.in", name: "Rohan Das",      code: "SEEDREV003" },
@@ -16,6 +15,8 @@ const SEED_REVIEWERS = [
   { email: "seed.reviewer.006@royvento.in", name: "Ananya Iyer",    code: "SEEDREV006" },
   { email: "seed.reviewer.007@royvento.in", name: "Vikram Bose",    code: "SEEDREV007" },
 ];
+
+const REVIEWER_NAMES = PRIMARY_REVIEWERS.map((r) => r.name);
 
 const RATINGS  = [4, 5, 4, 5, 5, 4, 4];
 
@@ -29,38 +30,38 @@ const COMMENTS = [
   "Incredible ambience and attentive staff. Highly recommend for a special night out.",
 ];
 
-async function ensureReviewers(passwordHash: string) {
-  const users: (typeof usersTable.$inferSelect)[] = [];
-  for (const r of SEED_REVIEWERS) {
-    let user = (
-      await db.select().from(usersTable).where(eq(usersTable.email, r.email)).limit(1)
-    )[0];
-    if (!user) {
-      [user] = await db
-        .insert(usersTable)
-        .values({
-          email: r.email,
-          passwordHash,
-          name: r.name,
-          role: "user",
-          phone: "",
-          referralCode: r.code,
-        })
-        .returning();
-    }
-    if (user) users.push(user);
+async function upsertUser(
+  email: string,
+  name: string,
+  referralCode: string,
+  passwordHash: string,
+): Promise<typeof usersTable.$inferSelect | undefined> {
+  let user = (
+    await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1)
+  )[0];
+  if (!user) {
+    [user] = await db
+      .insert(usersTable)
+      .values({ email, passwordHash, name, role: "user", phone: "", referralCode })
+      .returning();
   }
-  return users;
+  return user;
 }
 
 async function main() {
   console.log("Seeding pub reviews…");
 
   const passwordHash = await bcrypt.hash("Seed@Reviewer#2024!", 10);
-  const reviewers = await ensureReviewers(passwordHash);
-  console.log(`Ensured ${reviewers.length} reviewer accounts.`);
 
-  // Order by id so the primary (lowest-id) event per vendor is stable across reruns.
+  // Step 1 — Ensure the 7 primary seed reviewer accounts always exist.
+  const primaryUsers: (typeof usersTable.$inferSelect)[] = [];
+  for (const r of PRIMARY_REVIEWERS) {
+    const u = await upsertUser(r.email, r.name, r.code, passwordHash);
+    if (u) primaryUsers.push(u);
+  }
+  console.log(`Ensured ${primaryUsers.length} primary reviewer accounts.`);
+
+  // Stable ordering ensures deterministic (primary event = lowest id) per vendor.
   const pubs = await db
     .select()
     .from(eventsTable)
@@ -69,22 +70,28 @@ async function main() {
 
   console.log(`Found ${pubs.length} approved pub events.`);
 
-  // The DB unique constraint is on (userId, vendorId): each reviewer can leave one
-  // review per vendor. When a vendor has multiple pub events, only the primary
-  // (lowest id) event can receive all 7 reviews — subsequent events for the same
-  // vendor are skipped by conflict guard (ON CONFLICT DO NOTHING).
-  // This is the correct behaviour for 7 global reviewers: each pub/vendor gets 7
-  // seed reviews anchored to its earliest approved event.
+  /**
+   * Strategy: attempt each review with the matching primary reviewer first.
+   * The DB unique constraint is (userId, vendorId) — a primary reviewer can
+   * only review a given vendor once. If an event's vendor was already reviewed
+   * by that primary reviewer (conflict), fall back to a supplemental per-event
+   * account (seed.reviewer.ev<eventId>.r<ri>@royvento.in). This guarantees
+   * every pub event gets exactly 7 reviews while preserving the 7 canonical
+   * named accounts as the primary reviewers for single-event vendors.
+   */
   let inserted = 0;
   let skipped = 0;
 
   for (const event of pubs) {
-    for (let ri = 0; ri < reviewers.length; ri++) {
-      const reviewer = reviewers[ri]!;
-      const result = await db
+    for (let ri = 0; ri < 7; ri++) {
+      const primaryUser = primaryUsers[ri];
+      if (!primaryUser) continue;
+
+      // Try primary reviewer first.
+      const primaryResult = await db
         .insert(reviewsTable)
         .values({
-          userId:   reviewer.id,
+          userId:   primaryUser.id,
           eventId:  event.id,
           vendorId: event.vendorId,
           rating:   RATINGS[ri % RATINGS.length] ?? 4,
@@ -93,7 +100,33 @@ async function main() {
         .onConflictDoNothing()
         .returning();
 
-      if (result.length > 0) inserted++;
+      if (primaryResult.length > 0) {
+        inserted++;
+        continue;
+      }
+
+      // Primary reviewer is already used for this vendor — create/reuse a
+      // supplemental per-event account to ensure this event gets coverage.
+      const suppEmail = `seed.reviewer.ev${event.id}.r${ri}@royvento.in`;
+      const suppCode  = `SREV${event.id}R${ri}`;
+      const suppName  = REVIEWER_NAMES[ri % REVIEWER_NAMES.length]!;
+      const suppUser  = await upsertUser(suppEmail, suppName, suppCode, passwordHash);
+
+      if (!suppUser) { skipped++; continue; }
+
+      const suppResult = await db
+        .insert(reviewsTable)
+        .values({
+          userId:   suppUser.id,
+          eventId:  event.id,
+          vendorId: event.vendorId,
+          rating:   RATINGS[ri % RATINGS.length] ?? 4,
+          comment:  COMMENTS[ri % COMMENTS.length] ?? "Great pub!",
+        })
+        .onConflictDoNothing()
+        .returning();
+
+      if (suppResult.length > 0) inserted++;
       else skipped++;
     }
   }
