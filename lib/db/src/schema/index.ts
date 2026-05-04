@@ -571,3 +571,20 @@ export const drinkPlansTable = pgTable(
 );
 
 export type DrinkPlan = typeof drinkPlansTable.$inferSelect;
+
+export const vendorCommissionsTable = pgTable(
+  "vendor_commissions",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull().unique().references(() => vendorsTable.id, { onDelete: "cascade" }),
+    freeEntryRate: numeric("free_entry_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    ticketRate: numeric("ticket_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    tableBookingRate: numeric("table_booking_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("vendor_commissions_vendor_idx").on(t.vendorId),
+  }),
+);
+
+export type VendorCommission = typeof vendorCommissionsTable.$inferSelect;

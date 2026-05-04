@@ -2065,6 +2065,119 @@ export const GetAdminLeadsSummaryResponse = zod.object({
 });
 
 /**
+ * @summary Get commission rates for a vendor
+ */
+export const GetVendorCommissionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetVendorCommissionResponse = zod.object({
+  id: zod.number().optional(),
+  vendorId: zod.number(),
+  freeEntryRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  ticketRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  tableBookingRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Set (upsert) commission rates for a vendor
+ */
+export const SetVendorCommissionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const setVendorCommissionBodyFreeEntryRateMin = 0;
+export const setVendorCommissionBodyFreeEntryRateMax = 100;
+
+export const setVendorCommissionBodyTicketRateMin = 0;
+export const setVendorCommissionBodyTicketRateMax = 100;
+
+export const setVendorCommissionBodyTableBookingRateMin = 0;
+export const setVendorCommissionBodyTableBookingRateMax = 100;
+
+export const SetVendorCommissionBody = zod.object({
+  freeEntryRate: zod
+    .number()
+    .min(setVendorCommissionBodyFreeEntryRateMin)
+    .max(setVendorCommissionBodyFreeEntryRateMax),
+  ticketRate: zod
+    .number()
+    .min(setVendorCommissionBodyTicketRateMin)
+    .max(setVendorCommissionBodyTicketRateMax),
+  tableBookingRate: zod
+    .number()
+    .min(setVendorCommissionBodyTableBookingRateMin)
+    .max(setVendorCommissionBodyTableBookingRateMax),
+});
+
+export const SetVendorCommissionResponse = zod.object({
+  id: zod.number().optional(),
+  vendorId: zod.number(),
+  freeEntryRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  ticketRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  tableBookingRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Platform commission report
+ */
+export const GetCommissionReportQueryParams = zod.object({
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const GetCommissionReportResponse = zod.object({
+  rows: zod.array(
+    zod.object({
+      vendorId: zod.number(),
+      businessName: zod.string(),
+      city: zod.string(),
+      totalBookings: zod.number(),
+      totalRevenue: zod.number(),
+      totalCommission: zod.number(),
+      freeEntryCount: zod.number(),
+      freeEntryRevenue: zod.number(),
+      freeEntryCommission: zod.number(),
+      ticketCount: zod.number(),
+      ticketRevenue: zod.number(),
+      ticketCommission: zod.number(),
+      tableCount: zod.number(),
+      tableRevenue: zod.number(),
+      tableCommission: zod.number(),
+      bookings: zod.array(
+        zod.object({
+          id: zod.number(),
+          finalPrice: zod.number(),
+          bookingType: zod.enum(["free_entry", "ticket", "table"]),
+          commissionRate: zod.number(),
+          commissionAmount: zod.number(),
+          createdAt: zod.string(),
+        }),
+      ),
+    }),
+  ),
+  totals: zod.object({
+    totalBookings: zod.number(),
+    totalRevenue: zod.number(),
+    totalCommission: zod.number(),
+  }),
+});
+
+/**
  * @summary Platform analytics
  */
 export const GetAdminAnalyticsQueryParams = zod.object({

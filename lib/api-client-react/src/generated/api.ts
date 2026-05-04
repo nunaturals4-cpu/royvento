@@ -28,6 +28,7 @@ import type {
   AuthResponse,
   Availability,
   Booking,
+  CommissionReport,
   CreateBookingBody,
   CreateEventBody,
   CreateReviewBody,
@@ -42,6 +43,7 @@ import type {
   GetAdminLeadsParams,
   GetAdminLeadsSummaryParams,
   GetBookingTicketCode200,
+  GetCommissionReportParams,
   GetPartnerCheckinReportParams,
   HealthStatus,
   ImportGooglePubBody,
@@ -63,6 +65,7 @@ import type {
   RegisterBody,
   Review,
   SetAvailabilityBody,
+  SetVendorCommissionBody,
   UpdateBookingStatusBody,
   UpdateEventBody,
   UpdateMeBody,
@@ -72,6 +75,7 @@ import type {
   UploadUrlResponse,
   User,
   Vendor,
+  VendorCommission,
   VendorDrinkOffer,
   WishlistAddResponse,
   WishlistItem,
@@ -4692,6 +4696,280 @@ export function useGetAdminLeadsSummary<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetAdminLeadsSummaryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get commission rates for a vendor
+ */
+export const getGetVendorCommissionUrl = (id: number) => {
+  return `/api/admin/vendors/${id}/commission`;
+};
+
+export const getVendorCommission = async (
+  id: number,
+  options?: RequestInit,
+): Promise<VendorCommission> => {
+  return customFetch<VendorCommission>(getGetVendorCommissionUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVendorCommissionQueryKey = (id: number) => {
+  return [`/api/admin/vendors/${id}/commission`] as const;
+};
+
+export const getGetVendorCommissionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVendorCommission>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVendorCommission>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVendorCommissionQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getVendorCommission>>
+  > = ({ signal }) => getVendorCommission(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVendorCommission>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVendorCommissionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVendorCommission>>
+>;
+export type GetVendorCommissionQueryError = ErrorType<void>;
+
+/**
+ * @summary Get commission rates for a vendor
+ */
+
+export function useGetVendorCommission<
+  TData = Awaited<ReturnType<typeof getVendorCommission>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVendorCommission>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVendorCommissionQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Set (upsert) commission rates for a vendor
+ */
+export const getSetVendorCommissionUrl = (id: number) => {
+  return `/api/admin/vendors/${id}/commission`;
+};
+
+export const setVendorCommission = async (
+  id: number,
+  setVendorCommissionBody: SetVendorCommissionBody,
+  options?: RequestInit,
+): Promise<VendorCommission> => {
+  return customFetch<VendorCommission>(getSetVendorCommissionUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setVendorCommissionBody),
+  });
+};
+
+export const getSetVendorCommissionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setVendorCommission>>,
+    TError,
+    { id: number; data: BodyType<SetVendorCommissionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setVendorCommission>>,
+  TError,
+  { id: number; data: BodyType<SetVendorCommissionBody> },
+  TContext
+> => {
+  const mutationKey = ["setVendorCommission"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setVendorCommission>>,
+    { id: number; data: BodyType<SetVendorCommissionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setVendorCommission(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetVendorCommissionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setVendorCommission>>
+>;
+export type SetVendorCommissionMutationBody = BodyType<SetVendorCommissionBody>;
+export type SetVendorCommissionMutationError = ErrorType<void>;
+
+/**
+ * @summary Set (upsert) commission rates for a vendor
+ */
+export const useSetVendorCommission = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setVendorCommission>>,
+    TError,
+    { id: number; data: BodyType<SetVendorCommissionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setVendorCommission>>,
+  TError,
+  { id: number; data: BodyType<SetVendorCommissionBody> },
+  TContext
+> => {
+  return useMutation(getSetVendorCommissionMutationOptions(options));
+};
+
+/**
+ * @summary Platform commission report
+ */
+export const getGetCommissionReportUrl = (
+  params?: GetCommissionReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/commission-report?${stringifiedParams}`
+    : `/api/admin/commission-report`;
+};
+
+export const getCommissionReport = async (
+  params?: GetCommissionReportParams,
+  options?: RequestInit,
+): Promise<CommissionReport> => {
+  return customFetch<CommissionReport>(getGetCommissionReportUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCommissionReportQueryKey = (
+  params?: GetCommissionReportParams,
+) => {
+  return [`/api/admin/commission-report`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetCommissionReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCommissionReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetCommissionReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCommissionReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCommissionReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCommissionReport>>
+  > = ({ signal }) =>
+    getCommissionReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCommissionReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCommissionReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCommissionReport>>
+>;
+export type GetCommissionReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Platform commission report
+ */
+
+export function useGetCommissionReport<
+  TData = Awaited<ReturnType<typeof getCommissionReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetCommissionReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCommissionReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCommissionReportQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -1314,6 +1314,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminLeadsSummary"
 
+  /admin/vendors/{id}/commission:
+    get:
+      operationId: getVendorCommission
+      tags: [admin]
+      summary: Get commission rates for a vendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Commission rates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorCommission"
+        "400":
+          description: Invalid id
+    put:
+      operationId: setVendorCommission
+      tags: [admin]
+      summary: Set (upsert) commission rates for a vendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVendorCommissionBody"
+      responses:
+        "200":
+          description: Updated commission rates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorCommission"
+        "400":
+          description: Invalid input
+        "404":
+          description: Vendor not found
+
+  /admin/commission-report:
+    get:
+      operationId: getCommissionReport
+      tags: [admin]
+      summary: Platform commission report
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            description: ISO date (YYYY-MM-DD) range start
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            description: ISO date (YYYY-MM-DD) range end
+      responses:
+        "200":
+          description: Commission report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommissionReport"
+
   /admin/analytics:
     get:
       operationId: getAdminAnalytics
@@ -2704,6 +2778,122 @@ components:
           items:
             $ref: "#/components/schemas/DrinkPlanLineItem"
       required: [type, productName, gender]
+
+    VendorCommission:
+      type: object
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        freeEntryRate:
+          type: string
+          description: Percentage 0–100 (stored as decimal string)
+        ticketRate:
+          type: string
+          description: Percentage 0–100 (stored as decimal string)
+        tableBookingRate:
+          type: string
+          description: Percentage 0–100 (stored as decimal string)
+        updatedAt:
+          type: string
+      required: [vendorId, freeEntryRate, ticketRate, tableBookingRate]
+
+    SetVendorCommissionBody:
+      type: object
+      properties:
+        freeEntryRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        ticketRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        tableBookingRate:
+          type: number
+          minimum: 0
+          maximum: 100
+      required: [freeEntryRate, ticketRate, tableBookingRate]
+
+    CommissionReportBookingLine:
+      type: object
+      properties:
+        id:
+          type: integer
+        finalPrice:
+          type: number
+        bookingType:
+          type: string
+          enum: [free_entry, ticket, table]
+        commissionRate:
+          type: number
+        commissionAmount:
+          type: number
+        createdAt:
+          type: string
+      required: [id, finalPrice, bookingType, commissionRate, commissionAmount, createdAt]
+
+    CommissionReportVendorRow:
+      type: object
+      properties:
+        vendorId:
+          type: integer
+        businessName:
+          type: string
+        city:
+          type: string
+        totalBookings:
+          type: integer
+        totalRevenue:
+          type: number
+        totalCommission:
+          type: number
+        freeEntryCount:
+          type: integer
+        freeEntryRevenue:
+          type: number
+        freeEntryCommission:
+          type: number
+        ticketCount:
+          type: integer
+        ticketRevenue:
+          type: number
+        ticketCommission:
+          type: number
+        tableCount:
+          type: integer
+        tableRevenue:
+          type: number
+        tableCommission:
+          type: number
+        bookings:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommissionReportBookingLine"
+      required: [vendorId, businessName, city, totalBookings, totalRevenue, totalCommission, freeEntryCount, freeEntryRevenue, freeEntryCommission, ticketCount, ticketRevenue, ticketCommission, tableCount, tableRevenue, tableCommission, bookings]
+
+    CommissionReportTotals:
+      type: object
+      properties:
+        totalBookings:
+          type: integer
+        totalRevenue:
+          type: number
+        totalCommission:
+          type: number
+      required: [totalBookings, totalRevenue, totalCommission]
+
+    CommissionReport:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommissionReportVendorRow"
+        totals:
+          $ref: "#/components/schemas/CommissionReportTotals"
+      required: [rows, totals]
 
     VendorDrinkOffer:
       type: object

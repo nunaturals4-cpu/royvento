@@ -8,6 +8,7 @@ import {
   paymentsTable,
   profileViewsTable,
   couponsTable,
+  vendorCommissionsTable,
 } from "@workspace/db";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -1396,6 +1397,221 @@ router.post("/admin/pubs/import-google", requireAuth(["admin"]), async (req, res
       openingHours: place.openingHours,
     },
   });
+});
+
+// ─── Commission Rates ─────────────────────────────────────────────────────────
+
+router.get("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, res) => {
+  const vendorId = Number(req.params["id"]);
+  if (!Number.isFinite(vendorId)) {
+    res.status(400).json({ error: "Invalid vendor id" });
+    return;
+  }
+  const [row] = await db
+    .select()
+    .from(vendorCommissionsTable)
+    .where(eq(vendorCommissionsTable.vendorId, vendorId))
+    .limit(1);
+  if (!row) {
+    res.json({ vendorId, freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" });
+    return;
+  }
+  res.json(row);
+});
+
+router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, res) => {
+  const vendorId = Number(req.params["id"]);
+  if (!Number.isFinite(vendorId)) {
+    res.status(400).json({ error: "Invalid vendor id" });
+    return;
+  }
+  const [vendor] = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.id, vendorId)).limit(1);
+  if (!vendor) {
+    res.status(404).json({ error: "Vendor not found" });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  const freeEntryRate = Number(body["freeEntryRate"] ?? 0);
+  const ticketRate = Number(body["ticketRate"] ?? 0);
+  const tableBookingRate = Number(body["tableBookingRate"] ?? 0);
+  if (
+    !Number.isFinite(freeEntryRate) || freeEntryRate < 0 || freeEntryRate > 100 ||
+    !Number.isFinite(ticketRate) || ticketRate < 0 || ticketRate > 100 ||
+    !Number.isFinite(tableBookingRate) || tableBookingRate < 0 || tableBookingRate > 100
+  ) {
+    res.status(400).json({ error: "Rates must be numbers between 0 and 100" });
+    return;
+  }
+  const [upserted] = await db
+    .insert(vendorCommissionsTable)
+    .values({
+      vendorId,
+      freeEntryRate: freeEntryRate.toFixed(2),
+      ticketRate: ticketRate.toFixed(2),
+      tableBookingRate: tableBookingRate.toFixed(2),
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: vendorCommissionsTable.vendorId,
+      set: {
+        freeEntryRate: freeEntryRate.toFixed(2),
+        ticketRate: ticketRate.toFixed(2),
+        tableBookingRate: tableBookingRate.toFixed(2),
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  res.json(upserted);
+});
+
+// ─── Commission Report ────────────────────────────────────────────────────────
+
+router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) => {
+  const fromStr = req.query["from"] as string | undefined;
+  const toStr = req.query["to"] as string | undefined;
+  const from = fromStr ? new Date(`${fromStr}T00:00:00Z`) : undefined;
+  const to = toStr ? new Date(`${toStr}T23:59:59Z`) : undefined;
+
+  const whereConditions = [
+    sql`${bookingsTable.status} IN ('confirmed', 'completed')`,
+    ...(from ? [gte(bookingsTable.createdAt, from)] : []),
+    ...(to ? [lte(bookingsTable.createdAt, to)] : []),
+  ];
+
+  const [bookings, commissions, vendors] = await Promise.all([
+    db
+      .select({
+        id: bookingsTable.id,
+        vendorId: bookingsTable.vendorId,
+        finalPrice: bookingsTable.finalPrice,
+        pubMode: bookingsTable.pubMode,
+        ticketWomen: bookingsTable.ticketWomen,
+        ticketMen: bookingsTable.ticketMen,
+        ticketCouple: bookingsTable.ticketCouple,
+        createdAt: bookingsTable.createdAt,
+        status: bookingsTable.status,
+      })
+      .from(bookingsTable)
+      .where(and(...whereConditions)),
+    db.select().from(vendorCommissionsTable),
+    db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city }).from(vendorsTable),
+  ]);
+
+  const commissionMap = new Map(commissions.map((c) => [c.vendorId, c]));
+  const vendorMap = new Map(vendors.map((v) => [v.id, v]));
+
+  type BookingLineItem = {
+    id: number;
+    finalPrice: number;
+    bookingType: "free_entry" | "ticket" | "table";
+    commissionRate: number;
+    commissionAmount: number;
+    createdAt: Date;
+  };
+
+  type VendorSummary = {
+    vendorId: number;
+    businessName: string;
+    city: string;
+    totalBookings: number;
+    totalRevenue: number;
+    totalCommission: number;
+    freeEntryCount: number;
+    freeEntryRevenue: number;
+    freeEntryCommission: number;
+    ticketCount: number;
+    ticketRevenue: number;
+    ticketCommission: number;
+    tableCount: number;
+    tableRevenue: number;
+    tableCommission: number;
+    bookings: BookingLineItem[];
+  };
+
+  const summaryMap = new Map<number, VendorSummary>();
+
+  for (const b of bookings) {
+    const price = Number(b.finalPrice);
+    const rates = commissionMap.get(b.vendorId);
+    const freeEntryRate = Number(rates?.freeEntryRate ?? 0) / 100;
+    const ticketRate = Number(rates?.ticketRate ?? 0) / 100;
+    const tableRate = Number(rates?.tableBookingRate ?? 0) / 100;
+
+    let bookingType: "free_entry" | "ticket" | "table";
+    let commissionRate: number;
+
+    if (b.pubMode === "table") {
+      bookingType = "table";
+      commissionRate = tableRate;
+    } else if (price === 0 || b.pubMode === "free") {
+      bookingType = "free_entry";
+      commissionRate = freeEntryRate;
+    } else if (b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0) {
+      bookingType = "ticket";
+      commissionRate = ticketRate;
+    } else {
+      bookingType = "ticket";
+      commissionRate = ticketRate;
+    }
+
+    const commissionAmount = price * commissionRate;
+
+    if (!summaryMap.has(b.vendorId)) {
+      const vendor = vendorMap.get(b.vendorId);
+      summaryMap.set(b.vendorId, {
+        vendorId: b.vendorId,
+        businessName: vendor?.businessName ?? `Vendor #${b.vendorId}`,
+        city: vendor?.city ?? "",
+        totalBookings: 0,
+        totalRevenue: 0,
+        totalCommission: 0,
+        freeEntryCount: 0,
+        freeEntryRevenue: 0,
+        freeEntryCommission: 0,
+        ticketCount: 0,
+        ticketRevenue: 0,
+        ticketCommission: 0,
+        tableCount: 0,
+        tableRevenue: 0,
+        tableCommission: 0,
+        bookings: [],
+      });
+    }
+
+    const s = summaryMap.get(b.vendorId)!;
+    s.totalBookings += 1;
+    s.totalRevenue += price;
+    s.totalCommission += commissionAmount;
+    s.bookings.push({ id: b.id, finalPrice: price, bookingType, commissionRate: commissionRate * 100, commissionAmount, createdAt: b.createdAt });
+
+    if (bookingType === "free_entry") {
+      s.freeEntryCount += 1;
+      s.freeEntryRevenue += price;
+      s.freeEntryCommission += commissionAmount;
+    } else if (bookingType === "ticket") {
+      s.ticketCount += 1;
+      s.ticketRevenue += price;
+      s.ticketCommission += commissionAmount;
+    } else {
+      s.tableCount += 1;
+      s.tableRevenue += price;
+      s.tableCommission += commissionAmount;
+    }
+  }
+
+  const rows = Array.from(summaryMap.values()).sort((a, b) => b.totalCommission - a.totalCommission);
+
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.totalBookings += r.totalBookings;
+      acc.totalRevenue += r.totalRevenue;
+      acc.totalCommission += r.totalCommission;
+      return acc;
+    },
+    { totalBookings: 0, totalRevenue: 0, totalCommission: 0 },
+  );
+
+  res.json({ rows, totals });
 });
 
 const VALID_COUPON_TYPES = ["general", "event", "loyalty", "referral", "vip"] as const;

@@ -25,7 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions";
 
 interface ContactMessage {
   id: number;
@@ -211,6 +211,369 @@ interface AdminBlog {
   slug: string;
   published: boolean;
   createdAt: string;
+}
+
+// ─── AdminCommissionsTab ──────────────────────────────────────────────────────
+
+interface CommissionVendor {
+  id: number;
+  businessName: string;
+  city: string;
+}
+
+interface CommissionRates {
+  freeEntryRate: string;
+  ticketRate: string;
+  tableBookingRate: string;
+}
+
+interface CommissionReportBookingLine {
+  id: number;
+  finalPrice: number;
+  bookingType: "free_entry" | "ticket" | "table";
+  commissionRate: number;
+  commissionAmount: number;
+  createdAt: string;
+}
+
+interface CommissionReportVendorRow {
+  vendorId: number;
+  businessName: string;
+  city: string;
+  totalBookings: number;
+  totalRevenue: number;
+  totalCommission: number;
+  freeEntryCount: number;
+  freeEntryRevenue: number;
+  freeEntryCommission: number;
+  ticketCount: number;
+  ticketRevenue: number;
+  ticketCommission: number;
+  tableCount: number;
+  tableRevenue: number;
+  tableCommission: number;
+  bookings: CommissionReportBookingLine[];
+}
+
+interface CommissionReport {
+  rows: CommissionReportVendorRow[];
+  totals: { totalBookings: number; totalRevenue: number; totalCommission: number };
+}
+
+function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [vendors, setVendors] = useState<CommissionVendor[]>([]);
+  const [rates, setRates] = useState<Record<number, CommissionRates>>({});
+  const [drafts, setDrafts] = useState<Record<number, CommissionRates>>({});
+  const [saving, setSaving] = useState<Record<number, boolean>>({});
+  const [report, setReport] = useState<CommissionReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [expandedVendor, setExpandedVendor] = useState<number | null>(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  function loadVendors() {
+    setLoading(true);
+    customFetch<{ data: AdminVendorFull[]; total: number; page: number; totalPages: number }>("/api/admin/vendors?limit=500")
+      .then((res) => {
+        const approved = (res?.data ?? []).filter((v) => v.status === "approved");
+        setVendors(approved.map((v) => ({ id: v.id, businessName: v.businessName, city: v.city })));
+        return approved;
+      })
+      .then(async (approved) => {
+        const rateMap: Record<number, CommissionRates> = {};
+        await Promise.all(
+          approved.map(async (v) => {
+            try {
+              const r = await customFetch<CommissionRates>(`/api/admin/vendors/${v.id}/commission`);
+              rateMap[v.id] = r;
+            } catch {
+              rateMap[v.id] = { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" };
+            }
+          }),
+        );
+        setRates(rateMap);
+        setDrafts(
+          Object.fromEntries(Object.entries(rateMap).map(([k, v]) => [k, { ...v }])),
+        );
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }
+
+  function loadReport() {
+    setReportLoading(true);
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
+    const qs = params.toString();
+    customFetch<CommissionReport>(`/api/admin/commission-report${qs ? `?${qs}` : ""}`)
+      .then((r) => setReport(r))
+      .catch(() => setReport(null))
+      .finally(() => setReportLoading(false));
+  }
+
+  useEffect(() => {
+    loadVendors();
+    loadReport();
+  }, []);
+
+  async function saveRates(vendorId: number) {
+    const draft = drafts[vendorId];
+    if (!draft) return;
+    setSaving((prev) => ({ ...prev, [vendorId]: true }));
+    try {
+      const updated = await customFetch<CommissionRates>(`/api/admin/vendors/${vendorId}/commission`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          freeEntryRate: Number(draft.freeEntryRate),
+          ticketRate: Number(draft.ticketRate),
+          tableBookingRate: Number(draft.tableBookingRate),
+        }),
+      });
+      setRates((prev) => ({ ...prev, [vendorId]: updated }));
+      setDrafts((prev) => ({ ...prev, [vendorId]: { ...updated } }));
+      Alert.alert("Saved", "Commission rates updated.");
+    } catch {
+      Alert.alert("Error", "Failed to save rates.");
+    } finally {
+      setSaving((prev) => ({ ...prev, [vendorId]: false }));
+    }
+  }
+
+  function setDraft(vendorId: number, field: keyof CommissionRates, value: string) {
+    setDrafts((prev) => ({ ...prev, [vendorId]: { ...(prev[vendorId] ?? { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" }), [field]: value } }));
+  }
+
+  const isDirty = (vendorId: number) => {
+    const d = drafts[vendorId];
+    const r = rates[vendorId];
+    if (!d || !r) return false;
+    return d.freeEntryRate !== r.freeEntryRate || d.ticketRate !== r.ticketRate || d.tableBookingRate !== r.tableBookingRate;
+  };
+
+  const fmt = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table") =>
+    t === "free_entry" ? "Free Entry" : t === "ticket" ? "Ticket" : "Table";
+  const bookingTypeColor = (t: "free_entry" | "ticket" | "table") =>
+    t === "free_entry" ? "#22c55e" : t === "ticket" ? colors.primary : "#f59e0b";
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 100 }}>
+      {/* ── Commission Rates Section ── */}
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>
+        COMMISSION RATES PER PUB
+      </Text>
+      {vendors.length === 0 && (
+        <View style={{ alignItems: "center", padding: 32, gap: 12 }}>
+          <Ionicons name="business-outline" size={40} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14 }}>No approved pubs found.</Text>
+        </View>
+      )}
+      {vendors.map((v) => {
+        const draft = drafts[v.id] ?? { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" };
+        const dirty = isDirty(v.id);
+        const isSaving = saving[v.id] ?? false;
+        return (
+          <View key={v.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: dirty ? colors.primary : colors.border, backgroundColor: colors.card, padding: 14, gap: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{v.businessName}</Text>
+                {v.city ? <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{v.city}</Text> : null}
+              </View>
+              {dirty && (
+                <TouchableOpacity
+                  onPress={() => saveRates(v.id)}
+                  disabled={isSaving}
+                  style={{ borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: colors.primary, opacity: isSaving ? 0.6 : 1 }}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>Save</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
+                const fieldLabel = field === "freeEntryRate" ? "Free Entry %" : field === "ticketRate" ? "Ticket %" : "Table %";
+                return (
+                  <View key={field} style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{fieldLabel}</Text>
+                    <View style={{ borderWidth: 1, borderRadius: 8, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.background }}>
+                      <TextInput
+                        value={draft[field]}
+                        onChangeText={(t) => setDraft(v.id, field, t.replace(/[^0-9.]/g, ""))}
+                        keyboardType="decimal-pad"
+                        style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14 }}
+                        placeholder="0"
+                        placeholderTextColor={colors.mutedForeground}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+
+      {/* ── Commission Report Section ── */}
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground, marginTop: 8 }}>
+        COMMISSION REPORT
+      </Text>
+
+      {/* Date range filter */}
+      <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FROM (YYYY-MM-DD)</Text>
+          <View style={{ borderWidth: 1, borderRadius: 8, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.card }}>
+            <TextInput
+              value={fromDate}
+              onChangeText={setFromDate}
+              placeholder="2025-01-01"
+              placeholderTextColor={colors.mutedForeground}
+              style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 13 }}
+              keyboardType="numbers-and-punctuation"
+            />
+          </View>
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>TO (YYYY-MM-DD)</Text>
+          <View style={{ borderWidth: 1, borderRadius: 8, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.card }}>
+            <TextInput
+              value={toDate}
+              onChangeText={setToDate}
+              placeholder="2025-12-31"
+              placeholderTextColor={colors.mutedForeground}
+              style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 13 }}
+              keyboardType="numbers-and-punctuation"
+            />
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={loadReport}
+          disabled={reportLoading}
+          style={{ borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.primary, marginTop: 14, opacity: reportLoading ? 0.6 : 1 }}
+        >
+          {reportLoading ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>Filter</Text>}
+        </TouchableOpacity>
+      </View>
+
+      {/* Totals summary */}
+      {report && (
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {[
+            { label: "Total Bookings", value: String(report.totals.totalBookings), icon: "ticket-outline" as const },
+            { label: "Booking Revenue", value: fmt(report.totals.totalRevenue), icon: "cash-outline" as const },
+            { label: "Platform Earned", value: fmt(report.totals.totalCommission), icon: "trending-up-outline" as const },
+          ].map((kpi) => (
+            <View key={kpi.label} style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 6, alignItems: "center" }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + "20", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name={kpi.icon} size={16} color={colors.primary} />
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground, textAlign: "center" }}>{kpi.value}</Text>
+              <Text style={{ fontSize: 9, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" }}>{kpi.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Per-venue rows */}
+      {reportLoading && !report && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+      {report && report.rows.length === 0 && (
+        <View style={{ alignItems: "center", padding: 32, gap: 12 }}>
+          <Ionicons name="analytics-outline" size={40} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>No confirmed bookings in this date range.</Text>
+        </View>
+      )}
+      {report && report.rows.map((row) => {
+        const isExpanded = expandedVendor === row.vendorId;
+        return (
+          <View key={row.vendorId} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: "hidden" }}>
+            <TouchableOpacity
+              onPress={() => setExpandedVendor(isExpanded ? null : row.vendorId)}
+              style={{ padding: 14, gap: 8 }}
+              activeOpacity={0.8}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{row.businessName}</Text>
+                  {row.city ? <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{row.city}</Text> : null}
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 2 }}>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.primary }}>{fmt(row.totalCommission)}</Text>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>earned</Text>
+                </View>
+                <Ionicons
+                  name={isExpanded ? "chevron-up-outline" : "chevron-down-outline"}
+                  size={16}
+                  color={colors.mutedForeground}
+                  style={{ marginLeft: 10 }}
+                />
+              </View>
+              {/* Breakdown chips */}
+              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.muted, flexDirection: "row", gap: 4, alignItems: "center" }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{row.totalBookings} bookings</Text>
+                </View>
+                <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.muted, flexDirection: "row", gap: 4, alignItems: "center" }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>Rev: {fmt(row.totalRevenue)}</Text>
+                </View>
+                {row.freeEntryCount > 0 && (
+                  <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#22c55e20" }}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#22c55e" }}>Free: {row.freeEntryCount} · {fmt(row.freeEntryCommission)}</Text>
+                  </View>
+                )}
+                {row.ticketCount > 0 && (
+                  <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.primary + "20" }}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.primary }}>Ticket: {row.ticketCount} · {fmt(row.ticketCommission)}</Text>
+                  </View>
+                )}
+                {row.tableCount > 0 && (
+                  <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: "#f59e0b20" }}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#f59e0b" }}>Table: {row.tableCount} · {fmt(row.tableCommission)}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+
+            {/* Expanded individual bookings */}
+            {isExpanded && (
+              <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
+                {row.bookings.length === 0 ? (
+                  <Text style={{ padding: 14, color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>No bookings.</Text>
+                ) : row.bookings.map((b) => (
+                  <View key={b.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border + "60" }}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={{ borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: bookingTypeColor(b.bookingType) + "20" }}>
+                          <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: bookingTypeColor(b.bookingType) }}>{bookingTypeLabel(b.bookingType)}</Text>
+                        </View>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>#{b.id}</Text>
+                      </View>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                        {new Date(b.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 2 }}>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>{fmt(b.commissionAmount)}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{fmt(b.finalPrice)} × {fmtPct(b.commissionRate)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
 }
 
 // ─── AdminMessagesTab ─────────────────────────────────────────────────────────
@@ -2154,6 +2517,7 @@ export default function AdminPanelScreen() {
     { key: "booking-report" as AdminTab, icon: "stats-chart-outline" as const, label: "Report" },
     { key: "crm-leads" as AdminTab, icon: "person-add-outline" as const, label: "CRM" },
     { key: "import-pub" as AdminTab, icon: "cloud-download-outline" as const, label: "Import" },
+    { key: "commissions" as AdminTab, icon: "cash-outline" as const, label: "Commissions" },
   ];
 
   if (!user || user.role !== "admin") {
@@ -2219,6 +2583,7 @@ export default function AdminPanelScreen() {
       {activeTab === "booking-report" && renderBookingReport()}
       {activeTab === "crm-leads" && renderCrmLeads()}
       {activeTab === "import-pub" && renderImportPub()}
+      {activeTab === "commissions" && <AdminCommissionsTab colors={colors} />}
     </View>
   );
 }

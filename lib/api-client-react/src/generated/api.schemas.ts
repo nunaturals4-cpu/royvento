@@ -795,6 +795,84 @@ export interface DrinkPlanSummary {
   lineItems?: DrinkPlanLineItem[] | null;
 }
 
+export interface VendorCommission {
+  id?: number;
+  vendorId: number;
+  /** Percentage 0–100 (stored as decimal string) */
+  freeEntryRate: string;
+  /** Percentage 0–100 (stored as decimal string) */
+  ticketRate: string;
+  /** Percentage 0–100 (stored as decimal string) */
+  tableBookingRate: string;
+  updatedAt?: string;
+}
+
+export interface SetVendorCommissionBody {
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  freeEntryRate: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  ticketRate: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  tableBookingRate: number;
+}
+
+export type CommissionReportBookingLineBookingType =
+  (typeof CommissionReportBookingLineBookingType)[keyof typeof CommissionReportBookingLineBookingType];
+
+export const CommissionReportBookingLineBookingType = {
+  free_entry: "free_entry",
+  ticket: "ticket",
+  table: "table",
+} as const;
+
+export interface CommissionReportBookingLine {
+  id: number;
+  finalPrice: number;
+  bookingType: CommissionReportBookingLineBookingType;
+  commissionRate: number;
+  commissionAmount: number;
+  createdAt: string;
+}
+
+export interface CommissionReportVendorRow {
+  vendorId: number;
+  businessName: string;
+  city: string;
+  totalBookings: number;
+  totalRevenue: number;
+  totalCommission: number;
+  freeEntryCount: number;
+  freeEntryRevenue: number;
+  freeEntryCommission: number;
+  ticketCount: number;
+  ticketRevenue: number;
+  ticketCommission: number;
+  tableCount: number;
+  tableRevenue: number;
+  tableCommission: number;
+  bookings: CommissionReportBookingLine[];
+}
+
+export interface CommissionReportTotals {
+  totalBookings: number;
+  totalRevenue: number;
+  totalCommission: number;
+}
+
+export interface CommissionReport {
+  rows: CommissionReportVendorRow[];
+  totals: CommissionReportTotals;
+}
+
 export interface VendorDrinkOffer {
   vendorId: number;
   vendorName: string;
@@ -949,6 +1027,17 @@ export type GetAdminLeadsParams = {
 export type GetAdminLeadsSummaryParams = {
   startDate?: string;
   endDate?: string;
+};
+
+export type GetCommissionReportParams = {
+  /**
+   * ISO date (YYYY-MM-DD) range start
+   */
+  from?: string;
+  /**
+   * ISO date (YYYY-MM-DD) range end
+   */
+  to?: string;
 };
 
 export type GetAdminAnalyticsParams = {
