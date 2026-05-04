@@ -84,6 +84,7 @@ export function AdminPanel() {
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
+          <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
@@ -100,6 +101,7 @@ export function AdminPanel() {
         <TabsContent value="attendance"><AttendanceReport /></TabsContent>
         <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
         <TabsContent value="import-pub"><ImportPubFromGoogle /></TabsContent>
+        <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
       </Tabs>
     </div>
   );
@@ -3049,6 +3051,168 @@ function ImportPubFromGoogle() {
           </Button>
         </form>
       )}
+    </div>
+  );
+}
+
+interface AdminAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  imageUrl: string;
+  isFeaturedSlider: boolean;
+  vendorId: number;
+  vendorName: string;
+  createdAt: string;
+}
+
+function AnnouncementSliderAdmin() {
+  const [items, setItems] = useState<AdminAnnouncement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<AdminAnnouncement[]>("/api/admin/announcements")
+      .then(setItems)
+      .catch(() => toast({ title: "Failed to load announcements", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const toggle = async (item: AdminAnnouncement) => {
+    setToggling(item.id);
+    try {
+      const updated = await apiPatch<AdminAnnouncement>(
+        `/api/admin/announcements/${item.id}/slider`,
+        { isFeaturedSlider: !item.isFeaturedSlider },
+      );
+      setItems((prev) => prev.map((a) => (a.id === item.id ? { ...a, isFeaturedSlider: updated.isFeaturedSlider } : a)));
+      toast({
+        title: updated.isFeaturedSlider ? "Added to slider" : "Removed from slider",
+      });
+    } catch {
+      toast({ title: "Failed to update", variant: "destructive" });
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const featured = items.filter((a) => a.isFeaturedSlider);
+  const rest = items.filter((a) => !a.isFeaturedSlider);
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl glass-card p-6">
+        <div className="flex items-start gap-3 mb-6">
+          <div className="w-9 h-9 rounded-lg bg-amber-400/15 flex items-center justify-center shrink-0">
+            <Megaphone className="h-4 w-4 text-amber-400" />
+          </div>
+          <div>
+            <h2 className="font-serif text-2xl">Announcement Slider</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Toggle which announcements appear in the hero image slider on the Grab Deals page.
+              When none are selected, the slider falls back to the most recent announcements automatically.
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No announcements found.</p>
+        ) : (
+          <div className="space-y-8">
+            {featured.length > 0 && (
+              <div>
+                <p className="text-xs uppercase tracking-wider text-amber-400 font-semibold mb-3 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+                  Featured in slider ({featured.length})
+                </p>
+                <div className="space-y-2">
+                  {featured.map((a) => (
+                    <AnnouncementSliderRow key={a.id} item={a} toggling={toggling} onToggle={toggle} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {rest.length > 0 && (
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-3 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-white/20" />
+                  Not in slider ({rest.length})
+                </p>
+                <div className="space-y-2">
+                  {rest.map((a) => (
+                    <AnnouncementSliderRow key={a.id} item={a} toggling={toggling} onToggle={toggle} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnnouncementSliderRow({
+  item,
+  toggling,
+  onToggle,
+}: {
+  item: AdminAnnouncement;
+  toggling: number | null;
+  onToggle: (item: AdminAnnouncement) => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-4 rounded-xl border px-4 py-3 transition-colors ${
+        item.isFeaturedSlider
+          ? "border-amber-400/30 bg-amber-400/5"
+          : "border-white/8 bg-white/[0.02]"
+      }`}
+    >
+      {item.imageUrl ? (
+        <img
+          src={item.imageUrl}
+          alt=""
+          className="w-12 h-12 rounded-lg object-cover flex-shrink-0 opacity-80"
+        />
+      ) : (
+        <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+          <Megaphone className="h-5 w-5 text-white/25" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm leading-snug truncate">{item.title}</p>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">
+          {item.vendorName}
+          {item.announceDate && (
+            <span className="ml-2">
+              · {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+          )}
+        </p>
+      </div>
+      <button
+        onClick={() => onToggle(item)}
+        disabled={toggling === item.id}
+        aria-label={item.isFeaturedSlider ? "Remove from slider" : "Add to slider"}
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none disabled:opacity-50 ${
+          item.isFeaturedSlider ? "bg-amber-400" : "bg-white/20"
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${
+            item.isFeaturedSlider ? "translate-x-5" : "translate-x-0.5"
+          }`}
+        />
+      </button>
     </div>
   );
 }

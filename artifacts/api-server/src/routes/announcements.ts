@@ -162,6 +162,107 @@ router.get("/announcements/recent", async (_req, res) => {
   return res.json(rows.rows);
 });
 
+router.get("/announcements/slider", async (_req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const featured = await db.execute(sql`
+    SELECT
+      a.id,
+      a.title,
+      a.body,
+      a.announce_date AS "announceDate",
+      a.announce_time AS "announceTime",
+      a.image_url     AS "imageUrl",
+      COALESCE(NULLIF(a.image_url, ''), v.cover_image_url) AS "coverImageUrl",
+      a.vendor_id     AS "vendorId",
+      a.created_at    AS "createdAt",
+      v.business_name AS "vendorName",
+      COALESCE(
+        a.event_id,
+        (SELECT id FROM events WHERE vendor_id = a.vendor_id ORDER BY id DESC LIMIT 1)
+      ) AS "eventId",
+      COALESCE(
+        (SELECT title FROM events WHERE id = a.event_id),
+        (SELECT title FROM events WHERE vendor_id = a.vendor_id ORDER BY id DESC LIMIT 1)
+      ) AS "eventTitle"
+    FROM announcements a
+    JOIN vendors v ON v.id = a.vendor_id
+    WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+      AND a.is_featured_slider = true
+    ORDER BY a.created_at DESC
+    LIMIT 10
+  `);
+
+  if (featured.rows.length > 0) {
+    return res.json(featured.rows);
+  }
+
+  // Fallback: return recent announcements so the slider is never empty
+  const recent = await db.execute(sql`
+    SELECT
+      a.id,
+      a.title,
+      a.body,
+      a.announce_date AS "announceDate",
+      a.announce_time AS "announceTime",
+      a.image_url     AS "imageUrl",
+      COALESCE(NULLIF(a.image_url, ''), v.cover_image_url) AS "coverImageUrl",
+      a.vendor_id     AS "vendorId",
+      a.created_at    AS "createdAt",
+      v.business_name AS "vendorName",
+      COALESCE(
+        a.event_id,
+        (SELECT id FROM events WHERE vendor_id = a.vendor_id ORDER BY id DESC LIMIT 1)
+      ) AS "eventId",
+      COALESCE(
+        (SELECT title FROM events WHERE id = a.event_id),
+        (SELECT title FROM events WHERE vendor_id = a.vendor_id ORDER BY id DESC LIMIT 1)
+      ) AS "eventTitle"
+    FROM announcements a
+    JOIN vendors v ON v.id = a.vendor_id
+    WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+    ORDER BY a.created_at DESC
+    LIMIT 10
+  `);
+  return res.json(recent.rows);
+});
+
+router.get("/admin/announcements", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db.execute(sql`
+    SELECT
+      a.id,
+      a.title,
+      a.body,
+      a.announce_date      AS "announceDate",
+      a.announce_time      AS "announceTime",
+      a.image_url          AS "imageUrl",
+      a.is_featured_slider AS "isFeaturedSlider",
+      a.vendor_id          AS "vendorId",
+      a.created_at         AS "createdAt",
+      v.business_name      AS "vendorName"
+    FROM announcements a
+    JOIN vendors v ON v.id = a.vendor_id
+    ORDER BY a.created_at DESC
+  `);
+  return res.json(rows.rows);
+});
+
+router.patch("/admin/announcements/:id/slider", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const { isFeaturedSlider } = req.body as { isFeaturedSlider: boolean };
+  if (typeof isFeaturedSlider !== "boolean") {
+    return res.status(400).json({ error: "isFeaturedSlider must be a boolean" });
+  }
+  const [row] = await db
+    .update(announcementsTable)
+    .set({ isFeaturedSlider })
+    .where(eq(announcementsTable.id, id))
+    .returning();
+  if (!row) return res.status(404).json({ error: "Not found" });
+  return res.json(row);
+});
+
 router.get("/vendors/:vendorId/announcements", async (req, res) => {
   const vendorId = Number(req.params["vendorId"]);
   if (!Number.isFinite(vendorId)) return res.status(400).json({ error: "Invalid id" });
