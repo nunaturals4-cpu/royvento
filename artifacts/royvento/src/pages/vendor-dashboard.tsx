@@ -90,6 +90,7 @@ export function VendorDashboard() {
         <Tabs defaultValue={initialTab} className="space-y-6">
           <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
             <TabsTrigger value="overview">Profile</TabsTrigger>
+            <TabsTrigger value="listing"><MapPin className="h-3.5 w-3.5 mr-1 text-primary" /> Listing</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
             <TabsTrigger value="bookings">Booking Report</TabsTrigger>
             <TabsTrigger value="analytics">
@@ -120,6 +121,7 @@ export function VendorDashboard() {
           </TabsList>
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
+          <TabsContent value="listing"><ListingEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
           <TabsContent value="bookings"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
           <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
@@ -173,6 +175,105 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [city, setCity] = useState(vendor.city ?? "");
   const [country, setCountry] = useState(vendor.country || "India");
+  const [descError, setDescError] = useState("");
+  const update = useUpdateMyVendor();
+  const { toast } = useToast();
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (description.trim().length < 300) {
+      setDescError("Description must be at least 300 characters.");
+      return;
+    }
+    setDescError("");
+    update.mutate(
+      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, country, state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
+      {
+        onSuccess: () => {
+          toast({ title: "Profile updated" });
+          onSaved();
+        },
+        onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
+      },
+    );
+  };
+
+  const profileStateOpts = (() => {
+    const list = getStates(country);
+    return stateF && !list.includes(stateF) ? [stateF, ...list] : list;
+  })();
+  const profileCityOpts = (() => {
+    const list = getCities(country, stateF);
+    return city && !list.includes(city) ? [city, ...list] : list;
+  })();
+
+  return (
+    <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <Label>Business name</Label>
+            <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Country</Label>
+            <Select value={country || "India"} onValueChange={(v) => { setCountry(v); setStateF(""); setCity(""); }}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {COUNTRY_NAMES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>State / Region</Label>
+            <Select value={stateF || "any"} onValueChange={(v) => { setStateF(v === "any" ? "" : v); setCity(""); }}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select state —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">— select —</SelectItem>
+                {profileStateOpts.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>City</Label>
+            <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)} disabled={!stateF}>
+              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">— select —</SelectItem>
+                {profileCityOpts.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label>Description <span className="text-muted-foreground text-xs">(min 300 characters)</span></Label>
+          <Textarea
+            rows={6}
+            value={description}
+            onChange={(e) => { setDescription(e.target.value); if (descError) setDescError(""); }}
+            className="bg-black/40 border-white/10"
+          />
+          <div className="flex items-center justify-between mt-1">
+            {descError ? (
+              <p className="text-xs text-destructive">{descError}</p>
+            ) : (
+              <span />
+            )}
+            <p className={`text-xs ml-auto ${description.length >= 300 ? "text-green-400" : "text-muted-foreground"}`}>
+              {description.length} / 300
+            </p>
+          </div>
+        </div>
+        <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
+          {update.isPending ? "Saving…" : "Save profile"}
+        </Button>
+    </form>
+  );
+}
+
+function ListingEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
+  const [stateF, setStateF] = useState(vendor.state ?? "");
+  const [city, setCity] = useState(vendor.city ?? "");
+  const [country, setCountry] = useState(vendor.country || "India");
   const [danceFloor, setDanceFloor] = useState<string>(vendor.danceFloor ?? "");
   const [danceFloorPhotos, setDanceFloorPhotos] = useState<string[]>(
     Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []
@@ -196,7 +297,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       : vendor.menuUrl ? [vendor.menuUrl] : []
   );
   const [uploadingMenu, setUploadingMenu] = useState(false);
-  const [descError, setDescError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>(() => {
     const initial = parseDayHours(vendor.dayHours);
     const errors: Record<string, string> = {};
@@ -207,7 +308,6 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     }
     return errors;
   });
-  const update = useUpdateMyVendor();
   const { toast } = useToast();
 
   const uploadMenuFile = async (file: File): Promise<string> => {
@@ -281,7 +381,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   const toggleDay = (day: string) =>
     setOpenDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
-  const setDayTime = (day: string, field: "open" | "close", val: string) => {
+  const updateDayTime = (day: string, field: "open" | "close", val: string) => {
     setDayTimes((prev) => {
       const updated = { ...prev, [day]: { open: prev[day]?.open ?? "", close: prev[day]?.close ?? "", [field]: val } };
       const { open, close } = updated[day]!;
@@ -315,10 +415,6 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (description.trim().length < 300) {
-      setDescError("Description must be at least 300 characters.");
-      return;
-    }
     if (openDays.length === 0) {
       toast({ title: "Select at least one open day", variant: "destructive" }); return;
     }
@@ -326,459 +422,388 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     if (firstHoursError) {
       toast({ title: "Fix opening hours", description: firstHoursError, variant: "destructive" }); return;
     }
-    setDescError("");
     const dayHoursPayload: DayTimes = {};
     for (const day of openDays) {
       dayHoursPayload[day] = { open: dayTimes[day]?.open ?? "", close: dayTimes[day]?.close ?? "" };
     }
-    update.mutate(
-      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, country, state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
-      {
-        onSuccess: async () => {
-          try {
-            await apiPatch("/api/partner/profile", {
-              state: stateF, city, country, address, openDays, dayHours: dayHoursPayload,
-              danceFloor: danceFloor || null,
-              danceFloorPhotos,
-              menuUrl: menuUrls[0] ?? "",
-              menuUrls,
-            });
-            toast({ title: "Profile updated" });
-            onSaved();
-          } catch (err: any) {
-            toast({ title: "Location / schedule not saved", description: err?.message ?? "Please try again.", variant: "destructive" });
-          }
-        },
-        onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
-      },
-    );
+    setSaving(true);
+    try {
+      await apiPatch("/api/partner/profile", {
+        state: stateF, city, country, address, openDays, dayHours: dayHoursPayload,
+        danceFloor: danceFloor || null,
+        danceFloorPhotos,
+        menuUrl: menuUrls[0] ?? "",
+        menuUrls,
+      });
+      toast({ title: "Listing updated" });
+      onSaved();
+    } catch (err: any) {
+      toast({ title: "Listing not saved", description: err?.message ?? "Please try again.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const profileStateOpts = (() => {
-    const list = getStates(country);
-    return stateF && !list.includes(stateF) ? [stateF, ...list] : list;
-  })();
-  const profileCityOpts = (() => {
-    const list = getCities(country, stateF);
-    return city && !list.includes(city) ? [city, ...list] : list;
-  })();
-
   return (
-    <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <Label>Business name</Label>
-            <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Country</Label>
-            <Select value={country || "India"} onValueChange={(v) => { setCountry(v); setStateF(""); setCity(""); }}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COUNTRY_NAMES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>State / Region</Label>
-            <Select value={stateF || "any"} onValueChange={(v) => { setStateF(v === "any" ? "" : v); setCity(""); }}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select state —" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">— select —</SelectItem>
-                {profileStateOpts.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>City</Label>
-            <Select value={city || "any"} onValueChange={(v) => setCity(v === "any" ? "" : v)} disabled={!stateF}>
-              <SelectTrigger className="bg-black/40 border-white/10"><SelectValue placeholder="— select city —" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">— select —</SelectItem>
-                {profileCityOpts.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+    <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-6">
+      <div>
+        <Label className="mb-3 block text-sm font-medium">Dance floor</Label>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {DANCE_FLOOR_OPTIONS.map(({ value, label }) => (
+            <label
+              key={value}
+              className={`flex items-center gap-2.5 cursor-pointer rounded-xl border px-4 py-3 text-sm transition-colors flex-1 ${
+                danceFloor === value
+                  ? "border-primary/50 bg-primary/10 text-foreground"
+                  : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"
+              }`}
+            >
+              <input
+                type="radio"
+                name="danceFloor"
+                value={value}
+                checked={danceFloor === value}
+                onChange={() => setDanceFloor(value)}
+                className="accent-primary"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+      {danceFloor === "dedicated" && (
+        <div>
+          <Label className="mb-2 block text-sm font-medium flex items-center gap-1.5">
+            <ImageIcon className="h-3.5 w-3.5 text-primary" />
+            Dance floor photos
+            <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+          </Label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {danceFloorPhotos.map((url, i) => (
+              <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-white/10">
+                <img src={url} alt="" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i))}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="h-4 w-4 text-white" />
+                </button>
+              </div>
+            ))}
+            <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-lg border border-dashed cursor-pointer transition-colors ${uploadingDfPhoto ? "opacity-50 pointer-events-none" : "border-white/20 hover:border-primary/50 bg-black/20 hover:bg-primary/5"}`}>
+              {uploadingDfPhoto ? (
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Add</span>
+                </>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                multiple
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (!files.length) return;
+                  setUploadingDfPhoto(true);
+                  try {
+                    const urls = await Promise.all(files.map((f) => uploadDanceFloorPhoto(f)));
+                    setDanceFloorPhotos((prev) => [...prev, ...urls]);
+                  } catch {
+                    toast({ title: "Photo upload failed", variant: "destructive" });
+                  } finally {
+                    setUploadingDfPhoto(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </label>
           </div>
         </div>
-        <div>
-          <Label>Description <span className="text-muted-foreground text-xs">(min 300 characters)</span></Label>
-          <Textarea
-            rows={6}
-            value={description}
-            onChange={(e) => { setDescription(e.target.value); if (descError) setDescError(""); }}
-            className="bg-black/40 border-white/10"
-          />
-          <div className="flex items-center justify-between mt-1">
-            {descError ? (
-              <p className="text-xs text-destructive">{descError}</p>
-            ) : (
-              <span />
+      )}
+      <div>
+        <Label className="mb-2 block text-sm font-medium">Venue location</Label>
+        <div className="flex gap-6 mb-3">
+          {([
+            { value: "business", label: "Enter your business name (as on Google Maps)" },
+            { value: "manual", label: "Add full address" },
+          ] as const).map(({ value, label }) => (
+            <label key={value} className="flex items-center gap-2 cursor-pointer text-sm">
+              <input
+                type="radio"
+                name="addressMode"
+                value={value}
+                checked={addressMode === value}
+                onChange={() => {
+                  setAddressMode(value);
+                  if (value === "manual") {
+                    setSuggestions([]); setShowSugg(false); setFetchedAddress("");
+                  } else {
+                    setAddressQuery(address);
+                  }
+                }}
+                className="accent-primary"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        {addressMode === "business" && (
+          <div className="relative">
+            <Input
+              value={addressQuery}
+              onChange={(e) => { setAddressQuery(e.target.value); setAddress(e.target.value); setFetchedAddress(""); searchAddress(e.target.value); }}
+              onBlur={() => setTimeout(() => setShowSugg(false), 200)}
+              onFocus={() => { if (suggestions.length > 0) setShowSugg(true); }}
+              placeholder="e.g. The Bandra Bar Mumbai"
+              className="bg-black/40 border-white/10"
+              autoComplete="off"
+            />
+            {showSugg && suggestions.length > 0 && (
+              <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-card border border-white/10 shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                {suggestions.map((s) => {
+                  const isEstablishment = s.types.some((t) =>
+                    ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
+                  );
+                  const Icon = isEstablishment ? Building2 : MapPin;
+                  return (
+                    <li key={s.place_id}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug flex items-start gap-2.5"
+                        onMouseDown={() => selectSuggestion(s)}
+                      >
+                        <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                        <span>{s.description}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-            <p className={`text-xs ml-auto ${description.length >= 300 ? "text-green-400" : "text-muted-foreground"}`}>
-              {description.length} / 300
+            {fetchedAddress && (
+              <div className="mt-2">
+                <Label className="text-xs text-muted-foreground mb-1 block">Registered address on Google Maps</Label>
+                <Input
+                  value={fetchedAddress}
+                  readOnly
+                  className="bg-black/20 border-white/5 text-muted-foreground cursor-default select-all"
+                />
+              </div>
+            )}
+            {address.trim() && (
+              <div className="mt-3">
+                <iframe
+                  key={address}
+                  title="Venue location"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed&hl=en`}
+                  className="w-full h-48 md:h-56 rounded-xl border border-white/10"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Navigation className="h-3 w-3" />
+                  Open in Google Maps ↗
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+        {addressMode === "manual" && (
+          <div>
+            <Textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g. 123 Park Street, Kolkata, West Bengal 700016"
+              rows={3}
+              className="bg-black/40 border-white/10 resize-none"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              This address will appear on your public profile. You can paste a full address from Google Maps.
             </p>
           </div>
-        </div>
-        <div>
-          <Label className="mb-3 block text-sm font-medium">Dance floor</Label>
-          <div className="flex flex-col sm:flex-row gap-3">
-            {DANCE_FLOOR_OPTIONS.map(({ value, label }) => (
-              <label
-                key={value}
-                className={`flex items-center gap-2.5 cursor-pointer rounded-xl border px-4 py-3 text-sm transition-colors flex-1 ${
-                  danceFloor === value
-                    ? "border-primary/50 bg-primary/10 text-foreground"
-                    : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"
+        )}
+      </div>
+      <div>
+        <Label className="mb-3 block text-sm font-medium">Operating hours</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {ALL_DAYS.map((day) => {
+            const isOpen = openDays.includes(day);
+            const hasErr = !!dayHoursErrors[day];
+            const crossesMid = !hasErr && dayTimes[day]?.open && dayTimes[day]?.close &&
+              dayTimes[day]!.close < dayTimes[day]!.open;
+            return (
+              <div
+                key={day}
+                className={`rounded-xl border transition-all ${isOpen
+                  ? hasErr
+                    ? "border-red-500/40 bg-red-600/5"
+                    : "border-white/15 bg-white/[0.04]"
+                  : "border-white/8 bg-black/20"
                 }`}
               >
-                <input
-                  type="radio"
-                  name="danceFloor"
-                  value={value}
-                  checked={danceFloor === value}
-                  onChange={() => setDanceFloor(value)}
-                  className="accent-primary"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </div>
-        {danceFloor === "dedicated" && (
-          <div>
-            <Label className="mb-2 block text-sm font-medium flex items-center gap-1.5">
-              <ImageIcon className="h-3.5 w-3.5 text-primary" />
-              Dance floor photos
-              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-            </Label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {danceFloorPhotos.map((url, i) => (
-                <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-white/10">
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className={`text-sm font-semibold leading-none ${isOpen ? "text-foreground" : "text-muted-foreground"}`}>
+                      {DAY_FULL_NAMES[day]}
+                    </p>
+                    {!isOpen && (
+                      <span className="inline-flex items-center mt-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Closed</span>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i))}
-                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    role="switch"
+                    aria-checked={isOpen}
+                    onClick={() => toggleDay(day)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isOpen ? "bg-primary" : "bg-white/20"}`}
                   >
-                    <Trash2 className="h-4 w-4 text-white" />
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition-transform ${isOpen ? "translate-x-4" : "translate-x-0"}`} />
+                  </button>
+                </div>
+                {isOpen && (
+                  <div className="px-4 pb-4 pt-1 border-t border-white/8 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5" /> Opens
+                        </p>
+                        <Input
+                          type="time"
+                          value={dayTimes[day]?.open ?? ""}
+                          onChange={(e) => updateDayTime(day, "open", e.target.value)}
+                          className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5" /> Closes
+                        </p>
+                        <Input
+                          type="time"
+                          value={dayTimes[day]?.close ?? ""}
+                          onChange={(e) => updateDayTime(day, "close", e.target.value)}
+                          className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`}
+                        />
+                      </div>
+                    </div>
+                    {hasErr && (
+                      <p className="text-xs text-red-400">{dayHoursErrors[day]}</p>
+                    )}
+                    {crossesMid && (
+                      <p className="text-xs text-amber-400/90">↻ Overnight schedule — closes next day</p>
+                    )}
+                    {(dayTimes[day]?.open || dayTimes[day]?.close) && (() => {
+                      const otherOpenDays = openDays.filter((d) => d !== day);
+                      const weekdayTargets = (WEEKDAYS as readonly string[]).filter((d) => d !== day && openDays.includes(d));
+                      const weekendTargets = (WEEKEND_DAYS as readonly string[]).filter((d) => d !== day && openDays.includes(d));
+                      if (otherOpenDays.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => copyHours(day, ALL_DAYS)}
+                            className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
+                          >
+                            Copy to all days
+                          </button>
+                          {weekdayTargets.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => copyHours(day, WEEKDAYS)}
+                              className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
+                            >
+                              Copy to weekdays
+                            </button>
+                          )}
+                          {weekendTargets.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => copyHours(day, WEEKEND_DAYS)}
+                              className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
+                            >
+                              Copy to weekends
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">Toggle each day on or off. If closing time is earlier than opening time it is treated as an overnight schedule (e.g. 10 pm – 2 am).</p>
+      </div>
+      <div>
+        <Label className="flex items-center gap-1.5 mb-2">
+          <Upload className="h-3.5 w-3.5 text-primary" />
+          Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
+        </Label>
+        <div className="space-y-2">
+          {menuUrls.length > 0 && (
+            <div className="space-y-1.5">
+              {menuUrls.map((url, idx) => (
+                <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">
+                    Menu {idx + 1}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setMenuUrls((prev) => prev.filter((_, i) => i !== idx))}
+                    className="text-xs text-muted-foreground hover:text-destructive shrink-0"
+                  >
+                    Remove
                   </button>
                 </div>
               ))}
-              <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-lg border border-dashed cursor-pointer transition-colors ${uploadingDfPhoto ? "opacity-50 pointer-events-none" : "border-white/20 hover:border-primary/50 bg-black/20 hover:bg-primary/5"}`}>
-                {uploadingDfPhoto ? (
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 text-muted-foreground mb-1" />
-                    <span className="text-xs text-muted-foreground">Add</span>
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  multiple
-                  onChange={async (e) => {
-                    const files = Array.from(e.target.files ?? []);
-                    if (!files.length) return;
-                    setUploadingDfPhoto(true);
-                    try {
-                      const urls = await Promise.all(files.map((f) => uploadDanceFloorPhoto(f)));
-                      setDanceFloorPhotos((prev) => [...prev, ...urls]);
-                    } catch {
-                      toast({ title: "Photo upload failed", variant: "destructive" });
-                    } finally {
-                      setUploadingDfPhoto(false);
-                      e.target.value = "";
-                    }
-                  }}
-                />
-              </label>
-            </div>
-          </div>
-        )}
-        <div>
-          <Label className="mb-2 block text-sm font-medium">Venue location</Label>
-          <div className="flex gap-6 mb-3">
-            {([
-              { value: "business", label: "Enter your business name (as on Google Maps)" },
-              { value: "manual", label: "Add full address" },
-            ] as const).map(({ value, label }) => (
-              <label key={value} className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="radio"
-                  name="addressMode"
-                  value={value}
-                  checked={addressMode === value}
-                  onChange={() => {
-                    setAddressMode(value);
-                    if (value === "manual") {
-                      setSuggestions([]); setShowSugg(false); setFetchedAddress("");
-                    } else {
-                      setAddressQuery(address);
-                    }
-                  }}
-                  className="accent-primary"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-
-          {addressMode === "business" && (
-            <div className="relative">
-              <Input
-                value={addressQuery}
-                onChange={(e) => { setAddressQuery(e.target.value); setAddress(e.target.value); setFetchedAddress(""); searchAddress(e.target.value); }}
-                onBlur={() => setTimeout(() => setShowSugg(false), 200)}
-                onFocus={() => { if (suggestions.length > 0) setShowSugg(true); }}
-                placeholder="e.g. The Bandra Bar Mumbai"
-                className="bg-black/40 border-white/10"
-                autoComplete="off"
-              />
-              {showSugg && suggestions.length > 0 && (
-                <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-card border border-white/10 shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-                  {suggestions.map((s) => {
-                    const isEstablishment = s.types.some((t) =>
-                      ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
-                    );
-                    const Icon = isEstablishment ? Building2 : MapPin;
-                    return (
-                      <li key={s.place_id}>
-                        <button
-                          type="button"
-                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug flex items-start gap-2.5"
-                          onMouseDown={() => selectSuggestion(s)}
-                        >
-                          <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                          <span>{s.description}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {fetchedAddress && (
-                <div className="mt-2">
-                  <Label className="text-xs text-muted-foreground mb-1 block">Registered address on Google Maps</Label>
-                  <Input
-                    value={fetchedAddress}
-                    readOnly
-                    className="bg-black/20 border-white/5 text-muted-foreground cursor-default select-all"
-                  />
-                </div>
-              )}
-              {address.trim() && (
-                <div className="mt-3">
-                  <iframe
-                    key={address}
-                    title="Venue location"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed&hl=en`}
-                    className="w-full h-48 md:h-56 rounded-xl border border-white/10"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                  <a
-                    href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <Navigation className="h-3 w-3" />
-                    Open in Google Maps ↗
-                  </a>
-                </div>
-              )}
             </div>
           )}
-
-          {addressMode === "manual" && (
-            <div>
-              <Textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="e.g. 123 Park Street, Kolkata, West Bengal 700016"
-                rows={3}
-                className="bg-black/40 border-white/10 resize-none"
+          {menuUrls.length < 5 && (
+            <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition-colors ${uploadingMenu ? "opacity-50 pointer-events-none border-white/10 bg-black/20" : "border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"}`}>
+              {uploadingMenu ? (
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+              <span className="text-muted-foreground text-xs">{uploadingMenu ? "Uploading…" : `Add menu file (${menuUrls.length}/5)`}</span>
+              <input
+                type="file"
+                accept="application/pdf,image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingMenu(true);
+                  try {
+                    const url = await uploadMenuFile(file);
+                    setMenuUrls((prev) => [...prev, url]);
+                    setMenuUrl(url);
+                    toast({ title: "Menu uploaded" });
+                  } catch {
+                    toast({ title: "Menu upload failed", variant: "destructive" });
+                  } finally {
+                    setUploadingMenu(false);
+                    e.target.value = "";
+                  }
+                }}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                This address will appear on your public profile. You can paste a full address from Google Maps.
-              </p>
-            </div>
+            </label>
           )}
         </div>
-        <div>
-          <Label className="mb-3 block text-sm font-medium">Operating hours</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {ALL_DAYS.map((day) => {
-              const isOpen = openDays.includes(day);
-              const hasErr = !!dayHoursErrors[day];
-              const crossesMid = !hasErr && dayTimes[day]?.open && dayTimes[day]?.close &&
-                dayTimes[day]!.close < dayTimes[day]!.open;
-              return (
-                <div
-                  key={day}
-                  className={`rounded-xl border transition-all ${isOpen
-                    ? hasErr
-                      ? "border-red-500/40 bg-red-600/5"
-                      : "border-white/15 bg-white/[0.04]"
-                    : "border-white/8 bg-black/20"
-                  }`}
-                >
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <div>
-                      <p className={`text-sm font-semibold leading-none ${isOpen ? "text-foreground" : "text-muted-foreground"}`}>
-                        {DAY_FULL_NAMES[day]}
-                      </p>
-                      {!isOpen && (
-                        <span className="inline-flex items-center mt-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Closed</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={isOpen}
-                      onClick={() => toggleDay(day)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isOpen ? "bg-primary" : "bg-white/20"}`}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition-transform ${isOpen ? "translate-x-4" : "translate-x-0"}`} />
-                    </button>
-                  </div>
-                  {isOpen && (
-                    <div className="px-4 pb-4 pt-1 border-t border-white/8 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                            <Clock className="h-2.5 w-2.5" /> Opens
-                          </p>
-                          <Input
-                            type="time"
-                            value={dayTimes[day]?.open ?? ""}
-                            onChange={(e) => setDayTime(day, "open", e.target.value)}
-                            className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`}
-                          />
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                            <Clock className="h-2.5 w-2.5" /> Closes
-                          </p>
-                          <Input
-                            type="time"
-                            value={dayTimes[day]?.close ?? ""}
-                            onChange={(e) => setDayTime(day, "close", e.target.value)}
-                            className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`}
-                          />
-                        </div>
-                      </div>
-                      {hasErr && (
-                        <p className="text-xs text-red-400">{dayHoursErrors[day]}</p>
-                      )}
-                      {crossesMid && (
-                        <p className="text-xs text-amber-400/90">↻ Overnight schedule — closes next day</p>
-                      )}
-                      {(dayTimes[day]?.open || dayTimes[day]?.close) && (() => {
-                        const otherOpenDays = openDays.filter((d) => d !== day);
-                        const weekdayTargets = (WEEKDAYS as readonly string[]).filter((d) => d !== day && openDays.includes(d));
-                        const weekendTargets = (WEEKEND_DAYS as readonly string[]).filter((d) => d !== day && openDays.includes(d));
-                        if (otherOpenDays.length === 0) return null;
-                        return (
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => copyHours(day, ALL_DAYS)}
-                              className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
-                            >
-                              Copy to all days
-                            </button>
-                            {weekdayTargets.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => copyHours(day, WEEKDAYS)}
-                                className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
-                              >
-                                Copy to weekdays
-                              </button>
-                            )}
-                            {weekendTargets.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => copyHours(day, WEEKEND_DAYS)}
-                                className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
-                              >
-                                Copy to weekends
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground mt-3">Toggle each day on or off. If closing time is earlier than opening time it is treated as an overnight schedule (e.g. 10 pm – 2 am).</p>
-        </div>
-        <div>
-          <Label className="flex items-center gap-1.5 mb-2">
-            <Upload className="h-3.5 w-3.5 text-primary" />
-            Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
-          </Label>
-          <div className="space-y-2">
-            {menuUrls.length > 0 && (
-              <div className="space-y-1.5">
-                {menuUrls.map((url, idx) => (
-                  <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">
-                      Menu {idx + 1}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => setMenuUrls((prev) => prev.filter((_, i) => i !== idx))}
-                      className="text-xs text-muted-foreground hover:text-destructive shrink-0"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {menuUrls.length < 5 && (
-              <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition-colors ${uploadingMenu ? "opacity-50 pointer-events-none border-white/10 bg-black/20" : "border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"}`}>
-                {uploadingMenu ? (
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-                <span className="text-muted-foreground text-xs">{uploadingMenu ? "Uploading…" : `Add menu file (${menuUrls.length}/5)`}</span>
-                <input
-                  type="file"
-                  accept="application/pdf,image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setUploadingMenu(true);
-                    try {
-                      const url = await uploadMenuFile(file);
-                      setMenuUrls((prev) => [...prev, url]);
-                      setMenuUrl(url);
-                      toast({ title: "Menu uploaded" });
-                    } catch {
-                      toast({ title: "Menu upload failed", variant: "destructive" });
-                    } finally {
-                      setUploadingMenu(false);
-                      e.target.value = "";
-                    }
-                  }}
-                />
-              </label>
-            )}
-          </div>
-        </div>
-        <Button type="submit" disabled={update.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-          {update.isPending ? "Saving…" : "Save profile"}
-        </Button>
+      </div>
+      <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
+        {saving ? "Saving…" : "Save listing"}
+      </Button>
     </form>
   );
 }
