@@ -311,7 +311,7 @@ export function EventDetail() {
       { data: { eventId: event.id, vendorId: event.vendor.id, rating: reviewRating, comment: reviewComment } },
       {
         onSuccess: () => { toast({ title: t("events.review_posted") }); setReviewComment(""); refetchReviews(); },
-        onError: (e: any) => toast({ title: t("events.review_failed"), description: e?.message, variant: "destructive" }),
+        onError: (e: unknown) => toast({ title: t("events.review_failed"), description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
       },
     );
   };

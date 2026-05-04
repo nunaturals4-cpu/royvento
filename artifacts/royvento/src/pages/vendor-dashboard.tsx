@@ -196,7 +196,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           toast({ title: "Profile updated" });
           onSaved();
         },
-        onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
+        onError: (err: unknown) => toast({ title: "Failed", description: err instanceof Error ? err.message : undefined, variant: "destructive" }),
       },
     );
   };
@@ -867,7 +867,7 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
                           if (!confirm("Delete this listing?")) return;
                           del.mutate({ eventId: e.id }, {
                             onSuccess: () => { toast({ title: "Deleted" }); refetchEvents(); },
-                            onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
+                            onError: (err: unknown) => toast({ title: "Failed", description: err instanceof Error ? err.message : undefined, variant: "destructive" }),
                           });
                         }}
                       >
@@ -999,7 +999,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
       { data: body },
       {
         onSuccess: () => { toast({ title: "Submitted for review! An admin will approve your listing shortly." }); onSaved(); },
-        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+        onError: (e: unknown) => toast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
       },
     );
   };

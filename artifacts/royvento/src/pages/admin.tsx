@@ -579,7 +579,7 @@ function AllVendorsAdmin() {
                       className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs"
                       onClick={() => approve.mutate({ vendorId: v.id }, {
                         onSuccess: () => { toast({ title: "Approved" }); load(); },
-                        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+                        onError: (e: unknown) => toast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
                       })}
                     ><CheckCircle className="h-3.5 w-3.5 mr-1" />Approve</Button>
                     <Button
@@ -588,7 +588,7 @@ function AllVendorsAdmin() {
                       className="text-xs border-red-500/30 text-red-300"
                       onClick={() => reject.mutate({ vendorId: v.id }, {
                         onSuccess: () => { toast({ title: "Rejected" }); load(); },
-                        onError: (e: any) => toast({ title: "Failed to reject", description: e?.message, variant: "destructive" }),
+                        onError: (e: unknown) => toast({ title: "Failed to reject", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
                       })}
                     ><XCircle className="h-3.5 w-3.5 mr-1" />Reject</Button>
                   </>
@@ -1249,7 +1249,7 @@ function UsersPanel() {
                       { userId: u.id, data: { role: role as any } },
                       {
                         onSuccess: () => { toast({ title: "Role updated" }); refetch(); },
-                        onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+                        onError: (e: unknown) => toast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
                       },
                     )
                   }
@@ -1266,7 +1266,7 @@ function UsersPanel() {
                     if (!confirm(`Delete ${u.name}?`)) return;
                     del.mutate({ userId: u.id }, {
                       onSuccess: () => { toast({ title: "User deleted" }); refetch(); },
-                      onError: (e: any) => toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+                      onError: (e: unknown) => toast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
                     });
                   }}
                 >Delete</Button>
