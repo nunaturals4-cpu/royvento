@@ -149,6 +149,17 @@ export function EventCard({
             {title}
           </Text>
         </View>
+        {rating !== undefined && rating > 0 && reviewCount ? (
+          <View style={styles.ratingRow}>
+            <Text style={styles.ratingStar}>★</Text>
+            <Text style={[styles.ratingValue, { color: colors.foreground }]}>
+              {rating.toFixed(1)}
+            </Text>
+            <Text style={[styles.ratingCount, { color: colors.mutedForeground }]}>
+              ({reviewCount})
+            </Text>
+          </View>
+        ) : null}
         {location ? (
           <View style={styles.row}>
             <Ionicons name="location-outline" size={11} color={colors.mutedForeground} />
@@ -338,5 +349,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
     letterSpacing: 0.4,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  ratingStar: {
+    fontSize: 10,
+    color: "#f59e0b",
+    lineHeight: 14,
+  },
+  ratingValue: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    lineHeight: 14,
+  },
+  ratingCount: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 14,
   },
 });
