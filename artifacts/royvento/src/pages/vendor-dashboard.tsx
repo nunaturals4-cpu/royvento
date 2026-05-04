@@ -58,7 +58,8 @@ interface Lead {
 
 export function VendorDashboard() {
   const search = useSearch();
-  const initialTab = new URLSearchParams(search).get("tab") ?? "overview";
+  const rawTab = new URLSearchParams(search).get("tab") ?? "overview";
+  const initialTab = rawTab === "listing" ? "events" : rawTab;
   const { data: vendorData, refetch: refetchVendor } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
   const { data: eventsResp, refetch: refetchEvents } = useListMyVendorEvents(undefined, { query: { enabled: !!vendor } as any });
@@ -90,7 +91,6 @@ export function VendorDashboard() {
         <Tabs defaultValue={initialTab} className="space-y-6">
           <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
             <TabsTrigger value="overview">Profile</TabsTrigger>
-            <TabsTrigger value="listing"><MapPin className="h-3.5 w-3.5 mr-1 text-primary" /> Listing</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
             <TabsTrigger value="bookings">Booking Report</TabsTrigger>
             <TabsTrigger value="analytics">
@@ -124,8 +124,7 @@ export function VendorDashboard() {
           </TabsList>
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
-          <TabsContent value="listing"><ListingEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
-          <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
+          <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="bookings"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
           <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
@@ -769,8 +768,9 @@ function ListingEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
   );
 }
 
-function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events: any[]; refetchEvents: () => void }) {
+function EventsManager({ vendor, events, refetchEvents, onSaved }: { vendor: any; events: any[]; refetchEvents: () => void; onSaved: () => void }) {
   const [showForm, setShow] = useState(false);
+  const [showListing, setShowListing] = useState(false);
   const [, navigate] = useLocation();
   const del = useDeleteEvent();
   const { toast } = useToast();
@@ -789,6 +789,26 @@ function EventsManager({ vendor, events, refetchEvents }: { vendor: any; events:
 
   return (
     <div className="space-y-6">
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowListing((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/[0.08] transition-colors text-left"
+        >
+          <div className="flex items-center gap-2.5">
+            <MapPin className="h-4 w-4 text-primary shrink-0" />
+            <span className="text-sm font-medium">Venue Details</span>
+            <span className="text-xs text-muted-foreground">Location, hours, menu &amp; dance floor</span>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200${showListing ? " rotate-180" : ""}`} />
+        </button>
+        {showListing && (
+          <div className="mt-2">
+            <ListingEditor vendor={vendor} onSaved={onSaved} />
+          </div>
+        )}
+      </div>
+
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h2 className="font-serif text-2xl">Your events &amp; pubs</h2>
         {!hasPub && (

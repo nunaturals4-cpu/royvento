@@ -1076,6 +1076,8 @@ export default function VendorDashboardScreen() {
   const [dayHoursErrors, setDayHoursErrors] = useState<Record<string, string>>({});
   const [profCatPickerOpen, setProfCatPickerOpen] = useState(false);
   const [profSaving, setProfSaving] = useState(false);
+  const [showVenueDetails, setShowVenueDetails] = useState(false);
+  const [listingSaving, setListingSaving] = useState(false);
 
   const updateVendorMut = useUpdateMyVendor({
     mutation: { onSuccess: () => vendorQuery.refetch() },
@@ -1135,6 +1137,40 @@ export default function VendorDashboardScreen() {
   }, [user?.id]);
 
   async function saveProfile() {
+    setProfSaving(true);
+    try {
+      await updateVendorMut.mutateAsync({
+        data: {
+          businessName: profName.trim(),
+          description: profDesc.trim(),
+          category: profCategory || vendor?.category || "Cultural",
+          location: `${vendor?.city ?? ""}${vendor?.state ? ", " + vendor.state : ""}`,
+          country: vendor?.country || "India",
+          state: vendor?.state ?? "",
+          city: vendor?.city ?? "",
+          bannerImage: vendor?.bannerImage ?? "",
+          portfolioImages: vendor?.portfolioImages ?? [],
+        },
+      });
+      if (profPhone.trim()) {
+        await customFetch("/api/users/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: profPhone.trim() }),
+        });
+        await updateUser({ phone: profPhone.trim() });
+      }
+      qc.invalidateQueries({ queryKey: getGetMyVendorQueryKey() });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Saved", "Your profile has been updated.");
+    } catch {
+      Alert.alert("Error", "Failed to save profile. Please try again.");
+    } finally {
+      setProfSaving(false);
+    }
+  }
+
+  async function saveListing() {
     const firstHoursError = profOpenDays
       .filter((d) => VALID_API_DAYS.includes(d))
       .map((d) => dayHoursErrors[d])
@@ -1143,13 +1179,13 @@ export default function VendorDashboardScreen() {
       Alert.alert("Fix opening hours", firstHoursError);
       return;
     }
-    setProfSaving(true);
+    setListingSaving(true);
     try {
       await updateVendorMut.mutateAsync({
         data: {
-          businessName: profName.trim(),
-          description: profDesc.trim(),
-          category: profCategory || vendor?.category || "Cultural",
+          businessName: vendor?.businessName ?? profName.trim(),
+          description: vendor?.description ?? profDesc.trim(),
+          category: vendor?.category ?? (profCategory || "Cultural"),
           location: `${profLocation.city}${profLocation.state ? ", " + profLocation.state : ""}`,
           country: profLocation.country.trim() || "India",
           state: profLocation.state.trim(),
@@ -1178,21 +1214,13 @@ export default function VendorDashboardScreen() {
           menuUrls: profMenuUrls,
         }),
       });
-      if (profPhone.trim()) {
-        await customFetch("/api/users/me", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: profPhone.trim() }),
-        });
-        await updateUser({ phone: profPhone.trim() });
-      }
       qc.invalidateQueries({ queryKey: getGetMyVendorQueryKey() });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Saved", "Your profile has been updated.");
+      Alert.alert("Saved", "Venue details have been updated.");
     } catch {
-      Alert.alert("Error", "Failed to save profile. Please try again.");
+      Alert.alert("Error", "Failed to save venue details. Please try again.");
     } finally {
-      setProfSaving(false);
+      setListingSaving(false);
     }
   }
 
@@ -1651,6 +1679,345 @@ export default function VendorDashboardScreen() {
   function renderEvents() {
     if (eventLoading && eventItems.length === 0) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
     const hasPub = eventItems.some((e: any) => e.type === "pub");
+
+    if (showVenueDetails) {
+      return (
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          {activeDayPicker && (
+            Platform.OS === "ios" ? (
+              <Modal transparent animationType="slide">
+                <View style={styles.datePickerModal}>
+                  <View style={[styles.datePickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.datePickerTitle, { color: colors.foreground }]}>
+                      {activeDayPicker.day} — {activeDayPicker.field === "open" ? "Opening" : "Closing"} Time
+                    </Text>
+                    <DateTimePicker
+                      value={pickerTimeDate}
+                      mode="time"
+                      display="spinner"
+                      onChange={(_, d) => { if (d) setPickerTimeDate(d); }}
+                      themeVariant="dark"
+                    />
+                    <View style={styles.datePickerActions}>
+                      <TouchableOpacity
+                        style={[styles.datePickerCancel, { borderColor: colors.border }]}
+                        onPress={() => setActiveDayPicker(null)}
+                      >
+                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.datePickerConfirm, { backgroundColor: colors.primary }]}
+                        onPress={() => confirmDayTimePicker(pickerTimeDate)}
+                      >
+                        <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold" }}>Set Time</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            ) : (
+              <DateTimePicker
+                value={pickerTimeDate}
+                mode="time"
+                display="default"
+                onChange={(_, d) => {
+                  if (d) { confirmDayTimePicker(d); }
+                  else { setActiveDayPicker(null); }
+                }}
+              />
+            )
+          )}
+          <ScrollView contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground }}>Venue Details</Text>
+              <TouchableOpacity onPress={() => setShowVenueDetails(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>LOCATION</Text>
+            <View style={{ paddingHorizontal: 4, gap: 8 }}>
+              <LocationPicker value={profLocation} onChange={setProfLocation} />
+            </View>
+
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>VENUE ADDRESS</Text>
+            <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Address (optional)</Text>
+              <TextInput
+                style={[styles.fieldInput, { color: colors.foreground }]}
+                value={profAddressQuery}
+                onChangeText={(v) => { setProfAddressQuery(v); setProfAddress(v); searchAddress(v); }}
+                placeholder="Start typing venue address…"
+                placeholderTextColor={colors.mutedForeground}
+              />
+              {showAddrSugg && addrSuggestions.length > 0 && (
+                <View style={{ marginTop: 4, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}>
+                  {addrSuggestions.map((s) => {
+                    const isEstablishment = s.types.some((t) =>
+                      ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={s.place_id}
+                        style={{ paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.muted, flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+                        onPress={() => { setProfAddress(s.description); setProfAddressQuery(s.description); setAddrSuggestions([]); setShowAddrSugg(false); }}
+                      >
+                        <Ionicons
+                          name={isEstablishment ? "business-outline" : "location-outline"}
+                          size={14}
+                          color={colors.mutedForeground}
+                          style={{ marginTop: 1 }}
+                        />
+                        <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 }} numberOfLines={2}>{s.description}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8, marginBottom: 4 }]}>OPERATING HOURS</Text>
+            {ALL_DAYS.map((day) => {
+              const active = profOpenDays.includes(day);
+              const dayErr = active ? (dayHoursErrors[day] ?? "") : "";
+              const open = profDayTimes[day]?.open ?? "";
+              const close = profDayTimes[day]?.close ?? "";
+              const crossesMidnight = active && open && close && !dayErr && close < open;
+              return (
+                <View
+                  key={day}
+                  style={{ marginBottom: 10, borderRadius: 14, borderWidth: 1, borderColor: dayErr ? "#ef444450" : active ? colors.primary + "40" : colors.border, backgroundColor: active ? colors.card : colors.muted + "60", overflow: "hidden" }}
+                >
+                  <TouchableOpacity
+                    onPress={() => toggleDay(day)}
+                    activeOpacity={0.7}
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14 }}
+                  >
+                    <View>
+                      <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 15, color: active ? colors.foreground : colors.mutedForeground }}>{DAY_FULL_NAMES[day]}</Text>
+                      {!active && <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>Closed</Text>}
+                    </View>
+                    <View style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: active ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 3 }}>
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff", alignSelf: active ? "flex-end" : "flex-start", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 3, elevation: 3 }} />
+                    </View>
+                  </TouchableOpacity>
+                  {active && (
+                    <View style={{ paddingHorizontal: 14, paddingBottom: 14, borderTopWidth: 1, borderTopColor: colors.border + "40" }}>
+                      <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                        <TouchableOpacity
+                          style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: dayErr ? "#ef4444" : colors.border, backgroundColor: colors.background, padding: 12 }}
+                          onPress={() => openDayTimePicker(day, "open")}
+                        >
+                          <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Opens at</Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Ionicons name="time-outline" size={15} color={dayErr ? "#ef4444" : colors.primary} />
+                            <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: open ? colors.foreground : colors.mutedForeground }}>{displayTime(open)}</Text>
+                          </View>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: dayErr ? "#ef4444" : colors.border, backgroundColor: colors.background, padding: 12 }}
+                          onPress={() => openDayTimePicker(day, "close")}
+                        >
+                          <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Closes at</Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Ionicons name="time-outline" size={15} color={dayErr ? "#ef4444" : colors.primary} />
+                            <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: close ? colors.foreground : colors.mutedForeground }}>{displayTime(close)}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                      {dayErr ? (
+                        <Text style={{ fontSize: 12, color: "#ef4444", fontFamily: "Inter_400Regular", marginTop: 8 }}>{dayErr}</Text>
+                      ) : crossesMidnight ? (
+                        <Text style={{ fontSize: 12, color: "#f59e0b", fontFamily: "Inter_400Regular", marginTop: 8 }}>↻ Overnight schedule — closes next day</Text>
+                      ) : null}
+                      {(open || close) && (() => {
+                        const otherOpen = profOpenDays.filter((d) => d !== day);
+                        const wdTargets = WEEKDAYS.filter((d) => d !== day && profOpenDays.includes(d));
+                        const weTargets = WEEKEND_DAYS.filter((d) => d !== day && profOpenDays.includes(d));
+                        if (otherOpen.length === 0) return null;
+                        return (
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
+                            <TouchableOpacity onPress={() => copyHours(day, ALL_DAYS)}>
+                              <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to all days</Text>
+                            </TouchableOpacity>
+                            {wdTargets.length > 0 && (
+                              <TouchableOpacity onPress={() => copyHours(day, WEEKDAYS)}>
+                                <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to weekdays</Text>
+                              </TouchableOpacity>
+                            )}
+                            {weTargets.length > 0 && (
+                              <TouchableOpacity onPress={() => copyHours(day, WEEKEND_DAYS)}>
+                                <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to weekends</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DANCE FLOOR</Text>
+            {(["dedicated", "general", "none"] as const).map((opt) => {
+              const labels = { dedicated: "Dedicated dance floor", general: "Dancing in main area", none: "No dancing / seated only" };
+              const selected = profDanceFloor === opt;
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => setProfDanceFloor(opt)}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, borderColor: selected ? colors.primary + "80" : colors.border, backgroundColor: selected ? colors.primary + "15" : colors.card, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 }}
+                >
+                  <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: selected ? colors.primary : colors.border, alignItems: "center", justifyContent: "center" }}>
+                    {selected && <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary }} />}
+                  </View>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: selected ? colors.foreground : colors.mutedForeground }}>{labels[opt]}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            {profDanceFloor === "dedicated" && (
+              <View style={{ marginTop: 4, marginBottom: 8, gap: 10 }}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Dance floor photos (optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {profDanceFloorPhotos.map((url, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onLongPress={() => {
+                          Alert.alert("Remove photo?", undefined, [
+                            { text: "Cancel", style: "cancel" },
+                            { text: "Remove", style: "destructive", onPress: () => setProfDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i)) },
+                          ]);
+                        }}
+                        style={{ width: 80, height: 80, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
+                      >
+                        <Image source={{ uri: url }} style={{ width: 80, height: 80 }} resizeMode="cover" />
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      disabled={uploadingDfPhoto}
+                      onPress={async () => {
+                        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                        if (status !== "granted") { Alert.alert("Permission required", "Allow photo library access to upload photos."); return; }
+                        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, quality: 0.85 });
+                        if (result.canceled) return;
+                        setUploadingDfPhoto(true);
+                        try {
+                          const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri)));
+                          setProfDanceFloorPhotos((prev) => [...prev, ...urls]);
+                        } catch {
+                          Alert.alert("Upload failed", "Could not upload photo.");
+                        } finally {
+                          setUploadingDfPhoto(false);
+                        }
+                      }}
+                      style={{ width: 80, height: 80, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: uploadingDfPhoto ? colors.border : colors.primary + "60", backgroundColor: colors.card, alignItems: "center", justifyContent: "center", gap: 4 }}
+                    >
+                      {uploadingDfPhoto
+                        ? <ActivityIndicator size="small" color={colors.primary} />
+                        : <><Ionicons name="add" size={22} color={colors.primary} /><Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Add</Text></>
+                      }
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Long-press a photo to remove it</Text>
+              </View>
+            )}
+
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>PUB MENU</Text>
+            <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, gap: 10 }]}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Menu files (PDF or image, up to 5)</Text>
+              {profMenuUrls.map((url, idx) => {
+                const isPdf = url.toLowerCase().includes(".pdf");
+                const filename = url.split("/").pop()?.split("?")[0] ?? `Menu ${idx + 1}`;
+                return (
+                  <View key={idx} style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.muted + "40" }}>
+                    <Ionicons name={isPdf ? "document-text-outline" : "image-outline"} size={15} color={colors.mutedForeground} />
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{filename}</Text>
+                    <TouchableOpacity onPress={() => Linking.openURL(url)} style={{ padding: 4 }}>
+                      <Ionicons name="open-outline" size={15} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setProfMenuUrls((prev) => prev.filter((_, i) => i !== idx))} style={{ padding: 4 }}>
+                      <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              {profMenuUrls.length < 5 && (
+                <TouchableOpacity
+                  disabled={uploadingMenu}
+                  onPress={() => {
+                    Alert.alert("Add Menu File", "Choose file type", [
+                      {
+                        text: "Image (JPG / PNG / WebP)",
+                        onPress: async () => {
+                          try {
+                            const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
+                            if (result.canceled) return;
+                            const asset = result.assets[0];
+                            if (!asset) return;
+                            setUploadingMenu(true);
+                            const filename = asset.uri.split("/").pop() ?? "menu.jpg";
+                            const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+                            const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+                            const contentType = mimeMap[ext] ?? "image/jpeg";
+                            const url = await uploadMenuFileToStorage(asset.uri, filename, contentType);
+                            setProfMenuUrls((prev) => [...prev, url]);
+                          } catch {
+                            Alert.alert("Upload failed", "Could not upload menu image.");
+                          } finally {
+                            setUploadingMenu(false);
+                          }
+                        },
+                      },
+                      {
+                        text: "PDF",
+                        onPress: async () => {
+                          try {
+                            const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+                            if (result.canceled) return;
+                            const asset = result.assets[0];
+                            if (!asset) return;
+                            setUploadingMenu(true);
+                            const filename = asset.name ?? "menu.pdf";
+                            const url = await uploadMenuFileToStorage(asset.uri, filename, "application/pdf");
+                            setProfMenuUrls((prev) => [...prev, url]);
+                          } catch {
+                            Alert.alert("Upload failed", "Could not upload menu PDF.");
+                          } finally {
+                            setUploadingMenu(false);
+                          }
+                        },
+                      },
+                      { text: "Cancel", style: "cancel" },
+                    ]);
+                  }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: uploadingMenu ? colors.border : colors.primary + "60", paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.muted + "30", opacity: uploadingMenu ? 0.6 : 1 }}
+                >
+                  {uploadingMenu ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="add-circle-outline" size={16} color={colors.primary} />}
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: uploadingMenu ? colors.mutedForeground : colors.primary }}>
+                    {uploadingMenu ? "Uploading…" : "Add menu file"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: listingSaving ? 0.6 : 1 }]}
+              onPress={saveListing}
+              disabled={listingSaving}
+            >
+              {listingSaving ? <ActivityIndicator color={colors.primaryForeground} size="small" /> : null}
+              <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>
+                {listingSaving ? "Saving…" : "Save Venue Details"}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      );
+    }
+
     return (
       <FlatList
         data={eventItems}
@@ -1665,27 +2032,39 @@ export default function VendorDashboardScreen() {
         onEndReachedThreshold={0.4}
         ListFooterComponent={eventFetching ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} /> : null}
         ListHeaderComponent={
-          !hasPub ? (
+          <View>
             <TouchableOpacity
-              style={[styles.createBtn, { backgroundColor: colors.primary }]}
-              onPress={() => { setCreateForm({ ...DEFAULT_EVENT_FORM }); setShowCreateCatPicker(false); setShowCreateModal(true); }}
+              onPress={() => setShowVenueDetails(true)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 }}
             >
-              <Ionicons name="add" size={18} color={colors.primaryForeground} />
-              <Text style={[styles.createBtnText, { color: colors.primaryForeground }]}>New Listing</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.createBtn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                <Text style={[styles.createBtnText, { color: colors.foreground }]}>Pub already registered</Text>
+              <Ionicons name="location-outline" size={16} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.foreground }}>Venue Details</Text>
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 2 }}>Location, hours, menu & dance floor</Text>
               </View>
-              <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", paddingLeft: 26 }}>Delete your existing pub to create a new listing.</Text>
-            </View>
-          )
+              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            {!hasPub ? (
+              <TouchableOpacity
+                style={[styles.createBtn, { backgroundColor: colors.primary }]}
+                onPress={() => { setCreateForm({ ...DEFAULT_EVENT_FORM }); setShowCreateCatPicker(false); setShowCreateModal(true); }}
+              >
+                <Ionicons name="add" size={18} color={colors.primaryForeground} />
+                <Text style={[styles.createBtnText, { color: colors.primaryForeground }]}>New Listing</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.createBtn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border, flexDirection: "column", alignItems: "flex-start", gap: 2 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                  <Text style={[styles.createBtnText, { color: colors.foreground }]}>Pub already registered</Text>
+                </View>
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", paddingLeft: 26 }}>Delete your existing pub to create a new listing.</Text>
+              </View>
+            )}
+          </View>
         }
         renderItem={({ item: e }) => (
           <View style={[styles.eventRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Thumbnail */}
             {e.imageUrl ? (
               <Image source={{ uri: e.imageUrl }} style={styles.eventThumb} resizeMode="cover" />
             ) : (
@@ -1702,14 +2081,12 @@ export default function VendorDashboardScreen() {
                 {e.approvalStatus}
               </Text>
             </View>
-            {/* Edit button */}
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.muted }]}
               onPress={() => openEditModal(e)}
             >
               <Ionicons name="pencil-outline" size={15} color={colors.foreground} />
             </TouchableOpacity>
-            {/* Delete button */}
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.destructive + "20" }]}
               onPress={() =>
@@ -1787,415 +2164,6 @@ export default function VendorDashboardScreen() {
               numberOfLines={4}
             />
           </View>
-
-          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>LOCATION</Text>
-
-          <View style={{ paddingHorizontal: 4, gap: 8 }}>
-            <LocationPicker value={profLocation} onChange={setProfLocation} />
-          </View>
-
-          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>VENUE ADDRESS</Text>
-          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Address (optional)</Text>
-            <TextInput
-              style={[styles.fieldInput, { color: colors.foreground }]}
-              value={profAddressQuery}
-              onChangeText={(v) => { setProfAddressQuery(v); setProfAddress(v); searchAddress(v); }}
-              placeholder="Start typing venue address…"
-              placeholderTextColor={colors.mutedForeground}
-            />
-            {showAddrSugg && addrSuggestions.length > 0 && (
-              <View style={{ marginTop: 4, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}>
-                {addrSuggestions.map((s) => {
-                  const isEstablishment = s.types.some((t) =>
-                    ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
-                  );
-                  return (
-                    <TouchableOpacity
-                      key={s.place_id}
-                      style={{ paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.muted, flexDirection: "row", alignItems: "flex-start", gap: 8 }}
-                      onPress={() => { setProfAddress(s.description); setProfAddressQuery(s.description); setAddrSuggestions([]); setShowAddrSugg(false); }}
-                    >
-                      <Ionicons
-                        name={isEstablishment ? "business-outline" : "location-outline"}
-                        size={14}
-                        color={colors.mutedForeground}
-                        style={{ marginTop: 1 }}
-                      />
-                      <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 }} numberOfLines={2}>{s.description}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-
-          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8, marginBottom: 4 }]}>OPERATING HOURS</Text>
-          {ALL_DAYS.map((day) => {
-            const active = profOpenDays.includes(day);
-            const dayErr = active ? (dayHoursErrors[day] ?? "") : "";
-            const open = profDayTimes[day]?.open ?? "";
-            const close = profDayTimes[day]?.close ?? "";
-            const crossesMidnight = active && open && close && !dayErr && close < open;
-            return (
-              <View
-                key={day}
-                style={{
-                  marginBottom: 10,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: dayErr ? "#ef444450" : active ? colors.primary + "40" : colors.border,
-                  backgroundColor: active ? colors.card : colors.muted + "60",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Day header row — tap anywhere to toggle */}
-                <TouchableOpacity
-                  onPress={() => toggleDay(day)}
-                  activeOpacity={0.7}
-                  style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14 }}
-                >
-                  <View>
-                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 15, color: active ? colors.foreground : colors.mutedForeground }}>
-                      {DAY_FULL_NAMES[day]}
-                    </Text>
-                    {!active && (
-                      <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>Closed</Text>
-                    )}
-                  </View>
-                  {/* Toggle switch */}
-                  <View style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: active ? colors.primary : colors.border, justifyContent: "center", paddingHorizontal: 3 }}>
-                    <View style={{
-                      width: 20, height: 20, borderRadius: 10,
-                      backgroundColor: "#fff",
-                      alignSelf: active ? "flex-end" : "flex-start",
-                      shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 3, elevation: 3,
-                    }} />
-                  </View>
-                </TouchableOpacity>
-
-                {/* Time pickers — shown only when active */}
-                {active && (
-                  <View style={{ paddingHorizontal: 14, paddingBottom: 14, borderTopWidth: 1, borderTopColor: colors.border + "40" }}>
-                    <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
-                      {/* Opens at */}
-                      <TouchableOpacity
-                        style={{
-                          flex: 1, borderRadius: 10, borderWidth: 1,
-                          borderColor: dayErr ? "#ef4444" : colors.border,
-                          backgroundColor: colors.background,
-                          padding: 12,
-                        }}
-                        onPress={() => openDayTimePicker(day, "open")}
-                      >
-                        <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Opens at</Text>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Ionicons name="time-outline" size={15} color={dayErr ? "#ef4444" : colors.primary} />
-                          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: open ? colors.foreground : colors.mutedForeground }}>
-                            {displayTime(open)}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-
-                      {/* Closes at */}
-                      <TouchableOpacity
-                        style={{
-                          flex: 1, borderRadius: 10, borderWidth: 1,
-                          borderColor: dayErr ? "#ef4444" : colors.border,
-                          backgroundColor: colors.background,
-                          padding: 12,
-                        }}
-                        onPress={() => openDayTimePicker(day, "close")}
-                      >
-                        <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Closes at</Text>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Ionicons name="time-outline" size={15} color={dayErr ? "#ef4444" : colors.primary} />
-                          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: close ? colors.foreground : colors.mutedForeground }}>
-                            {displayTime(close)}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-
-                    {dayErr ? (
-                      <Text style={{ fontSize: 12, color: "#ef4444", fontFamily: "Inter_400Regular", marginTop: 8 }}>{dayErr}</Text>
-                    ) : crossesMidnight ? (
-                      <Text style={{ fontSize: 12, color: "#f59e0b", fontFamily: "Inter_400Regular", marginTop: 8 }}>↻ Overnight schedule — closes next day</Text>
-                    ) : null}
-                    {(open || close) && (() => {
-                      const otherOpen = profOpenDays.filter((d) => d !== day);
-                      const wdTargets = WEEKDAYS.filter((d) => d !== day && profOpenDays.includes(d));
-                      const weTargets = WEEKEND_DAYS.filter((d) => d !== day && profOpenDays.includes(d));
-                      if (otherOpen.length === 0) return null;
-                      return (
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
-                          <TouchableOpacity onPress={() => copyHours(day, ALL_DAYS)}>
-                            <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to all days</Text>
-                          </TouchableOpacity>
-                          {wdTargets.length > 0 && (
-                            <TouchableOpacity onPress={() => copyHours(day, WEEKDAYS)}>
-                              <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to weekdays</Text>
-                            </TouchableOpacity>
-                          )}
-                          {weTargets.length > 0 && (
-                            <TouchableOpacity onPress={() => copyHours(day, WEEKEND_DAYS)}>
-                              <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_400Regular", textDecorationLine: "underline" }}>Copy to weekends</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      );
-                    })()}
-                  </View>
-                )}
-              </View>
-            );
-          })}
-
-          {/* Per-day time picker modal */}
-          {activeDayPicker && (
-            Platform.OS === "ios" ? (
-              <Modal transparent animationType="slide">
-                <View style={styles.datePickerModal}>
-                  <View style={[styles.datePickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Text style={[styles.datePickerTitle, { color: colors.foreground }]}>
-                      {activeDayPicker.day} — {activeDayPicker.field === "open" ? "Opening" : "Closing"} Time
-                    </Text>
-                    <DateTimePicker
-                      value={pickerTimeDate}
-                      mode="time"
-                      display="spinner"
-                      onChange={(_, d) => { if (d) setPickerTimeDate(d); }}
-                      themeVariant="dark"
-                    />
-                    <View style={styles.datePickerActions}>
-                      <TouchableOpacity
-                        style={[styles.datePickerCancel, { borderColor: colors.border }]}
-                        onPress={() => setActiveDayPicker(null)}
-                      >
-                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.datePickerConfirm, { backgroundColor: colors.primary }]}
-                        onPress={() => confirmDayTimePicker(pickerTimeDate)}
-                      >
-                        <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold" }}>Set Time</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </Modal>
-            ) : (
-              <DateTimePicker
-                value={pickerTimeDate}
-                mode="time"
-                display="default"
-                onChange={(_, d) => {
-                  if (d) { confirmDayTimePicker(d); }
-                  else { setActiveDayPicker(null); }
-                }}
-              />
-            )
-          )}
-
-          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DANCE FLOOR</Text>
-
-          {(["dedicated", "general", "none"] as const).map((opt) => {
-            const labels = { dedicated: "Dedicated dance floor", general: "Dancing in main area", none: "No dancing / seated only" };
-            const selected = profDanceFloor === opt;
-            return (
-              <TouchableOpacity
-                key={opt}
-                onPress={() => setProfDanceFloor(opt)}
-                style={{
-                  flexDirection: "row", alignItems: "center", gap: 10,
-                  borderRadius: 12, borderWidth: 1,
-                  borderColor: selected ? colors.primary + "80" : colors.border,
-                  backgroundColor: selected ? colors.primary + "15" : colors.card,
-                  paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8,
-                }}
-              >
-                <View style={{
-                  width: 18, height: 18, borderRadius: 9, borderWidth: 2,
-                  borderColor: selected ? colors.primary : colors.border,
-                  alignItems: "center", justifyContent: "center",
-                }}>
-                  {selected && <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary }} />}
-                </View>
-                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: selected ? colors.foreground : colors.mutedForeground }}>
-                  {labels[opt]}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-
-          {profDanceFloor === "dedicated" && (
-            <View style={{ marginTop: 4, marginBottom: 8, gap: 10 }}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Dance floor photos (optional)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  {profDanceFloorPhotos.map((url, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      onLongPress={() => {
-                        Alert.alert("Remove photo?", undefined, [
-                          { text: "Cancel", style: "cancel" },
-                          { text: "Remove", style: "destructive", onPress: () => setProfDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i)) },
-                        ]);
-                      }}
-                      style={{ width: 80, height: 80, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
-                    >
-                      <Image source={{ uri: url }} style={{ width: 80, height: 80 }} resizeMode="cover" />
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    disabled={uploadingDfPhoto}
-                    onPress={async () => {
-                      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                      if (status !== "granted") { Alert.alert("Permission required", "Allow photo library access to upload photos."); return; }
-                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, quality: 0.85 });
-                      if (result.canceled) return;
-                      setUploadingDfPhoto(true);
-                      try {
-                        const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri)));
-                        setProfDanceFloorPhotos((prev) => [...prev, ...urls]);
-                      } catch {
-                        Alert.alert("Upload failed", "Could not upload photo.");
-                      } finally {
-                        setUploadingDfPhoto(false);
-                      }
-                    }}
-                    style={{
-                      width: 80, height: 80, borderRadius: 10,
-                      borderWidth: 1, borderStyle: "dashed", borderColor: uploadingDfPhoto ? colors.border : colors.primary + "60",
-                      backgroundColor: colors.card, alignItems: "center", justifyContent: "center", gap: 4,
-                    }}
-                  >
-                    {uploadingDfPhoto
-                      ? <ActivityIndicator size="small" color={colors.primary} />
-                      : <>
-                          <Ionicons name="add" size={22} color={colors.primary} />
-                          <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Add</Text>
-                        </>
-                    }
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
-                Long-press a photo to remove it
-              </Text>
-            </View>
-          )}
-
-          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>PUB MENU</Text>
-
-          <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, gap: 10 }]}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Menu files (PDF or image, up to 5)</Text>
-
-            {/* Uploaded menu files list */}
-            {profMenuUrls.map((url, idx) => {
-              const isPdf = url.toLowerCase().includes(".pdf");
-              const filename = url.split("/").pop()?.split("?")[0] ?? `Menu ${idx + 1}`;
-              return (
-                <View
-                  key={idx}
-                  style={{
-                    flexDirection: "row", alignItems: "center", gap: 8,
-                    borderRadius: 10, borderWidth: 1, borderColor: colors.border,
-                    paddingHorizontal: 12, paddingVertical: 10,
-                    backgroundColor: colors.muted + "40",
-                  }}
-                >
-                  <Ionicons name={isPdf ? "document-text-outline" : "image-outline"} size={15} color={colors.mutedForeground} />
-                  <Text
-                    numberOfLines={1}
-                    style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}
-                  >
-                    {filename}
-                  </Text>
-                  <TouchableOpacity onPress={() => Linking.openURL(url)} style={{ padding: 4 }}>
-                    <Ionicons name="open-outline" size={15} color={colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setProfMenuUrls((prev) => prev.filter((_, i) => i !== idx))}
-                    style={{ padding: 4 }}
-                  >
-                    <Ionicons name="trash-outline" size={15} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-
-            {/* Add menu file button — hidden when 5 files uploaded */}
-            {profMenuUrls.length < 5 && (
-              <TouchableOpacity
-                disabled={uploadingMenu}
-                onPress={() => {
-                  Alert.alert("Add Menu File", "Choose file type", [
-                    {
-                      text: "Image (JPG / PNG / WebP)",
-                      onPress: async () => {
-                        try {
-                          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
-                          if (result.canceled) return;
-                          const asset = result.assets[0];
-                          if (!asset) return;
-                          setUploadingMenu(true);
-                          const filename = asset.uri.split("/").pop() ?? "menu.jpg";
-                          const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-                          const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
-                          const contentType = mimeMap[ext] ?? "image/jpeg";
-                          const url = await uploadMenuFileToStorage(asset.uri, filename, contentType);
-                          setProfMenuUrls((prev) => [...prev, url]);
-                        } catch {
-                          Alert.alert("Upload failed", "Could not upload menu image.");
-                        } finally {
-                          setUploadingMenu(false);
-                        }
-                      },
-                    },
-                    {
-                      text: "PDF",
-                      onPress: async () => {
-                        try {
-                          const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
-                          if (result.canceled) return;
-                          const asset = result.assets[0];
-                          if (!asset) return;
-                          setUploadingMenu(true);
-                          const filename = asset.name ?? "menu.pdf";
-                          const url = await uploadMenuFileToStorage(asset.uri, filename, "application/pdf");
-                          setProfMenuUrls((prev) => [...prev, url]);
-                        } catch {
-                          Alert.alert("Upload failed", "Could not upload menu PDF.");
-                        } finally {
-                          setUploadingMenu(false);
-                        }
-                      },
-                    },
-                    { text: "Cancel", style: "cancel" },
-                  ]);
-                }}
-                style={{
-                  flexDirection: "row", alignItems: "center", gap: 8,
-                  borderRadius: 10, borderWidth: 1,
-                  borderStyle: "dashed",
-                  borderColor: uploadingMenu ? colors.border : colors.primary + "60",
-                  paddingHorizontal: 12, paddingVertical: 10,
-                  backgroundColor: colors.muted + "30",
-                  opacity: uploadingMenu ? 0.6 : 1,
-                }}
-              >
-                {uploadingMenu
-                  ? <ActivityIndicator size="small" color={colors.primary} />
-                  : <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-                }
-                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: uploadingMenu ? colors.mutedForeground : colors.primary }}>
-                  {uploadingMenu ? "Uploading…" : "Add menu file"}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>CONTACT INFO</Text>
 
           <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
