@@ -1513,6 +1513,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     vendorId: number;
     businessName: string;
     city: string;
+    appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
     totalBookings: number;
     totalRevenue: number;
     totalCommission: number;
@@ -1558,10 +1559,16 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
 
     if (!summaryMap.has(b.vendorId)) {
       const vendor = vendorMap.get(b.vendorId);
+      const vendorRates = commissionMap.get(b.vendorId);
       summaryMap.set(b.vendorId, {
         vendorId: b.vendorId,
         businessName: vendor?.businessName ?? `Vendor #${b.vendorId}`,
         city: vendor?.city ?? "",
+        appliedRates: {
+          freeEntryRate: vendorRates?.freeEntryRate ?? "0",
+          ticketRate: vendorRates?.ticketRate ?? "0",
+          tableBookingRate: vendorRates?.tableBookingRate ?? "0",
+        },
         totalBookings: 0,
         totalRevenue: 0,
         totalCommission: 0,

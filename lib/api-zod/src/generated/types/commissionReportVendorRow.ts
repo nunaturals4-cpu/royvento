@@ -6,11 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CommissionReportBookingLine } from "./commissionReportBookingLine";
+import type { CommissionReportVendorRowAppliedRates } from "./commissionReportVendorRowAppliedRates";
 
 export interface CommissionReportVendorRow {
   vendorId: number;
   businessName: string;
   city: string;
+  appliedRates: CommissionReportVendorRowAppliedRates;
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;

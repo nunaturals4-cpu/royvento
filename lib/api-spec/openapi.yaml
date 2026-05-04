@@ -2843,6 +2843,16 @@ components:
           type: string
         city:
           type: string
+        appliedRates:
+          type: object
+          properties:
+            freeEntryRate:
+              type: string
+            ticketRate:
+              type: string
+            tableBookingRate:
+              type: string
+          required: [freeEntryRate, ticketRate, tableBookingRate]
         totalBookings:
           type: integer
         totalRevenue:
@@ -2871,7 +2881,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CommissionReportBookingLine"
-      required: [vendorId, businessName, city, totalBookings, totalRevenue, totalCommission, freeEntryCount, freeEntryRevenue, freeEntryCommission, ticketCount, ticketRevenue, ticketCommission, tableCount, tableRevenue, tableCommission, bookings]
+      required: [vendorId, businessName, city, appliedRates, totalBookings, totalRevenue, totalCommission, freeEntryCount, freeEntryRevenue, freeEntryCommission, ticketCount, ticketRevenue, ticketCommission, tableCount, tableRevenue, tableCommission, bookings]
 
     CommissionReportTotals:
       type: object

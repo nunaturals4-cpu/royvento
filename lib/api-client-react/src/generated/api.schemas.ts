@@ -843,10 +843,17 @@ export interface CommissionReportBookingLine {
   createdAt: string;
 }
 
+export type CommissionReportVendorRowAppliedRates = {
+  freeEntryRate: string;
+  ticketRate: string;
+  tableBookingRate: string;
+};
+
 export interface CommissionReportVendorRow {
   vendorId: number;
   businessName: string;
   city: string;
+  appliedRates: CommissionReportVendorRowAppliedRates;
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;

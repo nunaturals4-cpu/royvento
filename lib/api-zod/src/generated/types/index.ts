@@ -34,6 +34,7 @@ export * from "./commissionReportBookingLine";
 export * from "./commissionReportBookingLineBookingType";
 export * from "./commissionReportTotals";
 export * from "./commissionReportVendorRow";
+export * from "./commissionReportVendorRowAppliedRates";
 export * from "./createBookingBody";
 export * from "./createBookingBodyPaymentMethod";
 export * from "./createEventBody";

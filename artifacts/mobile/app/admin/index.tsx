@@ -243,6 +243,7 @@ interface CommissionReportVendorRow {
   vendorId: number;
   businessName: string;
   city: string;
+  appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;
@@ -546,9 +547,22 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
               </View>
             </TouchableOpacity>
 
-            {/* Expanded individual bookings */}
+            {/* Expanded: applied rates + individual bookings */}
             {isExpanded && (
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
+                {/* Applied rates row */}
+                <View style={{ flexDirection: "row", gap: 8, padding: 12, backgroundColor: colors.muted + "60" }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, marginRight: 4 }}>Rates:</Text>
+                  {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
+                    const label = field === "freeEntryRate" ? "Free" : field === "ticketRate" ? "Ticket" : "Table";
+                    const val = row.appliedRates[field];
+                    return (
+                      <View key={field} style={{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.foreground }}>{label}: {val}%</Text>
+                      </View>
+                    );
+                  })}
+                </View>
                 {row.bookings.length === 0 ? (
                   <Text style={{ padding: 14, color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>No bookings.</Text>
                 ) : row.bookings.map((b) => (

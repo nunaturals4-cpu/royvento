@@ -2146,6 +2146,11 @@ export const GetCommissionReportResponse = zod.object({
       vendorId: zod.number(),
       businessName: zod.string(),
       city: zod.string(),
+      appliedRates: zod.object({
+        freeEntryRate: zod.string(),
+        ticketRate: zod.string(),
+        tableBookingRate: zod.string(),
+      }),
       totalBookings: zod.number(),
       totalRevenue: zod.number(),
       totalCommission: zod.number(),
