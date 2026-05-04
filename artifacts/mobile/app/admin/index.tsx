@@ -25,7 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports";
 
 interface ContactMessage {
   id: number;
@@ -92,7 +92,43 @@ interface AdminUser {
   name: string;
   email: string;
   role: string;
+  phone?: string;
   createdAt: string;
+}
+
+interface AdminAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  imageUrl: string | null;
+  isFeaturedSlider: boolean;
+  vendorId: number;
+  vendorName: string;
+  createdAt: string;
+}
+
+interface AdminVendorFull {
+  id: number;
+  businessName: string;
+  category: string;
+  status: string;
+  city: string;
+  state: string;
+  country: string;
+  userEmail: string;
+  eventCount: number;
+  createdAt: string;
+}
+
+interface AdminCheckinReport {
+  eventId: number;
+  eventTitle: string;
+  vendorName: string;
+  totalTickets: number;
+  checkedIn: number;
+  checkInRate: number;
 }
 
 interface AdminEvent {
@@ -611,6 +647,55 @@ export default function AdminPanelScreen() {
       .finally(() => setBlogLoading(false));
   }, []);
 
+  // ─── ANNOUNCEMENTS ──────────────────────────────────────────────────────────
+  const [announcements, setAnnouncements] = useState<AdminAnnouncement[]>([]);
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
+
+  const fetchAnnouncements = useCallback(() => {
+    setAnnouncementLoading(true);
+    customFetch<AdminAnnouncement[]>("/api/admin/announcements")
+      .then(setAnnouncements)
+      .catch(() => {})
+      .finally(() => setAnnouncementLoading(false));
+  }, []);
+
+  // ─── REPORTS ────────────────────────────────────────────────────────────────
+  const [checkinReport, setCheckinReport] = useState<AdminCheckinReport[]>([]);
+  const [checkinLoading, setCheckinLoading] = useState(false);
+  const [vendorsFull, setVendorsFull] = useState<AdminVendorFull[]>([]);
+  const [vendorsFullLoading, setVendorsFullLoading] = useState(false);
+
+  const fetchCheckinReport = useCallback(() => {
+    setCheckinLoading(true);
+    customFetch<AdminCheckinReport[]>("/api/admin/checkin-report")
+      .then(setCheckinReport)
+      .catch(() => {})
+      .finally(() => setCheckinLoading(false));
+  }, []);
+
+  const fetchVendorsFull = useCallback(() => {
+    setVendorsFullLoading(true);
+    customFetch<{ data: AdminVendorFull[] }>("/api/admin/vendors?limit=100")
+      .then((r) => setVendorsFull(r.data ?? []))
+      .catch(() => {})
+      .finally(() => setVendorsFullLoading(false));
+  }, []);
+
+  // ─── COUPON GRANT FORM STATE ─────────────────────────────────────────────────
+  const [grantUserId, setGrantUserId] = useState("");
+  const [grantDiscount, setGrantDiscount] = useState("10");
+  const [grantLoading, setGrantLoading] = useState(false);
+
+  // ─── SEND COUPON TO USER (from users tab) ────────────────────────────────────
+  const [sendCouponUserId, setSendCouponUserId] = useState<number | null>(null);
+  const [sendCouponCode, setSendCouponCode] = useState("");
+  const [sendCouponDiscount, setSendCouponDiscount] = useState("10");
+  const [sendCouponLoading, setSendCouponLoading] = useState(false);
+
+  // ─── VENDOR STATUS EDIT ──────────────────────────────────────────────────────
+  const [editVendorId, setEditVendorId] = useState<number | null>(null);
+  const [editVendorStatus, setEditVendorStatus] = useState<"approved" | "pending" | "rejected">("pending");
+
   useEffect(() => {
     if (activeTab === "vendors") fetchVendors();
     if (activeTab === "users") fetchUsers();
@@ -619,6 +704,8 @@ export default function AdminPanelScreen() {
     if (activeTab === "subscriptions") fetchSubscriptions();
     if (activeTab === "coupons") fetchCoupons();
     if (activeTab === "content") { fetchAds(); fetchBlogs(); }
+    if (activeTab === "announcements") fetchAnnouncements();
+    if (activeTab === "reports") { fetchCheckinReport(); fetchVendorsFull(); }
   }, [activeTab]);
 
   // ─── VENDOR ACTIONS ─────────────────────────────────────────────────────────
@@ -639,6 +726,106 @@ export default function AdminPanelScreen() {
       fetchVendors();
     } catch {
       Alert.alert("Error", "Failed to reject partner.");
+    }
+  }
+
+  async function deleteVendorAdmin(id: number, name: string) {
+    Alert.alert("Delete Partner?", `Delete "${name}" and all their listings? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            await customFetch(`/api/admin/vendors/${id}`, { method: "DELETE" });
+            fetchVendors();
+          } catch {
+            Alert.alert("Error", "Failed to delete partner.");
+          }
+        }
+      }
+    ]);
+  }
+
+  async function changeVendorStatus(id: number, status: "approved" | "pending" | "rejected") {
+    try {
+      await customFetch(`/api/admin/vendors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      setEditVendorId(null);
+      fetchVendors();
+    } catch {
+      Alert.alert("Error", "Failed to update partner status.");
+    }
+  }
+
+  // ─── USER ACTIONS ────────────────────────────────────────────────────────────
+  async function sendCouponToUser() {
+    if (!sendCouponUserId) return;
+    const discount = Number(sendCouponDiscount);
+    if (!sendCouponCode.trim() || !Number.isFinite(discount) || discount < 1 || discount > 100) {
+      Alert.alert("Invalid Input", "Enter a valid coupon code and discount (1–100).");
+      return;
+    }
+    setSendCouponLoading(true);
+    try {
+      await customFetch(`/api/admin/users/${sendCouponUserId}/send-coupon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: sendCouponCode.trim().toUpperCase(), discount, type: "general" }),
+      });
+      Alert.alert("Sent", "Coupon sent to user successfully.");
+      setSendCouponUserId(null);
+      setSendCouponCode("");
+      setSendCouponDiscount("10");
+    } catch {
+      Alert.alert("Error", "Failed to send coupon. Code may already exist.");
+    } finally {
+      setSendCouponLoading(false);
+    }
+  }
+
+  // ─── COUPON GRANT ────────────────────────────────────────────────────────────
+  async function grantCoupon() {
+    const uid = Number(grantUserId);
+    const pct = Number(grantDiscount);
+    if (!Number.isFinite(uid) || uid < 1) {
+      Alert.alert("Invalid Input", "Enter a valid numeric User ID.");
+      return;
+    }
+    if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+      Alert.alert("Invalid Input", "Discount must be between 1 and 100.");
+      return;
+    }
+    setGrantLoading(true);
+    try {
+      await customFetch("/api/admin/coupons/grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: uid, discountPercent: pct }),
+      });
+      Alert.alert("Granted", "Coupon granted successfully.");
+      setGrantUserId("");
+      setGrantDiscount("10");
+      fetchCoupons();
+    } catch {
+      Alert.alert("Error", "Failed to grant coupon.");
+    } finally {
+      setGrantLoading(false);
+    }
+  }
+
+  // ─── ANNOUNCEMENT ACTIONS ────────────────────────────────────────────────────
+  async function toggleAnnouncementSlider(id: number, current: boolean) {
+    try {
+      await customFetch(`/api/admin/announcements/${id}/slider`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeaturedSlider: !current }),
+      });
+      fetchAnnouncements();
+    } catch {
+      Alert.alert("Error", "Failed to update announcement.");
     }
   }
 
@@ -938,45 +1125,162 @@ export default function AdminPanelScreen() {
           </>
         )}
 
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pendingRequests.length > 0 ? 20 : 0 }]}>APPROVED PARTNERS ({approvedVendors.length})</Text>
-        {approvedVendors.map((v) => (
-          <View key={v.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{v.businessName}</Text>
-              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{v.category} · {v.location}</Text>
-            </View>
-            {v.isPremium && (
-              <View style={[styles.premiumBadge, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
-                <Ionicons name="star" size={10} color={colors.primary} />
-                <Text style={[{ color: colors.primary, fontSize: 10, fontFamily: "Inter_600SemiBold" }]}>Premium</Text>
-              </View>
-            )}
+        {editVendorId !== null && (
+          <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "40", marginBottom: 8 }]}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 8 }}>Change Status</Text>
+            {(["approved", "pending", "rejected"] as const).map((s) => (
+              <TouchableOpacity
+                key={s}
+                style={[styles.actionBtnWide, { backgroundColor: s === "approved" ? "#22c55e20" : s === "rejected" ? "#ef444420" : colors.muted, borderColor: s === "approved" ? "#22c55e" : s === "rejected" ? "#ef4444" : colors.border, marginBottom: 6 }]}
+                onPress={() => changeVendorStatus(editVendorId, s)}
+              >
+                <Text style={{ color: s === "approved" ? "#22c55e" : s === "rejected" ? "#ef4444" : colors.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => setEditVendorId(null)} style={{ marginTop: 4 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" }}>Cancel</Text>
+            </TouchableOpacity>
           </View>
-        ))}
+        )}
+
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: pendingRequests.length > 0 ? 20 : 0 }]}>ALL PARTNERS ({vendors.length})</Text>
+        {vendors.map((v) => {
+          function statusColor(s: string) {
+            if (s === "approved") return "#22c55e";
+            if (s === "pending") return "#f59e0b";
+            if (s === "rejected") return "#ef4444";
+            return colors.mutedForeground;
+          }
+          return (
+            <View key={v.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 8 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemTitle, { color: colors.foreground }]}>{v.businessName}</Text>
+                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{v.category} · {v.location}</Text>
+                </View>
+                <View style={[styles.roleBadge, { backgroundColor: statusColor(v.status) + "20", borderColor: statusColor(v.status) }]}>
+                  <Text style={{ color: statusColor(v.status), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{v.status}</Text>
+                </View>
+              </View>
+              {v.isPremium && (
+                <View style={[styles.premiumBadge, { backgroundColor: colors.primary + "20", borderColor: colors.primary, alignSelf: "flex-start" }]}>
+                  <Ionicons name="star" size={10} color={colors.primary} />
+                  <Text style={{ color: colors.primary, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Premium</Text>
+                </View>
+              )}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.actionBtnWide, { backgroundColor: colors.muted, borderColor: colors.border, flex: 1 }]}
+                  onPress={() => setEditVendorId(editVendorId === v.id ? null : v.id)}
+                >
+                  <Ionicons name="create-outline" size={14} color={colors.foreground} />
+                  <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Status</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#ef444410", borderColor: "#ef444440" }]}
+                  onPress={() => deleteVendorAdmin(v.id, v.businessName)}
+                >
+                  <Ionicons name="trash-outline" size={14} color={colors.destructive} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
       </ScrollView>
     );
   }
 
   // ─── RENDER USERS ───────────────────────────────────────────────────────────
   function renderUsers() {
+    function roleColor(r: string) {
+      if (r === "admin") return colors.primary;
+      if (r === "vendor") return "#8b5cf6";
+      return colors.mutedForeground;
+    }
+    function roleBg(r: string) {
+      if (r === "admin") return colors.primary + "20";
+      if (r === "vendor") return "#8b5cf620";
+      return colors.muted;
+    }
+    function roleBorder(r: string) {
+      if (r === "admin") return colors.primary;
+      if (r === "vendor") return "#8b5cf6";
+      return colors.border;
+    }
+
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={userLoading} onRefresh={fetchUsers} tintColor={colors.primary} />}>
         {userLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+
+        {sendCouponUserId !== null && (
+          <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "40" }]}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 8 }}>
+              Send Coupon to User #{sendCouponUserId}
+            </Text>
+            <TextInput
+              value={sendCouponCode}
+              onChangeText={(t) => setSendCouponCode(t.toUpperCase())}
+              placeholder="Coupon code (e.g. RV-GIFT10)"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10 }]}
+              autoCapitalize="characters"
+            />
+            <TextInput
+              value={sendCouponDiscount}
+              onChangeText={setSendCouponDiscount}
+              placeholder="Discount % (1–100)"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10, marginTop: 8 }]}
+              keyboardType="numeric"
+            />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: colors.primary + "20", borderColor: colors.primary, flex: 1 }]}
+                onPress={sendCouponToUser}
+                disabled={sendCouponLoading}
+              >
+                <Ionicons name="pricetag-outline" size={14} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{sendCouponLoading ? "Sending…" : "Send"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: colors.muted, borderColor: colors.border }]}
+                onPress={() => { setSendCouponUserId(null); setSendCouponCode(""); setSendCouponDiscount("10"); }}
+              >
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>ALL USERS ({users.length})</Text>
+        {users.length === 0 && !userLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 20 }}>No users found</Text>
+        )}
         {users.map((u) => (
-          <View key={u.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.userAvatar, { backgroundColor: colors.muted }]}>
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14 }}>
-                {u.name.charAt(0).toUpperCase()}
-              </Text>
+          <View key={u.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 10 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={[styles.userAvatar, { backgroundColor: colors.muted }]}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14 }}>
+                  {u.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.foreground }]}>{u.name}</Text>
+                <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{u.email}</Text>
+                {u.phone ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{u.phone}</Text> : null}
+                <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 }}>ID: {u.id}</Text>
+              </View>
+              <View style={[styles.roleBadge, { backgroundColor: roleBg(u.role), borderColor: roleBorder(u.role) }]}>
+                <Text style={{ color: roleColor(u.role), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{u.role}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{u.name}</Text>
-              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{u.email}</Text>
-            </View>
-            <View style={[styles.roleBadge, { backgroundColor: u.role === "admin" ? colors.primary + "20" : u.role === "vendor" ? "#8b5cf620" : colors.muted, borderColor: u.role === "admin" ? colors.primary : u.role === "vendor" ? "#8b5cf6" : colors.border }]}>
-              <Text style={{ color: u.role === "admin" ? colors.primary : u.role === "vendor" ? "#8b5cf6" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{u.role}</Text>
-            </View>
+            <TouchableOpacity
+              style={[styles.actionBtnWide, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "40", alignSelf: "flex-start" }]}
+              onPress={() => { setSendCouponUserId(u.id); setSendCouponCode(""); setSendCouponDiscount("10"); }}
+            >
+              <Ionicons name="pricetag-outline" size={13} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontSize: 12, fontFamily: "Inter_500Medium" }}>Send Coupon</Text>
+            </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
@@ -1126,15 +1430,52 @@ export default function AdminPanelScreen() {
 
   // ─── RENDER COUPONS ──────────────────────────────────────────────────────────
   function renderCoupons() {
+    const activeCoupons = coupons.filter((c) => !c.used);
+    const usedCoupons = coupons.filter((c) => c.used);
+
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={couponLoading} onRefresh={fetchCoupons} tintColor={colors.primary} />}>
         {couponLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>ALL COUPONS ({coupons.length})</Text>
-        {coupons.length === 0 && !couponLoading && (
-          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 20 }}>No coupons found</Text>
+
+        {/* GRANT COUPON FORM */}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>GRANT NEW COUPON</Text>
+        <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "30" }]}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 10 }}>
+            Auto-generates a coupon code and assigns it to a user by their ID.
+          </Text>
+          <TextInput
+            value={grantUserId}
+            onChangeText={setGrantUserId}
+            placeholder="User ID (numeric)"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10 }]}
+            keyboardType="numeric"
+          />
+          <TextInput
+            value={grantDiscount}
+            onChangeText={setGrantDiscount}
+            placeholder="Discount % (1–100)"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10, marginTop: 8 }]}
+            keyboardType="numeric"
+          />
+          <TouchableOpacity
+            style={[styles.actionBtnWide, { backgroundColor: colors.primary, borderColor: colors.primary, marginTop: 10, justifyContent: "center" }]}
+            onPress={grantCoupon}
+            disabled={grantLoading}
+          >
+            <Ionicons name="add-circle-outline" size={15} color={colors.primaryForeground} />
+            <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{grantLoading ? "Granting…" : "Grant Coupon"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ACTIVE COUPONS */}
+        <Text style={[styles.sectionHeader, { color: "#22c55e", marginTop: 16 }]}>ACTIVE ({activeCoupons.length})</Text>
+        {activeCoupons.length === 0 && !couponLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" }}>No active coupons</Text>
         )}
-        {coupons.map((c) => (
-          <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: c.used ? colors.border : colors.primary + "30" }]}>
+        {activeCoupons.map((c) => (
+          <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.primary + "30" }]}>
             <View style={[styles.kpiIcon, { backgroundColor: colors.primary + "20" }]}>
               <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
             </View>
@@ -1142,11 +1483,206 @@ export default function AdminPanelScreen() {
               <Text style={[styles.itemTitle, { color: colors.foreground }]}>{c.code}</Text>
               <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{c.discountPercent}% off{c.userEmail ? ` · ${c.userEmail}` : ""}</Text>
             </View>
-            <View style={[styles.roleBadge, { backgroundColor: c.used ? colors.muted : "#22c55e20", borderColor: c.used ? colors.border : "#22c55e" }]}>
-              <Text style={{ color: c.used ? colors.mutedForeground : "#22c55e", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{c.used ? "Used" : "Active"}</Text>
+            <View style={[styles.roleBadge, { backgroundColor: "#22c55e20", borderColor: "#22c55e" }]}>
+              <Text style={{ color: "#22c55e", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Active</Text>
             </View>
           </View>
         ))}
+
+        {/* USED COUPONS */}
+        {usedCoupons.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 16 }]}>USED ({usedCoupons.length})</Text>
+            {usedCoupons.map((c) => (
+              <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.kpiIcon, { backgroundColor: colors.muted }]}>
+                  <Ionicons name="pricetag-outline" size={16} color={colors.mutedForeground} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemTitle, { color: colors.mutedForeground }]}>{c.code}</Text>
+                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{c.discountPercent}% off{c.userEmail ? ` · ${c.userEmail}` : ""}</Text>
+                </View>
+                <View style={[styles.roleBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Used</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    );
+  }
+
+  // ─── RENDER ANNOUNCEMENTS ────────────────────────────────────────────────────
+  function renderAnnouncements() {
+    const sliderAnnouncements = announcements.filter((a) => a.isFeaturedSlider);
+    const others = announcements.filter((a) => !a.isFeaturedSlider);
+
+    return (
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={announcementLoading} onRefresh={fetchAnnouncements} tintColor={colors.primary} />}>
+        {announcementLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+
+        {sliderAnnouncements.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.primary }]}>FEATURED SLIDER ({sliderAnnouncements.length})</Text>
+            {sliderAnnouncements.map((a) => (
+              <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.primary + "40", flexDirection: "column", gap: 8 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{a.title}</Text>
+                    <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.vendorName}</Text>
+                    {a.announceDate ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.announceDate}{a.announceTime ? ` · ${a.announceTime}` : ""}</Text> : null}
+                  </View>
+                  <View style={[styles.roleBadge, { backgroundColor: colors.primary + "20", borderColor: colors.primary }]}>
+                    <Text style={{ color: colors.primary, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Slider</Text>
+                  </View>
+                </View>
+                {a.body ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }} numberOfLines={2}>{a.body}</Text> : null}
+                <TouchableOpacity
+                  style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444", alignSelf: "flex-start" }]}
+                  onPress={() => Alert.alert("Remove from Slider?", `Remove "${a.title}" from the featured slider?`, [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Remove", style: "destructive", onPress: () => toggleAnnouncementSlider(a.id, true) }
+                  ])}
+                >
+                  <Ionicons name="remove-circle-outline" size={13} color="#ef4444" />
+                  <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_500Medium" }}>Remove from Slider</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </>
+        )}
+
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: sliderAnnouncements.length > 0 ? 16 : 0 }]}>
+          ALL ANNOUNCEMENTS ({announcements.length})
+        </Text>
+        {announcements.length === 0 && !announcementLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 20 }}>No announcements found</Text>
+        )}
+        {others.map((a) => (
+          <View key={a.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{a.title}</Text>
+                <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.vendorName}</Text>
+                {a.announceDate ? <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{a.announceDate}{a.announceTime ? ` · ${a.announceTime}` : ""}</Text> : null}
+              </View>
+            </View>
+            {a.body ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }} numberOfLines={2}>{a.body}</Text> : null}
+            <TouchableOpacity
+              style={[styles.actionBtnWide, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "40", alignSelf: "flex-start" }]}
+              onPress={() => Alert.alert("Add to Slider?", `Feature "${a.title}" in the homepage slider?`, [
+                { text: "Cancel", style: "cancel" },
+                { text: "Add", onPress: () => toggleAnnouncementSlider(a.id, false) }
+              ])}
+            >
+              <Ionicons name="star-outline" size={13} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontSize: 12, fontFamily: "Inter_500Medium" }}>Add to Slider</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+
+  // ─── RENDER REPORTS ──────────────────────────────────────────────────────────
+  function renderReports() {
+    const totalTickets = checkinReport.reduce((s, r) => s + r.totalTickets, 0);
+    const totalCheckedIn = checkinReport.reduce((s, r) => s + r.checkedIn, 0);
+    const overallRate = totalTickets > 0 ? ((totalCheckedIn / totalTickets) * 100).toFixed(1) : "0";
+
+    function rateColor(rate: number) {
+      if (rate >= 75) return "#22c55e";
+      if (rate >= 40) return "#f59e0b";
+      return "#ef4444";
+    }
+
+    function vendorStatusColor(s: string) {
+      if (s === "approved") return "#22c55e";
+      if (s === "pending") return "#f59e0b";
+      if (s === "rejected") return "#ef4444";
+      return colors.mutedForeground;
+    }
+
+    return (
+      <ScrollView
+        contentContainerStyle={[styles.list, { paddingBottom: 120 }]}
+        refreshControl={<RefreshControl refreshing={checkinLoading || vendorsFullLoading} onRefresh={() => { fetchCheckinReport(); fetchVendorsFull(); }} tintColor={colors.primary} />}
+      >
+        {checkinLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
+
+        {/* CHECK-IN SUMMARY */}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>CHECK-IN OVERVIEW</Text>
+        <View style={styles.kpiGrid}>
+          {[
+            { label: "Total Tickets", value: totalTickets, icon: "ticket-outline" as const, color: "#3b82f6" },
+            { label: "Checked In", value: totalCheckedIn, icon: "checkmark-done-outline" as const, color: "#22c55e" },
+            { label: "Check-in Rate", value: `${overallRate}%`, icon: "stats-chart-outline" as const, color: "#f59e0b" },
+            { label: "Events", value: checkinReport.length, icon: "calendar-outline" as const, color: colors.primary },
+          ].map((k) => (
+            <View key={k.label} style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.kpiIcon, { backgroundColor: k.color + "20" }]}>
+                <Ionicons name={k.icon} size={18} color={k.color} />
+              </View>
+              <Text style={[styles.kpiValue, { color: colors.foreground }]}>{String(k.value)}</Text>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>{k.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* PER-EVENT CHECK-IN BREAKDOWN */}
+        {checkinReport.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>CHECK-IN BY EVENT</Text>
+            {checkinReport.slice(0, 20).map((r) => {
+              const rate = r.totalTickets > 0 ? (r.checkedIn / r.totalTickets) * 100 : 0;
+              return (
+                <View key={r.eventId} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 8 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{r.eventTitle}</Text>
+                      <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.vendorName}</Text>
+                    </View>
+                    <Text style={{ color: rateColor(rate), fontSize: 14, fontFamily: "Inter_700Bold" }}>{rate.toFixed(0)}%</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_400Regular" }}>
+                      {r.checkedIn} / {r.totalTickets} checked in
+                    </Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: colors.muted, borderRadius: 3 }}>
+                    <View style={{ height: 6, width: `${Math.min(rate, 100)}%`, backgroundColor: rateColor(rate), borderRadius: 3 }} />
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
+        {checkinReport.length === 0 && !checkinLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 8 }}>No check-in data available</Text>
+        )}
+
+        {/* VENDOR STATUS BREAKDOWN */}
+        {vendorsFull.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>PARTNER STATUS BREAKDOWN</Text>
+            {(["approved", "pending", "rejected"] as const).map((s) => {
+              const count = vendorsFull.filter((v) => v.status === s).length;
+              const pct = vendorsFull.length > 0 ? (count / vendorsFull.length) * 100 : 0;
+              return (
+                <View key={s} style={{ gap: 4, marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: vendorStatusColor(s), fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "capitalize" }}>{s}</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular" }}>{count}</Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: colors.muted, borderRadius: 3 }}>
+                    <View style={{ height: 6, width: `${pct}%`, backgroundColor: vendorStatusColor(s), borderRadius: 3 }} />
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
       </ScrollView>
     );
   }
@@ -1302,6 +1838,8 @@ export default function AdminPanelScreen() {
     { key: "events" as AdminTab, icon: "calendar-outline" as const, label: "Events" },
     { key: "subscriptions" as AdminTab, icon: "card-outline" as const, label: "Subs" },
     { key: "coupons" as AdminTab, icon: "pricetag-outline" as const, label: "Coupons" },
+    { key: "announcements" as AdminTab, icon: "megaphone-outline" as const, label: "Announce" },
+    { key: "reports" as AdminTab, icon: "analytics-outline" as const, label: "Reports" },
     { key: "content" as AdminTab, icon: "newspaper-outline" as const, label: "Content" },
     { key: "messages" as AdminTab, icon: "mail-outline" as const, label: "Messages" },
     { key: "booking-report" as AdminTab, icon: "stats-chart-outline" as const, label: "Report" },
@@ -1365,6 +1903,8 @@ export default function AdminPanelScreen() {
       {activeTab === "events" && renderEvents()}
       {activeTab === "subscriptions" && renderSubscriptions()}
       {activeTab === "coupons" && renderCoupons()}
+      {activeTab === "announcements" && renderAnnouncements()}
+      {activeTab === "reports" && renderReports()}
       {activeTab === "content" && renderContent()}
       {activeTab === "messages" && renderMessages()}
       {activeTab === "booking-report" && renderBookingReport()}
