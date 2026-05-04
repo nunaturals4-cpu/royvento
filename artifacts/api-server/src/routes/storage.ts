@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac, timingSafeEqual } from "crypto";
 import express from "express";
 import {
   RequestUploadUrlBody,
@@ -13,30 +13,61 @@ import { requireAuth } from "../lib/auth";
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
-/**
- * POST /storage/uploads/request-url
- *
- * Request an upload URL for file upload. Requires any authenticated user.
- * Used for vendor announcement images and user profile photos.
- * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned upload URL.
- *
- * Unlike the original presigned-URL flow, the returned uploadURL points to
- * this server's own PUT endpoint so we can compress images before storing.
- */
-const ALLOWED_ANNOUNCEMENT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_ANNOUNCEMENT_IMAGE_BYTES = 8 * 1024 * 1024;
+const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const UPLOAD_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
-function buildServerUploadUrl(req: Request, uuid: string): string {
+function uploadSecret(): string {
+  return process.env.SESSION_SECRET ?? "royvento-dev-secret";
+}
+
+function signUploadToken(uuid: string, maxBytes: number, contentType: string, expiresAt: number): string {
+  const payload = `${uuid}:${maxBytes}:${contentType}:${expiresAt}`;
+  return createHmac("sha256", uploadSecret()).update(payload).digest("hex");
+}
+
+function verifyUploadToken(
+  uuid: string,
+  maxBytes: number,
+  contentType: string,
+  expiresAt: number,
+  token: string,
+): boolean {
+  try {
+    const expected = Buffer.from(signUploadToken(uuid, maxBytes, contentType, expiresAt), "hex");
+    const provided = Buffer.from(token, "hex");
+    if (expected.length !== provided.length) return false;
+    return timingSafeEqual(expected, provided);
+  } catch {
+    return false;
+  }
+}
+
+function buildServerUploadUrl(req: Request, uuid: string, size: number, contentType: string): string {
   const host =
     req.get("x-forwarded-host") ??
     req.get("host") ??
     process.env.REPLIT_DEV_DOMAIN ??
     "localhost";
   const proto = (req.get("x-forwarded-proto") ?? "https").split(",")[0].trim();
-  return `${proto}://${host}/api/storage/uploads/file/${uuid}`;
+  const expiresAt = Date.now() + UPLOAD_TTL_MS;
+  const token = signUploadToken(uuid, size, contentType, expiresAt);
+  const qs = new URLSearchParams({
+    token,
+    expires: String(expiresAt),
+    size: String(size),
+    type: contentType,
+  });
+  return `${proto}://${host}/api/storage/uploads/file/${uuid}?${qs}`;
 }
 
+/**
+ * POST /storage/uploads/request-url
+ *
+ * Request an upload URL for file upload. Requires any authenticated user.
+ * Returns a short-lived HMAC-signed server-side upload URL instead of a
+ * presigned GCS URL, allowing the server to compress images before storing.
+ */
 router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
@@ -46,11 +77,11 @@ router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, 
 
   const { name, size, contentType } = parsed.data;
 
-  if (!ALLOWED_ANNOUNCEMENT_IMAGE_TYPES.includes(contentType)) {
+  if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
     res.status(400).json({ error: "Only JPEG, PNG and WebP images are allowed" });
     return;
   }
-  if (size > MAX_ANNOUNCEMENT_IMAGE_BYTES) {
+  if (size > MAX_UPLOAD_BYTES) {
     res.status(400).json({ error: "Image must be under 8 MB" });
     return;
   }
@@ -58,7 +89,7 @@ router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, 
   try {
     const uuid = randomUUID();
     const objectPath = `/objects/uploads/${uuid}`;
-    const uploadURL = buildServerUploadUrl(req, uuid);
+    const uploadURL = buildServerUploadUrl(req, uuid, size, contentType);
 
     res.json(
       RequestUploadUrlResponse.parse({
@@ -68,7 +99,7 @@ router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, 
       }),
     );
   } catch (error) {
-    req.log.error({ err: error }, "Error generating upload URL");
+    req.log.error({ err: error }, "Error generating upload token");
     res.status(500).json({ error: "Failed to generate upload URL" });
   }
 });
@@ -76,10 +107,11 @@ router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, 
 /**
  * PUT /storage/uploads/file/:uuid
  *
- * Receive raw image bytes from the client, compress them to WebP using sharp,
- * and store the compressed file in object storage under uploads/{uuid}.
- * This replaces the presigned-URL direct-to-GCS upload to allow server-side compression.
- * No authentication required — the UUID is unguessable and was issued to an authenticated user.
+ * Receive raw image bytes, verify the HMAC-signed token issued by request-url,
+ * compress to WebP, and store in object storage under uploads/{uuid}.
+ *
+ * Token carries: uuid, max allowed size, allowed content-type, expiry.
+ * No authentication header required — the signed token is the credential.
  */
 router.put(
   "/storage/uploads/file/:uuid",
@@ -91,18 +123,54 @@ router.put(
       return;
     }
 
+    // Verify signed token from query string
+    const { token, expires, size: sizeStr, type: allowedType } = req.query as Record<string, string>;
+    if (!token || !expires || !sizeStr || !allowedType) {
+      res.status(401).json({ error: "Missing upload authorization" });
+      return;
+    }
+
+    const expiresAt = Number(expires);
+    const maxBytes = Number(sizeStr);
+    if (!Number.isFinite(expiresAt) || !Number.isFinite(maxBytes)) {
+      res.status(400).json({ error: "Invalid token parameters" });
+      return;
+    }
+
+    if (Date.now() > expiresAt) {
+      res.status(401).json({ error: "Upload token expired" });
+      return;
+    }
+
+    if (!verifyUploadToken(uuid, maxBytes, allowedType, expiresAt, token)) {
+      res.status(401).json({ error: "Invalid upload token" });
+      return;
+    }
+
+    // Enforce allowed content type and size (from the signed token, not the request header)
+    if (!ALLOWED_UPLOAD_TYPES.has(allowedType)) {
+      res.status(400).json({ error: "Content type not allowed" });
+      return;
+    }
+
     const rawBody = req.body as Buffer;
     if (!Buffer.isBuffer(rawBody) || rawBody.length === 0) {
       res.status(400).json({ error: "Empty body" });
       return;
     }
-
-    const inputContentType = (req.get("content-type") ?? "image/jpeg").split(";")[0].trim();
+    // Allow a small tolerance (10%) beyond declared size to account for encoding overhead
+    if (rawBody.length > maxBytes * 1.1 + 1024) {
+      res.status(413).json({ error: "File exceeds declared size" });
+      return;
+    }
 
     try {
-      const { buffer, contentType, compressed } = await compressImage(rawBody, inputContentType);
+      const { buffer, contentType, compressed } = await compressImage(rawBody, allowedType);
       await objectStorageService.uploadBuffer(uuid, buffer, contentType);
-      req.log.info({ uuid, inputBytes: rawBody.length, outputBytes: buffer.length, compressed }, "Image uploaded");
+      req.log.info(
+        { uuid, inputBytes: rawBody.length, outputBytes: buffer.length, compressed },
+        "Image uploaded and compressed",
+      );
       res.status(200).json({ ok: true });
     } catch (error) {
       req.log.error({ err: error }, "Error uploading/compressing image");
@@ -116,7 +184,6 @@ router.put(
  *
  * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
  * These are unconditionally public — no authentication or ACL checks.
- * IMPORTANT: Always provide this endpoint when object storage is set up.
  */
 router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
   try {
@@ -129,7 +196,6 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
     }
 
     const response = await objectStorageService.downloadObject(file);
-
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
 
@@ -148,10 +214,8 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 /**
  * GET /storage/objects/uploads/*
  *
- * Serve uploaded files stored under the "uploads" prefix (e.g. announcement images).
- * Scoped to the uploads sub-directory only — other paths under PRIVATE_OBJECT_DIR
- * are not exposed. Intentionally public: announcement images must be viewable
- * on public pub profile pages without authentication.
+ * Serve uploaded files stored under the "uploads" prefix.
+ * Intentionally public: announcement images must be viewable on public pages.
  */
 router.get("/storage/objects/uploads/*path", async (req: Request, res: Response) => {
   try {
@@ -161,7 +225,6 @@ router.get("/storage/objects/uploads/*path", async (req: Request, res: Response)
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
     const response = await objectStorageService.downloadObject(objectFile);
-
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
 
