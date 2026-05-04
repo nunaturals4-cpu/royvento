@@ -122,13 +122,35 @@ interface AdminVendorFull {
   createdAt: string;
 }
 
-interface AdminCheckinReport {
+interface AdminCheckinRow {
+  id: number;
+  vendorId: number;
+  vendorName: string;
   eventId: number;
   eventTitle: string;
-  vendorName: string;
-  totalTickets: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  phone: string;
+  bookingDate: string;
+  guests: number;
+  status: string;
+  checkedIn: boolean;
+  checkedInAt: string | null;
+}
+
+interface AdminCheckinStats {
+  total: number;
   checkedIn: number;
-  checkInRate: number;
+  notArrived: number;
+}
+
+interface AdminCheckinResponse {
+  rows: AdminCheckinRow[];
+  stats: AdminCheckinStats;
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 interface AdminEvent {
@@ -660,15 +682,15 @@ export default function AdminPanelScreen() {
   }, []);
 
   // ─── REPORTS ────────────────────────────────────────────────────────────────
-  const [checkinReport, setCheckinReport] = useState<AdminCheckinReport[]>([]);
+  const [checkinData, setCheckinData] = useState<AdminCheckinResponse | null>(null);
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [vendorsFull, setVendorsFull] = useState<AdminVendorFull[]>([]);
   const [vendorsFullLoading, setVendorsFullLoading] = useState(false);
 
   const fetchCheckinReport = useCallback(() => {
     setCheckinLoading(true);
-    customFetch<AdminCheckinReport[]>("/api/admin/checkin-report")
-      .then(setCheckinReport)
+    customFetch<AdminCheckinResponse>("/api/admin/checkin-report")
+      .then(setCheckinData)
       .catch(() => {})
       .finally(() => setCheckinLoading(false));
   }, []);
@@ -692,9 +714,12 @@ export default function AdminPanelScreen() {
   const [sendCouponDiscount, setSendCouponDiscount] = useState("10");
   const [sendCouponLoading, setSendCouponLoading] = useState(false);
 
+  // ─── USER SEARCH & ROLE EDIT ─────────────────────────────────────────────────
+  const [userSearch, setUserSearch] = useState("");
+  const [changeRoleUserId, setChangeRoleUserId] = useState<number | null>(null);
+
   // ─── VENDOR STATUS EDIT ──────────────────────────────────────────────────────
   const [editVendorId, setEditVendorId] = useState<number | null>(null);
-  const [editVendorStatus, setEditVendorStatus] = useState<"approved" | "pending" | "rejected">("pending");
 
   useEffect(() => {
     if (activeTab === "vendors") fetchVendors();
@@ -760,6 +785,36 @@ export default function AdminPanelScreen() {
   }
 
   // ─── USER ACTIONS ────────────────────────────────────────────────────────────
+  async function changeUserRole(userId: number, role: "user" | "vendor" | "admin") {
+    try {
+      await customFetch(`/api/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      setChangeRoleUserId(null);
+      fetchUsers();
+    } catch {
+      Alert.alert("Error", "Failed to change user role.");
+    }
+  }
+
+  async function deleteUser(userId: number, name: string) {
+    Alert.alert("Delete User?", `Permanently delete "${name}"? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            await customFetch(`/api/users/${userId}`, { method: "DELETE" });
+            setUsers((prev) => prev.filter((u) => u.id !== userId));
+          } catch {
+            Alert.alert("Error", "Failed to delete user.");
+          }
+        }
+      }
+    ]);
+  }
+
   async function sendCouponToUser() {
     if (!sendCouponUserId) return;
     const discount = Number(sendCouponDiscount);
@@ -1208,10 +1263,26 @@ export default function AdminPanelScreen() {
       return colors.border;
     }
 
+    const q = userSearch.trim().toLowerCase();
+    const filteredUsers = q
+      ? users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone ?? "").includes(q))
+      : users;
+
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={userLoading} onRefresh={fetchUsers} tintColor={colors.primary} />}>
         {userLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
 
+        {/* SEARCH BAR */}
+        <TextInput
+          value={userSearch}
+          onChangeText={setUserSearch}
+          placeholder="Search by name, email or phone…"
+          placeholderTextColor={colors.mutedForeground}
+          style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card, minHeight: 0, paddingVertical: 10, marginBottom: 4 }]}
+          clearButtonMode="while-editing"
+        />
+
+        {/* SEND COUPON INLINE FORM */}
         {sendCouponUserId !== null && (
           <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "40" }]}>
             <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 8 }}>
@@ -1252,11 +1323,38 @@ export default function AdminPanelScreen() {
           </View>
         )}
 
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>ALL USERS ({users.length})</Text>
-        {users.length === 0 && !userLoading && (
-          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 20 }}>No users found</Text>
+        {/* ROLE CHANGE INLINE FORM */}
+        {changeRoleUserId !== null && (
+          <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "40" }]}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 8 }}>
+              Change Role for User #{changeRoleUserId}
+            </Text>
+            {(["user", "vendor", "admin"] as const).map((r) => (
+              <TouchableOpacity
+                key={r}
+                style={[styles.actionBtnWide, {
+                  backgroundColor: r === "admin" ? colors.primary + "20" : r === "vendor" ? "#8b5cf620" : colors.muted,
+                  borderColor: r === "admin" ? colors.primary : r === "vendor" ? "#8b5cf6" : colors.border,
+                  marginBottom: 6,
+                }]}
+                onPress={() => changeUserRole(changeRoleUserId, r)}
+              >
+                <Text style={{ color: roleColor(r), fontSize: 13, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{r}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => setChangeRoleUserId(null)} style={{ marginTop: 4 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
         )}
-        {users.map((u) => (
+
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>USERS ({filteredUsers.length}{q ? ` of ${users.length}` : ""})</Text>
+        {filteredUsers.length === 0 && !userLoading && (
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 20 }}>
+            {q ? "No users match your search" : "No users found"}
+          </Text>
+        )}
+        {filteredUsers.map((u) => (
           <View key={u.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 10 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <View style={[styles.userAvatar, { backgroundColor: colors.muted }]}>
@@ -1274,13 +1372,30 @@ export default function AdminPanelScreen() {
                 <Text style={{ color: roleColor(u.role), fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{u.role}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={[styles.actionBtnWide, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "40", alignSelf: "flex-start" }]}
-              onPress={() => { setSendCouponUserId(u.id); setSendCouponCode(""); setSendCouponDiscount("10"); }}
-            >
-              <Ionicons name="pricetag-outline" size={13} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontSize: 12, fontFamily: "Inter_500Medium" }}>Send Coupon</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "40" }]}
+                onPress={() => { setSendCouponUserId(u.id); setSendCouponCode(""); setSendCouponDiscount("10"); setChangeRoleUserId(null); }}
+              >
+                <Ionicons name="pricetag-outline" size={13} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 12, fontFamily: "Inter_500Medium" }}>Send Coupon</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: "#8b5cf610", borderColor: "#8b5cf640" }]}
+                onPress={() => { setChangeRoleUserId(changeRoleUserId === u.id ? null : u.id); setSendCouponUserId(null); }}
+              >
+                <Ionicons name="key-outline" size={13} color="#8b5cf6" />
+                <Text style={{ color: "#8b5cf6", fontSize: 12, fontFamily: "Inter_500Medium" }}>Change Role</Text>
+              </TouchableOpacity>
+              {u.role !== "admin" && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#ef444410", borderColor: "#ef444440" }]}
+                  onPress={() => deleteUser(u.id, u.name)}
+                >
+                  <Ionicons name="trash-outline" size={14} color={colors.destructive} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -1587,9 +1702,22 @@ export default function AdminPanelScreen() {
 
   // ─── RENDER REPORTS ──────────────────────────────────────────────────────────
   function renderReports() {
-    const totalTickets = checkinReport.reduce((s, r) => s + r.totalTickets, 0);
-    const totalCheckedIn = checkinReport.reduce((s, r) => s + r.checkedIn, 0);
-    const overallRate = totalTickets > 0 ? ((totalCheckedIn / totalTickets) * 100).toFixed(1) : "0";
+    const stats = checkinData?.stats ?? { total: 0, checkedIn: 0, notArrived: 0 };
+    const rows = checkinData?.rows ?? [];
+    const overallRate = stats.total > 0 ? ((stats.checkedIn / stats.total) * 100).toFixed(1) : "0";
+
+    // Group attendance rows by event for per-event breakdown
+    const byEvent = new Map<number, { title: string; vendor: string; total: number; checkedIn: number }>();
+    for (const r of rows) {
+      const existing = byEvent.get(r.eventId);
+      if (existing) {
+        existing.total += 1;
+        if (r.checkedIn) existing.checkedIn += 1;
+      } else {
+        byEvent.set(r.eventId, { title: r.eventTitle || `Event #${r.eventId}`, vendor: r.vendorName, total: 1, checkedIn: r.checkedIn ? 1 : 0 });
+      }
+    }
+    const eventBreakdown = Array.from(byEvent.entries()).map(([id, v]) => ({ eventId: id, ...v }));
 
     function rateColor(rate: number) {
       if (rate >= 75) return "#22c55e";
@@ -1611,14 +1739,14 @@ export default function AdminPanelScreen() {
       >
         {checkinLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
 
-        {/* CHECK-IN SUMMARY */}
+        {/* CHECK-IN SUMMARY KPIS */}
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>CHECK-IN OVERVIEW</Text>
         <View style={styles.kpiGrid}>
           {[
-            { label: "Total Tickets", value: totalTickets, icon: "ticket-outline" as const, color: "#3b82f6" },
-            { label: "Checked In", value: totalCheckedIn, icon: "checkmark-done-outline" as const, color: "#22c55e" },
-            { label: "Check-in Rate", value: `${overallRate}%`, icon: "stats-chart-outline" as const, color: "#f59e0b" },
-            { label: "Events", value: checkinReport.length, icon: "calendar-outline" as const, color: colors.primary },
+            { label: "Total Tickets", value: stats.total, icon: "ticket-outline" as const, color: "#3b82f6" },
+            { label: "Checked In", value: stats.checkedIn, icon: "checkmark-done-outline" as const, color: "#22c55e" },
+            { label: "Not Arrived", value: stats.notArrived, icon: "time-outline" as const, color: "#f59e0b" },
+            { label: "Check-in Rate", value: `${overallRate}%`, icon: "stats-chart-outline" as const, color: colors.primary },
           ].map((k) => (
             <View key={k.label} style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.kpiIcon, { backgroundColor: k.color + "20" }]}>
@@ -1631,25 +1759,23 @@ export default function AdminPanelScreen() {
         </View>
 
         {/* PER-EVENT CHECK-IN BREAKDOWN */}
-        {checkinReport.length > 0 && (
+        {eventBreakdown.length > 0 && (
           <>
             <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>CHECK-IN BY EVENT</Text>
-            {checkinReport.slice(0, 20).map((r) => {
-              const rate = r.totalTickets > 0 ? (r.checkedIn / r.totalTickets) * 100 : 0;
+            {eventBreakdown.slice(0, 20).map((ev) => {
+              const rate = ev.total > 0 ? (ev.checkedIn / ev.total) * 100 : 0;
               return (
-                <View key={r.eventId} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 8 }]}>
+                <View key={ev.eventId} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 8 }]}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{r.eventTitle}</Text>
-                      <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.vendorName}</Text>
+                      <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{ev.title}</Text>
+                      <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{ev.vendor}</Text>
                     </View>
                     <Text style={{ color: rateColor(rate), fontSize: 14, fontFamily: "Inter_700Bold" }}>{rate.toFixed(0)}%</Text>
                   </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_400Regular" }}>
-                      {r.checkedIn} / {r.totalTickets} checked in
-                    </Text>
-                  </View>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_400Regular" }}>
+                    {ev.checkedIn} / {ev.total} checked in
+                  </Text>
                   <View style={{ height: 6, backgroundColor: colors.muted, borderRadius: 3 }}>
                     <View style={{ height: 6, width: `${Math.min(rate, 100)}%`, backgroundColor: rateColor(rate), borderRadius: 3 }} />
                   </View>
@@ -1658,7 +1784,29 @@ export default function AdminPanelScreen() {
             })}
           </>
         )}
-        {checkinReport.length === 0 && !checkinLoading && (
+
+        {/* RECENT ATTENDANCE LIST */}
+        {rows.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>RECENT ATTENDANCE ({rows.length})</Text>
+            {rows.slice(0, 15).map((r) => (
+              <View key={r.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: r.checkedIn ? "#22c55e30" : colors.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{r.userName || r.userEmail}</Text>
+                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.eventTitle}</Text>
+                  <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{r.bookingDate}</Text>
+                </View>
+                <View style={[styles.roleBadge, { backgroundColor: r.checkedIn ? "#22c55e20" : colors.muted, borderColor: r.checkedIn ? "#22c55e" : colors.border }]}>
+                  <Text style={{ color: r.checkedIn ? "#22c55e" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>
+                    {r.checkedIn ? "In" : "Pending"}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
+        {rows.length === 0 && !checkinLoading && (
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginTop: 8 }}>No check-in data available</Text>
         )}
 
