@@ -3310,7 +3310,7 @@ function CommissionsAdmin() {
   return (
     <div className="space-y-8">
 
-      {/* ── Rate management ────────────────────────────────────────────── */}
+      {/* ── Fee management ─────────────────────────────────────────────── */}
       <div className="rounded-2xl glass-card p-6">
         <div className="flex items-start gap-3 mb-6">
           <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 red-ring">
@@ -3355,6 +3355,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
+                          max={99999.99}
                           step={0.01}
                           value={edits.freeEntryRate}
                           onChange={(e) => updateRate(row.vendorId, "freeEntryRate", e.target.value)}
@@ -3365,6 +3366,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
+                          max={99999.99}
                           step={0.01}
                           value={edits.ticketRate}
                           onChange={(e) => updateRate(row.vendorId, "ticketRate", e.target.value)}
@@ -3375,6 +3377,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
+                          max={99999.99}
                           step={0.01}
                           value={edits.tableBookingRate}
                           onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}

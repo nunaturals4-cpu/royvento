@@ -345,10 +345,10 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
       setRates((prev) => ({ ...prev, [vendorId]: updated }));
       setDrafts((prev) => ({ ...prev, [vendorId]: { ...updated } }));
       setRateErrors((prev) => ({ ...prev, [vendorId]: false }));
-      Alert.alert("Saved", "Commission rates updated.");
+      Alert.alert("Saved", "Commission fees updated.");
       loadReport();
     } catch {
-      Alert.alert("Error", "Failed to save rates.");
+      Alert.alert("Error", "Failed to save fees.");
     } finally {
       setSaving((prev) => ({ ...prev, [vendorId]: false }));
     }
@@ -376,9 +376,9 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
 
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 100 }}>
-      {/* ── Commission Rates Section ── */}
+      {/* ── Commission Fees Section ── */}
       <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>
-        COMMISSION RATES PER PUB
+        COMMISSION FEES PER PUB
       </Text>
       {vendors.length === 0 && (
         <View style={{ alignItems: "center", padding: 32, gap: 12 }}>
