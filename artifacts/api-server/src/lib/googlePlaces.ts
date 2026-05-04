@@ -1,5 +1,12 @@
 import { randomUUID } from "crypto";
 import { objectStorageClient, ObjectStorageService } from "./objectStorage";
+import { TtlCache } from "./ttlCache";
+
+const DETAILS_TTL_MS  = 24 * 60 * 60 * 1000; // 24 hours
+const URL_TTL_MS      =  1 * 60 * 60 * 1000; //  1 hour
+
+const detailsCache = new TtlCache<PlaceDetails>();
+const urlCache     = new TtlCache<PlaceDetails>();
 
 const GOOGLE_PLACES_BASE = "https://maps.googleapis.com/maps/api/place";
 
@@ -142,6 +149,9 @@ async function fetchPlaceDetails(
   placeId: string,
   apiKey: string,
 ): Promise<PlaceDetails> {
+  const cached = detailsCache.get(placeId);
+  if (cached) return cached;
+
   const fields =
     "place_id,name,formatted_address,address_components,international_phone_number,website,opening_hours,photos";
   const detailsResp = await fetch(
@@ -164,7 +174,9 @@ async function fetchPlaceDetails(
       { status: 502 },
     );
   }
-  return buildPlaceDetails(detailsData.result);
+  const details = buildPlaceDetails(detailsData.result);
+  detailsCache.set(placeId, details, DETAILS_TTL_MS);
+  return details;
 }
 
 export async function resolvePlaceFromUrl(
@@ -173,6 +185,9 @@ export async function resolvePlaceFromUrl(
 ): Promise<PlaceDetails> {
   const resolvedUrl = await resolveUrl(googleUrl.trim());
   const searchQuery = extractQueryFromUrl(resolvedUrl);
+
+  const urlCached = urlCache.get(searchQuery);
+  if (urlCached) return urlCached;
 
   // Text search to find place_id
   const searchResp = await fetch(
@@ -196,7 +211,9 @@ export async function resolvePlaceFromUrl(
     throw Object.assign(new Error(msg), { status: 404 });
   }
   const placeId = searchData.results[0]!.place_id;
-  return fetchPlaceDetails(placeId, apiKey);
+  const details = await fetchPlaceDetails(placeId, apiKey);
+  urlCache.set(searchQuery, details, URL_TTL_MS);
+  return details;
 }
 
 export async function resolvePlaceById(
