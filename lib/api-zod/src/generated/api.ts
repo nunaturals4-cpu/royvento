@@ -1692,6 +1692,122 @@ export const GetPartnerCommissionResponse = zod.object({
 });
 
 /**
+ * @summary Revenue and commission analytics for the authenticated partner vendor
+ */
+export const GetPartnerAnalyticsQueryParams = zod.object({
+  preset: zod.enum(["today", "7d", "30d", "3m", "6m"]).optional(),
+  from: zod.coerce.string().optional(),
+  to: zod.coerce.string().optional(),
+});
+
+export const GetPartnerAnalyticsResponse = zod.object({
+  totalEarnings: zod.number(),
+  monthEarnings: zod.number(),
+  codRevenue: zod.number(),
+  onlineRevenue: zod.number(),
+  grossEarnings: zod.number(),
+  netEarnings: zod.number(),
+  totalCommission: zod.number(),
+  codCommission: zod.number(),
+  onlineCommission: zod.number(),
+  commissionRates: zod.object({
+    freeEntryRate: zod
+      .string()
+      .describe("Percentage 0–100 (stored as decimal string)"),
+    ticketRate: zod
+      .string()
+      .describe("Percentage 0–100 (stored as decimal string)"),
+    tableBookingRate: zod
+      .string()
+      .describe("Percentage 0–100 (stored as decimal string)"),
+  }),
+  commissionSummary: zod.object({
+    freeEntry: zod.object({
+      count: zod.number(),
+      grossRevenue: zod.number(),
+      commissionAmount: zod.number(),
+      netRevenue: zod.number(),
+    }),
+    ticket: zod.object({
+      count: zod.number(),
+      grossRevenue: zod.number(),
+      commissionAmount: zod.number(),
+      netRevenue: zod.number(),
+    }),
+    table: zod.object({
+      count: zod.number(),
+      grossRevenue: zod.number(),
+      commissionAmount: zod.number(),
+      netRevenue: zod.number(),
+    }),
+  }),
+  totalWomen: zod.number(),
+  totalMen: zod.number(),
+  totalCouple: zod.number(),
+  perEvent: zod.array(
+    zod.object({
+      eventId: zod.number(),
+      eventTitle: zod.string(),
+      bookingCount: zod.number(),
+      revenue: zod.number(),
+    }),
+  ),
+  dailyRevenue: zod.array(
+    zod.object({
+      date: zod.string(),
+      revenue: zod.number(),
+    }),
+  ),
+  dailyCommission: zod.array(
+    zod.object({
+      date: zod.string(),
+      commission: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Scan and check in a ticket by booking reference code (partner)
+ */
+export const PartnerScanTicketBody = zod.object({
+  code: zod.string(),
+});
+
+export const PartnerScanTicketResponse = zod.object({
+  code: zod.enum(["OK", "ALREADY_CHECKED_IN", "NOT_FOUND", "INVALID_STATUS"]),
+  message: zod.string().optional(),
+  checkedInAt: zod.string().nullish(),
+  booking: zod
+    .object({
+      id: zod.number(),
+      eventTitle: zod.string(),
+      vendorName: zod.string(),
+      bookingDate: zod.string(),
+      personName: zod.string().nullish(),
+      userName: zod.string(),
+      pubMode: zod.string(),
+      ticketWomen: zod.number(),
+      ticketMen: zod.number(),
+      ticketCouple: zod.number(),
+      guests: zod.number(),
+      finalPrice: zod.number().optional(),
+      commissionRate: zod
+        .number()
+        .optional()
+        .describe("Effective commission rate applied (0–100 %)"),
+      commissionAmount: zod
+        .number()
+        .optional()
+        .describe("Platform fee deducted from gross"),
+      netAmount: zod
+        .number()
+        .optional()
+        .describe("Net amount the venue should collect"),
+    })
+    .nullish(),
+});
+
+/**
  * @summary Attendance / check-in report for the authenticated vendor
  */
 export const GetPartnerCheckinReportQueryParams = zod.object({

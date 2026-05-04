@@ -649,13 +649,34 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let codRevenue = 0;
   let onlineRevenue = 0;
   let totalCommission = 0;
+  let codCommission = 0;
+  let onlineCommission = 0;
+  const commSummary = {
+    freeEntry: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
+    ticket: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
+    table: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
+  };
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
     totalEarnings += fp;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += fp;
-    if (b.paymentMethod === "cod") codRevenue += fp;
+    const isCod = b.paymentMethod === "cod";
+    if (isCod) codRevenue += fp;
     else onlineRevenue += fp;
-    totalCommission += fp * getCommRate(fp, b.pubMode ?? "");
+    const rate = getCommRate(fp, b.pubMode ?? "");
+    const comm = fp * rate;
+    totalCommission += comm;
+    if (isCod) codCommission += comm;
+    else onlineCommission += comm;
+    // Per-booking-type commission summary
+    const bType = b.pubMode === "table" ? "table" : (fp === 0 || b.pubMode === "free") ? "freeEntry" : "ticket";
+    commSummary[bType].count++;
+    commSummary[bType].grossRevenue += fp;
+    commSummary[bType].commissionAmount += comm;
+  }
+  // Compute net per type
+  for (const k of Object.keys(commSummary) as (keyof typeof commSummary)[]) {
+    commSummary[k].netRevenue = commSummary[k].grossRevenue - commSummary[k].commissionAmount;
   }
 
   // Per-event breakdown
@@ -725,6 +746,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const totalMen = perEventArr.reduce((s, r) => s + r.ticketMen, 0);
   const totalCouple = perEventArr.reduce((s, r) => s + r.ticketCouple, 0);
 
+  function rnd2(n: number) { return Math.round(n * 100) / 100; }
   res.json({
     totalEarnings: Math.round(totalEarnings),
     monthEarnings: Math.round(monthEarnings),
@@ -732,11 +754,18 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     onlineRevenue: Math.round(onlineRevenue),
     grossEarnings: Math.round(totalEarnings),
     netEarnings: Math.round(totalEarnings - totalCommission),
-    totalCommission: Math.round(totalCommission * 100) / 100,
+    totalCommission: rnd2(totalCommission),
+    codCommission: rnd2(codCommission),
+    onlineCommission: rnd2(onlineCommission),
     commissionRates: {
       freeEntryRate: commRow?.freeEntryRate ?? "0",
       ticketRate: commRow?.ticketRate ?? "0",
       tableBookingRate: commRow?.tableBookingRate ?? "0",
+    },
+    commissionSummary: {
+      freeEntry: { count: commSummary.freeEntry.count, grossRevenue: Math.round(commSummary.freeEntry.grossRevenue), commissionAmount: rnd2(commSummary.freeEntry.commissionAmount), netRevenue: Math.round(commSummary.freeEntry.netRevenue) },
+      ticket: { count: commSummary.ticket.count, grossRevenue: Math.round(commSummary.ticket.grossRevenue), commissionAmount: rnd2(commSummary.ticket.commissionAmount), netRevenue: Math.round(commSummary.ticket.netRevenue) },
+      table: { count: commSummary.table.count, grossRevenue: Math.round(commSummary.table.grossRevenue), commissionAmount: rnd2(commSummary.table.commissionAmount), netRevenue: Math.round(commSummary.table.netRevenue) },
     },
     perEvent: perEventArr,
     dailyRevenue,
@@ -1574,8 +1603,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       code: "ALREADY_CHECKED_IN",
       message: "This ticket has already been used for entry.",
       checkedInAt,
-      booking: out ?? null,
-      ...scanCommInfo,
+      booking: out ? { ...out, ...scanCommInfo } : null,
     });
     return;
   }
@@ -1597,12 +1625,12 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     if (current) {
       const checkedInAt = current.checkedInAt ? current.checkedInAt.toISOString() : null;
       const [out] = await serializeBookings([current]);
+      const currComm = calcScanCommission(current);
       res.status(409).json({
         code: "ALREADY_CHECKED_IN",
         message: "This ticket has already been used for entry.",
         checkedInAt,
-        booking: out ?? null,
-        ...calcScanCommission(current),
+        booking: out ? { ...out, ...currComm } : null,
       });
     } else {
       res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
@@ -1675,7 +1703,8 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     console.error("Failed to trigger ticket-scanned email:", err);
   }
 
-  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ?? null, ...calcScanCommission(updated) });
+  const okComm = calcScanCommission(updated);
+  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ? { ...out, ...okComm } : null });
 });
 
 router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) => {

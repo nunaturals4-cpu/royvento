@@ -44,6 +44,7 @@ import type {
   GetAdminLeadsSummaryParams,
   GetBookingTicketCode200,
   GetCommissionReportParams,
+  GetPartnerAnalyticsParams,
   GetPartnerCheckinReportParams,
   HealthStatus,
   ImportGooglePubBody,
@@ -59,12 +60,15 @@ import type {
   MyVendorResponse,
   Notification,
   Ok,
+  PartnerAnalyticsResult,
   PartnerCommissionRates,
   PatchAdminEventBody,
   PreviewGooglePubBody,
   PreviewGooglePubResponse,
   RegisterBody,
   Review,
+  ScanTicketBody,
+  ScanTicketResult,
   SetAvailabilityBody,
   SetVendorCommissionBody,
   UpdateBookingStatusBody,
@@ -3778,6 +3782,195 @@ export function useGetPartnerCommission<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Revenue and commission analytics for the authenticated partner vendor
+ */
+export const getGetPartnerAnalyticsUrl = (
+  params?: GetPartnerAnalyticsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/partner/analytics?${stringifiedParams}`
+    : `/api/partner/analytics`;
+};
+
+export const getPartnerAnalytics = async (
+  params?: GetPartnerAnalyticsParams,
+  options?: RequestInit,
+): Promise<PartnerAnalyticsResult> => {
+  return customFetch<PartnerAnalyticsResult>(
+    getGetPartnerAnalyticsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPartnerAnalyticsQueryKey = (
+  params?: GetPartnerAnalyticsParams,
+) => {
+  return [`/api/partner/analytics`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetPartnerAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerAnalytics>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPartnerAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPartnerAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPartnerAnalyticsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPartnerAnalytics>>
+  > = ({ signal }) =>
+    getPartnerAnalytics(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerAnalytics>>
+>;
+export type GetPartnerAnalyticsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Revenue and commission analytics for the authenticated partner vendor
+ */
+
+export function useGetPartnerAnalytics<
+  TData = Awaited<ReturnType<typeof getPartnerAnalytics>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPartnerAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPartnerAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerAnalyticsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Scan and check in a ticket by booking reference code (partner)
+ */
+export const getPartnerScanTicketUrl = () => {
+  return `/api/partner/scan-ticket`;
+};
+
+export const partnerScanTicket = async (
+  scanTicketBody: ScanTicketBody,
+  options?: RequestInit,
+): Promise<ScanTicketResult> => {
+  return customFetch<ScanTicketResult>(getPartnerScanTicketUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(scanTicketBody),
+  });
+};
+
+export const getPartnerScanTicketMutationOptions = <
+  TError = ErrorType<ScanTicketResult>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof partnerScanTicket>>,
+    TError,
+    { data: BodyType<ScanTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof partnerScanTicket>>,
+  TError,
+  { data: BodyType<ScanTicketBody> },
+  TContext
+> => {
+  const mutationKey = ["partnerScanTicket"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof partnerScanTicket>>,
+    { data: BodyType<ScanTicketBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return partnerScanTicket(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PartnerScanTicketMutationResult = NonNullable<
+  Awaited<ReturnType<typeof partnerScanTicket>>
+>;
+export type PartnerScanTicketMutationBody = BodyType<ScanTicketBody>;
+export type PartnerScanTicketMutationError = ErrorType<ScanTicketResult>;
+
+/**
+ * @summary Scan and check in a ticket by booking reference code (partner)
+ */
+export const usePartnerScanTicket = <
+  TError = ErrorType<ScanTicketResult>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof partnerScanTicket>>,
+    TError,
+    { data: BodyType<ScanTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof partnerScanTicket>>,
+  TError,
+  { data: BodyType<ScanTicketBody> },
+  TContext
+> => {
+  return useMutation(getPartnerScanTicketMutationOptions(options));
+};
 
 /**
  * @summary Attendance / check-in report for the authenticated vendor

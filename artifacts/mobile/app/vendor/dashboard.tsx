@@ -2427,7 +2427,13 @@ export default function VendorDashboardScreen() {
     totalEarnings: number; monthEarnings: number;
     codRevenue: number; onlineRevenue: number;
     grossEarnings: number; netEarnings: number; totalCommission: number;
+    codCommission: number; onlineCommission: number;
     commissionRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
+    commissionSummary: {
+      freeEntry: { count: number; grossRevenue: number; commissionAmount: number; netRevenue: number };
+      ticket: { count: number; grossRevenue: number; commissionAmount: number; netRevenue: number };
+      table: { count: number; grossRevenue: number; commissionAmount: number; netRevenue: number };
+    };
     totalWomen: number; totalMen: number; totalCouple: number;
     perEvent: { eventId: number; eventTitle: string; bookingCount: number; revenue: number }[];
     dailyRevenue: { date: string; revenue: number }[];
@@ -2468,15 +2474,15 @@ export default function VendorDashboardScreen() {
   function renderAnalytics() {
     if (analyticsLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
     const a = analyticsData;
-    const hasCommission = a && (Number(a.commissionRates?.ticketRate ?? 0) > 0 || Number(a.commissionRates?.freeEntryRate ?? 0) > 0 || Number(a.commissionRates?.tableBookingRate ?? 0) > 0);
     const earningsKpis = [
       { label: "Gross Revenue", value: `₹${(a?.grossEarnings ?? a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "cash-outline" as const, color: colors.primary },
       { label: "Platform Fee", value: `₹${(a?.totalCommission ?? 0).toLocaleString("en-IN")}`, icon: "remove-circle-outline" as const, color: "#f59e0b" },
       { label: "Net Earnings", value: `₹${(a?.netEarnings ?? a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "checkmark-circle-outline" as const, color: "#22c55e" },
     ];
-    const paymentKpis = [
-      { label: "Pay at Venue", value: `₹${(a?.codRevenue ?? 0).toLocaleString("en-IN")}`, icon: "wallet-outline" as const, color: "#f59e0b" },
-      { label: "Online", value: `₹${(a?.onlineRevenue ?? 0).toLocaleString("en-IN")}`, icon: "card-outline" as const, color: "#3b82f6" },
+    type ChannelKpi = { label: string; icon: "wallet-outline" | "card-outline"; color: string; gross: number; commission: number; net: number };
+    const channelKpis: ChannelKpi[] = [
+      { label: "Pay at Venue", icon: "wallet-outline", color: "#f59e0b", gross: a?.codRevenue ?? 0, commission: a?.codCommission ?? 0, net: (a?.codRevenue ?? 0) - (a?.codCommission ?? 0) },
+      { label: "Online", icon: "card-outline", color: "#3b82f6", gross: a?.onlineRevenue ?? 0, commission: a?.onlineCommission ?? 0, net: (a?.onlineRevenue ?? 0) - (a?.onlineCommission ?? 0) },
     ];
     const guestKpis = [
       { label: "Women", value: String(a?.totalWomen ?? 0), icon: "person-outline" as const, color: "#ec4899" },
@@ -2507,30 +2513,26 @@ export default function VendorDashboardScreen() {
           ))}
         </View>
 
-        {/* Platform Charges card */}
-        {hasCommission && (
-          <>
-            <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>PLATFORM CHARGES</Text>
-            <View style={[styles.field, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8, borderWidth: 1.5 }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                <Ionicons name="information-circle-outline" size={16} color="#f59e0b" />
-                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>Commission rates applied to your bookings</Text>
+        {/* Platform Charges card — always shown */}
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>PLATFORM CHARGES</Text>
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8, borderWidth: 1.5 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+            <Ionicons name="information-circle-outline" size={16} color="#f59e0b" />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>Commission rates applied to your bookings</Text>
+          </View>
+          {[
+            { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0" },
+            { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0" },
+            { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0" },
+          ].map((r) => (
+            <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{r.label}</Text>
+              <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>{Number(r.value).toFixed(1)}%</Text>
               </View>
-              {[
-                { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0" },
-                { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0" },
-                { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0" },
-              ].map((r) => (
-                <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{r.label}</Text>
-                  <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>{Number(r.value).toFixed(1)}%</Text>
-                  </View>
-                </View>
-              ))}
             </View>
-          </>
-        )}
+          ))}
+        </View>
 
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>REVENUE OVERVIEW</Text>
         {/* Gross → Fee → Net row */}
@@ -2545,14 +2547,40 @@ export default function VendorDashboardScreen() {
             </View>
           ))}
         </View>
-        {/* Payment method + guests */}
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-          {[...paymentKpis, ...guestKpis].map((k) => (
-            <View key={k.label} style={[{ width: "47%", borderRadius: 14, borderWidth: 1, padding: 14, gap: 6, alignItems: "center" }, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }, { backgroundColor: k.color + "20" }]}>
-                <Ionicons name={k.icon} size={18} color={k.color} />
+        {/* Pay at Venue + Online — each shows gross / platform fee / net */}
+        <View style={{ gap: 10 }}>
+          {channelKpis.map((k) => (
+            <View key={k.label} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 14 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <View style={[{ width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" }, { backgroundColor: k.color + "20" }]}>
+                  <Ionicons name={k.icon} size={14} color={k.color} />
+                </View>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{k.label}</Text>
               </View>
-              <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: colors.foreground }}>{k.value}</Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Gross Revenue</Text>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>₹{k.gross.toLocaleString("en-IN")}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#f59e0b" }}>Platform Fee</Text>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#f59e0b" }}>− ₹{k.commission.toLocaleString("en-IN")}</Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#22c55e" }}>Net Earnings</Text>
+                <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#22c55e" }}>₹{k.net.toLocaleString("en-IN")}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+        {/* Guest counts */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+          {guestKpis.map((k) => (
+            <View key={k.label} style={[{ width: "30%", borderRadius: 14, borderWidth: 1, padding: 12, gap: 5, alignItems: "center" }, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" }, { backgroundColor: k.color + "20" }]}>
+                <Ionicons name={k.icon} size={16} color={k.color} />
+              </View>
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground }}>{k.value}</Text>
               <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" }}>{k.label}</Text>
             </View>
           ))}
@@ -2582,7 +2610,7 @@ export default function VendorDashboardScreen() {
                   <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[0]?.date?.slice(5) ?? ""}</Text>
                   <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[daily.length - 1]?.date?.slice(5) ?? ""}</Text>
                 </View>
-                {hasCommission && (
+                {(a?.totalCommission ?? 0) > 0 && (
                   <View style={{ flexDirection: "row", gap: 12, marginTop: 6, justifyContent: "center" }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                       <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colors.primary }} />

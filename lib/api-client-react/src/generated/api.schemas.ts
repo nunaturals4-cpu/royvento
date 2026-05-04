@@ -897,6 +897,98 @@ export interface PartnerCommissionRates {
   tableBookingRate: string;
 }
 
+export interface CommissionTypeSummary {
+  count: number;
+  grossRevenue: number;
+  commissionAmount: number;
+  netRevenue: number;
+}
+
+export type PartnerAnalyticsResultCommissionSummary = {
+  freeEntry: CommissionTypeSummary;
+  ticket: CommissionTypeSummary;
+  table: CommissionTypeSummary;
+};
+
+export type PartnerAnalyticsResultPerEventItem = {
+  eventId: number;
+  eventTitle: string;
+  bookingCount: number;
+  revenue: number;
+};
+
+export type PartnerAnalyticsResultDailyRevenueItem = {
+  date: string;
+  revenue: number;
+};
+
+export type PartnerAnalyticsResultDailyCommissionItem = {
+  date: string;
+  commission: number;
+};
+
+export interface PartnerAnalyticsResult {
+  totalEarnings: number;
+  monthEarnings: number;
+  codRevenue: number;
+  onlineRevenue: number;
+  grossEarnings: number;
+  netEarnings: number;
+  totalCommission: number;
+  codCommission: number;
+  onlineCommission: number;
+  commissionRates: PartnerCommissionRates;
+  commissionSummary: PartnerAnalyticsResultCommissionSummary;
+  totalWomen: number;
+  totalMen: number;
+  totalCouple: number;
+  perEvent: PartnerAnalyticsResultPerEventItem[];
+  dailyRevenue: PartnerAnalyticsResultDailyRevenueItem[];
+  dailyCommission: PartnerAnalyticsResultDailyCommissionItem[];
+}
+
+export interface ScanTicketBody {
+  code: string;
+}
+
+export interface ScanTicketBooking {
+  id: number;
+  eventTitle: string;
+  vendorName: string;
+  bookingDate: string;
+  personName?: string | null;
+  userName: string;
+  pubMode: string;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  guests: number;
+  finalPrice?: number;
+  /** Effective commission rate applied (0–100 %) */
+  commissionRate?: number;
+  /** Platform fee deducted from gross */
+  commissionAmount?: number;
+  /** Net amount the venue should collect */
+  netAmount?: number;
+}
+
+export type ScanTicketResultCode =
+  (typeof ScanTicketResultCode)[keyof typeof ScanTicketResultCode];
+
+export const ScanTicketResultCode = {
+  OK: "OK",
+  ALREADY_CHECKED_IN: "ALREADY_CHECKED_IN",
+  NOT_FOUND: "NOT_FOUND",
+  INVALID_STATUS: "INVALID_STATUS",
+} as const;
+
+export interface ScanTicketResult {
+  code: ScanTicketResultCode;
+  message?: string;
+  checkedInAt?: string | null;
+  booking?: ScanTicketBooking | null;
+}
+
 export type ListVendorsParams = {
   category?: string;
   country?: string;
@@ -983,6 +1075,23 @@ export type ListVendorBookings200 = {
 export type GetBookingTicketCode200 = {
   ticketCode: string;
 };
+
+export type GetPartnerAnalyticsParams = {
+  preset?: GetPartnerAnalyticsPreset;
+  from?: string;
+  to?: string;
+};
+
+export type GetPartnerAnalyticsPreset =
+  (typeof GetPartnerAnalyticsPreset)[keyof typeof GetPartnerAnalyticsPreset];
+
+export const GetPartnerAnalyticsPreset = {
+  today: "today",
+  "7d": "7d",
+  "30d": "30d",
+  "3m": "3m",
+  "6m": "6m",
+} as const;
 
 export type GetPartnerCheckinReportParams = {
   page?: number;

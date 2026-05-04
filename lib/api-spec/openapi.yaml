@@ -981,6 +981,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/PartnerCommissionRates"
 
+  /partner/analytics:
+    get:
+      operationId: getPartnerAnalytics
+      tags: [bookings]
+      summary: Revenue and commission analytics for the authenticated partner vendor
+      parameters:
+        - name: preset
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [today, 7d, 30d, 3m, 6m]
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Partner analytics result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerAnalyticsResult"
+
+  /partner/scan-ticket:
+    post:
+      operationId: partnerScanTicket
+      tags: [bookings]
+      summary: Scan and check in a ticket by booking reference code (partner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanTicketBody"
+      responses:
+        "200":
+          description: Ticket checked in successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanTicketResult"
+        "409":
+          description: Already checked in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanTicketResult"
+
   /partner/checkin-report:
     get:
       operationId: getPartnerCheckinReport
@@ -2949,3 +3004,153 @@ components:
           type: string
           description: Percentage 0–100 (stored as decimal string)
       required: [freeEntryRate, ticketRate, tableBookingRate]
+
+    CommissionTypeSummary:
+      type: object
+      properties:
+        count:
+          type: integer
+        grossRevenue:
+          type: number
+        commissionAmount:
+          type: number
+        netRevenue:
+          type: number
+      required: [count, grossRevenue, commissionAmount, netRevenue]
+
+    PartnerAnalyticsResult:
+      type: object
+      properties:
+        totalEarnings:
+          type: number
+        monthEarnings:
+          type: number
+        codRevenue:
+          type: number
+        onlineRevenue:
+          type: number
+        grossEarnings:
+          type: number
+        netEarnings:
+          type: number
+        totalCommission:
+          type: number
+        codCommission:
+          type: number
+        onlineCommission:
+          type: number
+        commissionRates:
+          $ref: "#/components/schemas/PartnerCommissionRates"
+        commissionSummary:
+          type: object
+          properties:
+            freeEntry:
+              $ref: "#/components/schemas/CommissionTypeSummary"
+            ticket:
+              $ref: "#/components/schemas/CommissionTypeSummary"
+            table:
+              $ref: "#/components/schemas/CommissionTypeSummary"
+          required: [freeEntry, ticket, table]
+        totalWomen:
+          type: integer
+        totalMen:
+          type: integer
+        totalCouple:
+          type: integer
+        perEvent:
+          type: array
+          items:
+            type: object
+            properties:
+              eventId:
+                type: integer
+              eventTitle:
+                type: string
+              bookingCount:
+                type: integer
+              revenue:
+                type: number
+            required: [eventId, eventTitle, bookingCount, revenue]
+        dailyRevenue:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              revenue:
+                type: number
+            required: [date, revenue]
+        dailyCommission:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              commission:
+                type: number
+            required: [date, commission]
+      required: [totalEarnings, monthEarnings, codRevenue, onlineRevenue, grossEarnings, netEarnings, totalCommission, codCommission, onlineCommission, commissionRates, commissionSummary, totalWomen, totalMen, totalCouple, perEvent, dailyRevenue, dailyCommission]
+
+    ScanTicketBody:
+      type: object
+      properties:
+        code:
+          type: string
+      required: [code]
+
+    ScanTicketBooking:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventTitle:
+          type: string
+        vendorName:
+          type: string
+        bookingDate:
+          type: string
+        personName:
+          type: string
+          nullable: true
+        userName:
+          type: string
+        pubMode:
+          type: string
+        ticketWomen:
+          type: integer
+        ticketMen:
+          type: integer
+        ticketCouple:
+          type: integer
+        guests:
+          type: integer
+        finalPrice:
+          type: number
+        commissionRate:
+          type: number
+          description: Effective commission rate applied (0–100 %)
+        commissionAmount:
+          type: number
+          description: Platform fee deducted from gross
+        netAmount:
+          type: number
+          description: Net amount the venue should collect
+      required: [id, eventTitle, vendorName, bookingDate, userName, pubMode, ticketWomen, ticketMen, ticketCouple, guests]
+
+    ScanTicketResult:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [OK, ALREADY_CHECKED_IN, NOT_FOUND, INVALID_STATUS]
+        message:
+          type: string
+        checkedInAt:
+          type: string
+          nullable: true
+        booking:
+          $ref: "#/components/schemas/ScanTicketBooking"
+          nullable: true
+      required: [code]
