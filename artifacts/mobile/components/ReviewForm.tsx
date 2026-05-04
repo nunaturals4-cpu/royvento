@@ -32,17 +32,19 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
   const createReview = useCreateReview();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   if (!user) return null;
 
-  const hasDuplicate = (reviews ?? []).some((r) => r.userId === user.id);
+  const hasDuplicate = submitted || (reviews ?? []).some((r) => r.userId === user.id);
 
   const handleSubmit = () => {
-    if (createReview.isPending) return;
+    if (createReview.isPending || submitted) return;
     createReview.mutate(
       { data: { eventId, vendorId, rating, comment } },
       {
         onSuccess: () => {
+          setSubmitted(true);
           setComment("");
           setRating(5);
           if (eventId) {

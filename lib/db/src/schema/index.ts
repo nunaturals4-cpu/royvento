@@ -207,6 +207,7 @@ export const reviewsTable = pgTable(
   (t) => ({
     vendorIdx: index("reviews_vendor_idx").on(t.vendorId),
     eventIdx: index("reviews_event_idx").on(t.eventId),
+    userVendorUniq: uniqueIndex("reviews_user_vendor_uniq").on(t.userId, t.vendorId),
   }),
 );
 
