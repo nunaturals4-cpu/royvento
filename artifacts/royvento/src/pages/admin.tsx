@@ -87,7 +87,7 @@ export function AdminPanel() {
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
-          <TabsTrigger value="commissions"><Percent className="h-3.5 w-3.5 mr-1" />Commissions</TabsTrigger>
+          <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
         </TabsList>
         <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
