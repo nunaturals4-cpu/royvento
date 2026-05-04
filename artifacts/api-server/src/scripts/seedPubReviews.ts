@@ -1,5 +1,5 @@
 import { db, usersTable, eventsTable, reviewsTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const REVIEWER_NAMES = [
@@ -45,56 +45,48 @@ async function ensureUser(
 async function main() {
   console.log("Seeding pub reviews...");
 
+  // Order by vendorId then id for deterministic, stable iteration across reruns.
   const pubs = await db
     .select()
     .from(eventsTable)
-    .where(and(eq(eventsTable.type, "pub"), eq(eventsTable.approvalStatus, "approved")));
+    .where(and(eq(eventsTable.type, "pub"), eq(eventsTable.approvalStatus, "approved")))
+    .orderBy(asc(eventsTable.vendorId), asc(eventsTable.id));
 
   console.log(`Found ${pubs.length} approved pub events.`);
 
-  // Group events by vendorId so we can slot users per (vendor, eventIndex).
   // The DB has a unique constraint on (userId, vendorId), so each user can only
   // review a given vendor once. To give every event its own 7 reviews we create
-  // 7 seed users per event slot: seed.rv.<vendorId>.<eventIndex>.<reviewerIndex>
-  const byVendor = new Map<number, (typeof pubs)[number][]>();
-  for (const pub of pubs) {
-    const list = byVendor.get(pub.vendorId) ?? [];
-    list.push(pub);
-    byVendor.set(pub.vendorId, list);
-  }
-
+  // 7 seed users keyed on (vendorId, eventId, reviewerIndex) — eventId is
+  // immutable and stable across reruns, unlike a position-based index.
   const passwordHash = await bcrypt.hash("Seed@Reviewer#2024!", 10);
   let inserted = 0;
   let skipped = 0;
 
-  for (const [vendorId, events] of byVendor) {
-    for (let ei = 0; ei < events.length; ei++) {
-      const event = events[ei]!;
-      for (let ri = 0; ri < 7; ri++) {
-        // Email and referralCode are scoped to (vendorId, eventIndex, reviewerIndex)
-        // so (userId, vendorId) is always unique across all events for this vendor.
-        const email = `seed.rv.${vendorId}.${ei}.${ri}@royvento.in`;
-        const referralCode = `SRV${vendorId}E${ei}R${ri}`;
-        const name = REVIEWER_NAMES[ri % REVIEWER_NAMES.length]!;
+  for (const event of pubs) {
+    for (let ri = 0; ri < 7; ri++) {
+      // Identity is deterministic: keyed on stable (vendorId, eventId, ri).
+      // (userId, vendorId) stays unique because eventId is different per event.
+      const email = `seed.rv.${event.vendorId}.${event.id}.${ri}@royvento.in`;
+      const referralCode = `SRV${event.vendorId}ID${event.id}R${ri}`;
+      const name = REVIEWER_NAMES[ri % REVIEWER_NAMES.length]!;
 
-        const user = await ensureUser(email, referralCode, name, passwordHash);
-        if (!user) continue;
+      const user = await ensureUser(email, referralCode, name, passwordHash);
+      if (!user) continue;
 
-        const result = await db
-          .insert(reviewsTable)
-          .values({
-            userId: user.id,
-            eventId: event.id,
-            vendorId: event.vendorId,
-            rating: RATINGS[ri % RATINGS.length] ?? 4,
-            comment: COMMENTS[ri % COMMENTS.length] ?? "Great pub!",
-          })
-          .onConflictDoNothing()
-          .returning();
+      const result = await db
+        .insert(reviewsTable)
+        .values({
+          userId: user.id,
+          eventId: event.id,
+          vendorId: event.vendorId,
+          rating: RATINGS[ri % RATINGS.length] ?? 4,
+          comment: COMMENTS[ri % COMMENTS.length] ?? "Great pub!",
+        })
+        .onConflictDoNothing()
+        .returning();
 
-        if (result.length > 0) inserted++;
-        else skipped++;
-      }
+      if (result.length > 0) inserted++;
+      else skipped++;
     }
   }
 
