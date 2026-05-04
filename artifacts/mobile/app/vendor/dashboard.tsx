@@ -95,6 +95,28 @@ interface VendorEvent {
   freeEntryRules?: FreeEntryRules | null;
 }
 
+interface VendorBookingItem {
+  id: number;
+  bookingDate: string;
+  guests: number | null;
+  status: string;
+  notes: string | null;
+  personName: string | null;
+  phone: string | null;
+  eventId: number;
+  eventTitle: string | null;
+  pubMode: string | null;
+  arrivalTime: string | null;
+  finalPrice: number | null;
+  totalPrice: number;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  selectedPubEvent: string | null;
+  couponCode: string | null;
+  [key: string]: unknown;
+}
+
 // ─── Image upload helper ──────────────────────────────────────────────────────
 
 async function requestPresignedUrl(name: string, size: number, contentType: string) {
@@ -771,7 +793,7 @@ export default function VendorDashboardScreen() {
   const vendor = vendorQuery.data?.vendor ?? null;
 
   const BOOKING_PAGE_LIMIT = 20;
-  const [bookingItems, setBookingItems] = useState<any[]>([]);
+  const [bookingItems, setBookingItems] = useState<VendorBookingItem[]>([]);
   const [bookingPage, setBookingPage] = useState(1);
   const [bookingTotal, setBookingTotal] = useState(0);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -781,11 +803,11 @@ export default function VendorDashboardScreen() {
     if (pg === 1) setBookingLoading(true);
     else setBookingFetching(true);
     try {
-      const resp = await customFetch<{ data: any[]; total: number; page: number; totalPages: number }>(
+      const resp = await customFetch<{ data: VendorBookingItem[]; total: number; page: number; totalPages: number }>(
         `/api/bookings/vendor?page=${pg}&limit=${BOOKING_PAGE_LIMIT}`,
       );
-      const newItems = (resp as any)?.data ?? [];
-      setBookingTotal((resp as any)?.total ?? 0);
+      const newItems = resp.data ?? [];
+      setBookingTotal(resp.total ?? 0);
       setBookingItems((prev) => (reset || pg === 1) ? newItems : [...prev, ...newItems]);
       setBookingPage(pg);
     } catch {
@@ -797,7 +819,7 @@ export default function VendorDashboardScreen() {
   }, []);
 
   const EVENT_PAGE_LIMIT = 20;
-  const [eventItems, setEventItems] = useState<any[]>([]);
+  const [eventItems, setEventItems] = useState<VendorEvent[]>([]);
   const [eventPage, setEventPage] = useState(1);
   const [eventTotal, setEventTotal] = useState(0);
   const [eventLoading, setEventLoading] = useState(false);
@@ -807,11 +829,11 @@ export default function VendorDashboardScreen() {
     if (pg === 1) setEventLoading(true);
     else setEventFetching(true);
     try {
-      const resp = await customFetch<{ data: any[]; total: number; page: number; totalPages: number }>(
+      const resp = await customFetch<{ data: VendorEvent[]; total: number; page: number; totalPages: number }>(
         `/api/events/vendor/me?page=${pg}&limit=${EVENT_PAGE_LIMIT}`,
       );
-      const newItems = (resp as any)?.data ?? [];
-      setEventTotal((resp as any)?.total ?? 0);
+      const newItems = resp.data ?? [];
+      setEventTotal(resp.total ?? 0);
       setEventItems((prev) => (reset || pg === 1) ? newItems : [...prev, ...newItems]);
       setEventPage(pg);
     } catch {

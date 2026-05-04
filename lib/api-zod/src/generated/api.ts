@@ -1236,6 +1236,19 @@ export const DeleteEventResponse = zod.object({
 /**
  * @summary List events owned by the current vendor
  */
+export const listMyVendorEventsQueryPageDefault = 1;
+export const listMyVendorEventsQueryLimitDefault = 20;
+
+export const ListMyVendorEventsQueryParams = zod.object({
+  page: zod.coerce
+    .number()
+    .default(listMyVendorEventsQueryPageDefault)
+    .describe(
+      "When provided, returns a paginated response object instead of a plain array",
+    ),
+  limit: zod.coerce.number().default(listMyVendorEventsQueryLimitDefault),
+});
+
 export const ListMyVendorEventsResponseItem = zod.object({
   id: zod.number(),
   vendorId: zod.number(),
@@ -1404,6 +1417,10 @@ export const listVendorBookingsQueryLimitDefault = 20;
 export const ListVendorBookingsQueryParams = zod.object({
   page: zod.coerce.number().default(listVendorBookingsQueryPageDefault),
   limit: zod.coerce.number().default(listVendorBookingsQueryLimitDefault),
+  from: zod
+    .date()
+    .optional()
+    .describe("Filter bookings on or after this date (YYYY-MM-DD)"),
 });
 
 export const ListVendorBookingsResponse = zod.object({

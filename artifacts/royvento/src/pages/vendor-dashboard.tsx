@@ -69,6 +69,8 @@ export function VendorDashboard() {
 
   const hasPub = (events as any[]).some((e: any) => e.type === "pub");
 
+  const [bookTablePage, setBookTablePage] = useState(1);
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
       <header className="mb-10 flex items-end justify-between gap-4 flex-wrap">
@@ -123,7 +125,7 @@ export function VendorDashboard() {
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
-          <TabsContent value="bookings"><BookingReport bookings={bookings} refetch={refetchBookings} /></TabsContent>
+          <TabsContent value="bookings"><BookingReport bookings={bookings} refetch={refetchBookings} bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
           <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
@@ -1642,12 +1644,8 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
 
 const BR_PAGE_SIZE = 20;
 
-function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refetch: () => void }) {
+function BookingReport({ bookings, refetch: _refetch, bookTablePage, setBookTablePage }: { bookings: any[]; refetch: () => void; bookTablePage: number; setBookTablePage: React.Dispatch<React.SetStateAction<number>> }) {
   const [preset, setPreset] = useState<ReportPreset>("12m");
-  const [bookTablePage, setBookTablePage] = useState(1);
-
-  // Dedicated server-paginated fetch for the "All bookings" table
-  const { data: tableResp } = useListVendorBookings({ page: bookTablePage, limit: BR_PAGE_SIZE });
 
   const now = new Date();
   const startDate = (() => {
@@ -1657,6 +1655,9 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
     return s;
   })();
   const startStr = toReportDateStr(startDate);
+
+  // Dedicated server-paginated fetch for the "All bookings" table — respects the preset's from date
+  const { data: tableResp } = useListVendorBookings({ page: bookTablePage, limit: BR_PAGE_SIZE, from: startStr });
 
   const filtered = bookings.filter((b) => b.bookingDate >= startStr);
   const confirmed = filtered.filter((b) => b.status === "confirmed" || b.status === "completed");

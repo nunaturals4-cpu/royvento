@@ -47,6 +47,7 @@ import type {
   ImportGooglePubBody,
   ImportGooglePubResponse,
   ListEventsParams,
+  ListMyVendorEventsParams,
   ListVendorBookings200,
   ListVendorBookingsParams,
   ListVendorsParams,
@@ -2485,41 +2486,60 @@ export const useDeleteEvent = <
 /**
  * @summary List events owned by the current vendor
  */
-export const getListMyVendorEventsUrl = () => {
-  return `/api/events/vendor/me`;
+export const getListMyVendorEventsUrl = (params?: ListMyVendorEventsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/events/vendor/me?${stringifiedParams}`
+    : `/api/events/vendor/me`;
 };
 
 export const listMyVendorEvents = async (
+  params?: ListMyVendorEventsParams,
   options?: RequestInit,
 ): Promise<Event[]> => {
-  return customFetch<Event[]>(getListMyVendorEventsUrl(), {
+  return customFetch<Event[]>(getListMyVendorEventsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListMyVendorEventsQueryKey = () => {
-  return [`/api/events/vendor/me`] as const;
+export const getListMyVendorEventsQueryKey = (
+  params?: ListMyVendorEventsParams,
+) => {
+  return [`/api/events/vendor/me`, ...(params ? [params] : [])] as const;
 };
 
 export const getListMyVendorEventsQueryOptions = <
   TData = Awaited<ReturnType<typeof listMyVendorEvents>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMyVendorEvents>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListMyVendorEventsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMyVendorEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListMyVendorEventsQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getListMyVendorEventsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listMyVendorEvents>>
-  > = ({ signal }) => listMyVendorEvents({ signal, ...requestOptions });
+  > = ({ signal }) => listMyVendorEvents(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listMyVendorEvents>>,
@@ -2540,15 +2560,18 @@ export type ListMyVendorEventsQueryError = ErrorType<unknown>;
 export function useListMyVendorEvents<
   TData = Awaited<ReturnType<typeof listMyVendorEvents>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMyVendorEvents>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListMyVendorEventsQueryOptions(options);
+>(
+  params?: ListMyVendorEventsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMyVendorEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMyVendorEventsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

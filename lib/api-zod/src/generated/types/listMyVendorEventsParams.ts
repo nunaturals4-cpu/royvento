@@ -6,11 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListVendorBookingsParams = {
+export type ListMyVendorEventsParams = {
+  /**
+   * When provided, returns a paginated response object instead of a plain array
+   */
   page?: number;
   limit?: number;
-  /**
-   * Filter bookings on or after this date (YYYY-MM-DD)
-   */
-  from?: Date;
 };

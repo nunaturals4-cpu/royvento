@@ -649,9 +649,23 @@ paths:
       operationId: listMyVendorEvents
       tags: [events]
       summary: List events owned by the current vendor
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: When provided, returns a paginated response object instead of a plain array
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
       responses:
         "200":
-          description: Events
+          description: Events (array when no page param; paginated object when page param is present)
           content:
             application/json:
               schema:
@@ -711,6 +725,13 @@ paths:
           schema:
             type: integer
             default: 20
+        - name: from
+          in: query
+          required: false
+          description: Filter bookings on or after this date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Paginated bookings

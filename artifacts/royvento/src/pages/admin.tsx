@@ -48,6 +48,7 @@ export function AdminPanel() {
   const [, navigate] = useLocation();
   const urlTab = new URLSearchParams(search).get("tab") ?? "analytics";
   const [activeTab, setActiveTab] = useState(urlTab);
+  const [perVendorPage, setPerVendorPage] = useState(1);
 
   useEffect(() => {
     const t = new URLSearchParams(search).get("tab");
@@ -84,7 +85,7 @@ export function AdminPanel() {
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
         </TabsList>
-        <TabsContent value="analytics"><Analytics /></TabsContent>
+        <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
         <TabsContent value="requests"><VendorRequests /></TabsContent>
         <TabsContent value="event-approvals"><EventApprovalsAdmin /></TabsContent>
@@ -127,11 +128,10 @@ function toDateStr(d: Date) {
 const ADMIN_PER_VENDOR_PAGE_SIZE = 10;
 const ADMIN_VENDOR_PAGE_SIZE = 10;
 
-function Analytics() {
+function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number; setPerVendorPage: React.Dispatch<React.SetStateAction<number>> }) {
   const [preset, setPreset] = useState<AnalyticsPreset>("30d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-  const [perVendorPage, setPerVendorPage] = useState(1);
 
   const now = new Date();
   const computedRange = (() => {
@@ -182,7 +182,7 @@ function Analytics() {
       <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
         <div>
           <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Time range</Label>
-          <Select value={preset} onValueChange={(v) => setPreset(v as AnalyticsPreset)}>
+          <Select value={preset} onValueChange={(v) => { setPreset(v as AnalyticsPreset); setPerVendorPage(1); }}>
             <SelectTrigger className="w-44">
               <SelectValue>{presetLabel[preset]}</SelectValue>
             </SelectTrigger>

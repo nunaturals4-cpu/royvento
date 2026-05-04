@@ -817,7 +817,11 @@ router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 && rawLimit <= 1000 ? rawLimit : 20;
   const offset = (page - 1) * limit;
 
-  const where = eq(bookingsTable.vendorId, vendor.id);
+  const rawFrom = String(req.query["from"] ?? "");
+  const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(rawFrom) ? rawFrom : null;
+  const where = fromDate
+    ? and(eq(bookingsTable.vendorId, vendor.id), gte(bookingsTable.bookingDate, fromDate))
+    : eq(bookingsTable.vendorId, vendor.id);
 
   const [countRow] = await db
     .select({ total: sql<number>`count(*)::int` })
