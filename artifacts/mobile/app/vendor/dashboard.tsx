@@ -2587,15 +2587,15 @@ export default function VendorDashboardScreen() {
         </View>
         {(a?.dailyRevenue ?? []).length > 0 && (() => {
           const daily = a?.dailyRevenue ?? [];
-          const dailyComm = a?.dailyCommission ?? [];
+          const dailyCommByDate = new Map((a?.dailyCommission ?? []).map((c) => [c.date, c.commission]));
           const max = Math.max(...daily.map((d) => d.revenue), 1);
           return (
             <>
               <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DAILY REVENUE</Text>
               <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 12 }]}>
                 <View style={{ flexDirection: "row", alignItems: "flex-end", height: 60, gap: 3 }}>
-                  {daily.map((d, idx) => {
-                    const commAmt = dailyComm[idx]?.commission ?? 0;
+                  {daily.map((d) => {
+                    const commAmt = dailyCommByDate.get(d.date) ?? 0;
                     const netH = Math.max(4, Math.round(((d.revenue - commAmt) / max) * 56));
                     const commH = d.revenue > 0 ? Math.max(0, Math.round((commAmt / max) * 56)) : 0;
                     return (

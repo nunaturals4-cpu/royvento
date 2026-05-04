@@ -269,6 +269,7 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
   const [rates, setRates] = useState<Record<number, CommissionRates>>({});
   const [drafts, setDrafts] = useState<Record<number, CommissionRates>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
+  const [rateErrors, setRateErrors] = useState<Record<number, boolean>>({});
   const [report, setReport] = useState<CommissionReport | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -286,17 +287,21 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
       })
       .then(async (approved) => {
         const rateMap: Record<number, CommissionRates> = {};
+        const errorMap: Record<number, boolean> = {};
         await Promise.all(
           approved.map(async (v) => {
             try {
               const r = await customFetch<CommissionRates>(`/api/admin/vendors/${v.id}/commission`);
               rateMap[v.id] = r;
+              errorMap[v.id] = false;
             } catch {
               rateMap[v.id] = { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" };
+              errorMap[v.id] = true;
             }
           }),
         );
         setRates(rateMap);
+        setRateErrors(errorMap);
         setDrafts(
           Object.fromEntries(Object.entries(rateMap).map(([k, v]) => [k, { ...v }])),
         );
@@ -338,7 +343,9 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
       });
       setRates((prev) => ({ ...prev, [vendorId]: updated }));
       setDrafts((prev) => ({ ...prev, [vendorId]: { ...updated } }));
+      setRateErrors((prev) => ({ ...prev, [vendorId]: false }));
       Alert.alert("Saved", "Commission rates updated.");
+      loadReport();
     } catch {
       Alert.alert("Error", "Failed to save rates.");
     } finally {
@@ -382,11 +389,19 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
         const draft = drafts[v.id] ?? { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" };
         const dirty = isDirty(v.id);
         const isSaving = saving[v.id] ?? false;
+        const hasRateError = rateErrors[v.id] ?? false;
         return (
-          <View key={v.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: dirty ? colors.primary : colors.border, backgroundColor: colors.card, padding: 14, gap: 10 }}>
+          <View key={v.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: hasRateError ? "#ef4444" : dirty ? colors.primary : colors.border, backgroundColor: colors.card, padding: 14, gap: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{v.businessName}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{v.businessName}</Text>
+                  {hasRateError && (
+                    <View style={{ borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: "#ef444420" }}>
+                      <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#ef4444" }}>RATE LOAD FAILED</Text>
+                    </View>
+                  )}
+                </View>
                 {v.city ? <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{v.city}</Text> : null}
               </View>
               {dirty && (
