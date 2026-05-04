@@ -496,10 +496,10 @@ export default function AdminPanelScreen() {
   const fetchVendors = useCallback(() => {
     setVendorLoading(true);
     Promise.all([
-      customFetch<AdminVendor[]>("/api/admin/vendors"),
+      customFetch<{ data: AdminVendor[]; total: number; page: number; totalPages: number }>("/api/admin/vendors?limit=200"),
       customFetch<VendorRequest[]>("/api/admin/vendor-requests"),
     ])
-      .then(([v, vr]) => { setVendors(v); setVendorRequests(vr); })
+      .then(([v, vr]) => { setVendors(v.data); setVendorRequests(vr); })
       .catch(() => {})
       .finally(() => setVendorLoading(false));
   }, []);

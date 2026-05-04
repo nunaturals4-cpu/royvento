@@ -148,8 +148,8 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
 
   const { data, isLoading } = useGetAdminAnalytics({
     ...computedRange,
-    perVendorPage,
-    perVendorLimit: ADMIN_PER_VENDOR_PAGE_SIZE,
+    page: perVendorPage,
+    limit: ADMIN_PER_VENDOR_PAGE_SIZE,
   });
 
   const adminData = (data ?? {}) as typeof data & {

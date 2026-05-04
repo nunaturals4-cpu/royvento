@@ -1332,12 +1332,12 @@ paths:
           schema:
             type: string
             description: ISO date string (YYYY-MM-DD) for range end
-        - name: perVendorPage
+        - name: page
           in: query
           required: false
           schema:
             type: integer
-        - name: perVendorLimit
+        - name: limit
           in: query
           required: false
           schema:

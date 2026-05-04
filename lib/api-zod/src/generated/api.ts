@@ -2070,8 +2070,8 @@ export const GetAdminLeadsSummaryResponse = zod.object({
 export const GetAdminAnalyticsQueryParams = zod.object({
   startDate: zod.coerce.string().optional(),
   endDate: zod.coerce.string().optional(),
-  perVendorPage: zod.coerce.number().optional(),
-  perVendorLimit: zod.coerce.number().optional(),
+  page: zod.coerce.number().optional(),
+  limit: zod.coerce.number().optional(),
 });
 
 export const GetAdminAnalyticsResponse = zod.object({

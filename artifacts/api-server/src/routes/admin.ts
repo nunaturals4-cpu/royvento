@@ -220,8 +220,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const pvPage = Math.max(1, Number(req.query["perVendorPage"] ?? 1));
-  const pvLimit = Math.max(1, Number(req.query["perVendorLimit"] ?? 10));
+  const pvPage = Math.max(1, Number(req.query["page"] ?? 1));
+  const pvLimit = Math.max(1, Number(req.query["limit"] ?? 10));
   const pvTotal = perVendor.length;
   const pvTotalPages = Math.max(1, Math.ceil(pvTotal / pvLimit));
   const pvSafePage = Math.min(pvPage, pvTotalPages);
