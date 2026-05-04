@@ -1,10 +1,13 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
+import { randomUUID } from "crypto";
+import express from "express";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { compressImage } from "../lib/imageCompressor";
 import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -13,13 +16,26 @@ const objectStorageService = new ObjectStorageService();
 /**
  * POST /storage/uploads/request-url
  *
- * Request a presigned URL for file upload. Requires any authenticated user.
+ * Request an upload URL for file upload. Requires any authenticated user.
  * Used for vendor announcement images and user profile photos.
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned presigned URL.
+ * Then uploads the file directly to the returned upload URL.
+ *
+ * Unlike the original presigned-URL flow, the returned uploadURL points to
+ * this server's own PUT endpoint so we can compress images before storing.
  */
 const ALLOWED_ANNOUNCEMENT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_ANNOUNCEMENT_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function buildServerUploadUrl(req: Request, uuid: string): string {
+  const host =
+    req.get("x-forwarded-host") ??
+    req.get("host") ??
+    process.env.REPLIT_DEV_DOMAIN ??
+    "localhost";
+  const proto = (req.get("x-forwarded-proto") ?? "https").split(",")[0].trim();
+  return `${proto}://${host}/api/storage/uploads/file/${uuid}`;
+}
 
 router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
@@ -40,8 +56,9 @@ router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, 
   }
 
   try {
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+    const uuid = randomUUID();
+    const objectPath = `/objects/uploads/${uuid}`;
+    const uploadURL = buildServerUploadUrl(req, uuid);
 
     res.json(
       RequestUploadUrlResponse.parse({
@@ -55,6 +72,44 @@ router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, 
     res.status(500).json({ error: "Failed to generate upload URL" });
   }
 });
+
+/**
+ * PUT /storage/uploads/file/:uuid
+ *
+ * Receive raw image bytes from the client, compress them to WebP using sharp,
+ * and store the compressed file in object storage under uploads/{uuid}.
+ * This replaces the presigned-URL direct-to-GCS upload to allow server-side compression.
+ * No authentication required — the UUID is unguessable and was issued to an authenticated user.
+ */
+router.put(
+  "/storage/uploads/file/:uuid",
+  express.raw({ type: "*/*", limit: "10mb" }),
+  async (req: Request, res: Response) => {
+    const { uuid } = req.params;
+    if (!uuid || !/^[0-9a-f-]{36}$/.test(uuid)) {
+      res.status(400).json({ error: "Invalid upload token" });
+      return;
+    }
+
+    const rawBody = req.body as Buffer;
+    if (!Buffer.isBuffer(rawBody) || rawBody.length === 0) {
+      res.status(400).json({ error: "Empty body" });
+      return;
+    }
+
+    const inputContentType = (req.get("content-type") ?? "image/jpeg").split(";")[0].trim();
+
+    try {
+      const { buffer, contentType, compressed } = await compressImage(rawBody, inputContentType);
+      await objectStorageService.uploadBuffer(uuid, buffer, contentType);
+      req.log.info({ uuid, inputBytes: rawBody.length, outputBytes: buffer.length, compressed }, "Image uploaded");
+      res.status(200).json({ ok: true });
+    } catch (error) {
+      req.log.error({ err: error }, "Error uploading/compressing image");
+      res.status(500).json({ error: "Failed to store image" });
+    }
+  },
+);
 
 /**
  * GET /storage/public-objects/*
