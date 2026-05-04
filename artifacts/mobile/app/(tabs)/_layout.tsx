@@ -100,6 +100,7 @@ export default function TabLayout() {
         name="vendors"
         options={{
           title: t("nav.partners"),
+          tabBarItemStyle: { display: "none" },
           tabBarIcon: ({ color, focused }) =>
             tabBarIcon(focused, color, "building.2.fill", "building.2", "business", "business-outline"),
         }}

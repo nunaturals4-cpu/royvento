@@ -204,7 +204,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider onAfterLogout={() => queryClient.clear()}>
+        <AuthProvider onAfterLogout={() => { queryClient.clear(); router.replace("/(auth)/login"); }}>
           <LanguageProvider>
           <CityProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>

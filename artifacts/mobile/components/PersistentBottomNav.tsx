@@ -46,13 +46,6 @@ const TABS: Tab[] = [
     matchPaths: ["/(tabs)/bookings", "/bookings"],
   },
   {
-    labelKey: "nav.partners",
-    icon: "business-outline",
-    iconFocused: "business",
-    route: "/(tabs)/vendors",
-    matchPaths: ["/(tabs)/vendors", "/vendors"],
-  },
-  {
     labelKey: "nav.profile",
     icon: "person-outline",
     iconFocused: "person",

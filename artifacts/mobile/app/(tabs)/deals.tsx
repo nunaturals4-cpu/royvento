@@ -290,6 +290,11 @@ export default function DealsScreen() {
     queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/recent"),
     staleTime: 1000 * 60 * 5,
   });
+  const { data: sliderAnnouncements = [], refetch: refetchSlider } = useQuery<RecentAnnouncement[]>({
+    queryKey: ["announcements", "slider"],
+    queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/slider"),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const isLoading = dealsLoading || annLoading;
   const isRefreshing = isRefetchingDeals;
@@ -297,6 +302,7 @@ export default function DealsScreen() {
   function onRefresh() {
     refetchDeals();
     refetchAnn();
+    refetchSlider();
   }
 
   const filteredAnnouncements = announcements.filter((a) => {
@@ -353,11 +359,15 @@ export default function DealsScreen() {
             { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 24 },
           ]}
         >
-          {/* Announcement Slider */}
+          {/* Hero Announcement Slider — from /api/announcements/slider */}
+          {sliderAnnouncements.length > 0 && (
+            <AnnouncementSlider announcements={sliderAnnouncements} />
+          )}
+
+          {/* What's On — filter chips + recent announcements */}
           {announcements.length > 0 && (
             <View>
-              {/* Announcement filter chips */}
-              <View style={{ paddingHorizontal: 20, paddingTop: 12, gap: 8 }}>
+              <View style={{ paddingHorizontal: 20, paddingTop: 4, gap: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <Ionicons name="musical-notes-outline" size={13} color={colors.mutedForeground} />
                   <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Genre</Text>
