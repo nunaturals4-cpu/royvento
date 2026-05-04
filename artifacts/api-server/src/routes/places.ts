@@ -1,7 +1,17 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
+import { TtlCache } from "../lib/ttlCache";
 
 const router: IRouter = Router();
+
+const AUTOCOMPLETE_TTL_MS = 60 * 60 * 1000;       // 1 hour
+const DETAILS_TTL_MS      = 24 * 60 * 60 * 1000;  // 24 hours
+
+type AutocompleteResult = { place_id: string; description: string; types: string[] }[];
+type DetailsResult = { address: string | null; city: string | null; state: string | null; country: string | null };
+
+const autocompleteCache = new TtlCache<AutocompleteResult>();
+const detailsCache      = new TtlCache<DetailsResult>();
 
 router.get("/places/autocomplete", requireAuth(["vendor", "admin"]), async (req, res) => {
   const q = String(req.query.q ?? "").trim();
@@ -13,6 +23,11 @@ router.get("/places/autocomplete", requireAuth(["vendor", "admin"]), async (req,
   if (!apiKey) {
     req.log.warn("GOOGLE_PLACES_API_KEY is not configured");
     res.status(503).json({ error: "Address autocomplete is not configured" });
+    return;
+  }
+  const cached = autocompleteCache.get(q);
+  if (cached) {
+    res.json(cached);
     return;
   }
   try {
@@ -41,6 +56,7 @@ router.get("/places/autocomplete", requireAuth(["vendor", "admin"]), async (req,
       description: p.description,
       types: p.types ?? [],
     }));
+    autocompleteCache.set(q, results, AUTOCOMPLETE_TTL_MS);
     res.json(results);
   } catch (err) {
     req.log.error({ err }, "Failed to call Google Places API");
@@ -58,6 +74,11 @@ router.get("/places/details", requireAuth(["vendor", "admin"]), async (req, res)
   if (!apiKey) {
     req.log.warn("GOOGLE_PLACES_API_KEY is not configured");
     res.status(503).json({ error: "Address lookup is not configured" });
+    return;
+  }
+  const cachedDetail = detailsCache.get(placeId);
+  if (cachedDetail) {
+    res.json(cachedDetail);
     return;
   }
   try {
@@ -87,12 +108,14 @@ router.get("/places/details", requireAuth(["vendor", "admin"]), async (req, res)
     const components = data.result?.address_components ?? [];
     const get = (...types: string[]) =>
       components.find((c) => types.some((t) => c.types.includes(t)))?.long_name ?? null;
-    res.json({
+    const result: DetailsResult = {
       address: data.result?.formatted_address ?? null,
       city: get("locality", "sublocality_level_1"),
       state: get("administrative_area_level_1"),
       country: get("country"),
-    });
+    };
+    detailsCache.set(placeId, result, DETAILS_TTL_MS);
+    res.json(result);
   } catch (err) {
     req.log.error({ err }, "Failed to call Google Places Details API");
     res.status(502).json({ error: "Place details unavailable" });
