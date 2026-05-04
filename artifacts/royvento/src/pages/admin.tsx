@@ -387,7 +387,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
 
       {/* Ticket sales by venue */}
       {(() => {
-        const pv = (adminData as any).perVendorPaginated as { data: NonNullable<typeof adminData>["perVendorPaginated"]["data"]; total: number; page: number; totalPages: number } | undefined;
+        const pv = adminData.perVendorPaginated;
         if (!pv || pv.total === 0) return null;
         return (
           <div className="rounded-2xl glass-card p-6">

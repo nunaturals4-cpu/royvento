@@ -1249,59 +1249,67 @@ export const ListMyVendorEventsQueryParams = zod.object({
   limit: zod.coerce.number().default(listMyVendorEventsQueryLimitDefault),
 });
 
-export const ListMyVendorEventsResponseItem = zod.object({
-  id: zod.number(),
-  vendorId: zod.number(),
-  title: zod.string(),
-  description: zod.string(),
-  category: zod.string(),
-  location: zod.string(),
-  price: zod.number(),
-  capacity: zod.number(),
-  imageUrl: zod.string(),
-  rating: zod.number(),
-  reviewCount: zod.number(),
-  vendorName: zod.string(),
-  galleryImages: zod.array(zod.string()),
-  galleryVideos: zod.array(zod.string()),
-  createdAt: zod.string(),
-  type: zod.string(),
-  priceWomen: zod.number(),
-  priceMen: zod.number(),
-  priceCouple: zod.number(),
-  approvalStatus: zod.string(),
-  pubEventTypes: zod.array(zod.string()).optional(),
-  dayPricing: zod
-    .record(
-      zod.string(),
-      zod.object({
-        women: zod.number().optional(),
-        men: zod.number().optional(),
-        couple: zod.number().optional(),
-      }),
-    )
-    .optional(),
-  freeEntryRules: zod
-    .union([
-      zod.object({
-        enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-        days: zod.array(
-          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-        ),
-        beforeTime: zod
-          .string()
-          .optional()
-          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-      }),
-      zod.null(),
-    ])
-    .optional(),
-  hasDrinkPlans: zod.boolean().optional(),
+export const ListMyVendorEventsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.number(),
+      vendorId: zod.number(),
+      title: zod.string(),
+      description: zod.string(),
+      category: zod.string(),
+      location: zod.string(),
+      price: zod.number(),
+      capacity: zod.number(),
+      imageUrl: zod.string(),
+      rating: zod.number(),
+      reviewCount: zod.number(),
+      vendorName: zod.string(),
+      galleryImages: zod.array(zod.string()),
+      galleryVideos: zod.array(zod.string()),
+      createdAt: zod.string(),
+      type: zod.string(),
+      priceWomen: zod.number(),
+      priceMen: zod.number(),
+      priceCouple: zod.number(),
+      approvalStatus: zod.string(),
+      pubEventTypes: zod.array(zod.string()).optional(),
+      dayPricing: zod
+        .record(
+          zod.string(),
+          zod.object({
+            women: zod.number().optional(),
+            men: zod.number().optional(),
+            couple: zod.number().optional(),
+          }),
+        )
+        .optional(),
+      freeEntryRules: zod
+        .union([
+          zod.object({
+            enabled: zod.boolean(),
+            genders: zod.array(
+              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+            ),
+            days: zod.array(
+              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+            ),
+            beforeTime: zod
+              .string()
+              .optional()
+              .describe(
+                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+              ),
+          }),
+          zod.null(),
+        ])
+        .optional(),
+      hasDrinkPlans: zod.boolean().optional(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  totalPages: zod.number(),
 });
-export const ListMyVendorEventsResponse = zod.array(
-  ListMyVendorEventsResponseItem,
-);
 
 /**
  * @summary Create a booking

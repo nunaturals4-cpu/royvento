@@ -47,6 +47,7 @@ import type {
   ImportGooglePubBody,
   ImportGooglePubResponse,
   ListEventsParams,
+  ListMyVendorEvents200,
   ListMyVendorEventsParams,
   ListVendorBookings200,
   ListVendorBookingsParams,
@@ -2505,8 +2506,8 @@ export const getListMyVendorEventsUrl = (params?: ListMyVendorEventsParams) => {
 export const listMyVendorEvents = async (
   params?: ListMyVendorEventsParams,
   options?: RequestInit,
-): Promise<Event[]> => {
-  return customFetch<Event[]>(getListMyVendorEventsUrl(params), {
+): Promise<ListMyVendorEvents200> => {
+  return customFetch<ListMyVendorEvents200>(getListMyVendorEventsUrl(params), {
     ...options,
     method: "GET",
   });

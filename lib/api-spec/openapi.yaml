@@ -665,13 +665,23 @@ paths:
             default: 20
       responses:
         "200":
-          description: Events (array when no page param; paginated object when page param is present)
+          description: Paginated events
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Event"
+                type: object
+                required: [data, total, page, totalPages]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Event"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  totalPages:
+                    type: integer
 
   /bookings:
     post:

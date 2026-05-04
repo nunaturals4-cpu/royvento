@@ -68,6 +68,7 @@ export * from "./importGooglePubResponsePlaceOpeningHours";
 export * from "./listEventsDrinkPlanType";
 export * from "./listEventsPaginatedResponse";
 export * from "./listEventsParams";
+export * from "./listMyVendorEvents200";
 export * from "./listMyVendorEventsParams";
 export * from "./listVendorBookings200";
 export * from "./listVendorBookingsParams";

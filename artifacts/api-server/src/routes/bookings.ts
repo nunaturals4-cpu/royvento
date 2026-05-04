@@ -794,6 +794,63 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
   });
 });
 
+router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  const vendor = vRows[0];
+  if (!vendor) {
+    res.json({ totalBookings: 0, totalRevenue: 0, totalGuests: 0, countConfirmed: 0, countCompleted: 0, countCancelled: 0, countPending: 0, monthlyRevenue: [], monthlyTrend: [], perEvent: [] });
+    return;
+  }
+  const rawFrom = String(req.query["from"] ?? "");
+  const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(rawFrom) ? rawFrom : null;
+  const baseWhere = fromDate
+    ? and(eq(bookingsTable.vendorId, vendor.id), gte(bookingsTable.bookingDate, fromDate))
+    : eq(bookingsTable.vendorId, vendor.id);
+  const confirmedStatuses = ["confirmed", "completed"] as const;
+  const [statsRows, monthlyRevenueRows, monthlyTrendRows, perEventRows] = await Promise.all([
+    db.select({
+      totalBookings: sql<number>`count(*)::int`,
+      countConfirmed: sql<number>`count(*) filter (where ${bookingsTable.status} = 'confirmed')::int`,
+      countCompleted: sql<number>`count(*) filter (where ${bookingsTable.status} = 'completed')::int`,
+      countCancelled: sql<number>`count(*) filter (where ${bookingsTable.status} = 'cancelled')::int`,
+      countPending: sql<number>`count(*) filter (where ${bookingsTable.status} = 'pending')::int`,
+      totalRevenue: sql<number>`coalesce(sum(case when ${bookingsTable.status} in ('confirmed','completed') then coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0) else 0 end),0)::int`,
+      totalGuests: sql<number>`coalesce(sum(case when ${bookingsTable.status} in ('confirmed','completed') then coalesce(${bookingsTable.ticketWomen},0)+coalesce(${bookingsTable.ticketMen},0)+coalesce(${bookingsTable.ticketCouple},0) else 0 end),0)::int`,
+    }).from(bookingsTable).where(baseWhere),
+    db.select({
+      month: sql<string>`substring(${bookingsTable.bookingDate},1,7)`,
+      revenue: sql<number>`coalesce(sum(coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0)),0)::int`,
+    }).from(bookingsTable)
+      .where(and(baseWhere, inArray(bookingsTable.status, [...confirmedStatuses])))
+      .groupBy(sql`substring(${bookingsTable.bookingDate},1,7)`)
+      .orderBy(sql`substring(${bookingsTable.bookingDate},1,7)`),
+    db.select({
+      month: sql<string>`substring(${bookingsTable.bookingDate},1,7)`,
+      confirmed: sql<number>`count(*) filter (where ${bookingsTable.status} in ('confirmed','completed'))::int`,
+      cancelled: sql<number>`count(*) filter (where ${bookingsTable.status} = 'cancelled')::int`,
+    }).from(bookingsTable).where(baseWhere)
+      .groupBy(sql`substring(${bookingsTable.bookingDate},1,7)`)
+      .orderBy(sql`substring(${bookingsTable.bookingDate},1,7)`),
+    db.select({
+      eventId: bookingsTable.eventId,
+      eventTitle: eventsTable.title,
+      bookingCount: sql<number>`count(*)::int`,
+      ticketWomen: sql<number>`coalesce(sum(${bookingsTable.ticketWomen}),0)::int`,
+      ticketMen: sql<number>`coalesce(sum(${bookingsTable.ticketMen}),0)::int`,
+      ticketCouple: sql<number>`coalesce(sum(${bookingsTable.ticketCouple}),0)::int`,
+      revenue: sql<number>`coalesce(sum(coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0)),0)::int`,
+    }).from(bookingsTable)
+      .leftJoin(eventsTable, eq(bookingsTable.eventId, eventsTable.id))
+      .where(and(baseWhere, inArray(bookingsTable.status, [...confirmedStatuses])))
+      .groupBy(bookingsTable.eventId, eventsTable.title)
+      .orderBy(desc(sql`coalesce(sum(coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0)),0)`)),
+  ]);
+  const stats = statsRows[0] ?? { totalBookings: 0, countConfirmed: 0, countCompleted: 0, countCancelled: 0, countPending: 0, totalRevenue: 0, totalGuests: 0 };
+  res.json({ ...stats, monthlyRevenue: monthlyRevenueRows, monthlyTrend: monthlyTrendRows, perEvent: perEventRows });
+});
+
 router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) {

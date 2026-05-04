@@ -863,6 +863,13 @@ export type ListMyVendorEventsParams = {
   limit?: number;
 };
 
+export type ListMyVendorEvents200 = {
+  data: Event[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
 export type ListVendorBookingsParams = {
   page?: number;
   limit?: number;

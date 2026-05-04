@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch, useRoute } from "wouter";
 import {
   useGetMyVendor,
@@ -60,14 +61,9 @@ export function VendorDashboard() {
   const initialTab = new URLSearchParams(search).get("tab") ?? "overview";
   const { data: vendorData, refetch: refetchVendor } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
-  const { data: events = [], refetch: refetchEvents } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
-  const { data: bookingsResp, refetch: refetchBookings } = useListVendorBookings(
-    { page: 1, limit: 500 },
-    { query: { enabled: !!vendor } as any },
-  );
-  const bookings = bookingsResp?.data ?? [];
-
-  const hasPub = (events as any[]).some((e: any) => e.type === "pub");
+  const { data: eventsResp, refetch: refetchEvents } = useListMyVendorEvents(undefined, { query: { enabled: !!vendor } as any });
+  const events = eventsResp?.data ?? [];
+  const hasPub = events.some((e: any) => e.type === "pub");
 
   const [bookTablePage, setBookTablePage] = useState(1);
 
@@ -125,12 +121,12 @@ export function VendorDashboard() {
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} /></TabsContent>
-          <TabsContent value="bookings"><BookingReport bookings={bookings} refetch={refetchBookings} bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
+          <TabsContent value="bookings"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
           <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
           <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
           <TabsContent value="ads"><AdsPanel /></TabsContent>
           <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
-          <TabsContent value="leads"><LeadsPanel bookings={bookings} /></TabsContent>
+          <TabsContent value="leads"><LeadsPanel /></TabsContent>
           <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
           <TabsContent value="attendance"><AttendancePanel /></TabsContent>
           <TabsContent value="managers"><ManagersPanel /></TabsContent>
@@ -1591,8 +1587,8 @@ export function VendorListingEditPage() {
   const [, navigate] = useLocation();
   const { data: vendorData, isLoading: vendorLoading } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
-  const { data: events = [], isLoading: eventsLoading } = useListMyVendorEvents({ query: { enabled: !!vendor } as any });
-  const event = (events as any[]).find((e: any) => e.id === eventId) ?? null;
+  const { data: eventsResp2, isLoading: eventsLoading } = useListMyVendorEvents(undefined, { query: { enabled: !!vendor } as any });
+  const event = (eventsResp2?.data ?? []).find((e: any) => e.id === eventId) ?? null;
   const loading = vendorLoading || eventsLoading;
 
   const goBack = () => navigate("/dashboard/vendor?tab=events");
@@ -1644,7 +1640,15 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
 
 const BR_PAGE_SIZE = 20;
 
-function BookingReport({ bookings, refetch: _refetch, bookTablePage, setBookTablePage }: { bookings: any[]; refetch: () => void; bookTablePage: number; setBookTablePage: React.Dispatch<React.SetStateAction<number>> }) {
+interface VendorBookingSummary {
+  totalBookings: number; totalRevenue: number; totalGuests: number;
+  countConfirmed: number; countCompleted: number; countCancelled: number; countPending: number;
+  monthlyRevenue: { month: string; revenue: number }[];
+  monthlyTrend: { month: string; confirmed: number; cancelled: number }[];
+  perEvent: { eventId: number | null; eventTitle: string | null; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }[];
+}
+
+function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: number; setBookTablePage: React.Dispatch<React.SetStateAction<number>> }) {
   const [preset, setPreset] = useState<ReportPreset>("12m");
 
   const now = new Date();
@@ -1656,59 +1660,24 @@ function BookingReport({ bookings, refetch: _refetch, bookTablePage, setBookTabl
   })();
   const startStr = toReportDateStr(startDate);
 
-  // Dedicated server-paginated fetch for the "All bookings" table — respects the preset's from date
+  const { data: summary } = useQuery<VendorBookingSummary>({
+    queryKey: ["vendor-booking-summary", startStr],
+    queryFn: () => apiGet<VendorBookingSummary>(`/api/bookings/vendor/summary?from=${encodeURIComponent(startStr)}`),
+  });
+
   const { data: tableResp } = useListVendorBookings({ page: bookTablePage, limit: BR_PAGE_SIZE, from: startStr });
 
-  const filtered = bookings.filter((b) => b.bookingDate >= startStr);
-  const confirmed = filtered.filter((b) => b.status === "confirmed" || b.status === "completed");
-
-  const totalBookings = filtered.length;
-  const totalRevenue = confirmed.reduce((s: number, b: any) => s + ((b.finalPrice ?? b.totalPrice) ?? 0), 0);
-  const totalGuests = confirmed.reduce((s: number, b: any) => s + ((b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0)), 0);
-
-  const countConfirmed = filtered.filter((b) => b.status === "confirmed").length;
-  const countCompleted = filtered.filter((b) => b.status === "completed").length;
-  const countCancelled = filtered.filter((b) => b.status === "cancelled").length;
-  const countPending = filtered.filter((b) => b.status === "pending").length;
-
+  const totalBookings = summary?.totalBookings ?? 0;
+  const totalRevenue = summary?.totalRevenue ?? 0;
+  const totalGuests = summary?.totalGuests ?? 0;
+  const countConfirmed = summary?.countConfirmed ?? 0;
+  const countCompleted = summary?.countCompleted ?? 0;
+  const countCancelled = summary?.countCancelled ?? 0;
+  const countPending = summary?.countPending ?? 0;
   const cancellationRate = totalBookings > 0 ? Math.round((countCancelled / totalBookings) * 100) : 0;
-
-  const monthMap: Record<string, number> = {};
-  confirmed.forEach((b) => {
-    const month = (b.bookingDate as string).slice(0, 7);
-    monthMap[month] = (monthMap[month] ?? 0) + ((b.finalPrice ?? b.totalPrice) ?? 0);
-  });
-  const monthlyData = Object.entries(monthMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, revenue]) => ({ month, revenue }));
-
-  const trendMap: Record<string, { confirmed: number; cancelled: number }> = {};
-  filtered.forEach((b) => {
-    const month = (b.bookingDate as string).slice(0, 7);
-    if (!trendMap[month]) trendMap[month] = { confirmed: 0, cancelled: 0 };
-    if (b.status === "confirmed" || b.status === "completed") {
-      trendMap[month].confirmed += 1;
-    } else if (b.status === "cancelled") {
-      trendMap[month].cancelled += 1;
-    }
-  });
-  const monthlyTrendData = Object.entries(trendMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, counts]) => ({ month, confirmed: counts.confirmed, cancelled: counts.cancelled }));
-
-  const eventMap: Record<number, { eventId: number; eventTitle: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }> = {};
-  confirmed.forEach((b) => {
-    if (!eventMap[b.eventId]) {
-      eventMap[b.eventId] = { eventId: b.eventId, eventTitle: b.eventTitle, bookingCount: 0, ticketWomen: 0, ticketMen: 0, ticketCouple: 0, revenue: 0 };
-    }
-    eventMap[b.eventId].bookingCount += 1;
-    eventMap[b.eventId].ticketWomen += b.ticketWomen ?? 0;
-    eventMap[b.eventId].ticketMen += b.ticketMen ?? 0;
-    eventMap[b.eventId].ticketCouple += b.ticketCouple ?? 0;
-    eventMap[b.eventId].revenue += (b.finalPrice ?? b.totalPrice) ?? 0;
-  });
-  const perEvent = Object.values(eventMap).sort((a, b) => b.revenue - a.revenue);
-
+  const monthlyData = summary?.monthlyRevenue ?? [];
+  const monthlyTrendData = summary?.monthlyTrend ?? [];
+  const perEvent = summary?.perEvent ?? [];
   const chartMax = Math.max(...monthlyData.map((m) => m.revenue), 1);
 
   const presetLabel: Record<ReportPreset, string> = {
@@ -1787,17 +1756,11 @@ function BookingReport({ bookings, refetch: _refetch, bookTablePage, setBookTabl
         </div>
       )}
 
-      {bookings.length === 0 ? (
+      {totalBookings === 0 ? (
         <div className="rounded-3xl glass-card p-10 text-center">
           <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-40" />
-          <p className="font-serif text-2xl mb-2">No bookings yet</p>
-          <p className="text-muted-foreground text-sm">Your booking report will appear here once guests start booking your events.</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-3xl glass-card p-10 text-center">
-          <CalendarCheck className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-40" />
-          <p className="font-serif text-2xl mb-2">No bookings in this period</p>
-          <p className="text-muted-foreground text-sm">Try a wider time range to see your booking history.</p>
+          <p className="font-serif text-2xl mb-2">{summary ? "No bookings in this period" : "Loading…"}</p>
+          <p className="text-muted-foreground text-sm">{summary ? "Try a wider time range to see your booking history." : ""}</p>
         </div>
       ) : (
         <>
@@ -1889,7 +1852,7 @@ function BookingReport({ bookings, refetch: _refetch, bookTablePage, setBookTabl
           )}
 
           {/* All bookings table with pagination */}
-          {filtered.length > 0 && (
+          {totalBookings > 0 && (
             <div className="rounded-2xl glass-card p-6">
               <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                 <h3 className="font-serif text-xl">All bookings</h3>
@@ -3131,7 +3094,9 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
   );
 }
 
-function LeadsPanel({ bookings }: { bookings: any[] }) {
+function LeadsPanel() {
+  const { data: bookingsResp } = useListVendorBookings({ page: 1, limit: 200 });
+  const bookings = bookingsResp?.data ?? [];
   const [data, setData] = useState<Lead | null>(null);
   const [sentCodes, setSentCodes] = useState<Record<number, string>>({});
   const [sendingId, setSendingId] = useState<number | null>(null);
