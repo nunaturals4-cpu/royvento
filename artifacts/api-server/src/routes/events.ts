@@ -285,8 +285,8 @@ router.get("/events/vendor/me", requireAuth(["vendor"]), async (req, res) => {
     return;
   }
 
-  const page = Math.max(1, Number(req.query["page"] ?? 1));
-  const limit = Math.max(1, Math.min(Number(req.query["limit"] ?? 500), 500));
+  const page = Math.max(1, Number(req.query["page"]) || 1);
+  const limit = Math.max(1, Math.min(Number(req.query["limit"]) || 500, 500));
   const [countRow, rows] = await Promise.all([
     db.select({ c: sql<number>`count(*)::int` }).from(eventsTable).where(eq(eventsTable.vendorId, vendor.id)),
     db.select().from(eventsTable).where(eq(eventsTable.vendorId, vendor.id)).orderBy(desc(eventsTable.createdAt)).limit(limit).offset((page - 1) * limit),

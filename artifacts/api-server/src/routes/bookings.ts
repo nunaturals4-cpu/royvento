@@ -706,7 +706,7 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
 
   const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
   const vendor = vRows[0];
-  if (!vendor) { res.json({ rows: [], stats: { total: 0, checkedIn: 0, notArrived: 0 }, total: 0, page: 1, totalPages: 0 }); return; }
+  if (!vendor) { res.json({ rows: [], stats: { total: 0, checkedIn: 0, notArrived: 0 }, total: 0, page: 1, totalPages: 1 }); return; }
 
   const page = Math.max(1, Number(req.query["page"]) || 1);
   const offset = (page - 1) * PARTNER_CHECKIN_PAGE_SIZE;
@@ -864,7 +864,7 @@ router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
     .limit(1);
   const vendor = vRows[0];
   if (!vendor) {
-    res.json({ data: [], total: 0, page: 1, totalPages: 0 });
+    res.json({ data: [], total: 0, page: 1, totalPages: 1 });
     return;
   }
 

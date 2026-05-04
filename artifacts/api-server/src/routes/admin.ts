@@ -220,8 +220,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const pvPage = Math.max(1, Number(req.query["page"] ?? 1));
-  const pvLimit = Math.max(1, Number(req.query["limit"] ?? 10));
+  const pvPage = Math.max(1, Number(req.query["page"]) || 1);
+  const pvLimit = Math.max(1, Number(req.query["limit"]) || 10);
   const pvTotal = perVendor.length;
   const pvTotalPages = Math.max(1, Math.ceil(pvTotal / pvLimit));
   const pvSafePage = Math.min(pvPage, pvTotalPages);
@@ -667,7 +667,7 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
       .from(usersTable)
       .where(sql`lower(${usersTable.name}) LIKE ${likeStr} OR lower(${usersTable.email}) LIKE ${likeStr}`);
     if (matchingUsers.length === 0) {
-      res.json({ bookings: [], total: 0, page: pageNum, totalPages: 0 });
+      res.json({ bookings: [], total: 0, page: pageNum, totalPages: 1 });
       return;
     }
     conditions.push(inArray(bookingsTable.userId, matchingUsers.map((u) => u.id)));
