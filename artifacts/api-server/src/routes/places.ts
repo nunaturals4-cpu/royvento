@@ -14,20 +14,20 @@ const autocompleteCache = new TtlCache<AutocompleteResult>();
 const detailsCache      = new TtlCache<DetailsResult>();
 
 router.get("/places/autocomplete", requireAuth(["vendor", "admin"]), async (req, res) => {
-  const q = String(req.query.q ?? "").trim();
+  const q = String(req.query.q ?? "").trim().toLowerCase();
   if (q.length < 3) {
     res.json([]);
+    return;
+  }
+  const cached = autocompleteCache.get(q);
+  if (cached) {
+    res.json(cached);
     return;
   }
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
     req.log.warn("GOOGLE_PLACES_API_KEY is not configured");
     res.status(503).json({ error: "Address autocomplete is not configured" });
-    return;
-  }
-  const cached = autocompleteCache.get(q);
-  if (cached) {
-    res.json(cached);
     return;
   }
   try {
@@ -70,15 +70,15 @@ router.get("/places/details", requireAuth(["vendor", "admin"]), async (req, res)
     res.status(400).json({ error: "place_id is required" });
     return;
   }
+  const cachedDetail = detailsCache.get(placeId);
+  if (cachedDetail) {
+    res.json(cachedDetail);
+    return;
+  }
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
     req.log.warn("GOOGLE_PLACES_API_KEY is not configured");
     res.status(503).json({ error: "Address lookup is not configured" });
-    return;
-  }
-  const cachedDetail = detailsCache.get(placeId);
-  if (cachedDetail) {
-    res.json(cachedDetail);
     return;
   }
   try {
