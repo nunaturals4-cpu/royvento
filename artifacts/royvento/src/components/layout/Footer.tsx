@@ -1,5 +1,7 @@
 import { Link } from "wouter";
 import { Crown } from "lucide-react";
+import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 
 export function Footer() {
   return (
@@ -46,12 +48,16 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t">
-        <div className="container mx-auto px-4 md:px-6 py-5 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="container mx-auto px-4 md:px-6 py-5 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>© {new Date().getFullYear()} Royvento. Crafted with care.</span>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap justify-center sm:justify-end">
             <Link href="/terms" className="hover:text-foreground">Terms</Link>
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            <span className="font-serif italic">Designed for hosts who notice the details.</span>
+            <span className="font-serif italic hidden sm:inline">Designed for hosts who notice the details.</span>
+            <div className="flex items-center gap-2">
+              <ThemeSwitcher />
+              <LanguageSwitcher />
+            </div>
           </div>
         </div>
       </div>

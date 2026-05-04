@@ -8,12 +8,10 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
-import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Palette, Check } from "lucide-react";
-import { useTheme, type Theme } from "@/components/ThemeProvider";
+import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
 
 interface Notification {
@@ -22,52 +20,6 @@ interface Notification {
   message: string;
   isRead: boolean;
   createdAt: string;
-}
-
-const THEMES: { id: Theme; label: string; color: string }[] = [
-  { id: "noir", label: "Midnight Noir", color: "#dc2626" },
-  { id: "gold", label: "Royal Gold",    color: "#D4A017" },
-  { id: "dusk", label: "Velvet Dusk",   color: "#dc5078" },
-];
-
-function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
-  const current = THEMES.find((t) => t.id === theme) ?? THEMES[0]!;
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="flex items-center gap-1.5 h-9 px-2.5 rounded-md border border-border bg-card/60 hover:border-primary/40 hover:bg-card/80 transition-colors text-sm"
-          aria-label="Change theme"
-        >
-          <span
-            className="h-3.5 w-3.5 rounded-full shrink-0"
-            style={{ background: current.color }}
-          />
-          <Palette className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44 glass-card-strong">
-        <DropdownMenuLabel className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Theme</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {THEMES.map((t) => (
-          <DropdownMenuItem
-            key={t.id}
-            onClick={() => setTheme(t.id)}
-            className="flex items-center gap-2.5 cursor-pointer"
-          >
-            <span
-              className="h-3.5 w-3.5 rounded-full shrink-0"
-              style={{ background: t.color }}
-            />
-            <span className="flex-1">{t.label}</span>
-            {theme === t.id && <Check className="h-3.5 w-3.5 text-primary" />}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }
 
 export function Navbar() {
@@ -224,9 +176,6 @@ export function Navbar() {
               </span>
               <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
             </button>
-
-            <span className="hidden lg:contents"><ThemeSwitcher /></span>
-            <span className="hidden lg:contents"><LanguageSwitcher /></span>
 
             {user && (
               <div className="relative" ref={notifRef}>
@@ -427,18 +376,6 @@ export function Navbar() {
                   </Link>
                 ))}
               </nav>
-
-              {/* Theme switcher */}
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-muted-foreground mb-2.5 font-medium uppercase tracking-wider">{t("nav.theme")}</p>
-                <ThemeSwitcher />
-              </div>
-
-              {/* Language switcher */}
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">{t("nav.language")}</p>
-                <LanguageSwitcher />
-              </div>
 
               {/* Mobile auth — logged-out only */}
               {!user && (
