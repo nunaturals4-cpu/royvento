@@ -1,4 +1,4 @@
-import { db, eventsTable, announcementsTable, vendorsTable, usersTable } from "@workspace/db";
+import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable } from "@workspace/db";
 import { and, ne, sql, lt, gte, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -188,8 +188,34 @@ export async function warnPartnersAboutUpcomingDeletion(): Promise<void> {
   }
 }
 
+// SAFETY GUARD: This cleanup job only touches events, announcements, and
+// notifications. Vendor/pub listings (vendorsTable), user accounts, bookings,
+// and all other business records are NEVER deleted by any function here.
+// Do not add any delete operation against vendorsTable or usersTable.
+
+const NOTIFICATION_MAX_AGE_DAYS = 60;
+
+export async function deleteOldNotifications(): Promise<void> {
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - NOTIFICATION_MAX_AGE_DAYS);
+
+    const result = await db
+      .delete(notificationsTable)
+      .where(lt(notificationsTable.createdAt, cutoff))
+      .returning({ id: notificationsTable.id });
+
+    if (result.length > 0) {
+      logger.info({ count: result.length }, "Cleanup: deleted old notifications");
+    }
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to delete old notifications");
+  }
+}
+
 export async function runCleanup(): Promise<void> {
   await warnPartnersAboutUpcomingDeletion();
   await deletePastEvents();
   await deleteExpiredAnnouncements();
+  await deleteOldNotifications();
 }
