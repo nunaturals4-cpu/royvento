@@ -10,6 +10,8 @@ export * from "./addToWishlistBody";
 export * from "./adminAnalytics";
 export * from "./adminAnalyticsBookingsByStatusItem";
 export * from "./adminAnalyticsMonthlyRevenueItem";
+export * from "./adminAnalyticsPerVendorPaginated";
+export * from "./adminAnalyticsPerVendorPaginatedDataItem";
 export * from "./adminAnalyticsTopVendorsItem";
 export * from "./adminBookingReportResponse";
 export * from "./adminBookingRow";

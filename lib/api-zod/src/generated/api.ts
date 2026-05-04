@@ -2045,6 +2045,8 @@ export const GetAdminLeadsSummaryResponse = zod.object({
 export const GetAdminAnalyticsQueryParams = zod.object({
   startDate: zod.coerce.string().optional(),
   endDate: zod.coerce.string().optional(),
+  perVendorPage: zod.coerce.number().optional(),
+  perVendorLimit: zod.coerce.number().optional(),
 });
 
 export const GetAdminAnalyticsResponse = zod.object({
@@ -2118,6 +2120,24 @@ export const GetAdminAnalyticsResponse = zod.object({
       revenue: zod.number(),
     }),
   ),
+  perVendorPaginated: zod
+    .object({
+      data: zod.array(
+        zod.object({
+          vendorId: zod.number(),
+          vendorName: zod.string(),
+          bookingCount: zod.number(),
+          ticketWomen: zod.number(),
+          ticketMen: zod.number(),
+          ticketCouple: zod.number(),
+          revenue: zod.number(),
+        }),
+      ),
+      total: zod.number(),
+      page: zod.number(),
+      totalPages: zod.number(),
+    })
+    .optional(),
 });
 
 /**

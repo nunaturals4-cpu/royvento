@@ -281,9 +281,29 @@ router.get("/events/vendor/me", requireAuth(["vendor"]), async (req, res) => {
     .limit(1);
   const vendor = vrows[0];
   if (!vendor) {
-    res.json([]);
+    // Return empty paginated response when page param present, else empty array
+    if (req.query["page"]) {
+      res.json({ data: [], total: 0, page: 1, totalPages: 1 });
+    } else {
+      res.json([]);
+    }
     return;
   }
+
+  // Paginated mode when ?page is supplied (used by mobile infinite scroll)
+  if (req.query["page"]) {
+    const page = Math.max(1, Number(req.query["page"] ?? 1));
+    const limit = Math.max(1, Number(req.query["limit"] ?? 20));
+    const [countRow, rows] = await Promise.all([
+      db.select({ c: sql<number>`count(*)::int` }).from(eventsTable).where(eq(eventsTable.vendorId, vendor.id)),
+      db.select().from(eventsTable).where(eq(eventsTable.vendorId, vendor.id)).orderBy(desc(eventsTable.createdAt)).limit(limit).offset((page - 1) * limit),
+    ]);
+    const total = countRow[0]?.c ?? 0;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    res.json({ data: await serializeEvents(rows), total, page, totalPages });
+    return;
+  }
+
   const rows = await db
     .select()
     .from(eventsTable)

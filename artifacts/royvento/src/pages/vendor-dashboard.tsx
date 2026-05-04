@@ -1646,6 +1646,9 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
   const [preset, setPreset] = useState<ReportPreset>("12m");
   const [bookTablePage, setBookTablePage] = useState(1);
 
+  // Dedicated server-paginated fetch for the "All bookings" table
+  const { data: tableResp } = useListVendorBookings({ page: bookTablePage, limit: BR_PAGE_SIZE });
+
   const now = new Date();
   const startDate = (() => {
     if (preset === "30d") return new Date(now.getTime() - 30 * 86400000);
@@ -1713,10 +1716,10 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
     "12m": "Last 12 months",
   };
 
-  const sortedFiltered = [...filtered].sort((a: any, b: any) => b.id - a.id);
-  const brTotalPages = Math.max(1, Math.ceil(sortedFiltered.length / BR_PAGE_SIZE));
-  const safeBrPage = Math.min(bookTablePage, brTotalPages);
-  const brPageRows = sortedFiltered.slice((safeBrPage - 1) * BR_PAGE_SIZE, safeBrPage * BR_PAGE_SIZE);
+  const brPageRows = tableResp?.data ?? [];
+  const brTotalPages = tableResp?.totalPages ?? 1;
+  const safeBrPage = tableResp?.page ?? 1;
+  const brTableTotal = tableResp?.total ?? 0;
 
   return (
     <div className="space-y-6">
@@ -1890,7 +1893,7 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
               <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                 <h3 className="font-serif text-xl">All bookings</h3>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {sortedFiltered.length} booking{sortedFiltered.length !== 1 ? "s" : ""}
+                  {brTableTotal} booking{brTableTotal !== 1 ? "s" : ""}
                 </span>
               </div>
               <div className="overflow-x-auto">
@@ -1938,7 +1941,7 @@ function BookingReport({ bookings, refetch: _refetch }: { bookings: any[]; refet
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
                   <Button variant="outline" size="sm" disabled={safeBrPage <= 1} onClick={() => setBookTablePage((p) => p - 1)}>← Prev</Button>
                   <span className="text-xs text-muted-foreground">
-                    {(safeBrPage - 1) * BR_PAGE_SIZE + 1}–{Math.min(safeBrPage * BR_PAGE_SIZE, sortedFiltered.length)} of {sortedFiltered.length}
+                    {(safeBrPage - 1) * BR_PAGE_SIZE + 1}–{Math.min(safeBrPage * BR_PAGE_SIZE, brTableTotal)} of {brTableTotal}
                   </span>
                   <Button variant="outline" size="sm" disabled={safeBrPage >= brTotalPages} onClick={() => setBookTablePage((p) => p + 1)}>Next →</Button>
                 </div>

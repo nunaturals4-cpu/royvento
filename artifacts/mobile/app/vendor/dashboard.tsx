@@ -4,12 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   customFetch,
   getGetMyVendorQueryKey,
-  getListMyVendorEventsQueryKey,
   useCreateEvent,
   useDeleteEvent,
   useGetMyVendor,
   useGetPartnerCheckinReport,
-  useListMyVendorEvents,
   useUpdateBookingStatus,
   useUpdateEvent,
   useUpdateMyVendor,
@@ -798,9 +796,32 @@ export default function VendorDashboardScreen() {
     }
   }, []);
 
-  const eventsQ = useListMyVendorEvents({
-    query: { queryKey: getListMyVendorEventsQueryKey(), enabled: isVendorOrAdmin },
-  });
+  const EVENT_PAGE_LIMIT = 20;
+  const [eventItems, setEventItems] = useState<any[]>([]);
+  const [eventPage, setEventPage] = useState(1);
+  const [eventTotal, setEventTotal] = useState(0);
+  const [eventLoading, setEventLoading] = useState(false);
+  const [eventFetching, setEventFetching] = useState(false);
+
+  const loadEvents = useCallback(async (pg: number, reset = false) => {
+    if (pg === 1) setEventLoading(true);
+    else setEventFetching(true);
+    try {
+      const resp = await customFetch<{ data: any[]; total: number; page: number; totalPages: number }>(
+        `/api/events/vendor/me?page=${pg}&limit=${EVENT_PAGE_LIMIT}`,
+      );
+      const newItems = (resp as any)?.data ?? [];
+      setEventTotal((resp as any)?.total ?? 0);
+      setEventItems((prev) => (reset || pg === 1) ? newItems : [...prev, ...newItems]);
+      setEventPage(pg);
+    } catch {
+      // silent
+    } finally {
+      setEventLoading(false);
+      setEventFetching(false);
+    }
+  }, []);
+
   const updateStatus = useUpdateBookingStatus({
     mutation: {
       onSuccess: () => {
@@ -811,8 +832,17 @@ export default function VendorDashboardScreen() {
   });
 
   useEffect(() => {
-    if (isVendorOrAdmin) loadBookings(1, true);
-  }, [isVendorOrAdmin, loadBookings]);
+    if (isVendorOrAdmin) {
+      loadBookings(1, true);
+      loadEvents(1, true);
+    }
+  }, [isVendorOrAdmin, loadBookings, loadEvents]);
+
+  const onEventEndReached = useCallback(() => {
+    const hasMore = eventItems.length < eventTotal;
+    if (!hasMore || eventFetching || eventLoading) return;
+    loadEvents(eventPage + 1);
+  }, [eventItems.length, eventTotal, eventFetching, eventLoading, eventPage, loadEvents]);
 
   const onBookingEndReached = useCallback(() => {
     const hasMore = bookingItems.length < bookingTotal;
@@ -829,7 +859,7 @@ export default function VendorDashboardScreen() {
   const createEventMut = useCreateEvent({
     mutation: {
       onSuccess: () => {
-        eventsQ.refetch();
+        loadEvents(1, true);
         setShowCreateModal(false);
         setCreateForm({ ...DEFAULT_EVENT_FORM });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -918,7 +948,7 @@ export default function VendorDashboardScreen() {
   const updateEventMut = useUpdateEvent({
     mutation: {
       onSuccess: () => {
-        eventsQ.refetch();
+        loadEvents(1, true);
         setEditingEvent(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
@@ -989,7 +1019,7 @@ export default function VendorDashboardScreen() {
   // ─── Delete event ────────────────────────────────────────────────────────────
   const deleteEventMut = useDeleteEvent({
     mutation: {
-      onSuccess: () => eventsQ.refetch(),
+      onSuccess: () => loadEvents(1, true),
       onError: () => Alert.alert("Error", "Failed to delete listing. Please try again."),
     },
   });
@@ -1589,19 +1619,21 @@ export default function VendorDashboardScreen() {
   }
 
   function renderEvents() {
-    if (eventsQ.isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
-    const evList = eventsQ.data ?? [];
-    const hasPub = evList.some((e: any) => e.type === "pub");
+    if (eventLoading && eventItems.length === 0) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
+    const hasPub = eventItems.some((e: any) => e.type === "pub");
     return (
       <FlatList
-        data={evList}
+        data={eventItems}
         keyExtractor={(e) => String(e.id)}
         ListEmptyComponent={
           <EmptyState icon="calendar-outline" title="No listings yet" subtitle="Create your first event or pub listing" />
         }
         contentContainerStyle={[styles.list, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }]}
-        onRefresh={eventsQ.refetch}
-        refreshing={eventsQ.isLoading}
+        onRefresh={() => loadEvents(1, true)}
+        refreshing={eventLoading && eventItems.length > 0}
+        onEndReached={onEventEndReached}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={eventFetching ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} /> : null}
         ListHeaderComponent={
           !hasPub ? (
             <TouchableOpacity
@@ -2945,7 +2977,7 @@ export default function VendorDashboardScreen() {
           {[
             { icon: "hourglass-outline" as const, value: pending.length, label: "Pending" },
             { icon: "checkmark-circle-outline" as const, value: allBookings.filter((b) => b.status === "confirmed").length, label: "Confirmed" },
-            { icon: "calendar-outline" as const, value: (eventsQ.data ?? []).length, label: "Listings" },
+            { icon: "calendar-outline" as const, value: eventTotal, label: "Listings" },
           ].map((s) => (
             <View key={s.label} style={[styles.stat, { backgroundColor: colors.muted }]}>
               <Ionicons name={s.icon} size={18} color={colors.primary} />

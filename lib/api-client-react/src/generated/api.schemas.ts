@@ -392,6 +392,23 @@ export type AdminAnalyticsMonthlyRevenueItem = {
   revenue: number;
 };
 
+export type AdminAnalyticsPerVendorPaginatedDataItem = {
+  vendorId: number;
+  vendorName: string;
+  bookingCount: number;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  revenue: number;
+};
+
+export type AdminAnalyticsPerVendorPaginated = {
+  data: AdminAnalyticsPerVendorPaginatedDataItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
 export interface AdminAnalytics {
   totalUsers: number;
   totalVendors: number;
@@ -405,6 +422,7 @@ export interface AdminAnalytics {
   recentBookings: Booking[];
   topVendors: AdminAnalyticsTopVendorsItem[];
   monthlyRevenue: AdminAnalyticsMonthlyRevenueItem[];
+  perVendorPaginated?: AdminAnalyticsPerVendorPaginated;
 }
 
 export interface ListEventsPaginatedResponse {
@@ -923,4 +941,6 @@ export type GetAdminAnalyticsParams = {
    * ISO date string (YYYY-MM-DD) for range end
    */
   endDate?: string;
+  perVendorPage?: number;
+  perVendorLimit?: number;
 };

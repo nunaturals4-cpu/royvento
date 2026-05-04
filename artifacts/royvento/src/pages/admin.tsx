@@ -146,7 +146,11 @@ function Analytics() {
     };
   })();
 
-  const { data, isLoading } = useGetAdminAnalytics(computedRange);
+  const { data, isLoading } = useGetAdminAnalytics({
+    ...computedRange,
+    perVendorPage,
+    perVendorLimit: ADMIN_PER_VENDOR_PAGE_SIZE,
+  });
 
   const adminData = (data ?? {}) as typeof data & {
     totalWomen?: number;
@@ -382,14 +386,15 @@ function Analytics() {
       </div>
 
       {/* Ticket sales by venue */}
-      {(adminData.perVendor ?? []).length > 0 && (() => {
-        const pvAll = adminData.perVendor ?? [];
-        const pvTotalPages = Math.max(1, Math.ceil(pvAll.length / ADMIN_PER_VENDOR_PAGE_SIZE));
-        const safePvPage = Math.min(perVendorPage, pvTotalPages);
-        const pvRows = pvAll.slice((safePvPage - 1) * ADMIN_PER_VENDOR_PAGE_SIZE, safePvPage * ADMIN_PER_VENDOR_PAGE_SIZE);
+      {(() => {
+        const pv = (adminData as any).perVendorPaginated as { data: NonNullable<typeof adminData>["perVendorPaginated"]["data"]; total: number; page: number; totalPages: number } | undefined;
+        if (!pv || pv.total === 0) return null;
         return (
           <div className="rounded-2xl glass-card p-6">
-            <h3 className="font-serif text-xl mb-4">Ticket sales by venue</h3>
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <h3 className="font-serif text-xl">Ticket sales by venue</h3>
+              <span className="text-xs text-muted-foreground">{pv.total} venue{pv.total !== 1 ? "s" : ""}</span>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[520px]">
                 <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
@@ -403,7 +408,7 @@ function Analytics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pvRows.map((row) => (
+                  {pv.data.map((row) => (
                     <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                       <td className="py-3 pr-4 font-medium">{row.vendorName}</td>
                       <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
@@ -416,11 +421,11 @@ function Analytics() {
                 </tbody>
               </table>
             </div>
-            {pvTotalPages > 1 && (
+            {pv.totalPages > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-                <Button variant="outline" size="sm" disabled={safePvPage <= 1} onClick={() => setPerVendorPage((p) => p - 1)}>← Prev</Button>
-                <span className="text-xs text-muted-foreground">Page {safePvPage} of {pvTotalPages} · {pvAll.length} venues</span>
-                <Button variant="outline" size="sm" disabled={safePvPage >= pvTotalPages} onClick={() => setPerVendorPage((p) => p + 1)}>Next →</Button>
+                <Button variant="outline" size="sm" disabled={pv.page <= 1} onClick={() => setPerVendorPage((p) => p - 1)}>← Prev</Button>
+                <span className="text-xs text-muted-foreground">Page {pv.page} of {pv.totalPages}</span>
+                <Button variant="outline" size="sm" disabled={pv.page >= pv.totalPages} onClick={() => setPerVendorPage((p) => p + 1)}>Next →</Button>
               </div>
             )}
           </div>
@@ -479,6 +484,8 @@ function AllVendorsAdmin() {
   const [vendors, setVendors] = useState<AdminVendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<AdminVendor>>({});
   const [saving, setSaving] = useState(false);
@@ -486,14 +493,21 @@ function AllVendorsAdmin() {
   const approve = useApproveVendor();
   const reject = useRejectVendor();
 
-  const load = () => {
+  const load = (pg = 1) => {
     setLoading(true);
-    apiGet<AdminVendor[]>("/api/admin/vendors")
-      .then(setVendors)
+    apiGet<{ data: AdminVendor[]; total: number; page: number; totalPages: number }>(
+      `/api/admin/vendors?page=${pg}&limit=${ADMIN_VENDOR_PAGE_SIZE}`,
+    )
+      .then((resp) => {
+        setVendors(resp.data);
+        setServerTotal(resp.total);
+        setServerTotalPages(resp.totalPages);
+        setPage(resp.page);
+      })
       .catch((e) => toast({ title: "Failed to load", description: e?.message, variant: "destructive" }))
       .finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(1); }, []);
 
   const startEdit = (v: AdminVendor) => {
     setEditingId(v.id);
@@ -506,7 +520,7 @@ function AllVendorsAdmin() {
       await apiPatch(`/api/admin/vendors/${id}`, editForm);
       toast({ title: "Partner updated" });
       setEditingId(null);
-      load();
+      load(page);
     } catch (e: any) {
       toast({ title: "Failed to save", description: e?.message, variant: "destructive" });
     } finally {
@@ -519,23 +533,19 @@ function AllVendorsAdmin() {
     try {
       await apiDelete(`/api/admin/vendors/${v.id}`);
       toast({ title: "Partner deleted" });
-      load();
+      load(page);
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
     }
   };
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (vendors.length === 0) return <p className="text-muted-foreground">No partners found.</p>;
-
-  const vendorTotalPages = Math.max(1, Math.ceil(vendors.length / ADMIN_VENDOR_PAGE_SIZE));
-  const safeVendorPage = Math.min(page, vendorTotalPages);
-  const pageVendors = vendors.slice((safeVendorPage - 1) * ADMIN_VENDOR_PAGE_SIZE, safeVendorPage * ADMIN_VENDOR_PAGE_SIZE);
+  if (vendors.length === 0 && serverTotal === 0) return <p className="text-muted-foreground">No partners found.</p>;
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{vendors.length} partner{vendors.length !== 1 ? "s" : ""} total</p>
-      {pageVendors.map((v) => (
+      <p className="text-sm text-muted-foreground">{serverTotal} partner{serverTotal !== 1 ? "s" : ""} total</p>
+      {vendors.map((v) => (
         <div key={v.id} className="rounded-2xl glass-card overflow-hidden">
           <div className="flex flex-col md:flex-row">
             {v.bannerImage && (
@@ -663,11 +673,11 @@ function AllVendorsAdmin() {
           )}
         </div>
       ))}
-      {vendorTotalPages > 1 && (
+      {serverTotalPages > 1 && (
         <div className="flex items-center justify-between pt-4 border-t border-white/10">
-          <Button variant="outline" size="sm" disabled={safeVendorPage <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</Button>
-          <span className="text-xs text-muted-foreground">Page {safeVendorPage} of {vendorTotalPages}</span>
-          <Button variant="outline" size="sm" disabled={safeVendorPage >= vendorTotalPages} onClick={() => setPage((p) => p + 1)}>Next →</Button>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => load(page - 1)}>← Prev</Button>
+          <span className="text-xs text-muted-foreground">Page {page} of {serverTotalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= serverTotalPages} onClick={() => load(page + 1)}>Next →</Button>
         </div>
       )}
     </div>

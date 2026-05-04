@@ -7,6 +7,7 @@
  */
 import type { AdminAnalyticsBookingsByStatusItem } from "./adminAnalyticsBookingsByStatusItem";
 import type { AdminAnalyticsMonthlyRevenueItem } from "./adminAnalyticsMonthlyRevenueItem";
+import type { AdminAnalyticsPerVendorPaginated } from "./adminAnalyticsPerVendorPaginated";
 import type { AdminAnalyticsTopVendorsItem } from "./adminAnalyticsTopVendorsItem";
 import type { Booking } from "./booking";
 
@@ -23,4 +24,5 @@ export interface AdminAnalytics {
   recentBookings: Booking[];
   topVendors: AdminAnalyticsTopVendorsItem[];
   monthlyRevenue: AdminAnalyticsMonthlyRevenueItem[];
+  perVendorPaginated?: AdminAnalyticsPerVendorPaginated;
 }

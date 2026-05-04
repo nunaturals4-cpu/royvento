@@ -220,6 +220,13 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
     .sort((a, b) => b.revenue - a.revenue);
 
+  const pvPage = Math.max(1, Number(req.query["perVendorPage"] ?? 1));
+  const pvLimit = Math.max(1, Number(req.query["perVendorLimit"] ?? 10));
+  const pvTotal = perVendor.length;
+  const pvTotalPages = Math.max(1, Math.ceil(pvTotal / pvLimit));
+  const pvSafePage = Math.min(pvPage, pvTotalPages);
+  const pvData = perVendor.slice((pvSafePage - 1) * pvLimit, pvSafePage * pvLimit);
+
   const { default: bookingsRouter } = await import("./bookings");
   void bookingsRouter;
 
@@ -304,7 +311,12 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalCouple,
     dailyRevenue: adminDailyRevenue,
     monthlyRevenue,
-    perVendor,
+    perVendorPaginated: {
+      data: pvData,
+      total: pvTotal,
+      page: pvSafePage,
+      totalPages: pvTotalPages,
+    },
   });
 });
 
@@ -440,14 +452,19 @@ router.get("/admin/users", requireAuth(["admin"]), async (_req, res) => {
 
 // ── Admin vendor management ──────────────────────────────────────────────────
 
-router.get("/admin/vendors", requireAuth(["admin"]), async (_req, res) => {
-  const rows = await db
-    .select()
-    .from(vendorsTable)
-    .orderBy(desc(vendorsTable.createdAt));
+router.get("/admin/vendors", requireAuth(["admin"]), async (req, res) => {
+  const page = Math.max(1, Number(req.query["page"] ?? 1));
+  const limit = Math.max(1, Number(req.query["limit"] ?? 20));
+
+  const [countRow, rows] = await Promise.all([
+    db.select({ c: sql<number>`count(*)::int` }).from(vendorsTable),
+    db.select().from(vendorsTable).orderBy(desc(vendorsTable.createdAt)).limit(limit).offset((page - 1) * limit),
+  ]);
+  const total = countRow[0]?.c ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   if (rows.length === 0) {
-    res.json([]);
+    res.json({ data: [], total, page, totalPages });
     return;
   }
 
@@ -467,8 +484,8 @@ router.get("/admin/vendors", requireAuth(["admin"]), async (_req, res) => {
     .where(sql`${usersTable.id} IN (${sql.join(userIds, sql`, `)})`);
   const uMap = new Map(users.map((u) => [u.id, u.email]));
 
-  res.json(
-    rows.map((v) => ({
+  res.json({
+    data: rows.map((v) => ({
       id: v.id,
       userId: v.userId,
       businessName: v.businessName,
@@ -484,7 +501,10 @@ router.get("/admin/vendors", requireAuth(["admin"]), async (_req, res) => {
       userEmail: uMap.get(v.userId) ?? "",
       createdAt: v.createdAt.toISOString(),
     })),
-  );
+    total,
+    page,
+    totalPages,
+  });
 });
 
 router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {

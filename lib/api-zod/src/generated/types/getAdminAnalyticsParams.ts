@@ -15,4 +15,6 @@ export type GetAdminAnalyticsParams = {
    * ISO date string (YYYY-MM-DD) for range end
    */
   endDate?: string;
+  perVendorPage?: number;
+  perVendorLimit?: number;
 };
