@@ -3746,12 +3746,35 @@ function SettlementsAdmin() {
                     <span className="text-primary font-semibold tabular-nums">{formatINR(Number(r.amount))}</span>
                   </div>
                 </div>
-                {r.bankingDetails && (
-                  <div className="rounded-lg bg-white/5 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
-                    <p><span className="text-foreground/70 font-medium">Account Holder:</span> {r.bankingDetails.accountHolderName}</p>
-                    <p><span className="text-foreground/70 font-medium">Bank:</span> {r.bankingDetails.bankName}</p>
-                    <p><span className="text-foreground/70 font-medium">Account No:</span> {r.bankingDetails.accountNumber}</p>
-                    <p><span className="text-foreground/70 font-medium">IFSC:</span> {r.bankingDetails.ifscCode}</p>
+                {r.bankingDetails ? (
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <CreditCard className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-primary">Banking Details</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Account Holder</span>
+                        <p className="font-semibold text-foreground mt-0.5">{r.bankingDetails.accountHolderName}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Bank</span>
+                        <p className="font-semibold text-foreground mt-0.5">{r.bankingDetails.bankName}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Account No.</span>
+                        <p className="font-mono font-semibold text-foreground mt-0.5">{r.bankingDetails.accountNumber}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">IFSC Code</span>
+                        <p className="font-mono font-semibold text-foreground mt-0.5">{r.bankingDetails.ifscCode}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400 flex items-center gap-2">
+                    <XCircle className="h-3.5 w-3.5 shrink-0" />
+                    No banking details on record for this partner
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground flex-wrap">

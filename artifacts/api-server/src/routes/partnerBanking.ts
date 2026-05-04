@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, type AuthedRequest } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -33,7 +33,7 @@ async function getVendorForUser(userId: number) {
 }
 
 router.get("/partner/banking-details", requireAuth(["vendor"]), async (req, res) => {
-  const userId = req.user!.id;
+  const userId = (req as AuthedRequest).user.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
     res.status(404).json({ error: "No vendor profile found" });
@@ -48,7 +48,7 @@ router.get("/partner/banking-details", requireAuth(["vendor"]), async (req, res)
 });
 
 router.put("/partner/banking-details", requireAuth(["vendor"]), async (req, res) => {
-  const userId = req.user!.id;
+  const userId = (req as AuthedRequest).user.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
     res.status(404).json({ error: "No vendor profile found" });
@@ -82,7 +82,7 @@ router.put("/partner/banking-details", requireAuth(["vendor"]), async (req, res)
 });
 
 router.get("/partner/settlement/requests", requireAuth(["vendor"]), async (req, res) => {
-  const userId = req.user!.id;
+  const userId = (req as AuthedRequest).user.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
     res.status(404).json({ error: "No vendor profile found" });
@@ -97,29 +97,47 @@ router.get("/partner/settlement/requests", requireAuth(["vendor"]), async (req, 
 });
 
 router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, res) => {
-  const userId = req.user!.id;
+  const userId = (req as AuthedRequest).user.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
     res.status(404).json({ error: "No vendor profile found" });
     return;
   }
-  const bankDetails = await db
-    .select({ id: vendorBankingDetailsTable.id })
+
+  // Fetch full banking details to snapshot — also guards against missing details.
+  const [bankDetails] = await db
+    .select()
     .from(vendorBankingDetailsTable)
     .where(eq(vendorBankingDetailsTable.vendorId, vendor.id))
     .limit(1);
-  if (!bankDetails.length) {
+
+  if (!bankDetails) {
     res.status(400).json({ error: "Please save your banking details before requesting a settlement" });
     return;
   }
+
   const parsed = SettlementRequestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
+
+  // Snapshot the banking details at request time so admin always sees the
+  // exact details that were on file, even if the partner changes them later.
+  const bankingDetailsSnapshot = {
+    accountHolderName: bankDetails.accountHolderName,
+    bankName: bankDetails.bankName,
+    accountNumber: bankDetails.accountNumber,
+    ifscCode: bankDetails.ifscCode,
+  };
+
   const [created] = await db
     .insert(settlementRequestsTable)
-    .values({ vendorId: vendor.id, amount: String(parsed.data.amount) })
+    .values({
+      vendorId: vendor.id,
+      amount: String(parsed.data.amount),
+      bankingDetailsSnapshot,
+    })
     .returning();
   res.json(created);
 });
@@ -135,6 +153,7 @@ router.get("/admin/settlement-requests", requireAuth(["admin"]), async (req, res
       adminNote: settlementRequestsTable.adminNote,
       requestedAt: settlementRequestsTable.requestedAt,
       processedAt: settlementRequestsTable.processedAt,
+      bankingDetailsSnapshot: settlementRequestsTable.bankingDetailsSnapshot,
       businessName: vendorsTable.businessName,
       city: vendorsTable.city,
     })
@@ -146,25 +165,40 @@ router.get("/admin/settlement-requests", requireAuth(["admin"]), async (req, res
     ? rows.filter((r) => r.status === statusFilter)
     : rows;
 
-  const vendorIds = [...new Set(filtered.map((r) => r.vendorId))];
-  let bankMap: Record<number, { id: number; vendorId: number; accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string }> = {};
-  if (vendorIds.length > 0) {
+  // For backward compatibility: rows without a snapshot (created before this migration)
+  // fall back to a live lookup of the vendor's current banking details.
+  const legacyVendorIds = [
+    ...new Set(
+      filtered
+        .filter((r) => r.bankingDetailsSnapshot == null)
+        .map((r) => r.vendorId),
+    ),
+  ];
+
+  let bankMap: Record<number, { accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string }> = {};
+  if (legacyVendorIds.length > 0) {
     const bankRows = await db
       .select()
       .from(vendorBankingDetailsTable)
       .where(
-        vendorIds.length === 1
-          ? eq(vendorBankingDetailsTable.vendorId, vendorIds[0]!)
-          : inArray(vendorBankingDetailsTable.vendorId, vendorIds),
+        legacyVendorIds.length === 1
+          ? eq(vendorBankingDetailsTable.vendorId, legacyVendorIds[0]!)
+          : inArray(vendorBankingDetailsTable.vendorId, legacyVendorIds),
       );
     for (const b of bankRows) {
-      bankMap[b.vendorId] = { id: b.id, vendorId: b.vendorId, accountHolderName: b.accountHolderName, bankName: b.bankName, accountNumber: b.accountNumber, ifscCode: b.ifscCode };
+      bankMap[b.vendorId] = {
+        accountHolderName: b.accountHolderName,
+        bankName: b.bankName,
+        accountNumber: b.accountNumber,
+        ifscCode: b.ifscCode,
+      };
     }
   }
 
   const result = filtered.map((r) => ({
     ...r,
-    bankingDetails: bankMap[r.vendorId] ?? null,
+    // Prefer the immutable snapshot; fall back to live lookup for legacy rows.
+    bankingDetails: r.bankingDetailsSnapshot ?? bankMap[r.vendorId] ?? null,
   }));
 
   res.json(result);

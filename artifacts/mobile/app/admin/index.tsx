@@ -312,18 +312,30 @@ function AdminSettlementsTab({ colors }: { colors: ReturnType<typeof useColors> 
                 </View>
               </View>
 
-              {r.bankingDetails && (
-                <View style={{ backgroundColor: colors.muted, borderRadius: 10, padding: 10, gap: 3 }}>
-                  {[
-                    { label: "Holder", value: r.bankingDetails.accountHolderName },
-                    { label: "Bank", value: r.bankingDetails.bankName },
-                    { label: "Account", value: r.bankingDetails.accountNumber },
-                    { label: "IFSC", value: r.bankingDetails.ifscCode },
-                  ].map((f) => (
-                    <Text key={f.label} style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground }}>
-                      <Text style={{ fontFamily: "Inter_500Medium", color: colors.foreground }}>{f.label}: </Text>{f.value}
-                    </Text>
-                  ))}
+              {r.bankingDetails ? (
+                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.primary + "40", backgroundColor: colors.primary + "0D", padding: 12, gap: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="card-outline" size={13} color={colors.primary} />
+                    <Text style={{ fontFamily: "Inter_700Bold", fontSize: 10, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.8 }}>Banking Details</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {[
+                      { label: "Account Holder", value: r.bankingDetails.accountHolderName },
+                      { label: "Bank", value: r.bankingDetails.bankName },
+                      { label: "Account No.", value: r.bankingDetails.accountNumber },
+                      { label: "IFSC Code", value: r.bankingDetails.ifscCode },
+                    ].map((f) => (
+                      <View key={f.label} style={{ minWidth: "45%", flex: 1 }}>
+                        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 10, color: colors.mutedForeground }}>{f.label}</Text>
+                        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: colors.foreground, marginTop: 1 }}>{f.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: "#f59e0b40", backgroundColor: "#f59e0b10", padding: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="warning-outline" size={13} color="#f59e0b" />
+                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: "#f59e0b", flex: 1 }}>No banking details on record</Text>
                 </View>
               )}
 

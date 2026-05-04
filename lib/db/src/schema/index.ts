@@ -609,6 +609,13 @@ export const vendorBankingDetailsTable = pgTable(
 
 export type VendorBankingDetails = typeof vendorBankingDetailsTable.$inferSelect;
 
+export interface BankingDetailsSnapshot {
+  accountHolderName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+}
+
 export const settlementRequestsTable = pgTable(
   "settlement_requests",
   {
@@ -619,6 +626,7 @@ export const settlementRequestsTable = pgTable(
     adminNote: text("admin_note").notNull().default(""),
     requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
+    bankingDetailsSnapshot: jsonb("banking_details_snapshot").$type<BankingDetailsSnapshot>(),
   },
   (t) => ({
     vendorIdx: index("sr_vendor_idx").on(t.vendorId),
