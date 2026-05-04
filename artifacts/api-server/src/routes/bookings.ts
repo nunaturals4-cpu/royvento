@@ -642,14 +642,15 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   ]);
 
   const commRow = commissions[0];
-  const commFreeRate = Number(commRow?.freeEntryRate ?? 0) / 100;
-  const commTicketRate = Number(commRow?.ticketRate ?? 0) / 100;
-  const commTableRate = Number(commRow?.tableBookingRate ?? 0) / 100;
+  const commFreeEntryFee = Number(commRow?.freeEntryRate ?? 0);
+  const commTicketFee = Number(commRow?.ticketRate ?? 0);
+  const commTableFee = Number(commRow?.tableBookingRate ?? 0);
 
-  function getCommRate(fp: number, pubMode: string): number {
-    if (pubMode === "table") return commTableRate;
-    if (fp === 0 || pubMode === "free") return commFreeRate;
-    return commTicketRate;
+  function calcComm(fp: number, pubMode: string, guests: number, ticketW: number, ticketM: number, ticketC: number): number {
+    if (pubMode === "table") return commTableFee;
+    if (fp === 0 || pubMode === "free") return commFreeEntryFee * Math.max(1, guests);
+    const ticketCount = ticketW + ticketM + ticketC;
+    return commTicketFee * Math.max(1, ticketCount);
   }
 
   // Summary figures
@@ -674,8 +675,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     const isCod = b.paymentMethod === "cod";
     if (isCod) codRevenue += fp;
     else onlineRevenue += fp;
-    const rate = getCommRate(fp, b.pubMode ?? "");
-    const comm = fp * rate;
+    const comm = calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple);
     totalCommission += comm;
     if (isCod) codCommission += comm;
     else onlineCommission += comm;
@@ -742,7 +742,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     const fp = Number(b.finalPrice);
     if (dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + fp);
-      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + fp * getCommRate(fp, b.pubMode ?? ""));
+      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple));
     }
   }
   const dailyRevenue = Array.from(dailyMap.entries())
@@ -1550,16 +1550,25 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   const scanComm = scanCommissionRows[0];
   function calcScanCommission(booking: typeof b) {
     const price = Number(booking.finalPrice);
-    const freeRate = Number(scanComm?.freeEntryRate ?? 0) / 100;
-    const tickRate = Number(scanComm?.ticketRate ?? 0) / 100;
-    const tableRate = Number(scanComm?.tableBookingRate ?? 0) / 100;
-    let rate: number;
-    if (booking.pubMode === "table") rate = tableRate;
-    else if (price === 0 || booking.pubMode === "free") rate = freeRate;
-    else rate = tickRate;
-    const commissionAmount = Math.round(price * rate * 100) / 100;
+    const freeEntryFee = Number(scanComm?.freeEntryRate ?? 0);
+    const ticketFee = Number(scanComm?.ticketRate ?? 0);
+    const tableFee = Number(scanComm?.tableBookingRate ?? 0);
+    let commissionAmount: number;
+    let feePerUnit: number;
+    if (booking.pubMode === "table") {
+      feePerUnit = tableFee;
+      commissionAmount = tableFee;
+    } else if (price === 0 || booking.pubMode === "free") {
+      feePerUnit = freeEntryFee;
+      commissionAmount = freeEntryFee * Math.max(1, booking.guests);
+    } else {
+      feePerUnit = ticketFee;
+      const ticketCount = booking.ticketWomen + booking.ticketMen + booking.ticketCouple;
+      commissionAmount = ticketFee * Math.max(1, ticketCount);
+    }
+    commissionAmount = Math.round(commissionAmount * 100) / 100;
     return {
-      commissionRate: Math.round(rate * 10000) / 100,
+      commissionRate: feePerUnit,
       commissionAmount,
       netAmount: Math.round((price - commissionAmount) * 100) / 100,
     };

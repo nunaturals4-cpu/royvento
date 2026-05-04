@@ -286,7 +286,7 @@ export default function ScannerScreen() {
                         <Text style={[styles.bookingValue, { color: colors.foreground }]}>₹{(result.booking.finalPrice ?? 0).toLocaleString("en-IN")}</Text>
                       </View>
                       <View style={styles.bookingRow}>
-                        <Text style={[styles.bookingLabel, { color: "#f59e0b" }]}>Platform Fee ({result.booking.commissionRate.toFixed(1)}%)</Text>
+                        <Text style={[styles.bookingLabel, { color: "#f59e0b" }]}>Platform Fee (₹{result.booking.commissionRate.toFixed(0)} flat)</Text>
                         <Text style={[styles.bookingValue, { color: "#f59e0b" }]}>− ₹{(result.booking.commissionAmount ?? 0).toLocaleString("en-IN")}</Text>
                       </View>
                       <View style={[styles.bookingRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, marginTop: 2 }]}>
@@ -307,7 +307,7 @@ export default function ScannerScreen() {
                         <Text style={[styles.bookingValue, { color: colors.foreground }]}>₹0</Text>
                       </View>
                       <View style={styles.bookingRow}>
-                        <Text style={[styles.bookingLabel, { color: "#f59e0b" }]}>Platform Fee (0%)</Text>
+                        <Text style={[styles.bookingLabel, { color: "#f59e0b" }]}>Platform Fee (₹0)</Text>
                         <Text style={[styles.bookingValue, { color: "#f59e0b" }]}>− ₹0</Text>
                       </View>
                       <View style={[styles.bookingRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, marginTop: 2 }]}>

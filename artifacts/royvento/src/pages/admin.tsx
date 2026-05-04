@@ -3264,8 +3264,8 @@ function CommissionsAdmin() {
     const free = Number(rates.freeEntryRate);
     const ticket = Number(rates.ticketRate);
     const table = Number(rates.tableBookingRate);
-    if ([free, ticket, table].some((n) => !Number.isFinite(n) || n < 0 || n > 100)) {
-      toast({ title: "Rates must be between 0 and 100", variant: "destructive" });
+    if ([free, ticket, table].some((n) => !Number.isFinite(n) || n < 0)) {
+      toast({ title: "Fees must be valid non-negative numbers", variant: "destructive" });
       return;
     }
     setSavingId(vendorId);
@@ -3316,8 +3316,8 @@ function CommissionsAdmin() {
             <Percent className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h2 className="font-serif text-2xl">Commission rates per partner</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Set the platform fee (%) applied to each booking type for every approved vendor.</p>
+            <h2 className="font-serif text-2xl">Commission fees per partner</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Set the flat platform fee (₹) per person/booking applied to each booking type for every approved vendor.</p>
           </div>
         </div>
 
@@ -3331,9 +3331,9 @@ function CommissionsAdmin() {
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
                 <tr>
                   <th className="text-left py-2 pr-4">Partner</th>
-                  <th className="text-right py-2 px-3">Free Entry %</th>
-                  <th className="text-right py-2 px-3">Ticket %</th>
-                  <th className="text-right py-2 px-3">Table Booking %</th>
+                  <th className="text-right py-2 px-3">Free Entry ₹/person</th>
+                  <th className="text-right py-2 px-3">Ticket ₹/ticket</th>
+                  <th className="text-right py-2 px-3">Table ₹/booking</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
               </thead>
@@ -3354,8 +3354,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          max={100}
-                          step={0.01}
+                          step={1}
                           value={edits.freeEntryRate}
                           onChange={(e) => updateRate(row.vendorId, "freeEntryRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
@@ -3365,8 +3364,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          max={100}
-                          step={0.01}
+                          step={1}
                           value={edits.ticketRate}
                           onChange={(e) => updateRate(row.vendorId, "ticketRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
@@ -3376,8 +3374,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          max={100}
-                          step={0.01}
+                          step={1}
                           value={edits.tableBookingRate}
                           onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
@@ -3467,7 +3464,7 @@ function CommissionsAdmin() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> · {row.city}</span> : ""}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Rates: FE {row.appliedRates.freeEntryRate}% / Ticket {row.appliedRates.ticketRate}% / Table {row.appliedRates.tableBookingRate}%
+                            Fees: FE ₹{row.appliedRates.freeEntryRate}/person · Ticket ₹{row.appliedRates.ticketRate}/ticket · Table ₹{row.appliedRates.tableBookingRate}/booking
                           </p>
                         </div>
                         <div className="flex items-center gap-6 tabular-nums text-sm shrink-0">
@@ -3501,7 +3498,7 @@ function CommissionsAdmin() {
                                       <td className="py-1.5 pr-3">Free Entry</td>
                                       <td className="text-right px-2">{row.freeEntryCount}</td>
                                       <td className="text-right px-2">{formatINR(row.freeEntryRevenue)}</td>
-                                      <td className="text-right px-2">{row.appliedRates.freeEntryRate}%</td>
+                                      <td className="text-right px-2">₹{row.appliedRates.freeEntryRate}/person</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.freeEntryCommission)}</td>
                                     </tr>
                                   )}
@@ -3510,7 +3507,7 @@ function CommissionsAdmin() {
                                       <td className="py-1.5 pr-3">Ticket</td>
                                       <td className="text-right px-2">{row.ticketCount}</td>
                                       <td className="text-right px-2">{formatINR(row.ticketRevenue)}</td>
-                                      <td className="text-right px-2">{row.appliedRates.ticketRate}%</td>
+                                      <td className="text-right px-2">₹{row.appliedRates.ticketRate}/ticket</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.ticketCommission)}</td>
                                     </tr>
                                   )}
@@ -3519,7 +3516,7 @@ function CommissionsAdmin() {
                                       <td className="py-1.5 pr-3">Table Booking</td>
                                       <td className="text-right px-2">{row.tableCount}</td>
                                       <td className="text-right px-2">{formatINR(row.tableRevenue)}</td>
-                                      <td className="text-right px-2">{row.appliedRates.tableBookingRate}%</td>
+                                      <td className="text-right px-2">₹{row.appliedRates.tableBookingRate}/booking</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.tableCommission)}</td>
                                     </tr>
                                   )}
@@ -3552,7 +3549,7 @@ function CommissionsAdmin() {
                                       </td>
                                       <td className="py-1.5 pr-3">{bookingTypeLabel(b.bookingType)}</td>
                                       <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
-                                      <td className="text-right px-2">{b.commissionRate.toFixed(2)}%</td>
+                                      <td className="text-right px-2">₹{b.commissionRate.toFixed(0)} flat</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(b.commissionAmount)}</td>
                                     </tr>
                                   ))}

@@ -798,29 +798,29 @@ export interface DrinkPlanSummary {
 export interface VendorCommission {
   id?: number;
   vendorId: number;
-  /** Percentage 0–100 (stored as decimal string) */
+  /** Flat fee in INR per person (stored as decimal string) */
   freeEntryRate: string;
-  /** Percentage 0–100 (stored as decimal string) */
+  /** Flat fee in INR per ticket (stored as decimal string) */
   ticketRate: string;
-  /** Percentage 0–100 (stored as decimal string) */
+  /** Flat fee in INR per table booking (stored as decimal string) */
   tableBookingRate: string;
   updatedAt?: string;
 }
 
 export interface SetVendorCommissionBody {
   /**
+   * Flat fee in INR per person
    * @minimum 0
-   * @maximum 100
    */
   freeEntryRate: number;
   /**
+   * Flat fee in INR per ticket
    * @minimum 0
-   * @maximum 100
    */
   ticketRate: number;
   /**
+   * Flat fee in INR per table booking
    * @minimum 0
-   * @maximum 100
    */
   tableBookingRate: number;
 }
@@ -889,11 +889,11 @@ export interface VendorDrinkOffer {
 }
 
 export interface PartnerCommissionRates {
-  /** Percentage 0–100 (stored as decimal string) */
+  /** Flat fee in INR per person (stored as decimal string) */
   freeEntryRate: string;
-  /** Percentage 0–100 (stored as decimal string) */
+  /** Flat fee in INR per ticket (stored as decimal string) */
   ticketRate: string;
-  /** Percentage 0–100 (stored as decimal string) */
+  /** Flat fee in INR per table booking (stored as decimal string) */
   tableBookingRate: string;
 }
 

@@ -8,18 +8,18 @@
 
 export interface SetVendorCommissionBody {
   /**
+   * Flat fee in INR per person
    * @minimum 0
-   * @maximum 100
    */
   freeEntryRate: number;
   /**
+   * Flat fee in INR per ticket
    * @minimum 0
-   * @maximum 100
    */
   ticketRate: number;
   /**
+   * Flat fee in INR per table booking
    * @minimum 0
-   * @maximum 100
    */
   tableBookingRate: number;
 }

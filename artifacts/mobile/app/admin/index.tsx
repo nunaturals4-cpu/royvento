@@ -420,10 +420,12 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
             </View>
             <View style={{ flexDirection: "row", gap: 10 }}>
               {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
-                const fieldLabel = field === "freeEntryRate" ? "Free Entry %" : field === "ticketRate" ? "Ticket %" : "Table %";
+                const fieldLabel = field === "freeEntryRate" ? "₹/person" : field === "ticketRate" ? "₹/ticket" : "₹/booking";
+                const fieldTitle = field === "freeEntryRate" ? "Free Entry" : field === "ticketRate" ? "Ticket" : "Table";
                 return (
                   <View key={field} style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{fieldLabel}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{fieldTitle}</Text>
+                    <Text style={{ fontSize: 9, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{fieldLabel}</Text>
                     <View style={{ borderWidth: 1, borderRadius: 8, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.background }}>
                       <TextInput
                         value={draft[field]}
@@ -567,13 +569,14 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
                 {/* Applied rates row */}
                 <View style={{ flexDirection: "row", gap: 8, padding: 12, backgroundColor: colors.muted + "60" }}>
-                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, marginRight: 4 }}>Rates:</Text>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, marginRight: 4 }}>Fees:</Text>
                   {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
-                    const label = field === "freeEntryRate" ? "Free" : field === "ticketRate" ? "Ticket" : "Table";
+                    const label = field === "freeEntryRate" ? "Free Entry" : field === "ticketRate" ? "Ticket" : "Table";
+                    const unit = field === "freeEntryRate" ? "/person" : field === "ticketRate" ? "/ticket" : "/booking";
                     const val = row.appliedRates[field];
                     return (
                       <View key={field} style={{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
-                        <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.foreground }}>{label}: {val}%</Text>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.foreground }}>{label}: ₹{val}{unit}</Text>
                       </View>
                     );
                   })}
@@ -595,7 +598,7 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                     </View>
                     <View style={{ alignItems: "flex-end", gap: 2 }}>
                       <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>{fmt(b.commissionAmount)}</Text>
-                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{fmt(b.finalPrice)} × {fmtPct(b.commissionRate)}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>₹{b.commissionRate.toFixed(0)} flat fee</Text>
                     </View>
                   </View>
                 ))}

@@ -577,9 +577,9 @@ export const vendorCommissionsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     vendorId: integer("vendor_id").notNull().unique().references(() => vendorsTable.id, { onDelete: "cascade" }),
-    freeEntryRate: numeric("free_entry_rate", { precision: 5, scale: 2 }).notNull().default("0"),
-    ticketRate: numeric("ticket_rate", { precision: 5, scale: 2 }).notNull().default("0"),
-    tableBookingRate: numeric("table_booking_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    freeEntryRate: numeric("free_entry_rate", { precision: 8, scale: 2 }).notNull().default("0"),
+    ticketRate: numeric("ticket_rate", { precision: 8, scale: 2 }).notNull().default("0"),
+    tableBookingRate: numeric("table_booking_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

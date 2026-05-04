@@ -2809,24 +2809,27 @@ function AnalyticsPanel() {
               <Percent className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="font-serif text-xl">Platform commission</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Fees deducted by the platform from your gross earnings.</p>
+              <p className="font-serif text-xl">Platform charges</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Flat fees charged by the platform per person/ticket/booking.</p>
             </div>
           </div>
 
-          {/* Applied rates */}
+          {/* Applied flat fees */}
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Free Entry rate</p>
-              <p className="text-2xl font-semibold tabular-nums">{data.commissionRates.freeEntryRate}%</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Free Entry fee</p>
+              <p className="text-2xl font-semibold tabular-nums">₹{data.commissionRates.freeEntryRate}</p>
+              <p className="text-xs text-muted-foreground mt-1">per person</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Ticket rate</p>
-              <p className="text-2xl font-semibold tabular-nums">{data.commissionRates.ticketRate}%</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Ticket fee</p>
+              <p className="text-2xl font-semibold tabular-nums">₹{data.commissionRates.ticketRate}</p>
+              <p className="text-xs text-muted-foreground mt-1">per ticket</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Table Booking rate</p>
-              <p className="text-2xl font-semibold tabular-nums">{data.commissionRates.tableBookingRate}%</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Table Booking fee</p>
+              <p className="text-2xl font-semibold tabular-nums">₹{data.commissionRates.tableBookingRate}</p>
+              <p className="text-xs text-muted-foreground mt-1">per booking</p>
             </div>
           </div>
 

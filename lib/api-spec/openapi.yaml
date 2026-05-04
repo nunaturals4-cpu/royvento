@@ -2856,13 +2856,13 @@ components:
           type: integer
         freeEntryRate:
           type: string
-          description: Percentage 0–100 (stored as decimal string)
+          description: Flat fee in INR per person (stored as decimal string)
         ticketRate:
           type: string
-          description: Percentage 0–100 (stored as decimal string)
+          description: Flat fee in INR per ticket (stored as decimal string)
         tableBookingRate:
           type: string
-          description: Percentage 0–100 (stored as decimal string)
+          description: Flat fee in INR per table booking (stored as decimal string)
         updatedAt:
           type: string
       required: [vendorId, freeEntryRate, ticketRate, tableBookingRate]
@@ -2873,15 +2873,15 @@ components:
         freeEntryRate:
           type: number
           minimum: 0
-          maximum: 100
+          description: Flat fee in INR per person
         ticketRate:
           type: number
           minimum: 0
-          maximum: 100
+          description: Flat fee in INR per ticket
         tableBookingRate:
           type: number
           minimum: 0
-          maximum: 100
+          description: Flat fee in INR per table booking
       required: [freeEntryRate, ticketRate, tableBookingRate]
 
     CommissionReportBookingLine:
@@ -2996,13 +2996,13 @@ components:
       properties:
         freeEntryRate:
           type: string
-          description: Percentage 0–100 (stored as decimal string)
+          description: Flat fee in INR per person (stored as decimal string)
         ticketRate:
           type: string
-          description: Percentage 0–100 (stored as decimal string)
+          description: Flat fee in INR per ticket (stored as decimal string)
         tableBookingRate:
           type: string
-          description: Percentage 0–100 (stored as decimal string)
+          description: Flat fee in INR per table booking (stored as decimal string)
       required: [freeEntryRate, ticketRate, tableBookingRate]
 
     CommissionTypeSummary:

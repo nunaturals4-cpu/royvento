@@ -1435,11 +1435,11 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
   const ticketRate = Number(body["ticketRate"] ?? 0);
   const tableBookingRate = Number(body["tableBookingRate"] ?? 0);
   if (
-    !Number.isFinite(freeEntryRate) || freeEntryRate < 0 || freeEntryRate > 100 ||
-    !Number.isFinite(ticketRate) || ticketRate < 0 || ticketRate > 100 ||
-    !Number.isFinite(tableBookingRate) || tableBookingRate < 0 || tableBookingRate > 100
+    !Number.isFinite(freeEntryRate) || freeEntryRate < 0 || freeEntryRate > 99999 ||
+    !Number.isFinite(ticketRate) || ticketRate < 0 || ticketRate > 99999 ||
+    !Number.isFinite(tableBookingRate) || tableBookingRate < 0 || tableBookingRate > 99999
   ) {
-    res.status(400).json({ error: "Rates must be numbers between 0 and 100" });
+    res.status(400).json({ error: "Rates must be valid non-negative numbers" });
     return;
   }
   const [upserted] = await db
@@ -1485,6 +1485,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         vendorId: bookingsTable.vendorId,
         finalPrice: bookingsTable.finalPrice,
         pubMode: bookingsTable.pubMode,
+        guests: bookingsTable.guests,
         ticketWomen: bookingsTable.ticketWomen,
         ticketMen: bookingsTable.ticketMen,
         ticketCouple: bookingsTable.ticketCouple,
@@ -1564,28 +1565,28 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   for (const b of bookings) {
     const price = Number(b.finalPrice);
     const rates = commissionMap.get(b.vendorId);
-    const freeEntryRate = Number(rates?.freeEntryRate ?? 0) / 100;
-    const ticketRate = Number(rates?.ticketRate ?? 0) / 100;
-    const tableRate = Number(rates?.tableBookingRate ?? 0) / 100;
+    const freeEntryFee = Number(rates?.freeEntryRate ?? 0);
+    const ticketFee = Number(rates?.ticketRate ?? 0);
+    const tableFee = Number(rates?.tableBookingRate ?? 0);
 
     let bookingType: "free_entry" | "ticket" | "table";
-    let commissionRate: number;
+    let commissionAmount: number;
+    let feePerUnit: number;
 
     if (b.pubMode === "table") {
       bookingType = "table";
-      commissionRate = tableRate;
+      feePerUnit = tableFee;
+      commissionAmount = tableFee;
     } else if (price === 0 || b.pubMode === "free") {
       bookingType = "free_entry";
-      commissionRate = freeEntryRate;
-    } else if (b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0) {
-      bookingType = "ticket";
-      commissionRate = ticketRate;
+      feePerUnit = freeEntryFee;
+      commissionAmount = freeEntryFee * Math.max(1, b.guests);
     } else {
       bookingType = "ticket";
-      commissionRate = ticketRate;
+      feePerUnit = ticketFee;
+      const ticketCount = b.ticketWomen + b.ticketMen + b.ticketCouple;
+      commissionAmount = ticketFee * Math.max(1, ticketCount);
     }
-
-    const commissionAmount = price * commissionRate;
 
     // Skip bookings from vendors not in the approved list
     if (!summaryMap.has(b.vendorId)) continue;
@@ -1594,7 +1595,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     s.totalBookings += 1;
     s.totalRevenue += price;
     s.totalCommission += commissionAmount;
-    s.bookings.push({ id: b.id, finalPrice: price, bookingType, commissionRate: commissionRate * 100, commissionAmount, createdAt: b.createdAt });
+    s.bookings.push({ id: b.id, finalPrice: price, bookingType, commissionRate: feePerUnit, commissionAmount, createdAt: b.createdAt });
 
     if (bookingType === "free_entry") {
       s.freeEntryCount += 1;

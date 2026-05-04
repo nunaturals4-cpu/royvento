@@ -2521,14 +2521,14 @@ export default function VendorDashboardScreen() {
             <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>Commission rates applied to your bookings</Text>
           </View>
           {[
-            { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0" },
-            { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0" },
-            { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0" },
+            { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0", unit: "/person" },
+            { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0", unit: "/ticket" },
+            { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0", unit: "/booking" },
           ].map((r) => (
             <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{r.label}</Text>
               <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>{Number(r.value).toFixed(1)}%</Text>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>₹{Number(r.value).toFixed(0)}{r.unit}</Text>
               </View>
             </View>
           ))}
