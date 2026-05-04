@@ -253,12 +253,6 @@ export function PubOffers() {
 
   return (
     <div className="pb-14">
-      {/* Page header — contained */}
-      <div className="container mx-auto px-4 md:px-6 pt-14 pb-10">
-        <header className="max-w-3xl">
-        </header>
-      </div>
-
       {!hasDeals && !hasAnnouncements && (
         <div className="container mx-auto px-4 md:px-6">
           <div className="rounded-3xl glass-card p-16 text-center">
