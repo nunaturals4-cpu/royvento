@@ -185,8 +185,9 @@ export async function resolvePlaceFromUrl(
 ): Promise<PlaceDetails> {
   const resolvedUrl = await resolveUrl(googleUrl.trim());
   const searchQuery = extractQueryFromUrl(resolvedUrl);
+  const cacheKey = searchQuery.trim().toLowerCase();
 
-  const urlCached = urlCache.get(searchQuery);
+  const urlCached = urlCache.get(cacheKey);
   if (urlCached) return urlCached;
 
   // Text search to find place_id
@@ -212,7 +213,7 @@ export async function resolvePlaceFromUrl(
   }
   const placeId = searchData.results[0]!.place_id;
   const details = await fetchPlaceDetails(placeId, apiKey);
-  urlCache.set(searchQuery, details, URL_TTL_MS);
+  urlCache.set(cacheKey, details, URL_TTL_MS);
   return details;
 }
 
