@@ -2896,11 +2896,15 @@ components:
           enum: [free_entry, ticket, table]
         commissionRate:
           type: number
+          description: Flat fee in INR per unit (per person, per ticket, or per table booking)
+        unitCount:
+          type: integer
+          description: Number of units charged (persons for free_entry, tickets for ticket, 1 for table)
         commissionAmount:
           type: number
         createdAt:
           type: string
-      required: [id, finalPrice, bookingType, commissionRate, commissionAmount, createdAt]
+      required: [id, finalPrice, bookingType, commissionRate, unitCount, commissionAmount, createdAt]
 
     CommissionReportVendorRow:
       type: object
@@ -3130,7 +3134,7 @@ components:
           type: number
         commissionRate:
           type: number
-          description: Effective commission rate applied (0–100 %)
+          description: Flat fee in INR per unit (per person, per ticket, or per table booking)
         commissionAmount:
           type: number
           description: Platform fee deducted from gross

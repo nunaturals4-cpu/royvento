@@ -19,7 +19,7 @@ export interface ScanTicketBooking {
   ticketCouple: number;
   guests: number;
   finalPrice?: number;
-  /** Effective commission rate applied (0–100 %) */
+  /** Flat fee in INR per unit (per person, per ticket, or per table booking) */
   commissionRate?: number;
   /** Platform fee deducted from gross */
   commissionAmount?: number;

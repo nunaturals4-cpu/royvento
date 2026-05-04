@@ -11,7 +11,10 @@ export interface CommissionReportBookingLine {
   id: number;
   finalPrice: number;
   bookingType: CommissionReportBookingLineBookingType;
+  /** Flat fee in INR per unit (per person, per ticket, or per table booking) */
   commissionRate: number;
+  /** Number of units charged (persons for free_entry, tickets for ticket, 1 for table) */
+  unitCount: number;
   commissionAmount: number;
   createdAt: string;
 }

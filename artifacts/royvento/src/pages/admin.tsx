@@ -3177,6 +3177,7 @@ interface CommissionBookingLine {
   finalPrice: number;
   bookingType: "free_entry" | "ticket" | "table";
   commissionRate: number;
+  unitCount: number;
   commissionAmount: number;
   createdAt: string;
 }
@@ -3549,7 +3550,11 @@ function CommissionsAdmin() {
                                       </td>
                                       <td className="py-1.5 pr-3">{bookingTypeLabel(b.bookingType)}</td>
                                       <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
-                                      <td className="text-right px-2">₹{b.commissionRate.toFixed(0)} flat</td>
+                                      <td className="text-right px-2">
+                                        {b.commissionRate > 0
+                                          ? `₹${b.commissionRate.toFixed(0)} × ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
+                                          : "—"}
+                                      </td>
                                       <td className="text-right pl-2 text-primary">{formatINR(b.commissionAmount)}</td>
                                     </tr>
                                   ))}

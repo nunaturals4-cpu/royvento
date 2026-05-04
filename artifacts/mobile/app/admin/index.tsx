@@ -235,6 +235,7 @@ interface CommissionReportBookingLine {
   finalPrice: number;
   bookingType: "free_entry" | "ticket" | "table";
   commissionRate: number;
+  unitCount: number;
   commissionAmount: number;
   createdAt: string;
 }
@@ -598,7 +599,11 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                     </View>
                     <View style={{ alignItems: "flex-end", gap: 2 }}>
                       <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>{fmt(b.commissionAmount)}</Text>
-                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>₹{b.commissionRate.toFixed(0)} flat fee</Text>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                        {b.commissionRate > 0
+                          ? `₹${b.commissionRate.toFixed(0)} × ${b.unitCount ?? 1} ${b.bookingType === "free_entry" ? (b.unitCount === 1 ? "person" : "persons") : b.bookingType === "ticket" ? (b.unitCount === 1 ? "ticket" : "tickets") : "booking"}`
+                          : "No fee"}
+                      </Text>
                     </View>
                   </View>
                 ))}

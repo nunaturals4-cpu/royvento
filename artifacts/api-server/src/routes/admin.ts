@@ -1508,6 +1508,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     finalPrice: number;
     bookingType: "free_entry" | "ticket" | "table";
     commissionRate: number;
+    unitCount: number;
     commissionAmount: number;
     createdAt: Date;
   };
@@ -1573,20 +1574,25 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     let commissionAmount: number;
     let feePerUnit: number;
 
+    let unitCount: number;
     if (b.pubMode === "table") {
       bookingType = "table";
       feePerUnit = tableFee;
+      unitCount = 1;
       commissionAmount = tableFee;
     } else if (price === 0 || b.pubMode === "free") {
       bookingType = "free_entry";
       feePerUnit = freeEntryFee;
-      commissionAmount = freeEntryFee * Math.max(1, b.guests);
+      unitCount = Math.max(1, b.guests);
+      commissionAmount = freeEntryFee * unitCount;
     } else {
       bookingType = "ticket";
       feePerUnit = ticketFee;
       const ticketCount = b.ticketWomen + b.ticketMen + b.ticketCouple;
-      commissionAmount = ticketFee * Math.max(1, ticketCount);
+      unitCount = Math.max(1, ticketCount);
+      commissionAmount = ticketFee * unitCount;
     }
+    commissionAmount = Math.min(commissionAmount, price);
 
     // Skip bookings from vendors not in the approved list
     if (!summaryMap.has(b.vendorId)) continue;
@@ -1595,7 +1601,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     s.totalBookings += 1;
     s.totalRevenue += price;
     s.totalCommission += commissionAmount;
-    s.bookings.push({ id: b.id, finalPrice: price, bookingType, commissionRate: feePerUnit, commissionAmount, createdAt: b.createdAt });
+    s.bookings.push({ id: b.id, finalPrice: price, bookingType, commissionRate: feePerUnit, unitCount, commissionAmount, createdAt: b.createdAt });
 
     if (bookingType === "free_entry") {
       s.freeEntryCount += 1;

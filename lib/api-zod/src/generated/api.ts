@@ -1794,7 +1794,9 @@ export const PartnerScanTicketResponse = zod.object({
       commissionRate: zod
         .number()
         .optional()
-        .describe("Effective commission rate applied (0–100 %)"),
+        .describe(
+          "Flat fee in INR per unit (per person, per ticket, or per table booking)",
+        ),
       commissionAmount: zod
         .number()
         .optional()
@@ -2296,7 +2298,16 @@ export const GetCommissionReportResponse = zod.object({
           id: zod.number(),
           finalPrice: zod.number(),
           bookingType: zod.enum(["free_entry", "ticket", "table"]),
-          commissionRate: zod.number(),
+          commissionRate: zod
+            .number()
+            .describe(
+              "Flat fee in INR per unit (per person, per ticket, or per table booking)",
+            ),
+          unitCount: zod
+            .number()
+            .describe(
+              "Number of units charged (persons for free_entry, tickets for ticket, 1 for table)",
+            ),
           commissionAmount: zod.number(),
           createdAt: zod.string(),
         }),

@@ -647,10 +647,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const commTableFee = Number(commRow?.tableBookingRate ?? 0);
 
   function calcComm(fp: number, pubMode: string, guests: number, ticketW: number, ticketM: number, ticketC: number): number {
-    if (pubMode === "table") return commTableFee;
-    if (fp === 0 || pubMode === "free") return commFreeEntryFee * Math.max(1, guests);
-    const ticketCount = ticketW + ticketM + ticketC;
-    return commTicketFee * Math.max(1, ticketCount);
+    let raw: number;
+    if (pubMode === "table") raw = commTableFee;
+    else if (fp === 0 || pubMode === "free") raw = commFreeEntryFee * Math.max(1, guests);
+    else { const ticketCount = ticketW + ticketM + ticketC; raw = commTicketFee * Math.max(1, ticketCount); }
+    return Math.min(raw, fp);
   }
 
   // Summary figures
@@ -1566,7 +1567,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       const ticketCount = booking.ticketWomen + booking.ticketMen + booking.ticketCouple;
       commissionAmount = ticketFee * Math.max(1, ticketCount);
     }
-    commissionAmount = Math.round(commissionAmount * 100) / 100;
+    commissionAmount = Math.round(Math.min(commissionAmount, price) * 100) / 100;
     return {
       commissionRate: feePerUnit,
       commissionAmount,
