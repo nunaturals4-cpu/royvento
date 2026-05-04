@@ -152,7 +152,6 @@ export function Profile() {
       if (pushSubscribed) {
         const sub = await reg.pushManager.getSubscription();
         await sub?.unsubscribe();
-        await apiPost("/api/push/subscribe", {}).catch(() => {});
         await fetch("/api/push/subscribe", { method: "DELETE", credentials: "include" });
         setPushSubscribed(false);
         toast({ title: "Push notifications disabled" });

@@ -7,7 +7,7 @@ self.addEventListener("push", (event) => {
     body: payload.body ?? "",
     icon: "/favicon.svg",
     badge: "/favicon.svg",
-    data: payload.data ?? {},
+    data: { url: payload.url ?? "/", ...(payload.data ?? {}) },
     tag: payload.tag ?? "royvento-push",
   };
   event.waitUntil(self.registration.showNotification(title, options));
