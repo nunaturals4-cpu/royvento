@@ -3353,7 +3353,9 @@ function LeadsPanel() {
             <p className="text-muted-foreground mb-6">Subscribe to Partner Premium ({formatINR(999)}/mo) to unlock who's viewing your profile and conversion analytics.</p>
           </>
         )}
-        <Link href="/subscription"><Button className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Upgrade to Premium</Button></Link>
+        <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
+          <Link href="/subscription">Upgrade to Premium</Link>
+        </Button>
       </div>
     );
   }

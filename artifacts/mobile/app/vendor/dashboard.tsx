@@ -1307,12 +1307,14 @@ export default function VendorDashboardScreen() {
         body: JSON.stringify({ date, reason: "", source: "manual" }),
       }),
     onSuccess: () => blockedDatesQ.refetch(),
+    onError: () => Alert.alert("Error", "Failed to block date. Please try again."),
   });
 
   const deleteBlockedMut = useMutation({
     mutationFn: (id: number) =>
       customFetch(`/api/partner/blocked-dates/${id}`, { method: "DELETE" }),
     onSuccess: () => blockedDatesQ.refetch(),
+    onError: () => Alert.alert("Error", "Failed to remove blocked date. Please try again."),
   });
 
   const [showDatePicker, setShowDatePicker] = useState(false);

@@ -168,10 +168,16 @@ export default function EventDetailScreen() {
   const hasEventBooking = (myBookings ?? []).some((b) => b.eventId === eventId);
 
   const addMutation = useAddToWishlist({
-    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }) },
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }),
+      onError: () => Alert.alert("Error", "Failed to add to wishlist. Please try again."),
+    },
   });
   const removeMutation = useRemoveFromWishlist({
-    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }) },
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }),
+      onError: () => Alert.alert("Error", "Failed to remove from wishlist. Please try again."),
+    },
   });
 
   useEffect(() => {

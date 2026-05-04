@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import React from "react";
 import {
+  Alert,
   FlatList,
   Platform,
   StyleSheet,
@@ -37,6 +38,7 @@ export default function WishlistScreen() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetWishlistQueryKey() });
       },
+      onError: () => Alert.alert("Error", "Failed to remove from wishlist. Please try again."),
     },
   });
 
