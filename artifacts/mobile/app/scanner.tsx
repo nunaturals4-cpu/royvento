@@ -45,6 +45,7 @@ export default function ScannerScreen() {
   const [manualCode, setManualCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
   const scanLock = useRef(false);
   const manualInputRef = useRef<TextInput>(null);
 
@@ -99,6 +100,19 @@ export default function ScannerScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.foreground }]}>Ticket Scanner</Text>
+        {hasCameraPermission && Platform.OS !== "web" && (
+          <TouchableOpacity
+            onPress={() => setTorchOn((prev) => !prev)}
+            style={[styles.torchBtn, { backgroundColor: torchOn ? colors.primary : colors.muted }]}
+            accessibilityLabel={torchOn ? "Turn off torch" : "Turn on torch"}
+          >
+            <Ionicons
+              name={torchOn ? "flash" : "flash-off"}
+              size={18}
+              color={torchOn ? colors.primaryForeground : colors.mutedForeground}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
@@ -110,7 +124,7 @@ export default function ScannerScreen() {
             </View>
           ) : !hasCameraPermission ? (
             <View style={styles.permCenter}>
-              <Ionicons name="camera-off-outline" size={48} color={colors.mutedForeground} />
+              <Ionicons name="camera-outline" size={48} color={colors.mutedForeground} />
               <Text style={[styles.permText, { color: colors.foreground }]}>Camera access needed</Text>
               <Text style={[styles.permSub, { color: colors.mutedForeground }]}>Allow camera to scan QR codes from guest tickets.</Text>
               <TouchableOpacity style={[styles.permBtn, { backgroundColor: colors.primary }]} onPress={requestPermission}>
@@ -121,6 +135,7 @@ export default function ScannerScreen() {
             <CameraView
               style={styles.camera}
               facing="back"
+              enableTorch={torchOn}
               barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
               onBarcodeScanned={({ data }) => {
                 const legacy = data.match(/royvento:booking:(\d+):/);
@@ -275,6 +290,7 @@ const styles = StyleSheet.create({
   header: { paddingBottom: 14, paddingHorizontal: 20, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", gap: 14 },
   backBtn: { flexDirection: "row", alignItems: "center" },
   title: { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.3, flex: 1 },
+  torchBtn: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   cameraSection: { height: 280, backgroundColor: "#000", position: "relative" },
   camera: { flex: 1 },
   scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },

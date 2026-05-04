@@ -80,6 +80,19 @@ interface Coupon {
   vendorName: string | null;
 }
 
+interface PointsHistoryEntry {
+  key: string;
+  type: "earned" | "spent";
+  points: number;
+  label: string;
+  date: string;
+}
+
+interface PointsHistory {
+  balance: number;
+  history: PointsHistoryEntry[];
+}
+
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -180,6 +193,12 @@ export default function ProfileScreen() {
   const invitationsQuery = useQuery<Invitation[]>({
     queryKey: ["manager-invitations"],
     queryFn: () => customFetch<Invitation[]>("/api/manager/invitations"),
+    enabled: !!user,
+  });
+
+  const pointsHistoryQuery = useQuery<PointsHistory>({
+    queryKey: ["points-history-me"],
+    queryFn: () => customFetch<PointsHistory>("/api/users/me/points-history"),
     enabled: !!user,
   });
 
@@ -316,6 +335,7 @@ export default function ProfileScreen() {
   const referral = referralQuery.data;
   const coupons = couponQuery.data ?? [];
   const discountInfo = discountQuery.data ?? null;
+  const pointsHistory = pointsHistoryQuery.data ?? null;
 
   return (
     <ScrollView
@@ -505,6 +525,56 @@ export default function ProfileScreen() {
           </View>
         </View>
       ) : null}
+
+      {/* Points History */}
+      {pointsHistory && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Ionicons name="star-outline" size={18} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Points history</Text>
+            <View style={{ flex: 1 }} />
+            <View style={[{ backgroundColor: colors.primary + "20", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 }]}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.primary }}>
+                {pointsHistory.balance} pts
+              </Text>
+            </View>
+          </View>
+          {pointsHistory.history.length === 0 ? (
+            <Text style={{ fontSize: 13, color: colors.mutedForeground, textAlign: "center", paddingVertical: 12 }}>
+              No transactions yet
+            </Text>
+          ) : (
+            pointsHistory.history.slice(0, 8).map((entry) => {
+              const earned = entry.type === "earned";
+              return (
+                <View
+                  key={entry.key}
+                  style={{ flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, gap: 10 }}
+                >
+                  <View style={[{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: earned ? "#22c55e20" : "#ef444420" }]}>
+                    <Ionicons
+                      name={earned ? "arrow-up-circle-outline" : "arrow-down-circle-outline"}
+                      size={18}
+                      color={earned ? "#22c55e" : "#ef4444"}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground }} numberOfLines={1}>
+                      {entry.label}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
+                      {new Date(entry.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: earned ? "#22c55e" : "#ef4444" }}>
+                    {earned ? "+" : "−"}{Math.abs(entry.points)}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+      )}
 
       {/* Coupons */}
       {coupons.length > 0 ? (
