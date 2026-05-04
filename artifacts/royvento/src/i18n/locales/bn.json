@@ -183,6 +183,7 @@
     "not_found": "ইভেন্ট পাওয়া যায়নি।",
     "wishlist_added": "উইশলিস্টে যোগ হয়েছে",
     "wishlist_add_error": "উইশলিস্টে যোগ করা যায়নি",
+    "wishlist_remove_error": "উইশলিস্ট থেকে সরানো যায়নি",
     "wishlist_removed": "উইশলিস্ট থেকে সরানো হয়েছে",
     "add_wishlist": "উইশলিস্টে যোগ করুন",
     "remove_wishlist": "উইশলিস্ট থেকে সরান",

@@ -32,7 +32,7 @@ export function Wishlist() {
       qc.invalidateQueries({ queryKey: ["wishlist"] });
       toast({ title: "Removed from wishlist" });
     },
-    onError: () => toast({ title: "Failed to remove", variant: "destructive" } as any),
+    onError: () => toast({ title: "Failed to remove from wishlist", variant: "destructive" }),
   });
 
   return (

@@ -183,6 +183,7 @@
     "not_found": "इवेंट नहीं मिला।",
     "wishlist_added": "विशलिस्ट में जोड़ा गया",
     "wishlist_add_error": "विशलिस्ट में जोड़ नहीं सका",
+    "wishlist_remove_error": "विशलिस्ट से हटा नहीं सका",
     "wishlist_removed": "विशलिस्ट से हटाया गया",
     "add_wishlist": "विशलिस्ट में जोड़ें",
     "remove_wishlist": "विशलिस्ट से हटाएं",

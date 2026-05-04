@@ -588,6 +588,7 @@ function AllVendorsAdmin() {
                       className="text-xs border-red-500/30 text-red-300"
                       onClick={() => reject.mutate({ vendorId: v.id }, {
                         onSuccess: () => { toast({ title: "Rejected" }); load(); },
+                        onError: (e: any) => toast({ title: "Failed to reject", description: e?.message, variant: "destructive" }),
                       })}
                     ><XCircle className="h-3.5 w-3.5 mr-1" />Reject</Button>
                   </>

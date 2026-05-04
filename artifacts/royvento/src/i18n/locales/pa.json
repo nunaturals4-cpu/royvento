@@ -183,6 +183,7 @@
     "not_found": "ਇਵੈਂਟ ਨਹੀਂ ਮਿਲਿਆ।",
     "wishlist_added": "ਵਿਸ਼ਲਿਸਟ ਵਿੱਚ ਸ਼ਾਮਲ ਕੀਤਾ",
     "wishlist_add_error": "ਵਿਸ਼ਲਿਸਟ ਵਿੱਚ ਸ਼ਾਮਲ ਨਹੀਂ ਕਰ ਸਕੇ",
+    "wishlist_remove_error": "ਵਿਸ਼ਲਿਸਟ ਵਿੱਚੋਂ ਹਟਾ ਨਹੀਂ ਸਕੇ",
     "wishlist_removed": "ਵਿਸ਼ਲਿਸਟ ਤੋਂ ਹਟਾਇਆ",
     "add_wishlist": "ਵਿਸ਼ਲਿਸਟ ਵਿੱਚ ਜੋੜੋ",
     "remove_wishlist": "ਵਿਸ਼ਲਿਸਟ ਤੋਂ ਹਟਾਓ",

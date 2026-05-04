@@ -117,7 +117,7 @@ export function EventDetail() {
   const removeFromWishlist = useMutation({
     mutationFn: () => apiDelete(`/api/wishlist/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: t("events.wishlist_removed") }); },
-    onError: () => toast({ title: t("events.wishlist_add_error"), variant: "destructive" }),
+    onError: () => toast({ title: t("events.wishlist_remove_error"), variant: "destructive" }),
   });
 
   const { data: similarPubs = [] } = useQuery<any[]>({

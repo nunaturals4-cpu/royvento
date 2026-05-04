@@ -183,6 +183,7 @@
     "not_found": "Event not found.",
     "wishlist_added": "Added to wishlist",
     "wishlist_add_error": "Could not add to wishlist",
+    "wishlist_remove_error": "Could not remove from wishlist",
     "wishlist_removed": "Removed from wishlist",
     "add_wishlist": "Add to wishlist",
     "remove_wishlist": "Remove from wishlist",
