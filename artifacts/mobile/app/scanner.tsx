@@ -297,8 +297,24 @@ export default function ScannerScreen() {
                   </View>
                 )}
                 {result.booking.finalPrice === 0 && (
-                  <View style={{ marginTop: 10, alignItems: "center", paddingVertical: 6, borderRadius: 8, backgroundColor: "#22c55e18" }}>
-                    <Text style={{ color: "#22c55e", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Free Entry — No Charge</Text>
+                  <View style={{ marginTop: 12, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}>
+                    <View style={{ backgroundColor: colors.muted, paddingHorizontal: 12, paddingVertical: 6 }}>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.5 }}>Payment Breakdown</Text>
+                    </View>
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 8, gap: 6 }}>
+                      <View style={styles.bookingRow}>
+                        <Text style={[styles.bookingLabel, { color: colors.mutedForeground }]}>Gross Amount</Text>
+                        <Text style={[styles.bookingValue, { color: colors.foreground }]}>₹0</Text>
+                      </View>
+                      <View style={styles.bookingRow}>
+                        <Text style={[styles.bookingLabel, { color: "#f59e0b" }]}>Platform Fee (0%)</Text>
+                        <Text style={[styles.bookingValue, { color: "#f59e0b" }]}>− ₹0</Text>
+                      </View>
+                      <View style={[styles.bookingRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, marginTop: 2 }]}>
+                        <Text style={[styles.bookingLabel, { color: "#22c55e", fontFamily: "Inter_600SemiBold" }]}>Net to Collect</Text>
+                        <Text style={[styles.bookingValue, { color: "#22c55e", fontSize: 15, fontFamily: "Inter_700Bold" }]}>Free Entry</Text>
+                      </View>
+                    </View>
                   </View>
                 )}
               </View>
