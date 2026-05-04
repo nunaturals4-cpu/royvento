@@ -32,7 +32,7 @@ async function getVendorForUser(userId: number) {
   return vendor ?? null;
 }
 
-router.get("/partner/banking-details", requireAuth(["vendor", "admin"]), async (req, res) => {
+router.get("/partner/banking-details", requireAuth(["vendor"]), async (req, res) => {
   const userId = req.user!.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
@@ -47,7 +47,7 @@ router.get("/partner/banking-details", requireAuth(["vendor", "admin"]), async (
   res.json(row ?? null);
 });
 
-router.put("/partner/banking-details", requireAuth(["vendor", "admin"]), async (req, res) => {
+router.put("/partner/banking-details", requireAuth(["vendor"]), async (req, res) => {
   const userId = req.user!.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
@@ -81,7 +81,7 @@ router.put("/partner/banking-details", requireAuth(["vendor", "admin"]), async (
   }
 });
 
-router.get("/partner/settlement/requests", requireAuth(["vendor", "admin"]), async (req, res) => {
+router.get("/partner/settlement/requests", requireAuth(["vendor"]), async (req, res) => {
   const userId = req.user!.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
@@ -96,7 +96,7 @@ router.get("/partner/settlement/requests", requireAuth(["vendor", "admin"]), asy
   res.json(requests);
 });
 
-router.post("/partner/settlement/request", requireAuth(["vendor", "admin"]), async (req, res) => {
+router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, res) => {
   const userId = req.user!.id;
   const vendor = await getVendorForUser(userId);
   if (!vendor) {
@@ -147,7 +147,7 @@ router.get("/admin/settlement-requests", requireAuth(["admin"]), async (req, res
     : rows;
 
   const vendorIds = [...new Set(filtered.map((r) => r.vendorId))];
-  let bankMap: Record<number, { accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string }> = {};
+  let bankMap: Record<number, { id: number; vendorId: number; accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string }> = {};
   if (vendorIds.length > 0) {
     const bankRows = await db
       .select()
@@ -158,7 +158,7 @@ router.get("/admin/settlement-requests", requireAuth(["admin"]), async (req, res
           : inArray(vendorBankingDetailsTable.vendorId, vendorIds),
       );
     for (const b of bankRows) {
-      bankMap[b.vendorId] = { accountHolderName: b.accountHolderName, bankName: b.bankName, accountNumber: b.accountNumber, ifscCode: b.ifscCode };
+      bankMap[b.vendorId] = { id: b.id, vendorId: b.vendorId, accountHolderName: b.accountHolderName, bankName: b.bankName, accountNumber: b.accountNumber, ifscCode: b.ifscCode };
     }
   }
 

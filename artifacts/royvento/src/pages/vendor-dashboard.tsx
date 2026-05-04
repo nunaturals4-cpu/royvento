@@ -4037,8 +4037,9 @@ function BankingPanel() {
       setShowRequestModal(false);
       setRequestAmount("");
       toast({ title: "Settlement request submitted" });
-    } catch (err: any) {
-      toast({ title: (err as any)?.message ?? "Failed to submit request", variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to submit request";
+      toast({ title: msg, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
