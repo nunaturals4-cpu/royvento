@@ -99,12 +99,52 @@ router.post(
   },
 );
 
+// Admin: grant by email (matches web admin usage)
+const AdminGrantByEmailBody = z.object({
+  email: z.string().email(),
+  discountPercent: z.number().int().min(1).max(100).default(10),
+});
+
+router.post("/admin/coupons", requireAuth(["admin"]), async (req, res) => {
+  const parsed = AdminGrantByEmailBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Provide a valid email and discount" });
+  const userRows = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.email, parsed.data.email.trim().toLowerCase()))
+    .limit(1);
+  if (!userRows[0]) return res.status(404).json({ error: "User not found" });
+  const [c] = await db
+    .insert(couponsTable)
+    .values({
+      userId: userRows[0].id,
+      code: genCode("RV"),
+      discountPercent: parsed.data.discountPercent,
+      source: "admin_grant",
+    })
+    .returning();
+  return res.json(c);
+});
+
 router.get("/admin/coupons", requireAuth(["admin"]), async (_req, res) => {
   const rows = await db
     .select()
     .from(couponsTable)
     .orderBy(desc(couponsTable.createdAt));
   return res.json(rows);
+});
+
+// Admin: deactivate (invalidate) a coupon
+router.patch("/admin/coupons/:id/deactivate", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [c] = await db
+    .update(couponsTable)
+    .set({ used: true })
+    .where(eq(couponsTable.id, id))
+    .returning();
+  if (!c) return res.status(404).json({ error: "Not found" });
+  return res.json(c);
 });
 
 export default router;

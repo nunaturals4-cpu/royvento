@@ -704,9 +704,17 @@ export default function AdminPanelScreen() {
   }, []);
 
   // ─── COUPON GRANT FORM STATE ─────────────────────────────────────────────────
-  const [grantUserId, setGrantUserId] = useState("");
+  const [grantEmail, setGrantEmail] = useState("");
   const [grantDiscount, setGrantDiscount] = useState("10");
   const [grantLoading, setGrantLoading] = useState(false);
+
+  // ─── CREATE ANNOUNCEMENT FORM STATE ─────────────────────────────────────────
+  const [newAnnouncementVendorId, setNewAnnouncementVendorId] = useState("");
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState("");
+  const [newAnnouncementBody, setNewAnnouncementBody] = useState("");
+  const [newAnnouncementDate, setNewAnnouncementDate] = useState("");
+  const [newAnnouncementLoading, setNewAnnouncementLoading] = useState(false);
+  const [showCreateAnnouncement, setShowCreateAnnouncement] = useState(false);
 
   // ─── SEND COUPON TO USER (from users tab) ────────────────────────────────────
   const [sendCouponUserId, setSendCouponUserId] = useState<number | null>(null);
@@ -842,10 +850,9 @@ export default function AdminPanelScreen() {
 
   // ─── COUPON GRANT ────────────────────────────────────────────────────────────
   async function grantCoupon() {
-    const uid = Number(grantUserId);
     const pct = Number(grantDiscount);
-    if (!Number.isFinite(uid) || uid < 1) {
-      Alert.alert("Invalid Input", "Enter a valid numeric User ID.");
+    if (!grantEmail.trim() || !grantEmail.includes("@")) {
+      Alert.alert("Invalid Input", "Enter a valid email address.");
       return;
     }
     if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
@@ -854,20 +861,36 @@ export default function AdminPanelScreen() {
     }
     setGrantLoading(true);
     try {
-      await customFetch("/api/admin/coupons/grant", {
+      await customFetch("/api/admin/coupons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: uid, discountPercent: pct }),
+        body: JSON.stringify({ email: grantEmail.trim().toLowerCase(), discountPercent: pct }),
       });
       Alert.alert("Granted", "Coupon granted successfully.");
-      setGrantUserId("");
+      setGrantEmail("");
       setGrantDiscount("10");
       fetchCoupons();
     } catch {
-      Alert.alert("Error", "Failed to grant coupon.");
+      Alert.alert("Error", "Failed to grant coupon. Check that the email is registered.");
     } finally {
       setGrantLoading(false);
     }
+  }
+
+  async function deactivateCoupon(id: number, code: string) {
+    Alert.alert("Deactivate Coupon?", `Mark "${code}" as used/inactive?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Deactivate", style: "destructive", onPress: async () => {
+          try {
+            await customFetch(`/api/admin/coupons/${id}/deactivate`, { method: "PATCH" });
+            fetchCoupons();
+          } catch {
+            Alert.alert("Error", "Failed to deactivate coupon.");
+          }
+        }
+      }
+    ]);
   }
 
   // ─── ANNOUNCEMENT ACTIONS ────────────────────────────────────────────────────
@@ -882,6 +905,58 @@ export default function AdminPanelScreen() {
     } catch {
       Alert.alert("Error", "Failed to update announcement.");
     }
+  }
+
+  async function createAnnouncement() {
+    const vendorId = Number(newAnnouncementVendorId);
+    if (!Number.isFinite(vendorId) || vendorId < 1) {
+      Alert.alert("Invalid Input", "Enter a valid Partner ID.");
+      return;
+    }
+    if (!newAnnouncementTitle.trim()) {
+      Alert.alert("Invalid Input", "Title is required.");
+      return;
+    }
+    setNewAnnouncementLoading(true);
+    try {
+      await customFetch("/api/admin/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vendorId,
+          title: newAnnouncementTitle.trim(),
+          body: newAnnouncementBody.trim(),
+          announceDate: newAnnouncementDate.trim(),
+        }),
+      });
+      Alert.alert("Created", "Announcement created successfully.");
+      setNewAnnouncementVendorId("");
+      setNewAnnouncementTitle("");
+      setNewAnnouncementBody("");
+      setNewAnnouncementDate("");
+      setShowCreateAnnouncement(false);
+      fetchAnnouncements();
+    } catch {
+      Alert.alert("Error", "Failed to create announcement. Check the Partner ID.");
+    } finally {
+      setNewAnnouncementLoading(false);
+    }
+  }
+
+  async function deleteAnnouncement(id: number, title: string) {
+    Alert.alert("Delete Announcement?", `Delete "${title}"? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            await customFetch(`/api/admin/announcements/${id}`, { method: "DELETE" });
+            fetchAnnouncements();
+          } catch {
+            Alert.alert("Error", "Failed to delete announcement.");
+          }
+        }
+      }
+    ]);
   }
 
   // ─── EVENT ACTIONS ──────────────────────────────────────────────────────────
@@ -1556,15 +1631,16 @@ export default function AdminPanelScreen() {
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>GRANT NEW COUPON</Text>
         <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "30" }]}>
           <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 10 }}>
-            Auto-generates a coupon code and assigns it to a user by their ID.
+            Auto-generates a coupon code and assigns it to a registered user by email.
           </Text>
           <TextInput
-            value={grantUserId}
-            onChangeText={setGrantUserId}
-            placeholder="User ID (numeric)"
+            value={grantEmail}
+            onChangeText={setGrantEmail}
+            placeholder="User email address"
             placeholderTextColor={colors.mutedForeground}
             style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10 }]}
-            keyboardType="numeric"
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
           <TextInput
             value={grantDiscount}
@@ -1590,17 +1666,26 @@ export default function AdminPanelScreen() {
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" }}>No active coupons</Text>
         )}
         {activeCoupons.map((c) => (
-          <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.primary + "30" }]}>
-            <View style={[styles.kpiIcon, { backgroundColor: colors.primary + "20" }]}>
-              <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
+          <View key={c.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.primary + "30", flexDirection: "column", gap: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={[styles.kpiIcon, { backgroundColor: colors.primary + "20" }]}>
+                <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.foreground }]}>{c.code}</Text>
+                <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{c.discountPercent}% off{c.userEmail ? ` · ${c.userEmail}` : ""}</Text>
+              </View>
+              <View style={[styles.roleBadge, { backgroundColor: "#22c55e20", borderColor: "#22c55e" }]}>
+                <Text style={{ color: "#22c55e", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Active</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemTitle, { color: colors.foreground }]}>{c.code}</Text>
-              <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{c.discountPercent}% off{c.userEmail ? ` · ${c.userEmail}` : ""}</Text>
-            </View>
-            <View style={[styles.roleBadge, { backgroundColor: "#22c55e20", borderColor: "#22c55e" }]}>
-              <Text style={{ color: "#22c55e", fontSize: 10, fontFamily: "Inter_600SemiBold" }}>Active</Text>
-            </View>
+            <TouchableOpacity
+              style={[styles.actionBtnWide, { backgroundColor: "#ef444410", borderColor: "#ef444440", alignSelf: "flex-start" }]}
+              onPress={() => deactivateCoupon(c.id, c.code)}
+            >
+              <Ionicons name="close-circle-outline" size={13} color="#ef4444" />
+              <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_500Medium" }}>Deactivate</Text>
+            </TouchableOpacity>
           </View>
         ))}
 
@@ -1637,6 +1722,64 @@ export default function AdminPanelScreen() {
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]} refreshControl={<RefreshControl refreshing={announcementLoading} onRefresh={fetchAnnouncements} tintColor={colors.primary} />}>
         {announcementLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
 
+        {/* CREATE ANNOUNCEMENT FORM */}
+        <TouchableOpacity
+          style={[styles.actionBtnWide, { backgroundColor: colors.primary + "20", borderColor: colors.primary, alignSelf: "stretch", marginBottom: 12, justifyContent: "center" }]}
+          onPress={() => setShowCreateAnnouncement((v) => !v)}
+        >
+          <Ionicons name={showCreateAnnouncement ? "chevron-up" : "add-circle-outline"} size={15} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>
+            {showCreateAnnouncement ? "Cancel" : "Create Announcement"}
+          </Text>
+        </TouchableOpacity>
+        {showCreateAnnouncement && (
+          <View style={[styles.rejectBox, { backgroundColor: colors.card, borderColor: colors.primary + "30", marginBottom: 12 }]}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 10 }}>
+              Create an announcement linked to an existing partner. Enter the partner's numeric ID (visible in the Partners tab).
+            </Text>
+            <TextInput
+              value={newAnnouncementVendorId}
+              onChangeText={setNewAnnouncementVendorId}
+              placeholder="Partner ID (numeric)"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10, marginBottom: 8 }]}
+              keyboardType="numeric"
+            />
+            <TextInput
+              value={newAnnouncementTitle}
+              onChangeText={setNewAnnouncementTitle}
+              placeholder="Title *"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10, marginBottom: 8 }]}
+            />
+            <TextInput
+              value={newAnnouncementBody}
+              onChangeText={setNewAnnouncementBody}
+              placeholder="Body / description (optional)"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, paddingVertical: 10, marginBottom: 8 }]}
+              multiline
+            />
+            <TextInput
+              value={newAnnouncementDate}
+              onChangeText={setNewAnnouncementDate}
+              placeholder="Announce date e.g. 2025-12-25 (optional)"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.reasonInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.muted, minHeight: 0, paddingVertical: 10, marginBottom: 12 }]}
+            />
+            <TouchableOpacity
+              style={[styles.actionBtnWide, { backgroundColor: colors.primary, borderColor: colors.primary, alignSelf: "flex-end" }]}
+              onPress={createAnnouncement}
+              disabled={newAnnouncementLoading}
+            >
+              {newAnnouncementLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <><Ionicons name="checkmark" size={14} color="#fff" /><Text style={{ color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Create</Text></>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+
         {sliderAnnouncements.length > 0 && (
           <>
             <Text style={[styles.sectionHeader, { color: colors.primary }]}>FEATURED SLIDER ({sliderAnnouncements.length})</Text>
@@ -1653,16 +1796,25 @@ export default function AdminPanelScreen() {
                   </View>
                 </View>
                 {a.body ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }} numberOfLines={2}>{a.body}</Text> : null}
-                <TouchableOpacity
-                  style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444", alignSelf: "flex-start" }]}
-                  onPress={() => Alert.alert("Remove from Slider?", `Remove "${a.title}" from the featured slider?`, [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Remove", style: "destructive", onPress: () => toggleAnnouncementSlider(a.id, true) }
-                  ])}
-                >
-                  <Ionicons name="remove-circle-outline" size={13} color="#ef4444" />
-                  <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_500Medium" }}>Remove from Slider</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity
+                    style={[styles.actionBtnWide, { backgroundColor: "#ef444420", borderColor: "#ef4444", alignSelf: "flex-start" }]}
+                    onPress={() => Alert.alert("Remove from Slider?", `Remove "${a.title}" from the featured slider?`, [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Remove", style: "destructive", onPress: () => toggleAnnouncementSlider(a.id, true) }
+                    ])}
+                  >
+                    <Ionicons name="remove-circle-outline" size={13} color="#ef4444" />
+                    <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_500Medium" }}>Remove from Slider</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtnWide, { backgroundColor: "#ef444415", borderColor: "#ef444430", alignSelf: "flex-start" }]}
+                    onPress={() => deleteAnnouncement(a.id, a.title)}
+                  >
+                    <Ionicons name="trash-outline" size={13} color="#ef4444" />
+                    <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_500Medium" }}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </>
@@ -1684,16 +1836,25 @@ export default function AdminPanelScreen() {
               </View>
             </View>
             {a.body ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }} numberOfLines={2}>{a.body}</Text> : null}
-            <TouchableOpacity
-              style={[styles.actionBtnWide, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "40", alignSelf: "flex-start" }]}
-              onPress={() => Alert.alert("Add to Slider?", `Feature "${a.title}" in the homepage slider?`, [
-                { text: "Cancel", style: "cancel" },
-                { text: "Add", onPress: () => toggleAnnouncementSlider(a.id, false) }
-              ])}
-            >
-              <Ionicons name="star-outline" size={13} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontSize: 12, fontFamily: "Inter_500Medium" }}>Add to Slider</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: colors.primary + "10", borderColor: colors.primary + "40", alignSelf: "flex-start" }]}
+                onPress={() => Alert.alert("Add to Slider?", `Feature "${a.title}" in the homepage slider?`, [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Add", onPress: () => toggleAnnouncementSlider(a.id, false) }
+                ])}
+              >
+                <Ionicons name="star-outline" size={13} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 12, fontFamily: "Inter_500Medium" }}>Add to Slider</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { backgroundColor: "#ef444415", borderColor: "#ef444430", alignSelf: "flex-start" }]}
+                onPress={() => deleteAnnouncement(a.id, a.title)}
+              >
+                <Ionicons name="trash-outline" size={13} color="#ef4444" />
+                <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_500Medium" }}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
       </ScrollView>

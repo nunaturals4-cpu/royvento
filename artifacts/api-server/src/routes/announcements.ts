@@ -247,6 +247,46 @@ router.get("/admin/announcements", requireAuth(["admin"]), async (_req, res) => 
   return res.json(rows.rows);
 });
 
+// Admin: create announcement (linked to an existing vendor)
+const AdminAnnouncementBody = z.object({
+  vendorId: z.number().int().positive(),
+  title: z.string().min(1).max(255),
+  body: z.string().optional().default(""),
+  announceDate: z.string().optional().default(""),
+  announceTime: z.string().optional().default(""),
+});
+
+router.post("/admin/announcements", requireAuth(["admin"]), async (req, res) => {
+  const parsed = AdminAnnouncementBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+  const vendorRows = await db
+    .select({ id: vendorsTable.id })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.id, parsed.data.vendorId))
+    .limit(1);
+  if (!vendorRows[0]) return res.status(404).json({ error: "Vendor not found" });
+  const [row] = await db
+    .insert(announcementsTable)
+    .values({
+      vendorId: parsed.data.vendorId,
+      title: parsed.data.title,
+      body: parsed.data.body ?? "",
+      announceDate: parsed.data.announceDate ?? "",
+      announceTime: parsed.data.announceTime ?? "",
+      imageUrl: "",
+    })
+    .returning();
+  return res.json(row);
+});
+
+// Admin: delete an announcement
+router.delete("/admin/announcements/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  await db.delete(announcementsTable).where(eq(announcementsTable.id, id));
+  return res.json({ ok: true });
+});
+
 router.patch("/admin/announcements/:id/slider", requireAuth(["admin"]), async (req, res) => {
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
