@@ -290,13 +290,13 @@ export default function DealsScreen() {
     queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/recent"),
     staleTime: 1000 * 60 * 5,
   });
-  const { data: sliderAnnouncements = [], refetch: refetchSlider } = useQuery<RecentAnnouncement[]>({
+  const { data: sliderAnnouncements = [], isLoading: sliderLoading, refetch: refetchSlider } = useQuery<RecentAnnouncement[]>({
     queryKey: ["announcements", "slider"],
     queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/slider"),
     staleTime: 1000 * 60 * 5,
   });
 
-  const isLoading = dealsLoading || annLoading;
+  const isLoading = dealsLoading || annLoading || sliderLoading;
   const isRefreshing = isRefetchingDeals;
 
   function onRefresh() {
