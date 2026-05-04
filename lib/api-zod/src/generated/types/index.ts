@@ -87,6 +87,7 @@ export * from "./meResponse";
 export * from "./myVendorResponse";
 export * from "./notification";
 export * from "./ok";
+export * from "./partnerCommissionRates";
 export * from "./patchAdminEventBody";
 export * from "./previewGooglePubBody";
 export * from "./previewGooglePubResponse";

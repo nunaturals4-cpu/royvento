@@ -968,6 +968,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
+  /partner/commission:
+    get:
+      operationId: getPartnerCommission
+      tags: [bookings]
+      summary: Get commission rates configured for the authenticated partner vendor
+      responses:
+        "200":
+          description: Commission rates for this vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerCommissionRates"
+
   /partner/checkin-report:
     get:
       operationId: getPartnerCheckinReport
@@ -2922,3 +2935,17 @@ components:
           items:
             $ref: "#/components/schemas/DrinkPlanSummary"
       required: [vendorId, vendorName, coverImageUrl, pubEventId, plans]
+
+    PartnerCommissionRates:
+      type: object
+      properties:
+        freeEntryRate:
+          type: string
+          description: Percentage 0–100 (stored as decimal string)
+        ticketRate:
+          type: string
+          description: Percentage 0–100 (stored as decimal string)
+        tableBookingRate:
+          type: string
+          description: Percentage 0–100 (stored as decimal string)
+      required: [freeEntryRate, ticketRate, tableBookingRate]

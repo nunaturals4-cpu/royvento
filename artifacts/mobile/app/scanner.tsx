@@ -29,6 +29,7 @@ interface BookingData {
   ticketMen: number;
   ticketCouple: number;
   guests: number;
+  finalPrice?: number;
 }
 
 interface ScanResult {
@@ -36,6 +37,9 @@ interface ScanResult {
   message?: string;
   checkedInAt?: string;
   booking?: BookingData;
+  commissionRate?: number;
+  commissionAmount?: number;
+  netAmount?: number;
 }
 
 export default function ScannerScreen() {
@@ -268,6 +272,34 @@ export default function ScannerScreen() {
                   <Text style={[styles.bookingMeta, { color: colors.mutedForeground, marginTop: 4 }]}>
                     {result.booking.guests} guest{result.booking.guests !== 1 ? "s" : ""}
                   </Text>
+                )}
+
+                {/* Commission breakdown — shown when finalPrice > 0 and commission rates exist */}
+                {result.booking.finalPrice != null && result.booking.finalPrice > 0 && result.commissionRate != null && (
+                  <View style={{ marginTop: 12, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}>
+                    <View style={{ backgroundColor: colors.muted, paddingHorizontal: 12, paddingVertical: 6 }}>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.5 }}>Payment Breakdown</Text>
+                    </View>
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 8, gap: 6 }}>
+                      <View style={styles.bookingRow}>
+                        <Text style={[styles.bookingLabel, { color: colors.mutedForeground }]}>Gross Amount</Text>
+                        <Text style={[styles.bookingValue, { color: colors.foreground }]}>₹{(result.booking.finalPrice ?? 0).toLocaleString("en-IN")}</Text>
+                      </View>
+                      <View style={styles.bookingRow}>
+                        <Text style={[styles.bookingLabel, { color: "#f59e0b" }]}>Platform Fee ({result.commissionRate.toFixed(1)}%)</Text>
+                        <Text style={[styles.bookingValue, { color: "#f59e0b" }]}>− ₹{(result.commissionAmount ?? 0).toLocaleString("en-IN")}</Text>
+                      </View>
+                      <View style={[styles.bookingRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, marginTop: 2 }]}>
+                        <Text style={[styles.bookingLabel, { color: "#22c55e", fontFamily: "Inter_600SemiBold" }]}>Net to Collect</Text>
+                        <Text style={[styles.bookingValue, { color: "#22c55e", fontSize: 15, fontFamily: "Inter_700Bold" }]}>₹{(result.netAmount ?? 0).toLocaleString("en-IN")}</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+                {result.booking.finalPrice === 0 && (
+                  <View style={{ marginTop: 10, alignItems: "center", paddingVertical: 6, borderRadius: 8, backgroundColor: "#22c55e18" }}>
+                    <Text style={{ color: "#22c55e", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Free Entry — No Charge</Text>
+                  </View>
                 )}
               </View>
             )}

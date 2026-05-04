@@ -888,6 +888,15 @@ export interface VendorDrinkOffer {
   plans: DrinkPlanSummary[];
 }
 
+export interface PartnerCommissionRates {
+  /** Percentage 0–100 (stored as decimal string) */
+  freeEntryRate: string;
+  /** Percentage 0–100 (stored as decimal string) */
+  ticketRate: string;
+  /** Percentage 0–100 (stored as decimal string) */
+  tableBookingRate: string;
+}
+
 export type ListVendorsParams = {
   category?: string;
   country?: string;

@@ -2426,9 +2426,12 @@ export default function VendorDashboardScreen() {
   type AnalyticsResult = {
     totalEarnings: number; monthEarnings: number;
     codRevenue: number; onlineRevenue: number;
+    grossEarnings: number; netEarnings: number; totalCommission: number;
+    commissionRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
     totalWomen: number; totalMen: number; totalCouple: number;
     perEvent: { eventId: number; eventTitle: string; bookingCount: number; revenue: number }[];
     dailyRevenue: { date: string; revenue: number }[];
+    dailyCommission: { date: string; commission: number }[];
   };
   type AnalyticsPresetMobile = "today" | "7d" | "30d" | "3m" | "6m";
   const [analyticsData, setAnalyticsData] = useState<AnalyticsResult | null>(null);
@@ -2465,10 +2468,17 @@ export default function VendorDashboardScreen() {
   function renderAnalytics() {
     if (analyticsLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
     const a = analyticsData;
-    const kpis = [
-      { label: "Total", value: `₹${(a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "cash-outline" as const, color: colors.primary },
+    const hasCommission = a && (Number(a.commissionRates?.ticketRate ?? 0) > 0 || Number(a.commissionRates?.freeEntryRate ?? 0) > 0 || Number(a.commissionRates?.tableBookingRate ?? 0) > 0);
+    const earningsKpis = [
+      { label: "Gross Revenue", value: `₹${(a?.grossEarnings ?? a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "cash-outline" as const, color: colors.primary },
+      { label: "Platform Fee", value: `₹${(a?.totalCommission ?? 0).toLocaleString("en-IN")}`, icon: "remove-circle-outline" as const, color: "#f59e0b" },
+      { label: "Net Earnings", value: `₹${(a?.netEarnings ?? a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "checkmark-circle-outline" as const, color: "#22c55e" },
+    ];
+    const paymentKpis = [
       { label: "Pay at Venue", value: `₹${(a?.codRevenue ?? 0).toLocaleString("en-IN")}`, icon: "wallet-outline" as const, color: "#f59e0b" },
-      { label: "Online", value: `₹${(a?.onlineRevenue ?? 0).toLocaleString("en-IN")}`, icon: "card-outline" as const, color: "#22c55e" },
+      { label: "Online", value: `₹${(a?.onlineRevenue ?? 0).toLocaleString("en-IN")}`, icon: "card-outline" as const, color: "#3b82f6" },
+    ];
+    const guestKpis = [
       { label: "Women", value: String(a?.totalWomen ?? 0), icon: "person-outline" as const, color: "#ec4899" },
       { label: "Men", value: String(a?.totalMen ?? 0), icon: "person-outline" as const, color: "#3b82f6" },
       { label: "Couples", value: String(a?.totalCouple ?? 0), icon: "people-outline" as const, color: "#8b5cf6" },
@@ -2497,9 +2507,47 @@ export default function VendorDashboardScreen() {
           ))}
         </View>
 
+        {/* Platform Charges card */}
+        {hasCommission && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>PLATFORM CHARGES</Text>
+            <View style={[styles.field, { backgroundColor: colors.card, borderColor: "#f59e0b40", flexDirection: "column", gap: 8, borderWidth: 1.5 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                <Ionicons name="information-circle-outline" size={16} color="#f59e0b" />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>Commission rates applied to your bookings</Text>
+              </View>
+              {[
+                { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0" },
+                { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0" },
+                { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0" },
+              ].map((r) => (
+                <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{r.label}</Text>
+                  <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>{Number(r.value).toFixed(1)}%</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>REVENUE OVERVIEW</Text>
+        {/* Gross → Fee → Net row */}
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+          {earningsKpis.map((k) => (
+            <View key={k.label} style={[{ flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, gap: 4, alignItems: "center" }, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[{ width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" }, { backgroundColor: k.color + "20" }]}>
+                <Ionicons name={k.icon} size={15} color={k.color} />
+              </View>
+              <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: k.color }}>{k.value}</Text>
+              <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" }}>{k.label}</Text>
+            </View>
+          ))}
+        </View>
+        {/* Payment method + guests */}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-          {kpis.map((k) => (
+          {[...paymentKpis, ...guestKpis].map((k) => (
             <View key={k.label} style={[{ width: "47%", borderRadius: 14, borderWidth: 1, padding: 14, gap: 6, alignItems: "center" }, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }, { backgroundColor: k.color + "20" }]}>
                 <Ionicons name={k.icon} size={18} color={k.color} />
@@ -2511,22 +2559,41 @@ export default function VendorDashboardScreen() {
         </View>
         {(a?.dailyRevenue ?? []).length > 0 && (() => {
           const daily = a?.dailyRevenue ?? [];
+          const dailyComm = a?.dailyCommission ?? [];
           const max = Math.max(...daily.map((d) => d.revenue), 1);
           return (
             <>
               <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DAILY REVENUE</Text>
               <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 12 }]}>
                 <View style={{ flexDirection: "row", alignItems: "flex-end", height: 60, gap: 3 }}>
-                  {daily.map((d) => (
-                    <View key={d.date} style={{ flex: 1, alignItems: "center" }}>
-                      <View style={{ width: "80%", height: Math.max(4, Math.round((d.revenue / max) * 56)), backgroundColor: d.revenue > 0 ? colors.primary : colors.muted, borderRadius: 3 }} />
-                    </View>
-                  ))}
+                  {daily.map((d, idx) => {
+                    const commAmt = dailyComm[idx]?.commission ?? 0;
+                    const netH = Math.max(4, Math.round(((d.revenue - commAmt) / max) * 56));
+                    const commH = d.revenue > 0 ? Math.max(0, Math.round((commAmt / max) * 56)) : 0;
+                    return (
+                      <View key={d.date} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", height: 60 }}>
+                        {commH > 0 && <View style={{ width: "80%", height: commH, backgroundColor: "#f59e0b", borderRadius: 0 }} />}
+                        <View style={{ width: "80%", height: d.revenue > 0 ? netH : 4, backgroundColor: d.revenue > 0 ? colors.primary : colors.muted, borderRadius: commH > 0 ? 0 : 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 }} />
+                      </View>
+                    );
+                  })}
                 </View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
                   <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[0]?.date?.slice(5) ?? ""}</Text>
                   <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[daily.length - 1]?.date?.slice(5) ?? ""}</Text>
                 </View>
+                {hasCommission && (
+                  <View style={{ flexDirection: "row", gap: 12, marginTop: 6, justifyContent: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colors.primary }} />
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Net</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: "#f59e0b" }} />
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Platform fee</Text>
+                    </View>
+                  </View>
+                )}
               </View>
             </>
           );

@@ -59,6 +59,7 @@ import type {
   MyVendorResponse,
   Notification,
   Ok,
+  PartnerCommissionRates,
   PatchAdminEventBody,
   PreviewGooglePubBody,
   PreviewGooglePubResponse,
@@ -3702,6 +3703,81 @@ export const useDeleteAvailability = <
 > => {
   return useMutation(getDeleteAvailabilityMutationOptions(options));
 };
+
+/**
+ * @summary Get commission rates configured for the authenticated partner vendor
+ */
+export const getGetPartnerCommissionUrl = () => {
+  return `/api/partner/commission`;
+};
+
+export const getPartnerCommission = async (
+  options?: RequestInit,
+): Promise<PartnerCommissionRates> => {
+  return customFetch<PartnerCommissionRates>(getGetPartnerCommissionUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPartnerCommissionQueryKey = () => {
+  return [`/api/partner/commission`] as const;
+};
+
+export const getGetPartnerCommissionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerCommission>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerCommission>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPartnerCommissionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPartnerCommission>>
+  > = ({ signal }) => getPartnerCommission({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerCommission>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerCommissionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerCommission>>
+>;
+export type GetPartnerCommissionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get commission rates configured for the authenticated partner vendor
+ */
+
+export function useGetPartnerCommission<
+  TData = Awaited<ReturnType<typeof getPartnerCommission>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerCommission>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerCommissionQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Attendance / check-in report for the authenticated vendor

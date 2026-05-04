@@ -13,6 +13,7 @@ import {
   partnerBlockedDatesTable,
   paymentsTable,
   vendorManagersTable,
+  vendorCommissionsTable,
 } from "@workspace/db";
 import { sendExpoPushNotification } from "../lib/expoPush";
 import { sendWebPushToUser } from "./webPush";
@@ -584,30 +585,61 @@ router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
 });
 
 // Partner analytics — earnings summary, per-event breakdown, daily revenue
+router.get("/partner/commission", requireAuth(["vendor"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const vRows = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  const vendor = vRows[0];
+  if (!vendor) {
+    res.json({ freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" });
+    return;
+  }
+  const [row] = await db.select().from(vendorCommissionsTable).where(eq(vendorCommissionsTable.vendorId, vendor.id)).limit(1);
+  res.json({
+    freeEntryRate: row?.freeEntryRate ?? "0",
+    ticketRate: row?.ticketRate ?? "0",
+    tableBookingRate: row?.tableBookingRate ?? "0",
+  });
+});
+
 router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
   const vendor = vRows[0];
-  if (!vendor) { res.json({ totalEarnings: 0, monthEarnings: 0, codRevenue: 0, onlineRevenue: 0, perEvent: [], dailyRevenue: [], totalWomen: 0, totalMen: 0, totalCouple: 0 }); return; }
+  if (!vendor) { res.json({ totalEarnings: 0, monthEarnings: 0, codRevenue: 0, onlineRevenue: 0, perEvent: [], dailyRevenue: [], totalWomen: 0, totalMen: 0, totalCouple: 0, grossEarnings: 0, netEarnings: 0, totalCommission: 0, commissionRates: { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" }, dailyCommission: [] }); return; }
 
   const fromStr = req.query["from"] as string | undefined;
   const toStr = req.query["to"] as string | undefined;
   const rangeStart = fromStr ? new Date(`${fromStr}T00:00:00Z`) : undefined;
   const rangeEnd = toStr ? new Date(`${toStr}T23:59:59Z`) : undefined;
 
-  const allBookings = await db
-    .select()
-    .from(bookingsTable)
-    .where(
-      and(
-        eq(bookingsTable.vendorId, vendor.id),
-        inArray(bookingsTable.status, ["confirmed", "completed"]),
-        rangeStart ? gte(bookingsTable.createdAt, rangeStart) : undefined,
-        rangeEnd ? lte(bookingsTable.createdAt, rangeEnd) : undefined,
+  const [allBookings, commissions] = await Promise.all([
+    db
+      .select()
+      .from(bookingsTable)
+      .where(
+        and(
+          eq(bookingsTable.vendorId, vendor.id),
+          inArray(bookingsTable.status, ["confirmed", "completed"]),
+          rangeStart ? gte(bookingsTable.createdAt, rangeStart) : undefined,
+          rangeEnd ? lte(bookingsTable.createdAt, rangeEnd) : undefined,
+        ),
       ),
-    );
+    db.select().from(vendorCommissionsTable).where(eq(vendorCommissionsTable.vendorId, vendor.id)).limit(1),
+  ]);
+
+  const commRow = commissions[0];
+  const commFreeRate = Number(commRow?.freeEntryRate ?? 0) / 100;
+  const commTicketRate = Number(commRow?.ticketRate ?? 0) / 100;
+  const commTableRate = Number(commRow?.tableBookingRate ?? 0) / 100;
+
+  function getCommRate(fp: number, pubMode: string): number {
+    if (pubMode === "table") return commTableRate;
+    if (fp === 0 || pubMode === "free") return commFreeRate;
+    return commTicketRate;
+  }
 
   // Summary figures
   const now = new Date();
@@ -616,12 +648,14 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let monthEarnings = 0;
   let codRevenue = 0;
   let onlineRevenue = 0;
+  let totalCommission = 0;
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
     totalEarnings += fp;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += fp;
     if (b.paymentMethod === "cod") codRevenue += fp;
     else onlineRevenue += fp;
+    totalCommission += fp * getCommRate(fp, b.pubMode ?? "");
   }
 
   // Per-event breakdown
@@ -658,6 +692,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
 
   // Daily revenue — bucketed over selected range (capped at 90 days to keep response small)
   const dailyMap = new Map<string, number>();
+  const dailyCommissionMap = new Map<string, number>();
   const chartEnd = rangeEnd ?? now;
   const chartStart = rangeStart ?? new Date(chartEnd.getTime() - 29 * 24 * 60 * 60 * 1000);
   const dayMs = 24 * 60 * 60 * 1000;
@@ -668,16 +703,22 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   for (let i = 0; i < cappedDays; i++) {
     const d = new Date(effectiveStart.getTime() + i * dayMs);
     dailyMap.set(d.toISOString().slice(0, 10), 0);
+    dailyCommissionMap.set(d.toISOString().slice(0, 10), 0);
   }
   for (const b of allBookings) {
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
+    const fp = Number(b.finalPrice);
     if (dailyMap.has(day)) {
-      dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
+      dailyMap.set(day, (dailyMap.get(day) ?? 0) + fp);
+      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + fp * getCommRate(fp, b.pubMode ?? ""));
     }
   }
   const dailyRevenue = Array.from(dailyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, revenue]) => ({ date, revenue }));
+  const dailyCommission = Array.from(dailyCommissionMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, commission]) => ({ date, commission: Math.round(commission * 100) / 100 }));
 
   const perEventArr = Array.from(perEventMap.values());
   const totalWomen = perEventArr.reduce((s, r) => s + r.ticketWomen, 0);
@@ -689,8 +730,17 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     monthEarnings: Math.round(monthEarnings),
     codRevenue: Math.round(codRevenue),
     onlineRevenue: Math.round(onlineRevenue),
+    grossEarnings: Math.round(totalEarnings),
+    netEarnings: Math.round(totalEarnings - totalCommission),
+    totalCommission: Math.round(totalCommission * 100) / 100,
+    commissionRates: {
+      freeEntryRate: commRow?.freeEntryRate ?? "0",
+      ticketRate: commRow?.ticketRate ?? "0",
+      tableBookingRate: commRow?.tableBookingRate ?? "0",
+    },
     perEvent: perEventArr,
     dailyRevenue,
+    dailyCommission,
     totalWomen,
     totalMen,
     totalCouple,
@@ -1446,12 +1496,35 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // Load vendor to enforce format requirements and verify checksum
-  const vRows = await db.select({ ticketSalt: vendorsTable.ticketSalt, ticketPrefix: vendorsTable.ticketPrefix })
-    .from(vendorsTable)
-    .where(eq(vendorsTable.id, b.vendorId))
-    .limit(1);
+  // Load vendor (format/checksum) and commission rates in parallel
+  const [vRows, scanCommissionRows] = await Promise.all([
+    db.select({ ticketSalt: vendorsTable.ticketSalt, ticketPrefix: vendorsTable.ticketPrefix })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, b.vendorId))
+      .limit(1),
+    db.select().from(vendorCommissionsTable).where(eq(vendorCommissionsTable.vendorId, b.vendorId)).limit(1),
+  ]);
   const scanVendor = vRows[0];
+
+  // Pre-compute commission for this booking
+  const scanComm = scanCommissionRows[0];
+  function calcScanCommission(booking: typeof b) {
+    const price = Number(booking.finalPrice);
+    const freeRate = Number(scanComm?.freeEntryRate ?? 0) / 100;
+    const tickRate = Number(scanComm?.ticketRate ?? 0) / 100;
+    const tableRate = Number(scanComm?.tableBookingRate ?? 0) / 100;
+    let rate: number;
+    if (booking.pubMode === "table") rate = tableRate;
+    else if (price === 0 || booking.pubMode === "free") rate = freeRate;
+    else rate = tickRate;
+    const commissionAmount = Math.round(price * rate * 100) / 100;
+    return {
+      commissionRate: Math.round(rate * 10000) / 100,
+      commissionAmount,
+      netAmount: Math.round((price - commissionAmount) * 100) / 100,
+    };
+  }
+  const scanCommInfo = calcScanCommission(b);
 
   // Lazy backfill: if vendor has no prefix/salt yet, generate them now so all future codes are secure
   let resolvedVendor = scanVendor;
@@ -1502,6 +1575,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       message: "This ticket has already been used for entry.",
       checkedInAt,
       booking: out ?? null,
+      ...scanCommInfo,
     });
     return;
   }
@@ -1528,6 +1602,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
         message: "This ticket has already been used for entry.",
         checkedInAt,
         booking: out ?? null,
+        ...calcScanCommission(current),
       });
     } else {
       res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
@@ -1600,7 +1675,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     console.error("Failed to trigger ticket-scanned email:", err);
   }
 
-  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ?? null });
+  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ?? null, ...calcScanCommission(updated) });
 });
 
 router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) => {

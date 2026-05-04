@@ -1677,6 +1677,21 @@ export const DeleteAvailabilityResponse = zod.object({
 });
 
 /**
+ * @summary Get commission rates configured for the authenticated partner vendor
+ */
+export const GetPartnerCommissionResponse = zod.object({
+  freeEntryRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  ticketRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+  tableBookingRate: zod
+    .string()
+    .describe("Percentage 0–100 (stored as decimal string)"),
+});
+
+/**
  * @summary Attendance / check-in report for the authenticated vendor
  */
 export const GetPartnerCheckinReportQueryParams = zod.object({
