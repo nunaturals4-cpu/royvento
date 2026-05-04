@@ -855,6 +855,7 @@ export default function VendorDashboardScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         loadBookings(1, true);
       },
+      onError: () => Alert.alert("Error", "Failed to update booking status. Please try again."),
     },
   });
 

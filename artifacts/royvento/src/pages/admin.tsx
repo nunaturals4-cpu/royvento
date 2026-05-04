@@ -2897,7 +2897,7 @@ function ImportPubFromGoogle() {
           <div className="flex gap-3">
             <Button variant="outline" onClick={handleReset} className="flex-1">Import another pub</Button>
             <Button variant="secondary" asChild className="flex-1">
-              <a href={`/admin?tab=events`}>View in Events tab</a>
+              <Link href={`/admin?tab=events`}>View in Events tab</Link>
             </Button>
           </div>
         </div>

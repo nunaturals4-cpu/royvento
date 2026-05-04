@@ -3353,7 +3353,7 @@ function LeadsPanel() {
             <p className="text-muted-foreground mb-6">Subscribe to Partner Premium ({formatINR(999)}/mo) to unlock who's viewing your profile and conversion analytics.</p>
           </>
         )}
-        <a href="/subscription"><Button className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Upgrade to Premium</Button></a>
+        <Link href="/subscription"><Button className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Upgrade to Premium</Button></Link>
       </div>
     );
   }
@@ -3370,7 +3370,7 @@ function LeadsPanel() {
           <Crown className="h-5 w-5 text-primary shrink-0" />
           <p className="text-sm text-primary font-medium">
             You have <span className="font-bold">{data.crmTrialDaysRemaining} day{data.crmTrialDaysRemaining === 1 ? "" : "s"}</span> of free CRM access remaining.{" "}
-            <a href="/subscription" className="underline underline-offset-2 hover:text-primary/80">Upgrade to keep it.</a>
+            <Link href="/subscription" className="underline underline-offset-2 hover:text-primary/80">Upgrade to keep it.</Link>
           </p>
         </div>
       )}

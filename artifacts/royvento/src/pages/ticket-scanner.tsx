@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Link } from "wouter";
 import jsQR from "jsqr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -353,7 +354,7 @@ export function TicketScanner() {
           This page is for venue partners and their scanner managers. If you received an invitation, please accept it from your profile.
         </p>
         <ManagerInvitations />
-        <a href="/dashboard/profile" className="inline-flex items-center gap-2 text-sm text-primary underline underline-offset-4">Go to profile to accept invitations</a>
+        <Link href="/dashboard/profile" className="inline-flex items-center gap-2 text-sm text-primary underline underline-offset-4">Go to profile to accept invitations</Link>
       </div>
     );
   }
