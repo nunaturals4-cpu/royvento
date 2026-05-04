@@ -1435,9 +1435,9 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
   const ticketRate = Number(body["ticketRate"] ?? 0);
   const tableBookingRate = Number(body["tableBookingRate"] ?? 0);
   if (
-    !Number.isFinite(freeEntryRate) || freeEntryRate < 0 || freeEntryRate > 99999 ||
-    !Number.isFinite(ticketRate) || ticketRate < 0 || ticketRate > 99999 ||
-    !Number.isFinite(tableBookingRate) || tableBookingRate < 0 || tableBookingRate > 99999
+    !Number.isFinite(freeEntryRate) || freeEntryRate < 0 || freeEntryRate > 99999.99 ||
+    !Number.isFinite(ticketRate) || ticketRate < 0 || ticketRate > 99999.99 ||
+    !Number.isFinite(tableBookingRate) || tableBookingRate < 0 || tableBookingRate > 99999.99
   ) {
     res.status(400).json({ error: "Rates must be valid non-negative numbers" });
     return;
@@ -1583,13 +1583,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     } else if (price === 0 || b.pubMode === "free") {
       bookingType = "free_entry";
       feePerUnit = freeEntryFee;
-      unitCount = Math.max(1, b.guests);
+      unitCount = Math.max(0, b.guests);
       commissionAmount = freeEntryFee * unitCount;
     } else {
       bookingType = "ticket";
       feePerUnit = ticketFee;
       const ticketCount = b.ticketWomen + b.ticketMen + b.ticketCouple;
-      unitCount = Math.max(1, ticketCount);
+      unitCount = Math.max(0, ticketCount);
       commissionAmount = ticketFee * unitCount;
     }
     commissionAmount = Math.min(commissionAmount, price);
