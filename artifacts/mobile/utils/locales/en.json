@@ -121,18 +121,9 @@
     "popular_pubs": "Popular Pubs",
     "whats_on": "What's On",
     "featured_events": "Featured Events",
-    "roy_title": "Hey! I'm Roy 👋",
-    "roy_error": "Sorry, I couldn't get a response. Please try again.",
-    "roy_suggestion_1": "Best pubs in Bandra?",
-    "roy_suggestion_2": "Events this weekend?",
-    "roy_suggestion_3": "Couple-friendly venues?",
-    "roy_placeholder": "Ask Roy anything...",
     "see_all": "See all",
     "discover": "Discover",
-    "events": "Events",
-    "roy_chat_title": "Roy — Nightlife AI",
-    "roy_online": "● Online",
-    "roy_intro": "Your personal nightlife assistant. Ask me about pubs, events, prices, or anything about the Indian nightlife scene!"
+    "events": "Events"
   },
   "explore": {
     "eyebrow": "Explore",

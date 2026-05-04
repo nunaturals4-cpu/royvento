@@ -8,8 +8,6 @@ import NotFound from "@/pages/not-found";
 
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { AiChatWidget } from "@/components/AiChatWidget";
-
 // Pages
 import { Home } from "@/pages/home";
 import { Explore } from "@/pages/explore";
@@ -133,7 +131,6 @@ function Router() {
         </Switch>
       </main>
       <Footer />
-      <AiChatWidget />
     </div>
   );
 }

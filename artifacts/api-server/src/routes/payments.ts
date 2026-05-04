@@ -21,7 +21,6 @@ import {
 } from "../lib/phonepe";
 import {
   sendBookingCreatedEmails,
-  sendWhatsAppBookingConfirmation,
 } from "../lib/notifications";
 
 const router: IRouter = Router();
@@ -123,24 +122,6 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
         ticketCouple: booking.ticketCouple || undefined,
       });
 
-      const whatsappPhone = booking.phone || user.phone;
-      if (whatsappPhone) {
-        sendWhatsAppBookingConfirmation({
-          phone: whatsappPhone,
-          userName: user.name,
-          pubName: vendor.businessName,
-          bookingId: booking.id,
-          bookingDate: booking.bookingDate,
-          pubMode: booking.pubMode || undefined,
-          ticketWomen: booking.ticketWomen || undefined,
-          ticketMen: booking.ticketMen || undefined,
-          ticketCouple: booking.ticketCouple || undefined,
-          guests: booking.guests,
-          totalPrice: Number(booking.finalPrice),
-        }).catch((err: unknown) => {
-          console.error("[whatsapp] Error sending confirmation:", err);
-        });
-      }
     }
   } catch (err) {
     console.error("[payments] Failed to send booking notifications:", err);

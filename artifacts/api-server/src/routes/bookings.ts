@@ -26,7 +26,6 @@ import {
   sendBookingStatusEmail,
   sendCustomerCancelledBookingEmail,
   sendTicketScannedEmail,
-  sendWhatsAppBookingConfirmation,
 } from "../lib/notifications";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 
@@ -430,24 +429,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       ticketCouple: b.ticketCouple || undefined,
     });
 
-    const whatsappPhone = b.phone || user.phone;
-    if (whatsappPhone) {
-      sendWhatsAppBookingConfirmation({
-        phone: whatsappPhone,
-        userName: user.name,
-        pubName: vendorName,
-        bookingId: b.id,
-        bookingDate: b.bookingDate,
-        pubMode: b.pubMode || undefined,
-        ticketWomen: b.ticketWomen || undefined,
-        ticketMen: b.ticketMen || undefined,
-        ticketCouple: b.ticketCouple || undefined,
-        guests: b.guests,
-        totalPrice: Number(b.finalPrice),
-      }).catch((err) => {
-        console.error("[whatsapp] Booking confirmation fire-and-forget error:", err);
-      });
-    }
   } catch (err) {
     console.error("Failed to send booking notifications:", err);
   }
