@@ -3355,7 +3355,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          step={1}
+                          step={0.01}
                           value={edits.freeEntryRate}
                           onChange={(e) => updateRate(row.vendorId, "freeEntryRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
@@ -3365,7 +3365,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          step={1}
+                          step={0.01}
                           value={edits.ticketRate}
                           onChange={(e) => updateRate(row.vendorId, "ticketRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
@@ -3375,7 +3375,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          step={1}
+                          step={0.01}
                           value={edits.tableBookingRate}
                           onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
@@ -3552,7 +3552,7 @@ function CommissionsAdmin() {
                                       <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
                                       <td className="text-right px-2">
                                         {b.commissionRate > 0
-                                          ? `₹${b.commissionRate.toFixed(0)} × ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
+                                          ? `₹${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)} × ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
                                           : "—"}
                                       </td>
                                       <td className="text-right pl-2 text-primary">{formatINR(b.commissionAmount)}</td>

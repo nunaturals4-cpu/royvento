@@ -891,6 +891,10 @@ export interface VendorDrinkOffer {
   plans: DrinkPlanSummary[];
 }
 
+/**
+ * Flat INR commission fees per booking unit. Field names retain the legacy *Rate suffix for backward-compatibility with existing clients.
+
+ */
 export interface PartnerCommissionRates {
   /** Flat fee in INR per person (stored as decimal string) */
   freeEntryRate: string;

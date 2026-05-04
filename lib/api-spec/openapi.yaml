@@ -2997,6 +2997,9 @@ components:
 
     PartnerCommissionRates:
       type: object
+      description: >
+        Flat INR commission fees per booking unit. Field names retain the legacy
+        *Rate suffix for backward-compatibility with existing clients.
       properties:
         freeEntryRate:
           type: string

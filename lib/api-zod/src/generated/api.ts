@@ -1679,17 +1679,21 @@ export const DeleteAvailabilityResponse = zod.object({
 /**
  * @summary Get commission rates configured for the authenticated partner vendor
  */
-export const GetPartnerCommissionResponse = zod.object({
-  freeEntryRate: zod
-    .string()
-    .describe("Flat fee in INR per person (stored as decimal string)"),
-  ticketRate: zod
-    .string()
-    .describe("Flat fee in INR per ticket (stored as decimal string)"),
-  tableBookingRate: zod
-    .string()
-    .describe("Flat fee in INR per table booking (stored as decimal string)"),
-});
+export const GetPartnerCommissionResponse = zod
+  .object({
+    freeEntryRate: zod
+      .string()
+      .describe("Flat fee in INR per person (stored as decimal string)"),
+    ticketRate: zod
+      .string()
+      .describe("Flat fee in INR per ticket (stored as decimal string)"),
+    tableBookingRate: zod
+      .string()
+      .describe("Flat fee in INR per table booking (stored as decimal string)"),
+  })
+  .describe(
+    "Flat INR commission fees per booking unit. Field names retain the legacy \*Rate suffix for backward-compatibility with existing clients.\n",
+  );
 
 /**
  * @summary Revenue and commission analytics for the authenticated partner vendor
@@ -1710,17 +1714,23 @@ export const GetPartnerAnalyticsResponse = zod.object({
   totalCommission: zod.number(),
   codCommission: zod.number(),
   onlineCommission: zod.number(),
-  commissionRates: zod.object({
-    freeEntryRate: zod
-      .string()
-      .describe("Flat fee in INR per person (stored as decimal string)"),
-    ticketRate: zod
-      .string()
-      .describe("Flat fee in INR per ticket (stored as decimal string)"),
-    tableBookingRate: zod
-      .string()
-      .describe("Flat fee in INR per table booking (stored as decimal string)"),
-  }),
+  commissionRates: zod
+    .object({
+      freeEntryRate: zod
+        .string()
+        .describe("Flat fee in INR per person (stored as decimal string)"),
+      ticketRate: zod
+        .string()
+        .describe("Flat fee in INR per ticket (stored as decimal string)"),
+      tableBookingRate: zod
+        .string()
+        .describe(
+          "Flat fee in INR per table booking (stored as decimal string)",
+        ),
+    })
+    .describe(
+      "Flat INR commission fees per booking unit. Field names retain the legacy \*Rate suffix for backward-compatibility with existing clients.\n",
+    ),
   commissionSummary: zod.object({
     freeEntry: zod.object({
       count: zod.number(),
