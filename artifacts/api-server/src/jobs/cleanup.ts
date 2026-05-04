@@ -205,9 +205,7 @@ export async function deleteOldNotifications(): Promise<void> {
       .where(lt(notificationsTable.createdAt, cutoff))
       .returning({ id: notificationsTable.id });
 
-    if (result.length > 0) {
-      logger.info({ count: result.length }, "Cleanup: deleted old notifications");
-    }
+    logger.info({ count: result.length }, "Cleanup: deleted old notifications");
   } catch (err) {
     logger.error({ err }, "Cleanup: failed to delete old notifications");
   }
