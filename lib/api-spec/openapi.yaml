@@ -2873,14 +2873,17 @@ components:
         freeEntryRate:
           type: number
           minimum: 0
+          maximum: 99999.99
           description: Flat fee in INR per person
         ticketRate:
           type: number
           minimum: 0
+          maximum: 99999.99
           description: Flat fee in INR per ticket
         tableBookingRate:
           type: number
           minimum: 0
+          maximum: 99999.99
           description: Flat fee in INR per table booking
       required: [freeEntryRate, ticketRate, tableBookingRate]
 

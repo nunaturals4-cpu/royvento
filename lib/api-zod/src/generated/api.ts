@@ -2237,23 +2237,29 @@ export const SetVendorCommissionParams = zod.object({
 });
 
 export const setVendorCommissionBodyFreeEntryRateMin = 0;
+export const setVendorCommissionBodyFreeEntryRateMax = 99999.99;
 
 export const setVendorCommissionBodyTicketRateMin = 0;
+export const setVendorCommissionBodyTicketRateMax = 99999.99;
 
 export const setVendorCommissionBodyTableBookingRateMin = 0;
+export const setVendorCommissionBodyTableBookingRateMax = 99999.99;
 
 export const SetVendorCommissionBody = zod.object({
   freeEntryRate: zod
     .number()
     .min(setVendorCommissionBodyFreeEntryRateMin)
+    .max(setVendorCommissionBodyFreeEntryRateMax)
     .describe("Flat fee in INR per person"),
   ticketRate: zod
     .number()
     .min(setVendorCommissionBodyTicketRateMin)
+    .max(setVendorCommissionBodyTicketRateMax)
     .describe("Flat fee in INR per ticket"),
   tableBookingRate: zod
     .number()
     .min(setVendorCommissionBodyTableBookingRateMin)
+    .max(setVendorCommissionBodyTableBookingRateMax)
     .describe("Flat fee in INR per table booking"),
 });
 
