@@ -80,7 +80,9 @@ export function Navbar() {
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [cityModalOpen, setCityModalOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLDivElement | null>(null);
 
   const { selectedCity } = useSelectedCity();
 
@@ -111,6 +113,16 @@ export function Navbar() {
     if (notifOpen) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [notifOpen]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    if (searchOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [searchOpen]);
 
   const markRead = async (id: number) => {
     try {
@@ -165,15 +177,40 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-3">
-            <form onSubmit={handleSearch} className="relative hidden lg:block">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("nav.search_placeholder")}
-                className="h-9 w-44 lg:w-60 pl-8 bg-card/60 border-border focus:border-primary/40"
-              />
-            </form>
+            {/* Desktop search — collapsed to icon by default */}
+            <div ref={searchRef} className="hidden lg:block">
+              <div
+                className="overflow-hidden transition-all duration-200 ease-in-out"
+                style={{ width: searchOpen ? "240px" : "36px" }}
+              >
+                {searchOpen ? (
+                  <form
+                    onSubmit={(e) => { handleSearch(e); setSearchOpen(false); }}
+                    className="relative"
+                  >
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      autoFocus
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setQ(""); } }}
+                      placeholder={t("nav.search_placeholder")}
+                      className="h-9 w-60 pl-8 bg-card/60 border-border focus:border-primary/40"
+                    />
+                  </form>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full hover:bg-foreground/5"
+                    onClick={() => setSearchOpen(true)}
+                    aria-label="Search"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {/* City selector — desktop */}
             <button
