@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import {
   useGetVendor,
   useListVendorReviews,
   useListEvents,
+  useGetMe,
 } from "@workspace/api-client-react";
-import { Badge } from "@/components/ui/badge";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { EventCard } from "@/components/EventCard";
-import { Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell } from "lucide-react";
-import { apiGet } from "@/lib/api";
+import { Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell, Heart } from "lucide-react";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface Announcement {
   id: number;
@@ -40,6 +42,10 @@ const PLAN_TYPE_LABELS: Record<string, string> = {
 export function VendorDetail() {
   const params = useParams();
   const id = Number(params["id"]);
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { data: me } = useGetMe({ query: { retry: false } as any });
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: reviews = [] } = useListVendorReviews(id);
   const { data: allEvents = [] } = useListEvents();
@@ -56,6 +62,12 @@ export function VendorDetail() {
       .catch(() => {});
   }, [id]);
 
+  const { data: wishlistItems = [] } = useQuery<{ id: number }[]>({
+    queryKey: ["wishlist"],
+    queryFn: () => apiGet<{ id: number }[]>("/api/wishlist"),
+    enabled: !!me?.user,
+  });
+
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
   if (!vendor) return <div className="container mx-auto px-4 py-20">Partner not found.</div>;
 
@@ -63,6 +75,32 @@ export function VendorDetail() {
   const pubEvent = events.find((e) => e.type === "pub");
   const pubEventTypes: string[] = pubEvent?.pubEventTypes ?? [];
   const danceFloor = vendor.danceFloor;
+
+  const inWishlist = pubEvent ? wishlistItems.some((w) => w.id === pubEvent.id) : false;
+  const addToWishlist = () => {
+    if (!me?.user) { setLocation("/login"); return; }
+    if (!pubEvent) return;
+    qc.setQueryData<{ id: number }[]>(["wishlist"], (old = []) => [...old, { id: pubEvent.id }]);
+    apiPost("/api/wishlist", { eventId: pubEvent.id })
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["wishlist"] });
+        toast({ title: "Added to wishlist" });
+      })
+      .catch(() => {
+        qc.invalidateQueries({ queryKey: ["wishlist"] });
+        toast({ title: "Could not add to wishlist", variant: "destructive" });
+      });
+  };
+  const removeFromWishlist = () => {
+    if (!pubEvent) return;
+    qc.setQueryData<{ id: number }[]>(["wishlist"], (old = []) => old.filter((w) => w.id !== pubEvent.id));
+    apiDelete(`/api/wishlist/${pubEvent.id}`)
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["wishlist"] });
+        toast({ title: "Removed from wishlist" });
+      })
+      .catch(() => qc.invalidateQueries({ queryKey: ["wishlist"] }));
+  };
 
   const fmtTime = (hhmm: string) => {
     if (!hhmm) return "";
@@ -74,7 +112,7 @@ export function VendorDetail() {
   return (
     <div>
       {/* Cinematic venue hero */}
-      <div className="relative min-h-[60vh] w-full overflow-hidden">
+      <div className="relative h-[380px] md:h-[460px] w-full overflow-hidden">
         {/* Full-bleed cover image */}
         {(vendor.coverImageUrl || vendor.bannerImage) ? (
           <div className="absolute inset-0">
@@ -87,26 +125,40 @@ export function VendorDetail() {
         ) : (
           <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 to-black" />
         )}
-        {/* Gradient overlay for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-black/30" />
+        {/* Top scrim */}
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
+        {/* Bottom scrim for text legibility */}
+        <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/95 via-black/65 to-transparent pointer-events-none" />
 
-        {/* Venue title block */}
-        <div className="container mx-auto px-4 md:px-6 pt-8 pb-12">
-          <div className="flex items-center gap-2 flex-wrap mb-4">
-            {vendor.rating > 0 && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10 text-xs">
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                <span className="font-semibold text-white">{vendor.rating.toFixed(1)}</span>
-                <span className="text-white/50">({vendor.reviewCount} reviews)</span>
-              </div>
-            )}
-          </div>
-          <h1 className="font-serif text-4xl md:text-6xl tracking-tight leading-tight">{vendor.businessName}</h1>
-          <div className="flex flex-wrap gap-4 mt-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 text-primary shrink-0" />
-              {vendor.location}
+        {/* Wishlist heart button — top right */}
+        <button
+          onClick={() => inWishlist ? removeFromWishlist() : addToWishlist()}
+          className="absolute top-4 right-4 h-9 w-9 rounded-full bg-black/55 border border-white/15 flex items-center justify-center hover:bg-black/75 transition-colors z-10"
+          aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <Heart className={`h-4 w-4 transition-colors ${inWishlist ? "fill-primary text-primary" : "text-white"}`} />
+        </button>
+
+        {/* Bottom-anchored venue title block */}
+        <div className="absolute bottom-0 left-0 right-0 px-5 md:px-10 pb-7">
+          {vendor.rating > 0 && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10 text-xs mb-3">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span className="font-semibold text-white">{vendor.rating.toFixed(1)}</span>
+              <span className="text-white/50">({vendor.reviewCount} reviews)</span>
+            </div>
+          )}
+          <h1 className="font-serif text-4xl md:text-6xl tracking-tight leading-tight text-white">{vendor.businessName}</h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-sm">
+            <span className="text-white/55">
+              by <span className="text-white/75">{(vendor as any).partnerName || vendor.businessName}</span>
             </span>
+            {vendor.location && (
+              <span className="flex items-center gap-1.5 text-white/55">
+                <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                {vendor.location}
+              </span>
+            )}
             {vendor.address && (
               <a
                 href={`https://maps.google.com/?q=${encodeURIComponent(vendor.address)}`}
@@ -114,7 +166,7 @@ export function VendorDetail() {
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-primary hover:underline"
               >
-                <Navigation className="h-4 w-4 shrink-0" />
+                <Navigation className="h-3.5 w-3.5 shrink-0" />
                 {vendor.address}
               </a>
             )}
@@ -123,7 +175,7 @@ export function VendorDetail() {
                 href={vendor.menuUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-sm text-primary hover:bg-primary/20 transition-colors"
+                className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary hover:bg-primary/20 transition-colors"
               >
                 View Menu
               </a>

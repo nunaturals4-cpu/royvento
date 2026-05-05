@@ -321,6 +321,9 @@ export default function PartnerDetailScreen() {
             ) : null}
           </View>
           <Text style={[styles.vendorName, { color: "#fff", textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{vendor.businessName}</Text>
+          <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 }}>
+            by {(vendor as any).partnerName || vendor.businessName}
+          </Text>
         </View>
       </View>
 
