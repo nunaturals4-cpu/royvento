@@ -770,7 +770,6 @@ function ListingEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
 
 function EventsManager({ vendor, events, refetchEvents, onSaved }: { vendor: any; events: any[]; refetchEvents: () => void; onSaved: () => void }) {
   const [showForm, setShow] = useState(false);
-  const [showListing, setShowListing] = useState(false);
   const [, navigate] = useLocation();
   const del = useDeleteEvent();
   const { toast } = useToast();
@@ -789,26 +788,6 @@ function EventsManager({ vendor, events, refetchEvents, onSaved }: { vendor: any
 
   return (
     <div className="space-y-6">
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowListing((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/[0.08] transition-colors text-left"
-        >
-          <div className="flex items-center gap-2.5">
-            <MapPin className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-sm font-medium">Venue Details</span>
-            <span className="text-xs text-muted-foreground">Location, hours, menu &amp; dance floor</span>
-          </div>
-          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200${showListing ? " rotate-180" : ""}`} />
-        </button>
-        {showListing && (
-          <div className="mt-2">
-            <ListingEditor vendor={vendor} onSaved={onSaved} />
-          </div>
-        )}
-      </div>
-
       <div className="flex justify-between items-center flex-wrap gap-3">
         <h2 className="font-serif text-2xl">Your events &amp; pubs</h2>
         {!hasPub && (
@@ -941,6 +920,41 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
   const create = useCreateEvent();
   const { toast } = useToast();
 
+  // ── Venue details state (mirrors ListingEditor, pre-filled from saved profile) ──
+  const [venueDanceFloor, setVenueDanceFloor] = useState<string>(vendor.danceFloor ?? "");
+  const [venueDanceFloorPhotos, setVenueDanceFloorPhotos] = useState<string[]>(
+    Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []
+  );
+  const [uploadingDfPhoto, setUploadingDfPhoto] = useState(false);
+  const [venueOpenDays, setVenueOpenDays] = useState<string[]>(
+    Array.isArray(vendor.openDays) && vendor.openDays.length > 0 ? vendor.openDays : [...ALL_DAYS]
+  );
+  const [venueDayTimes, setVenueDayTimes] = useState<DayTimes>(() => parseDayHours(vendor.dayHours));
+  const [venueAddress, setVenueAddress] = useState<string>(vendor.address ?? "");
+  const [venueAddressQuery, setVenueAddressQuery] = useState<string>(vendor.address ?? "");
+  const [venueFetchedAddress, setVenueFetchedAddress] = useState<string>("");
+  const [venueAddressMode, setVenueAddressMode] = useState<"business" | "manual">("business");
+  const [venueSuggestions, setVenueSuggestions] = useState<PlacesSuggestion[]>([]);
+  const [venueShowSugg, setVenueShowSugg] = useState(false);
+  const venueDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [venueMenuUrls, setVenueMenuUrls] = useState<string[]>(
+    Array.isArray(vendor.menuUrls) && vendor.menuUrls.length > 0
+      ? vendor.menuUrls
+      : vendor.menuUrl ? [vendor.menuUrl] : []
+  );
+  const [uploadingVenueMenu, setUploadingVenueMenu] = useState(false);
+  const [savingVenue, setSavingVenue] = useState(false);
+  const [venueDayHoursErrors, setVenueDayHoursErrors] = useState<Record<string, string>>(() => {
+    const initial = parseDayHours(vendor.dayHours);
+    const errors: Record<string, string> = {};
+    for (const [day, times] of Object.entries(initial)) {
+      if (times.open && times.close && times.open === times.close) {
+        errors[day] = "Opening and closing time cannot be the same";
+      }
+    }
+    return errors;
+  });
+
   const onImageFile = async (f: File | null) => {
     if (!f) return;
     try { setImageUrl(await fileToDataUrl(f)); } catch { /* ignore */ }
@@ -966,6 +980,136 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
 
   const togglePubEvent = (t: string) =>
     setPubEventTypes((arr) => arr.includes(t) ? arr.filter((x) => x !== t) : [...arr, t]);
+
+  // ── Venue detail helpers ──
+  const uploadVenueMenuFile = async (file: File): Promise<string> => {
+    const res = await fetch("/api/partner/menu-upload", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error ?? "Could not get upload URL");
+    }
+    const { uploadURL, objectPath } = await res.json();
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    if (!put.ok) throw new Error("Upload failed");
+    return `${window.location.origin}/api/storage${objectPath}`;
+  };
+
+  const uploadVenueDanceFloorPhoto = async (file: File): Promise<string> => {
+    const res = await fetch("/api/storage/uploads/request-url", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+    });
+    if (!res.ok) throw new Error("Could not get upload URL");
+    const { uploadURL, objectPath } = await res.json();
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    if (!put.ok) throw new Error("Upload failed");
+    return `/api/storage${objectPath}`;
+  };
+
+  const checkVenueDayError = (open: string, close: string): string => {
+    if (!open || !close) return "";
+    if (open === close) return "Opening and closing time cannot be the same";
+    return "";
+  };
+
+  const searchVenueAddress = (q: string) => {
+    if (venueDebounceRef.current) clearTimeout(venueDebounceRef.current);
+    if (q.trim().length < 3) { setVenueSuggestions([]); setVenueShowSugg(false); return; }
+    venueDebounceRef.current = setTimeout(async () => {
+      try {
+        const data: PlacesSuggestion[] = await apiGet(`/api/places/autocomplete?q=${encodeURIComponent(q)}`);
+        setVenueSuggestions(data);
+        setVenueShowSugg(data.length > 0);
+      } catch { setVenueSuggestions([]); }
+    }, 400);
+  };
+
+  const selectVenueSuggestion = async (s: PlacesSuggestion) => {
+    setVenueAddress(s.description);
+    setVenueAddressQuery(s.description);
+    setVenueFetchedAddress("");
+    setVenueSuggestions([]);
+    setVenueShowSugg(false);
+    try {
+      const details = await apiGet<{ address: string | null; city: string | null; state: string | null; country: string | null }>(
+        `/api/places/details?place_id=${encodeURIComponent(s.place_id)}`
+      );
+      if (details.address) setVenueFetchedAddress(details.address);
+      if (details.city) setCity(details.city);
+      if (details.state) setStateF(details.state);
+      if (details.country) setCountry(details.country);
+    } catch { /* silently ignore */ }
+  };
+
+  const toggleVenueDay = (day: string) =>
+    setVenueOpenDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+
+  const updateVenueDayTime = (day: string, field: "open" | "close", val: string) => {
+    setVenueDayTimes((prev) => {
+      const updated = { ...prev, [day]: { open: prev[day]?.open ?? "", close: prev[day]?.close ?? "", [field]: val } };
+      const { open, close } = updated[day]!;
+      const err = checkVenueDayError(open, close);
+      setVenueDayHoursErrors((e) => ({ ...e, [day]: err }));
+      return updated;
+    });
+  };
+
+  const copyVenueHours = (sourceDay: string, targets: readonly string[]) => {
+    const src = venueDayTimes[sourceDay];
+    if (!src?.open && !src?.close) return;
+    setVenueDayTimes((prev) => {
+      const next = { ...prev };
+      for (const d of targets) {
+        if (d !== sourceDay && venueOpenDays.includes(d)) next[d] = { open: src.open ?? "", close: src.close ?? "" };
+      }
+      return next;
+    });
+    setVenueDayHoursErrors((prev) => {
+      const next = { ...prev };
+      const err = checkVenueDayError(src.open ?? "", src.close ?? "");
+      for (const d of targets) {
+        if (d !== sourceDay && venueOpenDays.includes(d)) next[d] = err;
+      }
+      return next;
+    });
+  };
+
+  const saveVenueDetails = async () => {
+    if (venueOpenDays.length === 0) {
+      toast({ title: "Select at least one open day", variant: "destructive" }); return;
+    }
+    const firstHoursError = venueOpenDays.map((d) => venueDayHoursErrors[d]).find(Boolean);
+    if (firstHoursError) {
+      toast({ title: "Fix opening hours", description: firstHoursError, variant: "destructive" }); return;
+    }
+    const dayHoursPayload: DayTimes = {};
+    for (const day of venueOpenDays) {
+      dayHoursPayload[day] = { open: venueDayTimes[day]?.open ?? "", close: venueDayTimes[day]?.close ?? "" };
+    }
+    setSavingVenue(true);
+    try {
+      await apiPatch("/api/partner/profile", {
+        state: stateF, city, country,
+        address: venueAddress,
+        openDays: venueOpenDays,
+        dayHours: dayHoursPayload,
+        danceFloor: venueDanceFloor || null,
+        danceFloorPhotos: venueDanceFloorPhotos,
+        menuUrl: venueMenuUrls[0] ?? "",
+        menuUrls: venueMenuUrls,
+      });
+      toast({ title: "Venue details saved" });
+    } catch (err: unknown) {
+      toast({ title: "Venue details not saved", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingVenue(false);
+    }
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1278,6 +1422,250 @@ function EventForm({ vendor, lockedType, onCancel, onSaved }: {
             ))}
           </div>
         )}
+      </div>
+
+      {/* ── Venue Details ── */}
+      <div className="border-t border-white/10 pt-5 space-y-5">
+        <p className="font-serif text-lg flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-primary" />Venue Details
+        </p>
+
+        {/* Dance floor */}
+        <div>
+          <Label className="mb-3 block text-sm font-medium">Dance floor</Label>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {DANCE_FLOOR_OPTIONS.map(({ value, label }) => (
+              <label
+                key={value}
+                className={`flex items-center gap-2.5 cursor-pointer rounded-xl border px-4 py-3 text-sm transition-colors flex-1 ${
+                  venueDanceFloor === value
+                    ? "border-primary/50 bg-primary/10 text-foreground"
+                    : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"
+                }`}
+              >
+                <input type="radio" name="venueDanceFloor" value={value} checked={venueDanceFloor === value} onChange={() => setVenueDanceFloor(value)} className="accent-primary" />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+        {venueDanceFloor === "dedicated" && (
+          <div>
+            <Label className="mb-2 block text-sm font-medium flex items-center gap-1.5">
+              <ImageIcon className="h-3.5 w-3.5 text-primary" />Dance floor photos
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {venueDanceFloorPhotos.map((url, i) => (
+                <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-white/10">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => setVenueDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i))}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Trash2 className="h-4 w-4 text-white" />
+                  </button>
+                </div>
+              ))}
+              <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-lg border border-dashed cursor-pointer transition-colors ${uploadingDfPhoto ? "opacity-50 pointer-events-none" : "border-white/20 hover:border-primary/50 bg-black/20 hover:bg-primary/5"}`}>
+                {uploadingDfPhoto ? (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <><Upload className="h-4 w-4 text-muted-foreground mb-1" /><span className="text-xs text-muted-foreground">Add</span></>
+                )}
+                <input type="file" accept="image/*" className="hidden" multiple onChange={async (e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (!files.length) return;
+                  setUploadingDfPhoto(true);
+                  try {
+                    const urls = await Promise.all(files.map((f) => uploadVenueDanceFloorPhoto(f)));
+                    setVenueDanceFloorPhotos((prev) => [...prev, ...urls]);
+                  } catch { toast({ title: "Photo upload failed", variant: "destructive" }); }
+                  finally { setUploadingDfPhoto(false); e.target.value = ""; }
+                }} />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Venue location */}
+        <div>
+          <Label className="mb-2 block text-sm font-medium">Venue location</Label>
+          <div className="flex gap-6 mb-3">
+            {([
+              { value: "business", label: "Enter your business name (as on Google Maps)" },
+              { value: "manual", label: "Add full address" },
+            ] as const).map(({ value, label }) => (
+              <label key={value} className="flex items-center gap-2 cursor-pointer text-sm">
+                <input type="radio" name="venueAddressMode" value={value} checked={venueAddressMode === value}
+                  onChange={() => {
+                    setVenueAddressMode(value);
+                    if (value === "manual") { setVenueSuggestions([]); setVenueShowSugg(false); setVenueFetchedAddress(""); }
+                    else { setVenueAddressQuery(venueAddress); }
+                  }}
+                  className="accent-primary"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          {venueAddressMode === "business" && (
+            <div className="relative">
+              <Input value={venueAddressQuery}
+                onChange={(e) => { setVenueAddressQuery(e.target.value); setVenueAddress(e.target.value); setVenueFetchedAddress(""); searchVenueAddress(e.target.value); }}
+                onBlur={() => setTimeout(() => setVenueShowSugg(false), 200)}
+                onFocus={() => { if (venueSuggestions.length > 0) setVenueShowSugg(true); }}
+                placeholder="e.g. The Bandra Bar Mumbai"
+                className="bg-black/40 border-white/10"
+                autoComplete="off"
+              />
+              {venueShowSugg && venueSuggestions.length > 0 && (
+                <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-card border border-white/10 shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                  {venueSuggestions.map((s) => {
+                    const isEstablishment = s.types.some((t) =>
+                      ["establishment", "point_of_interest", "premise", "lodging", "food", "bar", "restaurant", "night_club", "event_venue"].includes(t)
+                    );
+                    const Icon = isEstablishment ? Building2 : MapPin;
+                    return (
+                      <li key={s.place_id}>
+                        <button type="button" className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 leading-snug flex items-start gap-2.5"
+                          onMouseDown={() => selectVenueSuggestion(s)}>
+                          <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          <span>{s.description}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {venueFetchedAddress && (
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground mb-1 block">Registered address on Google Maps</Label>
+                  <Input value={venueFetchedAddress} readOnly className="bg-black/20 border-white/5 text-muted-foreground cursor-default select-all" />
+                </div>
+              )}
+              {venueAddress.trim() && (
+                <div className="mt-3">
+                  <iframe key={venueAddress} title="Venue location"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(venueAddress)}&output=embed&hl=en`}
+                    className="w-full h-48 md:h-56 rounded-xl border border-white/10"
+                    loading="lazy" referrerPolicy="no-referrer-when-downgrade"
+                  />
+                  <a href={`https://maps.google.com/?q=${encodeURIComponent(venueAddress)}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
+                    <Navigation className="h-3 w-3" />Open in Google Maps ↗
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+          {venueAddressMode === "manual" && (
+            <div>
+              <Textarea value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)}
+                placeholder="e.g. 123 Park Street, Kolkata, West Bengal 700016" rows={3}
+                className="bg-black/40 border-white/10 resize-none" />
+              <p className="text-xs text-muted-foreground mt-1">This address will appear on your public profile. You can paste a full address from Google Maps.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Operating hours */}
+        <div>
+          <Label className="mb-3 block text-sm font-medium">Operating hours</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {ALL_DAYS.map((day) => {
+              const isOpen = venueOpenDays.includes(day);
+              const hasErr = !!venueDayHoursErrors[day];
+              const crossesMid = !hasErr && venueDayTimes[day]?.open && venueDayTimes[day]?.close &&
+                venueDayTimes[day]!.close < venueDayTimes[day]!.open;
+              return (
+                <div key={day} className={`rounded-xl border transition-all ${isOpen ? hasErr ? "border-red-500/40 bg-red-600/5" : "border-white/15 bg-white/[0.04]" : "border-white/8 bg-black/20"}`}>
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div>
+                      <p className={`text-sm font-semibold leading-none ${isOpen ? "text-foreground" : "text-muted-foreground"}`}>{DAY_FULL_NAMES[day]}</p>
+                      {!isOpen && <span className="inline-flex items-center mt-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Closed</span>}
+                    </div>
+                    <button type="button" role="switch" aria-checked={isOpen} onClick={() => toggleVenueDay(day)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isOpen ? "bg-primary" : "bg-white/20"}`}>
+                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition-transform ${isOpen ? "translate-x-4" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+                  {isOpen && (
+                    <div className="px-4 pb-4 pt-1 border-t border-white/8 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> Opens</p>
+                          <Input type="time" value={venueDayTimes[day]?.open ?? ""} onChange={(e) => updateVenueDayTime(day, "open", e.target.value)}
+                            className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> Closes</p>
+                          <Input type="time" value={venueDayTimes[day]?.close ?? ""} onChange={(e) => updateVenueDayTime(day, "close", e.target.value)}
+                            className={`bg-black/40 h-9 text-sm ${hasErr ? "border-red-500/70" : "border-white/10"}`} />
+                        </div>
+                      </div>
+                      {hasErr && <p className="text-xs text-red-400">{venueDayHoursErrors[day]}</p>}
+                      {crossesMid && <p className="text-xs text-amber-400/90">↻ Overnight schedule — closes next day</p>}
+                      {(venueDayTimes[day]?.open || venueDayTimes[day]?.close) && (() => {
+                        const otherOpenDays = venueOpenDays.filter((d) => d !== day);
+                        const weekdayTargets = (WEEKDAYS as readonly string[]).filter((d) => d !== day && venueOpenDays.includes(d));
+                        const weekendTargets = (WEEKEND_DAYS as readonly string[]).filter((d) => d !== day && venueOpenDays.includes(d));
+                        if (otherOpenDays.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button type="button" onClick={() => copyVenueHours(day, ALL_DAYS)} className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors">Copy to all days</button>
+                            {weekdayTargets.length > 0 && <button type="button" onClick={() => copyVenueHours(day, WEEKDAYS)} className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors">Copy to weekdays</button>}
+                            {weekendTargets.length > 0 && <button type="button" onClick={() => copyVenueHours(day, WEEKEND_DAYS)} className="text-[11px] text-primary/80 hover:text-primary underline underline-offset-2 transition-colors">Copy to weekends</button>}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-3">Toggle each day on or off. If closing time is earlier than opening time it is treated as an overnight schedule (e.g. 10 pm – 2 am).</p>
+        </div>
+
+        {/* Pub menu */}
+        <div>
+          <Label className="flex items-center gap-1.5 mb-2">
+            <Upload className="h-3.5 w-3.5 text-primary" />
+            Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
+          </Label>
+          <div className="space-y-2">
+            {venueMenuUrls.length > 0 && (
+              <div className="space-y-1.5">
+                {venueMenuUrls.map((url, idx) => (
+                  <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Menu {idx + 1}</a>
+                    <button type="button" onClick={() => setVenueMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {venueMenuUrls.length < 5 && (
+              <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+                <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground text-xs">{uploadingVenueMenu ? "Uploading…" : `Add menu file (${venueMenuUrls.length}/5)`}</span>
+                <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingVenueMenu(true);
+                  try {
+                    const url = await uploadVenueMenuFile(file);
+                    setVenueMenuUrls((prev) => [...prev, url]);
+                    toast({ title: "Menu uploaded" });
+                  } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
+                  finally { setUploadingVenueMenu(false); e.target.value = ""; }
+                }} />
+              </label>
+            )}
+          </div>
+        </div>
+
+        <Button type="button" disabled={savingVenue} onClick={saveVenueDetails} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
+          {savingVenue ? "Saving…" : "Save Venue Details"}
+        </Button>
       </div>
 
       <div className="flex gap-2">
