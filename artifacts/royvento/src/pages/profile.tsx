@@ -59,9 +59,7 @@ export function Profile() {
   const [invitations, setInvitations] = useState<{ id: number; vendorName: string; createdAt: string }[]>([]);
   const [actingInv, setActingInv] = useState<number | null>(null);
   const [pointsHistory, setPointsHistory] = useState<PointsHistory | null>(null);
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
+
 
   useEffect(() => {
     if (!user) return;
@@ -78,13 +76,6 @@ export function Profile() {
     apiGet<DiscountInfo>("/api/users/me/discounts").then(setDiscountInfo).catch(() => {});
     apiGet<{ id: number; vendorName: string; createdAt: string }[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
     apiGet<PointsHistory>("/api/users/me/points-history").then(setPointsHistory).catch(() => {});
-    if ("serviceWorker" in navigator && "PushManager" in window) {
-      setPushSupported(true);
-      navigator.serviceWorker.ready.then(async (reg) => {
-        const existing = await reg.pushManager.getSubscription();
-        setPushSubscribed(!!existing);
-      }).catch(() => {});
-    }
   }, [user]);
 
   const handleProfileFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,46 +123,6 @@ export function Profile() {
       } catch {
         toast({ title: "Copy failed", description: url });
       }
-    }
-  };
-
-  const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
-    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-    return outputArray;
-  };
-
-  const subscribeToPush = async () => {
-    if (!pushSupported) return;
-    setPushLoading(true);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      if (pushSubscribed) {
-        const sub = await reg.pushManager.getSubscription();
-        await sub?.unsubscribe();
-        await fetch("/api/push/subscribe", { method: "DELETE", credentials: "include" });
-        setPushSubscribed(false);
-        toast({ title: "Push notifications disabled" });
-        return;
-      }
-      const keyRes = await fetch("/api/push/vapid-public-key", { credentials: "include" });
-      if (!keyRes.ok) throw new Error("Push not configured on server");
-      const { publicKey } = await keyRes.json() as { publicKey: string };
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey).buffer as ArrayBuffer,
-      });
-      await apiPost("/api/push/subscribe", { subscription: sub.toJSON() });
-      setPushSubscribed(true);
-      toast({ title: "Push notifications enabled" });
-    } catch (err: any) {
-      const msg = err?.message ?? "Could not enable notifications";
-      toast({ title: "Failed", description: msg, variant: "destructive" });
-    } finally {
-      setPushLoading(false);
     }
   };
 
@@ -474,27 +425,6 @@ export function Profile() {
               </p>
               <Button asChild className="mt-4 w-full bg-gradient-to-br from-red-600 to-red-800 border-0" onClick={() => setLocation("/dashboard/partner")}>
                 <Link href="/dashboard/partner">Open partner dashboard</Link>
-              </Button>
-            </div>
-          )}
-          {pushSupported && (
-            <div className="rounded-3xl glass-card p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Bell className="h-5 w-5 text-primary" />
-                <h2 className="font-serif text-lg">Push notifications</h2>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {pushSubscribed
-                  ? "You'll receive alerts for bookings, announcements, and offers."
-                  : "Get instant alerts for booking confirmations, partner offers, and events."}
-              </p>
-              <Button
-                className="mt-4 w-full"
-                variant={pushSubscribed ? "outline" : "default"}
-                disabled={pushLoading}
-                onClick={subscribeToPush}
-              >
-                {pushLoading ? "Working…" : pushSubscribed ? "Disable notifications" : "Enable notifications"}
               </Button>
             </div>
           )}

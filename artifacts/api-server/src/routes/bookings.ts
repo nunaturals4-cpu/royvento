@@ -910,19 +910,19 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res)
       totalGuests: sql<number>`coalesce(sum(case when ${bookingsTable.status} in ('confirmed','completed') then coalesce(${bookingsTable.ticketWomen},0)+coalesce(${bookingsTable.ticketMen},0)+coalesce(${bookingsTable.ticketCouple},0) else 0 end),0)::int`,
     }).from(bookingsTable).where(baseWhere),
     db.select({
-      month: sql<string>`substring(${bookingsTable.bookingDate},1,7)`,
+      month: sql<string>`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`,
       revenue: sql<number>`coalesce(sum(coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0)),0)::int`,
     }).from(bookingsTable)
       .where(and(baseWhere, inArray(bookingsTable.status, [...confirmedStatuses])))
-      .groupBy(sql`substring(${bookingsTable.bookingDate},1,7)`)
-      .orderBy(sql`substring(${bookingsTable.bookingDate},1,7)`),
+      .groupBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`),
     db.select({
-      month: sql<string>`substring(${bookingsTable.bookingDate},1,7)`,
+      month: sql<string>`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`,
       confirmed: sql<number>`count(*) filter (where ${bookingsTable.status} in ('confirmed','completed'))::int`,
       cancelled: sql<number>`count(*) filter (where ${bookingsTable.status} = 'cancelled')::int`,
     }).from(bookingsTable).where(baseWhere)
-      .groupBy(sql`substring(${bookingsTable.bookingDate},1,7)`)
-      .orderBy(sql`substring(${bookingsTable.bookingDate},1,7)`),
+      .groupBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`),
     db.select({
       eventId: bookingsTable.eventId,
       eventTitle: eventsTable.title,

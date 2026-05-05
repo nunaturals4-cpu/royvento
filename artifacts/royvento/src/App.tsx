@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -49,6 +49,14 @@ const queryClient = new QueryClient({
   },
 });
 
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
+
 function OAuthErrorHandler() {
   const { toast } = useToast();
   useEffect(() => {
@@ -72,6 +80,7 @@ function OAuthErrorHandler() {
 function Router() {
   return (
     <div className="flex flex-col min-h-[100dvh]">
+      <ScrollToTop />
       <OAuthErrorHandler />
       <Navbar />
       <main className="flex-1">
