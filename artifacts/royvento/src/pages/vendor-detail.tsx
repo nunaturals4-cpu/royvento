@@ -151,9 +151,12 @@ export function VendorDetail() {
           )}
           <h1 className="font-serif text-4xl md:text-6xl tracking-tight leading-tight text-white">{vendor.businessName}</h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-sm">
-            <span className="text-white/55">
+            <Link
+              href="/pubs"
+              className="text-white/55 hover:text-white/80 transition-colors"
+            >
               by <span className="text-white/75">{(vendor as Vendor & { partnerName?: string }).partnerName || vendor.businessName}</span>
-            </span>
+            </Link>
             {vendor.location && (
               <span className="flex items-center gap-1.5 text-white/55">
                 <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
