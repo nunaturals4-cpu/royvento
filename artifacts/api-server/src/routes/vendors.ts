@@ -358,6 +358,10 @@ router.get("/vendors/drink-offers", async (_req, res) => {
         productName: p.productName,
         gender: p.gender,
         lineItems: p.lineItems,
+        days: p.days,
+        timeFrom: p.timeFrom,
+        timeTo: p.timeTo,
+        description: p.description,
       })),
     }))
     .filter((v) => v.plans.length > 0);

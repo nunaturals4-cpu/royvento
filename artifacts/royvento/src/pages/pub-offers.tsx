@@ -186,30 +186,54 @@ export function PubOffers() {
                       </div>
                       {/* Plan rows */}
                       <div className="px-3.5 pb-3.5 pt-3 flex flex-col gap-2 flex-1">
-                        {offer.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => (
-                          <div key={i} className="flex items-center gap-2 min-w-0">
-                            <span
-                              className={`flex-shrink-0 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border whitespace-nowrap ${
-                                DEAL_TYPE_COLORS[plan.type as keyof typeof DEAL_TYPE_COLORS] ??
-                                "bg-white/10 text-white/60 border-white/15"
-                              }`}
-                            >
-                              {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
-                            </span>
-                            <span className="text-xs text-white/65 flex-1 leading-snug truncate">
-                              {getPlanLabel(plan)}
-                            </span>
-                            <span
-                              className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                                plan.gender === "female"
-                                  ? "bg-rose-500/20 text-rose-300"
-                                  : "bg-primary/20 text-primary"
-                              }`}
-                            >
-                              {plan.gender === "female" ? "Ladies" : "All"}
-                            </span>
-                          </div>
-                        ))}
+                        {offer.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
+                          const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
+                          const showTime = plan.timeFrom && plan.timeTo;
+                          return (
+                            <div key={i} className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={`flex-shrink-0 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border whitespace-nowrap ${
+                                    DEAL_TYPE_COLORS[plan.type as keyof typeof DEAL_TYPE_COLORS] ??
+                                    "bg-white/10 text-white/60 border-white/15"
+                                  }`}
+                                >
+                                  {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
+                                </span>
+                                <span className="text-xs text-white/65 flex-1 leading-snug truncate">
+                                  {getPlanLabel(plan)}
+                                </span>
+                                <span
+                                  className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                                    plan.gender === "female"
+                                      ? "bg-rose-500/20 text-rose-300"
+                                      : "bg-primary/20 text-primary"
+                                  }`}
+                                >
+                                  {plan.gender === "female" ? "Ladies" : "All"}
+                                </span>
+                              </div>
+                              {(showDays || showTime) && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {showDays && (
+                                    <span className="text-[8px] text-white/35 flex items-center gap-1">
+                                      <Clock className="h-2.5 w-2.5 opacity-50" />
+                                      {plan.days!.map((d) => d.slice(0, 3)).join(" · ")}
+                                    </span>
+                                  )}
+                                  {showTime && (
+                                    <span className="text-[8px] text-white/35">
+                                      {showDays ? "· " : ""}{plan.timeFrom}–{plan.timeTo}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {plan.description && (
+                                <p className="text-[8px] text-white/30 italic truncate">{plan.description}</p>
+                              )}
+                            </div>
+                          );
+                        })}
                         {offer.plans.length > 3 && (
                           <span className="text-[10px] text-white/40">
                             +{offer.plans.length - 3} more

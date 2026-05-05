@@ -44,6 +44,31 @@ interface RecentAnnouncement {
   eventTitle: string;
 }
 
+const DEAL_TYPE_LABELS: Record<string, string> = {
+  welcome: "Free Drink",
+  unlimited: "Unlimited",
+  ticket: "With Ticket",
+  custom: "Discount",
+};
+const DEAL_TYPE_BG: Record<string, string> = {
+  welcome: "rgba(16,185,129,0.15)",
+  unlimited: "rgba(220,38,38,0.15)",
+  ticket: "rgba(139,92,246,0.15)",
+  custom: "rgba(245,158,11,0.15)",
+};
+const DEAL_TYPE_BORDER: Record<string, string> = {
+  welcome: "rgba(16,185,129,0.25)",
+  unlimited: "rgba(220,38,38,0.25)",
+  ticket: "rgba(139,92,246,0.25)",
+  custom: "rgba(245,158,11,0.25)",
+};
+const DEAL_TYPE_COLOR: Record<string, string> = {
+  welcome: "#10b981",
+  unlimited: "#dc2626",
+  ticket: "#8b5cf6",
+  custom: "#f59e0b",
+};
+
 function getPlanLabel(plan: DrinkPlanSummary): string {
   if (plan.type === "welcome") return "Free welcome drink";
   if (plan.type === "unlimited") return "Unlimited drinks";
@@ -227,31 +252,58 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <View style={styles.drinkCardBody}>
-                  {item.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
-                    <View key={i} style={styles.drinkPlanRow}>
-                      <View style={[styles.drinkIconBox, { backgroundColor: colors.primary + "22" }]}>
-                        <Ionicons
-                          name={plan.type === "unlimited" ? "wine-outline" : plan.type === "ticket" ? "ticket-outline" : "star-outline"}
-                          size={11}
-                          color={colors.primary}
-                        />
+                  {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
+                    const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
+                    const showTime = plan.timeFrom && plan.timeTo;
+                    return (
+                      <View key={i} style={styles.drinkPlanRow}>
+                        <View
+                          style={[
+                            styles.drinkTypeBadge,
+                            {
+                              backgroundColor: DEAL_TYPE_BG[plan.type] ?? "rgba(255,255,255,0.08)",
+                              borderColor: DEAL_TYPE_BORDER[plan.type] ?? "rgba(255,255,255,0.12)",
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.drinkTypeBadgeText, { color: DEAL_TYPE_COLOR[plan.type] ?? "rgba(255,255,255,0.5)" }]}>
+                            {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[styles.drinkPlanText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                            {getPlanLabel(plan)}
+                          </Text>
+                          {(showDays || showTime) && (
+                            <Text style={[styles.drinkPlanDetail, { color: "rgba(255,255,255,0.3)" }]} numberOfLines={1}>
+                              {[
+                                showDays ? plan.days!.map((d) => d.slice(0, 3)).join(" · ") : "",
+                                showTime ? `${plan.timeFrom}–${plan.timeTo}` : "",
+                              ].filter(Boolean).join("  ·  ")}
+                            </Text>
+                          )}
+                          {!!plan.description && (
+                            <Text style={[styles.drinkPlanDetail, { color: "rgba(255,255,255,0.25)", fontStyle: "italic" }]} numberOfLines={1}>
+                              {plan.description}
+                            </Text>
+                          )}
+                        </View>
+                        <View
+                          style={[
+                            styles.drinkGenderPill,
+                            { backgroundColor: plan.gender === "female" ? "rgba(244,63,94,0.15)" : "rgba(220,38,38,0.12)" },
+                          ]}
+                        >
+                          <Text style={[styles.drinkGenderText, { color: plan.gender === "female" ? "#e11d48" : "#dc2626" }]}>
+                            {plan.gender === "female" ? "Ladies" : "All"}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={[styles.drinkPlanText, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>
-                        {getPlanLabel(plan)}
-                      </Text>
-                      <View style={[
-                        styles.drinkGenderPill,
-                        { backgroundColor: plan.gender === "female" ? "rgba(244,63,94,0.15)" : "rgba(220,38,38,0.12)" },
-                      ]}>
-                        <Text style={[styles.drinkGenderText, { color: plan.gender === "female" ? "#e11d48" : "#dc2626" }]}>
-                          {plan.gender === "female" ? "Ladies" : "All"}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                  {item.plans.length > 2 && (
+                    );
+                  })}
+                  {item.plans.length > 3 && (
                     <Text style={[styles.drinkMoreText, { color: colors.mutedForeground }]}>
-                      +{item.plans.length - 2} more
+                      +{item.plans.length - 3} more
                     </Text>
                   )}
                   <View style={[styles.drinkCta, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "33" }]}>
@@ -559,7 +611,7 @@ const styles = StyleSheet.create({
   },
   drinkPlanRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
   },
   drinkIconBox: {
@@ -570,9 +622,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
+  drinkTypeBadge: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    flexShrink: 0,
+    alignSelf: "flex-start",
+  },
+  drinkTypeBadgeText: {
+    fontSize: 8,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   drinkPlanText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
+    lineHeight: 16,
+  },
+  drinkPlanDetail: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 14,
+    marginTop: 1,
   },
   drinkGenderPill: {
     borderRadius: 20,

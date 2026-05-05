@@ -123,54 +123,73 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
       </View>
       {/* Plan rows */}
       <View style={styles.dealBody}>
-        {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => (
-          <View key={i} style={styles.planRow}>
-            <View
-              style={[
-                styles.typeBadge,
-                {
-                  backgroundColor: DEAL_TYPE_BG[plan.type] ?? "rgba(255,255,255,0.08)",
-                  borderColor: DEAL_TYPE_BORDER[plan.type] ?? "rgba(255,255,255,0.12)",
-                },
-              ]}
-            >
-              <Text
+        {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
+          const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
+          const showTime = plan.timeFrom && plan.timeTo;
+          return (
+            <View key={i} style={styles.planRow}>
+              <View
                 style={[
-                  styles.typeBadgeText,
-                  { color: DEAL_TYPE_COLOR[plan.type] ?? "rgba(255,255,255,0.5)" },
+                  styles.typeBadge,
+                  {
+                    backgroundColor: DEAL_TYPE_BG[plan.type] ?? "rgba(255,255,255,0.08)",
+                    borderColor: DEAL_TYPE_BORDER[plan.type] ?? "rgba(255,255,255,0.12)",
+                  },
                 ]}
               >
-                {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
-              </Text>
-            </View>
-            <Text
-              style={[styles.planLabelText, { color: colors.mutedForeground, flex: 1 }]}
-              numberOfLines={1}
-            >
-              {getPlanLabel(plan)}
-            </Text>
-            <View
-              style={[
-                styles.genderPill,
-                {
-                  backgroundColor:
-                    plan.gender === "female"
-                      ? "rgba(244,63,94,0.15)"
-                      : colors.primary + "22",
-                },
-              ]}
-            >
-              <Text
+                <Text
+                  style={[
+                    styles.typeBadgeText,
+                    { color: DEAL_TYPE_COLOR[plan.type] ?? "rgba(255,255,255,0.5)" },
+                  ]}
+                >
+                  {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
+                </Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  style={[styles.planLabelText, { color: colors.mutedForeground }]}
+                  numberOfLines={1}
+                >
+                  {getPlanLabel(plan)}
+                </Text>
+                {(showDays || showTime) && (
+                  <Text style={[styles.planDetailText, { color: "rgba(255,255,255,0.3)" }]} numberOfLines={1}>
+                    {[
+                      showDays ? plan.days!.map((d) => d.slice(0, 3)).join(" · ") : "",
+                      showTime ? `${plan.timeFrom}–${plan.timeTo}` : "",
+                    ].filter(Boolean).join("  ·  ")}
+                  </Text>
+                )}
+                {!!plan.description && (
+                  <Text style={[styles.planDetailText, { color: "rgba(255,255,255,0.25)", fontStyle: "italic" }]} numberOfLines={1}>
+                    {plan.description}
+                  </Text>
+                )}
+              </View>
+              <View
                 style={[
-                  styles.genderText,
-                  { color: plan.gender === "female" ? "#e11d48" : colors.primary },
+                  styles.genderPill,
+                  {
+                    backgroundColor:
+                      plan.gender === "female"
+                        ? "rgba(244,63,94,0.15)"
+                        : colors.primary + "22",
+                  },
                 ]}
               >
-                {plan.gender === "female" ? "Ladies" : "All"}
-              </Text>
+                <Text
+                  style={[
+                    styles.genderText,
+                    { color: plan.gender === "female" ? "#e11d48" : colors.primary },
+                  ]}
+                >
+                  {plan.gender === "female" ? "Ladies" : "All"}
+                </Text>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
         {item.plans.length > 3 && (
           <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
             +{item.plans.length - 3} more
@@ -741,7 +760,7 @@ const styles = StyleSheet.create({
   },
   planRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
   },
   typeBadge: {
@@ -758,8 +777,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   planLabelText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
+    lineHeight: 16,
+  },
+  planDetailText: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 14,
+    marginTop: 1,
   },
   genderPill: {
     borderRadius: 10,

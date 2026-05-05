@@ -797,6 +797,14 @@ export interface DrinkPlanSummary {
   productName: string;
   gender: DrinkPlanSummaryGender;
   lineItems?: DrinkPlanLineItem[] | null;
+  /** Applicable days of the week (e.g. ['Monday', 'Friday']). Empty array means all days. */
+  days?: string[];
+  /** Offer start time in HH:MM format. Empty string means no restriction. */
+  timeFrom?: string;
+  /** Offer end time in HH:MM format. Empty string means no restriction. */
+  timeTo?: string;
+  /** Short description of the drink plan. */
+  description?: string;
 }
 
 export interface VendorCommission {

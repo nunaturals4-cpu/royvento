@@ -649,6 +649,28 @@ export const ListVendorDrinkOffersResponseItem = zod.object({
           }),
         )
         .nullish(),
+      days: zod
+        .array(zod.string())
+        .optional()
+        .describe(
+          "Applicable days of the week (e.g. ['Monday', 'Friday']). Empty array means all days.",
+        ),
+      timeFrom: zod
+        .string()
+        .optional()
+        .describe(
+          "Offer start time in HH:MM format. Empty string means no restriction.",
+        ),
+      timeTo: zod
+        .string()
+        .optional()
+        .describe(
+          "Offer end time in HH:MM format. Empty string means no restriction.",
+        ),
+      description: zod
+        .string()
+        .optional()
+        .describe("Short description of the drink plan."),
     }),
   ),
 });

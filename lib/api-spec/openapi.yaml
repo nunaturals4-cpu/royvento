@@ -3000,6 +3000,20 @@ components:
           nullable: true
           items:
             $ref: "#/components/schemas/DrinkPlanLineItem"
+        days:
+          type: array
+          items:
+            type: string
+          description: "Applicable days of the week (e.g. ['Monday', 'Friday']). Empty array means all days."
+        timeFrom:
+          type: string
+          description: "Offer start time in HH:MM format. Empty string means no restriction."
+        timeTo:
+          type: string
+          description: "Offer end time in HH:MM format. Empty string means no restriction."
+        description:
+          type: string
+          description: "Short description of the drink plan."
       required: [type, productName, gender]
 
     VendorCommission:
