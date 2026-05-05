@@ -485,6 +485,13 @@ function timesOverlap(fromA: string, toA: string, fromB: string, toB: string): b
   return a0 < b1 && b0 < a1;
 }
 
+const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+// Treat empty days array as "applies every day of the week"
+function effectiveDays(days: string[]): string[] {
+  return days.length > 0 ? days : [...ALL_DAYS];
+}
+
 async function checkDrinkPlanConflict(
   vendorId: number,
   type: string,
@@ -494,7 +501,7 @@ async function checkDrinkPlanConflict(
   excludePlanId?: number,
 ): Promise<boolean> {
   if (type !== "welcome" && type !== "ticket") return false;
-  if (days.length === 0) return false;
+  const incomingDays = effectiveDays(days);
   const existing = await db
     .select()
     .from(drinkPlansTable)
@@ -504,8 +511,8 @@ async function checkDrinkPlanConflict(
     ));
   for (const plan of existing) {
     if (excludePlanId && plan.id === excludePlanId) continue;
-    if (plan.days.length === 0) continue;
-    const sharedDay = days.some((d) => plan.days.includes(d));
+    const planDays = effectiveDays(plan.days);
+    const sharedDay = incomingDays.some((d) => planDays.includes(d));
     if (!sharedDay) continue;
     if (timesOverlap(timeFrom, timeTo, plan.timeFrom, plan.timeTo)) return true;
   }
@@ -551,13 +558,26 @@ router.patch("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (
   if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
   const parsed = DrinkPlanBody.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
-  if (parsed.data.type && parsed.data.days && parsed.data.timeFrom !== undefined && parsed.data.timeTo !== undefined) {
-    const conflict = await checkDrinkPlanConflict(vendor[0].id, parsed.data.type, parsed.data.days, parsed.data.timeFrom ?? "", parsed.data.timeTo ?? "", planId);
-    if (conflict) {
-      res.status(409).json({ error: "A conflicting free-entry or ticket plan already exists for this day and time." });
-      return;
-    }
+
+  // Load the existing plan so we can compute effective values even for partial patches
+  const [existingPlan] = await db
+    .select()
+    .from(drinkPlansTable)
+    .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, vendor[0].id)));
+  if (!existingPlan) { res.status(404).json({ error: "Plan not found" }); return; }
+
+  // Merge patch over existing to derive effective conflict-check inputs
+  const effectiveType = parsed.data.type ?? existingPlan.type;
+  const effectiveDaysVal = parsed.data.days ?? existingPlan.days;
+  const effectiveTimeFrom = parsed.data.timeFrom ?? existingPlan.timeFrom;
+  const effectiveTimeTo = parsed.data.timeTo ?? existingPlan.timeTo;
+
+  const conflict = await checkDrinkPlanConflict(vendor[0].id, effectiveType, effectiveDaysVal, effectiveTimeFrom, effectiveTimeTo, planId);
+  if (conflict) {
+    res.status(409).json({ error: "A conflicting free-entry or ticket plan already exists for this day and time." });
+    return;
   }
+
   const [updated] = await db
     .update(drinkPlansTable)
     .set(parsed.data)
