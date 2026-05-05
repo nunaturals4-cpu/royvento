@@ -153,7 +153,7 @@ export function Home() {
         </div>
         <div className="container mx-auto px-4 md:px-6 py-32 md:py-0 relative">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full glass-card px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-white/80 mb-8">
+            <div className="inline-flex items-center gap-2 rounded-full glass-card-dark px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-white/80 mb-8">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
               {t("home.hero_eyebrow")}
             </div>

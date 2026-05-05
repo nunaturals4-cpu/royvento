@@ -72,15 +72,15 @@
   --app-font-serif: 'Playfair Display', Georgia, serif;
   --app-font-mono: ui-monospace, Menlo, monospace;
   --radius: .75rem;
-  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.6);
-  --shadow-xs: 0 2px 4px rgba(0,0,0,0.6);
-  --shadow-sm: 0 4px 8px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.4);
-  --shadow: 0 6px 14px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.4);
-  --shadow-md: 0 10px 24px rgba(0,0,0,0.55), 0 4px 8px rgba(0,0,0,0.45);
-  --shadow-lg: 0 18px 40px rgba(0,0,0,0.6), 0 6px 12px rgba(0,0,0,0.45);
-  --shadow-xl: 0 28px 60px rgba(0,0,0,0.65), 0 10px 20px rgba(0,0,0,0.5);
-  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.7), 0 14px 28px rgba(0,0,0,0.55);
-  --shadow-card: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-xs: 0 2px 4px rgba(0,0,0,0.08);
+  --shadow-sm: 0 4px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 6px 14px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-md: 0 10px 24px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
+  --shadow-lg: 0 18px 40px rgba(0,0,0,0.12), 0 6px 12px rgba(0,0,0,0.07);
+  --shadow-xl: 0 28px 60px rgba(0,0,0,0.12), 0 10px 20px rgba(0,0,0,0.07);
+  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.14), 0 14px 28px rgba(0,0,0,0.08);
+  --shadow-card: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -105,57 +105,57 @@
   --radius-full: 9999px;
 }
 
-/* ========== THEME 1: MIDNIGHT NOIR (default) ========== */
+/* ========== THEME 1: CLEAN LIGHT (default) ========== */
 [data-theme="noir"], :root {
-  --button-outline: rgba(255,255,255, .14);
-  --badge-outline: rgba(255,255,255, .08);
+  --button-outline: rgba(0,0,0, .12);
+  --badge-outline: rgba(0,0,0, .06);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .05);
-  --elevate-2: rgba(255,255,255, .10);
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .06);
 
-  --background: 0 0% 5%;
-  --foreground: 0 0% 98%;
-  --border: 0 0% 15%;
+  --background: 0 0% 100%;
+  --foreground: 0 0% 8%;
+  --border: 0 0% 88%;
 
-  --card: 0 0% 10%;
-  --card-foreground: 0 0% 98%;
-  --card-border: 0 0% 18%;
+  --card: 0 0% 99%;
+  --card-foreground: 0 0% 8%;
+  --card-border: 0 0% 88%;
 
-  --sidebar: 0 0% 6%;
-  --sidebar-foreground: 0 0% 98%;
-  --sidebar-border: 0 0% 14%;
+  --sidebar: 0 0% 99%;
+  --sidebar-foreground: 0 0% 8%;
+  --sidebar-border: 0 0% 88%;
   --sidebar-primary: 0 84% 55%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 14%;
-  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-accent: 0 0% 93%;
+  --sidebar-accent-foreground: 0 0% 8%;
   --sidebar-ring: 0 84% 55%;
 
-  --popover: 0 0% 8%;
-  --popover-foreground: 0 0% 98%;
-  --popover-border: 0 0% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 8%;
+  --popover-border: 0 0% 88%;
 
   --primary: 0 84% 55%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 100%;
-  --secondary-foreground: 0 0% 5%;
+  --secondary: 0 0% 93%;
+  --secondary-foreground: 0 0% 8%;
 
-  --muted: 0 0% 12%;
-  --muted-foreground: 0 0% 65%;
+  --muted: 0 0% 93%;
+  --muted-foreground: 0 0% 45%;
 
-  --accent: 0 0% 14%;
-  --accent-foreground: 0 0% 98%;
+  --accent: 0 0% 93%;
+  --accent-foreground: 0 0% 8%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 0 0% 14%;
+  --input: 0 0% 91%;
   --ring: 0 84% 55%;
 
   --chart-1: 0 84% 55%;
-  --chart-2: 0 0% 95%;
-  --chart-3: 0 70% 70%;
-  --chart-4: 0 0% 60%;
+  --chart-2: 0 0% 20%;
+  --chart-3: 0 70% 65%;
+  --chart-4: 0 0% 50%;
   --chart-5: 0 50% 40%;
 
   --sidebar-primary-border: hsl(var(--sidebar-primary));
@@ -167,8 +167,8 @@
   --destructive-border: hsl(var(--destructive));
 
   --theme-glow-rgb: 220, 38, 38;
-  --theme-glass-tint: rgba(255,255,255,0.04);
-  --theme-glass-border: rgba(255,255,255,0.08);
+  --theme-glass-tint: rgba(0,0,0,0.02);
+  --theme-glass-border: rgba(0,0,0,0.08);
 }
 
 /* ========== THEME 2: ROYAL GOLD ========== */
@@ -316,11 +316,7 @@
   * { @apply border-border; }
   body {
     @apply font-sans antialiased text-foreground;
-    background:
-      radial-gradient(1200px 800px at 10% -10%, rgba(var(--theme-glow-rgb), 0.18), transparent 50%),
-      radial-gradient(900px 600px at 100% 0%, rgba(var(--theme-glow-rgb), 0.10), transparent 50%),
-      radial-gradient(1000px 800px at 50% 100%, rgba(var(--theme-glow-rgb), 0.08), transparent 60%),
-      hsl(var(--background));
+    background: hsl(var(--background));
     background-attachment: fixed;
   }
   h1, h2, h3, h4 { letter-spacing: -0.01em; }
@@ -435,24 +431,23 @@
     display: none;
   }
 
-  /* Premium glassmorphism card — default (noir) */
+  /* Premium card — default (light theme) */
   .glass-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-    border: 1px solid rgba(255,255,255,0.08);
-    box-shadow:
-      0 30px 60px -20px rgba(0,0,0,0.7),
-      inset 0 1px 0 rgba(255,255,255,0.06);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
   }
   .glass-card-strong {
-    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.10);
-    box-shadow:
-      0 40px 80px -20px rgba(0,0,0,0.75),
-      inset 0 1px 0 rgba(255,255,255,0.08);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 8px 24px rgba(0,0,0,0.09), 0 2px 6px rgba(0,0,0,0.05);
+  }
+  /* Dark glass card — for use on top of dark image hero sections */
+  .glass-card-dark {
+    background: rgba(0,0,0,0.30);
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
   }
 
   /* 3D lift on hover — default (noir) */
@@ -497,8 +492,8 @@
   /* Hero grid */
   .hero-grid {
     background-image:
-      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
     background-size: 60px 60px;
     mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 80%);
   }
@@ -518,7 +513,7 @@
   .stat-number {
     font-family: var(--app-font-serif);
     font-weight: 700;
-    background: linear-gradient(180deg, #ffffff, #cccccc);
+    background: linear-gradient(180deg, #111111, #555555);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

@@ -1,44 +1,43 @@
 /**
- * Royvento Mobile — Royal Gold theme
- * Derived from sibling web artifact's [data-theme="gold"] palette.
- * The app uses a dark-only theme; both light and dark return the same tokens.
+ * Royvento Mobile — Light theme
+ * White/light background with red primary accent, matching the web app.
  */
 
 const palette = {
-  text: "#f5f3ee",
-  tint: "#d4a017",
+  text: "#111827",
+  tint: "#dc2626",
 
-  background: "#0e0d12",
-  foreground: "#f5f3ee",
+  background: "#ffffff",
+  foreground: "#111827",
 
-  card: "#16151a",
-  cardForeground: "#f5f3ee",
+  card: "#f9fafb",
+  cardForeground: "#111827",
 
-  primary: "#d4a017",
-  primaryForeground: "#0d0d0d",
+  primary: "#dc2626",
+  primaryForeground: "#ffffff",
 
-  secondary: "#232229",
-  secondaryForeground: "#f5f3ee",
+  secondary: "#f3f4f6",
+  secondaryForeground: "#111827",
 
-  muted: "#232229",
-  mutedForeground: "#9c9ba5",
+  muted: "#f3f4f6",
+  mutedForeground: "#6b7280",
 
-  accent: "#1e1c24",
-  accentForeground: "#f5f3ee",
+  accent: "#f3f4f6",
+  accentForeground: "#111827",
 
-  destructive: "#e53935",
+  destructive: "#dc2626",
   destructiveForeground: "#ffffff",
 
-  border: "#2c2b32",
-  input: "#2c2b32",
+  border: "#e5e7eb",
+  input: "#e5e7eb",
 
-  gold: "#d4a017",
-  goldLight: "#e8c050",
-  overlay: "rgba(0,0,0,0.7)",
-  success: "#4caf50",
+  gold: "#dc2626",
+  goldLight: "#ef4444",
+  overlay: "rgba(0,0,0,0.5)",
+  success: "#22c55e",
 
-  tabIconDefault: "#9c9ba5",
-  tabIconSelected: "#d4a017",
+  tabIconDefault: "#9ca3af",
+  tabIconSelected: "#dc2626",
 };
 
 const colors = {
