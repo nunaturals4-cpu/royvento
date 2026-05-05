@@ -1265,7 +1265,9 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
   const [description, setDescription] = useState(event.description ?? "");
   const [imageUrl, setImageUrl] = useState(event.imageUrl ?? "");
   const [galleryImages, setGalleryImages] = useState<string[]>(event.galleryImages ?? []);
-  const [galleryVideos, setGalleryVideos] = useState<string[]>(event.galleryVideos ?? []);
+  const [galleryVideos, setGalleryVideos] = useState<string[]>(
+    event.type === "pub" ? (event.galleryVideos ?? []).slice(0, 1) : (event.galleryVideos ?? [])
+  );
   const [price, setPrice] = useState(Number(event.price ?? 0));
   const [priceWomen, setPriceWomen] = useState(Number(event.priceWomen ?? 0));
   const [priceMen, setPriceMen] = useState(Number(event.priceMen ?? 0));
