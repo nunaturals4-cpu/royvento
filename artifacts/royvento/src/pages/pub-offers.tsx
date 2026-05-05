@@ -151,16 +151,16 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
               </span>
             </div>
 
-            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-tight text-foreground">
+            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-tight text-zinc-900">
               {a.title}
             </h2>
 
-            <p className="text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl text-muted-foreground">
+            <p className="text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl text-zinc-700">
               {a.body}
             </p>
 
             {(a.announceDate || a.announceTime) && (
-              <div className="flex items-center gap-5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-5 text-xs text-zinc-600">
                 {a.announceDate && (
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
