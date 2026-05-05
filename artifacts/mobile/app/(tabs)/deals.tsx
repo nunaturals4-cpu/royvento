@@ -81,7 +81,7 @@ function AnnouncementSlider({ announcements }: { announcements: RecentAnnounceme
   if (announcements.length === 0) return null;
 
   return (
-    <View style={styles.sliderSection}>
+    <View style={[styles.sliderSection, { backgroundColor: colors.muted }]}>
       <View style={styles.sliderHeaderRow}>
         <Ionicons name="megaphone-outline" size={16} color={colors.primary} />
         <Text style={[styles.sliderTitle, { color: colors.foreground }]}>What's On</Text>

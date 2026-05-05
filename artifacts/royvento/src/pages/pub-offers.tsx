@@ -32,12 +32,12 @@ const DEAL_TYPE_LABELS: Record<string, string> = {
   discount: "Discount",
 };
 
-const SLIDE_GRADIENTS = [
-  "from-rose-900 via-rose-950 to-black",
-  "from-violet-900 via-violet-950 to-black",
-  "from-amber-900 via-amber-950 to-black",
-  "from-teal-900 via-teal-950 to-black",
-  "from-indigo-900 via-indigo-950 to-black",
+const SLIDE_LIGHT_GRADIENTS = [
+  "from-rose-50 via-slate-50 to-gray-50",
+  "from-violet-50 via-slate-50 to-gray-50",
+  "from-amber-50 via-slate-50 to-gray-50",
+  "from-teal-50 via-slate-50 to-gray-50",
+  "from-indigo-50 via-slate-50 to-gray-50",
 ];
 
 const BADGE_COLORS = [
@@ -46,6 +46,14 @@ const BADGE_COLORS = [
   "bg-amber-500/20 text-amber-300 border-amber-500/30",
   "bg-teal-500/20 text-teal-300 border-teal-500/30",
   "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+];
+
+const BADGE_COLORS_LIGHT = [
+  "bg-rose-500/15 text-rose-600 border-rose-400/40",
+  "bg-violet-500/15 text-violet-600 border-violet-400/40",
+  "bg-amber-500/15 text-amber-600 border-amber-400/40",
+  "bg-teal-500/15 text-teal-600 border-teal-400/40",
+  "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
 ];
 
 const AUTOPLAY_MS = 5000;
@@ -113,31 +121,36 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
   );
 
   const a = announcements[current];
-  const grad = SLIDE_GRADIENTS[current % SLIDE_GRADIENTS.length];
-  const badgeCls = BADGE_COLORS[current % BADGE_COLORS.length];
+  const lightGrad = SLIDE_LIGHT_GRADIENTS[current % SLIDE_LIGHT_GRADIENTS.length];
+  const badgeCls = a.imageUrl
+    ? BADGE_COLORS[current % BADGE_COLORS.length]
+    : BADGE_COLORS_LIGHT[current % BADGE_COLORS_LIGHT.length];
   const href = a.eventId ? `/events/${a.eventId}` : `/vendors/${a.vendorId}`;
+  const hasImage = !!a.imageUrl;
 
   return (
     <section
-      className="mb-12"
+      className="mb-12 bg-muted"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
       {/* Full-bleed hero slider */}
       <div className="relative w-full overflow-hidden mt-4" style={{ minHeight: 400 }}>
-        {/* Blurred background */}
+        {/* Background */}
         <div className="absolute inset-0">
-          {a.imageUrl ? (
-            <img
-              src={a.imageUrl}
-              alt=""
-              aria-hidden
-              className="h-full w-full object-cover scale-110 blur-xl opacity-25"
-            />
+          {hasImage ? (
+            <>
+              <img
+                src={a.imageUrl}
+                alt=""
+                aria-hidden
+                className="h-full w-full object-cover scale-110 blur-xl opacity-25"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/20" />
+            </>
           ) : (
-            <div className={`h-full w-full bg-gradient-to-br ${grad}`} />
+            <div className={`h-full w-full bg-gradient-to-br ${lightGrad}`} />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/20" />
         </div>
 
         {/* Content row */}
@@ -153,16 +166,16 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
               </span>
             </div>
 
-            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight text-white leading-tight">
+            <h2 className={`font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-tight ${hasImage ? "text-white" : "text-foreground"}`}>
               {a.title}
             </h2>
 
-            <p className="text-white/65 text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl">
+            <p className={`text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl ${hasImage ? "text-white/65" : "text-muted-foreground"}`}>
               {a.body}
             </p>
 
             {(a.announceDate || a.announceTime) && (
-              <div className="flex items-center gap-5 text-xs text-white/45">
+              <div className={`flex items-center gap-5 text-xs ${hasImage ? "text-white/45" : "text-muted-foreground"}`}>
                 {a.announceDate && (
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
@@ -194,15 +207,13 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
           </div>
 
           {/* Right: image card */}
-          <div className="hidden md:flex flex-shrink-0 w-52 lg:w-64 xl:w-72 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
-            {a.imageUrl ? (
+          <div className="hidden md:flex flex-shrink-0 w-52 lg:w-64 xl:w-72 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg ring-1 ring-black/5">
+            {hasImage ? (
               <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover" />
             ) : (
-              <div
-                className={`h-full w-full flex flex-col items-center justify-center bg-gradient-to-br ${grad} gap-3`}
-              >
-                <Megaphone className="h-10 w-10 text-white/25" />
-                <span className="text-white/35 text-xs font-medium text-center px-4 leading-snug">
+              <div className="h-full w-full flex flex-col items-center justify-center bg-white/80 gap-3">
+                <Megaphone className="h-10 w-10 text-muted-foreground/40" />
+                <span className="text-muted-foreground/60 text-xs font-medium text-center px-4 leading-snug">
                   {a.vendorName}
                 </span>
               </div>
@@ -216,16 +227,16 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
             <button
               onClick={prev}
               aria-label={t("pub_offers.prev_slide")}
-              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/40 hover:bg-black/70 border border-white/10 flex items-center justify-center transition-all backdrop-blur-sm"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-background/75 hover:bg-background border border-border flex items-center justify-center transition-all backdrop-blur-sm"
             >
-              <ChevronLeft className="h-4 w-4 text-white" />
+              <ChevronLeft className="h-4 w-4 text-foreground" />
             </button>
             <button
               onClick={next}
               aria-label={t("pub_offers.next_slide")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/40 hover:bg-black/70 border border-white/10 flex items-center justify-center transition-all backdrop-blur-sm"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-background/75 hover:bg-background border border-border flex items-center justify-center transition-all backdrop-blur-sm"
             >
-              <ChevronRight className="h-4 w-4 text-white" />
+              <ChevronRight className="h-4 w-4 text-foreground" />
             </button>
 
             {/* Dots */}
@@ -238,7 +249,7 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
                   className={`rounded-full transition-all duration-300 ${
                     i === current
                       ? "w-6 h-2 bg-primary"
-                      : "w-2 h-2 bg-white/30 hover:bg-white/60"
+                      : "w-2 h-2 bg-foreground/20 hover:bg-foreground/40"
                   }`}
                 />
               ))}
