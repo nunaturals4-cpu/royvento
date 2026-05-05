@@ -1,57 +1,107 @@
 import { Link } from "wouter";
-import { Crown } from "lucide-react";
+import { Crown, Instagram, Facebook, Twitter, QrCode } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="border-t bg-card mt-24">
-      <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-4">
-        <div className="md:col-span-1 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+    <footer className="border-t border-border/60 bg-black/40 backdrop-blur mt-24">
+      <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+        {/* Brand */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-gradient-to-br from-primary via-primary to-primary/70 rounded-lg flex items-center justify-center red-glow">
               <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
             </div>
             <span className="font-serif font-bold text-xl tracking-tight text-primary">Royvento</span>
           </div>
-          <p className="text-muted-foreground text-sm max-w-md leading-relaxed">
+          <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
             Heirloom-quality events. From estate weddings to founder summits and harvest festivals — Royvento is where remarkable hosts find remarkable craft.
           </p>
+          <div className="flex items-center gap-3 pt-1">
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="h-8 w-8 rounded-full border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Instagram className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href="https://facebook.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              className="h-8 w-8 rounded-full border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Facebook className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href="https://x.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="X (Twitter)"
+              className="h-8 w-8 rounded-full border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Twitter className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground">Discover</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><Link href="/explore" className="hover:text-foreground">Explore Events</Link></li>
-            <li><Link href="/vendors" className="hover:text-foreground">Browse Partners</Link></li>
-            <li><Link href="/contact" className="hover:text-foreground">Contact</Link></li>
+
+        {/* Discover */}
+        <div className="space-y-3">
+          <h4 className="font-semibold text-xs tracking-[0.18em] uppercase text-foreground/70">Discover</h4>
+          <ul className="space-y-2.5 text-sm text-muted-foreground">
+            <li><Link href="/explore" className="hover:text-foreground transition-colors">Explore Events</Link></li>
+            <li><Link href="/pubs" className="hover:text-foreground transition-colors">Browse Pubs</Link></li>
+            <li><Link href="/pub-offers" className="hover:text-foreground transition-colors">Hot Deals</Link></li>
+            <li><Link href="/blogs" className="hover:text-foreground transition-colors">Blog</Link></li>
+            <li><Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link></li>
           </ul>
         </div>
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground">For Partners</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><Link href="/register" className="hover:text-foreground">Become a Partner</Link></li>
-            <li><Link href="/login" className="hover:text-foreground">Partner Login</Link></li>
+
+        {/* For Partners */}
+        <div className="space-y-3">
+          <h4 className="font-semibold text-xs tracking-[0.18em] uppercase text-foreground/70">For Partners</h4>
+          <ul className="space-y-2.5 text-sm text-muted-foreground">
+            <li><Link href="/register" className="hover:text-foreground transition-colors">Become a Partner</Link></li>
+            <li><Link href="/login" className="hover:text-foreground transition-colors">Partner Login</Link></li>
             <li>
-              <Link href="/subscription" className="hover:text-foreground flex items-center gap-1.5">
+              <Link href="/subscription" className="hover:text-foreground transition-colors flex items-center gap-1.5">
                 <Crown className="h-3.5 w-3.5 text-primary" />
                 Premium
               </Link>
             </li>
           </ul>
         </div>
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm tracking-wide uppercase text-foreground">Legal</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><Link href="/terms" className="hover:text-foreground">Terms &amp; Conditions</Link></li>
-            <li><Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
+
+        {/* Legal */}
+        <div className="space-y-3">
+          <h4 className="font-semibold text-xs tracking-[0.18em] uppercase text-foreground/70">Legal</h4>
+          <ul className="space-y-2.5 text-sm text-muted-foreground">
+            <li><Link href="/terms" className="hover:text-foreground transition-colors">Terms &amp; Conditions</Link></li>
+            <li><Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
           </ul>
         </div>
+
+        {/* Download App */}
+        <div className="space-y-3 min-w-[140px]">
+          <h4 className="font-semibold text-xs tracking-[0.18em] uppercase text-foreground/70">Get the App</h4>
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-card/30 p-4">
+            <div className="h-24 w-24 rounded-xl bg-white flex items-center justify-center">
+              <QrCode className="h-16 w-16 text-black" strokeWidth={1.5} />
+            </div>
+            <p className="text-[11px] text-muted-foreground text-center leading-tight">Scan to download<br />Royvento Mobile</p>
+          </div>
+        </div>
       </div>
-      <div className="border-t">
-        <div className="container mx-auto px-4 md:px-6 py-5 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span>© {new Date().getFullYear()} Royvento. Crafted with care.</span>
+
+      <div className="border-t border-border/40">
+        <div className="container mx-auto px-4 md:px-6 py-5 text-xs text-muted-foreground/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span>© {new Date().getFullYear()} Royvento. All rights reserved.</span>
           <div className="flex items-center gap-4 flex-wrap justify-center sm:justify-end">
-            <Link href="/terms" className="hover:text-foreground">Terms</Link>
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            <span className="font-serif italic hidden sm:inline">Designed for hosts who notice the details.</span>
+            <Link href="/terms" className="hover:text-muted-foreground transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-muted-foreground transition-colors">Privacy</Link>
+            <span className="font-serif italic hidden sm:inline text-muted-foreground/40">Designed for hosts who notice the details.</span>
           </div>
         </div>
       </div>

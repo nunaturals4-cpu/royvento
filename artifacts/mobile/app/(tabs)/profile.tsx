@@ -345,18 +345,23 @@ export default function ProfileScreen() {
     >
       {/* Hero */}
       <LinearGradient
-        colors={[colors.card, colors.background]}
-        style={[styles.hero, { paddingTop: topPadding + 20 }]}
+        colors={["#121212", colors.background]}
+        style={[styles.hero, { paddingTop: topPadding + 24 }]}
       >
+        {/* Avatar row */}
         <View style={{ position: "relative" }}>
           <Pressable
             onPress={handlePickAndSaveImage}
             accessibilityLabel={t("profile.change_photo")}
           >
             {user.profileImage ? (
-              <Image source={{ uri: user.profileImage }} style={[styles.avatar, { backgroundColor: colors.muted }]} contentFit="cover" />
+              <Image
+                source={{ uri: user.profileImage }}
+                style={[styles.avatar, { backgroundColor: colors.muted, borderWidth: 3, borderColor: colors.primary + "40" }]}
+                contentFit="cover"
+              />
             ) : (
-              <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+              <View style={[styles.avatar, { backgroundColor: colors.primary, borderWidth: 3, borderColor: colors.primary + "40" }]}>
                 <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>{initials}</Text>
               </View>
             )}
@@ -378,26 +383,40 @@ export default function ProfileScreen() {
             <Ionicons name="pencil" size={12} color={colors.primary} />
           </Pressable>
         </View>
-        <Text style={[styles.name, { color: colors.foreground }]}>{user.name}</Text>
+
+        <Text style={[styles.name, { color: colors.foreground, fontSize: 24 }]}>{user.name}</Text>
         <Text style={[styles.email, { color: colors.mutedForeground }]}>{user.email}</Text>
+
         {user.about ? (
           <Text style={[styles.aboutText, { color: colors.mutedForeground }]} numberOfLines={2}>{user.about}</Text>
         ) : null}
-        <View style={[styles.roleBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-          <Ionicons
-            name={
-              user.role === "vendor"
-                ? "business-outline"
-                : user.role === "admin"
-                ? "shield-outline"
-                : "person-outline"
-            }
-            size={12}
-            color={colors.primary}
-          />
-          <Text style={[styles.roleText, { color: colors.primary }]}>
-            {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-          </Text>
+
+        {/* Role badge + points row */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+          <View style={[styles.roleBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <Ionicons
+              name={
+                user.role === "vendor"
+                  ? "business-outline"
+                  : user.role === "admin"
+                  ? "shield-outline"
+                  : "person-outline"
+              }
+              size={12}
+              color={colors.primary}
+            />
+            <Text style={[styles.roleText, { color: colors.primary }]}>
+              {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+            </Text>
+          </View>
+          {(user.points ?? 0) > 0 && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.primary + "18", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + "30" }}>
+              <Ionicons name="star" size={11} color={colors.primary} />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
+                {user.points ?? 0} pts
+              </Text>
+            </View>
+          )}
         </View>
       </LinearGradient>
 
@@ -873,9 +892,9 @@ const styles = StyleSheet.create({
   registerLink: { fontSize: 14, fontFamily: "Inter_500Medium" },
   languageSignedOutBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, borderWidth: 1, marginTop: 4 },
   languageSignedOutText: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  hero: { alignItems: "center", paddingBottom: 28, paddingHorizontal: 20, gap: 6 },
-  avatar: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  avatarText: { fontSize: 28, fontFamily: "Inter_700Bold" },
+  hero: { alignItems: "center", paddingBottom: 32, paddingHorizontal: 20, gap: 8 },
+  avatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  avatarText: { fontSize: 30, fontFamily: "Inter_700Bold" },
   editAvatar: { position: "absolute", bottom: 4, right: -4, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   editProfileBtn: { position: "absolute", top: -4, right: -28, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   name: { fontSize: 22, fontFamily: "Inter_700Bold" },

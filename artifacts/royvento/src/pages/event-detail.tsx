@@ -325,30 +325,57 @@ export function EventDetail() {
 
   return (
     <div>
-      {/* Pub venue cover photo shown as a full-width banner above the event hero */}
-      {isPub && vendorCover && (
-        <div className="w-full h-48 md:h-64 overflow-hidden">
-          <img src={vendorCover} alt="Venue cover" className="w-full h-full object-cover" />
+      {/* Cinematic hero — blurred backdrop + sharp foreground image */}
+      <div className="relative min-h-[72vh] md:min-h-[78vh] w-full overflow-hidden flex flex-col">
+        {/* Blurred full-bleed background */}
+        {(event.imageUrl || (isPub && vendorCover)) && (
+          <div className="absolute inset-0 -z-10">
+            <img
+              src={isPub && vendorCover ? vendorCover : event.imageUrl}
+              alt=""
+              className="h-full w-full object-cover blur-2xl scale-110 opacity-35"
+            />
+          </div>
+        )}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/50 via-background/70 to-background" />
+
+        {/* Event/venue image — constrained, sharp, centred */}
+        <div className="flex-1 flex items-center justify-center px-4 pt-10 pb-0">
+          {event.imageUrl && (
+            <div className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/8">
+              <img
+                src={event.imageUrl}
+                alt={event.title}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
         </div>
-      )}
-      <div className="relative h-[58vh] w-full overflow-hidden">
-        {event.imageUrl ? (
-          <img src={event.imageUrl} alt={event.title} className="absolute inset-0 h-full w-full object-cover" />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-        <div className="container mx-auto px-4 md:px-6 absolute inset-x-0 bottom-0 pb-12">
-          <div className="flex items-center gap-2 mb-3">
+
+        {/* Title block — overlaid at bottom */}
+        <div className="container mx-auto px-4 md:px-6 pt-8 pb-12 relative">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
             <Badge className="bg-white/10 border-white/10 text-white backdrop-blur">{event.category}</Badge>
             {(event as any).type === "pub" && <Badge className="bg-primary/30 text-primary-foreground border-primary/30">Pub</Badge>}
             {(event as any).popular && (
-              <Badge className="bg-primary border-0 text-primary-foreground">{t("events.popular_badge")}</Badge>
+              <Badge className="bg-primary border-0 text-primary-foreground red-glow">{t("events.popular_badge")}</Badge>
+            )}
+            {event.rating > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10 text-xs">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span className="font-semibold text-white">{event.rating.toFixed(1)}</span>
+                <span className="text-white/50">({event.reviewCount})</span>
+              </div>
             )}
           </div>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="font-serif text-4xl md:text-7xl tracking-tight max-w-4xl">{event.title}</h1>
-              <p className="mt-3 text-white/70">
-                by <Link href={`/partners/${event.vendor?.id ?? ""}`} className="underline-offset-4 hover:underline text-white">{event.vendorName}</Link>
+          <div className="flex items-end justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl tracking-tight max-w-4xl leading-tight">{event.title}</h1>
+              <p className="mt-3 text-white/60">
+                by{" "}
+                <Link href={`/partners/${event.vendor?.id ?? ""}`} className="text-white/85 hover:text-white underline underline-offset-4 transition-colors">
+                  {event.vendorName}
+                </Link>
               </p>
             </div>
             {me?.user && (
@@ -356,9 +383,9 @@ export function EventDetail() {
                 onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()}
                 disabled={addToWishlist.isPending || removeFromWishlist.isPending}
                 aria-label={inWishlist ? t("events.remove_wishlist") : t("events.add_wishlist")}
-                className="mt-2 shrink-0 p-2.5 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 transition-colors"
+                className="shrink-0 p-3 rounded-full bg-black/40 border border-white/10 backdrop-blur hover:bg-black/60 transition-colors"
               >
-                <Heart className={`h-6 w-6 transition-colors ${inWishlist ? "fill-primary text-primary" : "text-white"}`} />
+                <Heart className={`h-5 w-5 transition-colors ${inWishlist ? "fill-primary text-primary" : "text-white"}`} />
               </button>
             )}
           </div>
@@ -468,43 +495,52 @@ export function EventDetail() {
           })()}
 
           {isPub && drinkPlans.length > 0 && (
-            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5 space-y-4">
-              <div className="flex items-center gap-2">
-                <Wine className="h-4 w-4 text-primary shrink-0" />
-                <h3 className="font-semibold text-primary text-sm uppercase tracking-wide">{t("events.drink_deals")}</h3>
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 overflow-hidden">
+              {/* Menu header */}
+              <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-primary/15">
+                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                  <Wine className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <h3 className="font-semibold text-primary text-xs uppercase tracking-[0.2em]">{t("events.drink_deals")}</h3>
+                <span className="ml-auto text-[10px] text-primary/50 font-medium uppercase tracking-wide">{drinkPlans.length} plan{drinkPlans.length !== 1 ? "s" : ""}</span>
               </div>
-              <div className="space-y-3">
+              {/* Menu rows */}
+              <div className="divide-y divide-primary/10">
                 {drinkPlans.map((plan: any) => {
                   const hasItems = plan.lineItems && plan.lineItems.length > 0;
                   const isExpanded = expandedDrinkPlans.has(plan.id);
+                  const typeIcon = plan.type === "unlimited" ? "🥂" : plan.type === "ticket" ? "🎫" : plan.type === "welcome" ? "🍹" : "🍸";
                   return (
-                    <div key={plan.id} className="flex flex-col gap-1.5">
+                    <div key={plan.id} className="group">
                       <button
-                        className="flex items-center justify-between gap-3 flex-wrap text-left w-full group"
+                        className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-primary/5 transition-colors"
                         onClick={hasItems ? () => setExpandedDrinkPlans((prev) => {
                           const next = new Set(prev);
                           if (next.has(plan.id)) next.delete(plan.id); else next.add(plan.id);
                           return next;
                         }) : undefined}
+                        type="button"
                       >
-                        <span className="text-sm text-white/85">{getPlanSummary(plan, t)}</span>
+                        <span className="text-base shrink-0 leading-none">{typeIcon}</span>
+                        <span className="flex-1 text-sm text-white/85 font-medium leading-snug">{getPlanSummary(plan, t)}</span>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold border ${plan.gender === "female" ? "bg-rose-500/15 border-rose-500/25 text-rose-300" : "bg-primary/15 border-primary/25 text-primary"}`}>
                             {plan.gender === "female" ? t("events.drink_gender_ladies") : t("events.drink_gender_all")}
                           </span>
                           {hasItems && (
-                            <span className="text-white/30 text-xs group-hover:text-white/60 transition-colors">
+                            <span className="text-white/25 text-[10px] group-hover:text-white/50 transition-colors">
                               {isExpanded ? "▲" : "▼"}
                             </span>
                           )}
                         </div>
                       </button>
                       {hasItems && isExpanded && (
-                        <ul className="space-y-0.5 pl-4">
+                        <ul className="pb-3 px-5 pl-14 space-y-1.5">
                           {plan.lineItems.map((item: any, i: number) => (
-                            <li key={i} className="text-xs text-white/50 flex items-center gap-1.5">
+                            <li key={i} className="text-xs text-white/50 flex items-center gap-2">
                               <span className="h-1 w-1 rounded-full bg-primary/40 shrink-0" />
-                              {item.qty}× {item.name}
+                              <span className="tabular-nums font-medium text-white/40">{item.qty}×</span>
+                              {item.name}
                             </li>
                           ))}
                         </ul>
@@ -690,38 +726,56 @@ export function EventDetail() {
           )}
 
           <section>
-            <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">{t("events.reviews_section")}</h2>
+            <div className="flex items-end justify-between mb-5 flex-wrap gap-3">
+              <h2 className="font-serif text-3xl accent-underline inline-block">{t("events.reviews_section")}</h2>
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-white/60">
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => {
+                      const avg = reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length;
+                      return <Star key={i} className={`h-3.5 w-3.5 ${i < Math.round(avg) ? "fill-amber-400 text-amber-400" : "text-white/20"}`} />;
+                    })}
+                  </div>
+                  <span className="font-semibold text-white/80">
+                    {(reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                  </span>
+                  <span>· {reviews.length} review{reviews.length !== 1 ? "s" : ""}</span>
+                </div>
+              )}
+            </div>
             {reviews.length === 0 ? (
               <p className="text-muted-foreground text-sm mt-4">{t("events.no_reviews")}</p>
             ) : (
-              <div className="space-y-4 mt-4">
+              <div className="space-y-3 mt-4">
                 {reviews.map((r: any) => (
-                  <div key={r.id} className="rounded-xl glass-card p-5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
+                  <div key={r.id} className="rounded-2xl glass-card p-5 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         {r.userImage ? (
-                          <img src={r.userImage} alt={r.userName} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                          <img src={r.userImage} alt={r.userName} className="w-10 h-10 rounded-full object-cover shrink-0" />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold shrink-0">
-                            {r.userName?.charAt(0)}
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold shrink-0">
+                            {r.userName?.charAt(0)?.toUpperCase()}
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{r.userName}</p>
+                          <p className="font-semibold text-sm truncate">{r.userName}</p>
                           {r.verifiedBooking && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-green-400 font-medium">
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium mt-0.5">
                               <BadgeCheck className="h-3 w-3" /> {t("events.verified_booking")}
                             </span>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-0.5 shrink-0">
+                      <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
                         {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                          <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-amber-400 text-amber-400" : "text-white/15"}`} />
                         ))}
                       </div>
                     </div>
-                    <p className="mt-2 text-sm text-white/70 leading-relaxed">{r.comment}</p>
+                    {r.comment && (
+                      <p className="text-sm text-white/65 leading-relaxed">{r.comment}</p>
+                    )}
                   </div>
                 ))}
               </div>

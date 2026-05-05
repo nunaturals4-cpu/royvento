@@ -40,12 +40,20 @@ export function Navbar() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [cityModalOpen, setCityModalOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLDivElement | null>(null);
 
   const { selectedCity } = useSelectedCity();
 
   const user = me?.user as any;
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const loadNotifs = async () => {
     if (!user) return;
@@ -116,18 +124,25 @@ export function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full">
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-xl border-b border-border" />
-        <div className="container mx-auto px-4 md:px-6 h-16 flex items-center justify-between relative gap-3">
-          <div className="flex items-center gap-6 min-w-0">
+        {/* Background — transparent at top, frosted glass when scrolled */}
+        <div
+          className={`absolute inset-0 transition-all duration-300 ${
+            scrolled
+              ? "bg-background/85 backdrop-blur-2xl border-b border-border/60 shadow-md shadow-black/20"
+              : "bg-transparent"
+          }`}
+        />
+        <div className="container mx-auto px-4 md:px-6 h-[68px] flex items-center justify-between relative gap-3">
+          <div className="flex items-center gap-7 min-w-0">
             <Link href="/" className="flex items-center gap-2.5 group shrink-0">
               <div className="relative">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center red-glow">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center red-glow">
                   <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
                 </div>
               </div>
               <span className="font-serif font-bold text-xl tracking-tight">Royvento</span>
             </Link>
-            <nav className="hidden lg:flex items-center gap-6 text-sm font-medium">
+            <nav className="hidden lg:flex items-center gap-7 text-sm font-medium">
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.home")}</Link>
               <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pubs")}</Link>
               <Link href="/pub-offers" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pub_offers")}</Link>
@@ -135,11 +150,11 @@ export function Navbar() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-2 md:gap-2.5">
             {/* Desktop search — collapsed to icon by default */}
             <div ref={searchRef} className="hidden lg:block">
               <div
-                className="overflow-hidden transition-all duration-200 ease-in-out"
+                className="overflow-hidden transition-all duration-300 ease-in-out"
                 style={{ width: searchOpen ? "240px" : "36px" }}
               >
                 {searchOpen ? (
@@ -154,14 +169,14 @@ export function Navbar() {
                       onChange={(e) => setQ(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setQ(""); } }}
                       placeholder={t("nav.search_placeholder")}
-                      className="h-9 w-60 pl-8 bg-card/60 border-border focus:border-primary/40"
+                      className="h-9 w-60 pl-8 bg-card/60 border-border focus:border-primary/40 rounded-full"
                     />
                   </form>
                 ) : (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full hover:bg-foreground/5"
+                    className="h-9 w-9 rounded-full hover:bg-foreground/8"
                     onClick={() => setSearchOpen(true)}
                     aria-label="Search"
                   >
@@ -171,14 +186,14 @@ export function Navbar() {
               </div>
             </div>
 
-            {/* City selector — desktop */}
+            {/* City selector — desktop pill chip */}
             <button
               onClick={() => setCityModalOpen(true)}
-              className="hidden lg:flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-card/60 hover:border-primary/40 hover:bg-card/80 transition-colors text-sm min-w-0 max-w-[140px]"
+              className="hidden lg:flex items-center gap-1.5 h-8 px-3 rounded-full border border-border/70 bg-card/50 hover:border-primary/50 hover:bg-card/80 transition-all text-sm min-w-0 max-w-[140px]"
               aria-label="Select city"
             >
               <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-              <span className="truncate text-sm font-medium text-foreground/80">
+              <span className="truncate text-xs font-medium text-foreground/80">
                 {selectedCity || t("nav.select_city")}
               </span>
               <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -189,7 +204,7 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full hover:bg-foreground/5 relative"
+                  className="h-9 w-9 rounded-full hover:bg-foreground/8 relative"
                   onClick={() => { setNotifOpen((v) => !v); if (!notifOpen) loadNotifs(); }}
                   aria-label="Notifications"
                 >
@@ -202,7 +217,7 @@ export function Navbar() {
                 </Button>
 
                 {notifOpen && (
-                  <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl bg-card border border-border shadow-2xl overflow-hidden">
+                  <div className="absolute right-0 top-12 z-50 w-80 rounded-2xl bg-card border border-border shadow-2xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                       <p className="font-semibold text-sm">{t("nav.notifications")}</p>
                       {unreadCount > 0 && (
@@ -261,7 +276,7 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden h-9 w-9 rounded-full hover:bg-foreground/5"
+              className="lg:hidden h-9 w-9 rounded-full hover:bg-foreground/8"
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
             >
@@ -271,10 +286,10 @@ export function Navbar() {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-foreground/5">
-                    <Avatar className="h-10 w-10 border border-primary/40 ring-2 ring-primary/10">
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-foreground/8 p-0">
+                    <Avatar className="h-9 w-9 border border-primary/40 ring-2 ring-primary/10">
                       {user.profileImage ? <AvatarImage src={user.profileImage} /> : null}
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground font-semibold">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground font-semibold text-sm">
                         {user.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -383,7 +398,7 @@ export function Navbar() {
                   {t("nav.login")}
                 </Link>
                 <Link href="/register" className="hidden lg:block">
-                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0">
+                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0 rounded-full px-5 h-9">
                     {t("nav.register")}
                   </Button>
                 </Link>
@@ -394,7 +409,7 @@ export function Navbar() {
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="lg:hidden relative border-t border-border bg-background/95 backdrop-blur-xl">
+          <div className="lg:hidden relative border-t border-border bg-background/95 backdrop-blur-2xl">
             <div className="container mx-auto px-4 py-4 space-y-4">
               {/* Mobile search */}
               <form onSubmit={(e) => { handleSearch(e); setMobileOpen(false); }} className="relative">
@@ -403,14 +418,14 @@ export function Navbar() {
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder={t("nav.search_placeholder")}
-                  className="h-10 w-full pl-9 bg-card/60 border-border focus:border-primary/40"
+                  className="h-10 w-full pl-9 bg-card/60 border-border focus:border-primary/40 rounded-full"
                 />
               </form>
 
               {/* Mobile city selector */}
               <button
                 onClick={() => { setCityModalOpen(true); setMobileOpen(false); }}
-                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg border border-border bg-card/40 hover:border-primary/40 transition-colors text-sm"
+                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-full border border-border bg-card/40 hover:border-primary/40 transition-colors text-sm"
               >
                 <MapPin className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-foreground/80 font-medium">
@@ -442,10 +457,10 @@ export function Navbar() {
               {!user && (
                 <div className="flex gap-3 pt-1">
                   <Link href="/login" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <Button variant="outline" className="w-full">{t("nav.login")}</Button>
+                    <Button variant="outline" className="w-full rounded-full">{t("nav.login")}</Button>
                   </Link>
                   <Link href="/register" onClick={() => setMobileOpen(false)} className="flex-1">
-                    <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0">{t("nav.register")}</Button>
+                    <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 rounded-full">{t("nav.register")}</Button>
                   </Link>
                 </div>
               )}

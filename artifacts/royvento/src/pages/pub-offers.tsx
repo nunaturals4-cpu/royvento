@@ -286,6 +286,17 @@ export function PubOffers() {
 
   return (
     <div className="pb-14">
+      {/* Page header — always visible, above slider */}
+      {!hasSlider && (
+        <header className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">
+          <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
+            <GlassWater className="h-3.5 w-3.5" /> Hot Deals
+          </p>
+          <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pub_offers.title")}</h1>
+          <p className="mt-4 text-white/60 leading-relaxed max-w-xl">{t("pub_offers.subtitle")}</p>
+        </header>
+      )}
+
       {!hasDeals && !hasSlider && !hasAnnouncements && (
         <div className="container mx-auto px-4 md:px-6">
           <div className="rounded-3xl glass-card p-16 text-center">

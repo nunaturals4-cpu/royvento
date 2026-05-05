@@ -73,22 +73,53 @@ export function VendorDetail() {
 
   return (
     <div>
-      {/* Cover photo (full-width) displayed above the banner hero when set */}
-      {vendor.coverImageUrl && (
-        <div className="w-full h-52 md:h-72 overflow-hidden">
-          <img src={vendor.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
-        </div>
-      )}
-      <div className="relative h-[50vh] w-full overflow-hidden">
-        {vendor.bannerImage ? (
-          <img src={vendor.bannerImage} alt={vendor.businessName} className="absolute inset-0 h-full w-full object-cover" />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-        <div className="container mx-auto px-4 md:px-6 absolute inset-x-0 bottom-0 pb-10">
-          <Badge className="mb-3" variant="secondary">{vendor.category}</Badge>
-          <h1 className="font-serif text-4xl md:text-6xl tracking-tight">{vendor.businessName}</h1>
-          <div className="flex flex-wrap gap-5 mt-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />{vendor.location}</span>
+      {/* Cinematic venue hero */}
+      <div className="relative min-h-[60vh] w-full overflow-hidden flex flex-col">
+        {/* Blurred backdrop */}
+        {(vendor.bannerImage || vendor.coverImageUrl) && (
+          <div className="absolute inset-0 -z-10">
+            <img
+              src={vendor.bannerImage || vendor.coverImageUrl}
+              alt=""
+              className="h-full w-full object-cover blur-xl scale-110 opacity-40"
+            />
+          </div>
+        )}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/55 via-background/65 to-background" />
+
+        {/* Cover image — sharp, centred, contained */}
+        {(vendor.coverImageUrl || vendor.bannerImage) && (
+          <div className="flex-1 flex items-center justify-center px-4 pt-10 pb-0">
+            <div className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/8">
+              <img
+                src={vendor.coverImageUrl || vendor.bannerImage}
+                alt={vendor.businessName}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Venue title block */}
+        <div className="container mx-auto px-4 md:px-6 pt-8 pb-12">
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <Badge variant="secondary" className="bg-white/10 border-white/10 text-white backdrop-blur">
+              {vendor.category}
+            </Badge>
+            {vendor.rating > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10 text-xs">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span className="font-semibold text-white">{vendor.rating.toFixed(1)}</span>
+                <span className="text-white/50">({vendor.reviewCount} reviews)</span>
+              </div>
+            )}
+          </div>
+          <h1 className="font-serif text-4xl md:text-6xl tracking-tight leading-tight">{vendor.businessName}</h1>
+          <div className="flex flex-wrap gap-4 mt-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4 text-primary shrink-0" />
+              {vendor.location}
+            </span>
             {vendor.address && (
               <a
                 href={`https://maps.google.com/?q=${encodeURIComponent(vendor.address)}`}
@@ -96,20 +127,16 @@ export function VendorDetail() {
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-primary hover:underline"
               >
-                <Navigation className="h-4 w-4" />
+                <Navigation className="h-4 w-4 shrink-0" />
                 {vendor.address}
               </a>
             )}
-            <span className="flex items-center gap-1.5">
-              <Star className="h-4 w-4 fill-primary text-primary" />
-              {vendor.rating > 0 ? `${vendor.rating.toFixed(1)} (${vendor.reviewCount} reviews)` : "Newly listed"}
-            </span>
             {vendor.menuUrl && (
               <a
                 href={vendor.menuUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1 text-sm text-primary hover:bg-primary/20 transition-colors"
+                className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-sm text-primary hover:bg-primary/20 transition-colors"
               >
                 View Menu
               </a>

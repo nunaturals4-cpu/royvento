@@ -275,53 +275,59 @@ export default function PartnerDetailScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Banner */}
-      <View style={{ height: 220, position: "relative" }}>
+      {/* Cinematic hero banner */}
+      <View style={{ height: 300, position: "relative" }}>
         {vendor.bannerImage || vendor.coverImageUrl ? (
           <Image
             source={{ uri: vendor.bannerImage || vendor.coverImageUrl }}
-            style={{ width: "100%", height: 220 }}
+            style={{ width: "100%", height: 300 }}
             contentFit="cover"
           />
         ) : (
-          <View style={{ width: "100%", height: 220, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }}>
-            <Ionicons name="business-outline" size={48} color={colors.mutedForeground} />
+          <View style={{ width: "100%", height: 300, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="business-outline" size={56} color={colors.mutedForeground} />
           </View>
         )}
+        {/* Bottom scrim for title legibility */}
+        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 160, backgroundColor: "rgba(0,0,0,0)" }}
+              pointerEvents="none">
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)" }} />
+        </View>
         <View style={[styles.backOverlay, { paddingTop: topPadding + 8 }]}>
           <Pressable
             onPress={() => router.back()}
-            style={[styles.backBtn, { backgroundColor: "rgba(0,0,0,0.5)" }]}
+            style={[styles.backBtn, { backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }]}
           >
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </Pressable>
         </View>
-      </View>
-
-      <View style={styles.content}>
-        {/* Vendor info */}
-        <View style={{ gap: 8 }}>
-          <View style={styles.row}>
+        {/* Badges overlaid on hero bottom */}
+        <View style={{ position: "absolute", bottom: 16, left: 20, right: 20, gap: 6 }}>
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
             <View style={[styles.badge, { backgroundColor: colors.primary }]}>
               <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>{vendor.category}</Text>
             </View>
             {vendor.status === "approved" ? (
-              <View style={[styles.badge, { backgroundColor: "#22c55e20" }]}>
+              <View style={[styles.badge, { backgroundColor: "rgba(34,197,94,0.25)", borderWidth: 1, borderColor: "rgba(34,197,94,0.4)" }]}>
                 <Ionicons name="checkmark-circle" size={11} color="#22c55e" />
                 <Text style={[styles.badgeText, { color: "#22c55e" }]}>Verified</Text>
               </View>
             ) : null}
             {avgRating ? (
-              <View style={styles.row}>
-                <Ionicons name="star" size={13} color={colors.primary} />
-                <Text style={[styles.rating, { color: colors.foreground }]}>{avgRating}</Text>
-                <Text style={[styles.ratingCount, { color: colors.mutedForeground }]}>({reviews!.length})</Text>
+              <View style={[styles.row, { backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, gap: 4 }]}>
+                <Ionicons name="star" size={12} color="#fbbf24" />
+                <Text style={[styles.rating, { color: "#fff", fontSize: 12 }]}>{avgRating}</Text>
+                <Text style={[styles.ratingCount, { color: "rgba(255,255,255,0.6)", fontSize: 11 }]}>({reviews!.length})</Text>
               </View>
             ) : null}
           </View>
+          <Text style={[styles.vendorName, { color: "#fff", textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{vendor.businessName}</Text>
+        </View>
+      </View>
 
-          <Text style={[styles.vendorName, { color: colors.foreground }]}>{vendor.businessName}</Text>
-
+      <View style={styles.content}>
+        {/* Location row */}
+        <View style={{ gap: 4 }}>
           <View style={styles.row}>
             <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
             <Text style={[styles.location, { color: colors.mutedForeground }]}>

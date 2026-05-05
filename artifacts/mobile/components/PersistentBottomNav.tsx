@@ -99,10 +99,30 @@ export function PersistentBottomNav() {
             accessibilityLabel={t(tab.labelKey)}
             accessibilityState={{ selected: focused }}
           >
-            <View style={[styles.indicator, focused && { backgroundColor: colors.primary + "22" }]}>
+            {focused && (
+              <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
+            )}
+            <View
+              style={[
+                styles.indicator,
+                focused && {
+                  backgroundColor: colors.primary + "28",
+                  borderWidth: 1,
+                  borderColor: colors.primary + "44",
+                },
+              ]}
+            >
               <Ionicons name={focused ? tab.iconFocused : tab.icon} size={22} color={color} />
             </View>
-            <Text style={[styles.label, { color }]}>{t(tab.labelKey)}</Text>
+            <Text
+              style={[
+                styles.label,
+                { color },
+                focused && { fontFamily: "Inter_700Bold" },
+              ]}
+            >
+              {t(tab.labelKey)}
+            </Text>
           </Pressable>
         );
       })}
@@ -117,26 +137,35 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     zIndex: 100,
     ...(Platform.OS === "ios"
       ? {
           shadowColor: "#000",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.12,
-          shadowRadius: 8,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.18,
+          shadowRadius: 12,
         }
-      : { elevation: 12 }),
+      : { elevation: 16 }),
   },
   tab: {
     flex: 1,
     alignItems: "center",
     justifyContent: "flex-end",
-    paddingTop: 8,
+    paddingTop: 6,
     gap: 3,
+    position: "relative",
+  },
+  activeDot: {
+    position: "absolute",
+    top: 0,
+    width: 20,
+    height: 2,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
   },
   indicator: {
-    width: 44,
+    width: 48,
     height: 32,
     borderRadius: 16,
     alignItems: "center",

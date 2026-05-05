@@ -188,10 +188,10 @@ export function EventCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
-    width: 200,
+    width: 210,
   },
   compact: {
     width: "100%",
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   imageWrap: {
-    height: 130,
+    height: 140,
     position: "relative",
   },
   imageWrapCompact: {

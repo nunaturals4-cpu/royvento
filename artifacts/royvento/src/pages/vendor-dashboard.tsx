@@ -151,7 +151,8 @@ export function VendorDashboard() {
         </div>
       ) : (
         <Tabs defaultValue={initialTab} className="space-y-6">
-          <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
+          <div className="overflow-x-auto scrollbar-hide pb-1">
+          <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
             <TabsTrigger value="overview">Profile</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
             <TabsTrigger value="bookings">Booking Report</TabsTrigger>
@@ -184,6 +185,7 @@ export function VendorDashboard() {
               </button>
             </Link>
           </TabsList>
+          </div>
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>

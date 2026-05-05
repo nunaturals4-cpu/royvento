@@ -70,7 +70,8 @@ export function AdminPanel() {
       </header>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="bg-card flex-wrap h-auto p-1 gap-1">
+        <div className="overflow-x-auto scrollbar-hide pb-1">
+        <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="vendors">Partners</TabsTrigger>
           <TabsTrigger value="requests">Partner requests</TabsTrigger>
@@ -90,6 +91,7 @@ export function AdminPanel() {
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
         </TabsList>
+        </div>
         <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
         <TabsContent value="requests"><VendorRequests /></TabsContent>

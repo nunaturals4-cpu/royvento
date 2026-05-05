@@ -71,7 +71,7 @@
   --app-font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --app-font-serif: 'Playfair Display', Georgia, serif;
   --app-font-mono: ui-monospace, Menlo, monospace;
-  --radius: .9rem;
+  --radius: .75rem;
   --shadow-2xs: 0 1px 2px rgba(0,0,0,0.6);
   --shadow-xs: 0 2px 4px rgba(0,0,0,0.6);
   --shadow-sm: 0 4px 8px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.4);
@@ -80,8 +80,29 @@
   --shadow-lg: 0 18px 40px rgba(0,0,0,0.6), 0 6px 12px rgba(0,0,0,0.45);
   --shadow-xl: 0 28px 60px rgba(0,0,0,0.65), 0 10px 20px rgba(0,0,0,0.5);
   --shadow-2xl: 0 40px 80px rgba(0,0,0,0.7), 0 14px 28px rgba(0,0,0,0.55);
+  --shadow-card: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+
+  /* Font-size scale */
+  --font-size-xs:   0.75rem;
+  --font-size-sm:   0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg:   1.125rem;
+  --font-size-xl:   1.25rem;
+  --font-size-2xl:  1.5rem;
+  --font-size-3xl:  1.875rem;
+  --font-size-4xl:  2.25rem;
+  --font-size-5xl:  3rem;
+
+  /* Border radius scale */
+  --radius-xs:  4px;
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;
 }
 
 /* ========== THEME 1: MIDNIGHT NOIR (default) ========== */
@@ -89,16 +110,16 @@
   --button-outline: rgba(255,255,255, .14);
   --badge-outline: rgba(255,255,255, .08);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  --elevate-1: rgba(255,255,255, .05);
+  --elevate-2: rgba(255,255,255, .10);
 
   --background: 0 0% 5%;
   --foreground: 0 0% 98%;
-  --border: 0 0% 14%;
+  --border: 0 0% 15%;
 
-  --card: 0 0% 8%;
+  --card: 0 0% 10%;
   --card-foreground: 0 0% 98%;
-  --card-border: 0 0% 16%;
+  --card-border: 0 0% 18%;
 
   --sidebar: 0 0% 6%;
   --sidebar-foreground: 0 0% 98%;
@@ -214,6 +235,9 @@
   --theme-glow-rgb: 212, 160, 23;
   --theme-glass-tint: rgba(212,160,23,0.04);
   --theme-glass-border: rgba(212,160,23,0.10);
+
+  /* Design token parity with :root */
+  --shadow-card: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
 }
 
 
@@ -281,6 +305,9 @@
   --theme-glow-rgb: 220, 80, 120;
   --theme-glass-tint: rgba(140,60,100,0.06);
   --theme-glass-border: rgba(220,80,120,0.12);
+
+  /* Design token parity with :root */
+  --shadow-card: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .dark { /* dark uses :root/[data-theme] values */ }
@@ -388,6 +415,24 @@
     content: attr(data-placeholder);
     color: hsl(var(--muted-foreground));
     pointer-events: none;
+  }
+
+  /* Hide scrollbar but keep scroll */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar (alias) */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 
   /* Premium glassmorphism card — default (noir) */
