@@ -16,17 +16,7 @@ import { CityPickerModal } from "@/components/CityPickerModal";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/components/ThemeProvider";
 import { THEMES } from "@/components/ui/ThemeSwitcher";
-
-const LANGUAGES: { code: string; label: string; native: string }[] = [
-  { code: "en", label: "English",  native: "English"  },
-  { code: "hi", label: "Hindi",    native: "हिंदी"     },
-  { code: "bn", label: "Bengali",  native: "বাংলা"     },
-  { code: "kn", label: "Kannada",  native: "ಕನ್ನಡ"     },
-  { code: "te", label: "Telugu",   native: "తెలుగు"   },
-  { code: "ta", label: "Tamil",    native: "தமிழ்"    },
-  { code: "pa", label: "Punjabi",  native: "ਪੰਜਾਬੀ"   },
-  { code: "gu", label: "Gujarati", native: "ગુજરાતી"  },
-];
+import { LANGUAGES } from "@/components/ui/LanguageSwitcher";
 
 interface Notification {
   id: number;

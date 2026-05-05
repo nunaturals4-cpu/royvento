@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
-const LANGUAGES: { code: string; label: string; native: string }[] = [
+export const LANGUAGES: { code: string; label: string; native: string }[] = [
   { code: "en", label: "English",   native: "English"   },
   { code: "hi", label: "Hindi",     native: "हिंदी"      },
   { code: "bn", label: "Bengali",   native: "বাংলা"      },
