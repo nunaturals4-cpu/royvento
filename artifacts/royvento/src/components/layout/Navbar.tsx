@@ -6,13 +6,27 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
-import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown } from "lucide-react";
+import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Palette, Globe, Check } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
 import { useTranslation } from "react-i18next";
+import { useTheme } from "@/components/ThemeProvider";
+import { THEMES } from "@/components/ui/ThemeSwitcher";
+
+const LANGUAGES: { code: string; label: string; native: string }[] = [
+  { code: "en", label: "English",  native: "English"  },
+  { code: "hi", label: "Hindi",    native: "हिंदी"     },
+  { code: "bn", label: "Bengali",  native: "বাংলা"     },
+  { code: "kn", label: "Kannada",  native: "ಕನ್ನಡ"     },
+  { code: "te", label: "Telugu",   native: "తెలుగు"   },
+  { code: "ta", label: "Tamil",    native: "தமிழ்"    },
+  { code: "pa", label: "Punjabi",  native: "ਪੰਜਾਬੀ"   },
+  { code: "gu", label: "Gujarati", native: "ગુજરાતી"  },
+];
 
 interface Notification {
   id: number;
@@ -23,7 +37,10 @@ interface Notification {
 }
 
 export function Navbar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme, setTheme } = useTheme();
+  const currentLang = LANGUAGES.find((l) => l.code === i18n.language) ?? LANGUAGES[0]!;
+  const currentTheme = THEMES.find((th) => th.id === theme) ?? THEMES[0]!;
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
   const logout = useLogout();
   const [, setLocation] = useLocation();
@@ -264,7 +281,7 @@ export function Navbar() {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-60 glass-card-strong" align="end" forceMount>
+                <DropdownMenuContent className="w-60 bg-card border border-border shadow-xl" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{user.name}</p>
@@ -314,6 +331,51 @@ export function Navbar() {
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
                     {t("nav.log_out")}
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer">
+                      <span
+                        className="h-3.5 w-3.5 rounded-full shrink-0 mr-1"
+                        style={{ background: currentTheme.color }}
+                      />
+                      <Palette className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                      <span>Theme</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="bg-card border border-border shadow-xl w-44">
+                      {THEMES.map((th) => (
+                        <DropdownMenuItem
+                          key={th.id}
+                          onClick={() => setTheme(th.id)}
+                          className="flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <span
+                            className="h-3.5 w-3.5 rounded-full shrink-0"
+                            style={{ background: th.color }}
+                          />
+                          <span className="flex-1">{th.label}</span>
+                          {theme === th.id && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer">
+                      <Globe className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                      <span className="flex-1">{currentLang.native}</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="bg-card border border-border shadow-xl w-44">
+                      {LANGUAGES.map((lang) => (
+                        <DropdownMenuItem
+                          key={lang.code}
+                          onClick={() => i18n.changeLanguage(lang.code)}
+                          className="flex items-center justify-between cursor-pointer"
+                        >
+                          <span className={lang.code === i18n.language ? "text-primary font-semibold" : ""}>{lang.native}</span>
+                          <span className="text-xs text-muted-foreground">{lang.label}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (

@@ -1,7 +1,5 @@
 import { Link } from "wouter";
 import { Crown } from "lucide-react";
-import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 
 export function Footer() {
   return (
@@ -54,10 +52,6 @@ export function Footer() {
             <Link href="/terms" className="hover:text-foreground">Terms</Link>
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <span className="font-serif italic hidden sm:inline">Designed for hosts who notice the details.</span>
-            <div className="flex items-center gap-2">
-              <ThemeSwitcher />
-              <LanguageSwitcher />
-            </div>
           </div>
         </div>
       </div>
