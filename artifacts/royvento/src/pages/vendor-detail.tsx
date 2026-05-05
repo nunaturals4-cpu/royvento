@@ -93,9 +93,6 @@ export function VendorDetail() {
         {/* Venue title block */}
         <div className="container mx-auto px-4 md:px-6 pt-8 pb-12">
           <div className="flex items-center gap-2 flex-wrap mb-4">
-            <Badge variant="secondary" className="bg-white/10 border-white/10 text-white backdrop-blur">
-              {vendor.category}
-            </Badge>
             {vendor.rating > 0 && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10 text-xs">
                 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />

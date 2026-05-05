@@ -306,9 +306,6 @@ export default function PartnerDetailScreen() {
         {/* Badges overlaid on hero bottom */}
         <View style={{ position: "absolute", bottom: 16, left: 20, right: 20, gap: 6 }}>
           <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>{vendor.category}</Text>
-            </View>
             {vendor.status === "approved" ? (
               <View style={[styles.badge, { backgroundColor: "rgba(34,197,94,0.25)", borderWidth: 1, borderColor: "rgba(34,197,94,0.4)" }]}>
                 <Ionicons name="checkmark-circle" size={11} color="#22c55e" />
