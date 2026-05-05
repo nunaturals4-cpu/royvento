@@ -29,6 +29,7 @@ import { Subscription } from "@/pages/subscription";
 import { Blogs } from "@/pages/blogs";
 import { BlogDetail } from "@/pages/blog-detail";
 import { Wishlist } from "@/pages/wishlist";
+import { Notifications } from "@/pages/notifications";
 import { ForgotPassword } from "@/pages/forgot-password";
 import { ResetPassword } from "@/pages/reset-password";
 import { PaymentResult } from "@/pages/payment-result";
@@ -110,6 +111,9 @@ function Router() {
 
           <Route path="/wishlist">
             {() => <RequireAuth><Wishlist /></RequireAuth>}
+          </Route>
+          <Route path="/notifications">
+            {() => <RequireAuth><Notifications /></RequireAuth>}
           </Route>
           <Route path="/dashboard/profile">
             {() => <RequireAuth><Profile /></RequireAuth>}

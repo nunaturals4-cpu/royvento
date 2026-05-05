@@ -25,6 +25,13 @@ const PRICE_RANGES = [
   { label: "₹500–₹1500", min: 500, max: 1500 },
   { label: "₹1500+", min: 1500, max: undefined },
 ];
+const DRINK_DEAL_OPTIONS = [
+  { value: "welcome", label: "Welcome Drink" },
+  { value: "unlimited", label: "Unlimited" },
+  { value: "ticket", label: "Incl. with Ticket" },
+  { value: "custom", label: "Custom Deal" },
+] as const;
+type DrinkPlanType = typeof DRINK_DEAL_OPTIONS[number]["value"] | "";
 
 export default function PubsScreen() {
   const colors = useColors();
@@ -34,31 +41,54 @@ export default function PubsScreen() {
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("All Cities");
   const [priceRangeIdx, setPriceRangeIdx] = useState(0);
+  const [freeEntry, setFreeEntry] = useState(false);
+  const [drinkDeal, setDrinkDeal] = useState(false);
+  const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
 
   const priceRange = PRICE_RANGES[priceRangeIdx];
+
+  function toggleDrinkDeal(val: boolean) {
+    setDrinkDeal(val);
+    if (!val) setDrinkPlanType("");
+  }
 
   const eventsQuery = useListEvents({
     type: "pub",
     city: city !== "All Cities" ? city : undefined,
     minPrice: priceRange.min !== undefined ? String(priceRange.min) : undefined,
     maxPrice: priceRange.max !== undefined ? String(priceRange.max) : undefined,
+    drinkPlanType: drinkPlanType || undefined,
   });
 
   const events = (eventsQuery.data ?? []).filter((e) => {
-    return !search.trim() || e.title.toLowerCase().includes(search.toLowerCase()) || (e.location ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      !search.trim() ||
+      e.title.toLowerCase().includes(search.toLowerCase()) ||
+      (e.location ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchFreeEntry =
+      !freeEntry ||
+      (e.freeEntryRules?.enabled === true && (e.freeEntryRules?.days?.length ?? 0) > 0);
+    const matchDrinkDeal = !drinkDeal || !!drinkPlanType || e.hasDrinkPlans === true;
+    return matchSearch && matchFreeEntry && matchDrinkDeal;
   });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPadding + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          styles.header,
+          { paddingTop: topPadding + 16, backgroundColor: colors.card, borderBottomColor: colors.border },
+        ]}
+      >
         <View style={styles.headerRow}>
           <View style={[styles.iconCircle, { backgroundColor: colors.primary + "20" }]}>
             <Ionicons name="beer-outline" size={18} color={colors.primary} />
           </View>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Pubs & Nightlife</Text>
         </View>
-        <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>Discover the best venues near you</Text>
+        <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
+          Discover the best venues near you
+        </Text>
 
         {/* Search */}
         <View style={[styles.searchBar, { backgroundColor: colors.muted, borderColor: colors.border }]}>
@@ -77,6 +107,81 @@ export default function PubsScreen() {
           )}
         </View>
 
+        {/* Free Entry + Drink Deal toggles */}
+        <View style={styles.toggleRow}>
+          <Pressable
+            onPress={() => setFreeEntry((v) => !v)}
+            style={[
+              styles.togglePill,
+              {
+                backgroundColor: freeEntry ? "#22c55e20" : colors.muted,
+                borderColor: freeEntry ? "#22c55e" : colors.border,
+              },
+            ]}
+          >
+            <Ionicons
+              name={freeEntry ? "checkmark-circle" : "ticket-outline"}
+              size={13}
+              color={freeEntry ? "#22c55e" : colors.mutedForeground}
+            />
+            <Text style={[styles.toggleText, { color: freeEntry ? "#22c55e" : colors.mutedForeground }]}>
+              Free Entry
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => toggleDrinkDeal(!drinkDeal)}
+            style={[
+              styles.togglePill,
+              {
+                backgroundColor: drinkDeal ? "#f59e0b20" : colors.muted,
+                borderColor: drinkDeal ? "#f59e0b" : colors.border,
+              },
+            ]}
+          >
+            <Ionicons
+              name={drinkDeal ? "checkmark-circle" : "wine-outline"}
+              size={13}
+              color={drinkDeal ? "#f59e0b" : colors.mutedForeground}
+            />
+            <Text style={[styles.toggleText, { color: drinkDeal ? "#f59e0b" : colors.mutedForeground }]}>
+              Drink Deal
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Drink deal type chips — visible when drink deal toggle is on */}
+        {drinkDeal && (
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={DRINK_DEAL_OPTIONS}
+            keyExtractor={(o) => o.value}
+            contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => setDrinkPlanType(drinkPlanType === item.value ? "" : item.value)}
+                style={[
+                  styles.pill,
+                  {
+                    backgroundColor: drinkPlanType === item.value ? "#f59e0b" : colors.muted,
+                    borderColor: drinkPlanType === item.value ? "#f59e0b" : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pillText,
+                    { color: drinkPlanType === item.value ? "#fff" : colors.mutedForeground },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            )}
+          />
+        )}
+
         {/* Price Range Filter */}
         <FlatList
           horizontal
@@ -87,10 +192,24 @@ export default function PubsScreen() {
           renderItem={({ item, index }) => (
             <Pressable
               onPress={() => setPriceRangeIdx(index)}
-              style={[styles.pill, { backgroundColor: priceRangeIdx === index ? "#22c55e" : colors.muted, borderColor: priceRangeIdx === index ? "#22c55e" : colors.border }]}
+              style={[
+                styles.pill,
+                {
+                  backgroundColor: priceRangeIdx === index ? "#22c55e" : colors.muted,
+                  borderColor: priceRangeIdx === index ? "#22c55e" : colors.border,
+                },
+              ]}
             >
-              <Ionicons name="cash-outline" size={12} color={priceRangeIdx === index ? "#fff" : colors.mutedForeground} />
-              <Text style={[styles.pillText, { color: priceRangeIdx === index ? "#fff" : colors.mutedForeground }]}>{item.label}</Text>
+              <Ionicons
+                name="cash-outline"
+                size={12}
+                color={priceRangeIdx === index ? "#fff" : colors.mutedForeground}
+              />
+              <Text
+                style={[styles.pillText, { color: priceRangeIdx === index ? "#fff" : colors.mutedForeground }]}
+              >
+                {item.label}
+              </Text>
             </Pressable>
           )}
         />
@@ -105,15 +224,27 @@ export default function PubsScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => setCity(item)}
-              style={[styles.cityChip, { backgroundColor: city === item ? colors.primary : colors.muted, borderColor: city === item ? colors.primary : colors.border }]}
+              style={[
+                styles.cityChip,
+                {
+                  backgroundColor: city === item ? colors.primary : colors.muted,
+                  borderColor: city === item ? colors.primary : colors.border,
+                },
+              ]}
             >
-              <Text style={[styles.cityText, { color: city === item ? colors.primaryForeground : colors.mutedForeground }]}>{item}</Text>
+              <Text
+                style={[
+                  styles.cityText,
+                  { color: city === item ? colors.primaryForeground : colors.mutedForeground },
+                ]}
+              >
+                {item}
+              </Text>
             </Pressable>
           )}
         />
       </View>
 
-      {/* Events list */}
       {eventsQuery.isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} size="large" />
@@ -124,7 +255,9 @@ export default function PubsScreen() {
             <Ionicons name="beer-outline" size={48} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Pubs Found</Text>
             <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-              {search || city !== "All Cities" ? "Try different filters" : "Check back soon for new venues"}
+              {search || city !== "All Cities" || freeEntry || drinkDeal
+                ? "Try different filters"
+                : "Check back soon for new venues"}
             </Text>
           </View>
           <MobileFooter />
@@ -133,9 +266,19 @@ export default function PubsScreen() {
         <FlatList
           data={events}
           keyExtractor={(e) => String(e.id)}
-          contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: Platform.OS === "web" ? 80 : 120 }}
+          contentContainerStyle={{
+            padding: 16,
+            gap: 14,
+            paddingBottom: Platform.OS === "web" ? 80 : 120,
+          }}
           ListFooterComponent={<MobileFooter />}
-          refreshControl={<RefreshControl refreshing={eventsQuery.isRefetching} onRefresh={() => eventsQuery.refetch()} tintColor={colors.primary} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={eventsQuery.isRefetching}
+              onRefresh={() => eventsQuery.refetch()}
+              tintColor={colors.primary}
+            />
+          }
           renderItem={({ item }) => (
             <EventCard
               id={item.id}
@@ -160,13 +303,45 @@ export default function PubsScreen() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 14, gap: 10, borderBottomWidth: 1 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
   headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: -6 },
-  searchBar: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
-  pillRow: { flexDirection: "row", gap: 8 },
-  pill: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 5 },
+  toggleRow: { flexDirection: "row", gap: 8 },
+  togglePill: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  toggleText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  pill: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
   pillText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   cityChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
   cityText: { fontSize: 12, fontFamily: "Inter_500Medium" },

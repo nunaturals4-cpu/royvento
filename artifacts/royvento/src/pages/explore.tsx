@@ -13,6 +13,16 @@ import { BUDGET_RANGES } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useLocation } from "wouter";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+
+const DRINK_DEAL_OPTIONS = [
+  { value: "welcome", label: "Welcome Drink" },
+  { value: "unlimited", label: "Unlimited" },
+  { value: "ticket", label: "Incl. with Ticket" },
+  { value: "custom", label: "Custom Deal" },
+] as const;
+
+type DrinkPlanType = typeof DRINK_DEAL_OPTIONS[number]["value"] | "";
 
 const PAGE_SIZE = 18;
 
@@ -33,6 +43,7 @@ export function Explore() {
   const [stateF, setStateF] = useState<string>("");
   const [city, setCity] = useState<string>("");
   const [freeEntry, setFreeEntry] = useState(false);
+  const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
 
   const queryParams = useMemo(() => {
     const p: Record<string, string> = {};
@@ -44,8 +55,9 @@ export function Explore() {
       const b = BUDGET_RANGES.find((x) => x.value === budget);
       if (b) { p.minPrice = String(b.min); p.maxPrice = String(b.max); }
     }
+    if (drinkPlanType) p.drinkPlanType = drinkPlanType;
     return p;
-  }, [search, budget, stateF, city, country]);
+  }, [search, budget, stateF, city, country, drinkPlanType]);
 
   const {
     data,
@@ -73,10 +85,10 @@ export function Explore() {
 
   const clear = () => {
     setSearch(""); setMinRating("any");
-    setBudget("any"); setCountry(""); setStateF(""); setCity(""); setFreeEntry(false);
+    setBudget("any"); setCountry(""); setStateF(""); setCity(""); setFreeEntry(false); setDrinkPlanType("");
   };
 
-  const hasFilters = search || country || stateF || city || budget !== "any" || freeEntry || minRating !== "any";
+  const hasFilters = search || country || stateF || city || budget !== "any" || freeEntry || minRating !== "any" || drinkPlanType;
 
   const filteredEvents = useMemo(() => {
     if (minRating === "any") return allEvents;
@@ -169,6 +181,25 @@ export function Explore() {
             <span className="h-1.5 w-1.5 rounded-full inline-block bg-emerald-400" />
             <span className="text-sm">{t("explore.free_entry")}</span>
           </Label>
+        </div>
+        <div className="mt-3">
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Drink Deal type</p>
+          <div className="flex flex-wrap gap-2">
+            {DRINK_DEAL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDrinkPlanType(drinkPlanType === opt.value ? "" : opt.value)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  drinkPlanType === opt.value
+                    ? "bg-amber-500/20 border-amber-500/60 text-amber-400"
+                    : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
