@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   customFetch,
   getListMyBookingsQueryKey,
@@ -289,10 +290,11 @@ export default function PartnerDetailScreen() {
           </View>
         )}
         {/* Bottom scrim for title legibility */}
-        <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 160, backgroundColor: "rgba(0,0,0,0)" }}
-              pointerEvents="none">
-          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)" }} />
-        </View>
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.72)"]}
+          style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 180 }}
+          pointerEvents="none"
+        />
         <View style={[styles.backOverlay, { paddingTop: topPadding + 8 }]}>
           <Pressable
             onPress={() => router.back()}

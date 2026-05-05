@@ -368,26 +368,15 @@ export function PubOffers() {
                   className="snap-start flex-shrink-0 md:flex-shrink"
                 >
                   <div className="glass-card rounded-2xl overflow-hidden w-64 md:w-auto hover:bg-white/[0.06] transition-all cursor-pointer group h-full flex flex-col">
-                    <div className="h-36 bg-white/5 relative overflow-hidden">
-                      {offer.coverImageUrl ? (
-                        <img
-                          src={offer.coverImageUrl}
-                          alt={offer.vendorName}
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-transparent">
-                          <GlassWater className="h-10 w-10 text-white/20" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                      <div className="absolute bottom-2.5 left-3.5 right-3.5">
-                        <h3 className="font-serif text-base font-semibold text-white drop-shadow leading-tight truncate">
-                          {offer.vendorName}
-                        </h3>
-                      </div>
+                    <div className="p-3.5 pb-2 flex items-center gap-2.5">
+                      <span className="flex-shrink-0 h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
+                        <GlassWater className="h-3.5 w-3.5 text-primary" />
+                      </span>
+                      <h3 className="font-serif text-base font-semibold leading-tight truncate">
+                        {offer.vendorName}
+                      </h3>
                     </div>
-                    <div className="p-3.5 flex flex-col gap-2.5 flex-1">
+                    <div className="px-3.5 pb-3.5 flex flex-col gap-2.5 flex-1">
                       <div className="flex flex-col gap-2 flex-1">
                         {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
                           <div key={i} className="flex items-center gap-2">

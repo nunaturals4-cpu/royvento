@@ -233,27 +233,18 @@ export function Home() {
                   className="snap-start flex-shrink-0"
                 >
                   <div className="glass-card rounded-2xl overflow-hidden w-72 sm:w-80 hover:bg-white/[0.06] transition-all cursor-pointer h-full flex flex-col group border border-white/8">
-                    <div className="h-44 bg-white/5 relative overflow-hidden">
-                      {offer.coverImageUrl ? (
-                        <img
-                          src={offer.coverImageUrl}
-                          alt={offer.vendorName}
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="h-full flex items-center justify-center bg-white/5">
-                          <GlassWater className="h-12 w-12 text-white/20" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                      <div className="absolute bottom-3 left-4">
-                        <p className="font-serif text-base font-semibold text-white leading-tight line-clamp-1">
+                    <div className="p-4 pb-3 flex flex-col gap-3 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="flex-shrink-0 h-8 w-8 rounded-xl bg-primary/15 flex items-center justify-center">
+                          <GlassWater className="h-4 w-4 text-primary" />
+                        </span>
+                        <p className="font-serif text-base font-semibold leading-tight line-clamp-1">
                           {offer.vendorName}
                         </p>
                       </div>
                     </div>
 
-                    <div className="p-4 flex flex-col gap-3 flex-1">
+                    <div className="px-4 pb-4 flex flex-col gap-3 flex-1">
                       <div className="flex flex-col gap-2.5 flex-1">
                         {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
                           <div key={i} className="flex items-center gap-2.5">

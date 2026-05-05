@@ -188,22 +188,11 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
         }
       }}
     >
-      <View style={styles.dealImageWrap}>
-        {item.coverImageUrl ? (
-          <Image
-            source={{ uri: item.coverImageUrl }}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" }]}>
-            <Ionicons name="wine-outline" size={32} color="#9ca3af" />
-          </View>
-        )}
-      </View>
-
       <View style={[styles.dealBody, { borderTopColor: "#e5e7eb" }]}>
         <View style={styles.dealNameRow}>
+          <View style={[styles.planIcon, { backgroundColor: "#fef2f2" }]}>
+            <Ionicons name="wine-outline" size={14} color="#dc2626" />
+          </View>
           <Text style={styles.dealVenueNameLight} numberOfLines={1}>{item.vendorName}</Text>
           <View style={styles.dealTypeBadgeLight}>
             <Ionicons name="wine-outline" size={10} color="#dc2626" />

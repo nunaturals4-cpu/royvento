@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useListVendorDrinkOffers } from "@workspace/api-client-react";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
-import { LinearGradient } from "expo-linear-gradient";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -49,32 +48,18 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
         }
       }}
     >
-      <View style={styles.dealImageWrap}>
-        {item.coverImageUrl ? (
-          <Image
-            source={{ uri: item.coverImageUrl }}
-            style={StyleSheet.absoluteFillObject}
-            contentFit="cover"
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
-            <Ionicons name="wine-outline" size={32} color={colors.mutedForeground} />
+      <View style={[styles.dealBody, { borderTopColor: colors.border }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+          <View style={[styles.planIcon, { backgroundColor: colors.primary + "22" }]}>
+            <Ionicons name="wine-outline" size={14} color={colors.primary} />
           </View>
-        )}
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.78)"]}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <View style={styles.dealImageBottom}>
-          <Text style={styles.dealVenueName} numberOfLines={1}>{item.vendorName}</Text>
-          <View style={[styles.dealTypeBadge, { backgroundColor: colors.primary }]}>
-            <Ionicons name="wine-outline" size={10} color="#fff" />
-            <Text style={styles.dealTypeBadgeText}>Deals</Text>
+          <Text style={[styles.dealVenueName, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{item.vendorName}</Text>
+          <View style={[styles.dealTypeBadge, { backgroundColor: colors.primary + "22" }]}>
+            <Ionicons name="wine-outline" size={10} color={colors.primary} />
+            <Text style={[styles.dealTypeBadgeText, { color: colors.primary }]}>Deals</Text>
           </View>
         </View>
-      </View>
-
-      <View style={[styles.dealBody, { borderTopColor: colors.border }]}>
+      
         {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => (
           <View key={i} style={styles.planRow}>
             <View style={[styles.planIcon, { backgroundColor: colors.primary + "22" }]}>

@@ -74,31 +74,21 @@ export function VendorDetail() {
   return (
     <div>
       {/* Cinematic venue hero */}
-      <div className="relative min-h-[60vh] w-full overflow-hidden flex flex-col">
-        {/* Blurred backdrop */}
-        {(vendor.bannerImage || vendor.coverImageUrl) && (
-          <div className="absolute inset-0 -z-10">
+      <div className="relative min-h-[60vh] w-full overflow-hidden">
+        {/* Full-bleed cover image */}
+        {(vendor.coverImageUrl || vendor.bannerImage) ? (
+          <div className="absolute inset-0">
             <img
-              src={vendor.bannerImage || vendor.coverImageUrl}
-              alt=""
-              className="h-full w-full object-cover blur-xl scale-110 opacity-40"
+              src={vendor.coverImageUrl || vendor.bannerImage}
+              alt={vendor.businessName}
+              className="h-full w-full object-cover"
             />
           </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 to-black" />
         )}
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/55 via-background/65 to-background" />
-
-        {/* Cover image — sharp, centred, contained */}
-        {(vendor.coverImageUrl || vendor.bannerImage) && (
-          <div className="flex-1 flex items-center justify-center px-4 pt-10 pb-0">
-            <div className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/8">
-              <img
-                src={vendor.coverImageUrl || vendor.bannerImage}
-                alt={vendor.businessName}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          </div>
-        )}
+        {/* Gradient overlay for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-black/30" />
 
         {/* Venue title block */}
         <div className="container mx-auto px-4 md:px-6 pt-8 pb-12">
