@@ -105,9 +105,9 @@ export function EventCard({
           style={styles.gradient}
         />
 
-        {/* Top-left: category badge + Popular/New badge stacked */}
+        {/* Top-left: category badge + Popular/New badge stacked — hidden for pub-type events */}
         <View style={styles.topLeft}>
-          {category ? (
+          {category && type !== "pub" ? (
             <View style={[styles.badge, { backgroundColor: colors.primary }]}>
               <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
                 {category}
