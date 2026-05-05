@@ -100,30 +100,29 @@ function AnnouncementSlider({ announcements }: { announcements: RecentAnnounceme
         {announcements.map((item) => (
           <Pressable
             key={item.id}
-            style={[styles.announcementSlide, { backgroundColor: colors.card, borderColor: colors.border }]}
+            style={[styles.announcementSlide, { backgroundColor: colors.muted, borderColor: colors.border }]}
             onPress={() => item.eventId ? router.push(`/event/${item.eventId}` as never) : undefined}
           >
             {item.imageUrl ? (
               <View style={styles.slideImageWrap}>
                 <Image
                   source={{ uri: item.imageUrl }}
-                  style={StyleSheet.absoluteFillObject}
+                  style={[StyleSheet.absoluteFillObject, { opacity: 0.18 }]}
                   resizeMode="cover"
                 />
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.75)"]}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={styles.slideOverlay}>
-                  <View style={[styles.venueBadge, { backgroundColor: colors.primary + "CC" }]}>
-                    <Ionicons name="megaphone-outline" size={11} color="#fff" />
-                    <Text style={styles.venueText} numberOfLines={1}>{item.vendorName}</Text>
+                <View style={[styles.slideNoImage, { backgroundColor: "transparent" }]}>
+                  <View style={[styles.venueBadge, { backgroundColor: colors.primary + "22" }]}>
+                    <Ionicons name="megaphone-outline" size={11} color={colors.primary} />
+                    <Text style={[styles.venueText, { color: colors.primary }]} numberOfLines={1}>{item.vendorName}</Text>
                   </View>
-                  <Text style={styles.slideTitleOverlay} numberOfLines={2}>{item.title}</Text>
+                  <Text style={[styles.slideTitle, { color: colors.foreground }]} numberOfLines={3}>{item.title}</Text>
+                  {item.body ? (
+                    <Text style={[styles.slideBody, { color: colors.mutedForeground }]} numberOfLines={2}>{item.body}</Text>
+                  ) : null}
                   {item.announceDate ? (
                     <View style={styles.slideDateRow}>
-                      <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.slideDateText}>
+                      <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
+                      <Text style={[styles.slideDateText, { color: colors.mutedForeground }]}>
                         {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                         {item.announceTime ? `  ·  ${item.announceTime}` : ""}
                       </Text>
@@ -132,7 +131,7 @@ function AnnouncementSlider({ announcements }: { announcements: RecentAnnounceme
                 </View>
               </View>
             ) : (
-              <View style={[styles.slideNoImage, { backgroundColor: colors.muted }]}>
+              <View style={[styles.slideNoImage, { backgroundColor: "transparent" }]}>
                 <View style={[styles.venueBadge, { backgroundColor: colors.primary + "22" }]}>
                   <Ionicons name="megaphone-outline" size={11} color={colors.primary} />
                   <Text style={[styles.venueText, { color: colors.primary }]} numberOfLines={1}>{item.vendorName}</Text>

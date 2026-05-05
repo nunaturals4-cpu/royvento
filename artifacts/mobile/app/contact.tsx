@@ -23,7 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 const SUPPORT_EMAIL = "support@royvento.com";
-const SUPPORT_PHONE = "+91 98765 43210";
+const SUPPORT_PHONE = "+91 9875554165";
 
 export default function ContactScreen() {
   const colors = useColors();

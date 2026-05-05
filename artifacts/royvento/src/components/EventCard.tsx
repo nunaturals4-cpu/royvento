@@ -66,15 +66,6 @@ export function EventCard({ event, hidePubBadge }: Props) {
             </div>
           )}
 
-          {/* Top-right: Pub label */}
-          {event.type === "pub" && !hidePubBadge && (
-            <div className="absolute top-3 right-3">
-              <Badge variant="outline" className="bg-black/70 border-white/20 text-white">
-                Pub
-              </Badge>
-            </div>
-          )}
-
           {/* Bottom-right: Drink deal — sole occupant of this corner */}
           {event.hasDrinkPlans && (
             <div className="absolute bottom-3 right-3">
@@ -85,8 +76,8 @@ export function EventCard({ event, hidePubBadge }: Props) {
             </div>
           )}
 
-          {/* Bottom-left: Category badge — suppressed for pub cards when hidePubBadge is set */}
-          {!hidePubBadge && (
+          {/* Bottom-left: Category badge — hidden for pub-type events */}
+          {event.type !== "pub" && (
             <div className="absolute bottom-3 left-4">
               <Badge variant="secondary" className="bg-white/10 text-white border-white/10 backdrop-blur">
                 {event.category}

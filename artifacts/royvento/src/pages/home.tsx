@@ -165,7 +165,7 @@ export function Home() {
 
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (
-        <section className="py-16 md:py-20 bg-white">
+        <section className="py-16 md:py-20">
           <div className="container mx-auto px-4 md:px-6">
             {/* Section header */}
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
@@ -173,12 +173,12 @@ export function Home() {
                 <p className="text-xs uppercase tracking-[0.2em] text-primary mb-3 flex items-center gap-2">
                   <GlassWater className="h-3.5 w-3.5" /> Exclusive Offers
                 </p>
-                <h2 className="font-serif text-4xl md:text-6xl tracking-tight leading-none text-gray-900">
+                <h2 className="font-serif text-4xl md:text-6xl tracking-tight leading-none">
                   Drink Deals
-                  <span className="block italic text-primary">at Our Partners</span>
+                  <span className="block italic text-gradient-red">at Our Partners</span>
                 </h2>
                 <div className="mt-3 h-px w-24 bg-gradient-to-r from-primary to-transparent" />
-                <p className="mt-4 text-gray-500 text-sm md:text-base max-w-sm leading-relaxed">
+                <p className="mt-4 text-muted-foreground text-sm md:text-base max-w-sm leading-relaxed">
                   Exclusive drink deals — book before they're gone
                 </p>
               </div>
@@ -201,9 +201,9 @@ export function Home() {
                   href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
                   className="snap-start flex-shrink-0"
                 >
-                  <div className="bg-white border border-gray-200 shadow-md rounded-2xl overflow-hidden w-72 sm:w-80 hover:shadow-lg transition-all cursor-pointer h-full flex flex-col group">
-                    {/* Image */}
-                    <div className="h-44 bg-gray-100 relative overflow-hidden">
+                  <div className="glass-card rounded-2xl overflow-hidden w-72 sm:w-80 hover:bg-white/[0.06] transition-all cursor-pointer h-full flex flex-col group">
+                    {/* Image with vendor name overlaid */}
+                    <div className="h-44 bg-white/5 relative overflow-hidden">
                       {offer.coverImageUrl ? (
                         <img
                           src={offer.coverImageUrl}
@@ -211,33 +211,36 @@ export function Home() {
                           className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
-                        <div className="h-full flex items-center justify-center bg-gray-100">
-                          <GlassWater className="h-12 w-12 text-gray-300" />
+                        <div className="h-full flex items-center justify-center bg-white/5">
+                          <GlassWater className="h-12 w-12 text-white/20" />
                         </div>
                       )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                      <div className="absolute bottom-3 left-4">
+                        <p className="font-serif text-base font-semibold text-white leading-tight line-clamp-1">
+                          {offer.vendorName}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Vendor name + plan rows */}
+                    {/* Plan rows */}
                     <div className="p-4 flex flex-col gap-3 flex-1">
-                      <h3 className="font-serif text-xl font-semibold tracking-tight text-gray-900 leading-tight">
-                        {offer.vendorName}
-                      </h3>
                       <div className="flex flex-col gap-2.5 flex-1">
                         {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
                           <div key={i} className="flex items-center gap-2.5">
                             <span className="flex-shrink-0 h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
                               <PlanIcon type={plan.type} />
                             </span>
-                            <span className="text-sm text-gray-700 flex-1 leading-snug">
+                            <span className="text-sm text-muted-foreground flex-1 leading-snug">
                               {getPlanLabel(plan)}
                             </span>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${plan.gender === "female" ? "bg-rose-500/20 text-rose-600" : "bg-primary/20 text-primary"}`}>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${plan.gender === "female" ? "bg-rose-500/20 text-rose-300" : "bg-primary/20 text-primary"}`}>
                               {plan.gender === "female" ? "Ladies" : "All"}
                             </span>
                           </div>
                         ))}
                         {offer.plans.length > 2 && (
-                          <span className="text-xs text-gray-400 pl-9">
+                          <span className="text-xs text-muted-foreground/60 pl-9">
                             +{offer.plans.length - 2} more offer{offer.plans.length - 2 !== 1 ? "s" : ""}
                           </span>
                         )}

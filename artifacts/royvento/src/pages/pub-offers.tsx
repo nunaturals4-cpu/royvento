@@ -40,14 +40,6 @@ const SLIDE_LIGHT_GRADIENTS = [
   "from-indigo-50 via-slate-50 to-gray-50",
 ];
 
-const BADGE_COLORS = [
-  "bg-rose-500/20 text-rose-300 border-rose-500/30",
-  "bg-violet-500/20 text-violet-300 border-violet-500/30",
-  "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  "bg-teal-500/20 text-teal-300 border-teal-500/30",
-  "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-];
-
 const BADGE_COLORS_LIGHT = [
   "bg-rose-500/15 text-rose-600 border-rose-400/40",
   "bg-violet-500/15 text-violet-600 border-violet-400/40",
@@ -122,9 +114,6 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
 
   const a = announcements[current];
   const lightGrad = SLIDE_LIGHT_GRADIENTS[current % SLIDE_LIGHT_GRADIENTS.length];
-  const badgeCls = a.imageUrl
-    ? BADGE_COLORS[current % BADGE_COLORS.length]
-    : BADGE_COLORS_LIGHT[current % BADGE_COLORS_LIGHT.length];
   const href = a.eventId ? `/events/${a.eventId}` : `/vendors/${a.vendorId}`;
   const hasImage = !!a.imageUrl;
 
@@ -136,20 +125,16 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
     >
       {/* Full-bleed hero slider */}
       <div className="relative w-full overflow-hidden mt-4" style={{ minHeight: 400 }}>
-        {/* Background */}
+        {/* Background — always light gradient for uniform look */}
         <div className="absolute inset-0">
-          {hasImage ? (
-            <>
-              <img
-                src={a.imageUrl}
-                alt=""
-                aria-hidden
-                className="h-full w-full object-cover scale-110 blur-xl opacity-25"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/20" />
-            </>
-          ) : (
-            <div className={`h-full w-full bg-gradient-to-br ${lightGrad}`} />
+          <div className={`h-full w-full bg-gradient-to-br ${lightGrad}`} />
+          {hasImage && (
+            <img
+              src={a.imageUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full object-cover scale-110 blur-xl opacity-10"
+            />
           )}
         </div>
 
@@ -158,7 +143,7 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
           {/* Left: text */}
           <div className="flex-1 flex flex-col justify-center gap-4 min-w-0">
             <div
-              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 ${badgeCls}`}
+              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 ${BADGE_COLORS_LIGHT[current % BADGE_COLORS_LIGHT.length]}`}
             >
               <Megaphone className="h-3 w-3 flex-shrink-0" />
               <span className="text-xs font-semibold uppercase tracking-wider truncate max-w-[220px]">
@@ -166,16 +151,16 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
               </span>
             </div>
 
-            <h2 className={`font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-tight ${hasImage ? "text-white" : "text-foreground"}`}>
+            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-tight text-foreground">
               {a.title}
             </h2>
 
-            <p className={`text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl ${hasImage ? "text-white/65" : "text-muted-foreground"}`}>
+            <p className="text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl text-muted-foreground">
               {a.body}
             </p>
 
             {(a.announceDate || a.announceTime) && (
-              <div className={`flex items-center gap-5 text-xs ${hasImage ? "text-white/45" : "text-muted-foreground"}`}>
+              <div className="flex items-center gap-5 text-xs text-muted-foreground">
                 {a.announceDate && (
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
