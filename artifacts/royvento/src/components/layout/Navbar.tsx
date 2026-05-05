@@ -202,7 +202,7 @@ export function Navbar() {
                 </Button>
 
                 {notifOpen && (
-                  <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl glass-card-strong border border-border shadow-2xl overflow-hidden">
+                  <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl bg-card border border-border shadow-2xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                       <p className="font-semibold text-sm">{t("nav.notifications")}</p>
                       {unreadCount > 0 && (

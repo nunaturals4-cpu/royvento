@@ -22,11 +22,12 @@ interface Props {
     hasDrinkPlans?: boolean;
     freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   };
+  hidePubBadge?: boolean;
 }
 
 const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function EventCard({ event }: Props) {
+export function EventCard({ event, hidePubBadge }: Props) {
   const partner = event.partnerName ?? event.vendorName ?? "";
   const loc = event.city
     ? `${event.city}${event.state ? ", " + event.state : ""}`
@@ -66,7 +67,7 @@ export function EventCard({ event }: Props) {
           )}
 
           {/* Top-right: Pub label */}
-          {event.type === "pub" && (
+          {event.type === "pub" && !hidePubBadge && (
             <div className="absolute top-3 right-3">
               <Badge variant="outline" className="bg-black/70 border-white/20 text-white">
                 Pub

@@ -16,7 +16,7 @@ import {
   Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useListFeaturedEvents, useListVendorDrinkOffers } from "@workspace/api-client-react";
+import { useListFeaturedEvents, useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
 import { apiGet, formatINR } from "@/lib/api";
@@ -79,6 +79,8 @@ function PlanIcon({ type }: { type: string }) {
 
 export function Home() {
   const { t } = useTranslation();
+  const { data: me } = useGetMe({ query: { retry: false } as any });
+  const isLoggedIn = !!(me?.user);
   const { data: featured = [] } = useListFeaturedEvents();
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
   const [popular, setPopular] = useState<PublicEvent[]>([]);
@@ -133,11 +135,13 @@ export function Home() {
                   {t("home.browse_pubs")} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/register">
-                <Button size="lg" variant="outline" className="h-12 px-7 border-white/20 hover:bg-white/5">
-                  {t("home.join_free")}
-                </Button>
-              </Link>
+              {!isLoggedIn && (
+                <Link href="/register">
+                  <Button size="lg" variant="outline" className="h-12 px-7 border-white/20 hover:bg-white/5">
+                    {t("home.join_free")}
+                  </Button>
+                </Link>
+              )}
             </div>
 
             {/* Stats */}
@@ -385,7 +389,7 @@ export function Home() {
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedPubs.map((e) => <EventCard key={e.id} event={e} />)}
+            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge />)}
           </div>
         </section>
       )}
