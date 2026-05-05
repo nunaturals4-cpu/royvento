@@ -2,7 +2,7 @@
   "nav": {
     "home": "Home",
     "pubs": "Pubs",
-    "deals": "Deals",
+    "deals": "Hot Deals",
     "blog": "Blog",
     "premium": "Premium",
     "login": "Log in",
@@ -496,7 +496,7 @@
     "present_at_entrance": "Present at entrance · Non-transferable"
   },
   "deals": {
-    "title": "Grab Deals",
+    "title": "Hot Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
     "no_deals_sub": "Check back soon — new deals are added regularly",

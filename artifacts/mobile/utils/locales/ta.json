@@ -28,7 +28,7 @@
     "partners": "கூட்டாளிகள்",
     "partner": "கூட்டாளி",
     "profile": "சுயவிவரம்",
-    "deals": "Deals"
+    "deals": "Hot Deals"
   },
   "auth": {
     "welcome_back": "மீண்டும் வரவேற்கிறோம்",
@@ -521,7 +521,7 @@
     "gu": "ગુજરાતી"
   },
   "deals": {
-    "title": "Grab Deals",
+    "title": "Hot Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
     "no_deals_sub": "Check back soon — new deals are added regularly",

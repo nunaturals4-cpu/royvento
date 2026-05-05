@@ -2,7 +2,7 @@
   "nav": {
     "home": "Home",
     "pubs": "Pubs",
-    "pub_offers": "Grab Deals",
+    "pub_offers": "Hot Deals",
     "blog": "Blog",
     "premium": "Premium",
     "login": "Log in",
@@ -130,7 +130,7 @@
     "free_entry": "Free Entry only"
   },
   "pub_offers": {
-    "title": "Grab Deals",
+    "title": "Hot Deals",
     "subtitle": "Exclusive drink deals and the latest news straight from our partner venues.",
     "drink_deals": "Drink Deals",
     "browse_pubs": "Browse pubs",

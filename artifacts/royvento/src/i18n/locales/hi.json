@@ -2,7 +2,7 @@
   "nav": {
     "home": "होम",
     "pubs": "पब्स",
-    "pub_offers": "ग्रैब डील्स",
+    "pub_offers": "Hot Deals",
     "blog": "ब्लॉग",
     "premium": "प्रीमियम",
     "login": "लॉग इन",
@@ -130,7 +130,7 @@
     "free_entry": "केवल निःशुल्क प्रवेश"
   },
   "pub_offers": {
-    "title": "ग्रैब डील्स",
+    "title": "Hot Deals",
     "subtitle": "हमारे पार्टनर वेन्यू से एक्सक्लूसिव ड्रिंक डील्स और ताज़ा खबरें।",
     "drink_deals": "ड्रिंक डील्स",
     "browse_pubs": "पब देखें",

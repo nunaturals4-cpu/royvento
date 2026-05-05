@@ -2,7 +2,7 @@
   "nav": {
     "home": "હોમ",
     "pubs": "પબ",
-    "pub_offers": "ગ્રૅબ ડીલ્સ",
+    "pub_offers": "Hot Deals",
     "blog": "બ્લોગ",
     "premium": "પ્રીમિયમ",
     "login": "લૉગ ઇન",
@@ -130,7 +130,7 @@
     "free_entry": "ફક્ત મફત પ્રવેશ"
   },
   "pub_offers": {
-    "title": "ગ્રૅબ ડીલ્સ",
+    "title": "Hot Deals",
     "subtitle": "અમારા ભાગીદાર સ્થળોની એક્સક્લુઝિવ ડ્રિંક ડીલ્સ અને તાજા સમાચાર.",
     "drink_deals": "ડ્રિંક ડીલ્સ",
     "browse_pubs": "પબ જુઓ",

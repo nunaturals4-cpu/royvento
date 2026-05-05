@@ -209,7 +209,7 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
           <Text style={styles.dealVenueName} numberOfLines={1}>{item.vendorName}</Text>
           <View style={[styles.dealTypeBadge, { backgroundColor: colors.primary }]}>
             <Ionicons name="wine-outline" size={10} color="#fff" />
-            <Text style={styles.dealTypeBadgeText}>Deals</Text>
+            <Text style={styles.dealTypeBadgeText}>{t("nav.deals")}</Text>
           </View>
         </View>
       </View>

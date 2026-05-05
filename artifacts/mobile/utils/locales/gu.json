@@ -28,7 +28,7 @@
     "partners": "ભાગીદારો",
     "partner": "ભાગીદાર",
     "profile": "પ્રોફાઇલ",
-    "deals": "Deals"
+    "deals": "Hot Deals"
   },
   "auth": {
     "welcome_back": "પાછા સ્વાગત છે",
@@ -521,7 +521,7 @@
     "gu": "ગુજરાતી"
   },
   "deals": {
-    "title": "Grab Deals",
+    "title": "Hot Deals",
     "subtitle": "Exclusive offers & announcements",
     "no_deals": "No drink deals right now",
     "no_deals_sub": "Check back soon — new deals are added regularly",
