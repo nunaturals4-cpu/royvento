@@ -213,23 +213,18 @@ export default function HomeScreen() {
                   }
                 }}
               >
-                <View style={styles.drinkCardImage}>
-                  {item.coverImageUrl ? (
-                    <Image
-                      source={{ uri: item.coverImageUrl }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.drinkCardImagePlaceholder, { backgroundColor: "rgba(255,255,255,0.05)" }]}>
-                      <Ionicons name="wine-outline" size={28} color="rgba(255,255,255,0.2)" />
-                    </View>
-                  )}
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.82)"]}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <Text style={styles.drinkCardNameOverlay} numberOfLines={1}>{item.vendorName}</Text>
+                <View style={[styles.drinkCardHeader, { borderBottomColor: colors.border }]}>
+                  <View style={[styles.drinkIconBox, { backgroundColor: colors.primary + "22" }]}>
+                    <Ionicons name="wine-outline" size={16} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.drinkCardVenueName, { color: colors.foreground }]} numberOfLines={2}>
+                      {item.vendorName}
+                    </Text>
+                    <Text style={{ fontSize: 9, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.8, marginTop: 1 }}>
+                      Drink Deals
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.drinkCardBody}>
                   {item.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
@@ -539,30 +534,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   drinkCard: {
-    width: 280,
+    width: 268,
     borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
   },
-  drinkCardImage: {
-    height: 120,
-    position: "relative",
-    justifyContent: "flex-end",
-    overflow: "hidden",
+  drinkCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
   },
-  drinkCardImagePlaceholder: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  drinkCardNameOverlay: {
-    position: "absolute",
-    bottom: 10,
-    left: 12,
-    right: 12,
+  drinkCardVenueName: {
     fontSize: 15,
     fontFamily: "Inter_700Bold",
-    color: "#fff",
+    lineHeight: 20,
   },
   drinkCardBody: {
     padding: 12,
