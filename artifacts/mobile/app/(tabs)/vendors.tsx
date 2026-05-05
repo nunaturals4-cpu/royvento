@@ -118,7 +118,7 @@ export default function VendorsScreen() {
 
   const approvedVendors = (vendors ?? [])
     .filter((v) => v.status === "approved")
-    .filter((v) => !freeEntry || (v.freeEntryRules as any)?.enabled === true);
+    .filter((v) => !freeEntry || v.freeEntryRules?.enabled === true);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -205,8 +205,8 @@ export default function VendorsScreen() {
             <EmptyState
               icon="business-outline"
               title="No partners found"
-              subtitle={activeCategory !== "All" || activeDanceFloor !== "" ? "Try adjusting your filters" : "Check back soon"}
-              action={activeCategory !== "All" || activeDanceFloor !== "" ? { label: "Clear filters", onPress: () => { setActiveCategory("All"); setActiveDanceFloor(""); } } : undefined}
+              subtitle={activeCategory !== "All" || activeDanceFloor !== "" || freeEntry ? "Try adjusting your filters" : "Check back soon"}
+              action={activeCategory !== "All" || activeDanceFloor !== "" || freeEntry ? { label: "Clear filters", onPress: () => { setActiveCategory("All"); setActiveDanceFloor(""); setFreeEntry(false); } } : undefined}
             />
           }
           ListFooterComponent={approvedVendors.length > 0 ? <MobileFooter /> : null}
