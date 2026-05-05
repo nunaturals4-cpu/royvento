@@ -156,7 +156,7 @@ export function Login() {
         </p>
         <div className="mt-8 pt-6 border-t border-white/10 text-xs text-muted-foreground space-y-1">
           <p className="font-medium text-foreground">Demo accounts</p>
-          <p>admin@admin.com / admin123@</p>
+          <p>royvento56@gmail.com / admin123@ (admin)</p>
           <p>showcase@royvento.in / partner123 (partner)</p>
         </div>
       </div>

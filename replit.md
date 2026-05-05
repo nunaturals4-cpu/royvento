@@ -21,7 +21,7 @@ A full-stack event management marketplace for hosts and vendors.
 - Coupon = login-gated 10% off. Subscribing auto-grants a coupon. Admin can grant per-user coupons.
 - Vendor → "Partner" rename in UI/new endpoints; DB table stays `vendors`.
 - Auth additions: phone field on signup, Google OAuth STUB at `/api/auth/google/*`.
-- Demo accounts: `admin@admin.com` / `admin123@`, `showcase@royvento.in` / `partner123`.
+- Demo accounts: `royvento56@gmail.com` / `admin123@` (admin), `showcase@royvento.in` / `partner123` (partner).
 
 ## New backend routes (April 2026)
 `/api/subscriptions/me|POST`, `/api/coupons/me|validate`, `/api/partner/media`, `/api/partner/blocked-dates` (+ google-sync stub), `/api/partner/ads`, `/api/partner/leads/me`, `/api/partner/profile`, `/api/admin/{events,subscriptions,coupons,ads}`, `/api/events/popular`, `/api/events?type=pub&category=&state=&city=&country=&minPrice=&maxPrice=`. Routes use `apiGet/apiPost/apiPatch/apiDelete` from `lib/api.ts` (no orval regen for new endpoints).

@@ -12,23 +12,32 @@ const ADMIN_PASSWORD = "admin123@";
 async function ensureAdminAccount() {
   try {
     const target = await db.select().from(usersTable).where(eq(usersTable.email, ADMIN_EMAIL)).limit(1);
+    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
     if (target[0]) {
-      await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, target[0].id));
+      await db
+        .update(usersTable)
+        .set({ role: "admin", passwordHash, emailVerified: true })
+        .where(eq(usersTable.id, target[0].id));
+      logger.info("Admin account refreshed (password + verified)");
       return;
     }
     // Migrate from old email if present
     const old = await db.select().from(usersTable).where(eq(usersTable.email, "admin@admin.com")).limit(1);
     if (old[0]) {
-      await db.update(usersTable).set({ email: ADMIN_EMAIL, role: "admin" }).where(eq(usersTable.id, old[0].id));
+      await db
+        .update(usersTable)
+        .set({ email: ADMIN_EMAIL, role: "admin", passwordHash, emailVerified: true })
+        .where(eq(usersTable.id, old[0].id));
       logger.info("Admin email migrated to royvento56@gmail.com");
       return;
     }
     // Create fresh admin account
     await db.insert(usersTable).values({
       email: ADMIN_EMAIL,
-      passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10),
+      passwordHash,
       name: "Royvento Admin",
       role: "admin",
+      emailVerified: true,
       phone: "+91 9000000000",
     });
     logger.info("Admin account created");
