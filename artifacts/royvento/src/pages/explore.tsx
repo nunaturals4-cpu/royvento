@@ -183,7 +183,7 @@ export function Explore() {
           </Label>
         </div>
         <div className="mt-3">
-          <p className="text-xs text-muted-foreground mb-2 font-medium">Drink Deal type</p>
+          <p className="text-xs text-muted-foreground mb-2 font-medium">{t("explore.drink_deal_type")}</p>
           <div className="flex flex-wrap gap-2">
             {DRINK_DEAL_OPTIONS.map((opt) => (
               <button

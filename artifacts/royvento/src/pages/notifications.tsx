@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface Notification {
   id: number;
@@ -27,6 +28,7 @@ function formatTime(iso: string) {
 
 export function Notifications() {
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const { data, isLoading } = useQuery<Notification[]>({
     queryKey: ["notifications"],
@@ -38,12 +40,15 @@ export function Notifications() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
-  const markAllRead = () => {
-    const unread = (data ?? []).filter((n) => !n.isRead);
-    Promise.all(unread.map((n) => apiPatch(`/api/notifications/${n.id}/read`, {}))).then(() => {
-      qc.invalidateQueries({ queryKey: ["notifications"] });
-    });
-  };
+  const markAllRead = useMutation({
+    mutationFn: () => {
+      const unread = (data ?? []).filter((n) => !n.isRead);
+      return Promise.all(unread.map((n) => apiPatch(`/api/notifications/${n.id}/read`, {})));
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+    onError: () =>
+      toast({ title: "Could not mark all as read", description: "Please try again.", variant: "destructive" }),
+  });
 
   const notifications = data ?? [];
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -64,10 +69,15 @@ export function Notifications() {
           <Button
             variant="outline"
             size="sm"
-            onClick={markAllRead}
+            onClick={() => markAllRead.mutate()}
+            disabled={markAllRead.isPending}
             className="gap-2"
           >
-            <CheckCheck className="h-4 w-4" />
+            {markAllRead.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCheck className="h-4 w-4" />
+            )}
             Mark all read
           </Button>
         )}

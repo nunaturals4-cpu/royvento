@@ -12,6 +12,7 @@
     "notifications": "Notifications",
     "no_notifications": "No notifications yet",
     "mark_all_read": "Mark all read",
+    "view_all_notifications": "View all notifications",
     "open_menu": "Open menu",
     "close_menu": "Close menu",
     "my_profile": "My profile",
@@ -127,7 +128,8 @@
     "loading": "Loading events…",
     "no_match": "No events match yet",
     "no_match_sub": "Try a different filter or search term.",
-    "free_entry": "Free Entry only"
+    "free_entry": "Free Entry only",
+    "drink_deal_type": "Drink Deal type"
   },
   "pub_offers": {
     "title": "Hot Deals",

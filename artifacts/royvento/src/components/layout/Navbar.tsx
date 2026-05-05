@@ -249,7 +249,7 @@ export function Navbar() {
                         onClick={() => setNotifOpen(false)}
                         className="flex items-center justify-center px-4 py-3 text-xs font-medium text-primary hover:bg-accent/20 transition-colors"
                       >
-                        View all notifications
+                        {t("nav.view_all_notifications")}
                       </Link>
                     </div>
                   </div>
