@@ -40,6 +40,68 @@ import { Checkbox } from "@/components/ui/checkbox";
 const CATEGORIES = [...EVENT_CATEGORIES];
 const EVENT_KIND = ["event", "pub"] as const;
 
+const VIDEO_MAX_SIZE = 2 * 1024 * 1024;
+const VIDEO_MAX_DURATION = 12;
+const VIDEO_RATIO = 9 / 16;
+const VIDEO_RATIO_TOLERANCE = 0.08;
+
+function loadVideoMeta(file: File): Promise<{ duration: number; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const vid = document.createElement("video");
+    vid.preload = "metadata";
+    vid.src = url;
+    vid.onloadedmetadata = () => {
+      const result = { duration: vid.duration, width: vid.videoWidth, height: vid.videoHeight };
+      URL.revokeObjectURL(url);
+      resolve(result);
+    };
+    vid.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Cannot read video")); };
+  });
+}
+
+function compressVideo(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const vid = document.createElement("video");
+    vid.src = url;
+    vid.muted = true;
+    vid.playsInline = true;
+    vid.preload = "auto";
+    const TARGET_W = 405;
+    const TARGET_H = 720;
+    vid.onloadedmetadata = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = TARGET_W;
+      canvas.height = TARGET_H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas unavailable")); return; }
+      const mimeType = MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")
+        ? "video/mp4;codecs=avc1"
+        : "video/webm;codecs=vp9";
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 900_000 });
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        URL.revokeObjectURL(url);
+        const baseType = mimeType.split(";")[0];
+        const ext = baseType === "video/mp4" ? "mp4" : "webm";
+        const blob = new Blob(chunks, { type: baseType });
+        resolve(new File([blob], `compressed.${ext}`, { type: baseType }));
+      };
+      const drawLoop = () => {
+        if (vid.paused || vid.ended) { recorder.stop(); return; }
+        ctx.drawImage(vid, 0, 0, TARGET_W, TARGET_H);
+        requestAnimationFrame(drawLoop);
+      };
+      vid.onplay = () => { recorder.start(100); drawLoop(); };
+      vid.play().catch(reject);
+    };
+    vid.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load video")); };
+  });
+}
+
 
 interface BlockedDate {
   id: number; date: string; reason: string; source: string;
@@ -383,6 +445,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>([]);
   const [freeEntryDays, setFreeEntryDays] = useState<string[]>([]);
   const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState("");
+  const [videoCompressing, setVideoCompressing] = useState(false);
   const create = useCreateEvent();
   const { toast } = useToast();
 
@@ -437,11 +500,39 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
 
   const onGalleryVideosChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const urls: string[] = [];
-    for (const file of Array.from(files)) {
-      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+    const file = files[0];
+    if (file.type !== "video/mp4") {
+      toast({ title: "Only MP4 videos are allowed", variant: "destructive" }); return;
     }
-    setGalleryVideos((prev) => [...prev, ...urls]);
+    let meta: { duration: number; width: number; height: number };
+    try { meta = await loadVideoMeta(file); } catch {
+      toast({ title: "Could not read video metadata", variant: "destructive" }); return;
+    }
+    if (meta.duration > VIDEO_MAX_DURATION) {
+      toast({ title: `Video must be ${VIDEO_MAX_DURATION} seconds or shorter`, variant: "destructive" }); return;
+    }
+    const ratio = meta.width / meta.height;
+    if (Math.abs(ratio - VIDEO_RATIO) > VIDEO_RATIO_TOLERANCE) {
+      toast({ title: "Video must be 9:16 portrait", variant: "destructive" }); return;
+    }
+    let finalFile = file;
+    if (file.size > VIDEO_MAX_SIZE || meta.height > 720) {
+      setVideoCompressing(true);
+      try { finalFile = await compressVideo(file); } catch {
+        toast({ title: "Compression failed", description: "Please use a shorter or smaller video.", variant: "destructive" });
+        setVideoCompressing(false); return;
+      }
+      setVideoCompressing(false);
+      if (finalFile.size > VIDEO_MAX_SIZE) {
+        toast({ title: "Video too large after compression", description: "Please use a video under 2 MB.", variant: "destructive" }); return;
+      }
+    }
+    try {
+      const url = await fileToDataUrl(finalFile);
+      setGalleryVideos([url]);
+    } catch {
+      toast({ title: "Failed to process video", variant: "destructive" });
+    }
   };
 
   const togglePubEvent = (t: string) =>
@@ -867,19 +958,25 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           </div>
         )}
 
-        <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery videos</p>
-        <Input
-          type="file"
-          accept="video/*"
-          multiple
-          onChange={(e) => onGalleryVideosChange(e.target.files)}
-          className="bg-black/40 border-white/10"
-        />
-        {galleryVideos.length > 0 && (
+        <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery video <span className="text-xs text-muted-foreground font-normal">(MP4 · 9:16 · ≤12 s · ≤2 MB)</span></p>
+        {galleryVideos.length === 0 ? (
+          <>
+            <Input
+              type="file"
+              accept="video/mp4"
+              disabled={videoCompressing}
+              onChange={(e) => onGalleryVideosChange(e.target.files)}
+              className="bg-black/40 border-white/10"
+            />
+            {videoCompressing && (
+              <p className="text-xs text-muted-foreground animate-pulse">Compressing video…</p>
+            )}
+          </>
+        ) : (
           <div className="flex flex-wrap gap-2 mt-1">
             {galleryVideos.map((src, i) => (
               <div key={i} className="relative group">
-                <video src={src} className="h-20 w-20 rounded-lg object-cover" muted />
+                <video src={src} className="h-20 w-14 rounded-lg object-cover" muted />
                 <button
                   type="button"
                   onClick={() => setGalleryVideos((a) => a.filter((_, idx) => idx !== i))}
@@ -1169,6 +1266,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
   const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>(event.freeEntryRules?.beforeTime ?? "");
   const { toast } = useToast();
   const isPub = event.type === "pub";
+  const [videoCompressing, setVideoCompressing] = useState(false);
 
   const onImageFile = async (f: File | null) => {
     if (!f) return;
@@ -1186,11 +1284,39 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
 
   const onGalleryVideosChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const urls: string[] = [];
-    for (const file of Array.from(files)) {
-      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+    const file = files[0];
+    if (file.type !== "video/mp4") {
+      toast({ title: "Only MP4 videos are allowed", variant: "destructive" }); return;
     }
-    setGalleryVideos((prev) => [...prev, ...urls]);
+    let meta: { duration: number; width: number; height: number };
+    try { meta = await loadVideoMeta(file); } catch {
+      toast({ title: "Could not read video metadata", variant: "destructive" }); return;
+    }
+    if (meta.duration > VIDEO_MAX_DURATION) {
+      toast({ title: `Video must be ${VIDEO_MAX_DURATION} seconds or shorter`, variant: "destructive" }); return;
+    }
+    const ratio = meta.width / meta.height;
+    if (Math.abs(ratio - VIDEO_RATIO) > VIDEO_RATIO_TOLERANCE) {
+      toast({ title: "Video must be 9:16 portrait", variant: "destructive" }); return;
+    }
+    let finalFile = file;
+    if (file.size > VIDEO_MAX_SIZE || meta.height > 720) {
+      setVideoCompressing(true);
+      try { finalFile = await compressVideo(file); } catch {
+        toast({ title: "Compression failed", description: "Please use a shorter or smaller video.", variant: "destructive" });
+        setVideoCompressing(false); return;
+      }
+      setVideoCompressing(false);
+      if (finalFile.size > VIDEO_MAX_SIZE) {
+        toast({ title: "Video too large after compression", description: "Please use a video under 2 MB.", variant: "destructive" }); return;
+      }
+    }
+    try {
+      const url = await fileToDataUrl(finalFile);
+      setGalleryVideos([url]);
+    } catch {
+      toast({ title: "Failed to process video", variant: "destructive" });
+    }
   };
 
   const save = async (e: React.FormEvent) => {
@@ -1266,13 +1392,19 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
               ))}
             </div>
           )}
-          <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery videos</p>
-          <Input type="file" accept="video/*" multiple onChange={(e) => onGalleryVideosChange(e.target.files)} className="bg-black/40 border-white/10" />
-          {galleryVideos.length > 0 && (
+          <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery video <span className="text-xs text-muted-foreground font-normal">(MP4 · 9:16 · ≤12 s · ≤2 MB)</span></p>
+          {galleryVideos.length === 0 ? (
+            <>
+              <Input type="file" accept="video/mp4" disabled={videoCompressing} onChange={(e) => onGalleryVideosChange(e.target.files)} className="bg-black/40 border-white/10" />
+              {videoCompressing && (
+                <p className="text-xs text-muted-foreground animate-pulse">Compressing video…</p>
+              )}
+            </>
+          ) : (
             <div className="flex flex-wrap gap-2 mt-1">
               {galleryVideos.map((src, i) => (
                 <div key={i} className="relative group">
-                  <video src={src} className="h-20 w-20 rounded-lg object-cover" muted />
+                  <video src={src} className="h-20 w-14 rounded-lg object-cover" muted />
                   <button type="button" onClick={() => setGalleryVideos((a) => a.filter((_, idx) => idx !== i))}
                     className="absolute -top-1.5 -right-1.5 bg-destructive rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                 </div>
