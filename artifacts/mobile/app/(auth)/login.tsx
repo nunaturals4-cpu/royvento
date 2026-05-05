@@ -100,8 +100,16 @@ export default function LoginScreen() {
   });
 
   const handleLogin = () => {
-    if (!email.trim() || !password) {
-      Alert.alert(t("common.error"), t("auth.enter_email_password"));
+    if (!email.trim()) {
+      Alert.alert(t("common.error"), "Please enter your email address.");
+      return;
+    }
+    if (!email.includes("@") || !email.includes(".")) {
+      Alert.alert(t("common.error"), "Please enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      Alert.alert(t("common.error"), "Please enter your password.");
       return;
     }
     loginMutation.mutate({ data: { email: email.trim(), password } });

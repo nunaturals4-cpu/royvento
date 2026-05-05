@@ -4,9 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Check, X } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+
+const PASSWORD_RULES = [
+  { id: "len", label: "At least 8 characters", test: (p: string) => p.length >= 8 },
+  { id: "upper", label: "Uppercase letter (A–Z)", test: (p: string) => /[A-Z]/.test(p) },
+  { id: "lower", label: "Lowercase letter (a–z)", test: (p: string) => /[a-z]/.test(p) },
+  { id: "num", label: "Number (0–9)", test: (p: string) => /[0-9]/.test(p) },
+  { id: "special", label: "Special character (!@#$…)", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+];
+
+function isStrongPassword(p: string) {
+  return PASSWORD_RULES.every((r) => r.test(p));
+}
 
 export function Register() {
   const { t } = useTranslation();
@@ -14,6 +26,7 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,6 +49,11 @@ export function Register() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isStrongPassword(password)) {
+      setPasswordTouched(true);
+      toast({ title: "Weak password", description: "Please meet all password requirements before submitting.", variant: "destructive" });
+      return;
+    }
     setBusy(true);
     try {
       await apiPost("/api/auth/register", {
@@ -147,7 +165,14 @@ export function Register() {
           </div>
           <div>
             <Label htmlFor="phone">{t("auth.phone")}</Label>
-            <Input id="phone" type="tel" placeholder="+91 …" value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="Phone number (optional)"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="bg-black/40 border-white/10 mt-1"
+            />
           </div>
           <div>
             <Label htmlFor="password">{t("auth.password")}</Label>
@@ -157,9 +182,9 @@ export function Register() {
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 required
-                minLength={6}
+                minLength={8}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); }}
                 className="bg-black/40 border-white/10 pr-10"
               />
               <button
@@ -171,6 +196,19 @@ export function Register() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {passwordTouched && password.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {PASSWORD_RULES.map((rule) => {
+                  const ok = rule.test(password);
+                  return (
+                    <li key={rule.id} className={`flex items-center gap-1.5 text-xs ${ok ? "text-green-400" : "text-muted-foreground"}`}>
+                      {ok ? <Check className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
+                      {rule.label}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
           <div>
             <Label htmlFor="referralCode">{t("auth.referral_code")} <span className="text-muted-foreground">({t("auth.optional")})</span></Label>

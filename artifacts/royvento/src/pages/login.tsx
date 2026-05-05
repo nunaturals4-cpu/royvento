@@ -154,11 +154,6 @@ export function Login() {
         <p className="mt-6 text-sm text-muted-foreground text-center">
           {t("auth.no_account")} <Link href="/register" className="text-primary hover:underline">{t("auth.create_account_link")}</Link>
         </p>
-        <div className="mt-8 pt-6 border-t border-white/10 text-xs text-muted-foreground space-y-1">
-          <p className="font-medium text-foreground">Demo accounts</p>
-          <p>royvento56@gmail.com / admin123@ (admin)</p>
-          <p>showcase@royvento.in / partner123 (partner)</p>
-        </div>
       </div>
     </div>
   );

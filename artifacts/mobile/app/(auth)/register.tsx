@@ -50,8 +50,28 @@ export default function RegisterScreen() {
   });
 
   const handleRegister = () => {
-    if (!name.trim() || !email.trim() || password.length < 6) {
+    if (!name.trim() || !email.trim() || !password) {
       Alert.alert(t("common.error"), t("auth.fill_all_fields"));
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert("Weak password", "Password must be at least 8 characters long.");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      Alert.alert("Weak password", "Password must contain at least one uppercase letter.");
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      Alert.alert("Weak password", "Password must contain at least one lowercase letter.");
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      Alert.alert("Weak password", "Password must contain at least one number.");
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      Alert.alert("Weak password", "Password must contain at least one special character (e.g. !@#$%).");
       return;
     }
     registerMutation.mutate({

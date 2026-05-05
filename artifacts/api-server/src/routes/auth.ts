@@ -63,9 +63,17 @@ function genVerifyToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+const strongPassword = z
+  .string()
+  .min(8, "Password must be at least 8 characters long")
+  .refine((v) => /[A-Z]/.test(v), "Password must contain at least one uppercase letter")
+  .refine((v) => /[a-z]/.test(v), "Password must contain at least one lowercase letter")
+  .refine((v) => /[0-9]/.test(v), "Password must contain at least one number")
+  .refine((v) => /[^A-Za-z0-9]/.test(v), "Password must contain at least one special character");
+
 const RegisterBodyExt = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: strongPassword,
   name: z.string().min(1),
   role: z.enum(["user", "vendor", "admin"]).optional(),
   phone: z.string().optional().default(""),
@@ -80,7 +88,8 @@ const LoginBodyExt = z.object({
 router.post("/auth/register", registerLimiter, async (req, res) => {
   const parsed = RegisterBodyExt.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input", details: parsed.error });
+    const firstMsg = parsed.error.errors[0]?.message ?? "Invalid input";
+    res.status(400).json({ error: firstMsg });
     return;
   }
   const { email, password, name, role, phone, referralCode } = parsed.data;
