@@ -609,9 +609,9 @@ export default function EventDetailScreen() {
                         ) : null}
                       </Pressable>
                       {/* Days / time / description detail */}
-                      {((plan.days && plan.days.length > 0) || plan.timeFrom || plan.description) ? (
+                      {((plan.days && plan.days.length > 0) || plan.timeFrom || plan.timeTo || plan.description) ? (
                         <View style={{ gap: 4, paddingLeft: 4 }}>
-                          {(plan.days && plan.days.length > 0 || plan.timeFrom) ? (
+                          {((plan.days && plan.days.length > 0) || plan.timeFrom || plan.timeTo) ? (
                             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
                               {plan.days && plan.days.map((d: string) => (
                                 <View
@@ -628,7 +628,7 @@ export default function EventDetailScreen() {
                                   <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{d}</Text>
                                 </View>
                               ))}
-                              {plan.timeFrom ? (
+                              {(plan.timeFrom || plan.timeTo) ? (
                                 <View
                                   style={{
                                     backgroundColor: colors.muted,
@@ -644,7 +644,7 @@ export default function EventDetailScreen() {
                                 >
                                   <Ionicons name="time-outline" size={9} color={colors.mutedForeground} />
                                   <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
-                                    {plan.timeFrom}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
+                                    {plan.timeFrom || ""}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
                                   </Text>
                                 </View>
                               ) : null}
