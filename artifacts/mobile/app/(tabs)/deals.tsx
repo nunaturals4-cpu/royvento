@@ -174,6 +174,7 @@ function AnnouncementSlider({ announcements }: { announcements: RecentAnnounceme
 
 function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
   const colors = useColors();
+  const { t } = useLanguage();
   return (
     <Pressable
       style={({ pressed }) => [
