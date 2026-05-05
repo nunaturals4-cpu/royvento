@@ -277,15 +277,15 @@ export default function PartnerDetailScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Cinematic hero banner */}
-      <View style={{ height: 300, position: "relative" }}>
-        {vendor.bannerImage || vendor.coverImageUrl ? (
+      <View style={{ height: 300, position: "relative", overflow: "hidden" }}>
+        {(vendor.coverImageUrl || vendor.bannerImage) ? (
           <Image
-            source={{ uri: vendor.bannerImage || vendor.coverImageUrl }}
-            style={{ width: "100%", height: 300 }}
+            source={{ uri: vendor.coverImageUrl || vendor.bannerImage }}
+            style={StyleSheet.absoluteFillObject}
             contentFit="cover"
           />
         ) : (
-          <View style={{ width: "100%", height: 300, backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }}>
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
             <Ionicons name="business-outline" size={56} color={colors.mutedForeground} />
           </View>
         )}
