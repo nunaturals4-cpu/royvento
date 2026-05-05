@@ -62,6 +62,11 @@ function loadVideoMeta(file: File): Promise<{ duration: number; width: number; h
 
 function compressVideo(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
+    const mp4Mime = ["video/mp4;codecs=avc1", "video/mp4"].find((m) => MediaRecorder.isTypeSupported(m));
+    if (!mp4Mime) {
+      reject(new Error("MP4_UNSUPPORTED"));
+      return;
+    }
     const url = URL.createObjectURL(file);
     const vid = document.createElement("video");
     vid.src = url;
@@ -76,19 +81,14 @@ function compressVideo(file: File): Promise<File> {
       canvas.height = TARGET_H;
       const ctx = canvas.getContext("2d");
       if (!ctx) { URL.revokeObjectURL(url); reject(new Error("Canvas unavailable")); return; }
-      const mimeType = MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")
-        ? "video/mp4;codecs=avc1"
-        : "video/webm;codecs=vp9";
       const stream = canvas.captureStream(30);
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 900_000 });
+      const recorder = new MediaRecorder(stream, { mimeType: mp4Mime, videoBitsPerSecond: 900_000 });
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = () => {
         URL.revokeObjectURL(url);
-        const baseType = mimeType.split(";")[0];
-        const ext = baseType === "video/mp4" ? "mp4" : "webm";
-        const blob = new Blob(chunks, { type: baseType });
-        resolve(new File([blob], `compressed.${ext}`, { type: baseType }));
+        const blob = new Blob(chunks, { type: "video/mp4" });
+        resolve(new File([blob], "compressed.mp4", { type: "video/mp4" }));
       };
       const drawLoop = () => {
         if (vid.paused || vid.ended) { recorder.stop(); return; }
@@ -518,13 +518,33 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     let finalFile = file;
     if (file.size > VIDEO_MAX_SIZE || meta.height > 720) {
       setVideoCompressing(true);
-      try { finalFile = await compressVideo(file); } catch {
-        toast({ title: "Compression failed", description: "Please use a shorter or smaller video.", variant: "destructive" });
+      try { finalFile = await compressVideo(file); } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg === "MP4_UNSUPPORTED") {
+          toast({ title: "Browser can't compress this video", description: "Please manually resize to ≤720p and ≤2 MB, then try again.", variant: "destructive" });
+        } else {
+          toast({ title: "Compression failed", description: "Please use a shorter or smaller video.", variant: "destructive" });
+        }
         setVideoCompressing(false); return;
       }
       setVideoCompressing(false);
+      // Re-validate all rules on compressed output
+      let cMeta: { duration: number; width: number; height: number };
+      try { cMeta = await loadVideoMeta(finalFile); } catch {
+        toast({ title: "Could not verify compressed video", variant: "destructive" }); return;
+      }
       if (finalFile.size > VIDEO_MAX_SIZE) {
         toast({ title: "Video too large after compression", description: "Please use a video under 2 MB.", variant: "destructive" }); return;
+      }
+      if (cMeta.height > 720) {
+        toast({ title: "Video resolution too high after compression", variant: "destructive" }); return;
+      }
+      if (cMeta.duration > VIDEO_MAX_DURATION) {
+        toast({ title: `Compressed video exceeds ${VIDEO_MAX_DURATION} seconds`, variant: "destructive" }); return;
+      }
+      const cRatio = cMeta.width / cMeta.height;
+      if (Math.abs(cRatio - VIDEO_RATIO) > VIDEO_RATIO_TOLERANCE) {
+        toast({ title: "Compressed video ratio mismatch", variant: "destructive" }); return;
       }
     }
     try {
@@ -959,20 +979,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         )}
 
         <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery video <span className="text-xs text-muted-foreground font-normal">(MP4 · 9:16 · ≤12 s · ≤2 MB)</span></p>
-        {galleryVideos.length === 0 ? (
-          <>
-            <Input
-              type="file"
-              accept="video/mp4"
-              disabled={videoCompressing}
-              onChange={(e) => onGalleryVideosChange(e.target.files)}
-              className="bg-black/40 border-white/10"
-            />
-            {videoCompressing && (
-              <p className="text-xs text-muted-foreground animate-pulse">Compressing video…</p>
-            )}
-          </>
-        ) : (
+        {galleryVideos.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-1">
             {galleryVideos.map((src, i) => (
               <div key={i} className="relative group">
@@ -985,6 +992,19 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
               </div>
             ))}
           </div>
+        )}
+        <Input
+          type="file"
+          accept="video/mp4"
+          disabled={videoCompressing}
+          onChange={(e) => onGalleryVideosChange(e.target.files)}
+          className="bg-black/40 border-white/10"
+        />
+        {galleryVideos.length > 0 && !videoCompressing && (
+          <p className="text-xs text-muted-foreground">Select a new file to replace the current video</p>
+        )}
+        {videoCompressing && (
+          <p className="text-xs text-muted-foreground animate-pulse">Compressing video…</p>
         )}
       </div>
 
@@ -1302,13 +1322,33 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
     let finalFile = file;
     if (file.size > VIDEO_MAX_SIZE || meta.height > 720) {
       setVideoCompressing(true);
-      try { finalFile = await compressVideo(file); } catch {
-        toast({ title: "Compression failed", description: "Please use a shorter or smaller video.", variant: "destructive" });
+      try { finalFile = await compressVideo(file); } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg === "MP4_UNSUPPORTED") {
+          toast({ title: "Browser can't compress this video", description: "Please manually resize to ≤720p and ≤2 MB, then try again.", variant: "destructive" });
+        } else {
+          toast({ title: "Compression failed", description: "Please use a shorter or smaller video.", variant: "destructive" });
+        }
         setVideoCompressing(false); return;
       }
       setVideoCompressing(false);
+      // Re-validate all rules on compressed output
+      let cMeta: { duration: number; width: number; height: number };
+      try { cMeta = await loadVideoMeta(finalFile); } catch {
+        toast({ title: "Could not verify compressed video", variant: "destructive" }); return;
+      }
       if (finalFile.size > VIDEO_MAX_SIZE) {
         toast({ title: "Video too large after compression", description: "Please use a video under 2 MB.", variant: "destructive" }); return;
+      }
+      if (cMeta.height > 720) {
+        toast({ title: "Video resolution too high after compression", variant: "destructive" }); return;
+      }
+      if (cMeta.duration > VIDEO_MAX_DURATION) {
+        toast({ title: `Compressed video exceeds ${VIDEO_MAX_DURATION} seconds`, variant: "destructive" }); return;
+      }
+      const cRatio = cMeta.width / cMeta.height;
+      if (Math.abs(cRatio - VIDEO_RATIO) > VIDEO_RATIO_TOLERANCE) {
+        toast({ title: "Compressed video ratio mismatch", variant: "destructive" }); return;
       }
     }
     try {
@@ -1393,14 +1433,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
             </div>
           )}
           <p className="text-sm font-medium flex items-center gap-2 pt-1"><Video className="h-4 w-4 text-primary" />Gallery video <span className="text-xs text-muted-foreground font-normal">(MP4 · 9:16 · ≤12 s · ≤2 MB)</span></p>
-          {galleryVideos.length === 0 ? (
-            <>
-              <Input type="file" accept="video/mp4" disabled={videoCompressing} onChange={(e) => onGalleryVideosChange(e.target.files)} className="bg-black/40 border-white/10" />
-              {videoCompressing && (
-                <p className="text-xs text-muted-foreground animate-pulse">Compressing video…</p>
-              )}
-            </>
-          ) : (
+          {galleryVideos.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-1">
               {galleryVideos.map((src, i) => (
                 <div key={i} className="relative group">
@@ -1410,6 +1443,13 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
                 </div>
               ))}
             </div>
+          )}
+          <Input type="file" accept="video/mp4" disabled={videoCompressing} onChange={(e) => onGalleryVideosChange(e.target.files)} className="bg-black/40 border-white/10" />
+          {galleryVideos.length > 0 && !videoCompressing && (
+            <p className="text-xs text-muted-foreground">Select a new file to replace the current video</p>
+          )}
+          {videoCompressing && (
+            <p className="text-xs text-muted-foreground animate-pulse">Compressing video…</p>
           )}
         </div>
 
