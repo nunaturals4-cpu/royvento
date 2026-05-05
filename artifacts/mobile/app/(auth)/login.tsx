@@ -104,7 +104,7 @@ export default function LoginScreen() {
       Alert.alert(t("common.error"), "Please enter your email address.");
       return;
     }
-    if (!email.includes("@") || !email.includes(".")) {
+    if (!email.includes("@")) {
       Alert.alert(t("common.error"), "Please enter a valid email address.");
       return;
     }
