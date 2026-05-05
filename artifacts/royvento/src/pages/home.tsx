@@ -79,7 +79,7 @@ function PlanIcon({ type }: { type: string }) {
 
 export function Home() {
   const { t } = useTranslation();
-  const { data: me } = useGetMe({ query: { retry: false } as any });
+  const { data: me } = useGetMe();
   const isLoggedIn = !!(me?.user);
   const { data: featured = [] } = useListFeaturedEvents();
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
