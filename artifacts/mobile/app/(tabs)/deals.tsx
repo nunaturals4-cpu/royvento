@@ -173,13 +173,12 @@ function AnnouncementSlider({ announcements }: { announcements: RecentAnnounceme
 }
 
 function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
-  const colors = useColors();
   const { t } = useLanguage();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.dealCard,
-        { backgroundColor: colors.card, borderColor: colors.border },
+        { backgroundColor: "#fff", borderColor: "#e5e7eb" },
         pressed && styles.pressed,
       ]}
       onPress={() => {
@@ -198,27 +197,23 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
             resizeMode="cover"
           />
         ) : (
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
-            <Ionicons name="wine-outline" size={32} color={colors.mutedForeground} />
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" }]}>
+            <Ionicons name="wine-outline" size={32} color="#9ca3af" />
           </View>
         )}
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.78)"]}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <View style={styles.dealImageBottom}>
-          <Text style={styles.dealVenueName} numberOfLines={1}>{item.vendorName}</Text>
-          <View style={[styles.dealTypeBadge, { backgroundColor: colors.primary }]}>
-            <Ionicons name="wine-outline" size={10} color="#fff" />
-            <Text style={styles.dealTypeBadgeText}>{t("nav.deals")}</Text>
-          </View>
-        </View>
       </View>
 
-      <View style={[styles.dealBody, { borderTopColor: colors.border }]}>
+      <View style={[styles.dealBody, { borderTopColor: "#e5e7eb" }]}>
+        <View style={styles.dealNameRow}>
+          <Text style={styles.dealVenueNameLight} numberOfLines={1}>{item.vendorName}</Text>
+          <View style={styles.dealTypeBadgeLight}>
+            <Ionicons name="wine-outline" size={10} color="#dc2626" />
+            <Text style={styles.dealTypeBadgeTextLight}>{t("nav.deals")}</Text>
+          </View>
+        </View>
         {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => (
           <View key={i} style={styles.planRow}>
-            <View style={[styles.planIcon, { backgroundColor: colors.primary + "22" }]}>
+            <View style={[styles.planIcon, { backgroundColor: "#fef2f2" }]}>
               <Ionicons
                 name={
                   plan.type === "unlimited"
@@ -230,10 +225,10 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
                     : "pricetag-outline"
                 }
                 size={12}
-                color={colors.primary}
+                color="#dc2626"
               />
             </View>
-            <Text style={[styles.planLabel, { color: colors.foreground }]} numberOfLines={1}>
+            <Text style={styles.planLabelLight} numberOfLines={1}>
               {getPlanLabel(plan)}
             </Text>
             <View
@@ -242,15 +237,15 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
                 {
                   backgroundColor:
                     plan.gender === "female"
-                      ? "rgba(244,63,94,0.15)"
-                      : colors.primary + "1A",
+                      ? "rgba(244,63,94,0.12)"
+                      : "rgba(220,38,38,0.10)",
                 },
               ]}
             >
               <Text
                 style={[
                   styles.genderText,
-                  { color: plan.gender === "female" ? "#fb7185" : colors.primary },
+                  { color: plan.gender === "female" ? "#e11d48" : "#dc2626" },
                 ]}
               >
                 {plan.gender === "female" ? "Ladies" : "All"}
@@ -259,15 +254,15 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
           </View>
         ))}
         {item.plans.length > 3 && (
-          <Text style={[styles.morePlans, { color: colors.mutedForeground }]}>
+          <Text style={styles.morePlansLight}>
             +{item.plans.length - 3} more deal{item.plans.length - 3 !== 1 ? "s" : ""}
           </Text>
         )}
-        <View style={[styles.ctaRow, { borderTopColor: colors.border }]}>
-          <Text style={[styles.ctaText, { color: colors.primary }]}>
+        <View style={[styles.ctaRow, { borderTopColor: "#e5e7eb" }]}>
+          <Text style={[styles.ctaText, { color: "#dc2626" }]}>
             {item.pubEventId ? "Book now" : "View venue"}
           </Text>
-          <Ionicons name="arrow-forward-circle" size={18} color={colors.primary} />
+          <Ionicons name="arrow-forward-circle" size={18} color="#dc2626" />
         </View>
       </View>
     </Pressable>
@@ -365,45 +360,6 @@ export default function DealsScreen() {
             <AnnouncementSlider announcements={sliderAnnouncements} />
           )}
 
-          {/* What's On — filter chips + recent announcements */}
-          {announcements.length > 0 && (
-            <View>
-              <View style={{ paddingHorizontal: 20, paddingTop: 4, gap: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                  <Ionicons name="musical-notes-outline" size={13} color={colors.mutedForeground} />
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Genre</Text>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
-                  {["", ...ANN_GENRES].map((g) => (
-                    <Pressable
-                      key={g || "all"}
-                      onPress={() => setAnnGenreFilter(g === annGenreFilter ? "" : g)}
-                      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annGenreFilter === g ? colors.primary : colors.border, backgroundColor: annGenreFilter === g ? colors.primary + "18" : colors.card }}
-                    >
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annGenreFilter === g ? colors.primary : colors.mutedForeground }}>{g || "All"}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                  <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Event Type</Text>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 4 }}>
-                  {["", ...ANN_EVENT_TYPES].map((et) => (
-                    <Pressable
-                      key={et || "all"}
-                      onPress={() => setAnnEventTypeFilter(et === annEventTypeFilter ? "" : et)}
-                      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annEventTypeFilter === et ? colors.primary : colors.border, backgroundColor: annEventTypeFilter === et ? colors.primary + "18" : colors.card }}
-                    >
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annEventTypeFilter === et ? colors.primary : colors.mutedForeground }}>{et || "All"}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-              <AnnouncementSlider announcements={filteredAnnouncements} />
-            </View>
-          )}
-
           {/* Drink Deals */}
           <View style={styles.dealsSection}>
             <View style={styles.dealsSectionHeader}>
@@ -478,6 +434,45 @@ export default function DealsScreen() {
               />
             )}
           </View>
+
+          {/* What's On — filter chips + recent announcements */}
+          {announcements.length > 0 && (
+            <View>
+              <View style={{ paddingHorizontal: 20, paddingTop: 4, gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <Ionicons name="musical-notes-outline" size={13} color={colors.mutedForeground} />
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Genre</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+                  {["", ...ANN_GENRES].map((g) => (
+                    <Pressable
+                      key={g || "all"}
+                      onPress={() => setAnnGenreFilter(g === annGenreFilter ? "" : g)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annGenreFilter === g ? colors.primary : colors.border, backgroundColor: annGenreFilter === g ? colors.primary + "18" : colors.card }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annGenreFilter === g ? colors.primary : colors.mutedForeground }}>{g || "All"}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>Event Type</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 4 }}>
+                  {["", ...ANN_EVENT_TYPES].map((et) => (
+                    <Pressable
+                      key={et || "all"}
+                      onPress={() => setAnnEventTypeFilter(et === annEventTypeFilter ? "" : et)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: annEventTypeFilter === et ? colors.primary : colors.border, backgroundColor: annEventTypeFilter === et ? colors.primary + "18" : colors.card }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: annEventTypeFilter === et ? colors.primary : colors.mutedForeground }}>{et || "All"}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+              <AnnouncementSlider announcements={filteredAnnouncements} />
+            </View>
+          )}
 
           <MobileFooter />
         </ScrollView>
@@ -660,34 +655,34 @@ const styles = StyleSheet.create({
     height: 160,
     position: "relative",
   },
-  dealImageBottom: {
-    position: "absolute",
-    bottom: 12,
-    left: 14,
-    right: 14,
+  dealNameRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
-  dealVenueName: {
+  dealVenueNameLight: {
     flex: 1,
     fontSize: 15,
     fontFamily: "Inter_700Bold",
-    color: "#fff",
-    marginRight: 8,
+    color: "#111827",
+    marginRight: 4,
   },
-  dealTypeBadge: {
+  dealTypeBadgeLight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
   },
-  dealTypeBadgeText: {
+  dealTypeBadgeTextLight: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
-    color: "#fff",
+    color: "#dc2626",
     letterSpacing: 0.3,
   },
   dealBody: {
@@ -707,10 +702,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  planLabel: {
+  planLabelLight: {
     flex: 1,
     fontSize: 13,
     fontFamily: "Inter_500Medium",
+    color: "#374151",
   },
   genderPill: {
     borderRadius: 10,
@@ -721,10 +717,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
-  morePlans: {
+  morePlansLight: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     paddingLeft: 34,
+    color: "#9ca3af",
   },
   ctaRow: {
     flexDirection: "row",

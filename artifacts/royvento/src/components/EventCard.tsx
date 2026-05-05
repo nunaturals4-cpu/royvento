@@ -85,12 +85,14 @@ export function EventCard({ event, hidePubBadge }: Props) {
             </div>
           )}
 
-          {/* Bottom-left: Category badge — sole occupant of this corner */}
-          <div className="absolute bottom-3 left-4">
-            <Badge variant="secondary" className="bg-white/10 text-white border-white/10 backdrop-blur">
-              {event.category}
-            </Badge>
-          </div>
+          {/* Bottom-left: Category badge — suppressed for pub cards when hidePubBadge is set */}
+          {!hidePubBadge && (
+            <div className="absolute bottom-3 left-4">
+              <Badge variant="secondary" className="bg-white/10 text-white border-white/10 backdrop-blur">
+                {event.category}
+              </Badge>
+            </div>
+          )}
         </div>
 
         <div className="p-5 space-y-2.5">

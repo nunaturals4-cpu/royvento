@@ -181,7 +181,6 @@ export default function HomeScreen() {
                 imageUrl={item.imageUrl}
                 location={item.location}
                 price={item.priceWomen}
-                category="Pub"
                 type="pub"
                 popular={(item as { popular?: boolean }).popular}
                 rating={item.rating}
@@ -205,7 +204,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.row}
             renderItem={({ item }) => (
               <Pressable
-                style={[styles.drinkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[styles.drinkCard, { backgroundColor: "#fff", borderColor: "#e5e7eb" }]}
                 onPress={() => {
                   if (item.pubEventId) {
                     router.push(`/event/${item.pubEventId}` as never);
@@ -222,17 +221,13 @@ export default function HomeScreen() {
                       resizeMode="cover"
                     />
                   ) : (
-                    <View style={[styles.drinkCardImagePlaceholder, { backgroundColor: colors.muted }]}>
-                      <Ionicons name="wine-outline" size={28} color={colors.mutedForeground} />
+                    <View style={[styles.drinkCardImagePlaceholder, { backgroundColor: "#f3f4f6" }]}>
+                      <Ionicons name="wine-outline" size={28} color="#9ca3af" />
                     </View>
                   )}
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.82)"]}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <Text style={styles.drinkCardName} numberOfLines={1}>{item.vendorName}</Text>
                 </View>
                 <View style={styles.drinkCardBody}>
+                  <Text style={styles.drinkCardName} numberOfLines={1}>{item.vendorName}</Text>
                   {item.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
                     <View key={i} style={styles.drinkPlanRow}>
                       <View style={[styles.drinkIconBox, { backgroundColor: colors.primary + "22" }]}>
@@ -242,21 +237,21 @@ export default function HomeScreen() {
                           color={colors.primary}
                         />
                       </View>
-                      <Text style={[styles.drinkPlanText, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>
+                      <Text style={[styles.drinkPlanText, { color: "#374151", flex: 1 }]} numberOfLines={1}>
                         {getPlanLabel(plan)}
                       </Text>
                       <View style={[
                         styles.drinkGenderPill,
-                        { backgroundColor: plan.gender === "female" ? "rgba(244,63,94,0.18)" : colors.primary + "22" },
+                        { backgroundColor: plan.gender === "female" ? "rgba(244,63,94,0.12)" : "rgba(220,38,38,0.10)" },
                       ]}>
-                        <Text style={[styles.drinkGenderText, { color: plan.gender === "female" ? "#fb7185" : colors.primary }]}>
+                        <Text style={[styles.drinkGenderText, { color: plan.gender === "female" ? "#e11d48" : "#dc2626" }]}>
                           {plan.gender === "female" ? "Ladies" : "All"}
                         </Text>
                       </View>
                     </View>
                   ))}
                   {item.plans.length > 2 && (
-                    <Text style={[styles.drinkMoreText, { color: colors.mutedForeground }]}>
+                    <Text style={[styles.drinkMoreText, { color: "#9ca3af" }]}>
                       +{item.plans.length - 2} more
                     </Text>
                   )}
@@ -511,11 +506,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   drinkCardName: {
-    fontSize: 17,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
-    color: "#fff",
-    paddingHorizontal: 12,
-    paddingBottom: 10,
+    color: "#111827",
+    marginBottom: 4,
   },
   drinkCardBody: {
     padding: 12,
