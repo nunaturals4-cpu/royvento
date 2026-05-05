@@ -482,10 +482,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   announcementImageWrapper: {
-    height: 130,
-    borderRadius: 10,
+    height: 140,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
     overflow: "hidden",
-    marginBottom: 4,
+    marginHorizontal: -12,
+    marginTop: -12,
+    marginBottom: 6,
     position: "relative",
   },
   announcementImageFooter: {
@@ -542,7 +545,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   drinkCardImage: {
-    height: 160,
+    height: 120,
     position: "relative",
     justifyContent: "flex-end",
     overflow: "hidden",
