@@ -286,30 +286,49 @@ export default function HomeScreen() {
                 style={[styles.announcementCard, { backgroundColor: "#18181c", borderColor: "rgba(212,175,55,0.18)" }]}
                 onPress={() => item.eventId ? router.push(`/event/${item.eventId}` as never) : undefined}
               >
-                <View style={[styles.announcementBadge, { backgroundColor: "rgba(212,175,55,0.15)" }]}>
-                  <Ionicons name="megaphone-outline" size={13} color="#D4AF37" />
-                  <Text style={[styles.announcementVenue, { color: "#D4AF37" }]} numberOfLines={1}>
-                    {item.vendorName}
-                  </Text>
-                </View>
-                <Text style={[styles.announcementTitle, { color: "#fff" }]} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                {item.body ? (
+                {item.imageUrl ? (
+                  <View style={styles.announcementImageWrapper}>
+                    <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.78)"]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <View style={styles.announcementImageFooter}>
+                      <View style={[styles.announcementBadge, { backgroundColor: "rgba(212,175,55,0.25)" }]}>
+                        <Ionicons name="megaphone-outline" size={11} color="#D4AF37" />
+                        <Text style={[styles.announcementVenue, { color: "#D4AF37" }]} numberOfLines={1}>{item.vendorName}</Text>
+                      </View>
+                      <Text style={styles.announcementImageTitle} numberOfLines={2}>{item.title}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <View style={[styles.announcementBadge, { backgroundColor: "rgba(212,175,55,0.15)" }]}>
+                      <Ionicons name="megaphone-outline" size={13} color="#D4AF37" />
+                      <Text style={[styles.announcementVenue, { color: "#D4AF37" }]} numberOfLines={1}>
+                        {item.vendorName}
+                      </Text>
+                    </View>
+                    <Text style={[styles.announcementTitle, { color: "#fff" }]} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                  </>
+                )}
+                {!item.imageUrl && item.body ? (
                   <Text style={[styles.announcementBody, { color: "rgba(255,255,255,0.55)" }]} numberOfLines={2}>
                     {item.body}
                   </Text>
                 ) : null}
                 {item.announceDate ? (
                   <View style={[styles.announcementDateRow, { borderTopColor: "rgba(255,255,255,0.08)", borderTopWidth: 1, marginTop: 4, paddingTop: 8 }]}>
-                    <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.4)" />
-                    <Text style={[styles.announcementDate, { color: "rgba(255,255,255,0.4)" }]}>
+                    <Ionicons name="calendar-outline" size={11} color="#D4AF37" />
+                    <Text style={[styles.announcementDate, { color: "#D4AF37" }]}>
                       {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                     </Text>
                     {item.announceTime ? (
                       <>
-                        <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.4)" style={{ marginLeft: 8 }} />
-                        <Text style={[styles.announcementDate, { color: "rgba(255,255,255,0.4)" }]}>
+                        <Ionicons name="time-outline" size={11} color="#D4AF37" style={{ marginLeft: 8 }} />
+                        <Text style={[styles.announcementDate, { color: "#D4AF37" }]}>
                           {item.announceTime}
                         </Text>
                       </>
@@ -455,11 +474,33 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   announcementCard: {
-    width: 248,
+    width: 268,
     borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
+    padding: 12,
     gap: 8,
+    overflow: "hidden",
+  },
+  announcementImageWrapper: {
+    height: 130,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginBottom: 4,
+    position: "relative",
+  },
+  announcementImageFooter: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 10,
+    gap: 4,
+  },
+  announcementImageTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
+    lineHeight: 19,
   },
   announcementBadge: {
     flexDirection: "row",

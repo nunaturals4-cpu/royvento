@@ -44,6 +44,7 @@ interface Announcement {
   body: string;
   announceDate: string;
   announceTime: string;
+  imageUrl?: string;
   vendorName: string;
   eventId: number;
   eventTitle: string;
@@ -232,44 +233,45 @@ export function Home() {
                   href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
                   className="snap-start flex-shrink-0"
                 >
-                  <div className="glass-card rounded-2xl overflow-hidden w-72 sm:w-80 hover:bg-white/[0.06] transition-all cursor-pointer h-full flex flex-col group border border-white/8">
-                    <div className="p-4 pb-3 flex flex-col gap-3 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="flex-shrink-0 h-8 w-8 rounded-xl bg-primary/15 flex items-center justify-center">
-                          <GlassWater className="h-4 w-4 text-primary" />
-                        </span>
-                        <p className="font-serif text-base font-semibold leading-tight line-clamp-1">
-                          {offer.vendorName}
-                        </p>
-                      </div>
+                  <div className="rounded-2xl overflow-hidden w-[300px] sm:w-[320px] flex flex-col group cursor-pointer border border-white/10 hover:border-primary/35 bg-zinc-900/90 transition-all duration-300 hover:shadow-[0_0_28px_rgba(220,38,38,0.18)]">
+                    {/* Cover image */}
+                    <div className="relative h-44 overflow-hidden bg-zinc-800 flex-shrink-0">
+                      {offer.coverImageUrl ? (
+                        <img
+                          src={offer.coverImageUrl}
+                          alt={offer.vendorName}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/8 to-zinc-900">
+                          <GlassWater className="h-10 w-10 text-primary/25" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                      <p className="absolute bottom-3 left-4 right-4 font-serif text-xl text-white leading-tight line-clamp-1 drop-shadow-md">
+                        {offer.vendorName}
+                      </p>
                     </div>
 
-                    <div className="px-4 pb-4 flex flex-col gap-3 flex-1">
-                      <div className="flex flex-col gap-2.5 flex-1">
-                        {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
-                          <div key={i} className="flex items-center gap-2.5">
-                            <span className="flex-shrink-0 h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
-                              <PlanIcon type={plan.type} />
-                            </span>
-                            <span className="text-sm text-muted-foreground flex-1 leading-snug">
-                              {getPlanLabel(plan)}
-                            </span>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${plan.gender === "female" ? "bg-rose-500/20 text-rose-300" : "bg-primary/20 text-primary"}`}>
-                              {plan.gender === "female" ? "Ladies" : "All"}
-                            </span>
-                          </div>
-                        ))}
-                        {offer.plans.length > 2 && (
-                          <span className="text-xs text-muted-foreground/60 pl-9">
-                            +{offer.plans.length - 2} more offer{offer.plans.length - 2 !== 1 ? "s" : ""}
+                    {/* Deal rows */}
+                    <div className="p-4 flex flex-col gap-2.5 flex-1">
+                      {offer.plans.slice(0, 2).map((plan: DrinkPlanSummary, i: number) => (
+                        <div key={i} className="flex items-center gap-2.5">
+                          <span className="flex-shrink-0 h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
+                            <PlanIcon type={plan.type} />
                           </span>
-                        )}
-                      </div>
+                          <span className="text-sm text-white/65 flex-1 leading-snug">{getPlanLabel(plan)}</span>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 tracking-wide ${plan.gender === "female" ? "bg-rose-500/20 text-rose-300" : "bg-primary/20 text-primary"}`}>
+                            {plan.gender === "female" ? "Ladies" : "All"}
+                          </span>
+                        </div>
+                      ))}
+                      {offer.plans.length > 2 && (
+                        <span className="text-xs text-white/30 pl-9">+{offer.plans.length - 2} more offer{offer.plans.length - 2 !== 1 ? "s" : ""}</span>
+                      )}
 
-                      <div className="mt-1 rounded-xl bg-primary/10 border border-primary/25 px-4 py-2.5 flex items-center justify-between group-hover:bg-primary/20 transition-colors">
-                        <span className="text-sm font-semibold text-primary">
-                          {offer.pubEventId ? "Book now" : "View venue"}
-                        </span>
+                      <div className="mt-auto pt-3 rounded-xl bg-primary/10 border border-primary/25 px-4 py-2.5 flex items-center justify-between group-hover:bg-primary/20 transition-colors">
+                        <span className="text-sm font-semibold text-primary">{offer.pubEventId ? "Book now" : "View venue"}</span>
                         <ArrowRight className="h-4 w-4 text-primary" />
                       </div>
                     </div>
@@ -296,26 +298,44 @@ export function Home() {
             <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
               {announcements.map((a) => {
                 const cardInner = (
-                  <div className="rounded-2xl border border-amber-400/15 bg-zinc-900/90 p-5 hover:bg-zinc-800/90 transition-colors w-72 sm:w-80 flex flex-col gap-3 h-full">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center flex-shrink-0">
-                        <Megaphone className="h-3.5 w-3.5 text-amber-400" />
-                      </div>
-                      <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider truncate">{a.vendorName}</span>
-                    </div>
-                    <h3 className="font-serif text-lg leading-snug tracking-tight">{a.title}</h3>
-                    <p className="text-sm text-white/55 leading-relaxed line-clamp-2 flex-1">{a.body}</p>
-                    <div className="flex items-center gap-4 text-xs text-white/40 pt-1 border-t border-white/8">
-                      <span className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                      </span>
-                      {a.announceTime && (
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5" />
-                          {a.announceTime}
-                        </span>
+                  <div className="rounded-2xl border border-amber-400/15 bg-zinc-900/90 hover:bg-zinc-800/80 transition-colors w-[300px] sm:w-[320px] flex flex-col overflow-hidden h-full group">
+                    {/* Image area */}
+                    <div className="relative h-40 flex-shrink-0 bg-zinc-800 overflow-hidden">
+                      {a.imageUrl ? (
+                        <img
+                          src={a.imageUrl}
+                          alt={a.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400/8 to-zinc-900">
+                          <Megaphone className="h-10 w-10 text-amber-400/25" />
+                        </div>
                       )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                      {/* Vendor badge pinned to top-left of image */}
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm border border-amber-400/30 rounded-full px-2.5 py-1">
+                        <Megaphone className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                        <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider truncate max-w-[110px]">{a.vendorName}</span>
+                      </div>
+                    </div>
+
+                    {/* Text body */}
+                    <div className="p-5 flex flex-col gap-2.5 flex-1">
+                      <h3 className="font-serif text-xl leading-snug tracking-tight text-white">{a.title}</h3>
+                      {a.body && <p className="text-sm text-white/50 leading-relaxed line-clamp-2 flex-1">{a.body}</p>}
+                      <div className="flex items-center gap-4 text-xs text-amber-400/80 pt-2 border-t border-white/8">
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-amber-400" />
+                          {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
+                        {a.announceTime && (
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 text-amber-400" />
+                            {a.announceTime}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
