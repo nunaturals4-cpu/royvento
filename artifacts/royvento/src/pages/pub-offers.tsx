@@ -121,7 +121,7 @@ export function PubOffers() {
 
             {/* Filters */}
             <div className="mb-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Deal Type</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("pub_offers.filter_deal_type")}</p>
               <div className="flex flex-wrap gap-2 mb-3">
                 {(["", "welcome", "unlimited", "ticket", "custom"] as string[]).map((dt) => (
                   <button
@@ -134,16 +134,16 @@ export function PubOffers() {
                         : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
                     }`}
                   >
-                    {dt ? (DEAL_TYPE_LABELS[dt] ?? dt) : "All"}
+                    {dt ? (DEAL_TYPE_LABELS[dt] ?? dt) : t("pub_offers.filter_all")}
                   </button>
                 ))}
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">For</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("pub_offers.filter_for")}</p>
               <div className="flex flex-wrap gap-2 mb-6">
                 {[
-                  { key: "", label: "Everyone" },
-                  { key: "female", label: "Ladies" },
-                  { key: "other", label: "Mixed / All" },
+                  { key: "", label: t("pub_offers.filter_everyone") },
+                  { key: "female", label: t("pub_offers.filter_ladies") },
+                  { key: "other", label: t("pub_offers.filter_mixed_all") },
                 ].map((opt) => (
                   <button
                     key={opt.key || "all"}
@@ -181,7 +181,7 @@ export function PubOffers() {
                           <h3 className="font-serif text-base leading-snug tracking-tight text-white line-clamp-2">
                             {offer.vendorName}
                           </h3>
-                          <p className="text-[9px] text-white/35 uppercase tracking-wider mt-0.5">Drink Deals</p>
+                          <p className="text-[9px] text-white/35 uppercase tracking-wider mt-0.5">{t("pub_offers.drink_deals")}</p>
                         </div>
                       </div>
                       {/* Plan rows */}
@@ -210,7 +210,7 @@ export function PubOffers() {
                                       : "bg-primary/20 text-primary"
                                   }`}
                                 >
-                                  {plan.gender === "female" ? "Ladies" : "All"}
+                                  {plan.gender === "female" ? t("pub_offers.gender_ladies") : t("pub_offers.gender_all")}
                                 </span>
                               </div>
                               {(showDays || showTime) && (
@@ -262,7 +262,7 @@ export function PubOffers() {
             <div className="flex items-center gap-2">
               <Megaphone className="h-4 w-4 text-amber-400" />
               <span className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold">
-                What's On
+                {t("pub_offers.whats_on")}
               </span>
             </div>
             <div className="flex-1 h-px bg-white/10" />
@@ -284,7 +284,7 @@ export function PubOffers() {
                         : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
                     }`}
                   >
-                    {g || "All"}
+                    {g || t("pub_offers.filter_all")}
                   </button>
                 ))}
               </div>
@@ -305,7 +305,7 @@ export function PubOffers() {
                         : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
                     }`}
                   >
-                    {et || "All"}
+                    {et || t("pub_offers.filter_all")}
                   </button>
                 ))}
               </div>

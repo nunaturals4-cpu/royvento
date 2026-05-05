@@ -226,10 +226,10 @@ export function Home() {
           <div className="container mx-auto px-4 md:px-6">
             <SectionHeader
               icon={<GlassWater className="h-3.5 w-3.5" />}
-              eyebrow="Exclusive Offers"
-              title="Drink Deals"
+              eyebrow={t("pub_offers.deal_eyebrow")}
+              title={t("events.drink_deals")}
               seeAllHref="/pubs"
-              seeAllLabel="Browse pubs"
+              seeAllLabel={t("pub_offers.browse_pubs")}
             />
 
             <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
@@ -278,7 +278,7 @@ export function Home() {
                                     : "bg-primary/20 text-primary"
                                 }`}
                               >
-                                {plan.gender === "female" ? "Ladies" : "All"}
+                                {plan.gender === "female" ? t("pub_offers.gender_ladies") : t("pub_offers.gender_all")}
                               </span>
                             </div>
                             {(showDays || showTime) && (
@@ -309,7 +309,7 @@ export function Home() {
                       )}
                       <div className="mt-auto pt-3 rounded-xl bg-primary/10 border border-primary/25 px-4 py-2.5 flex items-center justify-between group-hover:bg-primary/20 transition-colors">
                         <span className="text-sm font-semibold text-primary">
-                          {offer.pubEventId ? "Book now" : "View venue"}
+                          {offer.pubEventId ? t("pub_offers.book_now") : t("pub_offers.view_venue")}
                         </span>
                         <ArrowRight className="h-4 w-4 text-primary" />
                       </div>

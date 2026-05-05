@@ -141,7 +141,16 @@
     "view_venue": "View venue",
     "prev_slide": "Previous announcement",
     "next_slide": "Next announcement",
-    "go_to_slide": "Go to slide {{n}}"
+    "go_to_slide": "Go to slide {{n}}",
+    "deal_eyebrow": "Exclusive Offers",
+    "filter_deal_type": "Deal Type",
+    "filter_for": "For",
+    "filter_all": "All",
+    "filter_everyone": "Everyone",
+    "filter_ladies": "Ladies",
+    "filter_mixed_all": "Mixed / All",
+    "gender_ladies": "Ladies",
+    "gender_all": "All"
   },
   "pubs": {
     "title": "Pubs & Clubs",
