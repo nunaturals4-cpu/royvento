@@ -1,7 +1,8 @@
 import { Link } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   ArrowRight, Calendar, Clock, GlassWater, Megaphone,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
@@ -36,6 +37,197 @@ const DEAL_TYPE_COLORS: Record<string, string> = {
   ticket: "bg-violet-500/15 text-violet-400 border-violet-500/25",
   custom: "bg-amber-500/15 text-amber-400 border-amber-500/25",
 };
+
+const SLIDE_LIGHT_GRADIENTS = [
+  "from-rose-50 via-slate-50 to-gray-50",
+  "from-violet-50 via-slate-50 to-gray-50",
+  "from-amber-50 via-slate-50 to-gray-50",
+  "from-teal-50 via-slate-50 to-gray-50",
+  "from-indigo-50 via-slate-50 to-gray-50",
+];
+
+const BADGE_COLORS_LIGHT = [
+  "bg-rose-500/15 text-rose-600 border-rose-400/40",
+  "bg-violet-500/15 text-violet-600 border-violet-400/40",
+  "bg-amber-500/15 text-amber-600 border-amber-400/40",
+  "bg-teal-500/15 text-teal-600 border-teal-400/40",
+  "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
+];
+
+const AUTOPLAY_MS = 5000;
+
+function AnnouncementSlider({ announcements }: { announcements: Announcement[] }) {
+  const { t } = useTranslation();
+  const [current, setCurrent] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isPausedRef = useRef(isPaused);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  const startTimer = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (announcements.length <= 1) return;
+    intervalRef.current = setInterval(() => {
+      if (!isPausedRef.current) {
+        setCurrent((i) => (i + 1) % announcements.length);
+      }
+    }, AUTOPLAY_MS);
+  }, [announcements.length]);
+
+  useEffect(() => {
+    startTimer();
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [startTimer]);
+
+  const goTo = useCallback(
+    (idx: number) => {
+      setCurrent(idx);
+      startTimer();
+    },
+    [startTimer],
+  );
+
+  const prev = useCallback(
+    () => goTo((current - 1 + announcements.length) % announcements.length),
+    [current, announcements.length, goTo],
+  );
+
+  const next = useCallback(
+    () => goTo((current + 1) % announcements.length),
+    [current, announcements.length, goTo],
+  );
+
+  const a = announcements[current];
+  const lightGrad = SLIDE_LIGHT_GRADIENTS[current % SLIDE_LIGHT_GRADIENTS.length];
+  const href = a.eventId ? `/events/${a.eventId}` : `/vendors/${a.vendorId}`;
+  const hasImage = !!a.imageUrl;
+
+  return (
+    <section
+      className="mb-12 bg-muted"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      <div className="relative w-full overflow-hidden mt-4" style={{ minHeight: 400 }}>
+        <div className="absolute inset-0">
+          <div className={`h-full w-full bg-gradient-to-br ${lightGrad}`} />
+          {hasImage && (
+            <img
+              src={a.imageUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full object-cover scale-110 blur-xl opacity-10"
+            />
+          )}
+        </div>
+
+        <div className="relative z-10 container mx-auto px-4 md:px-6 flex items-center gap-8 md:gap-16 py-14 md:py-20 min-h-[400px]">
+          <div className="flex-1 flex flex-col justify-center gap-4 min-w-0">
+            <div
+              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 ${BADGE_COLORS_LIGHT[current % BADGE_COLORS_LIGHT.length]}`}
+            >
+              <Megaphone className="h-3 w-3 flex-shrink-0" />
+              <span className="text-xs font-semibold uppercase tracking-wider truncate max-w-[220px]">
+                {a.vendorName}
+              </span>
+            </div>
+
+            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-tight text-zinc-900">
+              {a.title}
+            </h2>
+
+            <p className="text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl text-zinc-700">
+              {a.body}
+            </p>
+
+            {(a.announceDate || a.announceTime) && (
+              <div className="flex items-center gap-5 text-xs text-zinc-600">
+                {a.announceDate && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {new Date(a.announceDate).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                )}
+                {a.announceTime && (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    {a.announceTime}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="mt-1">
+              <Link
+                href={href}
+                className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm px-5 py-2.5 rounded-xl transition-all red-glow"
+              >
+                {t("pub_offers.book_now")}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="hidden md:flex flex-shrink-0 w-52 lg:w-64 xl:w-72 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg ring-1 ring-black/5">
+            {hasImage ? (
+              <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full flex flex-col items-center justify-center bg-white/80 gap-3">
+                <Megaphone className="h-10 w-10 text-muted-foreground/40" />
+                <span className="text-muted-foreground/60 text-xs font-medium text-center px-4 leading-snug">
+                  {a.vendorName}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {announcements.length > 1 && (
+          <>
+            <button
+              onClick={prev}
+              aria-label={t("pub_offers.prev_slide")}
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-background/75 hover:bg-background border border-border flex items-center justify-center transition-all backdrop-blur-sm"
+            >
+              <ChevronLeft className="h-4 w-4 text-foreground" />
+            </button>
+            <button
+              onClick={next}
+              aria-label={t("pub_offers.next_slide")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-background/75 hover:bg-background border border-border flex items-center justify-center transition-all backdrop-blur-sm"
+            >
+              <ChevronRight className="h-4 w-4 text-foreground" />
+            </button>
+
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+              {announcements.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  aria-label={t("pub_offers.go_to_slide", { n: i + 1 })}
+                  className={`rounded-full transition-all duration-300 ${
+                    i === current
+                      ? "w-6 h-2 bg-primary"
+                      : "w-2 h-2 bg-foreground/20 hover:bg-foreground/40"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function getPlanLabel(plan: DrinkPlanSummary): string {
   if (plan.type === "welcome") return "Free welcome drink";
@@ -78,27 +270,38 @@ export function PubOffers() {
     });
   });
 
+  const [sliderAnnouncements, setSliderAnnouncements] = useState<Announcement[]>([]);
+  useEffect(() => {
+    apiGet<Announcement[]>("/api/announcements/slider").then(setSliderAnnouncements).catch(() => {});
+  }, []);
+
   const hasDeals = (drinkOffers as VendorDrinkOffer[]).length > 0;
+  const hasSlider = sliderAnnouncements.length > 0;
   const hasAnnouncements = announcements.length > 0;
 
   return (
     <div className="pb-14">
-      {/* Page header */}
-      <header className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">
-        <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
-          <GlassWater className="h-3.5 w-3.5" /> Hot Deals
-        </p>
-        <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pub_offers.title")}</h1>
-        <p className="mt-4 text-white/60 leading-relaxed max-w-xl">{t("pub_offers.subtitle")}</p>
-      </header>
+      {/* Page header — hidden when slider is active */}
+      {!hasSlider && (
+        <header className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">
+          <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
+            <GlassWater className="h-3.5 w-3.5" /> Hot Deals
+          </p>
+          <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pub_offers.title")}</h1>
+          <p className="mt-4 text-white/60 leading-relaxed max-w-xl">{t("pub_offers.subtitle")}</p>
+        </header>
+      )}
 
-      {!hasDeals && !hasAnnouncements && (
+      {!hasDeals && !hasSlider && !hasAnnouncements && (
         <div className="container mx-auto px-4 md:px-6">
           <div className="rounded-3xl glass-card p-16 text-center">
             <p className="font-serif text-2xl mb-2 text-muted-foreground">{t("common.loading")}</p>
           </div>
         </div>
       )}
+
+      {/* Full-bleed hero announcement slider */}
+      {hasSlider && <AnnouncementSlider announcements={sliderAnnouncements} />}
 
       {/* Drink Deals */}
       {hasDeals && (

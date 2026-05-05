@@ -7,11 +7,14 @@ import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-r
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   RefreshControl,
@@ -26,6 +29,9 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const ANNOUNCEMENT_CARD_WIDTH = SCREEN_WIDTH - 40;
 
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
@@ -78,6 +84,109 @@ function getPlanLabel(plan: DrinkPlanSummary): string {
     return count > 0 ? `${count} item${count !== 1 ? "s" : ""} with ticket` : "Drinks with ticket";
   }
   return plan.productName || "Drinks discount";
+}
+
+function AnnouncementSlider({ announcements }: { announcements: RecentAnnouncement[] }) {
+  const colors = useColors();
+  const scrollRef = useRef<ScrollView>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const index = Math.round(e.nativeEvent.contentOffset.x / ANNOUNCEMENT_CARD_WIDTH);
+    setActiveIndex(index);
+  }
+
+  if (announcements.length === 0) return null;
+
+  return (
+    <View style={[styles.sliderSection, { backgroundColor: colors.muted }]}>
+      <View style={styles.sliderHeaderRow}>
+        <Ionicons name="megaphone-outline" size={16} color={colors.primary} />
+        <Text style={[styles.sliderTitle, { color: colors.foreground }]}>What's On</Text>
+      </View>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={ANNOUNCEMENT_CARD_WIDTH + 12}
+        decelerationRate="fast"
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        {announcements.map((item) => (
+          <Pressable
+            key={item.id}
+            style={[styles.announcementSlide, { backgroundColor: colors.muted, borderColor: colors.border }]}
+            onPress={() => item.eventId ? router.push(`/event/${item.eventId}` as never) : undefined}
+          >
+            {item.imageUrl ? (
+              <View style={styles.slideImageWrap}>
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={[StyleSheet.absoluteFillObject, { opacity: 0.18 }]}
+                  resizeMode="cover"
+                />
+                <View style={[styles.slideNoImage, { backgroundColor: "transparent" }]}>
+                  <View style={[styles.venueBadge, { backgroundColor: colors.primary + "22" }]}>
+                    <Ionicons name="megaphone-outline" size={11} color={colors.primary} />
+                    <Text style={[styles.venueText, { color: colors.primary }]} numberOfLines={1}>{item.vendorName}</Text>
+                  </View>
+                  <Text style={[styles.slideTitle, { color: colors.foreground }]} numberOfLines={3}>{item.title}</Text>
+                  {item.body ? (
+                    <Text style={[styles.slideBody, { color: colors.mutedForeground }]} numberOfLines={2}>{item.body}</Text>
+                  ) : null}
+                  {item.announceDate ? (
+                    <View style={styles.slideDateRow}>
+                      <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
+                      <Text style={[styles.slideDateText, { color: colors.mutedForeground }]}>
+                        {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        {item.announceTime ? `  ·  ${item.announceTime}` : ""}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            ) : (
+              <View style={[styles.slideNoImage, { backgroundColor: "transparent" }]}>
+                <View style={[styles.venueBadge, { backgroundColor: colors.primary + "22" }]}>
+                  <Ionicons name="megaphone-outline" size={11} color={colors.primary} />
+                  <Text style={[styles.venueText, { color: colors.primary }]} numberOfLines={1}>{item.vendorName}</Text>
+                </View>
+                <Text style={[styles.slideTitle, { color: colors.foreground }]} numberOfLines={3}>{item.title}</Text>
+                {item.body ? (
+                  <Text style={[styles.slideBody, { color: colors.mutedForeground }]} numberOfLines={2}>{item.body}</Text>
+                ) : null}
+                {item.announceDate ? (
+                  <View style={styles.slideDateRow}>
+                    <Ionicons name="calendar-outline" size={11} color={colors.mutedForeground} />
+                    <Text style={[styles.slideDateText, { color: colors.mutedForeground }]}>
+                      {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      {item.announceTime ? `  ·  ${item.announceTime}` : ""}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+          </Pressable>
+        ))}
+      </ScrollView>
+      {announcements.length > 1 && (
+        <View style={styles.dots}>
+          {announcements.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                { backgroundColor: i === activeIndex ? colors.primary : colors.border },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
 }
 
 function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
@@ -241,6 +350,14 @@ export default function DealsScreen() {
     queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/recent"),
     staleTime: 1000 * 60 * 5,
   });
+  const {
+    data: sliderAnnouncements = [],
+    refetch: refetchSlider,
+  } = useQuery<RecentAnnouncement[]>({
+    queryKey: ["announcements", "slider"],
+    queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/slider"),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const isLoading = dealsLoading || annLoading;
   const isRefreshing = isRefetchingDeals;
@@ -248,6 +365,7 @@ export default function DealsScreen() {
   function onRefresh() {
     refetchDeals();
     refetchAnn();
+    refetchSlider();
   }
 
   const filteredAnnouncements = announcements.filter((a) => {
@@ -306,6 +424,11 @@ export default function DealsScreen() {
             { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 24 },
           ]}
         >
+          {/* Announcement Slider */}
+          {sliderAnnouncements.length > 0 && (
+            <AnnouncementSlider announcements={sliderAnnouncements} />
+          )}
+
           {/* Drink Deals */}
           <View style={styles.dealsSection}>
             <View style={styles.dealsSectionHeader}>
@@ -822,6 +945,82 @@ const styles = StyleSheet.create({
   whatsOnTitle: {
     fontSize: 16,
     fontFamily: "Inter_700Bold",
+  },
+
+  sliderSection: {
+    marginBottom: 20,
+    paddingTop: 12,
+  },
+  sliderHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  sliderTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+  },
+  announcementSlide: {
+    width: ANNOUNCEMENT_CARD_WIDTH,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  slideImageWrap: {
+    height: 200,
+    position: "relative",
+  },
+  venueBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  venueText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    maxWidth: 200,
+  },
+  slideDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  slideDateText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+  slideNoImage: {
+    padding: 16,
+    gap: 8,
+    minHeight: 120,
+  },
+  slideTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    lineHeight: 22,
+  },
+  slideBody: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 19,
+  },
+  dots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   announcementCard: {
