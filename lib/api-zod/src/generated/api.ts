@@ -687,6 +687,8 @@ export const ListVendorDrinkPlansResponseItem = zod.object({
       }),
     )
     .nullish(),
+  validUntil: zod.string().nullish(),
+  validFrom: zod.string().nullish(),
   createdAt: zod.string(),
 });
 export const ListVendorDrinkPlansResponse = zod.array(
@@ -720,6 +722,8 @@ export const CreateDrinkPlanBody = zod.object({
       }),
     )
     .nullish(),
+  validUntil: zod.string().nullish(),
+  validFrom: zod.string().nullish(),
 });
 
 export const createDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
@@ -746,6 +750,8 @@ export const CreateDrinkPlanResponse = zod.object({
       }),
     )
     .nullish(),
+  validUntil: zod.string().nullish(),
+  validFrom: zod.string().nullish(),
   createdAt: zod.string(),
 });
 
@@ -780,6 +786,8 @@ export const UpdateDrinkPlanBody = zod.object({
       }),
     )
     .nullish(),
+  validUntil: zod.string().nullish(),
+  validFrom: zod.string().nullish(),
 });
 
 export const updateDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
@@ -806,6 +814,8 @@ export const UpdateDrinkPlanResponse = zod.object({
       }),
     )
     .nullish(),
+  validUntil: zod.string().nullish(),
+  validFrom: zod.string().nullish(),
   createdAt: zod.string(),
 });
 

@@ -2937,6 +2937,12 @@ components:
           nullable: true
           items:
             $ref: "#/components/schemas/DrinkPlanLineItem"
+        validUntil:
+          type: string
+          nullable: true
+        validFrom:
+          type: string
+          nullable: true
         createdAt:
           type: string
       required: [id, vendorId, type, productName, gender, price, days, timeFrom, timeTo, description, createdAt]
@@ -2970,6 +2976,12 @@ components:
           nullable: true
           items:
             $ref: "#/components/schemas/DrinkPlanLineItem"
+        validUntil:
+          type: string
+          nullable: true
+        validFrom:
+          type: string
+          nullable: true
       required: [type]
 
     DrinkPlanSummary:

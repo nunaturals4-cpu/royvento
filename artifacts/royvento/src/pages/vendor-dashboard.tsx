@@ -3528,6 +3528,7 @@ interface DrinkPlan {
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
   validUntil?: string | null;
+  validFrom?: string | null;
 }
 
 const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: 0 });
@@ -3547,18 +3548,24 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [feGender, setFeGender] = useState<"all" | "female">("all");
   const [feDrinksOffer, setFeDrinksOffer] = useState("");
   const [feFoodDiscount, setFeFoodDiscount] = useState("");
+  const [feDays, setFeDays] = useState<string[]>([]);
+  const [feTimeFrom, setFeTimeFrom] = useState("");
+  const [feTimeTo, setFeTimeTo] = useState("");
+  const [feDescription, setFeDescription] = useState("");
+  const [feValidFrom, setFeValidFrom] = useState("");
+  const [feValidUntil, setFeValidUntil] = useState("");
 
   // Add form — Included with Ticket section
   const [ticketChecked, setTicketChecked] = useState(false);
   const [ticketItems, setTicketItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
   const [ticketDrinksOffer, setTicketDrinksOffer] = useState("");
   const [ticketFoodDiscount, setTicketFoodDiscount] = useState("");
-
-  // Common fields for add form
-  const [days, setDays] = useState<string[]>([]);
-  const [timeFrom, setTimeFrom] = useState("");
-  const [timeTo, setTimeTo] = useState("");
-  const [description, setDescription] = useState("");
+  const [ticketDays, setTicketDays] = useState<string[]>([]);
+  const [ticketTimeFrom, setTicketTimeFrom] = useState("");
+  const [ticketTimeTo, setTicketTimeTo] = useState("");
+  const [ticketDescription, setTicketDescription] = useState("");
+  const [ticketValidFrom, setTicketValidFrom] = useState("");
+  const [ticketValidUntil, setTicketValidUntil] = useState("");
 
   // Edit form state
   const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
@@ -3571,8 +3578,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [editDescription, setEditDescription] = useState("");
   const [editDrinksOffer, setEditDrinksOffer] = useState("");
   const [editFoodDiscount, setEditFoodDiscount] = useState("");
-  const [feValidUntil, setFeValidUntil] = useState("");
-  const [ticketValidUntil, setTicketValidUntil] = useState("");
+  const [editValidFrom, setEditValidFrom] = useState("");
   const [editValidUntil, setEditValidUntil] = useState("");
 
   const errMsg = (err: unknown): string =>
@@ -3592,18 +3598,22 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   useEffect(() => { void fetchPlans(); }, [vendorId]);
 
-  const toggleDay = (day: string) =>
-    setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+  const toggleFeDays = (day: string) =>
+    setFeDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+
+  const toggleTicketDays = (day: string) =>
+    setTicketDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
   const toggleEditDay = (day: string) =>
     setEditDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
   const resetForm = () => {
     setFreeEntryChecked(false); setFeDrinkTypes(["welcome"]); setFeGender("all");
-    setFeDrinksOffer(""); setFeFoodDiscount(""); setFeValidUntil("");
+    setFeDrinksOffer(""); setFeFoodDiscount(""); setFeValidUntil(""); setFeValidFrom("");
+    setFeDays([]); setFeTimeFrom(""); setFeTimeTo(""); setFeDescription("");
     setTicketChecked(false); setTicketItems([emptyItem()]);
-    setTicketDrinksOffer(""); setTicketFoodDiscount(""); setTicketValidUntil("");
-    setDays([]); setTimeFrom(""); setTimeTo(""); setDescription("");
+    setTicketDrinksOffer(""); setTicketFoodDiscount(""); setTicketValidUntil(""); setTicketValidFrom("");
+    setTicketDays([]); setTicketTimeFrom(""); setTicketTimeTo(""); setTicketDescription("");
   };
 
   const startEdit = (plan: DrinkPlan) => {
@@ -3618,6 +3628,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditDescription(plan.description);
     setEditDrinksOffer(plan.drinksOfferLabel ?? "");
     setEditFoodDiscount(plan.foodDiscountLabel ?? "");
+    setEditValidFrom(plan.validFrom ?? "");
     setEditValidUntil(plan.validUntil ?? "");
   };
 
@@ -3636,17 +3647,18 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     }
     setSaving(true);
     try {
-      const common = { days, timeFrom, timeTo, description: description.trim() };
       if (freeEntryChecked) {
         for (const drinkType of feDrinkTypes) {
           await apiPost("/api/vendors/me/drink-plans", {
             type: drinkType,
             productName: drinkType === "welcome" ? "Free Drink" : "Unlimited Drinks",
             gender: feGender, price: 0,
+            days: feDays, timeFrom: feTimeFrom.trim(), timeTo: feTimeTo.trim(),
+            description: feDescription.trim(),
             drinksOfferLabel: feDrinksOffer.trim(),
             foodDiscountLabel: feFoodDiscount.trim(),
+            validFrom: feValidFrom || null,
             validUntil: feValidUntil || null,
-            ...common,
           });
         }
       }
@@ -3654,10 +3666,12 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         await apiPost("/api/vendors/me/drink-plans", {
           type: "ticket", productName: "Included with Ticket", gender: "all", price: 0,
           lineItems: ticketItems.filter((i) => i.name.trim()),
+          days: ticketDays, timeFrom: ticketTimeFrom.trim(), timeTo: ticketTimeTo.trim(),
+          description: ticketDescription.trim(),
           drinksOfferLabel: ticketDrinksOffer.trim(),
           foodDiscountLabel: ticketFoodDiscount.trim(),
+          validFrom: ticketValidFrom || null,
           validUntil: ticketValidUntil || null,
-          ...common,
         });
       }
       toast({ title: "Drink plan(s) added" });
@@ -3691,6 +3705,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         description: editDescription.trim(),
         drinksOfferLabel: editDrinksOffer.trim(),
         foodDiscountLabel: editFoodDiscount.trim(),
+        validFrom: editValidFrom || null,
         validUntil: editValidUntil || null,
       });
       setPlans((prev) => prev.map((p) => p.id === editingId ? updated : p));
@@ -3834,7 +3849,33 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     </div>
                   </div>
                 </div>
+                <div className="sm:col-span-2">
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Applicable days <span className="normal-case text-muted-foreground/60">(leave blank for all days)</span></Label>
+                  <DayPicker selected={feDays} onToggle={toggleFeDays} />
+                </div>
                 <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time from</Label>
+                    <Input type="time" value={feTimeFrom} onChange={(e) => setFeTimeFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time to</Label>
+                    <Input type="time" value={feTimeTo} onChange={(e) => setFeTimeTo(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid from <span className="normal-case text-muted-foreground/60">(optional — date deal starts)</span></Label>
+                    <Input type="date" value={feValidFrom} onChange={(e) => setFeValidFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after)</span></Label>
+                    <Input type="date" value={feValidUntil} onChange={(e) => setFeValidUntil(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Short description <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Textarea value={feDescription} onChange={(e) => setFeDescription(e.target.value)}
+                      placeholder="Any extra details customers should know…" rows={2}
+                      className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
+                  </div>
                   <div>
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input value={feDrinksOffer} onChange={(e) => setFeDrinksOffer(e.target.value)}
@@ -3844,11 +3885,6 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Food discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input value={feFoodDiscount} onChange={(e) => setFeFoodDiscount(e.target.value)}
                       placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
-                  </div>
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Offer valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after this date)</span></Label>
-                    <Input type="date" value={feValidUntil} onChange={(e) => setFeValidUntil(e.target.value)}
-                      className="bg-black/40 border-white/10 text-sm" />
                   </div>
                 </div>
               </div>
@@ -3874,7 +3910,33 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                   </Label>
                   <LineItemsEditor items={ticketItems} onChange={setTicketItems} />
                 </div>
+                <div>
+                  <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Applicable days <span className="normal-case text-muted-foreground/60">(leave blank for all days)</span></Label>
+                  <DayPicker selected={ticketDays} onToggle={toggleTicketDays} />
+                </div>
                 <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time from</Label>
+                    <Input type="time" value={ticketTimeFrom} onChange={(e) => setTicketTimeFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Time to</Label>
+                    <Input type="time" value={ticketTimeTo} onChange={(e) => setTicketTimeTo(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid from <span className="normal-case text-muted-foreground/60">(optional — date deal starts)</span></Label>
+                    <Input type="date" value={ticketValidFrom} onChange={(e) => setTicketValidFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after)</span></Label>
+                    <Input type="date" value={ticketValidUntil} onChange={(e) => setTicketValidUntil(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Short description <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
+                    <Textarea value={ticketDescription} onChange={(e) => setTicketDescription(e.target.value)}
+                      placeholder="Any extra details customers should know…" rows={2}
+                      className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
+                  </div>
                   <div>
                     <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input value={ticketDrinksOffer} onChange={(e) => setTicketDrinksOffer(e.target.value)}
@@ -3885,39 +3947,10 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Input value={ticketFoodDiscount} onChange={(e) => setTicketFoodDiscount(e.target.value)}
                       placeholder="e.g. 15% off food" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
                   </div>
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Offer valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after this date)</span></Label>
-                    <Input type="date" value={ticketValidUntil} onChange={(e) => setTicketValidUntil(e.target.value)}
-                      className="bg-black/40 border-white/10 text-sm" />
-                  </div>
                 </div>
               </div>
             )}
           </div>
-
-          {/* Common fields */}
-          {(freeEntryChecked || ticketChecked) && (
-            <div className="grid sm:grid-cols-2 gap-4 border-t border-white/10 pt-4">
-              <div className="sm:col-span-2">
-                <Label className="mb-2 block">Applicable days <span className="text-muted-foreground text-xs">(leave blank for all days)</span></Label>
-                <DayPicker selected={days} onToggle={toggleDay} />
-              </div>
-              <div>
-                <Label>Valid from</Label>
-                <Input type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)} className="bg-black/40 border-white/10" />
-              </div>
-              <div>
-                <Label>Valid until</Label>
-                <Input type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)} className="bg-black/40 border-white/10" />
-              </div>
-              <div className="sm:col-span-2">
-                <Label>Short description <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Any extra details customers should know…" rows={2}
-                  className="bg-black/40 border-white/10 resize-none" maxLength={500} />
-              </div>
-            </div>
-          )}
 
           <Button type="submit" disabled={saving || (!freeEntryChecked && !ticketChecked)} className="gap-2">
             <Plus className="h-4 w-4" />
@@ -3994,11 +4027,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                         <DayPicker selected={editDays} onToggle={toggleEditDay} />
                       </div>
                       <div>
-                        <Label>Valid from</Label>
+                        <Label>Time from</Label>
                         <Input type="time" value={editTimeFrom} onChange={(e) => setEditTimeFrom(e.target.value)} className="bg-black/40 border-white/10" />
                       </div>
                       <div>
-                        <Label>Valid until</Label>
+                        <Label>Time to</Label>
                         <Input type="time" value={editTimeTo} onChange={(e) => setEditTimeTo(e.target.value)} className="bg-black/40 border-white/10" />
                       </div>
                       <div>
@@ -4012,7 +4045,12 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                           placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10" maxLength={255} />
                       </div>
                       <div>
-                        <Label className="flex items-center gap-1">Offer valid until <span className="text-muted-foreground text-xs font-normal">(optional — auto-hides after this date)</span></Label>
+                        <Label className="flex items-center gap-1">Deal valid from <span className="text-muted-foreground text-xs font-normal">(optional — date deal starts)</span></Label>
+                        <Input type="date" value={editValidFrom} onChange={(e) => setEditValidFrom(e.target.value)}
+                          className="bg-black/40 border-white/10" />
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1">Deal valid until <span className="text-muted-foreground text-xs font-normal">(optional — auto-hides after this date)</span></Label>
                         <Input type="date" value={editValidUntil} onChange={(e) => setEditValidUntil(e.target.value)}
                           className="bg-black/40 border-white/10" />
                       </div>

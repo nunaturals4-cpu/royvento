@@ -464,7 +464,53 @@ const DrinkPlanBody = z.object({
   drinksOfferLabel: z.string().max(255).optional().default(""),
   foodDiscountLabel: z.string().max(255).optional().default(""),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
+
+// Convert HH:MM to minutes since midnight (empty string = 0 / 24*60 = open window)
+function toMinutes(hhmm: string): number {
+  if (!hhmm) return 0;
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+// Returns true if two time windows overlap.
+// Empty timeFrom+timeTo means "all day", which overlaps with everything.
+function timesOverlap(fromA: string, toA: string, fromB: string, toB: string): boolean {
+  if ((!fromA && !toA) || (!fromB && !toB)) return true;
+  const a0 = toMinutes(fromA);
+  const a1 = toMinutes(toA) || 24 * 60;
+  const b0 = toMinutes(fromB);
+  const b1 = toMinutes(toB) || 24 * 60;
+  return a0 < b1 && b0 < a1;
+}
+
+async function checkDrinkPlanConflict(
+  vendorId: number,
+  type: string,
+  days: string[],
+  timeFrom: string,
+  timeTo: string,
+  excludePlanId?: number,
+): Promise<boolean> {
+  if (type !== "welcome" && type !== "ticket") return false;
+  if (days.length === 0) return false;
+  const existing = await db
+    .select()
+    .from(drinkPlansTable)
+    .where(and(
+      eq(drinkPlansTable.vendorId, vendorId),
+      inArray(drinkPlansTable.type, ["welcome", "ticket"]),
+    ));
+  for (const plan of existing) {
+    if (excludePlanId && plan.id === excludePlanId) continue;
+    if (plan.days.length === 0) continue;
+    const sharedDay = days.some((d) => plan.days.includes(d));
+    if (!sharedDay) continue;
+    if (timesOverlap(timeFrom, timeTo, plan.timeFrom, plan.timeTo)) return true;
+  }
+  return false;
+}
 
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {
   const id = Number(req.params["vendorId"]);
@@ -484,6 +530,11 @@ router.post("/vendors/me/drink-plans", requireAuth(["vendor"]), async (req, res)
   if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
   const parsed = DrinkPlanBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
+  const conflict = await checkDrinkPlanConflict(vendor[0].id, parsed.data.type, parsed.data.days, parsed.data.timeFrom, parsed.data.timeTo);
+  if (conflict) {
+    res.status(409).json({ error: "A conflicting free-entry or ticket plan already exists for this day and time." });
+    return;
+  }
   const [plan] = await db.insert(drinkPlansTable).values({
     vendorId: vendor[0].id,
     ...parsed.data,
@@ -500,6 +551,13 @@ router.patch("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (
   if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
   const parsed = DrinkPlanBody.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
+  if (parsed.data.type && parsed.data.days && parsed.data.timeFrom !== undefined && parsed.data.timeTo !== undefined) {
+    const conflict = await checkDrinkPlanConflict(vendor[0].id, parsed.data.type, parsed.data.days, parsed.data.timeFrom ?? "", parsed.data.timeTo ?? "", planId);
+    if (conflict) {
+      res.status(409).json({ error: "A conflicting free-entry or ticket plan already exists for this day and time." });
+      return;
+    }
+  }
   const [updated] = await db
     .update(drinkPlansTable)
     .set(parsed.data)

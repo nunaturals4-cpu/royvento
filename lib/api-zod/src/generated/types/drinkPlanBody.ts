@@ -20,4 +20,6 @@ export interface DrinkPlanBody {
   timeTo?: string;
   description?: string;
   lineItems?: DrinkPlanLineItem[] | null;
+  validUntil?: string | null;
+  validFrom?: string | null;
 }

@@ -21,5 +21,7 @@ export interface DrinkPlan {
   timeTo: string;
   description: string;
   lineItems?: DrinkPlanLineItem[] | null;
+  validUntil?: string | null;
+  validFrom?: string | null;
   createdAt: string;
 }
