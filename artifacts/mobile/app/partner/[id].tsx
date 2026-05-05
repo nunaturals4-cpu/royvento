@@ -8,6 +8,7 @@ import {
   useListMyBookings,
   useListVendorReviews,
 } from "@workspace/api-client-react";
+import type { Vendor } from "@workspace/api-client-react";
 import { ReviewForm } from "@/components/ReviewForm";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -322,7 +323,7 @@ export default function PartnerDetailScreen() {
           </View>
           <Text style={[styles.vendorName, { color: "#fff", textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{vendor.businessName}</Text>
           <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 }}>
-            by {(vendor as any).partnerName || vendor.businessName}
+            by {(vendor as Vendor & { partnerName?: string }).partnerName || vendor.businessName}
           </Text>
         </View>
       </View>

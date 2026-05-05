@@ -6,6 +6,7 @@ import {
   useListEvents,
   useGetMe,
 } from "@workspace/api-client-react";
+import type { Vendor } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { EventCard } from "@/components/EventCard";
 import { Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell, Heart } from "lucide-react";
@@ -45,7 +46,7 @@ export function VendorDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: me } = useGetMe({ query: { retry: false } as any });
+  const { data: me } = useGetMe();
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: reviews = [] } = useListVendorReviews(id);
   const { data: allEvents = [] } = useListEvents();
@@ -151,7 +152,7 @@ export function VendorDetail() {
           <h1 className="font-serif text-4xl md:text-6xl tracking-tight leading-tight text-white">{vendor.businessName}</h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-sm">
             <span className="text-white/55">
-              by <span className="text-white/75">{(vendor as any).partnerName || vendor.businessName}</span>
+              by <span className="text-white/75">{(vendor as Vendor & { partnerName?: string }).partnerName || vendor.businessName}</span>
             </span>
             {vendor.location && (
               <span className="flex items-center gap-1.5 text-white/55">
