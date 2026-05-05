@@ -102,6 +102,7 @@ export default function VendorsScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeDanceFloor, setActiveDanceFloor] = useState<DanceFloorFilter>("");
+  const [freeEntry, setFreeEntry] = useState(false);
 
   const params: Record<string, string> = {};
   if (activeCategory !== "All") params["category"] = activeCategory;
@@ -115,7 +116,9 @@ export default function VendorsScreen() {
     },
   });
 
-  const approvedVendors = (vendors ?? []).filter((v) => v.status === "approved");
+  const approvedVendors = (vendors ?? [])
+    .filter((v) => v.status === "approved")
+    .filter((v) => !freeEntry || (v.freeEntryRules as any)?.enabled === true);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -146,7 +149,7 @@ export default function VendorsScreen() {
         })}
       </ScrollView>
 
-      {/* Dance floor filter chips */}
+      {/* Dance floor + Free Entry filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -165,6 +168,28 @@ export default function VendorsScreen() {
             </Pressable>
           );
         })}
+        <Pressable
+          style={[
+            styles.chipSmall,
+            {
+              backgroundColor: freeEntry ? "#22c55e20" : colors.muted,
+              borderColor: freeEntry ? "#22c55e" : colors.border,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+            },
+          ]}
+          onPress={() => setFreeEntry((v) => !v)}
+        >
+          <Ionicons
+            name={freeEntry ? "checkmark-circle" : "ticket-outline"}
+            size={12}
+            color={freeEntry ? "#22c55e" : colors.mutedForeground}
+          />
+          <Text style={[styles.chipText, { color: freeEntry ? "#22c55e" : colors.mutedForeground }]}>
+            Free Entry
+          </Text>
+        </Pressable>
       </ScrollView>
 
       {isLoading ? (
