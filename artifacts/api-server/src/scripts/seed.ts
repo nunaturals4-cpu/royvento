@@ -11,7 +11,7 @@ async function ensureAdmin() {
   const existing = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.email, "admin@admin.com"))
+    .where(eq(usersTable.email, "royvento56@gmail.com"))
     .limit(1);
   if (existing[0]) {
     await db
@@ -24,7 +24,7 @@ async function ensureAdmin() {
   const [admin] = await db
     .insert(usersTable)
     .values({
-      email: "admin@admin.com",
+      email: "royvento56@gmail.com",
       passwordHash: await bcrypt.hash("admin123@", 10),
       name: "Royvento Admin",
       role: "admin",

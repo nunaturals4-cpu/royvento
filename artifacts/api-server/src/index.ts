@@ -2,6 +2,40 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runCleanup } from "./jobs/cleanup";
 import cron from "node-cron";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+
+const ADMIN_EMAIL = "royvento56@gmail.com";
+const ADMIN_PASSWORD = "admin123@";
+
+async function ensureAdminAccount() {
+  try {
+    const target = await db.select().from(usersTable).where(eq(usersTable.email, ADMIN_EMAIL)).limit(1);
+    if (target[0]) {
+      await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, target[0].id));
+      return;
+    }
+    // Migrate from old email if present
+    const old = await db.select().from(usersTable).where(eq(usersTable.email, "admin@admin.com")).limit(1);
+    if (old[0]) {
+      await db.update(usersTable).set({ email: ADMIN_EMAIL, role: "admin" }).where(eq(usersTable.id, old[0].id));
+      logger.info("Admin email migrated to royvento56@gmail.com");
+      return;
+    }
+    // Create fresh admin account
+    await db.insert(usersTable).values({
+      email: ADMIN_EMAIL,
+      passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10),
+      name: "Royvento Admin",
+      role: "admin",
+      phone: "+91 9000000000",
+    });
+    logger.info("Admin account created");
+  } catch (err) {
+    logger.error({ err }, "Failed to ensure admin account on startup");
+  }
+}
 
 const rawPort = process.env["PORT"];
 
@@ -25,6 +59,7 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
+  ensureAdminAccount();
   runCleanup();
 
   cron.schedule("0 2 * * *", () => {
