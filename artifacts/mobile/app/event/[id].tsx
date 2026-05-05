@@ -608,6 +608,55 @@ export default function EventDetailScreen() {
                           />
                         ) : null}
                       </Pressable>
+                      {/* Days / time / description detail */}
+                      {((plan.days && plan.days.length > 0) || plan.timeFrom || plan.description) ? (
+                        <View style={{ gap: 4, paddingLeft: 4 }}>
+                          {(plan.days && plan.days.length > 0 || plan.timeFrom) ? (
+                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                              {plan.days && plan.days.map((d: string) => (
+                                <View
+                                  key={d}
+                                  style={{
+                                    backgroundColor: colors.muted,
+                                    borderRadius: 6,
+                                    paddingHorizontal: 7,
+                                    paddingVertical: 2,
+                                    borderWidth: 1,
+                                    borderColor: colors.border,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{d}</Text>
+                                </View>
+                              ))}
+                              {plan.timeFrom ? (
+                                <View
+                                  style={{
+                                    backgroundColor: colors.muted,
+                                    borderRadius: 6,
+                                    paddingHorizontal: 7,
+                                    paddingVertical: 2,
+                                    borderWidth: 1,
+                                    borderColor: colors.border,
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    gap: 3,
+                                  }}
+                                >
+                                  <Ionicons name="time-outline" size={9} color={colors.mutedForeground} />
+                                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
+                                    {plan.timeFrom}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          ) : null}
+                          {plan.description ? (
+                            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 16 }}>
+                              {plan.description}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : null}
                       {hasItems && isExpanded ? (
                         <View style={{ paddingLeft: 12, gap: 2 }}>
                           {plan.lineItems!.map((item: { name: string; qty: number }, i: number) => (

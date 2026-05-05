@@ -534,6 +534,29 @@ export function EventDetail() {
                           )}
                         </div>
                       </button>
+                      {/* Days / time / description detail */}
+                      {((plan.days && plan.days.length > 0) || plan.timeFrom || plan.description) && (
+                        <div className="px-5 pb-2.5 flex flex-col gap-1.5 -mt-1">
+                          {(plan.days && plan.days.length > 0 || plan.timeFrom) && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {plan.days && plan.days.map((d: string) => (
+                                <span key={d} className="rounded-md bg-white/[0.06] border border-white/10 px-2 py-0.5 text-[10px] font-medium text-white/50">
+                                  {d}
+                                </span>
+                              ))}
+                              {plan.timeFrom && (
+                                <span className="rounded-md bg-white/[0.06] border border-white/10 px-2 py-0.5 text-[10px] font-medium text-white/50 flex items-center gap-1">
+                                  <Clock className="h-2.5 w-2.5 shrink-0" />
+                                  {plan.timeFrom}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {plan.description && (
+                            <p className="text-[11px] text-white/40 leading-relaxed">{plan.description}</p>
+                          )}
+                        </div>
+                      )}
                       {hasItems && isExpanded && (
                         <ul className="pb-3 px-5 pl-14 space-y-1.5">
                           {plan.lineItems.map((item: any, i: number) => (
