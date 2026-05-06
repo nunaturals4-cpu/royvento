@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, announcementsTable, vendorsTable, eventsTable, bookingsTable, usersTable } from "@workspace/db";
+import { db, announcementsTable, vendorsTable, eventsTable, bookingsTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
 import { sendWebPushToUser } from "./webPush";
 import { z } from "zod";
@@ -63,31 +63,50 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
     })
     .returning();
 
-  // Notify all users with confirmed/completed bookings for this vendor's events
+  // Broadcast to ALL users in throttled batches so the server is never overwhelmed
   setImmediate(async () => {
     try {
-      const eventRows = await db
-        .select({ id: eventsTable.id })
-        .from(eventsTable)
-        .where(eq(eventsTable.vendorId, vendor.id));
-      const eventIds = eventRows.map((e) => e.id);
-      if (eventIds.length === 0) return;
-      const bookingRows = await db
-        .selectDistinct({ userId: bookingsTable.userId })
-        .from(bookingsTable)
-        .where(
-          and(
-            inArray(bookingsTable.eventId, eventIds),
-            inArray(bookingsTable.status, ["confirmed", "completed"]),
-          ),
+      const notifTitle = `${vendor.businessName}: ${parsed.data.title}`;
+      const notifBody = parsed.data.body || parsed.data.title;
+      const tag = `announcement-${row?.id ?? Date.now()}`;
+
+      // Fetch all user IDs in one query (select only what's needed)
+      const allUsers = await db
+        .select({ id: usersTable.id })
+        .from(usersTable);
+
+      const BATCH_SIZE = 20;
+      const BATCH_DELAY_MS = 150;
+
+      for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
+        const batch = allUsers.slice(i, i + BATCH_SIZE);
+
+        await Promise.all(
+          batch.map(async ({ id: userId }) => {
+            try {
+              // In-app notification for every user
+              await db.insert(notificationsTable).values({
+                userId,
+                title: notifTitle,
+                message: notifBody,
+              });
+              // Web push (only fires if the user has a subscription)
+              sendWebPushToUser(userId, {
+                title: notifTitle,
+                body: notifBody,
+                url: `/`,
+                tag,
+              }).catch(() => {});
+            } catch {
+              // non-critical per user — continue with next
+            }
+          }),
         );
-      for (const { userId } of bookingRows) {
-        sendWebPushToUser(userId, {
-          title: `${vendor.businessName}: ${parsed.data.title}`,
-          body: parsed.data.body || parsed.data.title,
-          url: `/`,
-          tag: `announcement-${row?.id ?? Date.now()}`,
-        }).catch(() => {});
+
+        // Pause between batches to avoid overwhelming the event loop
+        if (i + BATCH_SIZE < allUsers.length) {
+          await new Promise<void>((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+        }
       }
     } catch {
       // non-critical — ignore errors

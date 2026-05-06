@@ -1,10 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
+import { customFetch } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSegments } from "expo-router";
 import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 
 export const BOTTOM_NAV_HEIGHT = 60;
 
@@ -54,6 +57,11 @@ const TABS: Tab[] = [
   },
 ];
 
+interface NotificationItem {
+  id: number;
+  isRead: boolean;
+}
+
 export function PersistentBottomNav() {
   const { t } = useLanguage();
   const colors = useColors();
@@ -61,6 +69,18 @@ export function PersistentBottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const segments = useSegments();
+  const { user } = useAuth();
+
+  const { data: notifications } = useQuery<NotificationItem[]>({
+    queryKey: ["notifications"],
+    queryFn: () => customFetch<NotificationItem[]>("/api/notifications"),
+    enabled: !!user,
+    staleTime: 60_000,
+    refetchInterval: 90_000,
+    select: (data) => data,
+  });
+
+  const unreadCount = (notifications ?? []).filter((n) => !n.isRead).length;
 
   const isAuth = segments[0] === "(auth)";
   if (isAuth) return null;
@@ -90,6 +110,9 @@ export function PersistentBottomNav() {
       {TABS.map((tab) => {
         const focused = isActive(tab);
         const color = focused ? colors.primary : colors.mutedForeground;
+        const isProfile = tab.route === "/(tabs)/profile";
+        const showBadge = isProfile && unreadCount > 0;
+
         return (
           <Pressable
             key={tab.route}
@@ -102,17 +125,26 @@ export function PersistentBottomNav() {
             {focused && (
               <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
             )}
-            <View
-              style={[
-                styles.indicator,
-                focused && {
-                  backgroundColor: colors.primary + "28",
-                  borderWidth: 1,
-                  borderColor: colors.primary + "44",
-                },
-              ]}
-            >
-              <Ionicons name={focused ? tab.iconFocused : tab.icon} size={22} color={color} />
+            <View style={styles.iconWrapper}>
+              <View
+                style={[
+                  styles.indicator,
+                  focused && {
+                    backgroundColor: colors.primary + "28",
+                    borderWidth: 1,
+                    borderColor: colors.primary + "44",
+                  },
+                ]}
+              >
+                <Ionicons name={focused ? tab.iconFocused : tab.icon} size={22} color={color} />
+              </View>
+              {showBadge && (
+                <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? "99+" : String(unreadCount)}
+                  </Text>
+                </View>
+              )}
             </View>
             <Text
               style={[
@@ -164,12 +196,34 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
   },
+  iconWrapper: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   indicator: {
     width: 48,
     height: 32,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    lineHeight: 12,
   },
   label: {
     fontSize: 10,

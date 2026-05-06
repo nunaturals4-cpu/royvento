@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runCleanup } from "./jobs/cleanup";
+import { runBookingReminders } from "./jobs/bookingReminders";
 import cron from "node-cron";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -75,4 +76,19 @@ app.listen(port, (err) => {
     logger.info("Running daily cleanup job");
     runCleanup();
   });
+
+  // Booking-day reminders — fires at 10 AM and 5 PM IST every day
+  cron.schedule("0 10 * * *", () => {
+    logger.info("Running morning booking reminder job (10 AM IST)");
+    runBookingReminders("morning").catch((err) =>
+      logger.error({ err }, "Morning reminder job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
+
+  cron.schedule("0 17 * * *", () => {
+    logger.info("Running evening booking reminder job (5 PM IST)");
+    runBookingReminders("evening").catch((err) =>
+      logger.error({ err }, "Evening reminder job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
 });
