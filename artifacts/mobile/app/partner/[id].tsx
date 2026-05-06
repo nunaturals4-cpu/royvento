@@ -183,17 +183,18 @@ function DrinkPlansSection({ vendorId }: { vendorId: number }) {
             </Text>
           ) : null}
 
-          {plan.days && plan.days.length > 0 && (
+          {(plan.days && plan.days.length > 0 || plan.timeFrom || plan.timeTo) && (
             <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-              {plan.days.map((d) => (
-                <View key={d} style={{ backgroundColor: colors.muted, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{d}</Text>
+              {plan.days && plan.days.map((d) => (
+                <View key={d} style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.primary + "35" }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>{d}</Text>
                 </View>
               ))}
               {(plan.timeFrom || plan.timeTo) && (
-                <View style={{ backgroundColor: colors.muted, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
-                    {plan.timeFrom}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
+                <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.primary + "35", flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Ionicons name="time-outline" size={10} color={colors.primary} />
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
+                    {plan.timeFrom || ""}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
                   </Text>
                 </View>
               )}

@@ -515,17 +515,21 @@ export function VendorDetail() {
                       ))}
                     </ul>
                   )}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    {plan.days.length > 0 && (
-                      <span>{plan.days.join(", ")}</span>
-                    )}
-                    {plan.timeFrom && plan.timeTo && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {fmtTime(plan.timeFrom)} – {fmtTime(plan.timeTo)}
-                      </span>
-                    )}
-                  </div>
+                  {(plan.days.length > 0 || plan.timeFrom || plan.timeTo) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {plan.days.map((d) => (
+                        <span key={d} className="rounded-md bg-white/[0.06] border border-white/10 px-2 py-0.5 text-[10px] font-medium text-white/60">
+                          {d}
+                        </span>
+                      ))}
+                      {(plan.timeFrom || plan.timeTo) && (
+                        <span className="rounded-md bg-white/[0.06] border border-white/10 px-2 py-0.5 text-[10px] font-medium text-white/60 flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5 shrink-0" />
+                          {plan.timeFrom ? fmtTime(plan.timeFrom) : ""}{plan.timeTo ? ` – ${fmtTime(plan.timeTo)}` : ""}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (!plan.validUntil || plan.validUntil >= new Date().toISOString().slice(0, 10)) && (
                     <div className="flex flex-wrap gap-2 mt-1">
                       {plan.drinksOfferLabel && (
