@@ -36,6 +36,7 @@ interface VendorRow {
   menuUrl?: string | null;
   menuUrls?: string[] | null;
   crowdLevel?: string | null;
+  onlineBalance?: string | null;
   status: string;
   isPremium?: boolean;
   approvedAt?: Date | null;
@@ -102,6 +103,7 @@ async function serializeVendor(v: VendorRow) {
     menuUrl: v.menuUrl ?? "",
     menuUrls: v.menuUrls ?? [],
     crowdLevel: v.crowdLevel ?? null,
+    onlineBalance: Number(v.onlineBalance ?? 0),
   };
 }
 
@@ -167,6 +169,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       menuUrl: v.menuUrl ?? "",
       menuUrls: v.menuUrls ?? [],
       crowdLevel: v.crowdLevel ?? null,
+      onlineBalance: Number(v.onlineBalance ?? 0),
     };
   });
 }

@@ -36,6 +36,13 @@
       "when": 1746604800000,
       "tag": "0024_expo_push_tickets",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778081900000,
+      "tag": "0025_vendors_crowd_online_balance",
+      "breakpoints": true
     }
   ]
 }

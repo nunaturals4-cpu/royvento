@@ -259,6 +259,12 @@ export const ListVendorsResponseItem = zod.object({
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+  onlineBalance: zod
+    .number()
+    .optional()
+    .describe(
+      "Accumulated balance from online payments, available for settlement",
+    ),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 
@@ -311,6 +317,12 @@ export const GetMyVendorResponse = zod.object({
       danceFloorPhotos: zod.array(zod.string()).nullish(),
       menuUrl: zod.string().optional(),
       crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+      onlineBalance: zod
+        .number()
+        .optional()
+        .describe(
+          "Accumulated balance from online payments, available for settlement",
+        ),
     }),
     zod.null(),
   ]),
@@ -372,6 +384,12 @@ export const CreateMyVendorResponse = zod.object({
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+  onlineBalance: zod
+    .number()
+    .optional()
+    .describe(
+      "Accumulated balance from online payments, available for settlement",
+    ),
 });
 
 /**
@@ -431,6 +449,12 @@ export const UpdateMyVendorResponse = zod.object({
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+  onlineBalance: zod
+    .number()
+    .optional()
+    .describe(
+      "Accumulated balance from online payments, available for settlement",
+    ),
 });
 
 /**
@@ -480,6 +504,12 @@ export const GetVendorResponse = zod.object({
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+  onlineBalance: zod
+    .number()
+    .optional()
+    .describe(
+      "Accumulated balance from online payments, available for settlement",
+    ),
 });
 
 /**
@@ -525,6 +555,12 @@ export const ListPendingVendorsResponseItem = zod.object({
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+  onlineBalance: zod
+    .number()
+    .optional()
+    .describe(
+      "Accumulated balance from online payments, available for settlement",
+    ),
 });
 export const ListPendingVendorsResponse = zod.array(
   ListPendingVendorsResponseItem,
@@ -577,6 +613,12 @@ export const ApproveVendorResponse = zod.object({
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+  onlineBalance: zod
+    .number()
+    .optional()
+    .describe(
+      "Accumulated balance from online payments, available for settlement",
+    ),
 });
 
 /**
@@ -626,6 +668,12 @@ export const RejectVendorResponse = zod.object({
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+  onlineBalance: zod
+    .number()
+    .optional()
+    .describe(
+      "Accumulated balance from online payments, available for settlement",
+    ),
 });
 
 /**
@@ -1177,6 +1225,12 @@ export const GetEventResponse = zod
         danceFloorPhotos: zod.array(zod.string()).nullish(),
         menuUrl: zod.string().optional(),
         crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+        onlineBalance: zod
+          .number()
+          .optional()
+          .describe(
+            "Accumulated balance from online payments, available for settlement",
+          ),
       }),
     }),
   );
