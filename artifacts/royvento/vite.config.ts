@@ -26,12 +26,26 @@ if (!basePath) {
   );
 }
 
+const hmrKeepAlive = (): import("vite").Plugin => ({
+  name: "hmr-ws-keepalive",
+  configureServer(server) {
+    const PING_INTERVAL_MS = 20_000;
+    const interval = setInterval(() => {
+      (server.ws as any).wss?.clients?.forEach((client: any) => {
+        if (client.readyState === 1) client.ping();
+      });
+    }, PING_INTERVAL_MS);
+    server.httpServer?.on("close", () => clearInterval(interval));
+  },
+});
+
 export default defineConfig({
   base: basePath,
   plugins: [
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    hmrKeepAlive(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -65,6 +79,8 @@ export default defineConfig({
     allowedHosts: true,
     hmr: {
       clientPort: 443,
+      protocol: "wss",
+      timeout: 120_000,
     },
     fs: {
       strict: true,
