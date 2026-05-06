@@ -10,4 +10,6 @@ export interface CommissionReportTotals {
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;
+  collectedCommission: number;
+  pendingCommission: number;
 }

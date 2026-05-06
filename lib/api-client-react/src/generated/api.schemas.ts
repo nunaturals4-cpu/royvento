@@ -934,6 +934,8 @@ export interface CommissionReportBookingLine {
   /** Number of units charged (persons for free_entry, tickets for ticket, 1 for table) */
   unitCount: number;
   commissionAmount: number;
+  /** True when a commission_ledger row exists for this booking (commission has been realised). False = pending. */
+  collected: boolean;
   createdAt: string;
 }
 
@@ -951,6 +953,10 @@ export interface CommissionReportVendorRow {
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;
+  /** Sum of commission_ledger entries (online_payment + cod_checkin + free_checkin) for this vendor */
+  collectedCommission: number;
+  /** totalCommission − collectedCommission (never negative) */
+  pendingCommission: number;
   freeEntryCount: number;
   freeEntryRevenue: number;
   freeEntryCommission: number;
@@ -967,6 +973,8 @@ export interface CommissionReportTotals {
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;
+  collectedCommission: number;
+  pendingCommission: number;
 }
 
 export interface CommissionReport {
@@ -1378,6 +1386,10 @@ export type SetPartnerCrowdLevel200 = {
 
 export type GetPartnerSettlementBalance200 = {
   onlineBalance: number;
+  /** Unpaid commission accrued from COD/free-entry check-ins */
+  commissionOwed: number;
+  /** Maximum amount the vendor can request for settlement (onlineBalance − commissionOwed, never negative) */
+  payable: number;
 };
 
 export type GetAdminBookingsReportParams = {

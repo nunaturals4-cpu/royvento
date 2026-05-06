@@ -14,7 +14,13 @@ import {
   paymentsTable,
   vendorManagersTable,
   vendorCommissionsTable,
+  commissionLedgerTable,
 } from "@workspace/db";
+import {
+  computeCommissionFromPlanned,
+  computeCommissionFromActuals,
+  classifyBookingType,
+} from "../lib/commission";
 import { sendExpoPushToUser } from "../lib/expoPush";
 import { sendWebPushToUser } from "./webPush";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
@@ -439,12 +445,44 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       set: { status: "booked" },
     });
 
-  // For online+bypass path: credit vendor's online balance atomically (same as PhonePe confirmation)
+  // For online+bypass path: credit vendor's online balance net of commission
+  // (mirrors the PhonePe success path in payments.ts → activateBookingAfterPayment).
   if (wantsOnline && finalPrice > 0) {
-    await db
-      .update(vendorsTable)
-      .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(finalPrice)}` })
-      .where(eq(vendorsTable.id, evt.vendorId));
+    const [vcRow] = await db
+      .select()
+      .from(vendorCommissionsTable)
+      .where(eq(vendorCommissionsTable.vendorId, evt.vendorId))
+      .limit(1);
+    const comm = computeCommissionFromPlanned(
+      {
+        pubMode: parsed.data.pubMode || "",
+        finalPrice,
+        guests: guestsCount,
+        ticketWomen: parsed.data.ticketWomen || 0,
+        ticketMen: parsed.data.ticketMen || 0,
+        ticketCouple: parsed.data.ticketCouple || 0,
+      },
+      vcRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+    );
+    const netCredit = Math.max(0, finalPrice - comm.amount);
+    await db.transaction(async (tx) => {
+      await tx
+        .update(vendorsTable)
+        .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
+        .where(eq(vendorsTable.id, evt.vendorId));
+      if (comm.amount > 0) {
+        await tx
+          .insert(commissionLedgerTable)
+          .values({
+            vendorId: evt.vendorId,
+            bookingId: b.id,
+            amount: String(comm.amount),
+            bookingType: comm.bookingType,
+            trigger: "online_payment",
+          })
+          .onConflictDoNothing();
+      }
+    });
   }
 
   const [out] = await serializeBookings([b]);
@@ -1860,6 +1898,58 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     if (!updatedActuals) {
       res.status(500).json({ code: "SERVER_ERROR", message: "Failed to record actual entry. Please try again." });
       return;
+    }
+    // Record COD / free-entry commission against this booking's actuals.
+    // Idempotent: re-scanning to correct actuals updates the existing ledger
+    // row in place (and adjusts commissionOwed by the delta) instead of
+    // double-charging. Online bookings already had commission deducted at
+    // payment success — we never record a second entry for them here.
+    // pubMode is the source of truth for free-entry vs ticket vs table — there
+    // is no separate "free-entry rules" mechanism. classifyBookingType uses
+    // pubMode + finalPrice exactly as the rest of the system does.
+    const isCod = updatedActuals.paymentMethod === "cod";
+    const isFreeEntry =
+      classifyBookingType({ pubMode: updatedActuals.pubMode, finalPrice: updatedActuals.finalPrice }) === "free_entry";
+    if (isCod || isFreeEntry) {
+      const trigger: "cod_checkin" | "free_checkin" = isFreeEntry ? "free_checkin" : "cod_checkin";
+      const comm = computeCommissionFromActuals(
+        updatedActuals,
+        scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+        { priceWomen: scanPriceInfo.priceWomen, priceMen: scanPriceInfo.priceMen, priceCouple: scanPriceInfo.priceCouple },
+      );
+      try {
+        await db.transaction(async (tx) => {
+          const [existing] = await tx
+            .select({ id: commissionLedgerTable.id, amount: commissionLedgerTable.amount })
+            .from(commissionLedgerTable)
+            .where(and(eq(commissionLedgerTable.bookingId, updatedActuals.id), eq(commissionLedgerTable.trigger, trigger)))
+            .limit(1);
+          const oldAmount = existing ? Number(existing.amount) : 0;
+          const delta = comm.amount - oldAmount;
+          if (existing) {
+            await tx
+              .update(commissionLedgerTable)
+              .set({ amount: String(comm.amount), bookingType: comm.bookingType })
+              .where(eq(commissionLedgerTable.id, existing.id));
+          } else if (comm.amount > 0) {
+            await tx.insert(commissionLedgerTable).values({
+              vendorId: updatedActuals.vendorId,
+              bookingId: updatedActuals.id,
+              amount: String(comm.amount),
+              bookingType: comm.bookingType,
+              trigger,
+            });
+          }
+          if (delta !== 0) {
+            await tx
+              .update(vendorsTable)
+              .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
+              .where(eq(vendorsTable.id, updatedActuals.vendorId));
+          }
+        });
+      } catch (err) {
+        req.log.error({ err, bookingId: updatedActuals.id }, "Failed to record COD/free-entry commission ledger");
+      }
     }
     const [out] = await serializeBookings([updatedActuals]);
     const okComm = calcScanCommission(updatedActuals);

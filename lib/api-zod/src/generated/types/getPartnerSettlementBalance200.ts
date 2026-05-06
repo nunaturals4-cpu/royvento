@@ -8,4 +8,8 @@
 
 export type GetPartnerSettlementBalance200 = {
   onlineBalance: number;
+  /** Unpaid commission accrued from COD/free-entry check-ins */
+  commissionOwed: number;
+  /** Maximum amount the vendor can request for settlement (onlineBalance − commissionOwed, never negative) */
+  payable: number;
 };

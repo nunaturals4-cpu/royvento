@@ -5,6 +5,7 @@ import {
   vendorBankingDetailsTable,
   settlementRequestsTable,
   notificationsTable,
+  commissionLedgerTable,
 } from "@workspace/db";
 import { eq, desc, inArray, sql, gte, and } from "drizzle-orm";
 import { z } from "zod";
@@ -25,11 +26,22 @@ const SettlementRequestBody = z.object({
 
 async function getVendorForUser(userId: number) {
   const [vendor] = await db
-    .select({ id: vendorsTable.id, userId: vendorsTable.userId, onlineBalance: vendorsTable.onlineBalance })
+    .select({
+      id: vendorsTable.id,
+      userId: vendorsTable.userId,
+      onlineBalance: vendorsTable.onlineBalance,
+      commissionOwed: vendorsTable.commissionOwed,
+    })
     .from(vendorsTable)
     .where(eq(vendorsTable.userId, userId))
     .limit(1);
   return vendor ?? null;
+}
+
+function computePayable(onlineBalance: string | number | null | undefined, commissionOwed: string | number | null | undefined) {
+  const ob = Number(onlineBalance ?? 0);
+  const owed = Number(commissionOwed ?? 0);
+  return Math.max(0, ob - owed);
 }
 
 
@@ -90,7 +102,13 @@ router.get("/partner/settlement/balance", requireAuth(["vendor"]), async (req, r
     res.status(404).json({ error: "No vendor profile found" });
     return;
   }
-  res.json({ onlineBalance: Number(vendor.onlineBalance ?? 0) });
+  const onlineBalance = Number(vendor.onlineBalance ?? 0);
+  const commissionOwed = Number(vendor.commissionOwed ?? 0);
+  res.json({
+    onlineBalance,
+    commissionOwed,
+    payable: computePayable(onlineBalance, commissionOwed),
+  });
 });
 
 router.get("/partner/settlement/requests", requireAuth(["vendor"]), async (req, res) => {
@@ -134,9 +152,18 @@ router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, 
     return;
   }
 
+  // Payable = onlineBalance − commissionOwed. Vendors cannot withdraw funds
+  // that the platform is holding back to cover unpaid COD/free-entry commission.
   const currentBalance = Number(vendor.onlineBalance ?? 0);
-  if (parsed.data.amount > currentBalance) {
-    res.status(400).json({ error: `Amount exceeds your available online balance of ₹${currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` });
+  const currentOwed = Number(vendor.commissionOwed ?? 0);
+  const payable = computePayable(currentBalance, currentOwed);
+  if (parsed.data.amount > payable) {
+    res.status(400).json({
+      error:
+        currentOwed > 0
+          ? `Amount exceeds your payable balance of ₹${payable.toLocaleString("en-IN", { minimumFractionDigits: 2 })} (online ₹${currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })} − commission owed ₹${currentOwed.toLocaleString("en-IN", { minimumFractionDigits: 2 })})`
+          : `Amount exceeds your available online balance of ₹${currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    });
     return;
   }
 
@@ -153,13 +180,14 @@ router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, 
 
   try {
     await db.transaction(async (tx) => {
-      // Atomically reset balance to 0, guarded by sufficient balance check.
-      // If a concurrent request already consumed the balance, the WHERE clause
-      // matches 0 rows and the transaction rolls back, preventing double-spend.
+      // Atomically deduct only the requested amount from onlineBalance,
+      // guarded by a payable-sufficient check. commissionOwed is left in place
+      // and is netted out at admin approval time (settlement_offset ledger row).
+      const minRequired = String(parsed.data.amount + currentOwed);
       const [deducted] = await tx
         .update(vendorsTable)
-        .set({ onlineBalance: "0" })
-        .where(and(eq(vendorsTable.id, vendor.id), gte(vendorsTable.onlineBalance, String(parsed.data.amount))))
+        .set({ onlineBalance: sql`${vendorsTable.onlineBalance} - ${String(parsed.data.amount)}` })
+        .where(and(eq(vendorsTable.id, vendor.id), gte(vendorsTable.onlineBalance, minRequired)))
         .returning({ id: vendorsTable.id });
 
       if (!deducted) {
@@ -268,11 +296,49 @@ router.post("/admin/settlement-requests/:id/approve", requireAuth(["admin"]), as
     res.status(409).json({ error: "Request has already been processed" });
     return;
   }
-  const [updated] = await db
-    .update(settlementRequestsTable)
-    .set({ status: "approved", processedAt: new Date() })
-    .where(eq(settlementRequestsTable.id, id))
-    .returning();
+
+  // Net any outstanding commissionOwed against the vendor's remaining
+  // onlineBalance at approval time. The offset is realised for the platform —
+  // recorded as a settlement_offset ledger row for the audit trail.
+  let updated: typeof settlementRequestsTable.$inferSelect | undefined;
+  await db.transaction(async (tx) => {
+    const [v] = await tx
+      .select({
+        id: vendorsTable.id,
+        onlineBalance: vendorsTable.onlineBalance,
+        commissionOwed: vendorsTable.commissionOwed,
+      })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, sr.vendorId))
+      .limit(1);
+    if (v) {
+      const ob = Number(v.onlineBalance ?? 0);
+      const owed = Number(v.commissionOwed ?? 0);
+      const offset = Math.max(0, Math.min(owed, ob));
+      if (offset > 0) {
+        await tx
+          .update(vendorsTable)
+          .set({
+            onlineBalance: sql`${vendorsTable.onlineBalance} - ${String(offset)}`,
+            commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} - ${String(offset)})`,
+          })
+          .where(eq(vendorsTable.id, v.id));
+        await tx.insert(commissionLedgerTable).values({
+          vendorId: v.id,
+          bookingId: null,
+          amount: String(offset),
+          bookingType: "settlement_offset",
+          trigger: "settlement_offset",
+          settlementRequestId: sr.id,
+        });
+      }
+    }
+    [updated] = await tx
+      .update(settlementRequestsTable)
+      .set({ status: "approved", processedAt: new Date() })
+      .where(eq(settlementRequestsTable.id, id))
+      .returning();
+  });
 
   const [vendor] = await db
     .select({ userId: vendorsTable.userId })
@@ -311,11 +377,29 @@ router.post("/admin/settlement-requests/:id/reject", requireAuth(["admin"]), asy
     res.status(409).json({ error: "Request has already been processed" });
     return;
   }
-  const [updated] = await db
-    .update(settlementRequestsTable)
-    .set({ status: "rejected", adminNote: note, processedAt: new Date() })
-    .where(eq(settlementRequestsTable.id, id))
-    .returning();
+  // Refund the deducted amount back to the vendor's onlineBalance so they can
+  // request again. commissionOwed was untouched at request time, so nothing to
+  // restore there.
+  //
+  // NOTE on deploy migration: prior to commission-deduction wiring, request
+  // creation atomically reset onlineBalance to 0 (deducting the entire balance,
+  // not just `amount`). Any settlement_request rows that were already pending
+  // at deploy time were created under that old logic — rejecting them now will
+  // only refund `amount`, not the full pre-deduction balance. Operators should
+  // resolve (approve or manually refund) any pre-existing pending requests
+  // before deploying. Backfill is intentionally out of scope here.
+  let updated: typeof settlementRequestsTable.$inferSelect | undefined;
+  await db.transaction(async (tx) => {
+    await tx
+      .update(vendorsTable)
+      .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(sr.amount)}` })
+      .where(eq(vendorsTable.id, sr.vendorId));
+    [updated] = await tx
+      .update(settlementRequestsTable)
+      .set({ status: "rejected", adminNote: note, processedAt: new Date() })
+      .where(eq(settlementRequestsTable.id, id))
+      .returning();
+  });
 
   const [vendor] = await db
     .select({ userId: vendorsTable.userId })

@@ -16,6 +16,10 @@ export interface CommissionReportVendorRow {
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;
+  /** Sum of commission_ledger entries (online_payment + cod_checkin + free_checkin) for this vendor */
+  collectedCommission: number;
+  /** totalCommission − collectedCommission (never negative) */
+  pendingCommission: number;
   freeEntryCount: number;
   freeEntryRevenue: number;
   freeEntryCommission: number;

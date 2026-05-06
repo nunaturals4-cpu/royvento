@@ -83,6 +83,7 @@ export const vendorsTable = pgTable(
     menuUrls: text("menu_urls").array().notNull().default([]),
     crowdLevel: varchar("crowd_level", { length: 20 }),
     onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
+    commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -664,3 +665,28 @@ export const expoPushTicketsTable = pgTable(
 );
 
 export type ExpoPushTicket = typeof expoPushTicketsTable.$inferSelect;
+
+export const commissionLedgerTable = pgTable(
+  "commission_ledger",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id")
+      .notNull()
+      .references(() => vendorsTable.id, { onDelete: "cascade" }),
+    bookingId: integer("booking_id").references(() => bookingsTable.id, { onDelete: "set null" }),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+    bookingType: varchar("booking_type", { length: 30 }).notNull(),
+    trigger: varchar("trigger", { length: 30 }).notNull(),
+    paymentId: integer("payment_id").references(() => paymentsTable.id, { onDelete: "set null" }),
+    settlementRequestId: integer("settlement_request_id").references(() => settlementRequestsTable.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("commission_ledger_vendor_idx").on(t.vendorId),
+    bookingIdx: index("commission_ledger_booking_idx").on(t.bookingId),
+    triggerIdx: index("commission_ledger_trigger_idx").on(t.trigger),
+    bookingTriggerUniq: uniqueIndex("commission_ledger_booking_trigger_uniq").on(t.bookingId, t.trigger),
+  }),
+);
+
+export type CommissionLedger = typeof commissionLedgerTable.$inferSelect;

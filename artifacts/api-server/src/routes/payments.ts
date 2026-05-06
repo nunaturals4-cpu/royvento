@@ -5,6 +5,8 @@ import {
   bookingsTable,
   subscriptionsTable,
   vendorsTable,
+  vendorCommissionsTable,
+  commissionLedgerTable,
   usersTable,
   eventsTable,
   availabilityTable,
@@ -12,6 +14,7 @@ import {
   referralsTable,
   notificationsTable,
 } from "@workspace/db";
+import { computeCommissionFromPlanned } from "../lib/commission";
 import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import {
   checkPaymentStatus,
@@ -80,17 +83,53 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
     .returning({ id: paymentsTable.id });
 
   if (gated.length === 0) return;
+  const paymentRowId = gated[0]!.id;
 
   await db
     .update(bookingsTable)
     .set({ status: "confirmed", approvedBy: "payment" })
     .where(eq(bookingsTable.id, bookingId));
 
-  // Credit vendor's online balance atomically (avoids race conditions on concurrent confirmations)
-  await db
-    .update(vendorsTable)
-    .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(booking.finalPrice ?? 0)}` })
-    .where(eq(vendorsTable.id, booking.vendorId));
+  // Compute commission for this online payment and credit the vendor's online
+  // balance NET of commission. Insert an immutable ledger row so admin/vendor
+  // can audit the deduction back to the specific booking + payment.
+  const [vcRow] = await db
+    .select()
+    .from(vendorCommissionsTable)
+    .where(eq(vendorCommissionsTable.vendorId, booking.vendorId))
+    .limit(1);
+  const comm = computeCommissionFromPlanned(
+    {
+      pubMode: booking.pubMode,
+      finalPrice: booking.finalPrice,
+      guests: booking.guests,
+      ticketWomen: booking.ticketWomen,
+      ticketMen: booking.ticketMen,
+      ticketCouple: booking.ticketCouple,
+    },
+    vcRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+  );
+  const netCredit = Math.max(0, Number(booking.finalPrice ?? 0) - comm.amount);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(vendorsTable)
+      .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
+      .where(eq(vendorsTable.id, booking.vendorId));
+    if (comm.amount > 0) {
+      await tx
+        .insert(commissionLedgerTable)
+        .values({
+          vendorId: booking.vendorId,
+          bookingId: booking.id,
+          amount: String(comm.amount),
+          bookingType: comm.bookingType,
+          trigger: "online_payment",
+          paymentId: paymentRowId,
+        })
+        .onConflictDoNothing();
+    }
+  });
 
   await db
     .insert(availabilityTable)

@@ -16,5 +16,7 @@ export interface CommissionReportBookingLine {
   /** Number of units charged (persons for free_entry, tickets for ticket, 1 for table) */
   unitCount: number;
   commissionAmount: number;
+  /** True when a commission_ledger row exists for this booking (commission has been realised). False = pending. */
+  collected: boolean;
   createdAt: string;
 }

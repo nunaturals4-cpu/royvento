@@ -1151,7 +1151,13 @@ paths:
                 properties:
                   onlineBalance:
                     type: number
-                required: [onlineBalance]
+                  commissionOwed:
+                    type: number
+                    description: Unpaid commission accrued from COD/free-entry check-ins
+                  payable:
+                    type: number
+                    description: Maximum amount the vendor can request for settlement (onlineBalance − commissionOwed, never negative)
+                required: [onlineBalance, commissionOwed, payable]
         "404":
           description: Vendor profile not found
 
@@ -3269,9 +3275,12 @@ components:
           description: Number of units charged (persons for free_entry, tickets for ticket, 1 for table)
         commissionAmount:
           type: number
+        collected:
+          type: boolean
+          description: True when a commission_ledger row exists for this booking (commission has been realised). False = pending.
         createdAt:
           type: string
-      required: [id, finalPrice, bookingType, commissionRate, unitCount, commissionAmount, createdAt]
+      required: [id, finalPrice, bookingType, commissionRate, unitCount, commissionAmount, collected, createdAt]
 
     CommissionReportVendorRow:
       type: object
@@ -3298,6 +3307,12 @@ components:
           type: number
         totalCommission:
           type: number
+        collectedCommission:
+          type: number
+          description: Sum of commission_ledger entries (online_payment + cod_checkin + free_checkin) for this vendor
+        pendingCommission:
+          type: number
+          description: totalCommission − collectedCommission (never negative)
         freeEntryCount:
           type: integer
         freeEntryRevenue:
@@ -3320,7 +3335,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CommissionReportBookingLine"
-      required: [vendorId, businessName, city, appliedRates, totalBookings, totalRevenue, totalCommission, freeEntryCount, freeEntryRevenue, freeEntryCommission, ticketCount, ticketRevenue, ticketCommission, tableCount, tableRevenue, tableCommission, bookings]
+      required: [vendorId, businessName, city, appliedRates, totalBookings, totalRevenue, totalCommission, collectedCommission, pendingCommission, freeEntryCount, freeEntryRevenue, freeEntryCommission, ticketCount, ticketRevenue, ticketCommission, tableCount, tableRevenue, tableCommission, bookings]
 
     CommissionReportTotals:
       type: object
@@ -3331,7 +3346,11 @@ components:
           type: number
         totalCommission:
           type: number
-      required: [totalBookings, totalRevenue, totalCommission]
+        collectedCommission:
+          type: number
+        pendingCommission:
+          type: number
+      required: [totalBookings, totalRevenue, totalCommission, collectedCommission, pendingCommission]
 
     CommissionReport:
       type: object

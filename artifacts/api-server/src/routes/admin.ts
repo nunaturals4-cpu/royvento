@@ -9,7 +9,9 @@ import {
   profileViewsTable,
   couponsTable,
   vendorCommissionsTable,
+  commissionLedgerTable,
 } from "@workspace/db";
+import { computeCommissionFromPlanned } from "../lib/commission";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
@@ -1522,7 +1524,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     ...(to ? [lte(bookingsTable.createdAt, to)] : []),
   ];
 
-  const [bookings, commissions, approvedVendors] = await Promise.all([
+  const [bookings, commissions, approvedVendors, ledgerRows] = await Promise.all([
     db
       .select({
         id: bookingsTable.id,
@@ -1543,9 +1545,30 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city })
       .from(vendorsTable)
       .where(eq(vendorsTable.status, "approved")),
+    // Per-booking ledger entries (online_payment, cod_checkin, free_checkin)
+    // are the source of truth for "collected" commission. settlement_offset
+    // entries are excluded — they record realisation against vendor balance,
+    // not new commission earned.
+    db
+      .select({
+        vendorId: commissionLedgerTable.vendorId,
+        bookingId: commissionLedgerTable.bookingId,
+        amount: commissionLedgerTable.amount,
+      })
+      .from(commissionLedgerTable)
+      .where(inArray(commissionLedgerTable.trigger, ["online_payment", "cod_checkin", "free_checkin"])),
   ]);
 
   const commissionMap = new Map(commissions.map((c) => [c.vendorId, c]));
+  // Index ledger rows by (vendorId → totalCollected) and the set of bookingIds
+  // that have any collected entry so we can mark per-booking pending vs collected.
+  const collectedByVendor = new Map<number, number>();
+  const collectedBookingIds = new Set<number>();
+  for (const row of ledgerRows) {
+    const amt = Number(row.amount ?? 0);
+    collectedByVendor.set(row.vendorId, (collectedByVendor.get(row.vendorId) ?? 0) + amt);
+    if (row.bookingId != null) collectedBookingIds.add(row.bookingId);
+  }
 
   type BookingLineItem = {
     id: number;
@@ -1554,6 +1577,10 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     commissionRate: number;
     unitCount: number;
     commissionAmount: number;
+    /** True when this booking has a real commission_ledger entry (i.e. money
+     * has actually moved or been recorded). False = the report's computed
+     * commission is theoretical / pending realisation. */
+    collected: boolean;
     createdAt: Date;
   };
 
@@ -1565,6 +1592,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     totalBookings: number;
     totalRevenue: number;
     totalCommission: number;
+    /** Sum of commission_ledger amounts for this vendor (online_payment +
+     * cod_checkin + free_checkin). Source of truth for "money realised". */
+    collectedCommission: number;
+    /** totalCommission − collectedCommission, never negative. */
+    pendingCommission: number;
     freeEntryCount: number;
     freeEntryRevenue: number;
     freeEntryCommission: number;
@@ -1594,6 +1626,8 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       totalBookings: 0,
       totalRevenue: 0,
       totalCommission: 0,
+      collectedCommission: 0,
+      pendingCommission: 0,
       freeEntryCount: 0,
       freeEntryRevenue: 0,
       freeEntryCommission: 0,
@@ -1610,33 +1644,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   for (const b of bookings) {
     const price = Number(b.finalPrice);
     const rates = commissionMap.get(b.vendorId);
-    const freeEntryFee = Number(rates?.freeEntryRate ?? 0);
-    const ticketFee = Number(rates?.ticketRate ?? 0);
-    const tableFee = Number(rates?.tableBookingRate ?? 0);
-
-    let bookingType: "free_entry" | "ticket" | "table";
-    let commissionAmount: number;
-    let feePerUnit: number;
-
-    let unitCount: number;
-    if (b.pubMode === "table") {
-      bookingType = "table";
-      feePerUnit = tableFee;
-      unitCount = 1;
-      commissionAmount = tableFee;
-    } else if (price === 0 || b.pubMode === "free") {
-      bookingType = "free_entry";
-      feePerUnit = freeEntryFee;
-      unitCount = Math.max(0, b.guests);
-      commissionAmount = freeEntryFee * unitCount;
-    } else {
-      bookingType = "ticket";
-      feePerUnit = ticketFee;
-      const ticketCount = b.ticketWomen + b.ticketMen + b.ticketCouple;
-      unitCount = Math.max(0, ticketCount);
-      commissionAmount = ticketFee * unitCount;
-    }
-    commissionAmount = Math.min(commissionAmount, price);
+    // Use the shared helper so this report always agrees with the live
+    // online-payment + COD/free check-in flows.
+    const comm = computeCommissionFromPlanned(b, rates ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 });
+    const bookingType = comm.bookingType;
+    const feePerUnit = comm.ratePerUnit;
+    const unitCount = comm.unitCount;
+    const commissionAmount = comm.amount;
 
     // Skip bookings from vendors not in the approved list
     if (!summaryMap.has(b.vendorId)) continue;
@@ -1645,7 +1659,16 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     s.totalBookings += 1;
     s.totalRevenue += price;
     s.totalCommission += commissionAmount;
-    s.bookings.push({ id: b.id, finalPrice: price, bookingType, commissionRate: feePerUnit, unitCount, commissionAmount, createdAt: b.createdAt });
+    s.bookings.push({
+      id: b.id,
+      finalPrice: price,
+      bookingType,
+      commissionRate: feePerUnit,
+      unitCount,
+      commissionAmount,
+      collected: collectedBookingIds.has(b.id),
+      createdAt: b.createdAt,
+    });
 
     if (bookingType === "free_entry") {
       s.freeEntryCount += 1;
@@ -1662,6 +1685,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     }
   }
 
+  // Hydrate collected/pending fields from the ledger AFTER all bookings have
+  // been aggregated so totals are coherent.
+  for (const s of summaryMap.values()) {
+    s.collectedCommission = Math.round((collectedByVendor.get(s.vendorId) ?? 0) * 100) / 100;
+    s.pendingCommission = Math.max(0, Math.round((s.totalCommission - s.collectedCommission) * 100) / 100);
+  }
+
   const rows = Array.from(summaryMap.values()).sort((a, b) => b.totalCommission - a.totalCommission);
 
   const totals = rows.reduce(
@@ -1669,9 +1699,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       acc.totalBookings += r.totalBookings;
       acc.totalRevenue += r.totalRevenue;
       acc.totalCommission += r.totalCommission;
+      acc.collectedCommission += r.collectedCommission;
+      acc.pendingCommission += r.pendingCommission;
       return acc;
     },
-    { totalBookings: 0, totalRevenue: 0, totalCommission: 0 },
+    { totalBookings: 0, totalRevenue: 0, totalCommission: 0, collectedCommission: 0, pendingCommission: 0 },
   );
 
   res.json({ rows, totals });

@@ -2163,6 +2163,14 @@ export const SetPartnerCrowdLevelResponse = zod.object({
  */
 export const GetPartnerSettlementBalanceResponse = zod.object({
   onlineBalance: zod.number(),
+  commissionOwed: zod
+    .number()
+    .describe("Unpaid commission accrued from COD\/free-entry check-ins"),
+  payable: zod
+    .number()
+    .describe(
+      "Maximum amount the vendor can request for settlement (onlineBalance − commissionOwed, never negative)",
+    ),
 });
 
 /**
@@ -2690,6 +2698,14 @@ export const GetCommissionReportResponse = zod.object({
       totalBookings: zod.number(),
       totalRevenue: zod.number(),
       totalCommission: zod.number(),
+      collectedCommission: zod
+        .number()
+        .describe(
+          "Sum of commission_ledger entries (online_payment + cod_checkin + free_checkin) for this vendor",
+        ),
+      pendingCommission: zod
+        .number()
+        .describe("totalCommission − collectedCommission (never negative)"),
       freeEntryCount: zod.number(),
       freeEntryRevenue: zod.number(),
       freeEntryCommission: zod.number(),
@@ -2715,6 +2731,11 @@ export const GetCommissionReportResponse = zod.object({
               "Number of units charged (persons for free_entry, tickets for ticket, 1 for table)",
             ),
           commissionAmount: zod.number(),
+          collected: zod
+            .boolean()
+            .describe(
+              "True when a commission_ledger row exists for this booking (commission has been realised). False = pending.",
+            ),
           createdAt: zod.string(),
         }),
       ),
@@ -2724,6 +2745,8 @@ export const GetCommissionReportResponse = zod.object({
     totalBookings: zod.number(),
     totalRevenue: zod.number(),
     totalCommission: zod.number(),
+    collectedCommission: zod.number(),
+    pendingCommission: zod.number(),
   }),
 });
 
