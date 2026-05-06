@@ -2142,7 +2142,7 @@ export default function VendorDashboardScreen() {
   type AnalyticsResult = {
     totalEarnings: number; monthEarnings: number;
     codRevenue: number; onlineRevenue: number;
-    actualCodRevenue?: number; actualCodRecordedCount?: number;
+    actualCodRevenue?: number; actualCodRecordedCount?: number; pendingActualsCount?: number;
     grossEarnings: number; netEarnings: number; totalCommission: number;
     codCommission: number; onlineCommission: number;
     commissionRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
@@ -2254,6 +2254,17 @@ export default function VendorDashboardScreen() {
         </View>
 
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>REVENUE OVERVIEW</Text>
+        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginBottom: 8 }}>
+          Gross = online payments received + actual cash collected at door.
+        </Text>
+        {(a?.pendingActualsCount ?? 0) > 0 && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#f59e0b15", borderRadius: 8, padding: 10, marginBottom: 10 }}>
+            <Ionicons name="warning-outline" size={14} color="#f59e0b" />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#f59e0b", flex: 1 }}>
+              {a?.pendingActualsCount} COD booking{(a?.pendingActualsCount ?? 0) === 1 ? "" : "s"} pending actuals — record entry counts to count this revenue.
+            </Text>
+          </View>
+        )}
         {/* Gross → Fee → Net row */}
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
           {earningsKpis.map((k) => (

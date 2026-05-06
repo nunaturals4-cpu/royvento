@@ -1882,6 +1882,12 @@ export const GetPartnerAnalyticsResponse = zod.object({
     .number()
     .optional()
     .describe("Number of COD bookings that have actual entry recorded."),
+  pendingActualsCount: zod
+    .number()
+    .optional()
+    .describe(
+      "COD confirmed\/completed bookings still missing actual entry counts. These contribute ₹0 to totalEarnings until actuals are recorded.",
+    ),
   grossEarnings: zod.number(),
   netEarnings: zod.number(),
   totalCommission: zod.number(),
@@ -2702,6 +2708,12 @@ export const GetAdminAnalyticsResponse = zod.object({
     .number()
     .optional()
     .describe("Number of COD bookings that have actual entry counts recorded."),
+  pendingActualsCount: zod
+    .number()
+    .optional()
+    .describe(
+      "COD confirmed\/completed bookings still missing actual entry counts. These contribute ₹0 to totalRevenue until actuals are recorded.",
+    ),
   onlineRevenue: zod.number(),
   bookingsByStatus: zod.array(
     zod.object({

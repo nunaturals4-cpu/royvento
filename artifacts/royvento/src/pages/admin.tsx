@@ -241,17 +241,28 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
         <Stat icon={Briefcase} label="New partners" value={String(data.totalVendors)} />
         <Stat icon={Clock} label="Pending approval" value={String(data.pendingVendors)} />
         <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
-        <Stat icon={IndianRupee} label="Revenue" value={formatINR(data.totalRevenue)} />
+        <Stat
+          icon={IndianRupee}
+          label="Revenue"
+          value={formatINR(data.totalRevenue)}
+          subLabel="Online + actual cash"
+          subValue={`${formatINR(data.onlineRevenue)} + ${formatINR(data.actualCodRevenue ?? 0)}`}
+          {...((data as { pendingActualsCount?: number }).pendingActualsCount
+            ? { subHint: `${(data as { pendingActualsCount?: number }).pendingActualsCount} bookings pending actuals` }
+            : {})}
+        />
         <Stat
           icon={Banknote}
           label="COD / Pay at venue"
           value={formatINR(data.codRevenue)}
           valueClassName="text-amber-300"
-          {...(typeof data.actualCodRevenue === "number" ? {
-            subLabel: "Actual collected",
-            subValue: formatINR(data.actualCodRevenue),
-            subHint: `${data.actualCodRecordedCount ?? 0} bookings recorded`,
-          } : {})}
+          subLabel="Actual collected"
+          subValue={formatINR(data.actualCodRevenue ?? 0)}
+          subHint={
+            (data as { pendingActualsCount?: number }).pendingActualsCount
+              ? `${data.actualCodRecordedCount ?? 0} recorded · ${(data as { pendingActualsCount?: number }).pendingActualsCount} pending`
+              : `${data.actualCodRecordedCount ?? 0} bookings recorded`
+          }
         />
         <Stat icon={CreditCard} label="Online payments" value={formatINR(data.onlineRevenue)} />
       </div>

@@ -473,6 +473,8 @@ export interface AdminAnalytics {
   actualCodRevenue?: number;
   /** Number of COD bookings that have actual entry counts recorded. */
   actualCodRecordedCount?: number;
+  /** COD confirmed/completed bookings still missing actual entry counts. These contribute ₹0 to totalRevenue until actuals are recorded. */
+  pendingActualsCount?: number;
   onlineRevenue: number;
   bookingsByStatus: AdminAnalyticsBookingsByStatusItem[];
   recentBookings: Booking[];
@@ -1022,6 +1024,8 @@ export interface PartnerAnalyticsResult {
   actualCodRevenue?: number;
   /** Number of COD bookings that have actual entry recorded. */
   actualCodRecordedCount?: number;
+  /** COD confirmed/completed bookings still missing actual entry counts. These contribute ₹0 to totalEarnings until actuals are recorded. */
+  pendingActualsCount?: number;
   grossEarnings: number;
   netEarnings: number;
   totalCommission: number;

@@ -2875,7 +2875,12 @@ function AnalyticsPanel() {
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total earnings</p>
             <p className="stat-number text-3xl">{formatINR(data.totalEarnings)}</p>
-            <p className="text-xs text-muted-foreground mt-1">all confirmed bookings</p>
+            <p className="text-xs text-muted-foreground mt-1">online + actual cash collected</p>
+            {(data as { pendingActualsCount?: number }).pendingActualsCount ? (
+              <p className="text-[11px] text-amber-400 mt-1">
+                {(data as { pendingActualsCount?: number }).pendingActualsCount} bookings pending actuals
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="rounded-2xl glass-card p-5 flex items-start gap-4">

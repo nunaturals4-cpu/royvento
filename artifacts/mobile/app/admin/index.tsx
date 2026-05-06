@@ -1601,6 +1601,7 @@ export default function AdminPanelScreen() {
       { label: "Total Bookings", value: a?.["totalBookings"] ?? "—", icon: "ticket-outline" as const, color: "#8b5cf6" },
       { label: "Revenue", value: a?.["totalRevenue"] ? `₹${Number(a["totalRevenue"]).toLocaleString("en-IN")}` : "—", icon: "cash-outline" as const, color: colors.primary },
     ];
+    const pendingActuals = Number(a?.["pendingActualsCount"] ?? 0);
 
     const bsByStatus = (br?.["bookingsByStatus"] as Array<{ status: string; count: number }> | undefined) ?? [];
     const leadKpis = ls
@@ -1626,6 +1627,17 @@ export default function AdminPanelScreen() {
             </View>
           ))}
         </View>
+        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 4 }}>
+          Revenue = online payments received + actual cash collected at door.
+        </Text>
+        {pendingActuals > 0 && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#f59e0b15", borderRadius: 8, padding: 10, marginTop: 4 }}>
+            <Ionicons name="warning-outline" size={14} color="#f59e0b" />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#f59e0b", flex: 1 }}>
+              {pendingActuals} COD booking{pendingActuals === 1 ? "" : "s"} pending actuals (contributing ₹0)
+            </Text>
+          </View>
+        )}
 
         {bsByStatus.length > 0 && (
           <>

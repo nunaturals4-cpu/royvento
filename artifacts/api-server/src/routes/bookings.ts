@@ -718,6 +718,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let onlineRevenue = 0;
   let actualCodRevenue = 0;
   let actualCodRecordedCount = 0;
+  let pendingActualsCount = 0;
   let totalCommission = 0;
   let codCommission = 0;
   let onlineCommission = 0;
@@ -733,15 +734,21 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     : [];
   const eMap = new Map(_events.map((e) => [e.id, e]));
 
+  // Per-booking effective revenue: online → finalPrice; COD → actual cash collected (₹0 if not recorded).
+  // Used as the source of truth for totalEarnings, monthEarnings, perEvent.revenue, dailyRevenue, and
+  // commissionSummary[*].grossRevenue. Commission is still computed from finalPrice (booked price).
+  const revenueByBookingId = new Map<number, number>();
+
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
-    totalEarnings += fp;
-    if (new Date(b.createdAt) >= monthStart) monthEarnings += fp;
     const isCod = b.paymentMethod === "cod";
     if (isCod) codRevenue += fp;
     else onlineRevenue += fp;
-    // Actual cash collected at door (only meaningful for COD bookings that have actuals recorded)
-    if (isCod) {
+
+    let bookingRevenue = 0;
+    if (!isCod) {
+      bookingRevenue = fp;
+    } else {
       const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
       const hasActuals = aw != null || am != null || ac != null || ag != null;
       if (hasActuals) {
@@ -751,22 +758,37 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
           const pw = Number(ev?.priceWomen ?? 0);
           const pm = Number(ev?.priceMen ?? 0);
           const pc = Number(ev?.priceCouple ?? 0);
-          // Cash collected at door = per-type counts × per-type price (no coupon/points scaling).
-          actualCodRevenue += (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+          bookingRevenue = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
         } else {
           const guests = Math.max(1, b.guests);
-          actualCodRevenue += ((ag ?? 0) / guests) * fp;
+          bookingRevenue = ((ag ?? 0) / guests) * fp;
         }
+        actualCodRevenue += bookingRevenue;
+      } else {
+        // STRICT mode: COD bookings without recorded actuals contribute ₹0.
+        pendingActualsCount++;
       }
     }
-    const comm = calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple);
+    revenueByBookingId.set(b.id, bookingRevenue);
+    totalEarnings += bookingRevenue;
+    if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
+
+    // STRICT: commission only accrues against revenue that's actually counted.
+    // Pending COD (revenue=0) → commission=0, so net stays consistent (never negative).
+    // For COD with actuals, commission is capped at the realized bookingRevenue (not booked finalPrice).
+    const comm = bookingRevenue > 0
+      ? Math.min(
+          calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple),
+          bookingRevenue,
+        )
+      : 0;
     totalCommission += comm;
     if (isCod) codCommission += comm;
     else onlineCommission += comm;
-    // Per-booking-type commission summary
+    // Per-booking-type commission summary (gross uses new revenue formula).
     const bType = b.pubMode === "table" ? "table" : (fp === 0 || b.pubMode === "free") ? "freeEntry" : "ticket";
     commSummary[bType].count++;
-    commSummary[bType].grossRevenue += fp;
+    commSummary[bType].grossRevenue += bookingRevenue;
     commSummary[bType].commissionAmount += comm;
   }
   // Compute net per type
@@ -780,13 +802,14 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
   }>();
   for (const b of allBookings) {
+    const rev = revenueByBookingId.get(b.id) ?? 0;
     const existing = perEventMap.get(b.eventId);
     if (existing) {
       existing.bookingCount += 1;
       existing.ticketWomen += b.ticketWomen;
       existing.ticketMen += b.ticketMen;
       existing.ticketCouple += b.ticketCouple;
-      existing.revenue += Number(b.finalPrice);
+      existing.revenue += rev;
     } else {
       perEventMap.set(b.eventId, {
         eventId: b.eventId,
@@ -795,7 +818,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
         ticketWomen: b.ticketWomen,
         ticketMen: b.ticketMen,
         ticketCouple: b.ticketCouple,
-        revenue: Number(b.finalPrice),
+        revenue: rev,
       });
     }
   }
@@ -818,9 +841,13 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   for (const b of allBookings) {
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
     const fp = Number(b.finalPrice);
+    const rev = revenueByBookingId.get(b.id) ?? 0;
     if (dailyMap.has(day)) {
-      dailyMap.set(day, (dailyMap.get(day) ?? 0) + fp);
-      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple));
+      dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
+      const dayComm = rev > 0
+        ? Math.min(calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple), rev)
+        : 0;
+      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + dayComm);
     }
   }
   const dailyRevenue = Array.from(dailyMap.entries())
@@ -843,6 +870,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     onlineRevenue: Math.round(onlineRevenue),
     actualCodRevenue: Math.round(actualCodRevenue),
     actualCodRecordedCount,
+    pendingActualsCount,
     grossEarnings: Math.round(totalEarnings),
     netEarnings: Math.round(totalEarnings - totalCommission),
     totalCommission: rnd2(totalCommission),

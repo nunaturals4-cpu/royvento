@@ -57,26 +57,16 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
         ),
     ]);
 
-  const [revenueRow, paymentSplitRows] = await Promise.all([
-    db
-      .select({
-        total: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
-      })
-      .from(bookingsTable)
-      .where(
-        sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
-      ),
-    db
-      .select({
-        paymentMethod: bookingsTable.paymentMethod,
-        total: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
-      })
-      .from(bookingsTable)
-      .where(
-        sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
-      )
-      .groupBy(bookingsTable.paymentMethod),
-  ]);
+  const paymentSplitRows = await db
+    .select({
+      paymentMethod: bookingsTable.paymentMethod,
+      total: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
+    })
+    .from(bookingsTable)
+    .where(
+      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+    )
+    .groupBy(bookingsTable.paymentMethod);
 
   const statusCounts = await db
     .select({
@@ -95,33 +85,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     .orderBy(desc(bookingsTable.createdAt))
     .limit(8);
 
-  const top = await db
-    .select({
-      vendorId: bookingsTable.vendorId,
-      bookingCount: sql<number>`count(*)::int`,
-      revenue: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
-    })
-    .from(bookingsTable)
-    .where(
-      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
-    )
-    .groupBy(bookingsTable.vendorId)
-    .orderBy(desc(sql`count(*)`))
-    .limit(5);
-
-  const vendorRows =
-    top.length > 0
-      ? await db
-          .select()
-          .from(vendorsTable)
-          .where(
-            sql`${vendorsTable.id} IN (${sql.join(
-              top.map((t) => t.vendorId),
-              sql`, `,
-            )})`,
-          )
-      : [];
-  const vMap = new Map(vendorRows.map((v) => [v.id, v]));
+  // Top vendors are now derived from the in-memory per-vendor aggregation below so they
+  // use the new revenue formula (online + actual COD), not booked finalPrice.
 
   // Ticket breakdown + daily revenue + per-vendor breakdown (all filtered by date range)
   const confirmedBookings = await db
@@ -158,39 +123,44 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       )
     : [];
   const _codEventMap = new Map(_codEvents.map((e) => [e.id, e]));
+
+  // Per-booking effective revenue: online → finalPrice; COD → actual cash collected at door
+  // (₹0 if no actuals recorded yet — STRICT mode). Drives totalRevenue, monthlyRevenue,
+  // dailyRevenue, perVendor.revenue, and topVendors. finalPrice is still kept for the
+  // `codRevenue` and `onlineRevenue` breakdown fields above (booked-price view).
   let actualCodRevenue = 0;
   let actualCodRecordedCount = 0;
+  let pendingActualsCount = 0;
   for (const b of confirmedBookings) {
-    if (b.paymentMethod !== "cod") continue;
-    const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
-    const hasActuals = aw != null || am != null || ac != null || ag != null;
-    if (!hasActuals) continue;
-    actualCodRecordedCount++;
-    if (b.pubMode === "ticket") {
-      const ev = _codEventMap.get(b.eventId);
-      const pw = Number(ev?.priceWomen ?? 0);
-      const pm = Number(ev?.priceMen ?? 0);
-      const pc = Number(ev?.priceCouple ?? 0);
-      actualCodRevenue += (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+    let bookingRevenue = 0;
+    if (b.paymentMethod !== "cod") {
+      bookingRevenue = Number(b.finalPrice);
     } else {
-      const guests = Math.max(1, b.guests);
-      actualCodRevenue += ((ag ?? 0) / guests) * Number(b.finalPrice);
+      const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+      const hasActuals = aw != null || am != null || ac != null || ag != null;
+      if (hasActuals) {
+        actualCodRecordedCount++;
+        if (b.pubMode === "ticket") {
+          const ev = _codEventMap.get(b.eventId);
+          const pw = Number(ev?.priceWomen ?? 0);
+          const pm = Number(ev?.priceMen ?? 0);
+          const pc = Number(ev?.priceCouple ?? 0);
+          bookingRevenue = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+        } else {
+          const guests = Math.max(1, b.guests);
+          bookingRevenue = ((ag ?? 0) / guests) * Number(b.finalPrice);
+        }
+        actualCodRevenue += bookingRevenue;
+      } else {
+        pendingActualsCount++;
+      }
     }
+    // Attach revenue directly to booking object for downstream loops
+    (b as unknown as { _rev: number })._rev = bookingRevenue;
   }
+  const totalRevenue = confirmedBookings.reduce((s, b) => s + ((b as unknown as { _rev: number })._rev ?? 0), 0);
 
-  // Monthly revenue aggregation via SQL
-  const monthlyRevenueRows = await db
-    .select({
-      month: sql<string>`to_char(date_trunc('month', ${bookingsTable.createdAt}), 'YYYY-MM')`,
-      revenue: sql<string>`coalesce(sum(${bookingsTable.finalPrice}), 0)::text`,
-    })
-    .from(bookingsTable)
-    .where(
-      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
-    )
-    .groupBy(sql`date_trunc('month', ${bookingsTable.createdAt})`)
-    .orderBy(sql`date_trunc('month', ${bookingsTable.createdAt})`);
-  // Build full continuous monthly buckets for the range (zero-fill missing months)
+  // Monthly revenue: bucket in-memory using new revenue formula
   const monthlyMap = new Map<string, number>();
   const mCursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
   const mEnd = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1);
@@ -199,12 +169,16 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     monthlyMap.set(key, 0);
     mCursor.setMonth(mCursor.getMonth() + 1);
   }
-  for (const r of monthlyRevenueRows) {
-    monthlyMap.set(r.month, Number(r.revenue));
+  for (const b of confirmedBookings) {
+    const d = new Date(b.createdAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (monthlyMap.has(key)) {
+      monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + ((b as unknown as { _rev: number })._rev ?? 0));
+    }
   }
   const monthlyRevenue = Array.from(monthlyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, revenue]) => ({ month, revenue }));
+    .map(([month, revenue]) => ({ month, revenue: Math.round(revenue) }));
 
   let totalWomen = 0;
   let totalMen = 0;
@@ -226,9 +200,10 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalWomen += b.ticketWomen;
     totalMen += b.ticketMen;
     totalCouple += b.ticketCouple;
+    const rev = (b as unknown as { _rev: number })._rev ?? 0;
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
     if (new Date(b.createdAt) >= dailyStart && dailyMap.has(day)) {
-      dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number(b.finalPrice));
+      dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
     }
     const pv = perVendorMap.get(b.vendorId);
     if (pv) {
@@ -236,7 +211,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       pv.ticketWomen += b.ticketWomen;
       pv.ticketMen += b.ticketMen;
       pv.ticketCouple += b.ticketCouple;
-      pv.revenue += Number(b.finalPrice);
+      pv.revenue += rev;
     } else {
       perVendorMap.set(b.vendorId, {
         vendorId: b.vendorId,
@@ -244,13 +219,13 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
         ticketWomen: b.ticketWomen,
         ticketMen: b.ticketMen,
         ticketCouple: b.ticketCouple,
-        revenue: Number(b.finalPrice),
+        revenue: rev,
       });
     }
   }
   const adminDailyRevenue = Array.from(dailyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, revenue]) => ({ date, revenue }));
+    .map(([date, revenue]) => ({ date, revenue: Math.round(revenue) }));
 
   const codRevenue = Number(paymentSplitRows.find((r) => r.paymentMethod === "cod")?.total ?? 0);
   const onlineRevenue = Number(paymentSplitRows.find((r) => r.paymentMethod === "online")?.total ?? 0);
@@ -266,7 +241,16 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const pvTotal = perVendor.length;
   const pvTotalPages = Math.max(1, Math.ceil(pvTotal / pvLimit));
   const pvSafePage = Math.min(pvPage, pvTotalPages);
-  const pvData = perVendor.slice((pvSafePage - 1) * pvLimit, pvSafePage * pvLimit);
+  const pvData = perVendor.slice((pvSafePage - 1) * pvLimit, pvSafePage * pvLimit)
+    .map((pv) => ({ ...pv, revenue: Math.round(pv.revenue) }));
+
+  // Top 5 vendors by new revenue formula (online + actual COD)
+  const topVendors = perVendor.slice(0, 5).map((pv) => ({
+    vendorId: pv.vendorId,
+    businessName: pv.vendorName,
+    bookingCount: pv.bookingCount,
+    revenue: Math.round(pv.revenue),
+  }));
 
   const { default: bookingsRouter } = await import("./bookings");
   void bookingsRouter;
@@ -333,22 +317,18 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     pendingVendors: pendingCount[0]?.c ?? 0,
     totalEvents: eventsCount[0]?.c ?? 0,
     totalBookings: bookingsCount[0]?.c ?? 0,
-    totalRevenue: Number(revenueRow[0]?.total ?? 0),
+    totalRevenue: Math.round(totalRevenue),
     codRevenue,
     actualCodRevenue: Math.round(actualCodRevenue),
     actualCodRecordedCount,
+    pendingActualsCount,
     onlineRevenue,
     bookingsByStatus: statusCounts.map((s) => ({
       status: s.status,
       count: s.count,
     })),
     recentBookings,
-    topVendors: top.map((t) => ({
-      vendorId: t.vendorId,
-      businessName: vMap.get(t.vendorId)?.businessName ?? "Partner",
-      bookingCount: t.bookingCount,
-      revenue: Number(t.revenue),
-    })),
+    topVendors,
     totalWomen,
     totalMen,
     totalCouple,
