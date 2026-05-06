@@ -476,6 +476,7 @@ export function TicketScanner() {
               </div>
               <BookingDetails booking={result.booking} />
               <ActualEntryForm
+                key={`ok-${result.booking.id}`}
                 booking={result.booking}
                 onSaved={(updated) => setResult({ ...result, booking: updated })}
               />
@@ -497,6 +498,7 @@ export function TicketScanner() {
               </div>
               <BookingDetails booking={result.booking} />
               <ActualEntryForm
+                key={`used-${result.booking.id}`}
                 booking={result.booking}
                 onSaved={(updated) => setResult({ ...result, booking: updated })}
               />
