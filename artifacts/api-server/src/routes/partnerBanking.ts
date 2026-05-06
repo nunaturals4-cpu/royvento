@@ -181,13 +181,20 @@ router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, 
   try {
     await db.transaction(async (tx) => {
       // Atomically deduct only the requested amount from onlineBalance,
-      // guarded by a payable-sufficient check. commissionOwed is left in place
-      // and is netted out at admin approval time (settlement_offset ledger row).
-      const minRequired = String(parsed.data.amount + currentOwed);
+      // guarded by a SQL check that uses the LIVE commission_owed value (not
+      // the pre-tx snapshot) so a concurrent COD/free-entry check-in that
+      // increases commission_owed will correctly cause this request to fail.
+      // commissionOwed is left in place and is netted out at admin approval
+      // time (settlement_offset ledger row).
       const [deducted] = await tx
         .update(vendorsTable)
         .set({ onlineBalance: sql`${vendorsTable.onlineBalance} - ${String(parsed.data.amount)}` })
-        .where(and(eq(vendorsTable.id, vendor.id), gte(vendorsTable.onlineBalance, minRequired)))
+        .where(
+          and(
+            eq(vendorsTable.id, vendor.id),
+            sql`${vendorsTable.onlineBalance} >= ${vendorsTable.commissionOwed} + ${String(parsed.data.amount)}`,
+          ),
+        )
         .returning({ id: vendorsTable.id });
 
       if (!deducted) {

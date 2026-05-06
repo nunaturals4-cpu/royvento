@@ -362,40 +362,88 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
 
   const bookingStatus = usePhonePe ? "payment_pending" : "confirmed";
+  const isOnlineBypass = wantsOnline && finalPrice > 0 && !usePhonePe;
 
-  const [b] = await db
-    .insert(bookingsTable)
-    .values({
-      eventId: evt.id,
-      userId: user.id,
-      vendorId: evt.vendorId,
-      bookingDate: dateStr,
-      guests: guestsCount,
-      totalPrice: String(totalPrice),
-      couponCode: validCode,
-      discountAmount: String(discountAmount),
-      finalPrice: String(finalPrice),
-      budgetRange: parsed.data.budgetRange ?? "",
-      notes: parsed.data.notes ?? "",
-      eventType: parsed.data.eventType ?? "other",
-      status: bookingStatus,
-      pubMode: parsed.data.pubMode || "",
-      ticketWomen: parsed.data.ticketWomen || 0,
-      ticketMen: parsed.data.ticketMen || 0,
-      ticketCouple: parsed.data.ticketCouple || 0,
-      selectedPubEvent: parsed.data.selectedPubEvent || "",
-      personName: parsed.data.personName || user.name,
-      phone: parsed.data.phone ?? "",
-      pointsUsed,
-      arrivalTime: parsed.data.arrivalTime || null,
-      approvedBy: usePhonePe ? "" : "auto",
-      paymentMethod: wantsOnline ? "online" : "cod",
-    })
-    .returning();
-  if (!b) {
+  const bookingValues = {
+    eventId: evt.id,
+    userId: user.id,
+    vendorId: evt.vendorId,
+    bookingDate: dateStr,
+    guests: guestsCount,
+    totalPrice: String(totalPrice),
+    couponCode: validCode,
+    discountAmount: String(discountAmount),
+    finalPrice: String(finalPrice),
+    budgetRange: parsed.data.budgetRange ?? "",
+    notes: parsed.data.notes ?? "",
+    eventType: parsed.data.eventType ?? "other",
+    status: bookingStatus,
+    pubMode: parsed.data.pubMode || "",
+    ticketWomen: parsed.data.ticketWomen || 0,
+    ticketMen: parsed.data.ticketMen || 0,
+    ticketCouple: parsed.data.ticketCouple || 0,
+    selectedPubEvent: parsed.data.selectedPubEvent || "",
+    personName: parsed.data.personName || user.name,
+    phone: parsed.data.phone ?? "",
+    pointsUsed,
+    arrivalTime: parsed.data.arrivalTime || null,
+    approvedBy: usePhonePe ? "" : "auto",
+    paymentMethod: (wantsOnline ? "online" : "cod") as "online" | "cod",
+  };
+
+  // For the online+bypass path we MUST atomically (a) confirm the booking,
+  // (b) credit the vendor net of commission, and (c) write the commission
+  // ledger row — otherwise a partial failure could leave a confirmed booking
+  // with no commission record. Pre-compute commission first so the tx body
+  // contains only writes (kept short).
+  let bMaybe: typeof bookingsTable.$inferSelect | undefined;
+  if (isOnlineBypass) {
+    const [vcRow] = await db
+      .select()
+      .from(vendorCommissionsTable)
+      .where(eq(vendorCommissionsTable.vendorId, evt.vendorId))
+      .limit(1);
+    const comm = computeCommissionFromPlanned(
+      {
+        pubMode: parsed.data.pubMode || "",
+        finalPrice,
+        guests: guestsCount,
+        ticketWomen: parsed.data.ticketWomen || 0,
+        ticketMen: parsed.data.ticketMen || 0,
+        ticketCouple: parsed.data.ticketCouple || 0,
+      },
+      vcRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+    );
+    const netCredit = Math.max(0, finalPrice - comm.amount);
+    await db.transaction(async (tx) => {
+      const [inserted] = await tx.insert(bookingsTable).values(bookingValues).returning();
+      if (!inserted) throw new Error("Failed to insert booking");
+      bMaybe = inserted;
+      await tx
+        .update(vendorsTable)
+        .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
+        .where(eq(vendorsTable.id, evt.vendorId));
+      if (comm.amount > 0) {
+        await tx
+          .insert(commissionLedgerTable)
+          .values({
+            vendorId: evt.vendorId,
+            bookingId: inserted.id,
+            amount: String(comm.amount),
+            bookingType: comm.bookingType,
+            trigger: "online_payment",
+          })
+          .onConflictDoNothing();
+      }
+    });
+  } else {
+    [bMaybe] = await db.insert(bookingsTable).values(bookingValues).returning();
+  }
+  if (!bMaybe) {
     res.status(500).json({ error: "Failed" });
     return;
   }
+  const b = bMaybe;
 
   if (usePhonePe) {
     const merchantTransactionId = `BK${b.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
@@ -445,45 +493,9 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       set: { status: "booked" },
     });
 
-  // For online+bypass path: credit vendor's online balance net of commission
-  // (mirrors the PhonePe success path in payments.ts → activateBookingAfterPayment).
-  if (wantsOnline && finalPrice > 0) {
-    const [vcRow] = await db
-      .select()
-      .from(vendorCommissionsTable)
-      .where(eq(vendorCommissionsTable.vendorId, evt.vendorId))
-      .limit(1);
-    const comm = computeCommissionFromPlanned(
-      {
-        pubMode: parsed.data.pubMode || "",
-        finalPrice,
-        guests: guestsCount,
-        ticketWomen: parsed.data.ticketWomen || 0,
-        ticketMen: parsed.data.ticketMen || 0,
-        ticketCouple: parsed.data.ticketCouple || 0,
-      },
-      vcRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
-    );
-    const netCredit = Math.max(0, finalPrice - comm.amount);
-    await db.transaction(async (tx) => {
-      await tx
-        .update(vendorsTable)
-        .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
-        .where(eq(vendorsTable.id, evt.vendorId));
-      if (comm.amount > 0) {
-        await tx
-          .insert(commissionLedgerTable)
-          .values({
-            vendorId: evt.vendorId,
-            bookingId: b.id,
-            amount: String(comm.amount),
-            bookingType: comm.bookingType,
-            trigger: "online_payment",
-          })
-          .onConflictDoNothing();
-      }
-    });
-  }
+  // (Online+bypass commission credit is handled inside the booking-insert
+  // transaction above so booking confirmation, vendor credit, and ledger row
+  // all apply atomically.)
 
   const [out] = await serializeBookings([b]);
 
@@ -1917,39 +1929,41 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
         scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
         { priceWomen: scanPriceInfo.priceWomen, priceMen: scanPriceInfo.priceMen, priceCouple: scanPriceInfo.priceCouple },
       );
-      try {
-        await db.transaction(async (tx) => {
-          const [existing] = await tx
-            .select({ id: commissionLedgerTable.id, amount: commissionLedgerTable.amount })
-            .from(commissionLedgerTable)
-            .where(and(eq(commissionLedgerTable.bookingId, updatedActuals.id), eq(commissionLedgerTable.trigger, trigger)))
-            .limit(1);
-          const oldAmount = existing ? Number(existing.amount) : 0;
-          const delta = comm.amount - oldAmount;
-          if (existing) {
-            await tx
-              .update(commissionLedgerTable)
-              .set({ amount: String(comm.amount), bookingType: comm.bookingType })
-              .where(eq(commissionLedgerTable.id, existing.id));
-          } else if (comm.amount > 0) {
-            await tx.insert(commissionLedgerTable).values({
-              vendorId: updatedActuals.vendorId,
-              bookingId: updatedActuals.id,
-              amount: String(comm.amount),
-              bookingType: comm.bookingType,
-              trigger,
-            });
-          }
-          if (delta !== 0) {
-            await tx
-              .update(vendorsTable)
-              .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
-              .where(eq(vendorsTable.id, updatedActuals.vendorId));
-          }
-        });
-      } catch (err) {
-        req.log.error({ err, bookingId: updatedActuals.id }, "Failed to record COD/free-entry commission ledger");
-      }
+      // No try/catch wrapping: if commission persistence fails, the whole
+      // request fails with 500 so the operator sees the error and can retry,
+      // rather than silently losing commission accounting. The check-in
+      // actuals write above (line ~1886) will remain applied; the caller can
+      // safely re-scan to retry the commission write (idempotent on
+      // (booking_id, trigger)).
+      await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select({ id: commissionLedgerTable.id, amount: commissionLedgerTable.amount })
+          .from(commissionLedgerTable)
+          .where(and(eq(commissionLedgerTable.bookingId, updatedActuals.id), eq(commissionLedgerTable.trigger, trigger)))
+          .limit(1);
+        const oldAmount = existing ? Number(existing.amount) : 0;
+        const delta = comm.amount - oldAmount;
+        if (existing) {
+          await tx
+            .update(commissionLedgerTable)
+            .set({ amount: String(comm.amount), bookingType: comm.bookingType })
+            .where(eq(commissionLedgerTable.id, existing.id));
+        } else if (comm.amount > 0) {
+          await tx.insert(commissionLedgerTable).values({
+            vendorId: updatedActuals.vendorId,
+            bookingId: updatedActuals.id,
+            amount: String(comm.amount),
+            bookingType: comm.bookingType,
+            trigger,
+          });
+        }
+        if (delta !== 0) {
+          await tx
+            .update(vendorsTable)
+            .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
+            .where(eq(vendorsTable.id, updatedActuals.vendorId));
+        }
+      });
     }
     const [out] = await serializeBookings([updatedActuals]);
     const okComm = calcScanCommission(updatedActuals);
