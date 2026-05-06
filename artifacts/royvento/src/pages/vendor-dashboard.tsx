@@ -45,6 +45,37 @@ const VIDEO_MAX_DURATION = 12;
 const VIDEO_RATIO = 9 / 16;
 const VIDEO_RATIO_TOLERANCE = 0.08;
 
+// Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
+const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Hide a booking's price when it falls on a configured free-entry day for which all
+// booked ticket genders are eligible. Mirrors the rule used in the customer bookings
+// page and the mobile bookings tab so partner views stay in sync.
+function bookingIsFreeEntryDay(b: {
+  bookingDate?: string | null;
+  ticketWomen?: number | null;
+  ticketMen?: number | null;
+  ticketCouple?: number | null;
+  freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null;
+}): boolean {
+  const fer = b.freeEntryRules;
+  if (!fer?.enabled) return false;
+  if (!b.bookingDate) return false;
+  const days = Array.isArray(fer.days) ? fer.days : [];
+  const dayName = FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()];
+  if (!dayName || !days.includes(dayName)) return false;
+  const genders = new Set(Array.isArray(fer.genders) ? fer.genders : []);
+  const w = b.ticketWomen ?? 0, m = b.ticketMen ?? 0, c = b.ticketCouple ?? 0;
+  // Free-entry rules apply to ticket-mode bookings only. Table-mode bookings have
+  // zero ticket-gender counts and may still owe a table cover even on a free-entry
+  // day, so we don't hide the price for them.
+  if (w + m + c === 0) return false;
+  if (w > 0 && !genders.has("women")) return false;
+  if (m > 0 && !genders.has("men")) return false;
+  if (c > 0 && !genders.has("couple")) return false;
+  return true;
+}
+
 function loadVideoMeta(file: File): Promise<{ duration: number; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -3335,6 +3366,8 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                   const name = b.userName || b.personName || "—";
                   const email = b.userEmail || "";
                   const paid = b.finalPrice ?? b.totalPrice ?? 0;
+                  const isFreeEntry = bookingIsFreeEntryDay(b);
+                  const hidePaid = Number(paid) === 0 || isFreeEntry;
                   const original = b.discountAmount > 0 ? b.totalPrice : null;
                   const payLabel = b.paymentMethod === "cod" ? "COD" : b.paymentMethod === "online" ? "Online" : (b.paymentMethod ?? "—");
                   const mode = b.pubMode === "ticket" ? "Ticket" : b.pubMode === "event" ? "Table / Event" : (b.pubMode ?? "—");
@@ -3389,8 +3422,14 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                         })()}
                       </td>
                       <td className="py-2.5 pr-3 text-right whitespace-nowrap">
-                        <span className="font-medium text-primary">{formatINR(paid)}</span>
-                        {original && <span className="block text-xs text-muted-foreground line-through">{formatINR(original)}</span>}
+                        {hidePaid ? (
+                          <span className="text-xs text-emerald-400 font-medium">Free entry</span>
+                        ) : (
+                          <>
+                            <span className="font-medium text-primary">{formatINR(paid)}</span>
+                            {original && <span className="block text-xs text-muted-foreground line-through">{formatINR(original)}</span>}
+                          </>
+                        )}
                       </td>
                       <td className="py-2.5 pr-3 text-xs text-muted-foreground whitespace-nowrap">{payLabel}</td>
                       <td className="py-2.5 pr-3">
