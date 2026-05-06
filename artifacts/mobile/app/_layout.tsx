@@ -22,6 +22,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { CityProvider } from "@/context/CityContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -209,25 +210,27 @@ export default function RootLayout() {
           <CityProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
-              <StatusBar style="light" backgroundColor="#0e0d12" />
-              <AuthGate />
-              <NotificationHandler pushToken={pushToken} />
-              <PersistentBottomNav />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: "#0e0d12" },
-                  animation:
-                    Platform.OS === "android" ? "fade_from_bottom" : "default",
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
-                <Stack.Screen name="partner/[id]" options={{ headerShown: false }} />
-                <Stack.Screen name="vendor/dashboard" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
+              <ErrorBoundary>
+                <StatusBar style="light" backgroundColor="#0e0d12" />
+                <AuthGate />
+                <NotificationHandler pushToken={pushToken} />
+                <PersistentBottomNav />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: "#0e0d12" },
+                    animation:
+                      Platform.OS === "android" ? "fade_from_bottom" : "default",
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                  <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
+                  <Stack.Screen name="partner/[id]" options={{ headerShown: false }} />
+                  <Stack.Screen name="vendor/dashboard" options={{ headerShown: false }} />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+              </ErrorBoundary>
             </KeyboardProvider>
           </GestureHandlerRootView>
           </CityProvider>

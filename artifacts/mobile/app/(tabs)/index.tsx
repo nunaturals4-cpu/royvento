@@ -252,7 +252,7 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <View style={styles.drinkCardBody}>
-                  {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
+                  {(item.plans ?? []).slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
                     const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
                     const showTime = plan.timeFrom && plan.timeTo;
                     return (
@@ -310,9 +310,9 @@ export default function HomeScreen() {
                       </View>
                     );
                   })}
-                  {item.plans.length > 3 && (
+                  {(item.plans?.length ?? 0) > 3 && (
                     <Text style={[styles.drinkMoreText, { color: colors.mutedForeground }]}>
-                      +{item.plans.length - 3} more
+                      +{(item.plans?.length ?? 0) - 3} more
                     </Text>
                   )}
                   <View style={[styles.drinkCta, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "33" }]}>

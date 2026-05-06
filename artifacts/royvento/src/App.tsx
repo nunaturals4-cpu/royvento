@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useGetMe } from "@workspace/api-client-react";
+import { Spinner } from "@/components/ui/spinner";
 import NotFound from "@/pages/not-found";
 
 import { Navbar } from "@/components/layout/Navbar";
@@ -50,6 +52,30 @@ const queryClient = new QueryClient({
   },
 });
 
+function DashboardRedirect() {
+  const { data, isLoading } = useGetMe();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!data?.user) {
+      setLocation("/login");
+      return;
+    }
+    if (data.user.role === "vendor" || data.user.role === "admin") {
+      setLocation("/dashboard/vendor");
+    } else {
+      setLocation("/dashboard/profile");
+    }
+  }, [data, isLoading, setLocation]);
+
+  return (
+    <div className="flex items-center justify-center py-32">
+      <Spinner />
+    </div>
+  );
+}
+
 function ScrollToTop() {
   const [location] = useLocation();
   useEffect(() => {
@@ -68,7 +94,7 @@ function OAuthErrorHandler() {
     if (verified === "1") {
       toast({ title: "Email verified!", description: "Welcome to Royvento. You're now logged in." });
     } else if (error === "google_not_configured") {
-      toast({ title: "Google sign-in not configured", description: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable.", variant: "destructive" });
+      toast({ title: "Google sign-in coming soon", description: "This feature isn't available yet. Please sign in with your email instead." });
     } else if (error === "google_auth_failed") {
       toast({ title: "Google sign-in failed", description: "Something went wrong. Please try again or sign in with email.", variant: "destructive" });
     }
@@ -98,6 +124,9 @@ function Router() {
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/contact" component={Contact} />
+          <Route path="/hot-deals">{() => <Redirect to="/pub-offers" />}</Route>
+          <Route path="/profile">{() => <Redirect to="/dashboard/profile" />}</Route>
+          <Route path="/dashboard">{() => <DashboardRedirect />}</Route>
           <Route path="/blog">{() => <Redirect to="/blogs" />}</Route>
           <Route path="/premium">{() => <Redirect to="/subscription" />}</Route>
           <Route path="/subscription" component={Subscription} />

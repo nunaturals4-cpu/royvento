@@ -232,7 +232,7 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
       </View>
       {/* Plan rows */}
       <View style={styles.dealBody}>
-        {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
+        {(item.plans ?? []).slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
           const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
           const showTime = plan.timeFrom && plan.timeTo;
           return (
@@ -308,9 +308,9 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
             </View>
           );
         })}
-        {item.plans.length > 3 && (
+        {(item.plans?.length ?? 0) > 3 && (
           <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
-            +{item.plans.length - 3} more
+            +{(item.plans?.length ?? 0) - 3} more
           </Text>
         )}
         <View
@@ -385,7 +385,7 @@ export default function DealsScreen() {
 
   const filteredDeals = (drinkOffers as VendorDrinkOffer[]).filter((offer) => {
     if (!dealTypeFilter && !dealGenderFilter) return true;
-    return offer.plans.some((p) => {
+    return (offer.plans ?? []).some((p) => {
       const typeMatch = !dealTypeFilter || p.type === dealTypeFilter;
       const genderMatch =
         !dealGenderFilter ||

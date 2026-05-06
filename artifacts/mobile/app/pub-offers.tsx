@@ -60,7 +60,7 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
           </View>
         </View>
       
-        {item.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => (
+        {(item.plans ?? []).slice(0, 3).map((plan: DrinkPlanSummary, i: number) => (
           <View key={i} style={styles.planRow}>
             <View style={[styles.planIcon, { backgroundColor: colors.primary + "22" }]}>
               <Ionicons
@@ -102,9 +102,9 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
             </View>
           </View>
         ))}
-        {item.plans.length > 3 && (
+        {(item.plans?.length ?? 0) > 3 && (
           <Text style={[styles.morePlans, { color: colors.mutedForeground }]}>
-            +{item.plans.length - 3} more deal{item.plans.length - 3 !== 1 ? "s" : ""}
+            +{(item.plans?.length ?? 0) - 3} more deal{(item.plans?.length ?? 0) - 3 !== 1 ? "s" : ""}
           </Text>
         )}
         <View style={[styles.ctaRow, { borderTopColor: colors.border }]}>
