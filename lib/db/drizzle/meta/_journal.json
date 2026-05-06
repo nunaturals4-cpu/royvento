@@ -29,6 +29,13 @@
       "when": 1746518401000,
       "tag": "0023_backfill_expo_push_token",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1746604800000,
+      "tag": "0024_expo_push_tickets",
+      "breakpoints": true
     }
   ]
 }

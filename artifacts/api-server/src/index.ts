@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runCleanup } from "./jobs/cleanup";
 import { runBookingReminders } from "./jobs/bookingReminders";
+import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import cron from "node-cron";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -91,4 +92,13 @@ app.listen(port, (err) => {
       logger.error({ err }, "Evening reminder job failed"),
     );
   }, { timezone: "Asia/Kolkata" });
+
+  // Expo push receipt poll — runs every 6 hours to detect delayed delivery failures
+  // (e.g. APNs rejection) and clear stale device tokens.
+  cron.schedule("0 */6 * * *", () => {
+    logger.info("Running Expo push receipt-poll job");
+    runExpoPushReceiptPoll().catch((err) =>
+      logger.error({ err }, "Expo push receipt-poll job failed"),
+    );
+  });
 });

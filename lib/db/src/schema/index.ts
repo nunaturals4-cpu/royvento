@@ -637,3 +637,22 @@ export const settlementRequestsTable = pgTable(
 );
 
 export type SettlementRequest = typeof settlementRequestsTable.$inferSelect;
+
+export const expoPushTicketsTable = pgTable(
+  "expo_push_tickets",
+  {
+    id: serial("id").primaryKey(),
+    ticketId: varchar("ticket_id", { length: 255 }).notNull(),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    token: text("token").notNull().default(""),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    ticketIdIdx: uniqueIndex("expo_push_tickets_ticket_id_idx").on(t.ticketId),
+    userIdx: index("expo_push_tickets_user_idx").on(t.userId),
+    expiresAtIdx: index("expo_push_tickets_expires_at_idx").on(t.expiresAt),
+  }),
+);
+
+export type ExpoPushTicket = typeof expoPushTicketsTable.$inferSelect;
