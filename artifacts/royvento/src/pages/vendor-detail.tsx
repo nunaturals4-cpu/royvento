@@ -525,7 +525,7 @@ export function VendorDetail() {
                       {(plan.timeFrom || plan.timeTo) && (
                         <span className="rounded-md bg-white/[0.06] border border-white/10 px-2 py-0.5 text-[10px] font-medium text-white/60 flex items-center gap-1">
                           <Clock className="h-2.5 w-2.5 shrink-0" />
-                          {plan.timeFrom ? fmtTime(plan.timeFrom) : ""}{plan.timeTo ? ` – ${fmtTime(plan.timeTo)}` : ""}
+                          {[plan.timeFrom ? fmtTime(plan.timeFrom) : null, plan.timeTo ? fmtTime(plan.timeTo) : null].filter(Boolean).join(" – ")}
                         </span>
                       )}
                     </div>

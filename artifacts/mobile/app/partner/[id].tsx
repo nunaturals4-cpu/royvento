@@ -194,7 +194,7 @@ function DrinkPlansSection({ vendorId }: { vendorId: number }) {
                 <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.primary + "35", flexDirection: "row", alignItems: "center", gap: 4 }}>
                   <Ionicons name="time-outline" size={10} color={colors.primary} />
                   <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
-                    {plan.timeFrom || ""}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
+                    {[plan.timeFrom, plan.timeTo].filter(Boolean).join(" – ")}
                   </Text>
                 </View>
               )}
