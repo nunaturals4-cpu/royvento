@@ -2648,6 +2648,16 @@ export const GetAdminAnalyticsResponse = zod.object({
   totalBookings: zod.number(),
   totalRevenue: zod.number(),
   codRevenue: zod.number(),
+  actualCodRevenue: zod
+    .number()
+    .optional()
+    .describe(
+      "Sum of actual cash collected at the door for COD bookings (per-type entry counts × event prices for ticket mode, pro-rated finalPrice otherwise).",
+    ),
+  actualCodRecordedCount: zod
+    .number()
+    .optional()
+    .describe("Number of COD bookings that have actual entry counts recorded."),
   onlineRevenue: zod.number(),
   bookingsByStatus: zod.array(
     zod.object({

@@ -127,16 +127,56 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const confirmedBookings = await db
     .select({
       vendorId: bookingsTable.vendorId,
+      eventId: bookingsTable.eventId,
       finalPrice: bookingsTable.finalPrice,
       ticketWomen: bookingsTable.ticketWomen,
       ticketMen: bookingsTable.ticketMen,
       ticketCouple: bookingsTable.ticketCouple,
       createdAt: bookingsTable.createdAt,
+      paymentMethod: bookingsTable.paymentMethod,
+      pubMode: bookingsTable.pubMode,
+      guests: bookingsTable.guests,
+      actualWomen: bookingsTable.actualWomen,
+      actualMen: bookingsTable.actualMen,
+      actualCouple: bookingsTable.actualCouple,
+      actualGuests: bookingsTable.actualGuests,
     })
     .from(bookingsTable)
     .where(
       sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
     );
+
+  // Pre-fetch events for ticket-mode per-type prices, used to compute actual COD revenue.
+  const _codEventIds = Array.from(new Set(
+    confirmedBookings
+      .filter((b) => b.paymentMethod === "cod" && b.pubMode === "ticket")
+      .map((b) => b.eventId),
+  ));
+  const _codEvents = _codEventIds.length > 0
+    ? await db.select().from(eventsTable).where(
+        sql`${eventsTable.id} IN (${sql.join(_codEventIds, sql`, `)})`,
+      )
+    : [];
+  const _codEventMap = new Map(_codEvents.map((e) => [e.id, e]));
+  let actualCodRevenue = 0;
+  let actualCodRecordedCount = 0;
+  for (const b of confirmedBookings) {
+    if (b.paymentMethod !== "cod") continue;
+    const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+    const hasActuals = aw != null || am != null || ac != null || ag != null;
+    if (!hasActuals) continue;
+    actualCodRecordedCount++;
+    if (b.pubMode === "ticket") {
+      const ev = _codEventMap.get(b.eventId);
+      const pw = Number(ev?.priceWomen ?? 0);
+      const pm = Number(ev?.priceMen ?? 0);
+      const pc = Number(ev?.priceCouple ?? 0);
+      actualCodRevenue += (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+    } else {
+      const guests = Math.max(1, b.guests);
+      actualCodRevenue += ((ag ?? 0) / guests) * Number(b.finalPrice);
+    }
+  }
 
   // Monthly revenue aggregation via SQL
   const monthlyRevenueRows = await db
@@ -295,6 +335,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalBookings: bookingsCount[0]?.c ?? 0,
     totalRevenue: Number(revenueRow[0]?.total ?? 0),
     codRevenue,
+    actualCodRevenue: Math.round(actualCodRevenue),
+    actualCodRecordedCount,
     onlineRevenue,
     bookingsByStatus: statusCounts.map((s) => ({
       status: s.status,

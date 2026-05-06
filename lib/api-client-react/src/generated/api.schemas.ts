@@ -457,6 +457,10 @@ export interface AdminAnalytics {
   totalBookings: number;
   totalRevenue: number;
   codRevenue: number;
+  /** Sum of actual cash collected at the door for COD bookings (per-type entry counts × event prices for ticket mode, pro-rated finalPrice otherwise). */
+  actualCodRevenue?: number;
+  /** Number of COD bookings that have actual entry counts recorded. */
+  actualCodRecordedCount?: number;
   onlineRevenue: number;
   bookingsByStatus: AdminAnalyticsBookingsByStatusItem[];
   recentBookings: Booking[];

@@ -115,7 +115,7 @@ export function AdminPanel() {
   );
 }
 
-function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function Stat({ icon: Icon, label, value, valueClassName, subLabel, subValue, subHint }: { icon: any; label: string; value: string; valueClassName?: string; subLabel?: string; subValue?: string; subHint?: string }) {
   return (
     <div className="rounded-2xl glass-card p-5 lift-3d">
       <div className="flex items-center justify-between mb-3">
@@ -124,7 +124,14 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="stat-number text-3xl">{value}</p>
+      <p className={`stat-number text-3xl ${valueClassName ?? ""}`}>{value}</p>
+      {subValue !== undefined && (
+        <div className="mt-2 pt-2 border-t border-amber-500/20">
+          {subLabel && <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{subLabel}</p>}
+          <p className="text-base font-semibold text-amber-200 tabular-nums">{subValue}</p>
+          {subHint && <p className="text-[10px] text-muted-foreground">{subHint}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -235,7 +242,17 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
         <Stat icon={Clock} label="Pending approval" value={String(data.pendingVendors)} />
         <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
         <Stat icon={IndianRupee} label="Revenue" value={formatINR(data.totalRevenue)} />
-        <Stat icon={Banknote} label="COD / Pay at venue" value={formatINR(data.codRevenue)} />
+        <Stat
+          icon={Banknote}
+          label="COD / Pay at venue"
+          value={formatINR(data.codRevenue)}
+          valueClassName="text-amber-300"
+          {...(typeof data.actualCodRevenue === "number" ? {
+            subLabel: "Actual collected",
+            subValue: formatINR(data.actualCodRevenue),
+            subHint: `${data.actualCodRecordedCount ?? 0} bookings recorded`,
+          } : {})}
+        />
         <Stat icon={CreditCard} label="Online payments" value={formatINR(data.onlineRevenue)} />
       </div>
 

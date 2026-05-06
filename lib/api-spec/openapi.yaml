@@ -2402,6 +2402,12 @@ components:
           type: number
         codRevenue:
           type: number
+        actualCodRevenue:
+          type: number
+          description: Sum of actual cash collected at the door for COD bookings (per-type entry counts × event prices for ticket mode, pro-rated finalPrice otherwise).
+        actualCodRecordedCount:
+          type: integer
+          description: Number of COD bookings that have actual entry counts recorded.
         onlineRevenue:
           type: number
         bookingsByStatus:
