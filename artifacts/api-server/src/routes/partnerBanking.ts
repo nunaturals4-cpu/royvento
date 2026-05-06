@@ -304,10 +304,24 @@ router.post("/admin/settlement-requests/:id/approve", requireAuth(["admin"]), as
     return;
   }
 
-  // Net any outstanding commissionOwed against the vendor's remaining
-  // onlineBalance at approval time. The offset is realised for the platform —
-  // recorded as a settlement_offset ledger row for the audit trail.
+  // Re-validate the payout at approval time using row-locked LIVE values.
+  // Between request creation and approval, COD/free check-ins may have
+  // increased commissionOwed — we MUST cap the payout so the vendor never
+  // receives money the platform now needs to cover newly accrued commission.
+  //
+  // Conceptually we treat the reserved amount (sr.amount, already deducted at
+  // request time) as still belonging to the vendor:
+  //   virtual_balance  = current online_balance + sr.amount
+  //   virtual_payable  = max(0, virtual_balance - commissionOwed)
+  //   final_payout     = min(sr.amount, virtual_payable)   [capped at requested]
+  //   offset           = min(commissionOwed, virtual_balance - final_payout)
+  //   new_balance      = virtual_balance - final_payout - offset
+  //   new_owed         = commissionOwed - offset
+  // We refund the unpaid difference (sr.amount - final_payout) to the
+  // onlineBalance and persist final_payout + an explanatory adminNote.
   let updated: typeof settlementRequestsTable.$inferSelect | undefined;
+  let finalPayoutAmount = Number(sr.amount);
+  let cappedNote: string | null = null;
   await db.transaction(async (tx) => {
     const [v] = await tx
       .select({
@@ -317,32 +331,62 @@ router.post("/admin/settlement-requests/:id/approve", requireAuth(["admin"]), as
       })
       .from(vendorsTable)
       .where(eq(vendorsTable.id, sr.vendorId))
+      .for("update")
       .limit(1);
-    if (v) {
-      const ob = Number(v.onlineBalance ?? 0);
-      const owed = Number(v.commissionOwed ?? 0);
-      const offset = Math.max(0, Math.min(owed, ob));
-      if (offset > 0) {
-        await tx
-          .update(vendorsTable)
-          .set({
-            onlineBalance: sql`${vendorsTable.onlineBalance} - ${String(offset)}`,
-            commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} - ${String(offset)})`,
-          })
-          .where(eq(vendorsTable.id, v.id));
-        await tx.insert(commissionLedgerTable).values({
-          vendorId: v.id,
-          bookingId: null,
-          amount: String(offset),
-          bookingType: "settlement_offset",
-          trigger: "settlement_offset",
-          settlementRequestId: sr.id,
-        });
-      }
+    if (!v) {
+      throw new Error("Vendor not found");
     }
+    const requested = Number(sr.amount);
+    const liveBalance = Number(v.onlineBalance ?? 0);
+    const liveOwed = Number(v.commissionOwed ?? 0);
+    const virtualBalance = liveBalance + requested;
+    const virtualPayable = Math.max(0, virtualBalance - liveOwed);
+    const payout = Math.max(0, Math.min(requested, virtualPayable));
+    const offset = Math.max(0, Math.min(liveOwed, virtualBalance - payout));
+    finalPayoutAmount = Math.round(payout * 100) / 100;
+    const offsetRounded = Math.round(offset * 100) / 100;
+    const refundToBalance = Math.round((requested - payout) * 100) / 100;
+
+    // Apply: refund (requested - payout) to onlineBalance, then deduct offset.
+    // Net effect on online_balance: + refundToBalance - offsetRounded.
+    const balanceDelta = refundToBalance - offsetRounded;
+    if (balanceDelta !== 0) {
+      await tx
+        .update(vendorsTable)
+        .set({
+          onlineBalance: sql`GREATEST(0, ${vendorsTable.onlineBalance} + ${String(balanceDelta)})`,
+        })
+        .where(eq(vendorsTable.id, v.id));
+    }
+    if (offsetRounded > 0) {
+      await tx
+        .update(vendorsTable)
+        .set({
+          commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} - ${String(offsetRounded)})`,
+        })
+        .where(eq(vendorsTable.id, v.id));
+      await tx.insert(commissionLedgerTable).values({
+        vendorId: v.id,
+        bookingId: null,
+        amount: String(offsetRounded),
+        bookingType: "settlement_offset",
+        trigger: "settlement_offset",
+        settlementRequestId: sr.id,
+      });
+    }
+
+    if (finalPayoutAmount < requested) {
+      cappedNote = `Payout capped from ₹${requested.toFixed(2)} to ₹${finalPayoutAmount.toFixed(2)} — commission owed grew to ₹${liveOwed.toFixed(2)} after the request was filed. ₹${refundToBalance.toFixed(2)} refunded to online balance.`;
+    }
+
     [updated] = await tx
       .update(settlementRequestsTable)
-      .set({ status: "approved", processedAt: new Date() })
+      .set({
+        status: "approved",
+        processedAt: new Date(),
+        amount: String(finalPayoutAmount),
+        ...(cappedNote ? { adminNote: cappedNote } : {}),
+      })
       .where(eq(settlementRequestsTable.id, id))
       .returning();
   });
@@ -356,7 +400,9 @@ router.post("/admin/settlement-requests/:id/approve", requireAuth(["admin"]), as
     await db.insert(notificationsTable).values({
       userId: vendor.userId,
       title: "Settlement Approved",
-      message: `Your settlement request of ₹${Number(sr.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })} has been approved. Processing will take up to 24 hours.`,
+      message: cappedNote
+        ? `${cappedNote} Processing will take up to 24 hours.`
+        : `Your settlement request of ₹${finalPayoutAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} has been approved. Processing will take up to 24 hours.`,
     });
   }
   res.json(updated);

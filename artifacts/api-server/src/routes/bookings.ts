@@ -1948,7 +1948,12 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
             .update(commissionLedgerTable)
             .set({ amount: String(comm.amount), bookingType: comm.bookingType })
             .where(eq(commissionLedgerTable.id, existing.id));
-        } else if (comm.amount > 0) {
+        } else {
+          // Always insert the ledger marker on check-in — even when the
+          // commission amount is 0 — so the admin commission report can tell
+          // "checked in (commission realised, even if zero)" apart from
+          // "still pending check-in". Without this, a free-entry booking
+          // with a zero rate would stay forever "pending" in the report.
           await tx.insert(commissionLedgerTable).values({
             vendorId: updatedActuals.vendorId,
             bookingId: updatedActuals.id,
