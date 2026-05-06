@@ -36,6 +36,4 @@ export interface Vendor {
   danceFloorPhotos?: string[] | null;
   menuUrl?: string;
   crowdLevel?: VendorCrowdLevel;
-  /** Accumulated balance from online payments, available for settlement */
-  onlineBalance?: number;
 }

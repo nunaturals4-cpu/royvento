@@ -1955,9 +1955,6 @@ components:
           type: string
           enum: [low, moderate, party]
           nullable: true
-        onlineBalance:
-          type: number
-          description: Accumulated balance from online payments, available for settlement
       required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state, country]
 
     MyVendorResponse:
