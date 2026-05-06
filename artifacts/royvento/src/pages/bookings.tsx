@@ -58,6 +58,12 @@ interface BookingRecord {
   personName?: string | null;
   userName?: string | null;
   approvedBy?: string | null;
+  freeEntryRules?: {
+    enabled?: boolean;
+    genders?: string[];
+    days?: string[];
+    beforeTime?: string | null;
+  } | null;
 }
 
 export function Bookings() {
@@ -354,9 +360,7 @@ const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // artifacts/mobile/app/(tabs)/bookings.tsx and event-detail.tsx so web and mobile
 // stay in sync.
 function bookingIsFreeEntryDay(b: BookingRecord): boolean {
-  const fer = (b as unknown as {
-    freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null;
-  }).freeEntryRules;
+  const fer = b.freeEntryRules;
   if (!fer?.enabled) return false;
   if (!b.bookingDate) return false;
   const days = Array.isArray(fer.days) ? fer.days : [];
