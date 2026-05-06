@@ -267,7 +267,13 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     totalPrice = w * womenPrice + m * menPrice + c * couplePrice;
     guestsCount = w + m + c * 2;
   } else {
-    totalPrice = Number(evt.price) * Math.max(1, guestsCount);
+    // Table / event-mode: free-entry rules apply only when no per-gender ticket
+    // counts were supplied AND a free-entry day is active. Treating this as a
+    // free booking matches the customer ticket card's hide rule for table-mode
+    // bookings on a free-entry day. Otherwise charge the regular cover.
+    const tableModeFree = ferActive && (parsed.data.ticketWomen ?? 0) === 0 &&
+      (parsed.data.ticketMen ?? 0) === 0 && (parsed.data.ticketCouple ?? 0) === 0;
+    totalPrice = tableModeFree ? 0 : Number(evt.price) * Math.max(1, guestsCount);
     if (guestsCount === 0) guestsCount = 1;
   }
 

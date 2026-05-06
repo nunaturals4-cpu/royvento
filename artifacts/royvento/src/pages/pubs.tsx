@@ -44,7 +44,7 @@ interface PublicEvent {
 const CROWD_OPTIONS = [
   { value: "low", label: "Low" },
   { value: "moderate", label: "Moderate" },
-  { value: "party", label: "Party" },
+  { value: "party", label: "High Crowd" },
 ] as const;
 type CrowdFilter = "" | typeof CROWD_OPTIONS[number]["value"];
 

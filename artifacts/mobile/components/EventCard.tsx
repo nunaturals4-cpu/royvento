@@ -17,7 +17,7 @@ const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const CROWD_CONFIG: Record<string, { label: string; bg: string }> = {
   low: { label: "Low Crowd", bg: "#16a34a" },
   moderate: { label: "Moderate", bg: "#d97706" },
-  party: { label: "🔥 Party", bg: "#dc2626" },
+  party: { label: "🔥 High Crowd", bg: "#dc2626" },
 };
 
 interface EventCardProps {
