@@ -1666,9 +1666,6 @@ export default function VendorDashboardScreen() {
                   {b.eventTitle ? (
                     <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>{b.eventTitle}</Text>
                   ) : null}
-                  {b.phone ? (
-                    <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{b.phone}</Text>
-                  ) : null}
                   {b.pubMode === "event" && b.arrivalTime ? (
                     <Text style={[styles.cardSub, { color: colors.primary }]}>⏰ Arrival: {b.arrivalTime}</Text>
                   ) : null}
@@ -2833,7 +2830,6 @@ export default function VendorDashboardScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{b.userName || "—"}</Text>
                 {b.userEmail ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>{b.userEmail}</Text> : null}
-                {b.phone ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>{b.phone}</Text> : null}
                 <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
                   {b.eventTitle} · {b.bookingDate}
                 </Text>

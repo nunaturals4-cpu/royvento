@@ -1973,7 +1973,6 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                         <td className="py-2.5 pr-3 tabular-nums">{b.bookingDate}</td>
                         <td className="py-2.5 pr-3">
                           <span className="font-medium">{b.personName || "—"}</span>
-                          {b.phone ? <span className="ml-1 text-xs text-muted-foreground">{b.phone}</span> : null}
                         </td>
                         <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
                         <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
@@ -2259,7 +2258,6 @@ function AttendancePanel() {
                 <tr>
                   <th className="text-left py-2 pr-3">Guest</th>
                   <th className="text-left py-2 pr-3">Email</th>
-                  <th className="text-left py-2 pr-3">Phone</th>
                   <th className="text-left py-2 pr-3">Event</th>
                   <th className="text-left py-2 pr-3">Date</th>
                   <th className="text-right py-2 pr-3">Party</th>
@@ -2272,7 +2270,6 @@ function AttendancePanel() {
                   <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-2.5 pr-3 font-medium">{b.userName || "—"}</td>
                     <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.userEmail || "—"}</td>
-                    <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.phone || "—"}</td>
                     <td className="py-2.5 pr-3 text-muted-foreground max-w-[140px] truncate">{b.eventTitle || "—"}</td>
                     <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-muted-foreground">
