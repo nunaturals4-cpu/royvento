@@ -282,16 +282,16 @@ export function Home() {
                               </span>
                             </div>
                             {(showDays || showTime) && (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {showDays && (
-                                  <span className="text-[9px] text-white/35 flex items-center gap-1">
-                                    <Clock className="h-2.5 w-2.5 opacity-50" />
-                                    {plan.days!.map((d) => d.slice(0, 3)).join(" · ")}
+                              <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                {showDays && plan.days!.map((d) => (
+                                  <span key={d} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                    {d.slice(0, 3)}
                                   </span>
-                                )}
+                                ))}
                                 {showTime && (
-                                  <span className="text-[9px] text-white/35">
-                                    {showDays ? "· " : ""}{plan.timeFrom}–{plan.timeTo}
+                                  <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
+                                    <Clock className="h-2.5 w-2.5 shrink-0" />
+                                    {plan.timeFrom}–{plan.timeTo}
                                   </span>
                                 )}
                               </div>
@@ -375,6 +375,12 @@ export function Home() {
                           </span>
                         )}
                       </div>
+                      {a.eventId && (
+                        <div className="mt-auto rounded-lg bg-primary/10 border border-primary/25 px-4 py-2 flex items-center justify-between group-hover:bg-primary/20 transition-colors">
+                          <span className="text-sm font-semibold text-primary">{t("pub_offers.book_now")}</span>
+                          <ArrowRight className="h-4 w-4 text-primary" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
