@@ -100,6 +100,7 @@ export default function WishlistScreen() {
             <View style={{ position: "relative" }}>
               <EventCard
                 id={item.id}
+                vendorId={item.vendorId}
                 title={item.title}
                 imageUrl={item.imageUrl}
                 location={item.location}

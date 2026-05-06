@@ -22,6 +22,7 @@ const CROWD_CONFIG: Record<string, { label: string; bg: string }> = {
 
 interface EventCardProps {
   id: number;
+  vendorId?: number;
   title: string;
   imageUrl?: string;
   location?: string;
@@ -40,6 +41,7 @@ interface EventCardProps {
 
 export function EventCard({
   id,
+  vendorId,
   title,
   imageUrl,
   location,
@@ -82,7 +84,14 @@ export function EventCard({
 
   return (
     <Pressable
-      onPress={() => type === "pub" ? router.push(`/partner/${id}` as never) : router.push(`/event/${id}`)}
+      onPress={() => {
+        if (type === "pub") {
+          const targetId = vendorId ?? id;
+          router.push(`/partner/${targetId}` as never);
+        } else {
+          router.push(`/event/${id}`);
+        }
+      }}
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: colors.card, borderColor: colors.border },

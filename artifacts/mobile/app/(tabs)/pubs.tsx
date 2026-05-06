@@ -282,6 +282,7 @@ export default function PubsScreen() {
           renderItem={({ item }) => (
             <EventCard
               id={item.id}
+              vendorId={item.vendorId}
               title={item.title}
               imageUrl={item.imageUrl}
               location={item.location}

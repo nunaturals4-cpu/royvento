@@ -2132,15 +2132,6 @@ function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
     }
   };
 
-  const sync = async () => {
-    try {
-      const r = await apiPost<{ ok: boolean; message: string }>("/api/partner/blocked-dates/google-sync", {});
-      toast({ title: r.ok ? "Synced" : "Calendar sync info", description: r.message });
-    } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
-    }
-  };
-
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
@@ -2155,9 +2146,6 @@ function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
         </div>
         <div className="flex gap-2">
           <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Block date</Button>
-          <Button type="button" variant="outline" onClick={sync} className="border-white/15 gap-2">
-            <CalIcon className="h-4 w-4" /> Sync Google Calendar
-          </Button>
         </div>
       </form>
       <div className="rounded-3xl glass-card p-6">

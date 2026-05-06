@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import React from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 
 export function MobileFooter() {
@@ -29,7 +29,7 @@ export function MobileFooter() {
           <Pressable onPress={() => router.push("/(tabs)/pubs" as never)}>
             <Text style={[styles.link, { color: colors.mutedForeground }]}>Browse Partners</Text>
           </Pressable>
-          <Pressable onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/contact`)}>
+          <Pressable onPress={() => router.push("/contact" as never)}>
             <Text style={[styles.link, { color: colors.mutedForeground }]}>Contact</Text>
           </Pressable>
         </View>
@@ -46,11 +46,11 @@ export function MobileFooter() {
 
       {/* Legal */}
       <View style={styles.legalRow}>
-        <Pressable onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/terms`)}>
+        <Pressable onPress={() => router.push("/terms" as never)}>
           <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>Terms &amp; Conditions</Text>
         </Pressable>
         <Text style={[styles.legalSep, { color: colors.mutedForeground }]}>·</Text>
-        <Pressable onPress={() => Linking.openURL(`https://${process.env.EXPO_PUBLIC_DOMAIN ?? "royvento.com"}/privacy`)}>
+        <Pressable onPress={() => router.push("/privacy" as never)}>
           <Text style={[styles.legalLink, { color: colors.mutedForeground }]}>Privacy Policy</Text>
         </Pressable>
       </View>
