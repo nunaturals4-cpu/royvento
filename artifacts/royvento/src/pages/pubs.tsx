@@ -3,6 +3,7 @@ import { EventCard } from "@/components/EventCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Wine, X } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
@@ -198,36 +199,23 @@ export function Pubs() {
           </div>
         )}
 
-        {/* Crowd level chips */}
+        {/* Crowd level dropdown */}
         <div>
           <p className="text-xs text-muted-foreground mb-2 font-medium">Crowd level</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setCrowdLevel("")}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                crowdLevel === ""
-                  ? "bg-primary border-primary text-primary-foreground"
-                  : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
-              )}
-            >
-              Any
-            </button>
-            {CROWD_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setCrowdLevel(crowdLevel === opt.value ? "" : opt.value)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                  crowdLevel === opt.value
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <Select
+            value={crowdLevel === "" ? "any" : crowdLevel}
+            onValueChange={(v) => setCrowdLevel(v === "any" ? "" : (v as CrowdFilter))}
+          >
+            <SelectTrigger className="w-44 bg-black/40 border-white/10">
+              <SelectValue placeholder="Any" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              {CROWD_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Price range preset chips */}
