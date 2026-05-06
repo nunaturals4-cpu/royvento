@@ -5,12 +5,16 @@ import {
   useListVendorReviews,
   useListEvents,
   useGetMe,
+  useCreateReview,
 } from "@workspace/api-client-react";
 import type { Vendor } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { EventCard } from "@/components/EventCard";
-import { Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell, Heart } from "lucide-react";
+import { Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell, Heart, ChevronLeft, ChevronRight, X, ImagePlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
 
 interface Announcement {
@@ -48,7 +52,19 @@ export function VendorDetail() {
   const qc = useQueryClient();
   const { data: me } = useGetMe();
   const { data: vendor, isLoading } = useGetVendor(id);
-  const { data: reviews = [] } = useListVendorReviews(id);
+  const REVIEWS_PAGE_SIZE = 5;
+  const [reviewsPage, setReviewsPage] = useState(1);
+  useEffect(() => { setReviewsPage(1); }, [id]);
+  const { data: reviewsData, refetch: refetchReviews } = useListVendorReviews(id, { page: reviewsPage, pageSize: REVIEWS_PAGE_SIZE });
+  const reviews = reviewsData?.items ?? [];
+  const reviewsTotal = reviewsData?.total ?? 0;
+  const reviewsTotalPages = Math.max(1, Math.ceil(reviewsTotal / REVIEWS_PAGE_SIZE));
+  const createReview = useCreateReview();
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [reviewUploading, setReviewUploading] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const { data: allEvents = [] } = useListEvents();
   const [drinkPlans, setDrinkPlans] = useState<DrinkPlan[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -599,27 +615,190 @@ export function VendorDetail() {
 
         <section>
           <h2 className="font-serif text-2xl mb-5">Reviews</h2>
-          {reviews.length === 0 ? (
+          {reviewsTotal === 0 ? (
             <p className="text-muted-foreground">No reviews yet.</p>
           ) : (
-            <div className="grid md:grid-cols-2 gap-4">
-              {reviews.map((r) => (
-                <div key={r.id} className="rounded-xl border bg-card p-5">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{r.userName}</p>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                      ))}
+            <>
+              <div className="grid md:grid-cols-2 gap-4">
+                {reviews.map((r) => (
+                  <div key={r.id} className="rounded-xl border bg-card p-5">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{r.userName}</p>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                        ))}
+                      </div>
                     </div>
+                    {r.comment && (
+                      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{r.comment}</p>
+                    )}
+                    {Array.isArray(r.imageUrls) && r.imageUrls.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {r.imageUrls.map((url: string, i: number) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setLightbox(url)}
+                            className="rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
+                            aria-label="Open review image"
+                          >
+                            <img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{r.comment}</p>
+                ))}
+              </div>
+
+              {reviewsTotalPages > 1 && (
+                <div className="mt-5 flex items-center justify-between gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReviewsPage((p) => Math.max(1, p - 1))}
+                    disabled={reviewsPage <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {reviewsPage} of {reviewsTotalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReviewsPage((p) => Math.min(reviewsTotalPages, p + 1))}
+                    disabled={reviewsPage >= reviewsTotalPages}
+                  >
+                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
                 </div>
-              ))}
+              )}
+            </>
+          )}
+
+          {me?.user && (
+            <div className="mt-8 rounded-xl border bg-card p-6 space-y-3">
+              <p className="font-serif text-xl">Leave a review</p>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} type="button" onClick={() => setReviewRating(n)}>
+                    <Star className={`h-6 w-6 ${n <= reviewRating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="Share your experience…"
+              />
+              <div className="space-y-2">
+                {reviewImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {reviewImages.map((url, i) => (
+                      <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setReviewImages((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black"
+                          aria-label="Remove image"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer hover:bg-muted/50 transition-colors ${reviewUploading || reviewImages.length >= 5 ? "opacity-50 pointer-events-none" : ""}`}>
+                    <ImagePlus className="h-4 w-4" />
+                    <span>{reviewUploading ? "Uploading…" : reviewImages.length === 0 ? "Add photos" : "Add more"}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      multiple
+                      className="hidden"
+                      disabled={reviewUploading || reviewImages.length >= 5}
+                      onChange={async (e) => {
+                        const files = e.target.files;
+                        e.target.value = "";
+                        if (!files || files.length === 0) return;
+                        const remaining = 5 - reviewImages.length;
+                        if (remaining <= 0) {
+                          toast({ title: "Maximum 5 images", variant: "destructive" });
+                          return;
+                        }
+                        const picked = Array.from(files).slice(0, remaining);
+                        setReviewUploading(true);
+                        try {
+                          const uploaded: string[] = [];
+                          for (const f of picked) {
+                            const err = validateImageFile(f);
+                            if (err) { toast({ title: err, variant: "destructive" }); continue; }
+                            uploaded.push(await uploadImage(f));
+                          }
+                          if (uploaded.length > 0) setReviewImages((prev) => [...prev, ...uploaded].slice(0, 5));
+                        } catch (err: unknown) {
+                          toast({ title: "Upload failed", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
+                        } finally {
+                          setReviewUploading(false);
+                        }
+                      }}
+                    />
+                  </label>
+                  <span className="text-xs text-muted-foreground">{reviewImages.length}/5 · JPEG/PNG/WebP/GIF · max 8 MB each</span>
+                </div>
+              </div>
+              <Button
+                disabled={createReview.isPending || reviewUploading || !reviewComment.trim()}
+                onClick={() => {
+                  createReview.mutate(
+                    { data: { vendorId: id, rating: reviewRating, comment: reviewComment, imageUrls: reviewImages } },
+                    {
+                      onSuccess: () => {
+                        toast({ title: "Review posted" });
+                        setReviewComment("");
+                        setReviewImages([]);
+                        setReviewsPage(1);
+                        refetchReviews();
+                      },
+                      onError: (e: unknown) => toast({ title: "Could not post review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+                    },
+                  );
+                }}
+              >
+                Post review
+              </Button>
             </div>
           )}
         </section>
       </div>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLightbox(null); }}
+            className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightbox}
+            alt=""
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

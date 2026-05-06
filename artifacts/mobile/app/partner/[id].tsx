@@ -13,16 +13,18 @@ import { ReviewForm } from "@/components/ReviewForm";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -247,7 +249,14 @@ export default function PartnerDetailScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const { data: vendor, isLoading } = useGetVendor(vendorId);
-  const { data: reviews } = useListVendorReviews(vendorId);
+  const REVIEWS_PAGE_SIZE = 5;
+  const [reviewsPage, setReviewsPage] = useState(1);
+  useEffect(() => { setReviewsPage(1); }, [vendorId]);
+  const { data: reviewsData } = useListVendorReviews(vendorId, { page: reviewsPage, pageSize: REVIEWS_PAGE_SIZE });
+  const reviews = reviewsData?.items;
+  const reviewsTotal = reviewsData?.total ?? 0;
+  const reviewsTotalPages = Math.max(1, Math.ceil(reviewsTotal / REVIEWS_PAGE_SIZE));
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const { data: events } = useListEvents();
   const { data: myBookings } = useListMyBookings({ query: { queryKey: getListMyBookingsQueryKey(), enabled: !!user } });
   const hasVendorBooking = (myBookings ?? []).some((b) => b.vendorId === vendorId);
@@ -557,10 +566,10 @@ export default function PartnerDetailScreen() {
         <DrinkPlansSection vendorId={vendorId} />
 
         {/* Reviews */}
-        {(reviews ?? []).length > 0 ? (
+        {reviewsTotal > 0 ? (
           <View style={{ gap: 10 }}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
-            {reviews!.slice(0, 3).map((r) => (
+            {(reviews ?? []).map((r) => (
               <View key={r.id} style={[styles.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.row}>
                   <View style={[styles.reviewAvatar, { backgroundColor: colors.muted }]}>
@@ -578,8 +587,54 @@ export default function PartnerDetailScreen() {
                 {r.comment ? (
                   <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text>
                 ) : null}
+                {Array.isArray((r as any).imageUrls) && (r as any).imageUrls.length > 0 ? (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                    {((r as any).imageUrls as string[]).map((url, i) => (
+                      <Pressable
+                        key={i}
+                        onPress={() => setLightboxImage(url)}
+                        style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
+                      >
+                        <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             ))}
+            {reviewsTotalPages > 1 ? (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                <Pressable
+                  onPress={() => setReviewsPage((p) => Math.max(1, p - 1))}
+                  disabled={reviewsPage <= 1}
+                  style={{
+                    flexDirection: "row", alignItems: "center", gap: 4,
+                    paddingVertical: 8, paddingHorizontal: 12,
+                    borderRadius: 8, borderWidth: 1, borderColor: colors.border,
+                    opacity: reviewsPage <= 1 ? 0.4 : 1,
+                  }}
+                >
+                  <Ionicons name="chevron-back" size={14} color={colors.foreground} />
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Prev</Text>
+                </Pressable>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+                  Page {reviewsPage} of {reviewsTotalPages}
+                </Text>
+                <Pressable
+                  onPress={() => setReviewsPage((p) => Math.min(reviewsTotalPages, p + 1))}
+                  disabled={reviewsPage >= reviewsTotalPages}
+                  style={{
+                    flexDirection: "row", alignItems: "center", gap: 4,
+                    paddingVertical: 8, paddingHorizontal: 12,
+                    borderRadius: 8, borderWidth: 1, borderColor: colors.border,
+                    opacity: reviewsPage >= reviewsTotalPages ? 0.4 : 1,
+                  }}
+                >
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Next</Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.foreground} />
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -594,6 +649,23 @@ export default function PartnerDetailScreen() {
 
       <MobileFooter />
       <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
+
+      <Modal visible={!!lightboxImage} transparent animationType="fade" onRequestClose={() => setLightboxImage(null)}>
+        <Pressable
+          onPress={() => setLightboxImage(null)}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <TouchableOpacity
+            onPress={() => setLightboxImage(null)}
+            style={{ position: "absolute", top: topPadding + 12, right: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center", zIndex: 2 }}
+          >
+            <Ionicons name="close" size={22} color="#fff" />
+          </TouchableOpacity>
+          {lightboxImage ? (
+            <Image source={{ uri: lightboxImage }} style={{ width: "100%", height: "85%" }} contentFit="contain" />
+          ) : null}
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }

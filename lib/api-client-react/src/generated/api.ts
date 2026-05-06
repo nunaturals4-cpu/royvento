@@ -53,17 +53,20 @@ import type {
   ImportGooglePubBody,
   ImportGooglePubResponse,
   ListAdminSettlementRequestsParams,
+  ListEventReviewsParams,
   ListEventsParams,
   ListMyVendorEvents200,
   ListMyVendorEventsParams,
   ListVendorBookings200,
   ListVendorBookingsParams,
+  ListVendorReviewsParams,
   ListVendorsParams,
   LoginBody,
   MeResponse,
   MyVendorResponse,
   Notification,
   Ok,
+  PaginatedReviews,
   PartnerAnalyticsResult,
   PartnerCommissionRates,
   PatchAdminEventBody,
@@ -3285,22 +3288,47 @@ export const useCreateReview = <
 /**
  * @summary Reviews for an event
  */
-export const getListEventReviewsUrl = (eventId: number) => {
-  return `/api/reviews/event/${eventId}`;
+export const getListEventReviewsUrl = (
+  eventId: number,
+  params?: ListEventReviewsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reviews/event/${eventId}?${stringifiedParams}`
+    : `/api/reviews/event/${eventId}`;
 };
 
 export const listEventReviews = async (
   eventId: number,
+  params?: ListEventReviewsParams,
   options?: RequestInit,
-): Promise<Review[]> => {
-  return customFetch<Review[]>(getListEventReviewsUrl(eventId), {
-    ...options,
-    method: "GET",
-  });
+): Promise<PaginatedReviews> => {
+  return customFetch<PaginatedReviews>(
+    getListEventReviewsUrl(eventId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getListEventReviewsQueryKey = (eventId: number) => {
-  return [`/api/reviews/event/${eventId}`] as const;
+export const getListEventReviewsQueryKey = (
+  eventId: number,
+  params?: ListEventReviewsParams,
+) => {
+  return [
+    `/api/reviews/event/${eventId}`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getListEventReviewsQueryOptions = <
@@ -3308,6 +3336,7 @@ export const getListEventReviewsQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   eventId: number,
+  params?: ListEventReviewsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listEventReviews>>,
@@ -3320,11 +3349,12 @@ export const getListEventReviewsQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListEventReviewsQueryKey(eventId);
+    queryOptions?.queryKey ?? getListEventReviewsQueryKey(eventId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listEventReviews>>
-  > = ({ signal }) => listEventReviews(eventId, { signal, ...requestOptions });
+  > = ({ signal }) =>
+    listEventReviews(eventId, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -3352,6 +3382,7 @@ export function useListEventReviews<
   TError = ErrorType<unknown>,
 >(
   eventId: number,
+  params?: ListEventReviewsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listEventReviews>>,
@@ -3361,7 +3392,11 @@ export function useListEventReviews<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListEventReviewsQueryOptions(eventId, options);
+  const queryOptions = getListEventReviewsQueryOptions(
+    eventId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -3373,22 +3408,47 @@ export function useListEventReviews<
 /**
  * @summary Reviews for a vendor
  */
-export const getListVendorReviewsUrl = (vendorId: number) => {
-  return `/api/reviews/vendor/${vendorId}`;
+export const getListVendorReviewsUrl = (
+  vendorId: number,
+  params?: ListVendorReviewsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reviews/vendor/${vendorId}?${stringifiedParams}`
+    : `/api/reviews/vendor/${vendorId}`;
 };
 
 export const listVendorReviews = async (
   vendorId: number,
+  params?: ListVendorReviewsParams,
   options?: RequestInit,
-): Promise<Review[]> => {
-  return customFetch<Review[]>(getListVendorReviewsUrl(vendorId), {
-    ...options,
-    method: "GET",
-  });
+): Promise<PaginatedReviews> => {
+  return customFetch<PaginatedReviews>(
+    getListVendorReviewsUrl(vendorId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getListVendorReviewsQueryKey = (vendorId: number) => {
-  return [`/api/reviews/vendor/${vendorId}`] as const;
+export const getListVendorReviewsQueryKey = (
+  vendorId: number,
+  params?: ListVendorReviewsParams,
+) => {
+  return [
+    `/api/reviews/vendor/${vendorId}`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getListVendorReviewsQueryOptions = <
@@ -3396,6 +3456,7 @@ export const getListVendorReviewsQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   vendorId: number,
+  params?: ListVendorReviewsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listVendorReviews>>,
@@ -3408,12 +3469,12 @@ export const getListVendorReviewsQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListVendorReviewsQueryKey(vendorId);
+    queryOptions?.queryKey ?? getListVendorReviewsQueryKey(vendorId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listVendorReviews>>
   > = ({ signal }) =>
-    listVendorReviews(vendorId, { signal, ...requestOptions });
+    listVendorReviews(vendorId, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -3441,6 +3502,7 @@ export function useListVendorReviews<
   TError = ErrorType<unknown>,
 >(
   vendorId: number,
+  params?: ListVendorReviewsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listVendorReviews>>,
@@ -3450,7 +3512,11 @@ export function useListVendorReviews<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListVendorReviewsQueryOptions(vendorId, options);
+  const queryOptions = getListVendorReviewsQueryOptions(
+    vendorId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

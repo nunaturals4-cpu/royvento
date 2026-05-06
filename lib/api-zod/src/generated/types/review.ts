@@ -15,4 +15,5 @@ export interface Review {
   comment: string;
   createdAt: string;
   userName: string;
+  imageUrls?: string[];
 }

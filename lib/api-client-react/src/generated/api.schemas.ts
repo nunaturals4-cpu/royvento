@@ -392,6 +392,14 @@ export interface Review {
   comment: string;
   createdAt: string;
   userName: string;
+  imageUrls?: string[];
+}
+
+export interface PaginatedReviews {
+  items: Review[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface CreateReviewBody {
@@ -403,6 +411,8 @@ export interface CreateReviewBody {
    */
   rating: number;
   comment: string;
+  /** @maxItems 5 */
+  imageUrls?: string[];
 }
 
 export type AvailabilityStatus =
@@ -1279,6 +1289,30 @@ export type ListVendorBookings200 = {
 
 export type GetBookingTicketCode200 = {
   ticketCode: string;
+};
+
+export type ListEventReviewsParams = {
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  pageSize?: number;
+};
+
+export type ListVendorReviewsParams = {
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  pageSize?: number;
 };
 
 export type GetPartnerAnalyticsParams = {

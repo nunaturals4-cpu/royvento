@@ -1738,11 +1738,17 @@ export const MarkNotificationReadResponse = zod.object({
  */
 export const createReviewBodyRatingMax = 5;
 
+export const createReviewBodyImageUrlsMax = 5;
+
 export const CreateReviewBody = zod.object({
   eventId: zod.number().optional(),
   vendorId: zod.number(),
   rating: zod.number().min(1).max(createReviewBodyRatingMax),
   comment: zod.string(),
+  imageUrls: zod
+    .array(zod.string())
+    .max(createReviewBodyImageUrlsMax)
+    .optional(),
 });
 
 export const CreateReviewResponse = zod.object({
@@ -1754,6 +1760,7 @@ export const CreateReviewResponse = zod.object({
   comment: zod.string(),
   createdAt: zod.string(),
   userName: zod.string(),
+  imageUrls: zod.array(zod.string()).optional(),
 });
 
 /**
@@ -1763,17 +1770,38 @@ export const ListEventReviewsParams = zod.object({
   eventId: zod.coerce.number(),
 });
 
-export const ListEventReviewsResponseItem = zod.object({
-  id: zod.number(),
-  userId: zod.number(),
-  eventId: zod.number().optional(),
-  vendorId: zod.number(),
-  rating: zod.number(),
-  comment: zod.string(),
-  createdAt: zod.string(),
-  userName: zod.string(),
+export const listEventReviewsQueryPageDefault = 1;
+
+export const listEventReviewsQueryPageSizeDefault = 5;
+export const listEventReviewsQueryPageSizeMax = 50;
+
+export const ListEventReviewsQueryParams = zod.object({
+  page: zod.coerce.number().min(1).default(listEventReviewsQueryPageDefault),
+  pageSize: zod.coerce
+    .number()
+    .min(1)
+    .max(listEventReviewsQueryPageSizeMax)
+    .default(listEventReviewsQueryPageSizeDefault),
 });
-export const ListEventReviewsResponse = zod.array(ListEventReviewsResponseItem);
+
+export const ListEventReviewsResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      eventId: zod.number().optional(),
+      vendorId: zod.number(),
+      rating: zod.number(),
+      comment: zod.string(),
+      createdAt: zod.string(),
+      userName: zod.string(),
+      imageUrls: zod.array(zod.string()).optional(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  pageSize: zod.number(),
+});
 
 /**
  * @summary Reviews for a vendor
@@ -1782,19 +1810,38 @@ export const ListVendorReviewsParams = zod.object({
   vendorId: zod.coerce.number(),
 });
 
-export const ListVendorReviewsResponseItem = zod.object({
-  id: zod.number(),
-  userId: zod.number(),
-  eventId: zod.number().optional(),
-  vendorId: zod.number(),
-  rating: zod.number(),
-  comment: zod.string(),
-  createdAt: zod.string(),
-  userName: zod.string(),
+export const listVendorReviewsQueryPageDefault = 1;
+
+export const listVendorReviewsQueryPageSizeDefault = 5;
+export const listVendorReviewsQueryPageSizeMax = 50;
+
+export const ListVendorReviewsQueryParams = zod.object({
+  page: zod.coerce.number().min(1).default(listVendorReviewsQueryPageDefault),
+  pageSize: zod.coerce
+    .number()
+    .min(1)
+    .max(listVendorReviewsQueryPageSizeMax)
+    .default(listVendorReviewsQueryPageSizeDefault),
 });
-export const ListVendorReviewsResponse = zod.array(
-  ListVendorReviewsResponseItem,
-);
+
+export const ListVendorReviewsResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      eventId: zod.number().optional(),
+      vendorId: zod.number(),
+      rating: zod.number(),
+      comment: zod.string(),
+      createdAt: zod.string(),
+      userName: zod.string(),
+      imageUrls: zod.array(zod.string()).optional(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  pageSize: zod.number(),
+});
 
 /**
  * @summary Availability calendar for a vendor

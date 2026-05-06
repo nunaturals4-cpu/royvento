@@ -6,10 +6,12 @@ import {
 } from "@workspace/api-client-react";
 import type { Review } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,6 +19,7 @@ import {
 } from "react-native";
 import type { AuthUser } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { uploadImageToStorage } from "@/lib/uploadImage";
 
 interface ReviewFormProps {
   user: AuthUser | null;
@@ -32,21 +35,52 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
   const createReview = useCreateReview();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   if (!user) return null;
 
   const hasDuplicate = submitted || (reviews ?? []).some((r) => r.userId === user.id);
 
+  const pickImages = async () => {
+    if (uploading || images.length >= 5) return;
+    const remaining = 5 - images.length;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.85,
+    });
+    if (result.canceled || result.assets.length === 0) return;
+
+    setUploading(true);
+    try {
+      const uploaded: string[] = [];
+      for (const asset of result.assets.slice(0, remaining)) {
+        try {
+          const url = await uploadImageToStorage(asset.uri, asset.mimeType ?? undefined);
+          uploaded.push(url);
+        } catch (e: unknown) {
+          Alert.alert("Upload failed", e instanceof Error ? e.message : "Please try again.");
+        }
+      }
+      if (uploaded.length > 0) setImages((prev) => [...prev, ...uploaded].slice(0, 5));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (createReview.isPending || submitted) return;
     createReview.mutate(
-      { data: { eventId, vendorId, rating, comment } },
+      { data: { eventId, vendorId, rating, comment, imageUrls: images } },
       {
         onSuccess: () => {
           setSubmitted(true);
           setComment("");
           setRating(5);
+          setImages([]);
           if (eventId) {
             qc.invalidateQueries({ queryKey: getListEventReviewsQueryKey(eventId) });
           }
@@ -196,9 +230,78 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
             />
           </View>
 
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                fontFamily: "Inter_500Medium",
+                color: colors.mutedForeground,
+                textTransform: "uppercase",
+                letterSpacing: 0.4,
+              }}
+            >
+              Photos (optional, up to 5)
+            </Text>
+            {images.length > 0 ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {images.map((url, i) => (
+                  <View key={i} style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border, position: "relative" }}>
+                    <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} />
+                    <TouchableOpacity
+                      onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        right: 2,
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: "rgba(0,0,0,0.7)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="close" size={12} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            <TouchableOpacity
+              onPress={pickImages}
+              disabled={uploading || images.length >= 5}
+              activeOpacity={0.7}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.muted,
+                alignSelf: "flex-start",
+                opacity: uploading || images.length >= 5 ? 0.5 : 1,
+              }}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="image-outline" size={16} color={colors.primary} />
+              )}
+              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground }}>
+                {uploading ? "Uploading…" : images.length === 0 ? "Add photos" : "Add more"}
+              </Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+              {images.length}/5 · JPEG/PNG/WebP/GIF · max 8 MB
+            </Text>
+          </View>
+
           <TouchableOpacity
             onPress={handleSubmit}
-            disabled={createReview.isPending}
+            disabled={createReview.isPending || uploading}
             activeOpacity={0.8}
             style={{
               backgroundColor: colors.primary,
@@ -209,7 +312,7 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
               justifyContent: "center",
               flexDirection: "row",
               gap: 8,
-              opacity: createReview.isPending ? 0.6 : 1,
+              opacity: createReview.isPending || uploading ? 0.6 : 1,
             }}
           >
             {createReview.isPending ? (

@@ -6,15 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CreateReviewBody {
-  eventId?: number;
-  vendorId: number;
+export type ListVendorReviewsParams = {
   /**
    * @minimum 1
-   * @maximum 5
    */
-  rating: number;
-  comment: string;
-  /** @maxItems 5 */
-  imageUrls?: string[];
-}
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  pageSize?: number;
+};

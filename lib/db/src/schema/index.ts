@@ -12,6 +12,7 @@ import {
   index,
   jsonb,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const usersTable = pgTable(
   "users",
@@ -207,6 +208,7 @@ export const reviewsTable = pgTable(
     vendorId: integer("vendor_id").notNull(),
     rating: integer("rating").notNull(),
     comment: text("comment").notNull().default(""),
+    imageUrls: text("image_urls").array().notNull().default(sql`ARRAY[]::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

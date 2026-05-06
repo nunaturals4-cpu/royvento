@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation } from "lucide-react";
+import { uploadImage, validateImageFile } from "@/lib/uploadImage";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -42,7 +43,13 @@ export function EventDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { data: event, isLoading } = useGetEvent(id);
-  const { data: reviews = [], refetch: refetchReviews } = useListEventReviews(id);
+  const REVIEWS_PAGE_SIZE = 5;
+  const [reviewsPage, setReviewsPage] = useState(1);
+  useEffect(() => { setReviewsPage(1); }, [id]);
+  const { data: reviewsData, refetch: refetchReviews } = useListEventReviews(id, { page: reviewsPage, pageSize: REVIEWS_PAGE_SIZE });
+  const reviews = reviewsData?.items ?? [];
+  const reviewsTotal = reviewsData?.total ?? 0;
+  const reviewsTotalPages = Math.max(1, Math.ceil(reviewsTotal / REVIEWS_PAGE_SIZE));
   const { data: availability = [] } = useListVendorAvailability(event?.vendor?.id ?? 0, {
     query: { enabled: !!event?.vendor?.id } as any,
   });
@@ -80,6 +87,8 @@ export function EventDetail() {
   } | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [reviewUploading, setReviewUploading] = useState(false);
   const [myCoupons, setMyCoupons] = useState<Coupon[]>([]);
   const [booking, setBooking] = useState(false);
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
@@ -334,12 +343,43 @@ export function EventDetail() {
     if (!me?.user) { setLocation("/login"); return; }
     if (!event.vendor) return;
     createReview.mutate(
-      { data: { eventId: event.id, vendorId: event.vendor.id, rating: reviewRating, comment: reviewComment } },
+      { data: { eventId: event.id, vendorId: event.vendor.id, rating: reviewRating, comment: reviewComment, imageUrls: reviewImages } },
       {
-        onSuccess: () => { toast({ title: t("events.review_posted") }); setReviewComment(""); refetchReviews(); },
+        onSuccess: () => {
+          toast({ title: t("events.review_posted") });
+          setReviewComment("");
+          setReviewImages([]);
+          setReviewsPage(1);
+          refetchReviews();
+        },
         onError: (e: unknown) => toast({ title: t("events.review_failed"), description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
       },
     );
+  };
+
+  const handleReviewImagesPicked = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remaining = 5 - reviewImages.length;
+    if (remaining <= 0) {
+      toast({ title: "Maximum 5 images", variant: "destructive" });
+      return;
+    }
+    const picked = Array.from(files).slice(0, remaining);
+    setReviewUploading(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of picked) {
+        const err = validateImageFile(file);
+        if (err) { toast({ title: err, variant: "destructive" }); continue; }
+        const url = await uploadImage(file);
+        uploaded.push(url);
+      }
+      if (uploaded.length > 0) setReviewImages((prev) => [...prev, ...uploaded].slice(0, 5));
+    } catch (e: unknown) {
+      toast({ title: "Upload failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+    } finally {
+      setReviewUploading(false);
+    }
   };
 
   const cityState = (event as any).city
@@ -776,57 +816,99 @@ export function EventDetail() {
           <section>
             <div className="flex items-end justify-between mb-5 flex-wrap gap-3">
               <h2 className="font-serif text-3xl accent-underline inline-block">{t("events.reviews_section")}</h2>
-              {reviews.length > 0 && (
+              {reviewsTotal > 0 && (
                 <div className="flex items-center gap-2 text-sm text-white/60">
                   <div className="flex items-center gap-0.5">
-                    {Array.from({ length: 5 }).map((_, i) => {
-                      const avg = reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length;
-                      return <Star key={i} className={`h-3.5 w-3.5 ${i < Math.round(avg) ? "fill-amber-400 text-amber-400" : "text-white/20"}`} />;
-                    })}
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className={`h-3.5 w-3.5 ${i < Math.round(event.rating ?? 0) ? "fill-amber-400 text-amber-400" : "text-white/20"}`} />
+                    ))}
                   </div>
                   <span className="font-semibold text-white/80">
-                    {(reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                    {(event.rating ?? 0).toFixed(1)}
                   </span>
-                  <span>· {reviews.length} review{reviews.length !== 1 ? "s" : ""}</span>
+                  <span>· {reviewsTotal} review{reviewsTotal !== 1 ? "s" : ""}</span>
                 </div>
               )}
             </div>
-            {reviews.length === 0 ? (
+            {reviewsTotal === 0 ? (
               <p className="text-muted-foreground text-sm mt-4">{t("events.no_reviews")}</p>
             ) : (
-              <div className="space-y-3 mt-4">
-                {reviews.map((r: any) => (
-                  <div key={r.id} className="rounded-2xl glass-card p-5 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {r.userImage ? (
-                          <img src={r.userImage} alt={r.userName} className="w-10 h-10 rounded-full object-cover shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold shrink-0">
-                            {r.userName?.charAt(0)?.toUpperCase()}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm truncate">{r.userName}</p>
-                          {r.verifiedBooking && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium mt-0.5">
-                              <BadgeCheck className="h-3 w-3" /> {t("events.verified_booking")}
-                            </span>
+              <>
+                <div className="space-y-3 mt-4">
+                  {reviews.map((r: any) => (
+                    <div key={r.id} className="rounded-2xl glass-card p-5 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {r.userImage ? (
+                            <img src={r.userImage} alt={r.userName} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold shrink-0">
+                              {r.userName?.charAt(0)?.toUpperCase()}
+                            </div>
                           )}
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm truncate">{r.userName}</p>
+                            {r.verifiedBooking && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium mt-0.5">
+                                <BadgeCheck className="h-3 w-3" /> {t("events.verified_booking")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-amber-400 text-amber-400" : "text-white/15"}`} />
+                          ))}
                         </div>
                       </div>
-                      <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-amber-400 text-amber-400" : "text-white/15"}`} />
-                        ))}
-                      </div>
+                      {r.comment && (
+                        <p className="text-sm text-white/65 leading-relaxed">{r.comment}</p>
+                      )}
+                      {Array.isArray(r.imageUrls) && r.imageUrls.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {r.imageUrls.map((url: string, i: number) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setLightbox(url)}
+                              className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
+                              aria-label="Open review image"
+                            >
+                              <img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {r.comment && (
-                      <p className="text-sm text-white/65 leading-relaxed">{r.comment}</p>
-                    )}
+                  ))}
+                </div>
+
+                {reviewsTotalPages > 1 && (
+                  <div className="mt-5 flex items-center justify-between gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewsPage((p) => Math.max(1, p - 1))}
+                      disabled={reviewsPage <= 1}
+                      className="border-white/15"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                    </Button>
+                    <span className="text-sm text-white/60">
+                      Page {reviewsPage} of {reviewsTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewsPage((p) => Math.min(reviewsTotalPages, p + 1))}
+                      disabled={reviewsPage >= reviewsTotalPages}
+                      className="border-white/15"
+                    >
+                      Next <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
 
             {me?.user && (
@@ -840,7 +922,46 @@ export function EventDetail() {
                   ))}
                 </div>
                 <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder={t("events.review_placeholder")} className="bg-black/40 border-white/10" />
-                <Button onClick={handleReview} disabled={createReview.isPending || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">{t("events.post_review")}</Button>
+
+                <div className="space-y-2">
+                  {reviewImages.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {reviewImages.map((url, i) => (
+                        <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-white/10">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setReviewImages((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black"
+                            aria-label="Remove image"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 text-sm cursor-pointer hover:bg-white/5 transition-colors ${reviewUploading || reviewImages.length >= 5 ? "opacity-50 pointer-events-none" : ""}`}>
+                      <ImagePlus className="h-4 w-4" />
+                      <span>{reviewUploading ? "Uploading…" : reviewImages.length === 0 ? "Add photos" : "Add more"}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        multiple
+                        className="hidden"
+                        disabled={reviewUploading || reviewImages.length >= 5}
+                        onChange={(e) => {
+                          handleReviewImagesPicked(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <span className="text-xs text-white/40">{reviewImages.length}/5 · JPEG/PNG/WebP/GIF · max 8 MB each</span>
+                  </div>
+                </div>
+
+                <Button onClick={handleReview} disabled={createReview.isPending || reviewUploading || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">{t("events.post_review")}</Button>
               </div>
             )}
           </section>
