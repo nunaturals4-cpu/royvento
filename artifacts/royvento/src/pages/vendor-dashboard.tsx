@@ -2888,16 +2888,14 @@ function AnalyticsPanel() {
             <Banknote className="h-5 w-5 text-amber-400" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Pay at venue (COD)</p>
-            <p className="stat-number text-3xl text-amber-300">{formatINR(data.codRevenue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">booked cash / pay-at-door</p>
-            {typeof data.actualCodRevenue === "number" && (
-              <div className="mt-2 pt-2 border-t border-amber-500/20">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Actual collected</p>
-                <p className="text-base font-semibold text-amber-200 tabular-nums">{formatINR(data.actualCodRevenue)}</p>
-                <p className="text-[10px] text-muted-foreground">{data.actualCodRecordedCount ?? 0} bookings recorded</p>
-              </div>
-            )}
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">COD collected (actual)</p>
+            <p className="stat-number text-3xl text-amber-300">{formatINR(data.actualCodRevenue ?? 0)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{data.actualCodRecordedCount ?? 0} bookings recorded</p>
+            <div className="mt-2 pt-2 border-t border-amber-500/20">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Booked COD</p>
+              <p className="text-base font-semibold text-amber-200/80 tabular-nums">{formatINR(data.codRevenue)}</p>
+              <p className="text-[10px] text-muted-foreground">total booked at pay-at-door</p>
+            </div>
           </div>
         </div>
         <div className="rounded-2xl glass-card p-5 flex items-start gap-4">

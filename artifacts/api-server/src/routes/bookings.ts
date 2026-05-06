@@ -773,15 +773,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     totalEarnings += bookingRevenue;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
 
-    // STRICT: commission only accrues against revenue that's actually counted.
-    // Pending COD (revenue=0) → commission=0, so net stays consistent (never negative).
-    // For COD with actuals, commission is capped at the realized bookingRevenue (not booked finalPrice).
-    const comm = bookingRevenue > 0
-      ? Math.min(
-          calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple),
-          bookingRevenue,
-        )
-      : 0;
+    // Commission is computed on booked finalPrice (per task spec — unchanged).
+    const comm = calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple);
     totalCommission += comm;
     if (isCod) codCommission += comm;
     else onlineCommission += comm;
@@ -844,10 +837,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     const rev = revenueByBookingId.get(b.id) ?? 0;
     if (dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
-      const dayComm = rev > 0
-        ? Math.min(calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple), rev)
-        : 0;
-      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + dayComm);
+      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple));
     }
   }
   const dailyRevenue = Array.from(dailyMap.entries())

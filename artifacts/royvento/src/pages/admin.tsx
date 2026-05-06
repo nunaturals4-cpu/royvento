@@ -253,11 +253,11 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
         />
         <Stat
           icon={Banknote}
-          label="COD / Pay at venue"
-          value={formatINR(data.codRevenue)}
+          label="COD collected (actual)"
+          value={formatINR(data.actualCodRevenue ?? 0)}
           valueClassName="text-amber-300"
-          subLabel="Actual collected"
-          subValue={formatINR(data.actualCodRevenue ?? 0)}
+          subLabel="Booked COD"
+          subValue={formatINR(data.codRevenue)}
           subHint={
             (data as { pendingActualsCount?: number }).pendingActualsCount
               ? `${data.actualCodRecordedCount ?? 0} recorded · ${(data as { pendingActualsCount?: number }).pendingActualsCount} pending`

@@ -2196,9 +2196,9 @@ export default function VendorDashboardScreen() {
       { label: "Platform Fee", value: `₹${(a?.totalCommission ?? 0).toLocaleString("en-IN")}`, icon: "remove-circle-outline" as const, color: "#f59e0b" },
       { label: "Net Earnings", value: `₹${(a?.netEarnings ?? a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "checkmark-circle-outline" as const, color: "#22c55e" },
     ];
-    type ChannelKpi = { label: string; icon: "wallet-outline" | "card-outline"; color: string; gross: number; commission: number; net: number; actual?: number; actualCount?: number };
+    type ChannelKpi = { label: string; icon: "wallet-outline" | "card-outline"; color: string; gross: number; commission: number; net: number; actual?: number; actualCount?: number; isCod?: boolean };
     const channelKpis: ChannelKpi[] = [
-      { label: "Pay at Venue", icon: "wallet-outline", color: "#f59e0b", gross: a?.codRevenue ?? 0, commission: a?.codCommission ?? 0, net: (a?.codRevenue ?? 0) - (a?.codCommission ?? 0), actual: a?.actualCodRevenue, actualCount: a?.actualCodRecordedCount },
+      { label: "Pay at Venue", icon: "wallet-outline", color: "#f59e0b", gross: a?.actualCodRevenue ?? 0, commission: a?.codCommission ?? 0, net: (a?.actualCodRevenue ?? 0) - (a?.codCommission ?? 0), actual: a?.codRevenue, actualCount: a?.actualCodRecordedCount, isCod: true },
       { label: "Online", icon: "card-outline", color: "#3b82f6", gross: a?.onlineRevenue ?? 0, commission: a?.onlineCommission ?? 0, net: (a?.onlineRevenue ?? 0) - (a?.onlineCommission ?? 0) },
     ];
     const guestKpis = [
@@ -2303,10 +2303,10 @@ export default function VendorDashboardScreen() {
               {typeof k.actual === "number" && (
                 <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <View>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.4 }}>Actual collected</Text>
-                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{k.actualCount ?? 0} bookings recorded</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.4 }}>{k.isCod ? "Booked COD" : "Actual collected"}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{k.isCod ? `${k.actualCount ?? 0} actuals recorded` : `${k.actualCount ?? 0} bookings recorded`}</Text>
                   </View>
-                  <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: k.color }}>₹{k.actual.toLocaleString("en-IN")}</Text>
+                  <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: k.isCod ? colors.mutedForeground : k.color }}>₹{k.actual.toLocaleString("en-IN")}</Text>
                 </View>
               )}
             </View>
