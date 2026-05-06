@@ -15,7 +15,7 @@ import {
   vendorManagersTable,
   vendorCommissionsTable,
 } from "@workspace/db";
-import { sendExpoPushNotification } from "../lib/expoPush";
+import { sendExpoPushToUser } from "../lib/expoPush";
 import { sendWebPushToUser } from "./webPush";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
@@ -1164,23 +1164,12 @@ router.patch(
             message: notifMessage,
           });
 
-          // Send Expo push notification to user's device if they have a token
-          const [bookingUser] = await db
-            .select({ pushToken: usersTable.pushToken })
-            .from(usersTable)
-            .where(eq(usersTable.id, b.userId))
-            .limit(1);
-          if (bookingUser?.pushToken) {
-            sendExpoPushNotification([
-              {
-                to: bookingUser.pushToken,
-                title: notifTitle,
-                body: notifMessage,
-                sound: "default",
-                data: { bookingId: b.id, screen: "bookings" },
-              },
-            ]).catch(() => {});
-          }
+          // Send Expo push notification to user's mobile device if they have a token
+          sendExpoPushToUser(b.userId, {
+            title: notifTitle,
+            body: notifMessage,
+            data: { bookingId: b.id, screen: "bookings" },
+          }).catch(() => {});
           sendWebPushToUser(b.userId, {
             title: notifTitle,
             body: notifMessage,

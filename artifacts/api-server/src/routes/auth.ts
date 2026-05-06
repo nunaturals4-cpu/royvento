@@ -667,7 +667,7 @@ router.put("/auth/push-token", async (req, res) => {
   }
   await db
     .update(usersTable)
-    .set({ pushToken: parsed.data.pushToken })
+    .set({ expoPushToken: parsed.data.pushToken })
     .where(eq(usersTable.id, user.id));
   res.json({ ok: true });
 });

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, announcementsTable, vendorsTable, eventsTable, bookingsTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
 import { sendWebPushToUser } from "./webPush";
+import { sendExpoPushWithToken } from "../lib/expoPush";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -70,9 +71,9 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
       const notifBody = parsed.data.body || parsed.data.title;
       const tag = `announcement-${row?.id ?? Date.now()}`;
 
-      // Fetch all user IDs in one query (select only what's needed)
+      // Fetch all users including their Expo push tokens in one query
       const allUsers = await db
-        .select({ id: usersTable.id })
+        .select({ id: usersTable.id, expoPushToken: usersTable.expoPushToken })
         .from(usersTable);
 
       const BATCH_SIZE = 20;
@@ -82,7 +83,7 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
         const batch = allUsers.slice(i, i + BATCH_SIZE);
 
         await Promise.all(
-          batch.map(async ({ id: userId }) => {
+          batch.map(async ({ id: userId, expoPushToken }) => {
             try {
               // In-app notification for every user
               await db.insert(notificationsTable).values({
@@ -97,6 +98,14 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
                 url: `/`,
                 tag,
               }).catch(() => {});
+              // Expo push (only fires if the user has a registered mobile token)
+              if (expoPushToken) {
+                sendExpoPushWithToken(userId, expoPushToken, {
+                  title: notifTitle,
+                  body: notifBody,
+                  data: { screen: "home", tag },
+                }).catch(() => {});
+              }
             } catch {
               // non-critical per user — continue with next
             }

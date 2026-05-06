@@ -15,6 +15,20 @@
       "when": 1746345600000,
       "tag": "0015_announcements_featured_slider",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1746518400000,
+      "tag": "0022_users_expo_push_token",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1746518401000,
+      "tag": "0023_backfill_expo_push_token",
+      "breakpoints": true
     }
   ]
 }

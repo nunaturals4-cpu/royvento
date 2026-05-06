@@ -2,6 +2,7 @@ import { db, bookingsTable, eventsTable, vendorsTable, usersTable, notifications
 import { eq, inArray, and, gte, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { sendWebPushToUser } from "../routes/webPush";
+import { sendExpoPushWithToken } from "../lib/expoPush";
 
 export type ReminderSlot = "morning" | "evening";
 
@@ -26,9 +27,9 @@ function slotLabel(slot: ReminderSlot): string {
 /**
  * Sends booking-day reminder notifications.
  * Fires at 10 AM IST (morning) and 5 PM IST (evening) via cron.
- * Sends an in-app notification + web push for every confirmed/completed booking
- * whose bookingDate is today (IST). Deduplicates to prevent double-sending if
- * the server restarts while a cron window is active.
+ * Sends an in-app notification + web push + Expo push for every confirmed/completed
+ * booking whose bookingDate is today (IST). Deduplicates to prevent double-sending
+ * if the server restarts while a cron window is active.
  */
 export async function runBookingReminders(slot: ReminderSlot): Promise<void> {
   const todayIST = getTodayIST();
@@ -61,7 +62,7 @@ export async function runBookingReminders(slot: ReminderSlot): Promise<void> {
       return;
     }
 
-    // Batch-load events, vendors, users
+    // Batch-load events, vendors, users (including push tokens)
     const eventIds = [...new Set(bookings.map((b) => b.eventId))];
     const vendorIds = [...new Set(bookings.map((b) => b.vendorId))];
     const userIds = [...new Set(bookings.map((b) => b.userId))];
@@ -69,12 +70,12 @@ export async function runBookingReminders(slot: ReminderSlot): Promise<void> {
     const [events, vendors, users] = await Promise.all([
       db.select({ id: eventsTable.id, title: eventsTable.title }).from(eventsTable).where(inArray(eventsTable.id, eventIds)),
       db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName }).from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
-      db.select({ id: usersTable.id }).from(usersTable).where(inArray(usersTable.id, userIds)),
+      db.select({ id: usersTable.id, expoPushToken: usersTable.expoPushToken }).from(usersTable).where(inArray(usersTable.id, userIds)),
     ]);
 
     const eventMap = new Map(events.map((e) => [e.id, e.title]));
     const vendorMap = new Map(vendors.map((v) => [v.id, v.businessName]));
-    const userSet = new Set(users.map((u) => u.id));
+    const userMap = new Map(users.map((u) => [u.id, u.expoPushToken]));
 
     const notifTitle = `Booking Reminder · ${label}`;
 
@@ -82,7 +83,7 @@ export async function runBookingReminders(slot: ReminderSlot): Promise<void> {
     let skipped = 0;
 
     for (const booking of bookings) {
-      if (!userSet.has(booking.userId)) continue;
+      if (!userMap.has(booking.userId)) continue;
 
       const eventTitle = eventMap.get(booking.eventId) ?? "your event";
       const vendorName = vendorMap.get(booking.vendorId) ?? "the venue";
@@ -136,6 +137,15 @@ export async function runBookingReminders(slot: ReminderSlot): Promise<void> {
           url: "/dashboard/bookings",
           tag: `reminder-${booking.id}-${slot}`,
         }).catch(() => {});
+
+        const expoPushToken = userMap.get(booking.userId);
+        if (expoPushToken) {
+          sendExpoPushWithToken(booking.userId, expoPushToken, {
+            title: notifTitle,
+            body: message,
+            data: { screen: "bookings", bookingId: booking.id },
+          }).catch(() => {});
+        }
 
         sent++;
       } catch (err) {
