@@ -3274,6 +3274,12 @@ components:
           type: number
         onlineRevenue:
           type: number
+        actualCodRevenue:
+          type: number
+          description: Total cash actually expected at the door for COD bookings, computed from per-type actual entry counts.
+        actualCodRecordedCount:
+          type: integer
+          description: Number of COD bookings that have actual entry recorded.
         grossEarnings:
           type: number
         netEarnings:
@@ -3343,6 +3349,18 @@ components:
       properties:
         code:
           type: string
+        actualEntry:
+          type: object
+          description: Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue.
+          properties:
+            women:
+              type: integer
+            men:
+              type: integer
+            couple:
+              type: integer
+            guests:
+              type: integer
       required: [code]
 
     ScanTicketBooking:
@@ -3382,6 +3400,27 @@ components:
         netAmount:
           type: number
           description: Net amount the venue should collect
+        paymentMethod:
+          type: string
+        finalPriceBooked:
+          type: number
+          description: Original booked finalPrice (alias for finalPrice)
+        actualWomen:
+          type: integer
+          nullable: true
+        actualMen:
+          type: integer
+          nullable: true
+        actualCouple:
+          type: integer
+          nullable: true
+        actualGuests:
+          type: integer
+          nullable: true
+        actualAmountDue:
+          type: number
+          nullable: true
+          description: Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet.
       required: [id, eventTitle, vendorName, bookingDate, userName, pubMode, ticketWomen, ticketMen, ticketCouple, guests]
 
     ScanTicketResult:

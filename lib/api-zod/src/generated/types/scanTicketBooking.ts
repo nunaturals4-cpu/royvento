@@ -25,4 +25,13 @@ export interface ScanTicketBooking {
   commissionAmount?: number;
   /** Net amount the venue should collect */
   netAmount?: number;
+  paymentMethod?: string;
+  /** Original booked finalPrice (alias for finalPrice) */
+  finalPriceBooked?: number;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
+  /** Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet. */
+  actualAmountDue?: number | null;
 }

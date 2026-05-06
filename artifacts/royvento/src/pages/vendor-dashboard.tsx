@@ -2833,10 +2833,17 @@ function AnalyticsPanel() {
           <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
             <Banknote className="h-5 w-5 text-amber-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Pay at venue (COD)</p>
             <p className="stat-number text-3xl text-amber-300">{formatINR(data.codRevenue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">cash / pay-at-door</p>
+            <p className="text-xs text-muted-foreground mt-1">booked cash / pay-at-door</p>
+            {typeof (data as any).actualCodRevenue === "number" && (
+              <div className="mt-2 pt-2 border-t border-amber-500/20">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Actual collected</p>
+                <p className="text-base font-semibold text-amber-200 tabular-nums">{formatINR((data as any).actualCodRevenue)}</p>
+                <p className="text-[10px] text-muted-foreground">{(data as any).actualCodRecordedCount ?? 0} bookings recorded</p>
+              </div>
+            )}
           </div>
         </div>
         <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
@@ -3297,6 +3304,7 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                   <th className="text-left py-2 pr-3">Date</th>
                   <th className="text-left py-2 pr-3">Mode</th>
                   <th className="text-right py-2 pr-3">Tickets</th>
+                  <th className="text-right py-2 pr-3">Actual Entry</th>
                   <th className="text-right py-2 pr-3">Price</th>
                   <th className="text-left py-2 pr-3">Payment</th>
                   <th className="text-left py-2 pr-3">Status</th>
@@ -3333,6 +3341,25 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                         {!((b.ticketWomen ?? 0) > 0) && !((b.ticketMen ?? 0) > 0) && !((b.ticketCouple ?? 0) > 0) && (
                           <span className="text-muted-foreground">{b.guests ?? "—"}</span>
                         )}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
+                        {(() => {
+                          const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+                          const has = aw != null || am != null || ac != null || ag != null;
+                          if (!has) return <span className="text-muted-foreground/60">—</span>;
+                          const isTicket = b.pubMode === "ticket";
+                          if (isTicket) {
+                            return (
+                              <>
+                                {(aw ?? 0) > 0 && <span className="text-pink-300 mr-1">{aw}W</span>}
+                                {(am ?? 0) > 0 && <span className="text-blue-300 mr-1">{am}M</span>}
+                                {(ac ?? 0) > 0 && <span className="text-purple-300">{ac}C</span>}
+                                {(aw ?? 0) === 0 && (am ?? 0) === 0 && (ac ?? 0) === 0 && <span className="text-muted-foreground">0</span>}
+                              </>
+                            );
+                          }
+                          return <span className="text-foreground">{ag}</span>;
+                        })()}
                       </td>
                       <td className="py-2.5 pr-3 text-right whitespace-nowrap">
                         <span className="font-medium text-primary">{formatINR(paid)}</span>

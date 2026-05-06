@@ -4,7 +4,7 @@ import jsQR from "jsqr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff, Plus, Minus, IndianRupee, Banknote } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { useGetMe } from "@workspace/api-client-react";
 
@@ -22,6 +22,12 @@ interface BookingData {
   ticketMen: number;
   ticketCouple: number;
   guests: number;
+  paymentMethod?: string;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
+  actualAmountDue?: number | null;
 }
 
 interface ScanSuccess {
@@ -465,6 +471,10 @@ export function TicketScanner() {
                 </div>
               </div>
               <BookingDetails booking={result.booking} />
+              <ActualEntryForm
+                booking={result.booking}
+                onSaved={(updated) => setResult({ ...result, booking: updated })}
+              />
             </div>
           ) : isScanAlreadyUsed(result) ? (
             <div className="p-6 space-y-4">
@@ -482,6 +492,10 @@ export function TicketScanner() {
                 </div>
               </div>
               <BookingDetails booking={result.booking} />
+              <ActualEntryForm
+                booking={result.booking}
+                onSaved={(updated) => setResult({ ...result, booking: updated })}
+              />
             </div>
           ) : (
             <div className="p-6 flex items-center gap-3">
@@ -574,6 +588,130 @@ function BookingDetails({ booking: b }: { booking: BookingData }) {
           <Users className="h-3.5 w-3.5 inline mr-1" />{b.guests} guests
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function Stepper({ label, value, max, color, onChange }: { label: string; value: number; max: number; color: string; onChange: (v: number) => void }) {
+  if (max <= 0) return null;
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 flex items-center justify-between gap-3 ${color}`}>
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground/70">booked: {max}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button type="button" aria-label={`Decrease ${label}`} onClick={() => onChange(Math.max(0, value - 1))}
+          className="h-8 w-8 rounded-lg border border-white/10 bg-black/30 hover:bg-white/10 flex items-center justify-center disabled:opacity-30"
+          disabled={value <= 0}>
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <span className="text-lg font-semibold tabular-nums w-7 text-center">{value}</span>
+        <button type="button" aria-label={`Increase ${label}`} onClick={() => onChange(Math.min(max, value + 1))}
+          className="h-8 w-8 rounded-lg border border-white/10 bg-black/30 hover:bg-white/10 flex items-center justify-center disabled:opacity-30"
+          disabled={value >= max}>
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSaved: (b: BookingData) => void }) {
+  const { toast } = useToast();
+  const isTicket = b.pubMode === "ticket";
+  const initWomen = b.actualWomen ?? b.ticketWomen;
+  const initMen = b.actualMen ?? b.ticketMen;
+  const initCouple = b.actualCouple ?? b.ticketCouple;
+  const initGuests = b.actualGuests ?? b.guests;
+  const [w, setW] = useState<number>(initWomen);
+  const [m, setM] = useState<number>(initMen);
+  const [c, setC] = useState<number>(initCouple);
+  const [g, setG] = useState<number>(initGuests);
+  const [saving, setSaving] = useState(false);
+  const isCod = b.paymentMethod === "cod";
+  const alreadyRecorded = (
+    b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null
+  );
+
+  // Hide entirely when no relevant booked counts (e.g. ticket-mode with 0 across the board)
+  const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
+  if (isTicket && !hasAnyBookedTicket) return null;
+  if (!isTicket && b.guests <= 0) return null;
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
+      const code = `RV-${String(b.id).padStart(6, "0")}`;
+      const actualEntry = isTicket
+        ? { women: w, men: m, couple: c }
+        : { guests: g };
+      const res = await fetch("/api/partner/scan-ticket", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ code, actualEntry }),
+      });
+      const json = (await res.json()) as Record<string, unknown>;
+      if (res.ok && json["booking"]) {
+        toast({ title: "Actual entry saved" });
+        onSaved(json["booking"] as BookingData);
+      } else {
+        const msg = typeof json["message"] === "string" ? (json["message"] as string) : "Failed to save actuals.";
+        toast({ title: "Couldn't save", description: msg, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Couldn't reach server.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-black/30 border border-white/10 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Actual entry</p>
+        {alreadyRecorded && (
+          <span className="text-[10px] uppercase tracking-wider text-green-300/80">Recorded</span>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground -mt-1">Adjust if fewer guests showed up than booked.</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {isTicket ? (
+          <>
+            <Stepper label="Women" value={w} max={b.ticketWomen} color="border-pink-500/30 bg-pink-500/5" onChange={setW} />
+            <Stepper label="Men" value={m} max={b.ticketMen} color="border-blue-500/30 bg-blue-500/5" onChange={setM} />
+            <Stepper label="Couples" value={c} max={b.ticketCouple} color="border-purple-500/30 bg-purple-500/5" onChange={setC} />
+          </>
+        ) : (
+          <Stepper label="Guests" value={g} max={Math.max(b.guests, 1)} color="border-primary/30 bg-primary/5" onChange={setG} />
+        )}
+      </div>
+
+      {isCod && b.actualAmountDue != null && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between">
+          <span className="text-xs uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+            <Banknote className="h-3.5 w-3.5" /> Pay at venue (COD)
+          </span>
+          <span className="text-xl font-semibold text-amber-200 tabular-nums flex items-center gap-1">
+            <IndianRupee className="h-4 w-4" />{b.actualAmountDue.toLocaleString("en-IN")}
+          </span>
+        </div>
+      )}
+
+      <Button
+        type="button"
+        onClick={submit}
+        disabled={saving}
+        className="w-full bg-gradient-to-br from-primary to-primary/70 border-0 text-base py-3 gap-2"
+      >
+        {saving ? "Saving…" : alreadyRecorded ? "Update actual entry" : "Save actual entry"}
+      </Button>
     </div>
   );
 }

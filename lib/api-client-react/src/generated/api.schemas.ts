@@ -976,6 +976,10 @@ export interface PartnerAnalyticsResult {
   monthEarnings: number;
   codRevenue: number;
   onlineRevenue: number;
+  /** Total cash actually expected at the door for COD bookings, computed from per-type actual entry counts. */
+  actualCodRevenue?: number;
+  /** Number of COD bookings that have actual entry recorded. */
+  actualCodRecordedCount?: number;
   grossEarnings: number;
   netEarnings: number;
   totalCommission: number;
@@ -991,8 +995,20 @@ export interface PartnerAnalyticsResult {
   dailyCommission: PartnerAnalyticsResultDailyCommissionItem[];
 }
 
+/**
+ * Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue.
+ */
+export type ScanTicketBodyActualEntry = {
+  women?: number;
+  men?: number;
+  couple?: number;
+  guests?: number;
+};
+
 export interface ScanTicketBody {
   code: string;
+  /** Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue. */
+  actualEntry?: ScanTicketBodyActualEntry;
 }
 
 export interface ScanTicketBooking {
@@ -1014,6 +1030,15 @@ export interface ScanTicketBooking {
   commissionAmount?: number;
   /** Net amount the venue should collect */
   netAmount?: number;
+  paymentMethod?: string;
+  /** Original booked finalPrice (alias for finalPrice) */
+  finalPriceBooked?: number;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
+  /** Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet. */
+  actualAmountDue?: number | null;
 }
 
 export type ScanTicketResultCode =

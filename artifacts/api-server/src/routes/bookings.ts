@@ -93,6 +93,11 @@ interface BookingRow {
   checkedIn: boolean;
   checkedInAt: Date | null;
   arrivalTime: string | null;
+  paymentMethod?: string;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
   createdAt: Date;
 }
 
@@ -141,6 +146,11 @@ async function serializeBookings(rows: BookingRow[]) {
       checkedIn: b.checkedIn,
       checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
       arrivalTime: b.arrivalTime ?? "",
+      paymentMethod: b.paymentMethod ?? "online",
+      actualWomen: b.actualWomen ?? null,
+      actualMen: b.actualMen ?? null,
+      actualCouple: b.actualCouple ?? null,
+      actualGuests: b.actualGuests ?? null,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",
@@ -669,6 +679,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let monthEarnings = 0;
   let codRevenue = 0;
   let onlineRevenue = 0;
+  let actualCodRevenue = 0;
+  let actualCodRecordedCount = 0;
   let totalCommission = 0;
   let codCommission = 0;
   let onlineCommission = 0;
@@ -677,6 +689,13 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     ticket: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
     table: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
   };
+  // Pre-fetch events so the analytics loop can read per-type prices for actuals computation.
+  const _eventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
+  const _events = _eventIds.length > 0
+    ? await db.select().from(eventsTable).where(inArray(eventsTable.id, _eventIds))
+    : [];
+  const eMap = new Map(_events.map((e) => [e.id, e]));
+
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
     totalEarnings += fp;
@@ -684,6 +703,27 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     const isCod = b.paymentMethod === "cod";
     if (isCod) codRevenue += fp;
     else onlineRevenue += fp;
+    // Actual cash collected at door (only meaningful for COD bookings that have actuals recorded)
+    if (isCod) {
+      const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+      const hasActuals = aw != null || am != null || ac != null || ag != null;
+      if (hasActuals) {
+        actualCodRecordedCount++;
+        if (b.pubMode === "ticket") {
+          const ev = eMap.get(b.eventId);
+          const pw = Number(ev?.priceWomen ?? 0);
+          const pm = Number(ev?.priceMen ?? 0);
+          const pc = Number(ev?.priceCouple ?? 0);
+          const baseGross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+          const total = Number(b.totalPrice);
+          const ratio = total > 0 ? fp / total : 1;
+          actualCodRevenue += baseGross * ratio;
+        } else {
+          const guests = Math.max(1, b.guests);
+          actualCodRevenue += ((ag ?? 0) / guests) * fp;
+        }
+      }
+    }
     const comm = calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple);
     totalCommission += comm;
     if (isCod) codCommission += comm;
@@ -699,13 +739,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     commSummary[k].netRevenue = commSummary[k].grossRevenue - commSummary[k].commissionAmount;
   }
 
-  // Per-event breakdown
-  const eventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
-  const events = eventIds.length > 0
-    ? await db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds))
-    : [];
-  const eMap = new Map(events.map((e) => [e.id, e]));
-
+  // Per-event breakdown (reuses eMap fetched above)
   const perEventMap = new Map<number, {
     eventId: number; eventTitle: string;
     bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
@@ -772,6 +806,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     monthEarnings: Math.round(monthEarnings),
     codRevenue: Math.round(codRevenue),
     onlineRevenue: Math.round(onlineRevenue),
+    actualCodRevenue: Math.round(actualCodRevenue),
+    actualCodRecordedCount,
     grossEarnings: Math.round(totalEarnings),
     netEarnings: Math.round(totalEarnings - totalCommission),
     totalCommission: rnd2(totalCommission),
@@ -1461,6 +1497,13 @@ router.patch(
 );
 
 // Partner ticket scanner
+const ScanActualEntry = z.object({
+  women: z.number().int().nonnegative().optional(),
+  men: z.number().int().nonnegative().optional(),
+  couple: z.number().int().nonnegative().optional(),
+  guests: z.number().int().nonnegative().optional(),
+});
+
 router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) {
@@ -1468,12 +1511,23 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  const rawCode = (req.body as Record<string, unknown>)["code"];
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const rawCode = body["code"];
   if (typeof rawCode !== "string" || !rawCode.trim()) {
     res.status(400).json({ code: "INVALID_CODE", message: "Please enter a ticket code." });
     return;
   }
   const code = rawCode.trim().toUpperCase();
+  const actualEntryRaw = body["actualEntry"];
+  let actualEntry: z.infer<typeof ScanActualEntry> | null = null;
+  if (actualEntryRaw && typeof actualEntryRaw === "object") {
+    const parsed = ScanActualEntry.safeParse(actualEntryRaw);
+    if (!parsed.success) {
+      res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Invalid actualEntry payload." });
+      return;
+    }
+    actualEntry = parsed.data;
+  }
 
   // Determine booking ID and whether this is a new-format code (needs checksum verification)
   let bookingId: number;
@@ -1534,15 +1588,43 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // Load vendor (format/checksum) and commission rates in parallel
-  const [vRows, scanCommissionRows] = await Promise.all([
+  // Load vendor (format/checksum), commission rates, and event (for actual-entry pricing) in parallel
+  const [vRows, scanCommissionRows, evtRows] = await Promise.all([
     db.select({ ticketSalt: vendorsTable.ticketSalt, ticketPrefix: vendorsTable.ticketPrefix })
       .from(vendorsTable)
       .where(eq(vendorsTable.id, b.vendorId))
       .limit(1),
     db.select().from(vendorCommissionsTable).where(eq(vendorCommissionsTable.vendorId, b.vendorId)).limit(1),
+    db.select().from(eventsTable).where(eq(eventsTable.id, b.eventId)).limit(1),
   ]);
   const scanVendor = vRows[0];
+  const scanEvent = evtRows[0];
+
+  // Compute actualAmountDue from per-type actuals using event prices (ticket mode) or pro-rated finalPrice (otherwise).
+  // Returns null if no actuals are recorded yet.
+  function calcActualAmountDue(
+    booking: { pubMode: string; ticketWomen: number; ticketMen: number; ticketCouple: number; guests: number; finalPrice: string; totalPrice: string; actualWomen: number | null; actualMen: number | null; actualCouple: number | null; actualGuests: number | null },
+  ): number | null {
+    const aw = booking.actualWomen, am = booking.actualMen, ac = booking.actualCouple, ag = booking.actualGuests;
+    const isTicketMode = booking.pubMode === "ticket";
+    if (isTicketMode) {
+      if (aw == null && am == null && ac == null) return null;
+      const w = aw ?? 0, m = am ?? 0, c = ac ?? 0;
+      const pw = Number(scanEvent?.priceWomen ?? 0);
+      const pm = Number(scanEvent?.priceMen ?? 0);
+      const pc = Number(scanEvent?.priceCouple ?? 0);
+      const baseGross = w * pw + m * pm + c * pc;
+      // Apply same discount ratio as original booking so coupons/points carry over proportionally.
+      const total = Number(booking.totalPrice);
+      const final = Number(booking.finalPrice);
+      const ratio = total > 0 ? final / total : 1;
+      return Math.round(baseGross * ratio * 100) / 100;
+    }
+    if (ag == null) return null;
+    const guests = Math.max(1, booking.guests);
+    const final = Number(booking.finalPrice);
+    return Math.round((ag / guests) * final * 100) / 100;
+  }
 
   // Pre-compute commission for this booking
   const scanComm = scanCommissionRows[0];
@@ -1613,15 +1695,69 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
+  // ── Two-step path: actualEntry provided → record per-type actuals (and check-in if needed) ──
+  if (actualEntry) {
+    const isTicket = b.pubMode === "ticket";
+    // Preserve existing recorded values for fields the client omits, so a partial
+    // payload only updates what it explicitly provides rather than zeroing the rest.
+    let aw: number | null = b.actualWomen;
+    let am: number | null = b.actualMen;
+    let ac: number | null = b.actualCouple;
+    let ag: number | null = b.actualGuests;
+    if (isTicket) {
+      if (actualEntry.women !== undefined) aw = Math.min(actualEntry.women, b.ticketWomen);
+      if (actualEntry.men !== undefined) am = Math.min(actualEntry.men, b.ticketMen);
+      if (actualEntry.couple !== undefined) ac = Math.min(actualEntry.couple, b.ticketCouple);
+      if ((aw ?? 0) < 0 || (am ?? 0) < 0 || (ac ?? 0) < 0) {
+        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." });
+        return;
+      }
+    } else {
+      if (actualEntry.guests !== undefined) ag = Math.min(actualEntry.guests, Math.max(b.guests, 0));
+      if ((ag ?? 0) < 0) {
+        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual guests cannot be negative." });
+        return;
+      }
+    }
+    const wasCheckedIn = b.checkedIn;
+    const checkedInAtNow = b.checkedInAt ?? new Date();
+    const [updatedActuals] = await db
+      .update(bookingsTable)
+      .set({
+        actualWomen: aw,
+        actualMen: am,
+        actualCouple: ac,
+        actualGuests: ag,
+        checkedIn: true,
+        checkedInAt: checkedInAtNow,
+      })
+      .where(eq(bookingsTable.id, b.id))
+      .returning();
+    if (!updatedActuals) {
+      res.status(500).json({ code: "SERVER_ERROR", message: "Failed to record actual entry. Please try again." });
+      return;
+    }
+    const [out] = await serializeBookings([updatedActuals]);
+    const okComm = calcScanCommission(updatedActuals);
+    const actualAmountDue = calcActualAmountDue(updatedActuals);
+    res.json({
+      code: "OK",
+      checkedInAt: checkedInAtNow.toISOString(),
+      booking: out ? { ...out, ...okComm, actualAmountDue, justCheckedIn: !wasCheckedIn } : null,
+    });
+    return;
+  }
+
   // Already checked in?
   if (b.checkedIn) {
     const checkedInAt = b.checkedInAt ? b.checkedInAt.toISOString() : null;
     const [out] = await serializeBookings([b]);
+    const actualAmountDue = calcActualAmountDue(b);
     res.status(409).json({
       code: "ALREADY_CHECKED_IN",
       message: "This ticket has already been used for entry.",
       checkedInAt,
-      booking: out ? { ...out, ...scanCommInfo } : null,
+      booking: out ? { ...out, ...scanCommInfo, actualAmountDue } : null,
     });
     return;
   }
@@ -1644,11 +1780,12 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       const checkedInAt = current.checkedInAt ? current.checkedInAt.toISOString() : null;
       const [out] = await serializeBookings([current]);
       const currComm = calcScanCommission(current);
+      const actualAmountDue = calcActualAmountDue(current);
       res.status(409).json({
         code: "ALREADY_CHECKED_IN",
         message: "This ticket has already been used for entry.",
         checkedInAt,
-        booking: out ? { ...out, ...currComm } : null,
+        booking: out ? { ...out, ...currComm, actualAmountDue } : null,
       });
     } else {
       res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
@@ -1692,7 +1829,8 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   }
 
   const okComm = calcScanCommission(updated);
-  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ? { ...out, ...okComm } : null });
+  const actualAmountDue = calcActualAmountDue(updated);
+  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ? { ...out, ...okComm, actualAmountDue } : null });
 });
 
 router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) => {

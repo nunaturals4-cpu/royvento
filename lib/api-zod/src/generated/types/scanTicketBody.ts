@@ -5,7 +5,10 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { ScanTicketBodyActualEntry } from "./scanTicketBodyActualEntry";
 
 export interface ScanTicketBody {
   code: string;
+  /** Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue. */
+  actualEntry?: ScanTicketBodyActualEntry;
 }

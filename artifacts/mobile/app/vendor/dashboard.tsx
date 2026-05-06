@@ -2142,6 +2142,7 @@ export default function VendorDashboardScreen() {
   type AnalyticsResult = {
     totalEarnings: number; monthEarnings: number;
     codRevenue: number; onlineRevenue: number;
+    actualCodRevenue?: number; actualCodRecordedCount?: number;
     grossEarnings: number; netEarnings: number; totalCommission: number;
     codCommission: number; onlineCommission: number;
     commissionRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
@@ -2195,9 +2196,9 @@ export default function VendorDashboardScreen() {
       { label: "Platform Fee", value: `₹${(a?.totalCommission ?? 0).toLocaleString("en-IN")}`, icon: "remove-circle-outline" as const, color: "#f59e0b" },
       { label: "Net Earnings", value: `₹${(a?.netEarnings ?? a?.totalEarnings ?? 0).toLocaleString("en-IN")}`, icon: "checkmark-circle-outline" as const, color: "#22c55e" },
     ];
-    type ChannelKpi = { label: string; icon: "wallet-outline" | "card-outline"; color: string; gross: number; commission: number; net: number };
+    type ChannelKpi = { label: string; icon: "wallet-outline" | "card-outline"; color: string; gross: number; commission: number; net: number; actual?: number; actualCount?: number };
     const channelKpis: ChannelKpi[] = [
-      { label: "Pay at Venue", icon: "wallet-outline", color: "#f59e0b", gross: a?.codRevenue ?? 0, commission: a?.codCommission ?? 0, net: (a?.codRevenue ?? 0) - (a?.codCommission ?? 0) },
+      { label: "Pay at Venue", icon: "wallet-outline", color: "#f59e0b", gross: a?.codRevenue ?? 0, commission: a?.codCommission ?? 0, net: (a?.codRevenue ?? 0) - (a?.codCommission ?? 0), actual: a?.actualCodRevenue, actualCount: a?.actualCodRecordedCount },
       { label: "Online", icon: "card-outline", color: "#3b82f6", gross: a?.onlineRevenue ?? 0, commission: a?.onlineCommission ?? 0, net: (a?.onlineRevenue ?? 0) - (a?.onlineCommission ?? 0) },
     ];
     const guestKpis = [
@@ -2288,6 +2289,15 @@ export default function VendorDashboardScreen() {
                 <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#22c55e" }}>Net Earnings</Text>
                 <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#22c55e" }}>₹{k.net.toLocaleString("en-IN")}</Text>
               </View>
+              {typeof k.actual === "number" && (
+                <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.4 }}>Actual collected</Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{k.actualCount ?? 0} bookings recorded</Text>
+                  </View>
+                  <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: k.color }}>₹{k.actual.toLocaleString("en-IN")}</Text>
+                </View>
+              )}
             </View>
           ))}
         </View>

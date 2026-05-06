@@ -16,6 +16,10 @@ export interface PartnerAnalyticsResult {
   monthEarnings: number;
   codRevenue: number;
   onlineRevenue: number;
+  /** Total cash actually expected at the door for COD bookings, computed from per-type actual entry counts. */
+  actualCodRevenue?: number;
+  /** Number of COD bookings that have actual entry recorded. */
+  actualCodRecordedCount?: number;
   grossEarnings: number;
   netEarnings: number;
   totalCommission: number;

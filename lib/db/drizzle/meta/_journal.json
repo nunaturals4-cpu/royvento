@@ -43,6 +43,13 @@
       "when": 1778081900000,
       "tag": "0025_vendors_crowd_online_balance",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1778168300000,
+      "tag": "0026_bookings_actual_attendance",
+      "breakpoints": true
     }
   ]
 }

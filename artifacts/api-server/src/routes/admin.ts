@@ -816,6 +816,31 @@ router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => 
     checkedIn: b.checkedIn,
     checkedInAt: b.checkedInAt?.toISOString() ?? null,
     arrivalTime: b.arrivalTime ?? null,
+    paymentMethod: b.paymentMethod,
+    finalPrice: Number(b.finalPrice),
+    pubMode: b.pubMode ?? "",
+    actualWomen: b.actualWomen ?? null,
+    actualMen: b.actualMen ?? null,
+    actualCouple: b.actualCouple ?? null,
+    actualGuests: b.actualGuests ?? null,
+    actualAmountDue: ((): number | null => {
+      const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+      const ev = events.find((e) => e.id === b.eventId);
+      if (b.pubMode === "ticket") {
+        if (aw == null && am == null && ac == null) return null;
+        const pw = Number(ev?.priceWomen ?? 0);
+        const pm = Number(ev?.priceMen ?? 0);
+        const pc = Number(ev?.priceCouple ?? 0);
+        const baseGross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+        const total = Number(b.totalPrice);
+        const final = Number(b.finalPrice);
+        const ratio = total > 0 ? final / total : 1;
+        return Math.round(baseGross * ratio * 100) / 100;
+      }
+      if (ag == null) return null;
+      const guests = Math.max(1, b.guests);
+      return Math.round((ag / guests) * Number(b.finalPrice) * 100) / 100;
+    })(),
   }));
 
   res.json({

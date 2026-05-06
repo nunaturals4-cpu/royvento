@@ -183,6 +183,10 @@ export const bookingsTable = pgTable(
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
     arrivalTime: varchar("arrival_time", { length: 8 }),
     paymentMethod: varchar("payment_method", { length: 10 }).notNull().default("online"),
+    actualWomen: integer("actual_women"),
+    actualMen: integer("actual_men"),
+    actualCouple: integer("actual_couple"),
+    actualGuests: integer("actual_guests"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

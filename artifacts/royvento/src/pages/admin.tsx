@@ -2346,6 +2346,8 @@ function AttendanceReport() {
                   <th className="text-left py-2 pr-3">Event</th>
                   <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("bookingDate")}>Booking date<SortIcon k="bookingDate" /></th>
                   <th className="text-right py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("guests")}>Party<SortIcon k="guests" /></th>
+                  <th className="text-right py-2 pr-3">Actual Entry</th>
+                  <th className="text-right py-2 pr-3">Pay at Venue</th>
                   <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("checkedIn")}>Status<SortIcon k="checkedIn" /></th>
                   <th className="text-left py-2">Check-in time</th>
                 </tr>
@@ -2362,6 +2364,33 @@ function AttendanceReport() {
                     <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-muted-foreground">
                       {b.guests || (b.ticketWomen + b.ticketMen + b.ticketCouple) || "—"}
+                    </td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
+                      {(() => {
+                        const r = b as unknown as { actualWomen?: number | null; actualMen?: number | null; actualCouple?: number | null; actualGuests?: number | null; pubMode?: string };
+                        const aw = r.actualWomen, am = r.actualMen, ac = r.actualCouple, ag = r.actualGuests;
+                        const has = aw != null || am != null || ac != null || ag != null;
+                        if (!has) return <span className="text-muted-foreground/60">—</span>;
+                        if (r.pubMode === "ticket") {
+                          return (
+                            <>
+                              {(aw ?? 0) > 0 && <span className="text-pink-300 mr-1">{aw}W</span>}
+                              {(am ?? 0) > 0 && <span className="text-blue-300 mr-1">{am}M</span>}
+                              {(ac ?? 0) > 0 && <span className="text-purple-300">{ac}C</span>}
+                              {(aw ?? 0) === 0 && (am ?? 0) === 0 && (ac ?? 0) === 0 && <span className="text-muted-foreground">0</span>}
+                            </>
+                          );
+                        }
+                        return <span className="text-foreground">{ag}</span>;
+                      })()}
+                    </td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
+                      {(() => {
+                        const r = b as unknown as { actualAmountDue?: number | null; paymentMethod?: string };
+                        if (r.paymentMethod !== "cod") return <span className="text-muted-foreground/40">—</span>;
+                        if (r.actualAmountDue == null) return <span className="text-muted-foreground/60">—</span>;
+                        return <span className="text-amber-300 font-semibold">₹{r.actualAmountDue.toLocaleString("en-IN")}</span>;
+                      })()}
                     </td>
                     <td className="py-2.5 pr-3">
                       {b.checkedIn ? (

@@ -1756,6 +1756,16 @@ export const GetPartnerAnalyticsResponse = zod.object({
   monthEarnings: zod.number(),
   codRevenue: zod.number(),
   onlineRevenue: zod.number(),
+  actualCodRevenue: zod
+    .number()
+    .optional()
+    .describe(
+      "Total cash actually expected at the door for COD bookings, computed from per-type actual entry counts.",
+    ),
+  actualCodRecordedCount: zod
+    .number()
+    .optional()
+    .describe("Number of COD bookings that have actual entry recorded."),
   grossEarnings: zod.number(),
   netEarnings: zod.number(),
   totalCommission: zod.number(),
@@ -1828,6 +1838,17 @@ export const GetPartnerAnalyticsResponse = zod.object({
  */
 export const PartnerScanTicketBody = zod.object({
   code: zod.string(),
+  actualEntry: zod
+    .object({
+      women: zod.number().optional(),
+      men: zod.number().optional(),
+      couple: zod.number().optional(),
+      guests: zod.number().optional(),
+    })
+    .optional()
+    .describe(
+      "Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_\* columns and returns the recomputed actualAmountDue.",
+    ),
 });
 
 export const PartnerScanTicketResponse = zod.object({
@@ -1862,6 +1883,21 @@ export const PartnerScanTicketResponse = zod.object({
         .number()
         .optional()
         .describe("Net amount the venue should collect"),
+      paymentMethod: zod.string().optional(),
+      finalPriceBooked: zod
+        .number()
+        .optional()
+        .describe("Original booked finalPrice (alias for finalPrice)"),
+      actualWomen: zod.number().nullish(),
+      actualMen: zod.number().nullish(),
+      actualCouple: zod.number().nullish(),
+      actualGuests: zod.number().nullish(),
+      actualAmountDue: zod
+        .number()
+        .nullish()
+        .describe(
+          "Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet.",
+        ),
     })
     .nullish(),
 });

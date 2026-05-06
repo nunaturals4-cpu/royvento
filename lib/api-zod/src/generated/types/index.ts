@@ -115,6 +115,7 @@ export * from "./review";
 export * from "./role";
 export * from "./saveBankingDetailsBody";
 export * from "./scanTicketBody";
+export * from "./scanTicketBodyActualEntry";
 export * from "./scanTicketBooking";
 export * from "./scanTicketResult";
 export * from "./scanTicketResultCode";

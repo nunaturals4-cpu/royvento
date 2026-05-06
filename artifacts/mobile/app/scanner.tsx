@@ -33,6 +33,12 @@ interface BookingData {
   commissionRate?: number;
   commissionAmount?: number;
   netAmount?: number;
+  paymentMethod?: string;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
+  actualAmountDue?: number | null;
 }
 
 interface ScanResult {
@@ -238,6 +244,13 @@ export default function ScannerScreen() {
               </View>
             </View>
 
+            {result.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
+              <ActualEntrySection
+                booking={result.booking}
+                onSaved={(updated) => setResult({ ...result, booking: updated })}
+              />
+            )}
+
             {result.booking && (
               <View style={[styles.bookingInfo, { borderTopColor: colors.border }]}>
                 <Text style={[styles.bookingTitle, { color: colors.foreground }]}>{result.booking.eventTitle}</Text>
@@ -331,6 +344,106 @@ export default function ScannerScreen() {
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+function StepperRow({ label, value, max, color, onChange }: { label: string; value: number; max: number; color: string; onChange: (n: number) => void }) {
+  if (max <= 0) return null;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</Text>
+        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.5)" }}>booked: {max}</Text>
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <TouchableOpacity
+          accessibilityLabel={`Decrease ${label}`}
+          onPress={() => onChange(Math.max(0, value - 1))}
+          disabled={value <= 0}
+          style={{ width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: color + "20", opacity: value <= 0 ? 0.3 : 1 }}
+        >
+          <Ionicons name="remove" size={18} color={color} />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#fff", minWidth: 28, textAlign: "center" }}>{value}</Text>
+        <TouchableOpacity
+          accessibilityLabel={`Increase ${label}`}
+          onPress={() => onChange(Math.min(max, value + 1))}
+          disabled={value >= max}
+          style={{ width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: color + "20", opacity: value >= max ? 0.3 : 1 }}
+        >
+          <Ionicons name="add" size={18} color={color} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function ActualEntrySection({ booking: b, onSaved }: { booking: BookingData; onSaved: (b: BookingData) => void }) {
+  const colors = useColors();
+  const isTicket = b.pubMode === "ticket";
+  const [w, setW] = useState<number>(b.actualWomen ?? b.ticketWomen);
+  const [m, setM] = useState<number>(b.actualMen ?? b.ticketMen);
+  const [c, setC] = useState<number>(b.actualCouple ?? b.ticketCouple);
+  const [g, setG] = useState<number>(b.actualGuests ?? b.guests);
+  const [saving, setSaving] = useState(false);
+  const isCod = b.paymentMethod === "cod";
+  const alreadyRecorded = b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null;
+  const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
+  if (isTicket && !hasAnyBookedTicket) return null;
+  if (!isTicket && b.guests <= 0) return null;
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const code = `RV-${String(b.id).padStart(6, "0")}`;
+      const actualEntry = isTicket ? { women: w, men: m, couple: c } : { guests: g };
+      const res = await customFetch<{ booking?: BookingData }>("/api/partner/scan-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, actualEntry }),
+      });
+      if (res.booking) onSaved(res.booking);
+    } catch {
+      // Network errors are surfaced via the broader scanner state; nothing more to do here.
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 16, gap: 8 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>Actual entry</Text>
+        {alreadyRecorded && <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>Recorded</Text>}
+      </View>
+      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Adjust if fewer guests showed up than booked.</Text>
+      <View style={{ marginTop: 4 }}>
+        {isTicket ? (
+          <>
+            <StepperRow label="Women" value={w} max={b.ticketWomen} color="#ec4899" onChange={setW} />
+            <StepperRow label="Men" value={m} max={b.ticketMen} color="#3b82f6" onChange={setM} />
+            <StepperRow label="Couples" value={c} max={b.ticketCouple} color="#a855f7" onChange={setC} />
+          </>
+        ) : (
+          <StepperRow label="Guests" value={g} max={Math.max(b.guests, 1)} color={colors.primary} onChange={setG} />
+        )}
+      </View>
+      {isCod && b.actualAmountDue != null && (
+        <View style={{ marginTop: 8, borderRadius: 10, padding: 10, backgroundColor: "#f59e0b18", borderWidth: 1, borderColor: "#f59e0b40", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5 }}>Pay at venue (COD)</Text>
+          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#f59e0b" }}>₹{b.actualAmountDue.toLocaleString("en-IN")}</Text>
+        </View>
+      )}
+      <TouchableOpacity
+        onPress={submit}
+        disabled={saving}
+        style={{ marginTop: 8, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: "center", opacity: saving ? 0.5 : 1 }}
+      >
+        {saving
+          ? <ActivityIndicator size="small" color={colors.primaryForeground} />
+          : <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.primaryForeground }}>{alreadyRecorded ? "Update actual entry" : "Save actual entry"}</Text>}
+      </TouchableOpacity>
+    </View>
   );
 }
 
