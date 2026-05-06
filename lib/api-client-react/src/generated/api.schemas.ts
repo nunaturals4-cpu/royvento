@@ -279,6 +279,13 @@ export const BookingStatus = {
   completed: "completed",
 } as const;
 
+export type BookingActualEntry = {
+  women?: number | null;
+  men?: number | null;
+  couple?: number | null;
+  guests?: number | null;
+} | null;
+
 export interface Booking {
   id: number;
   eventId: number;
@@ -306,6 +313,17 @@ export interface Booking {
   personName?: string;
   checkedIn?: boolean;
   checkedInAt?: string | null;
+  finalPrice?: number;
+  paymentMethod?: string;
+  ticketWomen?: number;
+  ticketMen?: number;
+  ticketCouple?: number;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
+  actualAmountDue?: number | null;
+  actualEntry?: BookingActualEntry;
 }
 
 /**

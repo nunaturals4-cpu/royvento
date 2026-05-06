@@ -2222,6 +2222,39 @@ components:
         checkedInAt:
           type: string
           nullable: true
+        finalPrice:
+          type: number
+        paymentMethod:
+          type: string
+        ticketWomen:
+          type: integer
+        ticketMen:
+          type: integer
+        ticketCouple:
+          type: integer
+        actualWomen:
+          type: integer
+          nullable: true
+        actualMen:
+          type: integer
+          nullable: true
+        actualCouple:
+          type: integer
+          nullable: true
+        actualGuests:
+          type: integer
+          nullable: true
+        actualAmountDue:
+          type: number
+          nullable: true
+        actualEntry:
+          type: object
+          nullable: true
+          properties:
+            women: { type: integer, nullable: true }
+            men: { type: integer, nullable: true }
+            couple: { type: integer, nullable: true }
+            guests: { type: integer, nullable: true }
       required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail, phone]
 
     CreateBookingBody:

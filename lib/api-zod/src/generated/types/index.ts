@@ -30,6 +30,7 @@ export * from "./authResponse";
 export * from "./availability";
 export * from "./availabilityStatus";
 export * from "./booking";
+export * from "./bookingActualEntry";
 export * from "./bookingStatus";
 export * from "./commissionReport";
 export * from "./commissionReportBookingLine";

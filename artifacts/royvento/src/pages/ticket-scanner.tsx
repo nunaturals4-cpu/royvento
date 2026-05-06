@@ -22,6 +22,10 @@ interface BookingData {
   ticketMen: number;
   ticketCouple: number;
   guests: number;
+  finalPrice: number;
+  priceWomen?: number;
+  priceMen?: number;
+  priceCouple?: number;
   paymentMethod?: string;
   actualWomen?: number | null;
   actualMen?: number | null;
@@ -636,9 +640,9 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
 
   // LIVE running total computed from current stepper values (not server response,
   // which is null until the user saves). Only relevant for COD bookings.
-  const priceWomen = (b as unknown as { priceWomen?: number }).priceWomen ?? 0;
-  const priceMen = (b as unknown as { priceMen?: number }).priceMen ?? 0;
-  const priceCouple = (b as unknown as { priceCouple?: number }).priceCouple ?? 0;
+  const priceWomen = b.priceWomen ?? 0;
+  const priceMen = b.priceMen ?? 0;
+  const priceCouple = b.priceCouple ?? 0;
   const liveTotal = isTicket
     ? w * priceWomen + m * priceMen + c * priceCouple
     : (g / Math.max(1, b.guests)) * b.finalPrice;

@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { BookingActualEntry } from "./bookingActualEntry";
 import type { BookingStatus } from "./bookingStatus";
 
 export interface Booking {
@@ -34,4 +35,15 @@ export interface Booking {
   personName?: string;
   checkedIn?: boolean;
   checkedInAt?: string | null;
+  finalPrice?: number;
+  paymentMethod?: string;
+  ticketWomen?: number;
+  ticketMen?: number;
+  ticketCouple?: number;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
+  actualAmountDue?: number | null;
+  actualEntry?: BookingActualEntry;
 }

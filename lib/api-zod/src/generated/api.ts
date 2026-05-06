@@ -1420,6 +1420,24 @@ export const CreateBookingResponse = zod.object({
   personName: zod.string().optional(),
   checkedIn: zod.boolean().optional(),
   checkedInAt: zod.string().nullish(),
+  finalPrice: zod.number().optional(),
+  paymentMethod: zod.string().optional(),
+  ticketWomen: zod.number().optional(),
+  ticketMen: zod.number().optional(),
+  ticketCouple: zod.number().optional(),
+  actualWomen: zod.number().nullish(),
+  actualMen: zod.number().nullish(),
+  actualCouple: zod.number().nullish(),
+  actualGuests: zod.number().nullish(),
+  actualAmountDue: zod.number().nullish(),
+  actualEntry: zod
+    .object({
+      women: zod.number().nullish(),
+      men: zod.number().nullish(),
+      couple: zod.number().nullish(),
+      guests: zod.number().nullish(),
+    })
+    .nullish(),
 });
 
 /**
@@ -1460,6 +1478,24 @@ export const ListMyBookingsResponseItem = zod.object({
   personName: zod.string().optional(),
   checkedIn: zod.boolean().optional(),
   checkedInAt: zod.string().nullish(),
+  finalPrice: zod.number().optional(),
+  paymentMethod: zod.string().optional(),
+  ticketWomen: zod.number().optional(),
+  ticketMen: zod.number().optional(),
+  ticketCouple: zod.number().optional(),
+  actualWomen: zod.number().nullish(),
+  actualMen: zod.number().nullish(),
+  actualCouple: zod.number().nullish(),
+  actualGuests: zod.number().nullish(),
+  actualAmountDue: zod.number().nullish(),
+  actualEntry: zod
+    .object({
+      women: zod.number().nullish(),
+      men: zod.number().nullish(),
+      couple: zod.number().nullish(),
+      guests: zod.number().nullish(),
+    })
+    .nullish(),
 });
 export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 
@@ -1519,6 +1555,24 @@ export const ListVendorBookingsResponse = zod.object({
       personName: zod.string().optional(),
       checkedIn: zod.boolean().optional(),
       checkedInAt: zod.string().nullish(),
+      finalPrice: zod.number().optional(),
+      paymentMethod: zod.string().optional(),
+      ticketWomen: zod.number().optional(),
+      ticketMen: zod.number().optional(),
+      ticketCouple: zod.number().optional(),
+      actualWomen: zod.number().nullish(),
+      actualMen: zod.number().nullish(),
+      actualCouple: zod.number().nullish(),
+      actualGuests: zod.number().nullish(),
+      actualAmountDue: zod.number().nullish(),
+      actualEntry: zod
+        .object({
+          women: zod.number().nullish(),
+          men: zod.number().nullish(),
+          couple: zod.number().nullish(),
+          guests: zod.number().nullish(),
+        })
+        .nullish(),
     }),
   ),
   total: zod.number(),
@@ -1584,6 +1638,24 @@ export const UpdateBookingStatusResponse = zod.object({
   personName: zod.string().optional(),
   checkedIn: zod.boolean().optional(),
   checkedInAt: zod.string().nullish(),
+  finalPrice: zod.number().optional(),
+  paymentMethod: zod.string().optional(),
+  ticketWomen: zod.number().optional(),
+  ticketMen: zod.number().optional(),
+  ticketCouple: zod.number().optional(),
+  actualWomen: zod.number().nullish(),
+  actualMen: zod.number().nullish(),
+  actualCouple: zod.number().nullish(),
+  actualGuests: zod.number().nullish(),
+  actualAmountDue: zod.number().nullish(),
+  actualEntry: zod
+    .object({
+      women: zod.number().nullish(),
+      men: zod.number().nullish(),
+      couple: zod.number().nullish(),
+      guests: zod.number().nullish(),
+    })
+    .nullish(),
 });
 
 /**
@@ -2623,6 +2695,24 @@ export const GetAdminAnalyticsResponse = zod.object({
       personName: zod.string().optional(),
       checkedIn: zod.boolean().optional(),
       checkedInAt: zod.string().nullish(),
+      finalPrice: zod.number().optional(),
+      paymentMethod: zod.string().optional(),
+      ticketWomen: zod.number().optional(),
+      ticketMen: zod.number().optional(),
+      ticketCouple: zod.number().optional(),
+      actualWomen: zod.number().nullish(),
+      actualMen: zod.number().nullish(),
+      actualCouple: zod.number().nullish(),
+      actualGuests: zod.number().nullish(),
+      actualAmountDue: zod.number().nullish(),
+      actualEntry: zod
+        .object({
+          women: zod.number().nullish(),
+          men: zod.number().nullish(),
+          couple: zod.number().nullish(),
+          guests: zod.number().nullish(),
+        })
+        .nullish(),
     }),
   ),
   topVendors: zod.array(

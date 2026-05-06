@@ -118,6 +118,23 @@ async function serializeBookings(rows: BookingRow[]) {
     const e = eMap.get(b.eventId);
     const u = uMap.get(b.userId);
     const v = vMap.get(b.vendorId);
+    const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+    const hasActuals = aw != null || am != null || ac != null || ag != null;
+    const actualEntry = hasActuals ? { women: aw, men: am, couple: ac, guests: ag } : null;
+    let actualAmountDue: number | null = null;
+    if (hasActuals) {
+      if (b.pubMode === "ticket") {
+        if (aw != null || am != null || ac != null) {
+          const pw = Number(e?.priceWomen ?? 0);
+          const pm = Number(e?.priceMen ?? 0);
+          const pc = Number(e?.priceCouple ?? 0);
+          actualAmountDue = Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
+        }
+      } else if (ag != null) {
+        const guests = Math.max(1, b.guests);
+        actualAmountDue = Math.round(((ag / guests) * Number(b.finalPrice)) * 100) / 100;
+      }
+    }
     return {
       id: b.id,
       eventId: b.eventId,
@@ -151,6 +168,8 @@ async function serializeBookings(rows: BookingRow[]) {
       actualMen: b.actualMen ?? null,
       actualCouple: b.actualCouple ?? null,
       actualGuests: b.actualGuests ?? null,
+      actualEntry,
+      actualAmountDue,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",
@@ -887,21 +906,38 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
   const userIds = [...new Set(rows.map((r) => r.userId))];
 
   const [events, users] = await Promise.all([
-    eventIds.length > 0 ? db.select({ id: eventsTable.id, title: eventsTable.title }).from(eventsTable).where(inArray(eventsTable.id, eventIds)) : [],
+    eventIds.length > 0 ? db.select({ id: eventsTable.id, title: eventsTable.title, priceWomen: eventsTable.priceWomen, priceMen: eventsTable.priceMen, priceCouple: eventsTable.priceCouple }).from(eventsTable).where(inArray(eventsTable.id, eventIds)) : [],
     userIds.length > 0 ? db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, phone: sql<string>`coalesce(phone,'')` }).from(usersTable).where(inArray(usersTable.id, userIds)) : [],
   ]);
 
-  const eventMap = new Map(events.map((e) => [e.id, e.title]));
+  const eventMap = new Map(events.map((e) => [e.id, e]));
   const userMap = new Map(users.map((u) => [u.id, u]));
 
   const attendanceRows = rows.map((b) => {
     const u = userMap.get(b.userId);
+    const e = eventMap.get(b.eventId);
+    const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+    const hasActuals = aw != null || am != null || ac != null || ag != null;
+    let actualAmountDue: number | null = null;
+    if (hasActuals) {
+      if (b.pubMode === "ticket") {
+        if (aw != null || am != null || ac != null) {
+          const pw = Number(e?.priceWomen ?? 0);
+          const pm = Number(e?.priceMen ?? 0);
+          const pc = Number(e?.priceCouple ?? 0);
+          actualAmountDue = Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
+        }
+      } else if (ag != null) {
+        const guests = Math.max(1, b.guests);
+        actualAmountDue = Math.round(((ag / guests) * Number(b.finalPrice)) * 100) / 100;
+      }
+    }
     return {
       id: b.id,
       vendorId: b.vendorId,
       vendorName: vendor.businessName,
       eventId: b.eventId,
-      eventTitle: eventMap.get(b.eventId) ?? "",
+      eventTitle: e?.title ?? "",
       userId: b.userId,
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
@@ -915,6 +951,14 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
       checkedIn: b.checkedIn,
       checkedInAt: b.checkedInAt?.toISOString() ?? null,
       arrivalTime: b.arrivalTime ?? null,
+      paymentMethod: b.paymentMethod ?? "online",
+      finalPrice: Number(b.finalPrice),
+      pubMode: b.pubMode,
+      actualWomen: aw,
+      actualMen: am,
+      actualCouple: ac,
+      actualGuests: ag,
+      actualAmountDue,
     };
   });
 
@@ -1704,6 +1748,20 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   // ── Two-step path: actualEntry provided → record per-type actuals (and check-in if needed) ──
   if (actualEntry) {
+    // Reject empty payloads ({} or all-undefined) so we never mark a booking checked-in
+    // without recording at least one per-type count.
+    if (
+      actualEntry.women === undefined &&
+      actualEntry.men === undefined &&
+      actualEntry.couple === undefined &&
+      actualEntry.guests === undefined
+    ) {
+      res.status(400).json({
+        code: "INVALID_ACTUAL_ENTRY",
+        message: "actualEntry must include at least one of women/men/couple/guests.",
+      });
+      return;
+    }
     const isTicket = b.pubMode === "ticket";
     // Preserve existing recorded values for fields the client omits, so a partial
     // payload only updates what it explicitly provides rather than zeroing the rest.
