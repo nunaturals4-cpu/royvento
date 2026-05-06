@@ -202,6 +202,15 @@ export default function ProfileScreen() {
     enabled: !!user,
   });
 
+  const { data: notificationData } = useQuery<{ id: number; isRead: boolean }[]>({
+    queryKey: ["notifications"],
+    queryFn: () => customFetch<{ id: number; isRead: boolean }[]>("/api/notifications"),
+    enabled: !!user,
+    staleTime: 60_000,
+    refetchInterval: 90_000,
+  });
+  const unreadCount = (notificationData ?? []).filter((n) => !n.isRead).length;
+
   const [actingInv, setActingInv] = useState<number | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -677,19 +686,19 @@ export default function ProfileScreen() {
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
           ...(user.role === "user"
-            ? [{ icon: "business-outline" as const, label: t("profile.become_partner"), onPress: () => router.push("/become-vendor") }]
+            ? [{ icon: "business-outline" as const, label: t("profile.become_partner"), onPress: () => router.push("/become-vendor"), badge: 0 }]
             : []),
-          { icon: "notifications-outline" as const, label: "Notifications", onPress: () => router.push("/notifications") },
-          { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings") },
-          { icon: "heart-outline" as const, label: t("profile.wishlist"), onPress: () => router.push("/(tabs)/wishlist") },
-          { icon: "beer-outline" as const, label: t("nav.pubs"), onPress: () => router.push("/(tabs)/explore") },
-          { icon: "pricetags-outline" as const, label: t("nav.deals"), onPress: () => router.push("/(tabs)/deals") },
-          { icon: "newspaper-outline" as const, label: t("profile.blog_stories"), onPress: () => router.push("/blogs") },
-          { icon: "star-outline" as const, label: t("profile.subscription_premium"), onPress: () => router.push("/subscription") },
-          { icon: "headset-outline" as const, label: t("profile.contact_help"), onPress: () => router.push("/contact") },
-          { icon: "language-outline" as const, label: t("profile.language"), onPress: () => setLangModal(true) },
-          { icon: "document-text-outline" as const, label: "Terms of Service", onPress: () => router.push("/terms") },
-          { icon: "shield-checkmark-outline" as const, label: "Privacy Policy", onPress: () => router.push("/privacy") },
+          { icon: "notifications-outline" as const, label: "Notifications", onPress: () => router.push("/notifications"), badge: unreadCount },
+          { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings"), badge: 0 },
+          { icon: "heart-outline" as const, label: t("profile.wishlist"), onPress: () => router.push("/(tabs)/wishlist"), badge: 0 },
+          { icon: "beer-outline" as const, label: t("nav.pubs"), onPress: () => router.push("/(tabs)/explore"), badge: 0 },
+          { icon: "pricetags-outline" as const, label: t("nav.deals"), onPress: () => router.push("/(tabs)/deals"), badge: 0 },
+          { icon: "newspaper-outline" as const, label: t("profile.blog_stories"), onPress: () => router.push("/blogs"), badge: 0 },
+          { icon: "star-outline" as const, label: t("profile.subscription_premium"), onPress: () => router.push("/subscription"), badge: 0 },
+          { icon: "headset-outline" as const, label: t("profile.contact_help"), onPress: () => router.push("/contact"), badge: 0 },
+          { icon: "language-outline" as const, label: t("profile.language"), onPress: () => setLangModal(true), badge: 0 },
+          { icon: "document-text-outline" as const, label: "Terms of Service", onPress: () => router.push("/terms"), badge: 0 },
+          { icon: "shield-checkmark-outline" as const, label: "Privacy Policy", onPress: () => router.push("/privacy"), badge: 0 },
           {
             icon: "log-out-outline" as const,
             label: t("profile.sign_out"),
@@ -699,6 +708,7 @@ export default function ProfileScreen() {
                 { text: t("profile.sign_out"), style: "destructive", onPress: handleLogout },
               ]),
             tint: colors.destructive,
+            badge: 0,
           },
         ].map((item, idx, arr) => (
           <Pressable
@@ -715,7 +725,14 @@ export default function ProfileScreen() {
             </View>
             <Text style={[styles.menuLabel, { color: item.tint ?? colors.foreground }]}>{item.label}</Text>
             {"tint" in item && item.tint === colors.destructive ? null : (
-              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                {item.badge > 0 && (
+                  <View style={[styles.menuBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.menuBadgeText}>{item.badge > 99 ? "99+" : String(item.badge)}</Text>
+                  </View>
+                )}
+                <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+              </View>
             )}
           </Pressable>
         ))}
@@ -925,6 +942,8 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   menuIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   menuLabel: { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium" },
+  menuBadge: { borderRadius: 10, minWidth: 20, height: 20, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
+  menuBadgeText: { color: "#fff", fontSize: 11, fontFamily: "Inter_700Bold", lineHeight: 14 },
   version: { textAlign: "center", fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 8 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)" },
   modalCard: { borderRadius: 24, borderWidth: 1, padding: 24, gap: 16 },

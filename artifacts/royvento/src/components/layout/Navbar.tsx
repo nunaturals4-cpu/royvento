@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "@/components/ThemeProvider";
 import { THEMES } from "@/components/ui/ThemeSwitcher";
 import { LANGUAGES } from "@/components/ui/LanguageSwitcher";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Notification {
   id: number;
@@ -36,13 +37,13 @@ export function Navbar() {
   const [, setLocation] = useLocation();
   const [q, setQ] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notifs, setNotifs] = useState<Notification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [cityModalOpen, setCityModalOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLDivElement | null>(null);
+  const qc = useQueryClient();
 
   const { selectedCity } = useSelectedCity();
 
@@ -55,21 +56,38 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const loadNotifs = async () => {
-    if (!user) return;
-    try {
-      const rows = await apiGet<Notification[]>("/api/notifications");
-      setNotifs(rows);
-    } catch {
-    }
-  };
+  const { data: notifs = [] } = useQuery<Notification[]>({
+    queryKey: ["notifications"],
+    queryFn: () => apiGet<Notification[]>("/api/notifications"),
+    enabled: !!user,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
 
-  useEffect(() => {
-    if (!user) { setNotifs([]); return; }
-    loadNotifs();
-    const t = setInterval(loadNotifs, 30000);
-    return () => clearInterval(t);
-  }, [user?.id]);
+  const markReadMutation = useMutation({
+    mutationFn: (id: number) => apiPatch(`/api/notifications/${id}/read`, {}),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      qc.setQueryData<Notification[]>(["notifications"], (prev) =>
+        (prev ?? []).map((n) => n.id === id ? { ...n, isRead: true } : n),
+      );
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => {
+      const unread = notifs.filter((n) => !n.isRead);
+      await Promise.all(unread.map((n) => apiPatch(`/api/notifications/${n.id}/read`, {})));
+    },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      qc.setQueryData<Notification[]>(["notifications"], (prev) =>
+        (prev ?? []).map((n) => ({ ...n, isRead: true })),
+      );
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -90,18 +108,6 @@ export function Navbar() {
     if (searchOpen) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [searchOpen]);
-
-  const markRead = async (id: number) => {
-    try {
-      await apiPatch(`/api/notifications/${id}/read`, {});
-      setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
-    } catch {}
-  };
-
-  const markAllRead = async () => {
-    const unread = notifs.filter((n) => !n.isRead);
-    await Promise.all(unread.map((n) => markRead(n.id)));
-  };
 
   const handleLogout = () => {
     logout.mutate(undefined, {
@@ -205,7 +211,7 @@ export function Navbar() {
                   variant="ghost"
                   size="icon"
                   className="h-9 w-9 rounded-full hover:bg-foreground/8 relative"
-                  onClick={() => { setNotifOpen((v) => !v); if (!notifOpen) loadNotifs(); }}
+                  onClick={() => setNotifOpen((v) => !v)}
                   aria-label="Notifications"
                 >
                   <Bell className="h-4 w-4" />
@@ -222,7 +228,7 @@ export function Navbar() {
                       <p className="font-semibold text-sm">{t("nav.notifications")}</p>
                       {unreadCount > 0 && (
                         <button
-                          onClick={markAllRead}
+                          onClick={() => markAllReadMutation.mutate()}
                           className="text-xs text-primary hover:underline"
                         >
                           {t("nav.mark_all_read")}
@@ -240,7 +246,7 @@ export function Navbar() {
                           <div
                             key={n.id}
                             className={`px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors ${!n.isRead ? "bg-primary/5" : ""}`}
-                            onClick={() => markRead(n.id)}
+                            onClick={() => { if (!n.isRead) markReadMutation.mutate(n.id); }}
                           >
                             <div className="flex items-start gap-2">
                               {!n.isRead && (
@@ -451,6 +457,20 @@ export function Navbar() {
                     {label}
                   </Link>
                 ))}
+                {user && (
+                  <Link
+                    href="/notifications"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-between py-3 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-border/40"
+                  >
+                    <span>{t("nav.notifications")}</span>
+                    {unreadCount > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
               </nav>
 
               {/* Mobile auth — logged-out only */}

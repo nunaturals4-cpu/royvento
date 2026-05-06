@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
-import { apiGet, apiPatch } from "@/lib/api";
+import { Bell, BellOff, BellRing, CheckCheck, Loader2 } from "lucide-react";
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 
 interface Notification {
   id: number;
@@ -26,6 +27,124 @@ function formatTime(iso: string) {
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
+type PushState = "unsupported" | "loading" | "subscribed" | "unsubscribed" | "denied";
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+function WebPushToggle() {
+  const { toast } = useToast();
+  const [state, setState] = useState<PushState>("loading");
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setState("unsupported");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setState("denied");
+      return;
+    }
+    navigator.serviceWorker.ready.then(async (reg) => {
+      const sub = await reg.pushManager.getSubscription();
+      setState(sub ? "subscribed" : "unsubscribed");
+    }).catch(() => setState("unsubscribed"));
+  }, []);
+
+  const subscribe = async () => {
+    setState("loading");
+    try {
+      const { publicKey } = await apiGet<{ publicKey: string }>("/api/push/vapid-public-key");
+      const reg = await navigator.serviceWorker.ready;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setState("denied");
+        toast({ title: "Permission denied", description: "Enable notifications in your browser settings to receive push alerts.", variant: "destructive" });
+        return;
+      }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      await apiPost("/api/push/subscribe", { subscription: sub.toJSON() });
+      setState("subscribed");
+      toast({ title: "Push notifications enabled", description: "You'll now get booking reminders and announcements even when the tab is closed." });
+    } catch (err: any) {
+      setState("unsubscribed");
+      const msg = err?.message ?? "";
+      if (msg.includes("503") || msg.includes("not configured")) {
+        toast({ title: "Not available yet", description: "Push notifications aren't configured on this server.", variant: "destructive" });
+      } else {
+        toast({ title: "Could not enable push", description: "Please try again.", variant: "destructive" });
+      }
+    }
+  };
+
+  const unsubscribe = async () => {
+    setState("loading");
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+      await apiDelete("/api/push/subscribe");
+      setState("unsubscribed");
+      toast({ title: "Push notifications disabled", description: "You won't receive browser push alerts anymore." });
+    } catch {
+      setState("subscribed");
+      toast({ title: "Could not disable push", description: "Please try again.", variant: "destructive" });
+    }
+  };
+
+  if (state === "unsupported") return null;
+
+  return (
+    <div className="rounded-2xl glass-card px-5 py-4 flex items-center justify-between gap-4 mb-6">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={`shrink-0 h-9 w-9 rounded-xl flex items-center justify-center ${state === "subscribed" ? "bg-primary/15" : "bg-muted"}`}>
+          {state === "subscribed" ? (
+            <BellRing className="h-4 w-4 text-primary" />
+          ) : (
+            <BellOff className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-tight">
+            {state === "subscribed" ? "Browser push on" : state === "denied" ? "Notifications blocked" : "Browser push off"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+            {state === "subscribed"
+              ? "Reminders and announcements delivered even when the tab is closed."
+              : state === "denied"
+              ? "Allow notifications in your browser settings, then reload."
+              : "Enable to get booking reminders and partner announcements instantly."}
+          </p>
+        </div>
+      </div>
+      {state !== "denied" && (
+        <Button
+          size="sm"
+          variant={state === "subscribed" ? "outline" : "default"}
+          onClick={state === "subscribed" ? unsubscribe : subscribe}
+          disabled={state === "loading"}
+          className="shrink-0"
+        >
+          {state === "loading" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : state === "subscribed" ? (
+            "Turn off"
+          ) : (
+            "Turn on"
+          )}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function Notifications() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -37,15 +156,27 @@ export function Notifications() {
 
   const markRead = useMutation({
     mutationFn: (id: number) => apiPatch(`/api/notifications/${id}/read`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      qc.setQueryData<Notification[]>(["notifications"], (prev) =>
+        (prev ?? []).map((n) => n.id === id ? { ...n, isRead: true } : n),
+      );
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
   const markAllRead = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const unread = (data ?? []).filter((n) => !n.isRead);
-      return Promise.all(unread.map((n) => apiPatch(`/api/notifications/${n.id}/read`, {})));
+      await Promise.all(unread.map((n) => apiPatch(`/api/notifications/${n.id}/read`, {})));
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      qc.setQueryData<Notification[]>(["notifications"], (prev) =>
+        (prev ?? []).map((n) => ({ ...n, isRead: true })),
+      );
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
     onError: () =>
       toast({ title: "Could not mark all as read", description: "Please try again.", variant: "destructive" }),
   });
@@ -82,6 +213,8 @@ export function Notifications() {
           </Button>
         )}
       </div>
+
+      <WebPushToggle />
 
       {isLoading ? (
         <div className="flex justify-center py-20">
