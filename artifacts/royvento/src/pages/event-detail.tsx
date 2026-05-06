@@ -344,38 +344,46 @@ export function EventDetail() {
 
   return (
     <div>
-      {/* Cinematic hero — blurred backdrop + sharp foreground image */}
-      <div className="relative min-h-[72vh] md:min-h-[78vh] w-full overflow-hidden flex flex-col">
-        {/* Blurred full-bleed background */}
-        {(event.imageUrl || (isPub && vendorCover)) && (
-          <div className="absolute inset-0 -z-10">
+      {/* Cinematic hero — full-bleed cover image */}
+      <div className="relative h-[62vh] md:h-[72vh] w-full overflow-hidden">
+        {/* Full-bleed cover image */}
+        {(event.imageUrl || (isPub && vendorCover)) ? (
+          <div className="absolute inset-0">
             <img
-              src={isPub && vendorCover ? vendorCover : event.imageUrl}
-              alt=""
-              className="h-full w-full object-cover blur-2xl scale-110 opacity-35"
+              src={event.imageUrl || vendorCover}
+              alt={event.title}
+              className="h-full w-full object-cover"
             />
           </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 to-black" />
         )}
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/50 via-background/70 to-background" />
+        {/* Top scrim */}
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+        {/* Bottom scrim — deep cinematic fade */}
+        <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
 
-        {/* Event/venue image — constrained, sharp, centred */}
-        <div className="flex-1 flex items-center justify-center px-4 pt-10 pb-0">
-          {event.imageUrl && (
-            <div className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/8">
-              <img
-                src={event.imageUrl}
-                alt={event.title}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          )}
-        </div>
+        {/* Wishlist button — top right */}
+        {me?.user && (
+          <button
+            onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()}
+            disabled={addToWishlist.isPending || removeFromWishlist.isPending}
+            aria-label={inWishlist ? t("events.remove_wishlist") : t("events.add_wishlist")}
+            className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-black/50 border border-white/15 hover:bg-black/70 transition-colors"
+          >
+            <Heart className={`h-4 w-4 transition-colors ${inWishlist ? "fill-primary text-primary" : "text-white"}`} />
+          </button>
+        )}
 
-        {/* Title block — overlaid at bottom */}
-        <div className="container mx-auto px-4 md:px-6 pt-8 pb-12 relative">
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <Badge className="bg-white/10 border-white/10 text-white backdrop-blur">{event.category}</Badge>
-            {(event as any).type === "pub" && <Badge className="bg-primary/30 text-primary-foreground border-primary/30">Pub</Badge>}
+        {/* Title block — anchored at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 px-4 md:px-10 pb-9">
+          {/* Badges row — only Pub type + Popular; category ("Pubs") removed */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            {(event as any).type === "pub" && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-white tracking-wide">
+                Pub
+              </span>
+            )}
             {(event as any).popular && (
               <Badge className="bg-primary border-0 text-primary-foreground red-glow">{t("events.popular_badge")}</Badge>
             )}
@@ -387,27 +395,13 @@ export function EventDetail() {
               </div>
             )}
           </div>
-          <div className="flex items-end justify-between gap-4 flex-wrap">
-            <div className="flex-1 min-w-0">
-              <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl tracking-tight max-w-4xl leading-tight">{event.title}</h1>
-              <p className="mt-3 text-white/60">
-                by{" "}
-                <Link href={`/partners/${event.vendor?.id ?? ""}`} className="text-white/85 hover:text-white underline underline-offset-4 transition-colors">
-                  {event.vendorName}
-                </Link>
-              </p>
-            </div>
-            {me?.user && (
-              <button
-                onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()}
-                disabled={addToWishlist.isPending || removeFromWishlist.isPending}
-                aria-label={inWishlist ? t("events.remove_wishlist") : t("events.add_wishlist")}
-                className="shrink-0 p-3 rounded-full bg-black/40 border border-white/10 backdrop-blur hover:bg-black/60 transition-colors"
-              >
-                <Heart className={`h-5 w-5 transition-colors ${inWishlist ? "fill-primary text-primary" : "text-white"}`} />
-              </button>
-            )}
-          </div>
+          <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl tracking-tight max-w-4xl leading-tight text-white">{event.title}</h1>
+          <p className="mt-3 text-white/60">
+            by{" "}
+            <Link href={`/partners/${event.vendor?.id ?? ""}`} className="text-white/85 hover:text-white underline underline-offset-4 transition-colors">
+              {event.vendorName}
+            </Link>
+          </p>
         </div>
       </div>
 
