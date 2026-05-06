@@ -1548,7 +1548,8 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     // Per-booking ledger entries (online_payment, cod_checkin, free_checkin)
     // are the source of truth for "collected" commission. settlement_offset
     // entries are excluded — they record realisation against vendor balance,
-    // not new commission earned.
+    // not new commission earned. The from/to window MUST match the bookings
+    // window so collected/pending totals are consistent with the report period.
     db
       .select({
         vendorId: commissionLedgerTable.vendorId,
@@ -1556,7 +1557,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         amount: commissionLedgerTable.amount,
       })
       .from(commissionLedgerTable)
-      .where(inArray(commissionLedgerTable.trigger, ["online_payment", "cod_checkin", "free_checkin"])),
+      .where(
+        and(
+          inArray(commissionLedgerTable.trigger, ["online_payment", "cod_checkin", "free_checkin"]),
+          ...(from ? [gte(commissionLedgerTable.createdAt, from)] : []),
+          ...(to ? [lte(commissionLedgerTable.createdAt, to)] : []),
+        ),
+      ),
   ]);
 
   const commissionMap = new Map(commissions.map((c) => [c.vendorId, c]));
@@ -1592,10 +1599,15 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     totalBookings: number;
     totalRevenue: number;
     totalCommission: number;
-    /** Sum of commission_ledger amounts for this vendor (online_payment +
-     * cod_checkin + free_checkin). Source of truth for "money realised". */
+    /** Sum of commission_ledger amounts for this vendor in the report window
+     * (online_payment + cod_checkin + free_checkin). Source of truth for
+     * "money realised by the platform". */
     collectedCommission: number;
-    /** totalCommission − collectedCommission, never negative. */
+    /** Sum of computed commission for bookings in the report window that have
+     * NO ledger entry yet (i.e. eligible but not yet triggered — a COD booking
+     * that hasn't been checked in, or an online booking still pending payment).
+     * Computed per-booking, not as totalCommission − collectedCommission, so
+     * actuals diverging from planned counts can't distort the figure. */
     pendingCommission: number;
     freeEntryCount: number;
     freeEntryRevenue: number;
@@ -1659,6 +1671,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     s.totalBookings += 1;
     s.totalRevenue += price;
     s.totalCommission += commissionAmount;
+    const isCollected = collectedBookingIds.has(b.id);
     s.bookings.push({
       id: b.id,
       finalPrice: price,
@@ -1666,9 +1679,14 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       commissionRate: feePerUnit,
       unitCount,
       commissionAmount,
-      collected: collectedBookingIds.has(b.id),
+      collected: isCollected,
       createdAt: b.createdAt,
     });
+    // Per-booking pending: if no ledger entry exists yet for this booking,
+    // its planned commission counts as pending.
+    if (!isCollected) {
+      s.pendingCommission += commissionAmount;
+    }
 
     if (bookingType === "free_entry") {
       s.freeEntryCount += 1;
@@ -1685,11 +1703,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     }
   }
 
-  // Hydrate collected/pending fields from the ledger AFTER all bookings have
-  // been aggregated so totals are coherent.
+  // Collected commission per vendor comes straight from the ledger (already
+  // window-filtered). Pending was accumulated per-booking above; just round.
   for (const s of summaryMap.values()) {
     s.collectedCommission = Math.round((collectedByVendor.get(s.vendorId) ?? 0) * 100) / 100;
-    s.pendingCommission = Math.max(0, Math.round((s.totalCommission - s.collectedCommission) * 100) / 100);
+    s.pendingCommission = Math.max(0, Math.round(s.pendingCommission * 100) / 100);
   }
 
   const rows = Array.from(summaryMap.values()).sort((a, b) => b.totalCommission - a.totalCommission);

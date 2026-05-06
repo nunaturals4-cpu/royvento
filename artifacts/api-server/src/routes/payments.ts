@@ -76,23 +76,8 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
 
   if (!booking) return;
 
-  const gated = await db
-    .update(paymentsTable)
-    .set({ status: "success", phonepeTransactionId, updatedAt: new Date() })
-    .where(and(eq(paymentsTable.bookingId, bookingId), eq(paymentsTable.status, "initiated")))
-    .returning({ id: paymentsTable.id });
-
-  if (gated.length === 0) return;
-  const paymentRowId = gated[0]!.id;
-
-  await db
-    .update(bookingsTable)
-    .set({ status: "confirmed", approvedBy: "payment" })
-    .where(eq(bookingsTable.id, bookingId));
-
-  // Compute commission for this online payment and credit the vendor's online
-  // balance NET of commission. Insert an immutable ledger row so admin/vendor
-  // can audit the deduction back to the specific booking + payment.
+  // Look up commission rates BEFORE the transaction (read-only) to keep the
+  // tx short. The rates table is effectively immutable per vendor in this flow.
   const [vcRow] = await db
     .select()
     .from(vendorCommissionsTable)
@@ -111,11 +96,34 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
   );
   const netCredit = Math.max(0, Number(booking.finalPrice ?? 0) - comm.amount);
 
+  // Atomic activation: payment status gate, booking confirmation, vendor net
+  // credit, and commission ledger insert all happen in a single transaction.
+  // The initiated→success gate lives INSIDE the tx so a concurrent caller
+  // either sees us mid-flight (and rolls back) or finds status=success and
+  // no-ops. If anything inside fails, payment status stays `initiated` and the
+  // next callback/webhook can safely retry.
+  let activated = false;
   await db.transaction(async (tx) => {
+    const gated = await tx
+      .update(paymentsTable)
+      .set({ status: "success", phonepeTransactionId, updatedAt: new Date() })
+      .where(and(eq(paymentsTable.bookingId, bookingId), eq(paymentsTable.status, "initiated")))
+      .returning({ id: paymentsTable.id });
+
+    if (gated.length === 0) return; // already activated by a concurrent caller — nothing to do
+
+    const paymentRowId = gated[0]!.id;
+
+    await tx
+      .update(bookingsTable)
+      .set({ status: "confirmed", approvedBy: "payment" })
+      .where(eq(bookingsTable.id, bookingId));
+
     await tx
       .update(vendorsTable)
       .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
       .where(eq(vendorsTable.id, booking.vendorId));
+
     if (comm.amount > 0) {
       await tx
         .insert(commissionLedgerTable)
@@ -129,7 +137,10 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
         })
         .onConflictDoNothing();
     }
+    activated = true;
   });
+
+  if (!activated) return;
 
   await db
     .insert(availabilityTable)
