@@ -714,10 +714,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
           const pw = Number(ev?.priceWomen ?? 0);
           const pm = Number(ev?.priceMen ?? 0);
           const pc = Number(ev?.priceCouple ?? 0);
-          const baseGross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
-          const total = Number(b.totalPrice);
-          const ratio = total > 0 ? fp / total : 1;
-          actualCodRevenue += baseGross * ratio;
+          // Cash collected at door = per-type counts × per-type price (no coupon/points scaling).
+          actualCodRevenue += (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
         } else {
           const guests = Math.max(1, b.guests);
           actualCodRevenue += ((ag ?? 0) / guests) * fp;

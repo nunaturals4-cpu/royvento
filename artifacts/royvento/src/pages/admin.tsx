@@ -2334,6 +2334,77 @@ function AttendanceReport() {
           <h3 className="font-serif text-xl mb-4">
             {statusFilter === "checkedIn" ? "Checked-in guests" : statusFilter === "notArrived" ? "Not-arrived guests" : "All confirmed guests"}
           </h3>
+
+          {/* Booked vs attended totals — one row per event on the current page. */}
+          {(() => {
+            const byEvent = new Map<number, {
+              eventId: number;
+              eventTitle: string;
+              vendorName: string;
+              bookedW: number; bookedM: number; bookedC: number; bookedG: number;
+              attW: number; attM: number; attC: number; attG: number;
+              codDue: number;
+              hasActuals: boolean;
+            }>();
+            for (const r of rows) {
+              const cur = byEvent.get(r.eventId) ?? {
+                eventId: r.eventId, eventTitle: r.eventTitle, vendorName: r.vendorName,
+                bookedW: 0, bookedM: 0, bookedC: 0, bookedG: 0,
+                attW: 0, attM: 0, attC: 0, attG: 0,
+                codDue: 0, hasActuals: false,
+              };
+              cur.bookedW += r.ticketWomen ?? 0;
+              cur.bookedM += r.ticketMen ?? 0;
+              cur.bookedC += r.ticketCouple ?? 0;
+              cur.bookedG += r.guests ?? 0;
+              if (r.actualWomen != null) { cur.attW += r.actualWomen; cur.hasActuals = true; }
+              if (r.actualMen != null) { cur.attM += r.actualMen; cur.hasActuals = true; }
+              if (r.actualCouple != null) { cur.attC += r.actualCouple; cur.hasActuals = true; }
+              if (r.actualGuests != null) { cur.attG += r.actualGuests; cur.hasActuals = true; }
+              if (r.paymentMethod === "cod" && typeof r.actualAmountDue === "number") cur.codDue += r.actualAmountDue;
+              byEvent.set(r.eventId, cur);
+            }
+            const totals = Array.from(byEvent.values());
+            if (totals.length === 0) return null;
+            return (
+              <div className="mb-5 overflow-x-auto rounded-xl border border-white/10 bg-black/20">
+                <table className="w-full text-xs min-w-[700px]">
+                  <thead className="text-[10px] uppercase tracking-wider text-muted-foreground bg-white/5">
+                    <tr>
+                      <th className="text-left py-2 px-3">Event</th>
+                      <th className="text-right py-2 px-3">Booked (W/M/C/Guests)</th>
+                      <th className="text-right py-2 px-3">Attended (W/M/C/Guests)</th>
+                      <th className="text-right py-2 px-3">Pay at Venue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {totals.map((t) => (
+                      <tr key={t.eventId} className="border-t border-white/5">
+                        <td className="py-2 px-3">
+                          <span className="font-medium">{t.eventTitle || `Event #${t.eventId}`}</span>
+                          <span className="block text-[10px] text-muted-foreground">{t.vendorName}</span>
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">
+                          {t.bookedW}/{t.bookedM}/{t.bookedC}/{t.bookedG}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {t.hasActuals
+                            ? <span className="text-foreground">{t.attW}/{t.attM}/{t.attC}/{t.attG}</span>
+                            : <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {t.codDue > 0
+                            ? <span className="text-amber-300 font-semibold">₹{t.codDue.toLocaleString("en-IN")}</span>
+                            : <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
@@ -2367,11 +2438,10 @@ function AttendanceReport() {
                     </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
                       {(() => {
-                        const r = b as unknown as { actualWomen?: number | null; actualMen?: number | null; actualCouple?: number | null; actualGuests?: number | null; pubMode?: string };
-                        const aw = r.actualWomen, am = r.actualMen, ac = r.actualCouple, ag = r.actualGuests;
+                        const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
                         const has = aw != null || am != null || ac != null || ag != null;
                         if (!has) return <span className="text-muted-foreground/60">—</span>;
-                        if (r.pubMode === "ticket") {
+                        if (b.pubMode === "ticket") {
                           return (
                             <>
                               {(aw ?? 0) > 0 && <span className="text-pink-300 mr-1">{aw}W</span>}
@@ -2385,12 +2455,11 @@ function AttendanceReport() {
                       })()}
                     </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
-                      {(() => {
-                        const r = b as unknown as { actualAmountDue?: number | null; paymentMethod?: string };
-                        if (r.paymentMethod !== "cod") return <span className="text-muted-foreground/40">—</span>;
-                        if (r.actualAmountDue == null) return <span className="text-muted-foreground/60">—</span>;
-                        return <span className="text-amber-300 font-semibold">₹{r.actualAmountDue.toLocaleString("en-IN")}</span>;
-                      })()}
+                      {b.paymentMethod !== "cod"
+                        ? <span className="text-muted-foreground/40">—</span>
+                        : b.actualAmountDue == null
+                          ? <span className="text-muted-foreground/60">—</span>
+                          : <span className="text-amber-300 font-semibold">₹{b.actualAmountDue.toLocaleString("en-IN")}</span>}
                     </td>
                     <td className="py-2.5 pr-3">
                       {b.checkedIn ? (

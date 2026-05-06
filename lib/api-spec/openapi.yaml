@@ -2668,6 +2668,30 @@ components:
         arrivalTime:
           type: string
           nullable: true
+        paymentMethod:
+          type: string
+          nullable: true
+        finalPrice:
+          type: number
+          nullable: true
+        pubMode:
+          type: string
+          nullable: true
+        actualWomen:
+          type: integer
+          nullable: true
+        actualMen:
+          type: integer
+          nullable: true
+        actualCouple:
+          type: integer
+          nullable: true
+        actualGuests:
+          type: integer
+          nullable: true
+        actualAmountDue:
+          type: number
+          nullable: true
       required: [id, vendorId, vendorName, eventId, eventTitle, userId, userName, userEmail, phone, bookingDate, guests, ticketWomen, ticketMen, ticketCouple, status, checkedIn]
 
     AttendanceStats:

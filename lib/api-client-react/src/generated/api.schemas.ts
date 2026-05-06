@@ -561,6 +561,14 @@ export interface AttendanceReportRow {
   checkedIn: boolean;
   checkedInAt?: string | null;
   arrivalTime?: string | null;
+  paymentMethod?: string | null;
+  finalPrice?: number | null;
+  pubMode?: string | null;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
+  actualAmountDue?: number | null;
 }
 
 export interface AttendanceStats {

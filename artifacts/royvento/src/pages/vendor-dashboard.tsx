@@ -2837,11 +2837,11 @@ function AnalyticsPanel() {
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Pay at venue (COD)</p>
             <p className="stat-number text-3xl text-amber-300">{formatINR(data.codRevenue)}</p>
             <p className="text-xs text-muted-foreground mt-1">booked cash / pay-at-door</p>
-            {typeof (data as any).actualCodRevenue === "number" && (
+            {typeof data.actualCodRevenue === "number" && (
               <div className="mt-2 pt-2 border-t border-amber-500/20">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Actual collected</p>
-                <p className="text-base font-semibold text-amber-200 tabular-nums">{formatINR((data as any).actualCodRevenue)}</p>
-                <p className="text-[10px] text-muted-foreground">{(data as any).actualCodRecordedCount ?? 0} bookings recorded</p>
+                <p className="text-base font-semibold text-amber-200 tabular-nums">{formatINR(data.actualCodRevenue)}</p>
+                <p className="text-[10px] text-muted-foreground">{data.actualCodRecordedCount ?? 0} bookings recorded</p>
               </div>
             )}
           </div>
@@ -3348,17 +3348,26 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
                           const has = aw != null || am != null || ac != null || ag != null;
                           if (!has) return <span className="text-muted-foreground/60">—</span>;
                           const isTicket = b.pubMode === "ticket";
-                          if (isTicket) {
-                            return (
-                              <>
-                                {(aw ?? 0) > 0 && <span className="text-pink-300 mr-1">{aw}W</span>}
-                                {(am ?? 0) > 0 && <span className="text-blue-300 mr-1">{am}M</span>}
-                                {(ac ?? 0) > 0 && <span className="text-purple-300">{ac}C</span>}
-                                {(aw ?? 0) === 0 && (am ?? 0) === 0 && (ac ?? 0) === 0 && <span className="text-muted-foreground">0</span>}
-                              </>
-                            );
-                          }
-                          return <span className="text-foreground">{ag}</span>;
+                          const isCod = b.paymentMethod === "cod";
+                          const due = typeof b.actualAmountDue === "number" ? b.actualAmountDue : null;
+                          const counts = isTicket ? (
+                            <>
+                              {(aw ?? 0) > 0 && <span className="text-pink-300 mr-1">{aw}W</span>}
+                              {(am ?? 0) > 0 && <span className="text-blue-300 mr-1">{am}M</span>}
+                              {(ac ?? 0) > 0 && <span className="text-purple-300">{ac}C</span>}
+                              {(aw ?? 0) === 0 && (am ?? 0) === 0 && (ac ?? 0) === 0 && <span className="text-muted-foreground">0</span>}
+                            </>
+                          ) : (
+                            <span className="text-foreground">{ag}</span>
+                          );
+                          return (
+                            <>
+                              {counts}
+                              {isCod && due != null && (
+                                <span className="block text-amber-300 text-[10px] font-semibold">{formatINR(due)}</span>
+                              )}
+                            </>
+                          );
                         })()}
                       </td>
                       <td className="py-2.5 pr-3 text-right whitespace-nowrap">
