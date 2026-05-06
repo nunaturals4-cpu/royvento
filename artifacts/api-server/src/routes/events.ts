@@ -348,6 +348,7 @@ router.get("/events/:eventId", async (req, res) => {
           status: v.status,
           rating: rating.rating,
           reviewCount: rating.reviewCount,
+          crowdLevel: (v as unknown as { crowdLevel?: string | null }).crowdLevel ?? null,
           createdAt: v.createdAt.toISOString(),
         }
       : null,

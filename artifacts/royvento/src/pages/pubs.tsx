@@ -37,7 +37,15 @@ interface PublicEvent {
   popular: boolean;
   hasDrinkPlans?: boolean;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
+  vendorCrowdLevel?: string | null;
 }
+
+const CROWD_OPTIONS = [
+  { value: "low", label: "Low" },
+  { value: "moderate", label: "Moderate" },
+  { value: "party", label: "Party" },
+] as const;
+type CrowdFilter = "" | typeof CROWD_OPTIONS[number]["value"];
 
 const PRICE_PRESETS = [
   { label: "Under ₹500", min: 0, max: 500 },
@@ -56,6 +64,7 @@ export function Pubs() {
   const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
   const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
   const [freeEntry, setFreeEntry] = useState(false);
+  const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -94,11 +103,12 @@ export function Pubs() {
     let list = pubs;
     if (hasDrinkDeal && !drinkPlanType) list = list.filter((p) => p.hasDrinkPlans);
     if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true && (p.freeEntryRules?.days?.length ?? 0) > 0);
+    if (crowdLevel) list = list.filter((p) => p.vendorCrowdLevel === crowdLevel);
     return list;
-  }, [pubs, hasDrinkDeal, drinkPlanType, freeEntry]);
+  }, [pubs, hasDrinkDeal, drinkPlanType, freeEntry, crowdLevel]);
 
   const hasFilters =
-    search || country || stateF || city || pricePreset !== null || drinkPlanType || hasDrinkDeal || freeEntry;
+    search || country || stateF || city || pricePreset !== null || drinkPlanType || hasDrinkDeal || freeEntry || crowdLevel;
 
   function clearAll() {
     setSearch("");
@@ -109,6 +119,7 @@ export function Pubs() {
     setDrinkPlanType("");
     setHasDrinkDeal(false);
     setFreeEntry(false);
+    setCrowdLevel("");
   }
 
   return (
@@ -186,6 +197,38 @@ export function Pubs() {
             </div>
           </div>
         )}
+
+        {/* Crowd level chips */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Crowd level</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setCrowdLevel("")}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                crowdLevel === ""
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+              )}
+            >
+              Any
+            </button>
+            {CROWD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setCrowdLevel(crowdLevel === opt.value ? "" : opt.value)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  crowdLevel === opt.value
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Price range preset chips */}
         <div>

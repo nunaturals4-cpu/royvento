@@ -21,11 +21,18 @@ interface Props {
     popular?: boolean;
     hasDrinkPlans?: boolean;
     freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
+    vendorCrowdLevel?: string | null;
   };
   hidePubBadge?: boolean;
 }
 
 const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const CROWD_BADGE: Record<string, { label: string; color: string }> = {
+  low: { label: "Low Crowd", color: "bg-green-600" },
+  moderate: { label: "Moderate Crowd", color: "bg-amber-500" },
+  party: { label: "Party Mode 🔥", color: "bg-red-600" },
+};
 
 export function EventCard({ event, hidePubBadge }: Props) {
   const partner = event.partnerName ?? event.vendorName ?? "";
@@ -42,6 +49,7 @@ export function EventCard({ event, hidePubBadge }: Props) {
 
   const isNew = event.rating === 0 && event.reviewCount === 0;
   const ratingLabel = event.rating > 0 ? event.rating.toFixed(1) : null;
+  const crowd = event.vendorCrowdLevel ? CROWD_BADGE[event.vendorCrowdLevel] : null;
 
   return (
     <Link href={`/events/${event.id}`}>
@@ -76,14 +84,19 @@ export function EventCard({ event, hidePubBadge }: Props) {
             </div>
           </div>
 
-          {/* Top-left: Popular badge */}
-          {event.popular && (
-            <div className="absolute top-3 left-3">
+          {/* Top-left: Popular badge + crowd */}
+          <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+            {event.popular && (
               <Badge className="bg-primary text-primary-foreground border-0 red-glow text-[10px] px-2 py-0.5">
                 ★ Popular
               </Badge>
-            </div>
-          )}
+            )}
+            {crowd && (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full ${crowd.color} text-white text-[10px] font-semibold border border-white/20 shadow`}>
+                {crowd.label}
+              </span>
+            )}
+          </div>
 
           {/* Bottom row: left chip + right drink deal */}
           <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 pt-8 flex items-end justify-between">

@@ -277,6 +277,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     try {
       await apiPatch("/api/partner/crowd-level", { crowdLevel: level });
       setCrowdLevel(level);
+      onSaved();
       toast({ title: "Crowd level updated" });
     } catch {
       toast({ title: "Failed to update crowd level", variant: "destructive" });
@@ -284,6 +285,10 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       setSavingCrowd(false);
     }
   };
+
+  useEffect(() => {
+    setCrowdLevel(vendor.crowdLevel ?? null);
+  }, [vendor.crowdLevel]);
 
   return (
     <div className="space-y-6">
@@ -1977,15 +1982,26 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                         <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
                         <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
                         <td className="py-2.5 pr-3">
-                          {b.pubMode === "event" && b.arrivalTime
-                            ? <span className="text-primary font-medium">{b.arrivalTime}</span>
+                          {b.checkedInAt
+                            ? <span className="text-primary font-medium tabular-nums">{new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                             : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="py-2.5 pr-3 text-right tabular-nums">{b.guests ?? "—"}</td>
                         <td className="py-2.5">
-                          <span className={`text-xs font-medium capitalize ${b.status === "confirmed" || b.status === "completed" ? "text-green-400" : b.status === "cancelled" ? "text-red-400" : "text-amber-400"}`}>
-                            {b.status}
-                          </span>
+                          {(() => {
+                            const isCancelled = b.status === "cancelled";
+                            const isPending = b.status === "pending";
+                            const isConfirmed = !!b.checkedIn;
+                            const label = isCancelled ? "Cancelled" : isPending ? "Pending" : isConfirmed ? "Confirmed" : "Booked";
+                            const cls = isCancelled
+                              ? "text-red-400"
+                              : isPending
+                              ? "text-amber-400"
+                              : isConfirmed
+                              ? "text-green-400"
+                              : "text-blue-300";
+                            return <span className={`text-xs font-medium ${cls}`}>{label}</span>;
+                          })()}
                         </td>
                       </tr>
                     ))}
