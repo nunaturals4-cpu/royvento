@@ -34,6 +34,7 @@ import {
   sendCustomerCancelledBookingEmail,
 } from "../lib/notifications";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
+import { computeEffectiveRevenues } from "../lib/effectiveRevenue";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
 const CANCELLATION_CUTOFF_HOURS = Number(process.env["CANCELLATION_CUTOFF_HOURS"] ?? 24);
@@ -766,9 +767,6 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let monthEarnings = 0;
   let codRevenue = 0;
   let onlineRevenue = 0;
-  let actualCodRevenue = 0;
-  let actualCodRecordedCount = 0;
-  let pendingActualsCount = 0;
   let totalCommission = 0;
   let codCommission = 0;
   let onlineCommission = 0;
@@ -777,17 +775,12 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     ticket: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
     table: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
   };
-  // Pre-fetch events so the analytics loop can read per-type prices for actuals computation.
-  const _eventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
-  const _events = _eventIds.length > 0
-    ? await db.select().from(eventsTable).where(inArray(eventsTable.id, _eventIds))
-    : [];
-  const eMap = new Map(_events.map((e) => [e.id, e]));
 
   // Per-booking effective revenue: online → finalPrice; COD → actual cash collected (₹0 if not recorded).
-  // Used as the source of truth for totalEarnings, monthEarnings, perEvent.revenue, dailyRevenue, and
-  // commissionSummary[*].grossRevenue. Commission is still computed from finalPrice (booked price).
-  const revenueByBookingId = new Map<number, number>();
+  // Shared with /bookings/vendor/summary and /admin/analytics so all "Revenue"/"Total Earnings"
+  // figures stay consistent. Commission is still computed from finalPrice (booked price).
+  const { byBookingId: revenueByBookingId, actualCodRevenue, actualCodRecordedCount, pendingActualsCount } =
+    await computeEffectiveRevenues(allBookings);
 
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
@@ -795,31 +788,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     if (isCod) codRevenue += fp;
     else onlineRevenue += fp;
 
-    let bookingRevenue = 0;
-    if (!isCod) {
-      bookingRevenue = fp;
-    } else {
-      const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
-      const hasActuals = aw != null || am != null || ac != null || ag != null;
-      if (hasActuals) {
-        actualCodRecordedCount++;
-        if (b.pubMode === "ticket") {
-          const ev = eMap.get(b.eventId);
-          const pw = Number(ev?.priceWomen ?? 0);
-          const pm = Number(ev?.priceMen ?? 0);
-          const pc = Number(ev?.priceCouple ?? 0);
-          bookingRevenue = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
-        } else {
-          const guests = Math.max(1, b.guests);
-          bookingRevenue = ((ag ?? 0) / guests) * fp;
-        }
-        actualCodRevenue += bookingRevenue;
-      } else {
-        // STRICT mode: COD bookings without recorded actuals contribute ₹0.
-        pendingActualsCount++;
-      }
-    }
-    revenueByBookingId.set(b.id, bookingRevenue);
+    const bookingRevenue = revenueByBookingId.get(b.id) ?? 0;
     totalEarnings += bookingRevenue;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
 
@@ -828,7 +797,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     totalCommission += comm;
     if (isCod) codCommission += comm;
     else onlineCommission += comm;
-    // Per-booking-type commission summary (gross uses new revenue formula).
+    // Per-booking-type commission summary (gross uses effective revenue).
     const bType = b.pubMode === "table" ? "table" : (fp === 0 || b.pubMode === "free") ? "freeEntry" : "ticket";
     commSummary[bType].count++;
     commSummary[bType].grossRevenue += bookingRevenue;
@@ -839,7 +808,12 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     commSummary[k].netRevenue = commSummary[k].grossRevenue - commSummary[k].commissionAmount;
   }
 
-  // Per-event breakdown (reuses eMap fetched above)
+  // Per-event breakdown — fetch event titles for any events referenced by these bookings.
+  const _eventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
+  const _events = _eventIds.length > 0
+    ? await db.select({ id: eventsTable.id, title: eventsTable.title }).from(eventsTable).where(inArray(eventsTable.id, _eventIds))
+    : [];
+  const eTitleMap = new Map(_events.map((e) => [e.id, e.title]));
   const perEventMap = new Map<number, {
     eventId: number; eventTitle: string;
     bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
@@ -856,7 +830,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     } else {
       perEventMap.set(b.eventId, {
         eventId: b.eventId,
-        eventTitle: eMap.get(b.eventId)?.title ?? `Event #${b.eventId}`,
+        eventTitle: eTitleMap.get(b.eventId) ?? `Event #${b.eventId}`,
         bookingCount: 1,
         ticketWomen: b.ticketWomen,
         ticketMen: b.ticketMen,
@@ -1072,23 +1046,17 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res)
     ? and(eq(bookingsTable.vendorId, vendor.id), gte(bookingsTable.bookingDate, fromDate))
     : eq(bookingsTable.vendorId, vendor.id);
   const confirmedStatuses = ["confirmed", "completed"] as const;
-  const [statsRows, monthlyRevenueRows, monthlyTrendRows, perEventRows] = await Promise.all([
+  // Counts (across all statuses) and trend chart counts stay in SQL — they don't
+  // depend on revenue logic.
+  const [statsRows, monthlyTrendRows, confirmedBookings] = await Promise.all([
     db.select({
       totalBookings: sql<number>`count(*)::int`,
       countConfirmed: sql<number>`count(*) filter (where ${bookingsTable.status} = 'confirmed')::int`,
       countCompleted: sql<number>`count(*) filter (where ${bookingsTable.status} = 'completed')::int`,
       countCancelled: sql<number>`count(*) filter (where ${bookingsTable.status} = 'cancelled')::int`,
       countPending: sql<number>`count(*) filter (where ${bookingsTable.status} = 'pending')::int`,
-      totalRevenue: sql<number>`coalesce(sum(case when ${bookingsTable.status} in ('confirmed','completed') then coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0) else 0 end),0)::int`,
       totalGuests: sql<number>`coalesce(sum(case when ${bookingsTable.status} in ('confirmed','completed') then coalesce(${bookingsTable.ticketWomen},0)+coalesce(${bookingsTable.ticketMen},0)+coalesce(${bookingsTable.ticketCouple},0) else 0 end),0)::int`,
     }).from(bookingsTable).where(baseWhere),
-    db.select({
-      month: sql<string>`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`,
-      revenue: sql<number>`coalesce(sum(coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0)),0)::int`,
-    }).from(bookingsTable)
-      .where(and(baseWhere, inArray(bookingsTable.status, [...confirmedStatuses])))
-      .groupBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`)
-      .orderBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`),
     db.select({
       month: sql<string>`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`,
       confirmed: sql<number>`count(*) filter (where ${bookingsTable.status} in ('confirmed','completed'))::int`,
@@ -1096,22 +1064,65 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res)
     }).from(bookingsTable).where(baseWhere)
       .groupBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`)
       .orderBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`),
-    db.select({
-      eventId: bookingsTable.eventId,
-      eventTitle: eventsTable.title,
-      bookingCount: sql<number>`count(*)::int`,
-      ticketWomen: sql<number>`coalesce(sum(${bookingsTable.ticketWomen}),0)::int`,
-      ticketMen: sql<number>`coalesce(sum(${bookingsTable.ticketMen}),0)::int`,
-      ticketCouple: sql<number>`coalesce(sum(${bookingsTable.ticketCouple}),0)::int`,
-      revenue: sql<number>`coalesce(sum(coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0)),0)::int`,
-    }).from(bookingsTable)
-      .leftJoin(eventsTable, eq(bookingsTable.eventId, eventsTable.id))
-      .where(and(baseWhere, inArray(bookingsTable.status, [...confirmedStatuses])))
-      .groupBy(bookingsTable.eventId, eventsTable.title)
-      .orderBy(desc(sql`coalesce(sum(coalesce(${bookingsTable.finalPrice},${bookingsTable.totalPrice},0)),0)`)),
+    // Pull confirmed/completed bookings into memory so totalRevenue, monthlyRevenue,
+    // and perEvent.revenue use the unified effective-revenue rule (online finalPrice +
+    // actual cash collected; COD without recorded actuals contributes ₹0).
+    db.select().from(bookingsTable)
+      .where(and(baseWhere, inArray(bookingsTable.status, [...confirmedStatuses]))),
   ]);
-  const stats = statsRows[0] ?? { totalBookings: 0, countConfirmed: 0, countCompleted: 0, countCancelled: 0, countPending: 0, totalRevenue: 0, totalGuests: 0 };
-  res.json({ ...stats, monthlyRevenue: monthlyRevenueRows, monthlyTrend: monthlyTrendRows, perEvent: perEventRows });
+
+  const { byBookingId } = await computeEffectiveRevenues(confirmedBookings);
+
+  let totalRevenue = 0;
+  const monthlyRevMap = new Map<string, number>();
+  const perEventMap = new Map<number, {
+    eventId: number; eventTitle: string;
+    bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
+  }>();
+  for (const b of confirmedBookings) {
+    const rev = byBookingId.get(b.id) ?? 0;
+    totalRevenue += rev;
+    const month = (b.bookingDate ?? "").slice(0, 7);
+    if (month) monthlyRevMap.set(month, (monthlyRevMap.get(month) ?? 0) + rev);
+    const existing = perEventMap.get(b.eventId);
+    if (existing) {
+      existing.bookingCount += 1;
+      existing.ticketWomen += b.ticketWomen;
+      existing.ticketMen += b.ticketMen;
+      existing.ticketCouple += b.ticketCouple;
+      existing.revenue += rev;
+    } else {
+      perEventMap.set(b.eventId, {
+        eventId: b.eventId,
+        eventTitle: "",
+        bookingCount: 1,
+        ticketWomen: b.ticketWomen,
+        ticketMen: b.ticketMen,
+        ticketCouple: b.ticketCouple,
+        revenue: rev,
+      });
+    }
+  }
+
+  const eventIds = Array.from(perEventMap.keys());
+  if (eventIds.length > 0) {
+    const ev = await db.select({ id: eventsTable.id, title: eventsTable.title })
+      .from(eventsTable).where(inArray(eventsTable.id, eventIds));
+    for (const e of ev) {
+      const rec = perEventMap.get(e.id);
+      if (rec) rec.eventTitle = e.title;
+    }
+  }
+
+  const monthlyRevenue = Array.from(monthlyRevMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, revenue]) => ({ month, revenue: Math.round(revenue) }));
+  const perEvent = Array.from(perEventMap.values())
+    .map((r) => ({ ...r, revenue: Math.round(r.revenue) }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const stats = statsRows[0] ?? { totalBookings: 0, countConfirmed: 0, countCompleted: 0, countCancelled: 0, countPending: 0, totalGuests: 0 };
+  res.json({ ...stats, totalRevenue: Math.round(totalRevenue), monthlyRevenue, monthlyTrend: monthlyTrendRows, perEvent });
 });
 
 router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {

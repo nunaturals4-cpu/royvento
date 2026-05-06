@@ -1752,9 +1752,9 @@ function toReportDateStr(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function Stat({ icon: Icon, label, value, hint, tooltip }: { icon: any; label: string; value: string; hint?: string; tooltip?: string }) {
   return (
-    <div className="rounded-2xl glass-card p-5 lift-3d">
+    <div className="rounded-2xl glass-card p-5 lift-3d" title={tooltip}>
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
         <div className="w-9 h-9 rounded-lg bg-red-600/15 text-primary flex items-center justify-center red-ring">
@@ -1762,6 +1762,7 @@ function Stat({ icon: Icon, label, value }: { icon: any; label: string; value: s
         </div>
       </div>
       <p className="stat-number text-3xl">{value}</p>
+      {hint && <p className="mt-2 text-[11px] text-muted-foreground leading-snug">{hint}</p>}
     </div>
   );
 }
@@ -1842,7 +1843,13 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Stat icon={CalendarCheck} label="Bookings" value={String(totalBookings)} />
         <Stat icon={Users} label="Guests" value={String(totalGuests)} />
-        <Stat icon={IndianRupee} label="Revenue" value={formatINR(totalRevenue)} />
+        <Stat
+          icon={IndianRupee}
+          label="Revenue"
+          value={formatINR(totalRevenue)}
+          hint="Online payments + actual cash collected. COD bookings without recorded entries are not counted."
+          tooltip="Online payments + actual cash collected. COD bookings without recorded entries are not counted."
+        />
       </div>
 
       {/* Status breakdown row */}
