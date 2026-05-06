@@ -5,6 +5,7 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { ScanTicketBookingActualEntry } from "./scanTicketBookingActualEntry";
 
 export interface ScanTicketBooking {
   id: number;
@@ -34,4 +35,12 @@ export interface ScanTicketBooking {
   actualGuests?: number | null;
   /** Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet. */
   actualAmountDue?: number | null;
+  /** Per-type actuals as a single object. Null if none recorded yet. */
+  actualEntry?: ScanTicketBookingActualEntry;
+  /** Per-woman ticket price for this event (used by client to compute live actual amount). */
+  priceWomen?: number;
+  /** Per-man ticket price for this event. */
+  priceMen?: number;
+  /** Per-couple ticket price for this event. */
+  priceCouple?: number;
 }

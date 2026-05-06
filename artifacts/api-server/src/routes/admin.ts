@@ -831,11 +831,8 @@ router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => 
         const pw = Number(ev?.priceWomen ?? 0);
         const pm = Number(ev?.priceMen ?? 0);
         const pc = Number(ev?.priceCouple ?? 0);
-        const baseGross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
-        const total = Number(b.totalPrice);
-        const final = Number(b.finalPrice);
-        const ratio = total > 0 ? final / total : 1;
-        return Math.round(baseGross * ratio * 100) / 100;
+        // Cash collected at door = per-type counts × per-type price (no coupon/points scaling).
+        return Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
       }
       if (ag == null) return null;
       const guests = Math.max(1, b.guests);

@@ -1011,6 +1011,16 @@ export interface ScanTicketBody {
   actualEntry?: ScanTicketBodyActualEntry;
 }
 
+/**
+ * Per-type actuals as a single object. Null if none recorded yet.
+ */
+export type ScanTicketBookingActualEntry = {
+  women?: number | null;
+  men?: number | null;
+  couple?: number | null;
+  guests?: number | null;
+} | null;
+
 export interface ScanTicketBooking {
   id: number;
   eventTitle: string;
@@ -1039,6 +1049,14 @@ export interface ScanTicketBooking {
   actualGuests?: number | null;
   /** Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet. */
   actualAmountDue?: number | null;
+  /** Per-type actuals as a single object. Null if none recorded yet. */
+  actualEntry?: ScanTicketBookingActualEntry;
+  /** Per-woman ticket price for this event (used by client to compute live actual amount). */
+  priceWomen?: number;
+  /** Per-man ticket price for this event. */
+  priceMen?: number;
+  /** Per-couple ticket price for this event. */
+  priceCouple?: number;
 }
 
 export type ScanTicketResultCode =

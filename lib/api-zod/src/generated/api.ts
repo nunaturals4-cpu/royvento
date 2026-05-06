@@ -1898,6 +1898,31 @@ export const PartnerScanTicketResponse = zod.object({
         .describe(
           "Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet.",
         ),
+      actualEntry: zod
+        .object({
+          women: zod.number().nullish(),
+          men: zod.number().nullish(),
+          couple: zod.number().nullish(),
+          guests: zod.number().nullish(),
+        })
+        .nullish()
+        .describe(
+          "Per-type actuals as a single object. Null if none recorded yet.",
+        ),
+      priceWomen: zod
+        .number()
+        .optional()
+        .describe(
+          "Per-woman ticket price for this event (used by client to compute live actual amount).",
+        ),
+      priceMen: zod
+        .number()
+        .optional()
+        .describe("Per-man ticket price for this event."),
+      priceCouple: zod
+        .number()
+        .optional()
+        .describe("Per-couple ticket price for this event."),
     })
     .nullish(),
 });

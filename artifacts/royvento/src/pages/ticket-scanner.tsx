@@ -634,6 +634,23 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
     b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null
   );
 
+  // LIVE running total computed from current stepper values (not server response,
+  // which is null until the user saves). Only relevant for COD bookings.
+  const priceWomen = (b as unknown as { priceWomen?: number }).priceWomen ?? 0;
+  const priceMen = (b as unknown as { priceMen?: number }).priceMen ?? 0;
+  const priceCouple = (b as unknown as { priceCouple?: number }).priceCouple ?? 0;
+  const liveTotal = isTicket
+    ? w * priceWomen + m * priceMen + c * priceCouple
+    : (g / Math.max(1, b.guests)) * b.finalPrice;
+  const liveTotalRounded = Math.round(liveTotal * 100) / 100;
+  const subRows: { label: string; qty: number; price: number; subtotal: number }[] = isTicket
+    ? [
+        { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen },
+        { label: "Men", qty: m, price: priceMen, subtotal: m * priceMen },
+        { label: "Couples", qty: c, price: priceCouple, subtotal: c * priceCouple },
+      ].filter((r) => r.qty > 0)
+    : [];
+
   // Hide entirely when no relevant booked counts (e.g. ticket-mode with 0 across the board)
   const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
   if (isTicket && !hasAnyBookedTicket) return null;
@@ -693,14 +710,27 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
         )}
       </div>
 
-      {isCod && b.actualAmountDue != null && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between">
-          <span className="text-xs uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-            <Banknote className="h-3.5 w-3.5" /> Pay at venue (COD)
-          </span>
-          <span className="text-xl font-semibold text-amber-200 tabular-nums flex items-center gap-1">
-            <IndianRupee className="h-4 w-4" />{b.actualAmountDue.toLocaleString("en-IN")}
-          </span>
+      {isCod && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+          {isTicket && subRows.length > 0 && (
+            <div className="space-y-1">
+              {subRows.map((r) => (
+                <div key={r.label} className="flex items-center justify-between text-xs text-amber-100/80">
+                  <span>{r.label} · {r.qty} × ₹{r.price.toLocaleString("en-IN")}</span>
+                  <span className="tabular-nums">₹{r.subtotal.toLocaleString("en-IN")}</span>
+                </div>
+              ))}
+              <div className="h-px bg-amber-300/20 my-1" />
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+              <Banknote className="h-3.5 w-3.5" /> Total to collect (COD)
+            </span>
+            <span className="text-xl font-semibold text-amber-200 tabular-nums flex items-center gap-1">
+              <IndianRupee className="h-4 w-4" />{liveTotalRounded.toLocaleString("en-IN")}
+            </span>
+          </div>
         </div>
       )}
 

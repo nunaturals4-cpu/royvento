@@ -5,7 +5,9 @@ import { router } from "expo-router";
 import React, { useState, useRef, useEffect } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -55,6 +57,16 @@ export default function ScannerScreen() {
   const [manualCode, setManualCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Auto-open the bottom sheet whenever a successful (or already-checked-in) scan
+  // surfaces a booking the operator can record actuals against.
+  useEffect(() => {
+    if (result?.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN")) {
+      setSheetOpen(true);
+    } else {
+      setSheetOpen(false);
+    }
+  }, [result?.code, result?.booking?.id]);
   const [torchOn, setTorchOn] = useState(false);
   const scanLock = useRef(false);
   const manualInputRef = useRef<TextInput>(null);
@@ -245,10 +257,20 @@ export default function ScannerScreen() {
             </View>
 
             {result.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
-              <ActualEntrySection
-                booking={result.booking}
-                onSaved={(updated) => setResult({ ...result, booking: updated })}
-              />
+              <TouchableOpacity
+                onPress={() => setSheetOpen(true)}
+                style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+              >
+                <View>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>Record actual entry</Text>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
+                    {result.booking.actualAmountDue != null
+                      ? `Recorded · ₹${result.booking.actualAmountDue.toLocaleString("en-IN")} due`
+                      : "Tap to log who actually showed up"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
             )}
 
             {result.booking && (
@@ -343,6 +365,14 @@ export default function ScannerScreen() {
 
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
+      {result?.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
+        <ActualEntrySheet
+          booking={result.booking}
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          onSaved={(updated) => setResult({ ...result, booking: updated })}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -378,7 +408,17 @@ function StepperRow({ label, value, max, color, onChange }: { label: string; val
   );
 }
 
-function ActualEntrySection({ booking: b, onSaved }: { booking: BookingData; onSaved: (b: BookingData) => void }) {
+function ActualEntrySheet({
+  booking: b,
+  visible,
+  onClose,
+  onSaved,
+}: {
+  booking: BookingData;
+  visible: boolean;
+  onClose: () => void;
+  onSaved: (b: BookingData) => void;
+}) {
   const colors = useColors();
   const isTicket = b.pubMode === "ticket";
   const [w, setW] = useState<number>(b.actualWomen ?? b.ticketWomen);
@@ -386,11 +426,34 @@ function ActualEntrySection({ booking: b, onSaved }: { booking: BookingData; onS
   const [c, setC] = useState<number>(b.actualCouple ?? b.ticketCouple);
   const [g, setG] = useState<number>(b.actualGuests ?? b.guests);
   const [saving, setSaving] = useState(false);
+  // Reset stepper state whenever a different booking is shown.
+  useEffect(() => {
+    setW(b.actualWomen ?? b.ticketWomen);
+    setM(b.actualMen ?? b.ticketMen);
+    setC(b.actualCouple ?? b.ticketCouple);
+    setG(b.actualGuests ?? b.guests);
+  }, [b.id, b.actualWomen, b.actualMen, b.actualCouple, b.actualGuests, b.ticketWomen, b.ticketMen, b.ticketCouple, b.guests]);
+
   const isCod = b.paymentMethod === "cod";
   const alreadyRecorded = b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null;
   const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
-  if (isTicket && !hasAnyBookedTicket) return null;
-  if (!isTicket && b.guests <= 0) return null;
+  const shouldRender = (isTicket && hasAnyBookedTicket) || (!isTicket && b.guests > 0);
+
+  // LIVE running total from current stepper state (server response is null until save).
+  const priceWomen = (b as unknown as { priceWomen?: number }).priceWomen ?? 0;
+  const priceMen = (b as unknown as { priceMen?: number }).priceMen ?? 0;
+  const priceCouple = (b as unknown as { priceCouple?: number }).priceCouple ?? 0;
+  const liveTotal = isTicket
+    ? w * priceWomen + m * priceMen + c * priceCouple
+    : (g / Math.max(1, b.guests)) * (b.finalPrice ?? 0);
+  const liveTotalRounded = Math.round(liveTotal * 100) / 100;
+  const subRows = isTicket
+    ? [
+        { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen },
+        { label: "Men", qty: m, price: priceMen, subtotal: m * priceMen },
+        { label: "Couples", qty: c, price: priceCouple, subtotal: c * priceCouple },
+      ].filter((r) => r.qty > 0)
+    : [];
 
   const submit = async () => {
     setSaving(true);
@@ -402,7 +465,10 @@ function ActualEntrySection({ booking: b, onSaved }: { booking: BookingData; onS
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, actualEntry }),
       });
-      if (res.booking) onSaved(res.booking);
+      if (res.booking) {
+        onSaved(res.booking);
+        onClose();
+      }
     } catch {
       // Network errors are surfaced via the broader scanner state; nothing more to do here.
     } finally {
@@ -410,40 +476,63 @@ function ActualEntrySection({ booking: b, onSaved }: { booking: BookingData; onS
     }
   };
 
+  if (!shouldRender) return null;
+
   return (
-    <View style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 16, gap: 8 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>Actual entry</Text>
-        {alreadyRecorded && <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>Recorded</Text>}
-      </View>
-      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Adjust if fewer guests showed up than booked.</Text>
-      <View style={{ marginTop: 4 }}>
-        {isTicket ? (
-          <>
-            <StepperRow label="Women" value={w} max={b.ticketWomen} color="#ec4899" onChange={setW} />
-            <StepperRow label="Men" value={m} max={b.ticketMen} color="#3b82f6" onChange={setM} />
-            <StepperRow label="Couples" value={c} max={b.ticketCouple} color="#a855f7" onChange={setC} />
-          </>
-        ) : (
-          <StepperRow label="Guests" value={g} max={Math.max(b.guests, 1)} color={colors.primary} onChange={setG} />
-        )}
-      </View>
-      {isCod && b.actualAmountDue != null && (
-        <View style={{ marginTop: 8, borderRadius: 10, padding: 10, backgroundColor: "#f59e0b18", borderWidth: 1, borderColor: "#f59e0b40", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5 }}>Pay at venue (COD)</Text>
-          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#f59e0b" }}>₹{b.actualAmountDue.toLocaleString("en-IN")}</Text>
-        </View>
-      )}
-      <TouchableOpacity
-        onPress={submit}
-        disabled={saving}
-        style={{ marginTop: 8, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: "center", opacity: saving ? 0.5 : 1 }}
-      >
-        {saving
-          ? <ActivityIndicator size="small" color={colors.primaryForeground} />
-          : <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.primaryForeground }}>{alreadyRecorded ? "Update actual entry" : "Save actual entry"}</Text>}
-      </TouchableOpacity>
-    </View>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+        <Pressable onPress={() => { /* swallow taps inside sheet */ }} style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 28, gap: 10, maxHeight: "85%" }}>
+          <View style={{ alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 4 }} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: colors.foreground }}>Actual entry</Text>
+            {alreadyRecorded && <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>Recorded</Text>}
+          </View>
+          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Adjust if fewer guests showed up than booked.</Text>
+          <ScrollView style={{ marginTop: 4 }} showsVerticalScrollIndicator={false}>
+            {isTicket ? (
+              <>
+                <StepperRow label="Women" value={w} max={b.ticketWomen} color="#ec4899" onChange={setW} />
+                <StepperRow label="Men" value={m} max={b.ticketMen} color="#3b82f6" onChange={setM} />
+                <StepperRow label="Couples" value={c} max={b.ticketCouple} color="#a855f7" onChange={setC} />
+              </>
+            ) : (
+              <StepperRow label="Guests" value={g} max={Math.max(b.guests, 1)} color={colors.primary} onChange={setG} />
+            )}
+          </ScrollView>
+          {isCod && (
+            <View style={{ marginTop: 4, borderRadius: 10, padding: 10, backgroundColor: "#f59e0b18", borderWidth: 1, borderColor: "#f59e0b40", gap: 6 }}>
+              {isTicket && subRows.length > 0 && (
+                <>
+                  {subRows.map((r) => (
+                    <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#fcd34d" }}>{r.label} · {r.qty} × ₹{r.price.toLocaleString("en-IN")}</Text>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#fcd34d" }}>₹{r.subtotal.toLocaleString("en-IN")}</Text>
+                    </View>
+                  ))}
+                  <View style={{ height: 1, backgroundColor: "#f59e0b30" }} />
+                </>
+              )}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5 }}>Total to collect (COD)</Text>
+                <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: "#f59e0b" }}>₹{liveTotalRounded.toLocaleString("en-IN")}</Text>
+              </View>
+            </View>
+          )}
+          <TouchableOpacity
+            onPress={submit}
+            disabled={saving}
+            style={{ marginTop: 8, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: "center", opacity: saving ? 0.5 : 1 }}
+          >
+            {saving
+              ? <ActivityIndicator size="small" color={colors.primaryForeground} />
+              : <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.primaryForeground }}>{alreadyRecorded ? "Update actual entry" : "Save actual entry"}</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={{ alignItems: "center", paddingVertical: 8 }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>Skip for now</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

@@ -117,6 +117,7 @@ export * from "./saveBankingDetailsBody";
 export * from "./scanTicketBody";
 export * from "./scanTicketBodyActualEntry";
 export * from "./scanTicketBooking";
+export * from "./scanTicketBookingActualEntry";
 export * from "./scanTicketResult";
 export * from "./scanTicketResultCode";
 export * from "./setAvailabilityBody";

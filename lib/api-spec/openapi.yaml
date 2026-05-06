@@ -3421,6 +3421,32 @@ components:
           type: number
           nullable: true
           description: Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet.
+        actualEntry:
+          type: object
+          nullable: true
+          description: Per-type actuals as a single object. Null if none recorded yet.
+          properties:
+            women:
+              type: integer
+              nullable: true
+            men:
+              type: integer
+              nullable: true
+            couple:
+              type: integer
+              nullable: true
+            guests:
+              type: integer
+              nullable: true
+        priceWomen:
+          type: number
+          description: Per-woman ticket price for this event (used by client to compute live actual amount).
+        priceMen:
+          type: number
+          description: Per-man ticket price for this event.
+        priceCouple:
+          type: number
+          description: Per-couple ticket price for this event.
       required: [id, eventTitle, vendorName, bookingDate, userName, pubMode, ticketWomen, ticketMen, ticketCouple, guests]
 
     ScanTicketResult:

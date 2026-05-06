@@ -1613,18 +1613,27 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       const pw = Number(scanEvent?.priceWomen ?? 0);
       const pm = Number(scanEvent?.priceMen ?? 0);
       const pc = Number(scanEvent?.priceCouple ?? 0);
-      const baseGross = w * pw + m * pm + c * pc;
-      // Apply same discount ratio as original booking so coupons/points carry over proportionally.
-      const total = Number(booking.totalPrice);
-      const final = Number(booking.finalPrice);
-      const ratio = total > 0 ? final / total : 1;
-      return Math.round(baseGross * ratio * 100) / 100;
+      // Cash collected at the door = per-type counts × per-type ticket price (no coupon/points scaling).
+      return Math.round((w * pw + m * pm + c * pc) * 100) / 100;
     }
     if (ag == null) return null;
     const guests = Math.max(1, booking.guests);
     const final = Number(booking.finalPrice);
     return Math.round((ag / guests) * final * 100) / 100;
   }
+
+  // Per-type prices from the event (used by client to render a live cash total before save).
+  const scanPriceInfo = {
+    priceWomen: Number(scanEvent?.priceWomen ?? 0),
+    priceMen: Number(scanEvent?.priceMen ?? 0),
+    priceCouple: Number(scanEvent?.priceCouple ?? 0),
+  };
+  const buildActualEntry = (
+    bk: { actualWomen: number | null; actualMen: number | null; actualCouple: number | null; actualGuests: number | null },
+  ) => {
+    if (bk.actualWomen == null && bk.actualMen == null && bk.actualCouple == null && bk.actualGuests == null) return null;
+    return { women: bk.actualWomen, men: bk.actualMen, couple: bk.actualCouple, guests: bk.actualGuests };
+  };
 
   // Pre-compute commission for this booking
   const scanComm = scanCommissionRows[0];
@@ -1704,19 +1713,42 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     let am: number | null = b.actualMen;
     let ac: number | null = b.actualCouple;
     let ag: number | null = b.actualGuests;
+    const overLimit = (label: string, value: number, max: number) => {
+      res.status(400).json({
+        code: "INVALID_ACTUAL_ENTRY",
+        message: `Actual ${label} (${value}) exceeds booked count (${max}).`,
+      });
+    };
     if (isTicket) {
-      if (actualEntry.women !== undefined) aw = Math.min(actualEntry.women, b.ticketWomen);
-      if (actualEntry.men !== undefined) am = Math.min(actualEntry.men, b.ticketMen);
-      if (actualEntry.couple !== undefined) ac = Math.min(actualEntry.couple, b.ticketCouple);
-      if ((aw ?? 0) < 0 || (am ?? 0) < 0 || (ac ?? 0) < 0) {
-        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." });
+      if (actualEntry.women !== undefined) {
+        if (actualEntry.women < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
+        if (actualEntry.women > b.ticketWomen) { overLimit("women", actualEntry.women, b.ticketWomen); return; }
+        aw = actualEntry.women;
+      }
+      if (actualEntry.men !== undefined) {
+        if (actualEntry.men < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
+        if (actualEntry.men > b.ticketMen) { overLimit("men", actualEntry.men, b.ticketMen); return; }
+        am = actualEntry.men;
+      }
+      if (actualEntry.couple !== undefined) {
+        if (actualEntry.couple < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
+        if (actualEntry.couple > b.ticketCouple) { overLimit("couples", actualEntry.couple, b.ticketCouple); return; }
+        ac = actualEntry.couple;
+      }
+      if (actualEntry.guests !== undefined) {
+        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "guests is not valid for ticket-mode bookings; use women/men/couple." });
         return;
       }
     } else {
-      if (actualEntry.guests !== undefined) ag = Math.min(actualEntry.guests, Math.max(b.guests, 0));
-      if ((ag ?? 0) < 0) {
-        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual guests cannot be negative." });
+      if (actualEntry.women !== undefined || actualEntry.men !== undefined || actualEntry.couple !== undefined) {
+        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "women/men/couple are only valid for ticket-mode bookings." });
         return;
+      }
+      if (actualEntry.guests !== undefined) {
+        if (actualEntry.guests < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual guests cannot be negative." }); return; }
+        const cap = Math.max(b.guests, 0);
+        if (actualEntry.guests > cap) { overLimit("guests", actualEntry.guests, cap); return; }
+        ag = actualEntry.guests;
       }
     }
     const wasCheckedIn = b.checkedIn;
@@ -1743,7 +1775,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     res.json({
       code: "OK",
       checkedInAt: checkedInAtNow.toISOString(),
-      booking: out ? { ...out, ...okComm, actualAmountDue, justCheckedIn: !wasCheckedIn } : null,
+      booking: out ? { ...out, ...okComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(updatedActuals), justCheckedIn: !wasCheckedIn } : null,
     });
     return;
   }
@@ -1757,7 +1789,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       code: "ALREADY_CHECKED_IN",
       message: "This ticket has already been used for entry.",
       checkedInAt,
-      booking: out ? { ...out, ...scanCommInfo, actualAmountDue } : null,
+      booking: out ? { ...out, ...scanCommInfo, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(b) } : null,
     });
     return;
   }
@@ -1785,7 +1817,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
         code: "ALREADY_CHECKED_IN",
         message: "This ticket has already been used for entry.",
         checkedInAt,
-        booking: out ? { ...out, ...currComm, actualAmountDue } : null,
+        booking: out ? { ...out, ...currComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(current) } : null,
       });
     } else {
       res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
@@ -1830,7 +1862,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   const okComm = calcScanCommission(updated);
   const actualAmountDue = calcActualAmountDue(updated);
-  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ? { ...out, ...okComm, actualAmountDue } : null });
+  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ? { ...out, ...okComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(updated) } : null });
 });
 
 router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) => {
