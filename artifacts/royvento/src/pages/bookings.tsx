@@ -491,10 +491,10 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
           <div class="notch notch-r"></div>
         </div>
         <div class="footer-sec">
-          <div>
+          ${Number(b.finalPrice ?? b.totalPrice ?? 0) === 0 ? "" : `<div>
             <div class="price-lbl">${esc(t("bookings.amount_paid"))}</div>
             <div class="price-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</div>
-          </div>
+          </div>`}
           <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>${esc(t("bookings.non_transferable"))} &middot; Royvento</div>
         </div>
       </div>
@@ -644,10 +644,12 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
 
         {/* Footer section */}
         <div className="relative z-10 flex justify-between items-center px-7 py-5">
-          <div>
-            <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>Amount paid</p>
-            <p className="font-serif text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
-          </div>
+          {Number(b.finalPrice ?? b.totalPrice ?? 0) === 0 ? <div /> : (
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>Amount paid</p>
+              <p className="font-serif text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
+            </div>
+          )}
           <p className="text-[10px] text-right leading-relaxed max-w-44" style={{ color: "rgba(255,255,255,0.25)" }}>
             Present this ticket at the entrance.<br />Non-transferable · Royvento
           </p>

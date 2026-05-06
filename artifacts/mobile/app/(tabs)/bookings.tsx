@@ -139,11 +139,13 @@ export default function BookingsScreen() {
         bx.ticketCouple ? `${bx.ticketCouple}× ${t("bookings.couple")}` : "",
       ].filter(Boolean).join(" · ") || `${b.guests} ${t("bookings.guests_label")}`;
 
-      const price = bx.finalPrice != null
-        ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
+      const priceNumber = bx.finalPrice != null
+        ? Number(bx.finalPrice)
         : b.totalPrice != null
-        ? `₹${Number(b.totalPrice).toLocaleString("en-IN")}`
-        : "—";
+        ? Number(b.totalPrice)
+        : null;
+      const isFreeBooking = priceNumber != null && priceNumber === 0;
+      const price = priceNumber != null ? `₹${priceNumber.toLocaleString("en-IN")}` : "—";
 
       const html = `<!doctype html><html><head><meta charset="utf-8">
 <style>
@@ -200,7 +202,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
   <div class="perf"><div class="notch"></div><div class="dash"></div><div class="notch notch-r"></div></div>
   <div class="tear">${esc(ticketCode)}</div>
   <div class="footer">
-    <div><div class="price-lbl">${esc(t("bookings.amount_paid"))}</div><div class="price">${esc(price)}</div></div>
+    ${isFreeBooking ? "<div></div>" : `<div><div class="price-lbl">${esc(t("bookings.amount_paid"))}</div><div class="price">${esc(price)}</div></div>`}
     <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>Royvento</div>
   </div>
 </div>
@@ -522,19 +524,23 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     <Text style={styles.ptCode}>{qrValue}</Text>
 
                     {/* Footer: price + disclaimer */}
-                    <View style={styles.ptFooter}>
-                      <View style={styles.ptPriceRow}>
-                        <Text style={styles.ptPriceLabel}>{t("bookings.total_label")}</Text>
-                        <Text style={styles.ptPriceValue}>
-                          {bx.finalPrice != null
-                            ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
-                            : b.totalPrice != null
-                            ? `₹${Number(b.totalPrice).toLocaleString("en-IN")}`
-                            : "—"}
-                        </Text>
-                      </View>
-                      <Text style={styles.ptFooterHint}>{t("bookings.present_at_entrance")}</Text>
-                    </View>
+                    {(() => {
+                      const _pn = bx.finalPrice != null ? Number(bx.finalPrice) : b.totalPrice != null ? Number(b.totalPrice) : null;
+                      const _isFree = _pn != null && _pn === 0;
+                      return (
+                        <View style={styles.ptFooter}>
+                          {!_isFree && (
+                            <View style={styles.ptPriceRow}>
+                              <Text style={styles.ptPriceLabel}>{t("bookings.total_label")}</Text>
+                              <Text style={styles.ptPriceValue}>
+                                {_pn != null ? `₹${_pn.toLocaleString("en-IN")}` : "—"}
+                              </Text>
+                            </View>
+                          )}
+                          <Text style={styles.ptFooterHint}>{t("bookings.present_at_entrance")}</Text>
+                        </View>
+                      );
+                    })()}
                   </LinearGradient>
                 )}
 
