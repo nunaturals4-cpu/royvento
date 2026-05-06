@@ -2703,6 +2703,8 @@ interface AnalyticsData {
   totalCommission: number;
   codCommission: number;
   onlineCommission: number;
+  actualCodRevenue?: number;
+  actualCodRecordedCount?: number;
   commissionRates: {
     freeEntryRate: string;
     ticketRate: string;

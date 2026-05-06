@@ -32,6 +32,9 @@ interface BookingData {
   ticketCouple: number;
   guests: number;
   finalPrice?: number;
+  priceWomen?: number;
+  priceMen?: number;
+  priceCouple?: number;
   commissionRate?: number;
   commissionAmount?: number;
   netAmount?: number;
@@ -440,9 +443,9 @@ function ActualEntrySheet({
   const shouldRender = (isTicket && hasAnyBookedTicket) || (!isTicket && b.guests > 0);
 
   // LIVE running total from current stepper state (server response is null until save).
-  const priceWomen = (b as unknown as { priceWomen?: number }).priceWomen ?? 0;
-  const priceMen = (b as unknown as { priceMen?: number }).priceMen ?? 0;
-  const priceCouple = (b as unknown as { priceCouple?: number }).priceCouple ?? 0;
+  const priceWomen = b.priceWomen ?? 0;
+  const priceMen = b.priceMen ?? 0;
+  const priceCouple = b.priceCouple ?? 0;
   const liveTotal = isTicket
     ? w * priceWomen + m * priceMen + c * priceCouple
     : (g / Math.max(1, b.guests)) * (b.finalPrice ?? 0);
