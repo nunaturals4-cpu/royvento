@@ -21,6 +21,9 @@ export interface AuthUser {
   phone?: string;
   about?: string;
   profileImage?: string;
+  points: number;
+  referralCode?: string;
+  referredBy?: number | null;
 }
 
 interface StoredAuth {
@@ -91,7 +94,8 @@ export function AuthProvider({ children, onAfterLogout }: AuthProviderProps) {
           try {
             const parsed = JSON.parse(stored) as StoredAuth;
             setToken(parsed.token);
-            setUser(parsed.user);
+            const raw = parsed.user as AuthUser & { points?: number };
+            setUser({ ...raw, points: raw.points ?? 0 });
           } catch {
             await secureDelete(TOKEN_KEY);
           }
