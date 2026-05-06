@@ -159,7 +159,7 @@ export function VendorDetail() {
               const cfg: Record<string, { label: string; bg: string }> = {
                 low: { label: "Low Crowd", bg: "bg-green-600/80" },
                 moderate: { label: "Moderate Crowd", bg: "bg-amber-500/80" },
-                party: { label: "Party Mode 🔥", bg: "bg-red-600/80" },
+                party: { label: "High Crowd 🔥", bg: "bg-red-600/80" },
               };
               const c = cfg[cl];
               return c ? (

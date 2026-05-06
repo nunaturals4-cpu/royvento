@@ -1900,7 +1900,7 @@ export default function VendorDashboardScreen() {
           {[
             { value: "low", label: "Low Crowd", desc: "Quiet, easy to get in", color: "#22c55e" },
             { value: "moderate", label: "Moderate Crowd", desc: "Getting busy, some wait", color: "#f59e0b" },
-            { value: "party", label: "🔥 Party Mode", desc: "Packed, full energy", color: "#ef4444" },
+            { value: "party", label: "🔥 High Crowd", desc: "Packed, full energy", color: "#ef4444" },
           ].map((opt) => (
             <TouchableOpacity
               key={opt.value}

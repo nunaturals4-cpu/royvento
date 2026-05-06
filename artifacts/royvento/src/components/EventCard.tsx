@@ -31,7 +31,7 @@ const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const CROWD_BADGE: Record<string, { label: string; color: string }> = {
   low: { label: "Low Crowd", color: "bg-green-600" },
   moderate: { label: "Moderate Crowd", color: "bg-amber-500" },
-  party: { label: "Party Mode 🔥", color: "bg-red-600" },
+  party: { label: "High Crowd 🔥", color: "bg-red-600" },
 };
 
 export function EventCard({ event, hidePubBadge }: Props) {

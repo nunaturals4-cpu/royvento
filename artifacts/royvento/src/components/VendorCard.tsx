@@ -18,7 +18,7 @@ const DANCE_FLOOR_LABELS: Record<string, string> = {
 const CROWD_LABEL: Record<string, { label: string; color: string }> = {
   low: { label: "Low Crowd", color: "bg-green-600" },
   moderate: { label: "Moderate Crowd", color: "bg-amber-500" },
-  party: { label: "Party Mode 🔥", color: "bg-red-600" },
+  party: { label: "High Crowd 🔥", color: "bg-red-600" },
 };
 
 interface Props {

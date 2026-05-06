@@ -242,7 +242,18 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     }
   }
 
-  // Compute base total based on mode
+  // Compute base total based on mode. Apply per-pub free-entry rules: when the
+  // pub has freeEntryRules.enabled and the booking date's weekday is in the
+  // configured days list, drop the price contribution of every booked gender
+  // that appears in the rule's genders list. This must mirror the client-side
+  // calc in event-detail (web) and event/[id] (mobile) and the ticket-card
+  // hide rule in bookings.tsx so the user is never charged for a free ticket.
+  const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const fer = (evt as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null }).freeEntryRules;
+  const bookingDayName = FREE_ENTRY_DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
+  const ferActive = !!(fer?.enabled && bookingDayName && Array.isArray(fer.days) && fer.days.includes(bookingDayName));
+  const ferGenders = new Set(ferActive && Array.isArray(fer?.genders) ? fer!.genders! : []);
+
   let totalPrice = 0;
   let guestsCount = parsed.data.guests || 0;
 
@@ -250,10 +261,10 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     const w = parsed.data.ticketWomen || 0;
     const m = parsed.data.ticketMen || 0;
     const c = parsed.data.ticketCouple || 0;
-    totalPrice =
-      w * Number(evt.priceWomen) +
-      m * Number(evt.priceMen) +
-      c * Number(evt.priceCouple);
+    const womenPrice = ferGenders.has("women") ? 0 : Number(evt.priceWomen);
+    const menPrice = ferGenders.has("men") ? 0 : Number(evt.priceMen);
+    const couplePrice = ferGenders.has("couple") ? 0 : Number(evt.priceCouple);
+    totalPrice = w * womenPrice + m * menPrice + c * couplePrice;
     guestsCount = w + m + c * 2;
   } else {
     totalPrice = Number(evt.price) * Math.max(1, guestsCount);

@@ -184,21 +184,28 @@ export function EventDetail() {
     return true;
   };
 
-  const _fer = (ev as any)?.freeEntryRules as { enabled?: boolean; days?: string[] } | undefined;
+  const _fer = (ev as any)?.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | undefined;
+  const ferDayActive = !!(_fer?.enabled === true && (_fer.days ?? []).includes(selectedDayName));
+  const ferGenders = new Set(ferDayActive && Array.isArray(_fer?.genders) ? (_fer!.genders as string[]) : []);
   const isFreeEntryDay = isPub && (
-    (_fer?.enabled === true && (_fer.days ?? []).includes(selectedDayName)) ||
+    ferDayActive ||
     (effectiveWomen === 0 && effectiveMen === 0 && effectiveCouple === 0)
   );
 
   const venueName = ev.vendor?.businessName ?? "This venue";
 
-  // Compute subtotal based on mode
+  // Compute subtotal based on mode. Mirrors the server's free-entry zeroing in
+  // bookings.ts so the form preview matches the actual charge: any booked
+  // gender listed in the active rule contributes ₹0.
+  const subtotalWomenPrice = ferGenders.has("women") ? 0 : effectiveWomen;
+  const subtotalMenPrice = ferGenders.has("men") ? 0 : effectiveMen;
+  const subtotalCouplePrice = ferGenders.has("couple") ? 0 : effectiveCouple;
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     subtotal =
-      ticketWomen * effectiveWomen +
-      ticketMen * effectiveMen +
-      ticketCouple * effectiveCouple;
+      ticketWomen * subtotalWomenPrice +
+      ticketMen * subtotalMenPrice +
+      ticketCouple * subtotalCouplePrice;
   } else {
     subtotal = Number(ev.price) * Math.max(1, guests);
   }

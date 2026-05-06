@@ -277,13 +277,24 @@ export default function EventDetailScreen() {
   const basePrice = parseFloat(String(event?.price ?? 0));
 
   const freeEntryRules = (event as unknown as { freeEntryRules?: { enabled?: boolean; days?: string[] } })?.freeEntryRules;
+  const ferDayActiveMobile = !!(freeEntryRules?.enabled === true && (freeEntryRules.days ?? []).includes(bookingDayName));
+  const ferGendersMobile = new Set(
+    ferDayActiveMobile && Array.isArray((freeEntryRules as { genders?: string[] })?.genders)
+      ? ((freeEntryRules as { genders?: string[] }).genders as string[])
+      : [],
+  );
   const isFreeEntryDay = isPub && (
-    (freeEntryRules?.enabled === true && (freeEntryRules.days ?? []).includes(bookingDayName)) ||
+    ferDayActiveMobile ||
     (priceWomen === 0 && priceMen === 0 && priceCouple === 0)
   );
 
+  // Mirrors server-side free-entry zeroing in bookings.ts: any booked gender
+  // listed in the active rule's genders contributes ₹0 to the subtotal.
+  const subtotalPriceWomen = ferGendersMobile.has("women") ? 0 : priceWomen;
+  const subtotalPriceMen = ferGendersMobile.has("men") ? 0 : priceMen;
+  const subtotalPriceCouple = ferGendersMobile.has("couple") ? 0 : priceCouple;
   const subtotal = isPub
-    ? ticketWomen * priceWomen + ticketMen * priceMen + ticketCouple * priceCouple
+    ? ticketWomen * subtotalPriceWomen + ticketMen * subtotalPriceMen + ticketCouple * subtotalPriceCouple
     : basePrice * (parseInt(guests) || 1);
 
   const newUserPercent = discountInfo?.isNewUser && !couponState ? (discountInfo.bookingDiscountPercent || 0) : 0;
@@ -478,7 +489,7 @@ export default function EventDetailScreen() {
               const cl = (event as unknown as { vendorCrowdLevel?: string | null }).vendorCrowdLevel;
               if (!cl) return null;
               const cfg = cl === "party"
-                ? { color: "#ef4444", label: "🔥 Party Mode" }
+                ? { color: "#ef4444", label: "🔥 High Crowd" }
                 : cl === "moderate"
                   ? { color: "#f59e0b", label: "Moderate Crowd" }
                   : { color: "#22c55e", label: "Low Crowd" };
