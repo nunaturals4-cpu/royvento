@@ -262,8 +262,8 @@ export default function PartnerDetailScreen() {
   const hasVendorBooking = (myBookings ?? []).some((b) => b.vendorId === vendorId);
 
   const vendorEvents = (events ?? []).filter((e) => e.vendorId === vendorId);
-  const avgRating = reviews?.length
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+  const avgRating = vendor && vendor.reviewCount > 0
+    ? vendor.rating.toFixed(1)
     : null;
 
   if (isLoading) {
@@ -338,7 +338,7 @@ export default function PartnerDetailScreen() {
               <View style={[styles.row, { backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, gap: 4 }]}>
                 <Ionicons name="star" size={12} color="#fbbf24" />
                 <Text style={[styles.rating, { color: "#fff", fontSize: 12 }]}>{avgRating}</Text>
-                <Text style={[styles.ratingCount, { color: "rgba(255,255,255,0.6)", fontSize: 11 }]}>({reviews!.length})</Text>
+                <Text style={[styles.ratingCount, { color: "rgba(255,255,255,0.6)", fontSize: 11 }]}>({vendor!.reviewCount})</Text>
               </View>
             ) : null}
           </View>
@@ -587,9 +587,9 @@ export default function PartnerDetailScreen() {
                 {r.comment ? (
                   <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text>
                 ) : null}
-                {Array.isArray((r as any).imageUrls) && (r as any).imageUrls.length > 0 ? (
+                {r.imageUrls && r.imageUrls.length > 0 ? (
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                    {((r as any).imageUrls as string[]).map((url, i) => (
+                    {r.imageUrls.map((url, i) => (
                       <Pressable
                         key={i}
                         onPress={() => setLightboxImage(url)}

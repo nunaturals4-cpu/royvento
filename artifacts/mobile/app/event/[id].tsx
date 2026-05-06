@@ -429,8 +429,8 @@ export default function EventDetailScreen() {
     );
   }
 
-  const avgRating = reviews?.length
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+  const avgRating = event && event.reviewCount > 0
+    ? event.rating.toFixed(1)
     : null;
 
   const vendor = (event as unknown as EventWithVendor).vendor;
@@ -511,7 +511,7 @@ export default function EventDetailScreen() {
               <View style={styles.row}>
                 <Ionicons name="star" size={13} color={colors.primary} />
                 <Text style={[styles.rating, { color: colors.foreground }]}>{avgRating}</Text>
-                <Text style={[styles.ratingCount, { color: colors.mutedForeground }]}>({reviews!.length})</Text>
+                <Text style={[styles.ratingCount, { color: colors.mutedForeground }]}>({event!.reviewCount})</Text>
               </View>
             ) : null}
           </View>
@@ -879,9 +879,9 @@ export default function EventDetailScreen() {
                   {r.comment ? (
                     <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text>
                   ) : null}
-                  {Array.isArray((r as any).imageUrls) && (r as any).imageUrls.length > 0 ? (
+                  {r.imageUrls && r.imageUrls.length > 0 ? (
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                      {((r as any).imageUrls as string[]).map((url, i) => (
+                      {r.imageUrls.map((url, i) => (
                         <Pressable
                           key={i}
                           onPress={() => setLightboxImage(url)}
