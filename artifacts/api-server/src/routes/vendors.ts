@@ -103,7 +103,6 @@ async function serializeVendor(v: VendorRow) {
     menuUrl: v.menuUrl ?? "",
     menuUrls: v.menuUrls ?? [],
     crowdLevel: v.crowdLevel ?? null,
-    onlineBalance: Number(v.onlineBalance ?? 0),
   };
 }
 
@@ -169,7 +168,6 @@ async function serializeVendorList(rows: VendorRow[]) {
       menuUrl: v.menuUrl ?? "",
       menuUrls: v.menuUrls ?? [],
       crowdLevel: v.crowdLevel ?? null,
-      onlineBalance: Number(v.onlineBalance ?? 0),
     };
   });
 }

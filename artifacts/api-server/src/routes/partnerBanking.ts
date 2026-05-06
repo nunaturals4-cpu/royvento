@@ -6,7 +6,7 @@ import {
   settlementRequestsTable,
   notificationsTable,
 } from "@workspace/db";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, sql, gte, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
 
@@ -149,20 +149,40 @@ router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, 
     ifscCode: bankDetails.ifscCode,
   };
 
-  const [created] = await db
-    .insert(settlementRequestsTable)
-    .values({
-      vendorId: vendor.id,
-      amount: String(parsed.data.amount),
-      bankingDetailsSnapshot,
-    })
-    .returning();
+  let created: typeof settlementRequestsTable.$inferSelect | undefined;
 
-  // Reset vendor's online balance to zero after settlement request
-  await db
-    .update(vendorsTable)
-    .set({ onlineBalance: "0" })
-    .where(eq(vendorsTable.id, vendor.id));
+  try {
+    await db.transaction(async (tx) => {
+      // Atomically reset balance to 0, guarded by sufficient balance check.
+      // If a concurrent request already consumed the balance, the WHERE clause
+      // matches 0 rows and the transaction rolls back, preventing double-spend.
+      const [deducted] = await tx
+        .update(vendorsTable)
+        .set({ onlineBalance: "0" })
+        .where(and(eq(vendorsTable.id, vendor.id), gte(vendorsTable.onlineBalance, String(parsed.data.amount))))
+        .returning({ id: vendorsTable.id });
+
+      if (!deducted) {
+        throw Object.assign(new Error("Insufficient balance"), { code: "INSUFFICIENT_BALANCE" });
+      }
+
+      [created] = await tx
+        .insert(settlementRequestsTable)
+        .values({
+          vendorId: vendor.id,
+          amount: String(parsed.data.amount),
+          bankingDetailsSnapshot,
+        })
+        .returning();
+    });
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code;
+    if (code === "INSUFFICIENT_BALANCE") {
+      res.status(400).json({ error: "Insufficient balance — another request may have already consumed it." });
+      return;
+    }
+    throw err;
+  }
 
   res.json(created);
 });
