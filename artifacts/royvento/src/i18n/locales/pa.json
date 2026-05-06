@@ -325,7 +325,8 @@
     "drink_ticket_items_one": "1 item included with ticket",
     "drink_ticket_items_other": "{{count}} items included with ticket",
     "drink_ticket_generic": "Drinks included with ticket",
-    "drink_offer_generic": "Drinks discount"
+    "drink_offer_generic": "Drinks discount",
+    "drink_deal_today": "ਅੱਜ"
   },
   "profile": {
     "my_profile": "ਮੇਰਾ ਪ੍ਰੋਫ਼ਾਈਲ",

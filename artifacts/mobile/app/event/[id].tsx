@@ -576,6 +576,25 @@ export default function EventDetailScreen() {
                 {drinkPlans.map((plan) => {
                   const hasItems = plan.lineItems && plan.lineItems.length > 0;
                   const isExpanded = expandedDrinkPlans.has(plan.id);
+                  const isDrinkPlanAvailableToday = (() => {
+                    const DAY_ABBRS_LOCAL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                    if (!plan.days || plan.days.length === 0) return false;
+                    const todayAbbr = DAY_ABBRS_LOCAL[new Date().getDay()];
+                    if (!plan.days.includes(todayAbbr)) return false;
+                    if (plan.timeFrom || plan.timeTo) {
+                      const now = new Date();
+                      const currentMins = now.getHours() * 60 + now.getMinutes();
+                      if (plan.timeFrom) {
+                        const [fh, fm] = plan.timeFrom.split(":").map(Number);
+                        if (currentMins < fh * 60 + (fm || 0)) return false;
+                      }
+                      if (plan.timeTo) {
+                        const [th, tm] = plan.timeTo.split(":").map(Number);
+                        if (currentMins > th * 60 + (tm || 0)) return false;
+                      }
+                    }
+                    return true;
+                  })();
                   const c = plan.type === "ticket" ? (plan.lineItems ?? []).filter((i: { name: string }) => i.name).length : 0;
                   const summary = plan.type === "welcome"
                     ? plan.gender === "female" ? t("events.drink_welcome_ladies") : t("events.drink_welcome_all")
@@ -595,6 +614,11 @@ export default function EventDetailScreen() {
                         }) : undefined}
                       >
                         <Text style={[styles.drinkPlanSummary, { color: colors.foreground, flex: 1 }]}>{summary}</Text>
+                        {isDrinkPlanAvailableToday && (
+                          <View style={{ backgroundColor: "#10b98122", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: "#10b98144", marginRight: 4 }}>
+                            <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#34d399" }}>Today</Text>
+                          </View>
+                        )}
                         <View style={[styles.genderPill, { backgroundColor: colors.primary + "22" }]}>
                           <Text style={[styles.genderPillText, { color: colors.primary }]}>
                             {plan.gender === "female" ? "Ladies" : "All guests"}

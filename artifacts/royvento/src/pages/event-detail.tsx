@@ -165,6 +165,25 @@ export function EventDetail() {
   const effectiveMen = dayOverride ? Number(dayOverride.men) : Number(ev.priceMen || 0);
   const effectiveCouple = dayOverride ? Number(dayOverride.couple) : Number(ev.priceCouple || 0);
 
+  const isDrinkPlanAvailableToday = (plan: any): boolean => {
+    if (!plan.days || plan.days.length === 0) return false;
+    const todayAbbr = DAY_ABBRS[new Date().getDay()];
+    if (!plan.days.includes(todayAbbr)) return false;
+    if (plan.timeFrom || plan.timeTo) {
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      if (plan.timeFrom) {
+        const [fh, fm] = plan.timeFrom.split(":").map(Number);
+        if (currentMins < fh * 60 + (fm || 0)) return false;
+      }
+      if (plan.timeTo) {
+        const [th, tm] = plan.timeTo.split(":").map(Number);
+        if (currentMins > th * 60 + (tm || 0)) return false;
+      }
+    }
+    return true;
+  };
+
   const _fer = (ev as any)?.freeEntryRules as { enabled?: boolean; days?: string[] } | undefined;
   const isFreeEntryDay = isPub && (
     (_fer?.enabled === true && (_fer.days ?? []).includes(selectedDayName)) ||
@@ -524,6 +543,11 @@ export function EventDetail() {
                         <span className="text-base shrink-0 leading-none">{typeIcon}</span>
                         <span className="flex-1 text-sm text-white/85 font-medium leading-snug">{getPlanSummary(plan, t)}</span>
                         <div className="flex items-center gap-2 shrink-0">
+                          {isDrinkPlanAvailableToday(plan) && (
+                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold border bg-emerald-500/15 border-emerald-500/30 text-emerald-400">
+                              {t("events.drink_deal_today")}
+                            </span>
+                          )}
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold border ${plan.gender === "female" ? "bg-rose-500/15 border-rose-500/25 text-rose-300" : "bg-primary/15 border-primary/25 text-primary"}`}>
                             {plan.gender === "female" ? t("events.drink_gender_ladies") : t("events.drink_gender_all")}
                           </span>
