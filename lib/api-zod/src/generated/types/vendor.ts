@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FreeEntryRules } from "./freeEntryRules";
+import type { VendorCrowdLevel } from "./vendorCrowdLevel";
 import type { VendorDanceFloor } from "./vendorDanceFloor";
 import type { VendorDayHours } from "./vendorDayHours";
 import type { VendorStatus } from "./vendorStatus";
@@ -34,4 +35,5 @@ export interface Vendor {
   danceFloor?: VendorDanceFloor;
   danceFloorPhotos?: string[] | null;
   menuUrl?: string;
+  crowdLevel?: VendorCrowdLevel;
 }

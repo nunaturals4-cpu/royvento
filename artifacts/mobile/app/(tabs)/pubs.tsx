@@ -292,6 +292,7 @@ export default function PubsScreen() {
               reviewCount={item.reviewCount}
               freeEntryRules={item.freeEntryRules}
               hasDrinkPlans={item.hasDrinkPlans}
+              vendorCrowdLevel={(item as unknown as { vendorCrowdLevel?: string | null }).vendorCrowdLevel}
             />
           )}
         />

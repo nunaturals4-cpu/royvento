@@ -80,6 +80,8 @@ export const vendorsTable = pgTable(
     danceFloorPhotos: text("dance_floor_photos").array(),
     menuUrl: text("menu_url").notNull().default(""),
     menuUrls: text("menu_urls").array().notNull().default([]),
+    crowdLevel: varchar("crowd_level", { length: 20 }),
+    onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

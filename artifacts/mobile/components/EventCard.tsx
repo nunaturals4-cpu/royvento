@@ -14,6 +14,12 @@ import { useLanguage } from "@/context/LanguageContext";
 
 const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const CROWD_CONFIG: Record<string, { label: string; bg: string }> = {
+  low: { label: "Low Crowd", bg: "#16a34a" },
+  moderate: { label: "Moderate", bg: "#d97706" },
+  party: { label: "🔥 Party", bg: "#dc2626" },
+};
+
 interface EventCardProps {
   id: number;
   title: string;
@@ -29,6 +35,7 @@ interface EventCardProps {
   reviewCount?: number;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   hasDrinkPlans?: boolean;
+  vendorCrowdLevel?: string | null;
 }
 
 export function EventCard({
@@ -46,6 +53,7 @@ export function EventCard({
   reviewCount,
   freeEntryRules,
   hasDrinkPlans,
+  vendorCrowdLevel,
 }: EventCardProps) {
   const colors = useColors();
   const { t } = useLanguage();
@@ -124,6 +132,13 @@ export function EventCard({
             </View>
           ) : null}
         </View>
+
+        {/* Top-right: crowd level badge for pub events */}
+        {type === "pub" && vendorCrowdLevel && CROWD_CONFIG[vendorCrowdLevel] ? (
+          <View style={[styles.crowdBadge, { backgroundColor: CROWD_CONFIG[vendorCrowdLevel]!.bg }]}>
+            <Text style={styles.crowdBadgeText}>{CROWD_CONFIG[vendorCrowdLevel]!.label}</Text>
+          </View>
+        ) : null}
 
         {/* Bottom-right: drink deal — in compact mode shows icon-only pill to fit the 90px image */}
         {hasDrinkPlans ? (
@@ -323,6 +338,21 @@ const styles = StyleSheet.create({
   },
   freeEntryTextToday: {
     color: "#22c55e",
+  },
+  crowdBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  crowdBadgeText: {
+    fontSize: 9,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    color: "#fff",
   },
   drinkBadge: {
     position: "absolute",

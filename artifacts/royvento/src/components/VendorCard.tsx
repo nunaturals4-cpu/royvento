@@ -15,6 +15,12 @@ const DANCE_FLOOR_LABELS: Record<string, string> = {
   none: "Seated only",
 };
 
+const CROWD_LABEL: Record<string, { label: string; color: string }> = {
+  low: { label: "Low Crowd", color: "bg-green-600" },
+  moderate: { label: "Moderate Crowd", color: "bg-amber-500" },
+  party: { label: "Party Mode 🔥", color: "bg-red-600" },
+};
+
 interface Props {
   vendor: {
     id: number;
@@ -26,12 +32,14 @@ interface Props {
     reviewCount: number;
     freeEntryRules?: FreeEntryRules | null;
     danceFloor?: string | null;
+    crowdLevel?: string | null;
   };
 }
 
 export function VendorCard({ vendor }: Props) {
   const fer = vendor.freeEntryRules;
   const danceFloorLabel = vendor.danceFloor ? DANCE_FLOOR_LABELS[vendor.danceFloor] : null;
+  const crowd = vendor.crowdLevel ? CROWD_LABEL[vendor.crowdLevel] : null;
   return (
     <Link href={`/vendors/${vendor.id}`}>
       <div className="group cursor-pointer overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-1 hover:shadow-xl">
@@ -47,6 +55,11 @@ export function VendorCard({ vendor }: Props) {
           {fer?.enabled && (
             <span className="absolute top-2 left-2 bg-emerald-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow">
               Free Entry{fer.genders.length > 0 ? ` · ${fer.genders.join(" & ")}` : ""}
+            </span>
+          )}
+          {crowd && (
+            <span className={`absolute top-2 right-2 ${crowd.color} text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow`}>
+              {crowd.label}
             </span>
           )}
         </div>

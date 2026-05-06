@@ -25,12 +25,14 @@ const SettlementRequestBody = z.object({
 
 async function getVendorForUser(userId: number) {
   const [vendor] = await db
-    .select({ id: vendorsTable.id, userId: vendorsTable.userId })
+    .select({ id: vendorsTable.id, userId: vendorsTable.userId, onlineBalance: vendorsTable.onlineBalance })
     .from(vendorsTable)
     .where(eq(vendorsTable.userId, userId))
     .limit(1);
   return vendor ?? null;
 }
+
+
 
 router.get("/partner/banking-details", requireAuth(["vendor"]), async (req, res) => {
   const userId = (req as AuthedRequest).user.id;
@@ -81,6 +83,16 @@ router.put("/partner/banking-details", requireAuth(["vendor"]), async (req, res)
   }
 });
 
+router.get("/partner/settlement/balance", requireAuth(["vendor"]), async (req, res) => {
+  const userId = (req as AuthedRequest).user.id;
+  const vendor = await getVendorForUser(userId);
+  if (!vendor) {
+    res.status(404).json({ error: "No vendor profile found" });
+    return;
+  }
+  res.json({ onlineBalance: Number(vendor.onlineBalance ?? 0) });
+});
+
 router.get("/partner/settlement/requests", requireAuth(["vendor"]), async (req, res) => {
   const userId = (req as AuthedRequest).user.id;
   const vendor = await getVendorForUser(userId);
@@ -122,6 +134,12 @@ router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, 
     return;
   }
 
+  const currentBalance = Number(vendor.onlineBalance ?? 0);
+  if (parsed.data.amount > currentBalance) {
+    res.status(400).json({ error: `Amount exceeds your available online balance of ₹${currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` });
+    return;
+  }
+
   // Snapshot the banking details at request time so admin always sees the
   // exact details that were on file, even if the partner changes them later.
   const bankingDetailsSnapshot = {
@@ -139,6 +157,13 @@ router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, 
       bankingDetailsSnapshot,
     })
     .returning();
+
+  // Reset vendor's online balance to zero after settlement request
+  await db
+    .update(vendorsTable)
+    .set({ onlineBalance: "0" })
+    .where(eq(vendorsTable.id, vendor.id));
+
   res.json(created);
 });
 

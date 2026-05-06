@@ -236,10 +236,18 @@ const DANCE_FLOOR_OPTIONS = [
   { value: "none", label: "No dancing / seated only" },
 ] as const;
 
+const CROWD_LEVELS = [
+  { value: "low", label: "Low Crowd", desc: "Quiet, easy to get in", color: "text-green-400" },
+  { value: "moderate", label: "Moderate Crowd", desc: "Getting busy, some wait", color: "text-amber-400" },
+  { value: "party", label: "Party Mode 🔥", desc: "Packed, full energy", color: "text-red-400" },
+];
+
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
   const [descError, setDescError] = useState("");
+  const [crowdLevel, setCrowdLevel] = useState<string | null>(vendor.crowdLevel ?? null);
+  const [savingCrowd, setSavingCrowd] = useState(false);
   const update = useUpdateMyVendor();
   const { toast } = useToast();
 
@@ -264,7 +272,21 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     );
   };
 
+  const saveCrowdLevel = async (level: string | null) => {
+    setSavingCrowd(true);
+    try {
+      await apiPatch("/api/partner/crowd-level", { crowdLevel: level });
+      setCrowdLevel(level);
+      toast({ title: "Crowd level updated" });
+    } catch {
+      toast({ title: "Failed to update crowd level", variant: "destructive" });
+    } finally {
+      setSavingCrowd(false);
+    }
+  };
+
   return (
+    <div className="space-y-6">
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div>
           <Label>Business name</Label>
@@ -293,6 +315,39 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           {update.isPending ? "Saving…" : "Save profile"}
         </Button>
     </form>
+
+    {/* Live Crowd Level */}
+    <div className="rounded-3xl glass-card-strong p-8 space-y-4">
+      <div>
+        <Label className="text-base font-semibold">Live Crowd Level</Label>
+        <p className="text-xs text-muted-foreground mt-0.5">Let guests know how busy your venue is right now.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {CROWD_LEVELS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            disabled={savingCrowd}
+            onClick={() => saveCrowdLevel(crowdLevel === opt.value ? null : opt.value)}
+            className={`rounded-2xl border p-4 text-left transition-all disabled:opacity-50 ${crowdLevel === opt.value ? "border-primary bg-primary/10" : "border-white/10 bg-black/30 hover:border-white/30"}`}
+          >
+            <div className={`text-sm font-semibold ${opt.color}`}>{opt.label}</div>
+            <div className="text-xs text-muted-foreground mt-1">{opt.desc}</div>
+          </button>
+        ))}
+      </div>
+      {crowdLevel && (
+        <button
+          type="button"
+          disabled={savingCrowd}
+          onClick={() => saveCrowdLevel(null)}
+          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors disabled:opacity-50"
+        >
+          Clear crowd level
+        </button>
+      )}
+    </div>
+    </div>
   );
 }
 
@@ -4156,6 +4211,7 @@ function BankingPanel() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestAmount, setRequestAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [onlineBalance, setOnlineBalance] = useState<number>(0);
 
   async function loadData() {
     setLoadingBanking(true);
@@ -4178,6 +4234,12 @@ function BankingPanel() {
       // ignore
     } finally {
       setLoadingRequests(false);
+    }
+    try {
+      const bal = await apiGet<{ onlineBalance: number }>("/api/partner/settlement/balance");
+      setOnlineBalance(bal.onlineBalance ?? 0);
+    } catch {
+      // ignore
     }
   }
 
@@ -4208,12 +4270,17 @@ function BankingPanel() {
       toast({ title: "Enter a valid amount", variant: "destructive" });
       return;
     }
+    if (amount > onlineBalance) {
+      toast({ title: `Amount exceeds available balance of ${formatINR(onlineBalance)}`, variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       const created = await apiPost<{ id: number; amount: string; status: string; adminNote: string; requestedAt: string }>("/api/partner/settlement/request", { amount });
       setRequests((prev) => [created, ...prev]);
       setShowRequestModal(false);
       setRequestAmount("");
+      setOnlineBalance(0);
       toast({ title: "Settlement request submitted" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to submit request";
@@ -4272,11 +4339,20 @@ function BankingPanel() {
             <h2 className="font-serif text-xl">Settlement Requests</h2>
           </div>
           {banking && (
-            <Button size="sm" onClick={() => setShowRequestModal(true)} className="gap-1.5">
+            <Button size="sm" onClick={() => { setRequestAmount(String(onlineBalance > 0 ? onlineBalance : "")); setShowRequestModal(true); }} className="gap-1.5">
               <Plus className="h-4 w-4" /> Request Settlement
             </Button>
           )}
         </div>
+        {banking && (
+          <div className="flex items-center gap-3 mb-5 rounded-xl border border-white/10 bg-white/3 px-4 py-3">
+            <CheckCircle className="h-4 w-4 text-green-400 shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">Available online balance</p>
+              <p className="text-lg font-bold text-green-400 tabular-nums">{formatINR(onlineBalance)}</p>
+            </div>
+          </div>
+        )}
         {!banking && (
           <p className="text-sm text-muted-foreground">Save your banking details above before requesting a settlement.</p>
         )}
@@ -4315,9 +4391,16 @@ function BankingPanel() {
           <div className="rounded-2xl glass-card p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-serif text-lg mb-4">Request Settlement</h3>
             <form onSubmit={submitRequest} className="space-y-4">
+              {onlineBalance > 0 && (
+                <div className="rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Available: </span>
+                  <span className="font-semibold text-green-400">{formatINR(onlineBalance)}</span>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>Amount (₹)</Label>
-                <Input type="number" min="1" step="0.01" value={requestAmount} onChange={(e) => setRequestAmount(e.target.value)} placeholder="Enter amount" required />
+                <Input type="number" min="1" max={onlineBalance > 0 ? onlineBalance : undefined} step="0.01" value={requestAmount} onChange={(e) => setRequestAmount(e.target.value)} placeholder="Enter amount" required />
+                {onlineBalance > 0 && <p className="text-xs text-muted-foreground">Max: {formatINR(onlineBalance)}</p>}
               </div>
               <div className="flex gap-3">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setShowRequestModal(false)}>Cancel</Button>

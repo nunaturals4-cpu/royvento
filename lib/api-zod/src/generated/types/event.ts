@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EventDayPricing } from "./eventDayPricing";
+import type { EventVendorCrowdLevel } from "./eventVendorCrowdLevel";
 import type { FreeEntryRules } from "./freeEntryRules";
 
 export interface Event {
@@ -33,4 +34,5 @@ export interface Event {
   dayPricing?: EventDayPricing;
   freeEntryRules?: FreeEntryRules | null;
   hasDrinkPlans?: boolean;
+  vendorCrowdLevel?: EventVendorCrowdLevel;
 }

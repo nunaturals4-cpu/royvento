@@ -48,6 +48,7 @@ import type {
   GetCommissionReportParams,
   GetPartnerAnalyticsParams,
   GetPartnerCheckinReportParams,
+  GetPartnerSettlementBalance200,
   HealthStatus,
   ImportGooglePubBody,
   ImportGooglePubResponse,
@@ -75,6 +76,8 @@ import type {
   ScanTicketBody,
   ScanTicketResult,
   SetAvailabilityBody,
+  SetPartnerCrowdLevel200,
+  SetPartnerCrowdLevelBody,
   SetVendorCommissionBody,
   SettlementRequest,
   UpdateBookingStatusBody,
@@ -4074,6 +4077,173 @@ export function useGetPartnerCheckinReport<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetPartnerCheckinReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Set the current crowd level for the authenticated partner venue
+ */
+export const getSetPartnerCrowdLevelUrl = () => {
+  return `/api/partner/crowd-level`;
+};
+
+export const setPartnerCrowdLevel = async (
+  setPartnerCrowdLevelBody: SetPartnerCrowdLevelBody,
+  options?: RequestInit,
+): Promise<SetPartnerCrowdLevel200> => {
+  return customFetch<SetPartnerCrowdLevel200>(getSetPartnerCrowdLevelUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setPartnerCrowdLevelBody),
+  });
+};
+
+export const getSetPartnerCrowdLevelMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setPartnerCrowdLevel>>,
+    TError,
+    { data: BodyType<SetPartnerCrowdLevelBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setPartnerCrowdLevel>>,
+  TError,
+  { data: BodyType<SetPartnerCrowdLevelBody> },
+  TContext
+> => {
+  const mutationKey = ["setPartnerCrowdLevel"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setPartnerCrowdLevel>>,
+    { data: BodyType<SetPartnerCrowdLevelBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return setPartnerCrowdLevel(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetPartnerCrowdLevelMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setPartnerCrowdLevel>>
+>;
+export type SetPartnerCrowdLevelMutationBody =
+  BodyType<SetPartnerCrowdLevelBody>;
+export type SetPartnerCrowdLevelMutationError = ErrorType<void>;
+
+/**
+ * @summary Set the current crowd level for the authenticated partner venue
+ */
+export const useSetPartnerCrowdLevel = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setPartnerCrowdLevel>>,
+    TError,
+    { data: BodyType<SetPartnerCrowdLevelBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setPartnerCrowdLevel>>,
+  TError,
+  { data: BodyType<SetPartnerCrowdLevelBody> },
+  TContext
+> => {
+  return useMutation(getSetPartnerCrowdLevelMutationOptions(options));
+};
+
+/**
+ * @summary Get the current online balance available for settlement
+ */
+export const getGetPartnerSettlementBalanceUrl = () => {
+  return `/api/partner/settlement/balance`;
+};
+
+export const getPartnerSettlementBalance = async (
+  options?: RequestInit,
+): Promise<GetPartnerSettlementBalance200> => {
+  return customFetch<GetPartnerSettlementBalance200>(
+    getGetPartnerSettlementBalanceUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPartnerSettlementBalanceQueryKey = () => {
+  return [`/api/partner/settlement/balance`] as const;
+};
+
+export const getGetPartnerSettlementBalanceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerSettlementBalance>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerSettlementBalance>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPartnerSettlementBalanceQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPartnerSettlementBalance>>
+  > = ({ signal }) =>
+    getPartnerSettlementBalance({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerSettlementBalance>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerSettlementBalanceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerSettlementBalance>>
+>;
+export type GetPartnerSettlementBalanceQueryError = ErrorType<void>;
+
+/**
+ * @summary Get the current online balance available for settlement
+ */
+
+export function useGetPartnerSettlementBalance<
+  TData = Awaited<ReturnType<typeof getPartnerSettlementBalance>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerSettlementBalance>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerSettlementBalanceQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -1096,6 +1096,8 @@ export default function VendorDashboardScreen() {
   const [profSaving, setProfSaving] = useState(false);
   const [listingSaving, setListingSaving] = useState(false);
   const [showVenueDetailsModal, setShowVenueDetailsModal] = useState(false);
+  const [profCrowdLevel, setProfCrowdLevel] = useState<string | null>(null);
+  const [savingCrowdLevel, setSavingCrowdLevel] = useState(false);
 
   const updateVendorMut = useUpdateMyVendor({
     mutation: { onSuccess: () => vendorQuery.refetch() },
@@ -1137,6 +1139,7 @@ export default function VendorDashboardScreen() {
       setProfAddress(vendor.address ?? "");
       setProfAddressQuery(vendor.address ?? "");
       setProfDanceFloor(vendor.danceFloor ?? "");
+      setProfCrowdLevel((vendor as unknown as { crowdLevel?: string | null }).crowdLevel ?? null);
       setProfDanceFloorPhotos(Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []);
       const raw = (vendor as unknown as Record<string, unknown>)["menuUrls"];
       const existingUrls: string[] = Array.isArray(raw) ? (raw as string[]) : [];
@@ -1185,6 +1188,23 @@ export default function VendorDashboardScreen() {
       Alert.alert("Error", "Failed to save profile. Please try again.");
     } finally {
       setProfSaving(false);
+    }
+  }
+
+  async function saveCrowdLevel(level: string | null) {
+    setSavingCrowdLevel(true);
+    try {
+      await customFetch("/api/partner/crowd-level", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crowdLevel: level }),
+      });
+      setProfCrowdLevel(level);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Error", "Failed to update crowd level.");
+    } finally {
+      setSavingCrowdLevel(false);
     }
   }
 
@@ -1874,6 +1894,46 @@ export default function VendorDashboardScreen() {
               {profSaving ? "Saving…" : "Save Profile"}
             </Text>
           </TouchableOpacity>
+
+          {/* Live Crowd Level */}
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>LIVE CROWD LEVEL</Text>
+          <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground, marginBottom: 10 }}>
+            Let guests know how busy your venue is right now.
+          </Text>
+          {[
+            { value: "low", label: "Low Crowd", desc: "Quiet, easy to get in", color: "#22c55e" },
+            { value: "moderate", label: "Moderate Crowd", desc: "Getting busy, some wait", color: "#f59e0b" },
+            { value: "party", label: "🔥 Party Mode", desc: "Packed, full energy", color: "#ef4444" },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              onPress={() => saveCrowdLevel(profCrowdLevel === opt.value ? null : opt.value)}
+              disabled={savingCrowdLevel}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                backgroundColor: profCrowdLevel === opt.value ? opt.color + "22" : colors.card,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: profCrowdLevel === opt.value ? opt.color : colors.border,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                marginBottom: 8,
+                opacity: savingCrowdLevel ? 0.6 : 1,
+              }}
+            >
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: opt.color }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: profCrowdLevel === opt.value ? opt.color : colors.foreground }}>{opt.label}</Text>
+                <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: colors.mutedForeground }}>{opt.desc}</Text>
+              </View>
+              {profCrowdLevel === opt.value && (
+                <Ionicons name="checkmark-circle" size={18} color={opt.color} />
+              )}
+            </TouchableOpacity>
+          ))}
+
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -4069,6 +4129,7 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   const [reqAmount, setReqAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onlineBalance, setOnlineBalance] = useState<number>(0);
 
   async function loadData() {
     setLoadingBanking(true);
@@ -4081,6 +4142,10 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
       const r = await customFetch<SettlementRequest[]>("/api/partner/settlement/requests");
       setRequests(r ?? []);
     } catch { /* ignore */ } finally { setLoadingRequests(false); }
+    try {
+      const bal = await customFetch<{ onlineBalance: number }>("/api/partner/settlement/balance");
+      setOnlineBalance(bal?.onlineBalance ?? 0);
+    } catch { /* ignore */ }
   }
 
   useEffect(() => { loadData(); }, []);
@@ -4098,10 +4163,12 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   async function submitRequest() {
     const amount = parseFloat(reqAmount);
     if (!amount || amount <= 0) { setError("Enter a valid amount."); return; }
+    if (amount > onlineBalance) { setError(`Amount exceeds available balance of ₹${onlineBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`); return; }
     setError(null); setSubmitting(true);
     try {
       const created = await customFetch<SettlementRequest>("/api/partner/settlement/request", { method: "POST", body: JSON.stringify({ amount }) });
       setRequests((prev) => [created, ...prev]);
+      setOnlineBalance(0);
       setShowModal(false); setReqAmount("");
     } catch (e: any) { setError(e?.message ?? "Failed to submit"); } finally { setSubmitting(false); }
   }
@@ -4159,13 +4226,19 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
           <Text style={{ fontFamily: "Inter_700Bold", fontSize: 16, color: colors.foreground }}>Settlement Requests</Text>
           {banking && (
             <TouchableOpacity
-              onPress={() => { setError(null); setShowModal(true); }}
+              onPress={() => { setError(null); setReqAmount(onlineBalance > 0 ? String(onlineBalance) : ""); setShowModal(true); }}
               style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 }}
             >
               <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>+ Request</Text>
             </TouchableOpacity>
           )}
         </View>
+        {banking && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#22c55e18", borderRadius: 10, borderWidth: 1, borderColor: "#22c55e30", paddingHorizontal: 12, paddingVertical: 8, marginTop: 4 }}>
+            <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground }}>Online Balance:</Text>
+            <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: "#22c55e" }}>₹{onlineBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</Text>
+          </View>
+        )}
         {!banking && <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>Save your banking details above before requesting a settlement.</Text>}
         {loadingRequests ? (
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>Loading…</Text>
@@ -4197,8 +4270,13 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 24 }}>
           <View style={{ backgroundColor: colors.card, borderRadius: 20, padding: 24, width: "100%", gap: 16 }}>
             <Text style={{ fontFamily: "Inter_700Bold", fontSize: 17, color: colors.foreground }}>Request Settlement</Text>
+            {onlineBalance > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#22c55e18", borderRadius: 10, borderWidth: 1, borderColor: "#22c55e30", paddingHorizontal: 12, paddingVertical: 8 }}>
+                <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: "#22c55e" }}>Available: <Text style={{ fontFamily: "Inter_700Bold" }}>₹{onlineBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</Text></Text>
+              </View>
+            )}
             <View style={{ gap: 4 }}>
-              <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.mutedForeground }}>Amount (₹)</Text>
+              <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.mutedForeground }}>Amount (₹){onlineBalance > 0 ? ` · max ₹${onlineBalance.toLocaleString("en-IN")}` : ""}</Text>
               <TextInput
                 value={reqAmount}
                 onChangeText={setReqAmount}

@@ -154,6 +154,20 @@ export function VendorDetail() {
                 <span className="text-white/50">({vendor.reviewCount} reviews)</span>
               </div>
             )}
+            {(vendor as Vendor & { crowdLevel?: string | null }).crowdLevel && (() => {
+              const cl = (vendor as Vendor & { crowdLevel?: string | null }).crowdLevel!;
+              const cfg: Record<string, { label: string; bg: string }> = {
+                low: { label: "Low Crowd", bg: "bg-green-600/80" },
+                moderate: { label: "Moderate Crowd", bg: "bg-amber-500/80" },
+                party: { label: "Party Mode 🔥", bg: "bg-red-600/80" },
+              };
+              const c = cfg[cl];
+              return c ? (
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full ${c.bg} border border-white/20 text-xs font-semibold text-white`}>
+                  {c.label}
+                </span>
+              ) : null;
+            })()}
           </div>
           <h1 className="font-serif text-4xl md:text-6xl tracking-tight leading-tight text-white">{vendor.businessName}</h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-sm">

@@ -126,6 +126,16 @@ export const VendorDanceFloor = {
   none: "none",
 } as const;
 
+export type VendorCrowdLevel =
+  | (typeof VendorCrowdLevel)[keyof typeof VendorCrowdLevel]
+  | null;
+
+export const VendorCrowdLevel = {
+  low: "low",
+  moderate: "moderate",
+  party: "party",
+} as const;
+
 export interface Vendor {
   id: number;
   userId: number;
@@ -150,6 +160,7 @@ export interface Vendor {
   danceFloor?: VendorDanceFloor;
   danceFloorPhotos?: string[] | null;
   menuUrl?: string;
+  crowdLevel?: VendorCrowdLevel;
 }
 
 export interface MyVendorResponse {
@@ -191,6 +202,16 @@ export type EventDayPricing = {
   };
 };
 
+export type EventVendorCrowdLevel =
+  | (typeof EventVendorCrowdLevel)[keyof typeof EventVendorCrowdLevel]
+  | null;
+
+export const EventVendorCrowdLevel = {
+  low: "low",
+  moderate: "moderate",
+  party: "party",
+} as const;
+
 export interface Event {
   id: number;
   vendorId: number;
@@ -216,6 +237,7 @@ export interface Event {
   dayPricing?: EventDayPricing;
   freeEntryRules?: FreeEntryRules | null;
   hasDrinkPlans?: boolean;
+  vendorCrowdLevel?: EventVendorCrowdLevel;
 }
 
 export type EventDetail = Event & {
@@ -1202,6 +1224,38 @@ export const GetPartnerCheckinReportStatus = {
   checkedIn: "checkedIn",
   notArrived: "notArrived",
 } as const;
+
+export type SetPartnerCrowdLevelBodyCrowdLevel =
+  | (typeof SetPartnerCrowdLevelBodyCrowdLevel)[keyof typeof SetPartnerCrowdLevelBodyCrowdLevel]
+  | null;
+
+export const SetPartnerCrowdLevelBodyCrowdLevel = {
+  low: "low",
+  moderate: "moderate",
+  party: "party",
+} as const;
+
+export type SetPartnerCrowdLevelBody = {
+  crowdLevel: SetPartnerCrowdLevelBodyCrowdLevel;
+};
+
+export type SetPartnerCrowdLevel200CrowdLevel =
+  | (typeof SetPartnerCrowdLevel200CrowdLevel)[keyof typeof SetPartnerCrowdLevel200CrowdLevel]
+  | null;
+
+export const SetPartnerCrowdLevel200CrowdLevel = {
+  low: "low",
+  moderate: "moderate",
+  party: "party",
+} as const;
+
+export type SetPartnerCrowdLevel200 = {
+  crowdLevel: SetPartnerCrowdLevel200CrowdLevel;
+};
+
+export type GetPartnerSettlementBalance200 = {
+  onlineBalance: number;
+};
 
 export type GetAdminBookingsReportParams = {
   page?: number;

@@ -169,6 +169,7 @@ async function serializeEvents(rows: EventRow[]) {
       partnerName: v?.businessName ?? "",
       createdAt: e.createdAt.toISOString(),
       hasDrinkPlans: vendorIdsWithPlans.has(e.vendorId),
+      vendorCrowdLevel: (v as unknown as { crowdLevel?: string | null })?.crowdLevel ?? null,
     };
   });
 }

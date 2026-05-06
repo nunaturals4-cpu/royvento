@@ -258,6 +258,7 @@ export const ListVendorsResponseItem = zod.object({
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 
@@ -309,6 +310,7 @@ export const GetMyVendorResponse = zod.object({
       danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
       danceFloorPhotos: zod.array(zod.string()).nullish(),
       menuUrl: zod.string().optional(),
+      crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
     }),
     zod.null(),
   ]),
@@ -369,6 +371,7 @@ export const CreateMyVendorResponse = zod.object({
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 
 /**
@@ -427,6 +430,7 @@ export const UpdateMyVendorResponse = zod.object({
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 
 /**
@@ -475,6 +479,7 @@ export const GetVendorResponse = zod.object({
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 
 /**
@@ -519,6 +524,7 @@ export const ListPendingVendorsResponseItem = zod.object({
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 export const ListPendingVendorsResponse = zod.array(
   ListPendingVendorsResponseItem,
@@ -570,6 +576,7 @@ export const ApproveVendorResponse = zod.object({
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 
 /**
@@ -618,6 +625,7 @@ export const RejectVendorResponse = zod.object({
   danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
   danceFloorPhotos: zod.array(zod.string()).nullish(),
   menuUrl: zod.string().optional(),
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 
 /**
@@ -920,6 +928,7 @@ export const ListEventsResponseItem = zod.object({
     ])
     .optional(),
   hasDrinkPlans: zod.boolean().optional(),
+  vendorCrowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 export const ListEventsResponse = zod.array(ListEventsResponseItem);
 
@@ -1000,6 +1009,7 @@ export const CreateEventResponse = zod.object({
     ])
     .optional(),
   hasDrinkPlans: zod.boolean().optional(),
+  vendorCrowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 
 /**
@@ -1054,6 +1064,7 @@ export const ListFeaturedEventsResponseItem = zod.object({
     ])
     .optional(),
   hasDrinkPlans: zod.boolean().optional(),
+  vendorCrowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 export const ListFeaturedEventsResponse = zod.array(
   ListFeaturedEventsResponseItem,
@@ -1118,6 +1129,7 @@ export const GetEventResponse = zod
       ])
       .optional(),
     hasDrinkPlans: zod.boolean().optional(),
+    vendorCrowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
   })
   .and(
     zod.object({
@@ -1164,6 +1176,7 @@ export const GetEventResponse = zod
         danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
         danceFloorPhotos: zod.array(zod.string()).nullish(),
         menuUrl: zod.string().optional(),
+        crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
       }),
     }),
   );
@@ -1252,6 +1265,7 @@ export const UpdateEventResponse = zod.object({
     ])
     .optional(),
   hasDrinkPlans: zod.boolean().optional(),
+  vendorCrowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
 });
 
 /**
@@ -1336,6 +1350,7 @@ export const ListMyVendorEventsResponse = zod.object({
         ])
         .optional(),
       hasDrinkPlans: zod.boolean().optional(),
+      vendorCrowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
     }),
   ),
   total: zod.number(),
@@ -1892,6 +1907,24 @@ export const GetPartnerCheckinReportResponse = zod.object({
   total: zod.number(),
   page: zod.number(),
   totalPages: zod.number(),
+});
+
+/**
+ * @summary Set the current crowd level for the authenticated partner venue
+ */
+export const SetPartnerCrowdLevelBody = zod.object({
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullable(),
+});
+
+export const SetPartnerCrowdLevelResponse = zod.object({
+  crowdLevel: zod.enum(["low", "moderate", "party"]).nullable(),
+});
+
+/**
+ * @summary Get the current online balance available for settlement
+ */
+export const GetPartnerSettlementBalanceResponse = zod.object({
+  onlineBalance: zod.number(),
 });
 
 /**
@@ -2675,6 +2708,7 @@ export const GetWishlistResponseItem = zod
       ])
       .optional(),
     hasDrinkPlans: zod.boolean().optional(),
+    vendorCrowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
   })
   .and(
     zod.object({

@@ -35,6 +35,7 @@ interface VendorRow {
   danceFloorPhotos?: string[] | null;
   menuUrl?: string | null;
   menuUrls?: string[] | null;
+  crowdLevel?: string | null;
   status: string;
   isPremium?: boolean;
   approvedAt?: Date | null;
@@ -100,6 +101,7 @@ async function serializeVendor(v: VendorRow) {
     danceFloorPhotos: v.danceFloorPhotos ?? null,
     menuUrl: v.menuUrl ?? "",
     menuUrls: v.menuUrls ?? [],
+    crowdLevel: v.crowdLevel ?? null,
   };
 }
 
@@ -164,6 +166,7 @@ async function serializeVendorList(rows: VendorRow[]) {
       danceFloorPhotos: v.danceFloorPhotos ?? null,
       menuUrl: v.menuUrl ?? "",
       menuUrls: v.menuUrls ?? [],
+      crowdLevel: v.crowdLevel ?? null,
     };
   });
 }
@@ -309,6 +312,28 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
     return;
   }
   res.json(await serializeVendor(v));
+});
+
+const VALID_CROWD_LEVELS = new Set(["low", "moderate", "party"]);
+
+router.patch("/partner/crowd-level", requireAuth(["vendor"]), async (req, res) => {
+  const user = (req as import("../lib/auth").AuthedRequest).user;
+  const body = req.body as Record<string, unknown>;
+  const crowdLevel = typeof body["crowdLevel"] === "string" ? body["crowdLevel"] : null;
+  if (crowdLevel !== null && !VALID_CROWD_LEVELS.has(crowdLevel)) {
+    res.status(400).json({ error: "crowdLevel must be low, moderate, or party" });
+    return;
+  }
+  const [v] = await db
+    .update(vendorsTable)
+    .set({ crowdLevel: crowdLevel })
+    .where(eq(vendorsTable.userId, user.id))
+    .returning();
+  if (!v) {
+    res.status(404).json({ error: "Vendor profile not found" });
+    return;
+  }
+  res.json({ crowdLevel: v.crowdLevel ?? null });
 });
 
 router.get("/vendors/drink-offers", async (_req, res) => {

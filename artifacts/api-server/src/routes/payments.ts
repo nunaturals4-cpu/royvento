@@ -86,6 +86,20 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
     .set({ status: "confirmed", approvedBy: "payment" })
     .where(eq(bookingsTable.id, bookingId));
 
+  // Credit vendor's online balance with the booking's final price
+  {
+    const [vendorRow] = await db
+      .select({ onlineBalance: vendorsTable.onlineBalance })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, booking.vendorId))
+      .limit(1);
+    const newBalance = Number(vendorRow?.onlineBalance ?? 0) + Number(booking.finalPrice ?? 0);
+    await db
+      .update(vendorsTable)
+      .set({ onlineBalance: String(newBalance) })
+      .where(eq(vendorsTable.id, booking.vendorId));
+  }
+
   await db
     .insert(availabilityTable)
     .values({ vendorId: booking.vendorId, date: booking.bookingDate, status: "booked" })

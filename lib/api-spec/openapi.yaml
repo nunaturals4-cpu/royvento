@@ -1071,6 +1071,64 @@ paths:
               schema:
                 $ref: "#/components/schemas/AttendanceReportResponse"
 
+  /partner/crowd-level:
+    patch:
+      operationId: setPartnerCrowdLevel
+      tags: [vendors]
+      summary: Set the current crowd level for the authenticated partner venue
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                crowdLevel:
+                  type: string
+                  enum: [low, moderate, party]
+                  nullable: true
+              required: [crowdLevel]
+      responses:
+        "200":
+          description: Updated crowd level
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  crowdLevel:
+                    type: string
+                    enum: [low, moderate, party]
+                    nullable: true
+                required: [crowdLevel]
+        "400":
+          description: Invalid crowd level
+        "404":
+          description: Vendor profile not found
+
+  /partner/settlement/balance:
+    get:
+      operationId: getPartnerSettlementBalance
+      tags: [bookings]
+      summary: Get the current online balance available for settlement
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Available online balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  onlineBalance:
+                    type: number
+                required: [onlineBalance]
+        "404":
+          description: Vendor profile not found
+
   /partner/banking-details:
     get:
       operationId: getPartnerBankingDetails
@@ -1893,6 +1951,10 @@ components:
           nullable: true
         menuUrl:
           type: string
+        crowdLevel:
+          type: string
+          enum: [low, moderate, party]
+          nullable: true
       required: [id, userId, businessName, category, description, location, bannerImage, coverImageUrl, portfolioImages, status, rating, reviewCount, createdAt, openDays, city, state, country]
 
     MyVendorResponse:
@@ -2027,6 +2089,10 @@ components:
             - type: "null"
         hasDrinkPlans:
           type: boolean
+        vendorCrowdLevel:
+          type: string
+          enum: [low, moderate, party]
+          nullable: true
       required: [id, vendorId, title, description, category, location, price, capacity, imageUrl, rating, reviewCount, vendorName, galleryImages, galleryVideos, createdAt, type, priceWomen, priceMen, priceCouple, approvalStatus]
 
     EventDetail:
