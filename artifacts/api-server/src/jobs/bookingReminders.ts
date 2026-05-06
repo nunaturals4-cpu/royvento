@@ -114,10 +114,14 @@ export async function runBookingReminders(slot: ReminderSlot): Promise<void> {
           ? "event booking"
           : "table booking";
 
-      const arrivalNote = booking.arrivalTime ? ` at ${booking.arrivalTime}` : "";
+      // Always include a time reference — use the booking's arrival time if set,
+      // otherwise show the slot reminder time so the message always answers "when?"
+      const timeRef = booking.arrivalTime
+        ? `at ${booking.arrivalTime}`
+        : `— reminder sent at ${label}`;
 
       const message =
-        `${refCode}: You have a ${bookingKind} for "${eventTitle}" at ${vendorName} today${arrivalNote}. Don't miss it! 🎉`;
+        `${refCode}: You have a ${bookingKind} for "${eventTitle}" at ${vendorName} today ${timeRef}. Don't miss it! 🎉`;
 
       try {
         await db.insert(notificationsTable).values({
