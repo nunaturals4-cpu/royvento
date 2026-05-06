@@ -518,12 +518,12 @@ export function VendorDetail() {
                   {((plan.days ?? []).length > 0 || plan.timeFrom || plan.timeTo) && (
                     <div className="flex flex-wrap gap-1.5">
                       {(plan.days ?? []).map((d) => (
-                        <span key={d} className="rounded-md bg-primary/10 border border-primary/25 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <span key={d} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
                           {d}
                         </span>
                       ))}
                       {(plan.timeFrom || plan.timeTo) && (
-                        <span className="rounded-md bg-primary/10 border border-primary/25 px-2 py-0.5 text-[10px] font-semibold text-primary flex items-center gap-1">
+                        <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
                           <Clock className="h-2.5 w-2.5 shrink-0" />
                           {[plan.timeFrom ? fmtTime(plan.timeFrom) : null, plan.timeTo ? fmtTime(plan.timeTo) : null].filter(Boolean).join(" – ")}
                         </span>

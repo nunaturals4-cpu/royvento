@@ -641,33 +641,33 @@ export default function EventDetailScreen() {
                                 <View
                                   key={d}
                                   style={{
-                                    backgroundColor: colors.muted,
+                                    backgroundColor: "rgba(0,0,0,0.45)",
                                     borderRadius: 6,
                                     paddingHorizontal: 7,
                                     paddingVertical: 2,
                                     borderWidth: 1,
-                                    borderColor: colors.border,
+                                    borderColor: "rgba(255,255,255,0.15)",
                                   }}
                                 >
-                                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{d}</Text>
+                                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff" }}>{d}</Text>
                                 </View>
                               ))}
                               {(plan.timeFrom || plan.timeTo) ? (
                                 <View
                                   style={{
-                                    backgroundColor: colors.muted,
+                                    backgroundColor: "rgba(0,0,0,0.45)",
                                     borderRadius: 6,
                                     paddingHorizontal: 7,
                                     paddingVertical: 2,
                                     borderWidth: 1,
-                                    borderColor: colors.border,
+                                    borderColor: "rgba(255,255,255,0.15)",
                                     flexDirection: "row",
                                     alignItems: "center",
                                     gap: 3,
                                   }}
                                 >
-                                  <Ionicons name="time-outline" size={9} color={colors.mutedForeground} />
-                                  <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
+                                  <Ionicons name="time-outline" size={9} color="#fff" />
+                                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff" }}>
                                     {plan.timeFrom || ""}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
                                   </Text>
                                 </View>
