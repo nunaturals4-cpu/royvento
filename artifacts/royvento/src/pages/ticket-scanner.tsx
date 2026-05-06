@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
+import { useGetMe } from "@workspace/api-client-react";
 
 interface BookingData {
   id: number;
@@ -108,30 +109,36 @@ function useAccessCheck() {
   const [accessStatus, setAccessStatus] = useState<"loading" | "allowed" | "denied">("loading");
   const [managedVendors, setManagedVendors] = useState<{ id: number; businessName: string }[]>([]);
 
+  // Use server-confirmed role via /api/auth/me — avoids stale JWT where a partner
+  // approved after login still has role "user" cached in localStorage.
+  const { data: me, isError: meError } = useGetMe({ query: { retry: false } as any });
+
   useEffect(() => {
-    const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
-    if (!token) { setAccessStatus("denied"); return; }
+    // Still loading — wait
+    if (!me && !meError) return;
 
-    // Decode role from JWT payload (no verification needed on client — server re-checks on every request)
-    let role = "user";
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]!));
-      role = typeof payload.role === "string" ? payload.role : "user";
-    } catch { /* ignore */ }
+    // Not logged in at all
+    if (meError || !me?.user) { setAccessStatus("denied"); return; }
 
-    // Always fetch managed venues regardless of role
+    const role = me.user.role as string;
+
+    // Vendors and admins get immediate access — fetch their managed venues in background
+    if (role === "vendor" || role === "admin") {
+      setAccessStatus("allowed");
+      apiGet<{ id: number; businessName: string }[]>("/api/manager/my-vendors")
+        .then(setManagedVendors)
+        .catch(() => {});
+      return;
+    }
+
+    // For regular users, check if they have accepted manager relationships
     apiGet<{ id: number; businessName: string }[]>("/api/manager/my-vendors").then((vendors) => {
       setManagedVendors(vendors);
-      if (role === "vendor" || role === "admin" || vendors.length > 0) {
-        setAccessStatus("allowed");
-      } else {
-        setAccessStatus("denied");
-      }
+      setAccessStatus(vendors.length > 0 ? "allowed" : "denied");
     }).catch(() => {
-      // If API call fails, still allow vendors/admins
-      setAccessStatus(role === "vendor" || role === "admin" ? "allowed" : "denied");
+      setAccessStatus("denied");
     });
-  }, []);
+  }, [me, meError]);
 
   return { accessStatus, managedVendors };
 }
