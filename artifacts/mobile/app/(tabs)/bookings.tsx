@@ -144,7 +144,7 @@ export default function BookingsScreen() {
         : b.totalPrice != null
         ? Number(b.totalPrice)
         : null;
-      const isFreeBooking = priceNumber != null && priceNumber === 0;
+      const isFreeBooking = Number(bx.finalPrice ?? b.totalPrice ?? 0) === 0;
       const price = priceNumber != null ? `₹${priceNumber.toLocaleString("en-IN")}` : "—";
 
       const html = `<!doctype html><html><head><meta charset="utf-8">
@@ -524,23 +524,21 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     <Text style={styles.ptCode}>{qrValue}</Text>
 
                     {/* Footer: price + disclaimer */}
-                    {(() => {
-                      const _pn = bx.finalPrice != null ? Number(bx.finalPrice) : b.totalPrice != null ? Number(b.totalPrice) : null;
-                      const _isFree = _pn != null && _pn === 0;
-                      return (
-                        <View style={styles.ptFooter}>
-                          {!_isFree && (
-                            <View style={styles.ptPriceRow}>
-                              <Text style={styles.ptPriceLabel}>{t("bookings.total_label")}</Text>
-                              <Text style={styles.ptPriceValue}>
-                                {_pn != null ? `₹${_pn.toLocaleString("en-IN")}` : "—"}
-                              </Text>
-                            </View>
-                          )}
-                          <Text style={styles.ptFooterHint}>{t("bookings.present_at_entrance")}</Text>
+                    <View style={styles.ptFooter}>
+                      {Number(bx.finalPrice ?? b.totalPrice ?? 0) !== 0 && (
+                        <View style={styles.ptPriceRow}>
+                          <Text style={styles.ptPriceLabel}>{t("bookings.total_label")}</Text>
+                          <Text style={styles.ptPriceValue}>
+                            {bx.finalPrice != null
+                              ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
+                              : b.totalPrice != null
+                              ? `₹${Number(b.totalPrice).toLocaleString("en-IN")}`
+                              : "—"}
+                          </Text>
                         </View>
-                      );
-                    })()}
+                      )}
+                      <Text style={styles.ptFooterHint}>{t("bookings.present_at_entrance")}</Text>
+                    </View>
                   </LinearGradient>
                 )}
 
