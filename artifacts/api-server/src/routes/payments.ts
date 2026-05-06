@@ -12,7 +12,7 @@ import {
   referralsTable,
   notificationsTable,
 } from "@workspace/db";
-import { eq, and, inArray, ne } from "drizzle-orm";
+import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import {
   checkPaymentStatus,
   verifyWebhookSignature,
@@ -86,19 +86,11 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
     .set({ status: "confirmed", approvedBy: "payment" })
     .where(eq(bookingsTable.id, bookingId));
 
-  // Credit vendor's online balance with the booking's final price
-  {
-    const [vendorRow] = await db
-      .select({ onlineBalance: vendorsTable.onlineBalance })
-      .from(vendorsTable)
-      .where(eq(vendorsTable.id, booking.vendorId))
-      .limit(1);
-    const newBalance = Number(vendorRow?.onlineBalance ?? 0) + Number(booking.finalPrice ?? 0);
-    await db
-      .update(vendorsTable)
-      .set({ onlineBalance: String(newBalance) })
-      .where(eq(vendorsTable.id, booking.vendorId));
-  }
+  // Credit vendor's online balance atomically (avoids race conditions on concurrent confirmations)
+  await db
+    .update(vendorsTable)
+    .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(booking.finalPrice ?? 0)}` })
+    .where(eq(vendorsTable.id, booking.vendorId));
 
   await db
     .insert(availabilityTable)

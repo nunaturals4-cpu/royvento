@@ -474,6 +474,21 @@ export default function EventDetailScreen() {
                 <Text style={[styles.catText, { color: colors.mutedForeground }]}>{t("events.pub_label")}</Text>
               </View>
             )}
+            {(() => {
+              const cl = (event as unknown as { vendorCrowdLevel?: string | null }).vendorCrowdLevel;
+              if (!cl) return null;
+              const cfg = cl === "party"
+                ? { color: "#ef4444", label: "🔥 Party Mode" }
+                : cl === "moderate"
+                  ? { color: "#f59e0b", label: "Moderate Crowd" }
+                  : { color: "#22c55e", label: "Low Crowd" };
+              return (
+                <View style={[styles.catBadge, { backgroundColor: cfg.color + "22", borderWidth: 1, borderColor: cfg.color + "55", flexDirection: "row", alignItems: "center", gap: 4 }]}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: cfg.color }} />
+                  <Text style={[styles.catText, { color: cfg.color }]}>{cfg.label}</Text>
+                </View>
+              );
+            })()}
             {avgRating ? (
               <View style={styles.row}>
                 <Ionicons name="star" size={13} color={colors.primary} />

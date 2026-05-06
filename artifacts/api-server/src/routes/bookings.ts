@@ -391,6 +391,15 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       target: [availabilityTable.vendorId, availabilityTable.date],
       set: { status: "booked" },
     });
+
+  // For online+bypass path: credit vendor's online balance atomically (same as PhonePe confirmation)
+  if (wantsOnline && finalPrice > 0) {
+    await db
+      .update(vendorsTable)
+      .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(finalPrice)}` })
+      .where(eq(vendorsTable.id, evt.vendorId));
+  }
+
   const [out] = await serializeBookings([b]);
 
   try {
