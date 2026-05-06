@@ -286,6 +286,16 @@ export type BookingActualEntry = {
   guests?: number | null;
 } | null;
 
+/**
+ * Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets.
+ */
+export type BookingFreeEntryRules = {
+  enabled?: boolean;
+  genders?: string[];
+  days?: string[];
+  beforeTime?: string | null;
+} | null;
+
 export interface Booking {
   id: number;
   eventId: number;
@@ -324,6 +334,8 @@ export interface Booking {
   actualGuests?: number | null;
   actualAmountDue?: number | null;
   actualEntry?: BookingActualEntry;
+  /** Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets. */
+  freeEntryRules?: BookingFreeEntryRules;
 }
 
 /**

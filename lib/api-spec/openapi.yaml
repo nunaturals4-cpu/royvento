@@ -2255,6 +2255,19 @@ components:
             men: { type: integer, nullable: true }
             couple: { type: integer, nullable: true }
             guests: { type: integer, nullable: true }
+        freeEntryRules:
+          type: object
+          nullable: true
+          description: "Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets."
+          properties:
+            enabled: { type: boolean }
+            genders:
+              type: array
+              items: { type: string }
+            days:
+              type: array
+              items: { type: string }
+            beforeTime: { type: string, nullable: true }
       required: [id, eventId, userId, vendorId, bookingDate, guests, totalPrice, notes, status, createdAt, eventTitle, eventImage, vendorName, userName, userEmail, phone]
 
     CreateBookingBody:

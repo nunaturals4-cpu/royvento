@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BookingActualEntry } from "./bookingActualEntry";
+import type { BookingFreeEntryRules } from "./bookingFreeEntryRules";
 import type { BookingStatus } from "./bookingStatus";
 
 export interface Booking {
@@ -46,4 +47,6 @@ export interface Booking {
   actualGuests?: number | null;
   actualAmountDue?: number | null;
   actualEntry?: BookingActualEntry;
+  /** Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets. */
+  freeEntryRules?: BookingFreeEntryRules;
 }

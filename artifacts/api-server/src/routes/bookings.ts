@@ -170,6 +170,7 @@ async function serializeBookings(rows: BookingRow[]) {
       actualGuests: b.actualGuests ?? null,
       actualEntry,
       actualAmountDue,
+      freeEntryRules: e?.freeEntryRules ?? null,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
       eventImage: e?.imageUrl ?? "",

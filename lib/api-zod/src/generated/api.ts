@@ -1438,6 +1438,17 @@ export const CreateBookingResponse = zod.object({
       guests: zod.number().nullish(),
     })
     .nullish(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean().optional(),
+      genders: zod.array(zod.string()).optional(),
+      days: zod.array(zod.string()).optional(),
+      beforeTime: zod.string().nullish(),
+    })
+    .nullish()
+    .describe(
+      "Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets.",
+    ),
 });
 
 /**
@@ -1496,6 +1507,17 @@ export const ListMyBookingsResponseItem = zod.object({
       guests: zod.number().nullish(),
     })
     .nullish(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean().optional(),
+      genders: zod.array(zod.string()).optional(),
+      days: zod.array(zod.string()).optional(),
+      beforeTime: zod.string().nullish(),
+    })
+    .nullish()
+    .describe(
+      "Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets.",
+    ),
 });
 export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 
@@ -1573,6 +1595,17 @@ export const ListVendorBookingsResponse = zod.object({
           guests: zod.number().nullish(),
         })
         .nullish(),
+      freeEntryRules: zod
+        .object({
+          enabled: zod.boolean().optional(),
+          genders: zod.array(zod.string()).optional(),
+          days: zod.array(zod.string()).optional(),
+          beforeTime: zod.string().nullish(),
+        })
+        .nullish()
+        .describe(
+          "Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets.",
+        ),
     }),
   ),
   total: zod.number(),
@@ -1656,6 +1689,17 @@ export const UpdateBookingStatusResponse = zod.object({
       guests: zod.number().nullish(),
     })
     .nullish(),
+  freeEntryRules: zod
+    .object({
+      enabled: zod.boolean().optional(),
+      genders: zod.array(zod.string()).optional(),
+      days: zod.array(zod.string()).optional(),
+      beforeTime: zod.string().nullish(),
+    })
+    .nullish()
+    .describe(
+      "Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets.",
+    ),
 });
 
 /**
@@ -2723,6 +2767,17 @@ export const GetAdminAnalyticsResponse = zod.object({
           guests: zod.number().nullish(),
         })
         .nullish(),
+      freeEntryRules: zod
+        .object({
+          enabled: zod.boolean().optional(),
+          genders: zod.array(zod.string()).optional(),
+          days: zod.array(zod.string()).optional(),
+          beforeTime: zod.string().nullish(),
+        })
+        .nullish()
+        .describe(
+          "Free-entry-day configuration copied from the event at serialization time, used by clients to hide the Amount Paid block on free-entry-day tickets.",
+        ),
     }),
   ),
   topVendors: zod.array(

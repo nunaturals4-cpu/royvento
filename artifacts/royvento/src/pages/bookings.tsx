@@ -346,11 +346,41 @@ function TicketField({ label, value }: { label: string; value: React.ReactNode }
   );
 }
 
+// Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
+const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Hide the Amount Paid block when the booking falls on a configured free-entry day
+// for which all booked ticket genders are eligible. Mirrors the rule in
+// artifacts/mobile/app/(tabs)/bookings.tsx and event-detail.tsx so web and mobile
+// stay in sync.
+function bookingIsFreeEntryDay(b: BookingRecord): boolean {
+  const fer = (b as unknown as {
+    freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null;
+  }).freeEntryRules;
+  if (!fer?.enabled) return false;
+  if (!b.bookingDate) return false;
+  const days = Array.isArray(fer.days) ? fer.days : [];
+  const dayName = FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()];
+  if (!dayName || !days.includes(dayName)) return false;
+  const genders = new Set(Array.isArray(fer.genders) ? fer.genders : []);
+  const w = b.ticketWomen ?? 0, m = b.ticketMen ?? 0, c = b.ticketCouple ?? 0;
+  // Free-entry rules apply to ticket-mode bookings only. Table-mode bookings have
+  // zero ticket-gender counts and may still owe a table cover even on a free-entry
+  // day, so we don't hide Amount Paid for them.
+  if (w + m + c === 0) return false;
+  if (w > 0 && !genders.has("women")) return false;
+  if (m > 0 && !genders.has("men")) return false;
+  if (c > 0 && !genders.has("couple")) return false;
+  return true;
+}
+
 function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+  const hideAmountPaid =
+    Number(b.finalPrice ?? b.totalPrice ?? 0) === 0 || bookingIsFreeEntryDay(b);
 
   const shareTicket = async () => {
     const url = `${window.location.origin}${import.meta.env.BASE_URL}dashboard/bookings`;
@@ -491,7 +521,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
           <div class="notch notch-r"></div>
         </div>
         <div class="footer-sec">
-          ${Number(b.finalPrice ?? b.totalPrice ?? 0) === 0 ? "" : `<div>
+          ${hideAmountPaid ? "" : `<div>
             <div class="price-lbl">${esc(t("bookings.amount_paid"))}</div>
             <div class="price-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</div>
           </div>`}
@@ -644,7 +674,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
 
         {/* Footer section */}
         <div className="relative z-10 flex justify-between items-center px-7 py-5">
-          {Number(b.finalPrice ?? b.totalPrice ?? 0) === 0 ? <div /> : (
+          {hideAmountPaid ? <div /> : (
             <div>
               <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>Amount paid</p>
               <p className="font-serif text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
