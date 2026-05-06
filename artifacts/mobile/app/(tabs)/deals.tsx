@@ -263,12 +263,21 @@ function DrinkDealCard({ item }: { item: VendorDrinkOffer }) {
                   {getPlanLabel(plan)}
                 </Text>
                 {(showDays || showTime) && (
-                  <Text style={[styles.planDetailText, { color: "rgba(255,255,255,0.3)" }]} numberOfLines={1}>
-                    {[
-                      showDays ? plan.days!.map((d) => d.slice(0, 3)).join(" · ") : "",
-                      showTime ? `${plan.timeFrom}–${plan.timeTo}` : "",
-                    ].filter(Boolean).join("  ·  ")}
-                  </Text>
+                  <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
+                    {showDays && plan.days!.map((d) => (
+                      <View key={d} style={{ backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }}>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff" }}>{d.slice(0, 3)}</Text>
+                      </View>
+                    ))}
+                    {showTime && (
+                      <View style={{ backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="time-outline" size={10} color="#fff" />
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff" }}>
+                          {plan.timeFrom}–{plan.timeTo}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 )}
                 {!!plan.description && (
                   <Text style={[styles.planDetailText, { color: "rgba(255,255,255,0.25)", fontStyle: "italic" }]} numberOfLines={1}>
