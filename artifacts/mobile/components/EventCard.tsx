@@ -74,7 +74,7 @@ export function EventCard({
 
   return (
     <Pressable
-      onPress={() => router.push(`/event/${id}`)}
+      onPress={() => type === "pub" ? router.push(`/partner/${id}` as never) : router.push(`/event/${id}`)}
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: colors.card, borderColor: colors.border },
