@@ -113,7 +113,7 @@ export function VendorDetail() {
   return (
     <div>
       {/* Cinematic venue hero */}
-      <div className="relative h-[380px] md:h-[460px] w-full overflow-hidden">
+      <div className="relative h-[420px] md:h-[540px] w-full overflow-hidden">
         {/* Full-bleed cover image */}
         {(vendor.coverImageUrl || vendor.bannerImage) ? (
           <div className="absolute inset-0">
@@ -127,9 +127,9 @@ export function VendorDetail() {
           <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 to-black" />
         )}
         {/* Top scrim */}
-        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
-        {/* Bottom scrim for text legibility */}
-        <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/95 via-black/65 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+        {/* Bottom scrim — deep, cinematic fade */}
+        <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
 
         {/* Wishlist heart button — top right */}
         <button
@@ -141,14 +141,20 @@ export function VendorDetail() {
         </button>
 
         {/* Bottom-anchored venue title block */}
-        <div className="absolute bottom-0 left-0 right-0 px-5 md:px-10 pb-7">
-          {vendor.rating > 0 && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10 text-xs mb-3">
-              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              <span className="font-semibold text-white">{vendor.rating.toFixed(1)}</span>
-              <span className="text-white/50">({vendor.reviewCount} reviews)</span>
-            </div>
-          )}
+        <div className="absolute bottom-0 left-0 right-0 px-5 md:px-10 pb-8">
+          {/* Type + rating row */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-white tracking-wide">
+              Pub
+            </span>
+            {vendor.rating > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10 text-xs">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span className="font-semibold text-white">{vendor.rating.toFixed(1)}</span>
+                <span className="text-white/50">({vendor.reviewCount} reviews)</span>
+              </div>
+            )}
+          </div>
           <h1 className="font-serif text-4xl md:text-6xl tracking-tight leading-tight text-white">{vendor.businessName}</h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5 text-sm">
             <Link

@@ -279,7 +279,7 @@ export default function PartnerDetailScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Cinematic hero banner */}
-      <View style={{ height: 300, position: "relative", overflow: "hidden" }}>
+      <View style={{ height: 380, position: "relative", overflow: "hidden" }}>
         {(vendor.coverImageUrl || vendor.bannerImage) ? (
           <Image
             source={{ uri: vendor.coverImageUrl || vendor.bannerImage }}
@@ -291,10 +291,16 @@ export default function PartnerDetailScreen() {
             <Ionicons name="business-outline" size={56} color={colors.mutedForeground} />
           </View>
         )}
-        {/* Bottom scrim for title legibility */}
+        {/* Top scrim */}
         <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.72)"]}
-          style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 180 }}
+          colors={["rgba(0,0,0,0.55)", "transparent"]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 100 }}
+          pointerEvents="none"
+        />
+        {/* Bottom scrim — deep cinematic fade */}
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.88)", "rgba(0,0,0,0.98)"]}
+          style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 240 }}
           pointerEvents="none"
         />
         <View style={[styles.backOverlay, { paddingTop: topPadding + 8 }]}>
@@ -305,9 +311,14 @@ export default function PartnerDetailScreen() {
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </Pressable>
         </View>
-        {/* Badges overlaid on hero bottom */}
-        <View style={{ position: "absolute", bottom: 16, left: 20, right: 20, gap: 6 }}>
-          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+        {/* Badges + title overlaid on hero bottom */}
+        <View style={{ position: "absolute", bottom: 18, left: 20, right: 20, gap: 8 }}>
+          {/* Badge row: Pub type + Verified + Rating */}
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {/* Pub type badge — always shown, no "Pubs" category badge */}
+            <View style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.22)", paddingHorizontal: 10, paddingVertical: 4 }}>
+              <Text style={{ color: "#fff", fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.3 }}>Pub</Text>
+            </View>
             {vendor.status === "approved" ? (
               <View style={[styles.badge, { backgroundColor: "rgba(34,197,94,0.25)", borderWidth: 1, borderColor: "rgba(34,197,94,0.4)" }]}>
                 <Ionicons name="checkmark-circle" size={11} color="#22c55e" />
@@ -322,8 +333,8 @@ export default function PartnerDetailScreen() {
               </View>
             ) : null}
           </View>
-          <Text style={[styles.vendorName, { color: "#fff", textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]}>{vendor.businessName}</Text>
-          <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 }}>
+          <Text style={[styles.vendorName, { color: "#fff", textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }]}>{vendor.businessName}</Text>
+          <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_400Regular" }}>
             by {(vendor as Vendor & { partnerName?: string }).partnerName || vendor.businessName}
           </Text>
         </View>
