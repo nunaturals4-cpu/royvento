@@ -127,18 +127,32 @@ async function serializeBookings(rows: BookingRow[]) {
     const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
     const hasActuals = aw != null || am != null || ac != null || ag != null;
     const actualEntry = hasActuals ? { women: aw, men: am, couple: ac, guests: ag } : null;
+    // Per-gender free-entry zeroing — must mirror create-booking,
+    // calcActualAmountDue (scan-ticket), and the partner attendance handler.
+    // Only tiers in fer.genders are zero-priced; table mode is free only when
+    // all genders are listed.
+    const serFer = (e as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null } | undefined)?.freeEntryRules ?? null;
+    const serDayName = b.bookingDate ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;
+    const serFerActive = !!(serFer?.enabled && serDayName && Array.isArray(serFer.days) && serFer.days.includes(serDayName));
+    const serFerGenders = serFerActive ? (serFer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+    const serFerAllFree = serFerActive && ["women","men","couple"].every((g) => serFerGenders.includes(g));
+    const serIsTierFree = (g: "women" | "men" | "couple") => serFerActive && serFerGenders.includes(g);
     let actualAmountDue: number | null = null;
     if (hasActuals) {
       if (b.pubMode === "ticket") {
         if (aw != null || am != null || ac != null) {
-          const pw = Number(e?.priceWomen ?? 0);
-          const pm = Number(e?.priceMen ?? 0);
-          const pc = Number(e?.priceCouple ?? 0);
+          const pw = serIsTierFree("women") ? 0 : Number(e?.priceWomen ?? 0);
+          const pm = serIsTierFree("men") ? 0 : Number(e?.priceMen ?? 0);
+          const pc = serIsTierFree("couple") ? 0 : Number(e?.priceCouple ?? 0);
           actualAmountDue = Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
         }
       } else if (ag != null) {
-        const guests = Math.max(1, b.guests);
-        actualAmountDue = Math.round(((ag / guests) * Number(b.finalPrice)) * 100) / 100;
+        if (serFerAllFree) {
+          actualAmountDue = 0;
+        } else {
+          const guests = Math.max(1, b.guests);
+          actualAmountDue = Math.round(((ag / guests) * Number(b.finalPrice)) * 100) / 100;
+        }
       }
     }
     return {
@@ -248,19 +262,21 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     }
   }
 
-  // Compute base total based on mode. Apply per-pub free-entry rules: when the
-  // pub has freeEntryRules.enabled and the booking date's weekday is in the
-  // configured days list, the ENTIRE booking is free regardless of which
-  // genders were booked or whether the booking is ticket-mode or table-mode.
-  // The `genders` field on the rule is purely informational marketing copy
-  // for the event-detail badge; it does not gate pricing here. This mirrors
-  // the client-side calc in event-detail (web) and event/[id] (mobile) and
-  // the ticket-card hide rule in bookings.tsx so the user is never charged
-  // anything for a free-entry-day booking.
+  // Compute base total based on mode. Apply per-pub, PER-GENDER free-entry
+  // rules: when the pub has freeEntryRules.enabled and the booking date's
+  // weekday is in the configured `days` list, only those tiers whose gender
+  // is in `freeEntryRules.genders` are zero-priced; other tiers are charged
+  // normally. Table-mode (no per-gender concept) is treated as free only when
+  // ALL three genders are listed (matches the legacy whole-booking-free
+  // behavior). Mirrored in event-detail (web), event/[id] (mobile), and the
+  // ticket-card hide rule in bookings.tsx — keep the four in sync.
   const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const fer = (evt as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null }).freeEntryRules;
   const bookingDayName = FREE_ENTRY_DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
   const ferActive = !!(fer?.enabled && bookingDayName && Array.isArray(fer.days) && fer.days.includes(bookingDayName));
+  const ferGenders = ferActive ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+  const ferAllGendersFree = ferActive && ["women", "men", "couple"].every((g) => ferGenders.includes(g));
+  const isTierFree = (g: "women" | "men" | "couple") => ferActive && ferGenders.includes(g);
 
   let totalPrice = 0;
   let guestsCount = parsed.data.guests || 0;
@@ -269,16 +285,16 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     const w = parsed.data.ticketWomen || 0;
     const m = parsed.data.ticketMen || 0;
     const c = parsed.data.ticketCouple || 0;
-    // Free-entry day → whole booking is ₹0 regardless of gender mix.
-    totalPrice = ferActive
-      ? 0
-      : w * Number(evt.priceWomen) + m * Number(evt.priceMen) + c * Number(evt.priceCouple);
+    // Per-gender zero-pricing: only tiers in fer.genders are free.
+    const pw = isTierFree("women") ? 0 : Number(evt.priceWomen);
+    const pm = isTierFree("men") ? 0 : Number(evt.priceMen);
+    const pc = isTierFree("couple") ? 0 : Number(evt.priceCouple);
+    totalPrice = w * pw + m * pm + c * pc;
     guestsCount = w + m + c * 2;
   } else {
-    // Table / event-mode: free-entry day → ₹0 regardless of guest count or
-    // whether per-gender ticket counts were supplied. Otherwise charge the
-    // regular cover.
-    totalPrice = ferActive ? 0 : Number(evt.price) * Math.max(1, guestsCount);
+    // Table / event-mode: no per-gender concept, so only treat as free when
+    // every gender is listed. Otherwise charge the regular cover.
+    totalPrice = ferAllGendersFree ? 0 : Number(evt.price) * Math.max(1, guestsCount);
     if (guestsCount === 0) guestsCount = 1;
   }
 
@@ -973,23 +989,43 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
   const eventMap = new Map(events.map((e) => [e.id, e]));
   const userMap = new Map(users.map((u) => [u.id, u]));
 
+  // Per-gender free-entry helpers — must mirror the create-booking handler and
+  // calcActualAmountDue (`/partner/scan-ticket`). On a configured day, only
+  // tiers whose gender is in fer.genders are zero-priced; other tiers still
+  // owe their normal price. Table-mode is treated as free only when ALL
+  // genders are listed.
+  const ATTEND_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const attendEventRows = eventIds.length > 0
+    ? await db.select({ id: eventsTable.id, freeEntryRules: eventsTable.freeEntryRules }).from(eventsTable).where(inArray(eventsTable.id, eventIds))
+    : [];
+  const attendFerMap = new Map(attendEventRows.map((e) => [e.id, e.freeEntryRules as { enabled?: boolean; genders?: string[]; days?: string[] } | null]));
   const attendanceRows = rows.map((b) => {
     const u = userMap.get(b.userId);
     const e = eventMap.get(b.eventId);
     const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
     const hasActuals = aw != null || am != null || ac != null || ag != null;
+    const fer = attendFerMap.get(b.eventId) ?? null;
+    const dayName = b.bookingDate ? ATTEND_FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;
+    const ferActive = !!(fer?.enabled && dayName && Array.isArray(fer.days) && fer.days.includes(dayName));
+    const ferGenders = ferActive ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+    const ferAllGendersFree = ferActive && ["women", "men", "couple"].every((g) => ferGenders.includes(g));
+    const isTierFree = (g: "women" | "men" | "couple") => ferActive && ferGenders.includes(g);
     let actualAmountDue: number | null = null;
     if (hasActuals) {
       if (b.pubMode === "ticket") {
         if (aw != null || am != null || ac != null) {
-          const pw = Number(e?.priceWomen ?? 0);
-          const pm = Number(e?.priceMen ?? 0);
-          const pc = Number(e?.priceCouple ?? 0);
+          const pw = isTierFree("women") ? 0 : Number(e?.priceWomen ?? 0);
+          const pm = isTierFree("men") ? 0 : Number(e?.priceMen ?? 0);
+          const pc = isTierFree("couple") ? 0 : Number(e?.priceCouple ?? 0);
           actualAmountDue = Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
         }
       } else if (ag != null) {
-        const guests = Math.max(1, b.guests);
-        actualAmountDue = Math.round(((ag / guests) * Number(b.finalPrice)) * 100) / 100;
+        if (ferAllGendersFree) {
+          actualAmountDue = 0;
+        } else {
+          const guests = Math.max(1, b.guests);
+          actualAmountDue = Math.round(((ag / guests) * Number(b.finalPrice)) * 100) / 100;
+        }
       }
     }
     return {
@@ -1743,12 +1779,15 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   const scanEvent = evtRows[0];
 
   // Compute actualAmountDue from per-type actuals using event prices (ticket mode) or pro-rated finalPrice (otherwise).
-  // Returns null if no actuals are recorded yet. On a free-entry day (mirrors the
-  // create-booking handler's `ferActive` rule), returns 0 regardless of the
-  // event's per-type prices: the customer owes nothing at the door even though
-  // admin commission still accrues via the existing `freeEntryRate` path.
+  // Returns null if no actuals are recorded yet. Mirrors the per-gender free-
+  // entry rule in the create-booking handler: when the rule is active for the
+  // booking's weekday, only tiers whose gender is listed in `fer.genders` are
+  // zero-priced at the door; other tiers still owe their per-type ticket price.
+  // Table-mode (no per-gender concept) is treated as free only when ALL three
+  // genders are listed. Admin commission still accrues on ALL guests via the
+  // existing `freeEntryRate` / `ticketRate` paths.
   const SCAN_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const scanFer = (scanEvent as { freeEntryRules?: { enabled?: boolean; days?: string[] } | null } | undefined)?.freeEntryRules;
+  const scanFer = (scanEvent as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null } | undefined)?.freeEntryRules;
   function calcActualAmountDue(
     booking: { pubMode: string; ticketWomen: number; ticketMen: number; ticketCouple: number; guests: number; finalPrice: string; totalPrice: string; bookingDate: string; actualWomen: number | null; actualMen: number | null; actualCouple: number | null; actualGuests: number | null },
   ): number | null {
@@ -1758,20 +1797,21 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       ? SCAN_FREE_ENTRY_DAY_ABBRS[new Date(`${booking.bookingDate}T12:00:00`).getDay()]
       : undefined;
     const ferActive = !!(scanFer?.enabled && dayName && Array.isArray(scanFer.days) && scanFer.days.includes(dayName));
+    const ferGenders = ferActive ? (scanFer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+    const ferAllGendersFree = ferActive && ["women", "men", "couple"].every((g) => ferGenders.includes(g));
+    const isTierFree = (g: "women" | "men" | "couple") => ferActive && ferGenders.includes(g);
     if (isTicketMode) {
       if (aw == null && am == null && ac == null) return null;
-      // Free-entry day → no cash to collect from the customer regardless of
-      // per-type prices or which genders showed up.
-      if (ferActive) return 0;
       const w = aw ?? 0, m = am ?? 0, c = ac ?? 0;
-      const pw = Number(scanEvent?.priceWomen ?? 0);
-      const pm = Number(scanEvent?.priceMen ?? 0);
-      const pc = Number(scanEvent?.priceCouple ?? 0);
-      // Cash collected at the door = per-type counts × per-type ticket price (no coupon/points scaling).
+      const pw = isTierFree("women") ? 0 : Number(scanEvent?.priceWomen ?? 0);
+      const pm = isTierFree("men") ? 0 : Number(scanEvent?.priceMen ?? 0);
+      const pc = isTierFree("couple") ? 0 : Number(scanEvent?.priceCouple ?? 0);
+      // Cash collected at the door = per-type counts × per-type ticket price
+      // (zero for free tiers, no coupon/points scaling for paid tiers).
       return Math.round((w * pw + m * pm + c * pc) * 100) / 100;
     }
     if (ag == null) return null;
-    if (ferActive) return 0;
+    if (ferAllGendersFree) return 0;
     const guests = Math.max(1, booking.guests);
     const final = Number(booking.finalPrice);
     return Math.round((ag / guests) * final * 100) / 100;

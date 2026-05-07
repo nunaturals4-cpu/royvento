@@ -352,33 +352,18 @@ function TicketField({ label, value }: { label: string; value: React.ReactNode }
   );
 }
 
-// Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
-const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// Hide the Amount Paid block when the booking falls on a configured free-entry day.
-// Per product rule: if the rule is enabled and the booking date's weekday is in the
-// rule's `days` list, the ENTIRE booking is free regardless of which genders were
-// booked or whether it's ticket- or table-mode. The `genders` field is purely
-// informational marketing copy on the event-detail badge. Mirrors the rule in
-// artifacts/mobile/app/(tabs)/bookings.tsx and event-detail.tsx so web and mobile
-// stay in sync.
-function bookingIsFreeEntryDay(b: BookingRecord): boolean {
-  const fer = b.freeEntryRules;
-  if (!fer?.enabled) return false;
-  if (!b.bookingDate) return false;
-  const days = Array.isArray(fer.days) ? fer.days : [];
-  const dayName = FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()];
-  if (!dayName || !days.includes(dayName)) return false;
-  return true;
-}
+// Per-gender free-entry billing: only tiers in fer.genders are free; others
+// still owe their normal price. Show "Amount Paid" whenever the booking has a
+// non-zero finalPrice — partial-paid bookings (e.g. women free, men paid)
+// must still display the men's contribution. Hide the line only when the
+// booking is genuinely ₹0. Kept in sync with mobile bookings + event-detail.
 
 function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
-  const hideAmountPaid =
-    Number(b.finalPrice ?? b.totalPrice ?? 0) === 0 || bookingIsFreeEntryDay(b);
+  const hideAmountPaid = Number(b.finalPrice ?? b.totalPrice ?? 0) === 0;
 
   const shareTicket = async () => {
     const url = `${window.location.origin}${import.meta.env.BASE_URL}dashboard/bookings`;

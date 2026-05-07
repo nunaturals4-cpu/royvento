@@ -283,22 +283,35 @@ export default function EventDetailScreen() {
   const priceCouple = dayOverrideMobile ? Number(dayOverrideMobile.couple) : basePriceCouple;
   const basePrice = parseFloat(String(event?.price ?? 0));
 
-  const freeEntryRules = (event as unknown as { freeEntryRules?: { enabled?: boolean; days?: string[] } })?.freeEntryRules;
+  const freeEntryRules = (event as unknown as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } })?.freeEntryRules;
   const ferDayActiveMobile = !!(freeEntryRules?.enabled === true && (freeEntryRules.days ?? []).includes(bookingDayName));
+  const ferGendersMobile = ferDayActiveMobile ? (freeEntryRules?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+  const ferAllGendersFreeMobile = ferDayActiveMobile && ["women", "men", "couple"].every((g) => ferGendersMobile.includes(g));
+  const isTierFreeMobile = (g: "women" | "men" | "couple") => ferDayActiveMobile && ferGendersMobile.includes(g);
+  // "Whole booking is free" only when every gender is listed (or all tier
+  // prices are already zero). Partial free-entry days still flow through
+  // normal checkout.
   const isFreeEntryDay = isPub && (
-    ferDayActiveMobile ||
+    ferAllGendersFreeMobile ||
     (priceWomen === 0 && priceMen === 0 && priceCouple === 0)
   );
 
-  // Mirrors server-side free-entry zeroing in bookings.ts: when the rule is
-  // active for the selected weekday, the ENTIRE booking is ₹0 regardless of
-  // gender mix or pubMode. The `genders` field is purely informational copy
-  // for the event-detail free-entry badge.
-  const subtotal = ferDayActiveMobile && isPub
-    ? 0
-    : isPub
-      ? ticketWomen * priceWomen + ticketMen * priceMen + ticketCouple * priceCouple
-      : basePrice * (parseInt(guests) || 1);
+  // Per-gender free-entry zeroing — mirrors the server pricing in bookings.ts.
+  // Pub ticket-mode: only tiers whose gender is in fer.genders are zero-priced;
+  // other tiers still charge normally. Pub event/table-mode (no per-gender
+  // concept) is free only when ALL three genders are listed. Non-pub events
+  // use the flat event price.
+  let subtotal = 0;
+  if (isPub && pubMode === "ticket") {
+    subtotal =
+      ticketWomen * (isTierFreeMobile("women") ? 0 : priceWomen)
+      + ticketMen * (isTierFreeMobile("men") ? 0 : priceMen)
+      + ticketCouple * (isTierFreeMobile("couple") ? 0 : priceCouple);
+  } else if (isPub && ferAllGendersFreeMobile) {
+    subtotal = 0;
+  } else {
+    subtotal = basePrice * (parseInt(guests) || 1);
+  }
 
   useEffect(() => {
     if (isFreeEntryDay && (couponState || couponInput)) {

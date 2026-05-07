@@ -218,26 +218,33 @@ export function EventDetail() {
 
   const _fer = (ev as any)?.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | undefined;
   const ferDayActive = !!(_fer?.enabled === true && (_fer.days ?? []).includes(selectedDayName));
+  const ferGenders = ferDayActive ? (_fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+  const ferAllGendersFree = ferDayActive && ["women", "men", "couple"].every((g) => ferGenders.includes(g));
+  const isTierFree = (g: "women" | "men" | "couple") => ferDayActive && ferGenders.includes(g);
+  // "Whole booking is free" — only true when every gender is in the rule's
+  // gender list (or the venue's tier prices are already all ₹0). Partial
+  // free-entry days (some tiers free, others paid) still flow through normal
+  // checkout (coupon/points/payment-method UI stays visible).
   const isFreeEntryDay = isPub && (
-    ferDayActive ||
+    ferAllGendersFree ||
     (effectiveWomen === 0 && effectiveMen === 0 && effectiveCouple === 0)
   );
 
   const venueName = ev.vendor?.businessName ?? "This venue";
 
-  // Compute subtotal based on mode. Mirrors the server's free-entry zeroing in
-  // bookings.ts: when the rule is active for the selected weekday, the ENTIRE
-  // booking is ₹0 regardless of which gender tabs were ticked or whether the
-  // booking is ticket-mode or table-mode. The `genders` field is purely
-  // informational marketing copy for the badge below.
+  // Compute subtotal with PER-GENDER free-entry zeroing — mirrors the server
+  // pricing in bookings.ts. Only tiers whose gender appears in fer.genders
+  // are zero-priced; other tiers still charge their normal per-tier price.
+  // Table-mode (no per-gender concept) is treated as free only when ALL three
+  // genders are listed.
   let subtotal = 0;
-  if (ferDayActive && isPub) {
+  if (isPub && pubMode === "ticket") {
+    const pw = isTierFree("women") ? 0 : effectiveWomen;
+    const pm = isTierFree("men") ? 0 : effectiveMen;
+    const pc = isTierFree("couple") ? 0 : effectiveCouple;
+    subtotal = ticketWomen * pw + ticketMen * pm + ticketCouple * pc;
+  } else if (isPub && ferAllGendersFree) {
     subtotal = 0;
-  } else if (isPub && pubMode === "ticket") {
-    subtotal =
-      ticketWomen * effectiveWomen +
-      ticketMen * effectiveMen +
-      ticketCouple * effectiveCouple;
   } else {
     subtotal = Number(ev.price) * Math.max(1, guests);
   }
@@ -1157,9 +1164,9 @@ export function EventDetail() {
                   {pubMode === "ticket" && (
                     <div className="space-y-2 rounded-xl border border-white/10 p-3">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.ticket_counts")}</p>
-                      <TicketRow label={t("events.women")} price={effectiveWomen} value={ticketWomen} onChange={setTicketWomen} hidePrice={isFreeEntryDay} />
-                      <TicketRow label={t("events.men")} price={effectiveMen} value={ticketMen} onChange={setTicketMen} hidePrice={isFreeEntryDay} />
-                      <TicketRow label={t("events.couple")} price={effectiveCouple} value={ticketCouple} onChange={setTicketCouple} hidePrice={isFreeEntryDay} />
+                      <TicketRow label={t("events.women")} price={isTierFree("women") ? 0 : effectiveWomen} value={ticketWomen} onChange={setTicketWomen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("women") && !isFreeEntryDay} />
+                      <TicketRow label={t("events.men")} price={isTierFree("men") ? 0 : effectiveMen} value={ticketMen} onChange={setTicketMen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("men") && !isFreeEntryDay} />
+                      <TicketRow label={t("events.couple")} price={isTierFree("couple") ? 0 : effectiveCouple} value={ticketCouple} onChange={setTicketCouple} hidePrice={isFreeEntryDay} freeBadge={isTierFree("couple") && !isFreeEntryDay} />
                     </div>
                   )}
 
@@ -1460,12 +1467,18 @@ export function EventDetail() {
   );
 }
 
-function TicketRow({ label, price, value, onChange, hidePrice }: { label: string; price: number; value: number; onChange: (n: number) => void; hidePrice?: boolean }) {
+function TicketRow({ label, price, value, onChange, hidePrice, freeBadge }: { label: string; price: number; value: number; onChange: (n: number) => void; hidePrice?: boolean; freeBadge?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <div className="flex-1">
         <span className="font-medium">{label}</span>
-        {!hidePrice && <span className="text-muted-foreground ml-2">{price > 0 ? formatINRExact(price) : "—"}</span>}
+        {!hidePrice && (
+          freeBadge ? (
+            <span className="ml-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/30">FREE</span>
+          ) : (
+            <span className="text-muted-foreground ml-2">{price > 0 ? formatINRExact(price) : "—"}</span>
+          )
+        )}
       </div>
       <div className="flex items-center gap-1">
         <button

@@ -80,30 +80,11 @@ interface ExtendedBooking {
   } | null;
 }
 
-// Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
-const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// Hide the Amount Paid block when the booking falls on a configured free-entry day.
-// Per product rule: if the rule is enabled and the booking date's weekday is in the
-// rule's `days` list, the ENTIRE booking is free regardless of which genders were
-// booked or whether it's ticket- or table-mode. The `genders` field is purely
-// informational marketing copy on the event-detail badge. Mirrors the rule in
-// artifacts/royvento/src/pages/bookings.tsx and event-detail.tsx so web and mobile
-// stay in sync.
-function bookingIsFreeEntryDay(
-  bookingDate: string | null | undefined,
-  _ticketWomen: number,
-  _ticketMen: number,
-  _ticketCouple: number,
-  fer: ExtendedBooking["freeEntryRules"],
-): boolean {
-  if (!fer?.enabled) return false;
-  if (!bookingDate) return false;
-  const days = Array.isArray(fer.days) ? fer.days : [];
-  const dayName = FREE_ENTRY_DAY_ABBRS[new Date(`${bookingDate}T12:00:00`).getDay()];
-  if (!dayName || !days.includes(dayName)) return false;
-  return true;
-}
+// Per-gender free-entry billing: only tiers in fer.genders are free; others
+// still owe their normal price. The booking's stored finalPrice is the source
+// of truth — show "Amount Paid" whenever it's > 0 so partial-paid bookings
+// (e.g. women free, men paid) display the paid amount. Kept in sync with web
+// bookings.tsx and event-detail.
 
 export default function BookingsScreen() {
   const colors = useColors();
@@ -175,15 +156,7 @@ export default function BookingsScreen() {
         : b.totalPrice != null
         ? Number(b.totalPrice)
         : null;
-      const isFreeBooking =
-        Number(bx.finalPrice ?? b.totalPrice ?? 0) === 0 ||
-        bookingIsFreeEntryDay(
-          b.bookingDate,
-          bx.ticketWomen ?? 0,
-          bx.ticketMen ?? 0,
-          bx.ticketCouple ?? 0,
-          bx.freeEntryRules,
-        );
+      const isFreeBooking = Number(bx.finalPrice ?? b.totalPrice ?? 0) === 0;
       const price = priceNumber != null ? `₹${priceNumber.toLocaleString("en-IN")}` : "—";
 
       const html = `<!doctype html><html><head><meta charset="utf-8">
@@ -564,16 +537,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
 
                     {/* Footer: price + disclaimer */}
                     <View style={styles.ptFooter}>
-                      {!(
-                        Number(bx.finalPrice ?? b.totalPrice ?? 0) === 0 ||
-                        bookingIsFreeEntryDay(
-                          b.bookingDate,
-                          bx.ticketWomen ?? 0,
-                          bx.ticketMen ?? 0,
-                          bx.ticketCouple ?? 0,
-                          bx.freeEntryRules,
-                        )
-                      ) && (
+                      {Number(bx.finalPrice ?? b.totalPrice ?? 0) > 0 && (
                         <View style={styles.ptPriceRow}>
                           <Text style={styles.ptPriceLabel}>{t("bookings.total_label")}</Text>
                           <Text style={styles.ptPriceValue}>
