@@ -600,6 +600,14 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
+          {/* Free-entry headline (replaces "Starting at" on fer days) */}
+          {isPub && ferDayActiveMobile ? (
+            <View style={[styles.priceRow, { backgroundColor: "#052e16", borderColor: "#16a34a44" }]}>
+              <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+              <Text style={[styles.priceValue, { color: "#4ade80", marginLeft: 6 }]}>{ferHeadlineMobile}</Text>
+            </View>
+          ) : null}
+
           {/* Pub pricing */}
           {isPub && !isFreeEntryDay && (priceWomen > 0 || priceMen > 0) ? (
             <View style={[styles.pubPricing, { backgroundColor: colors.muted, borderColor: colors.border }]}>

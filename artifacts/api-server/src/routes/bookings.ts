@@ -48,25 +48,30 @@ const EVENT_TYPES = [
   "other",
 ] as const;
 
+// Required-field policy: every booking-request field must be provided
+// EXCEPT couponCode / pointsToUse / notes (and a handful of pub/event-only
+// fields which the client only sends when relevant).
 const CreateBookingBody = z.object({
   eventId: z.number().int().positive(),
-  bookingDate: z.string().min(1),
+  bookingDate: z.string().min(1, "Booking date is required"),
   guests: z.number().int().nonnegative().optional().default(0),
+  // Optional per task spec.
   notes: z.string().optional().default(""),
-  eventType: z.enum(EVENT_TYPES).optional().default("other"),
-  budgetRange: z.string().optional().default(""),
   couponCode: z.string().optional().default(""),
-  pubMode: z.enum(["", "ticket", "event"]).optional().default(""),
-  ticketWomen: z.number().int().nonnegative().optional().default(0),
-  ticketMen: z.number().int().nonnegative().optional().default(0),
-  ticketCouple: z.number().int().nonnegative().optional().default(0),
-  selectedPubEvent: z.string().optional().default(""),
-  personName: z.string().optional().default(""),
-  phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits").optional().default(""),
   pointsToUse: z.number().int().nonnegative().optional().default(0),
-  paymentMethod: z.enum(["cod", "online"]).optional().default("online"),
+  // Required.
+  eventType: z.enum(EVENT_TYPES).default("other"),
+  budgetRange: z.string().default(""),
+  pubMode: z.enum(["", "ticket", "event"]).default(""),
+  ticketWomen: z.number().int().nonnegative().default(0),
+  ticketMen: z.number().int().nonnegative().default(0),
+  ticketCouple: z.number().int().nonnegative().default(0),
+  selectedPubEvent: z.string().default(""),
+  personName: z.string().min(1, "Person name is required"),
+  phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits"),
+  paymentMethod: z.enum(["cod", "online"]).default("online"),
   callbackScheme: z.enum(["royvento"]).optional(),
-  arrivalTime: z.string().optional().default(""),
+  arrivalTime: z.string().default(""),
 });
 
 const router: IRouter = Router();

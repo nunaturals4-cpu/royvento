@@ -345,7 +345,11 @@
     "wishlist_removed": "ਵਿਸ਼ਲਿਸਟ ਤੋਂ ਹਟਾਇਆ",
     "women": "ਔਰਤਾਂ",
     "free_entry_today": "ਅੱਜ ਮੁਫ਼ਤ ਦਾਖਲਾ",
-    "free_some_days": "ਕੁਝ ਦਿਨ ਮੁਫ਼ਤ"
+    "free_some_days": "ਕੁਝ ਦਿਨ ਮੁਫ਼ਤ",
+    "free_entry_for": "%{genders} ਲਈ ਮੁਫ਼ਤ ਦਾਖਲਾ",
+    "free_entry_for_everyone": "ਸਾਰਿਆਂ ਲਈ ਮੁਫ਼ਤ ਦਾਖਲਾ",
+    "required_field": "ਇਹ ਖੇਤਰ ਲੋੜੀਂਦਾ ਹੈ",
+    "free_entry_label": "ਮੁਫ਼ਤ ਦਾਖਲਾ"
   },
   "profile": {
     "my_profile": "ਮੇਰਾ ਪ੍ਰੋਫ਼ਾਈਲ",
@@ -493,7 +497,8 @@
     "amount_paid": "ਅਦਾ ਕੀਤੀ ਰਕਮ",
     "notes": "ਨੋਟਸ",
     "status": "ਸਥਿਤੀ",
-    "present_at_entrance": "ਦਾਖਲੇ ਤੇ ਪੇਸ਼ ਕਰੋ · ਅਟੱਲ"
+    "present_at_entrance": "ਦਾਖਲੇ ਤੇ ਪੇਸ਼ ਕਰੋ · ਅਟੱਲ",
+    "amount_due": "ਦੇਣ ਯੋਗ ਰਕਮ"
   },
   "common": {
     "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",

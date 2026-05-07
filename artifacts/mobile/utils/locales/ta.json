@@ -345,7 +345,11 @@
     "wishlist_removed": "விஷ்லிஸ்டில் இருந்து நீக்கப்பட்டது",
     "women": "பெண்கள்",
     "free_entry_today": "இன்று இலவச நுழைவு",
-    "free_some_days": "சில நாட்கள் இலவசம்"
+    "free_some_days": "சில நாட்கள் இலவசம்",
+    "free_entry_for": "%{genders} க்கு இலவச நுழைவு",
+    "free_entry_for_everyone": "அனைவருக்கும் இலவச நுழைவு",
+    "required_field": "இந்த புலம் தேவை",
+    "free_entry_label": "இலவச நுழைவு"
   },
   "profile": {
     "my_profile": "என் சுயவிவரம்",
@@ -493,7 +497,8 @@
     "amount_paid": "செலுத்திய தொகை",
     "notes": "குறிப்புகள்",
     "status": "நிலை",
-    "present_at_entrance": "நுழைவாயிலில் காட்டவும் · மாற்றமுடியாதது"
+    "present_at_entrance": "நுழைவாயிலில் காட்டவும் · மாற்றமுடியாதது",
+    "amount_due": "செலுத்த வேண்டிய தொகை"
   },
   "common": {
     "loading": "ஏற்றுகிறது…",

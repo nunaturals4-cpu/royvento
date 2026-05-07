@@ -326,7 +326,10 @@
     "drink_ticket_items_other": "{{count}} items included with ticket",
     "drink_ticket_generic": "Drinks included with ticket",
     "drink_offer_generic": "Drinks discount",
-    "drink_deal_today": "আজ"
+    "drink_deal_today": "আজ",
+    "free_entry_for": "{{genders}} এর জন্য বিনামূল্যে প্রবেশ",
+    "free_entry_for_everyone": "সবার জন্য বিনামূল্যে প্রবেশ",
+    "required_field": "এই ক্ষেত্রটি প্রয়োজনীয়"
   },
   "profile": {
     "my_profile": "আমার প্রোফাইল",
@@ -446,7 +449,8 @@
     "present_at_entrance": "প্রবেশদ্বারে এই টিকেট দেখান।",
     "non_transferable": "অ-হস্তান্তরযোগ্য",
     "partner": "পার্টনার",
-    "approved_by": "অনুমোদিত দ্বারা"
+    "approved_by": "অনুমোদিত দ্বারা",
+    "amount_due": "বকেয়া পরিমাণ"
   },
   "common": {
     "loading": "লোড হচ্ছে…",

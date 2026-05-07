@@ -345,7 +345,11 @@
     "wishlist_removed": "विशलिस्ट से हटाया गया",
     "women": "महिलाएँ",
     "free_entry_today": "आज मुफ़्त प्रवेश",
-    "free_some_days": "कुछ दिन मुफ़्त"
+    "free_some_days": "कुछ दिन मुफ़्त",
+    "free_entry_for": "%{genders} के लिए मुफ़्त प्रवेश",
+    "free_entry_for_everyone": "सभी के लिए मुफ़्त प्रवेश",
+    "required_field": "यह फ़ील्ड आवश्यक है",
+    "free_entry_label": "मुफ़्त प्रवेश"
   },
   "profile": {
     "my_profile": "मेरा प्रोफ़ाइल",
@@ -493,7 +497,8 @@
     "amount_paid": "भुगतान राशि",
     "notes": "नोट्स",
     "status": "स्थिति",
-    "present_at_entrance": "प्रवेश पर प्रस्तुत करें · अहस्तांतरणीय"
+    "present_at_entrance": "प्रवेश पर प्रस्तुत करें · अहस्तांतरणीय",
+    "amount_due": "देय राशि"
   },
   "common": {
     "loading": "लोड हो रहा है…",

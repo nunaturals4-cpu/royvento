@@ -326,7 +326,10 @@
     "drink_ticket_items_other": "{{count}} items included with ticket",
     "drink_ticket_generic": "Drinks included with ticket",
     "drink_offer_generic": "Drinks discount",
-    "drink_deal_today": "నేడు"
+    "drink_deal_today": "నేడు",
+    "free_entry_for": "{{genders}} కోసం ఉచిత ప్రవేశం",
+    "free_entry_for_everyone": "అందరికీ ఉచిత ప్రవేశం",
+    "required_field": "ఈ ఫీల్డ్ అవసరం"
   },
   "profile": {
     "my_profile": "నా ప్రొఫైల్",
@@ -446,7 +449,8 @@
     "present_at_entrance": "ప్రవేశద్వారం వద్ద ఈ టికెట్ చూపించండి.",
     "non_transferable": "బదిలీ చేయలేనిది",
     "partner": "భాగస్వామి",
-    "approved_by": "ఆమోదించినది"
+    "approved_by": "ఆమోదించినది",
+    "amount_due": "చెల్లించాల్సిన మొత్తం"
   },
   "common": {
     "loading": "లోడ్ అవుతోంది…",

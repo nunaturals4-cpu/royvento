@@ -345,7 +345,11 @@
     "wishlist_removed": "উইশলিস্ট থেকে সরানো হয়েছে",
     "women": "মহিলা",
     "free_entry_today": "আজ বিনামূল্যে প্রবেশ",
-    "free_some_days": "কিছু দিন বিনামূল্যে"
+    "free_some_days": "কিছু দিন বিনামূল্যে",
+    "free_entry_for": "%{genders} এর জন্য বিনামূল্যে প্রবেশ",
+    "free_entry_for_everyone": "সবার জন্য বিনামূল্যে প্রবেশ",
+    "required_field": "এই ক্ষেত্রটি প্রয়োজনীয়",
+    "free_entry_label": "বিনামূল্যে প্রবেশ"
   },
   "profile": {
     "my_profile": "আমার প্রোফাইল",
@@ -493,7 +497,8 @@
     "amount_paid": "পরিশোধিত পরিমাণ",
     "notes": "নোটস",
     "status": "অবস্থা",
-    "present_at_entrance": "প্রবেশদ্বারে উপস্থাপন করুন · অ-হস্তান্তরযোগ্য"
+    "present_at_entrance": "প্রবেশদ্বারে উপস্থাপন করুন · অ-হস্তান্তরযোগ্য",
+    "amount_due": "বকেয়া পরিমাণ"
   },
   "common": {
     "loading": "লোড হচ্ছে…",

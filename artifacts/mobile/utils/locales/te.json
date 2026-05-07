@@ -345,7 +345,11 @@
     "wishlist_removed": "విష్‌లిస్ట్ నుండి తీసివేయబడింది",
     "women": "మహిళలు",
     "free_entry_today": "ఈ రోజు ఉచిత ప్రవేశం",
-    "free_some_days": "కొన్ని రోజులు ఉచితం"
+    "free_some_days": "కొన్ని రోజులు ఉచితం",
+    "free_entry_for": "%{genders} కోసం ఉచిత ప్రవేశం",
+    "free_entry_for_everyone": "అందరికీ ఉచిత ప్రవేశం",
+    "required_field": "ఈ ఫీల్డ్ అవసరం",
+    "free_entry_label": "ఉచిత ప్రవేశం"
   },
   "profile": {
     "my_profile": "నా ప్రొఫైల్",
@@ -493,7 +497,8 @@
     "amount_paid": "చెల్లించిన మొత్తం",
     "notes": "గమనికలు",
     "status": "స్థితి",
-    "present_at_entrance": "ప్రవేశద్వారంలో చూపించండి · బదిలీ చేయలేనిది"
+    "present_at_entrance": "ప్రవేశద్వారంలో చూపించండి · బదిలీ చేయలేనిది",
+    "amount_due": "చెల్లించాల్సిన మొత్తం"
   },
   "common": {
     "loading": "లోడ్ అవుతోంది…",
