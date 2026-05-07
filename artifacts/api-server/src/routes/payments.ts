@@ -12,8 +12,8 @@ import {
   availabilityTable,
   couponsTable,
   referralsTable,
-  notificationsTable,
 } from "@workspace/db";
+import { createUserNotification } from "../lib/notify";
 import { computeCommissionFromPlanned } from "../lib/commission";
 import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import {
@@ -227,10 +227,12 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
 
   try {
     const [evt] = await db.select().from(eventsTable).where(eq(eventsTable.id, booking.eventId)).limit(1);
-    await db.insert(notificationsTable).values({
+    await createUserNotification({
       userId: booking.userId,
       title: "Booking confirmed!",
       message: `Your booking for "${evt?.title ?? `#${booking.id}`}" is confirmed. See you there!`,
+      url: "/dashboard/bookings",
+      tag: `booking-${booking.id}`,
     });
   } catch (err) {
     console.error("[payments] Failed to create booking confirmation notification:", err);

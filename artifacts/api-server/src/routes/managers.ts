@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import crypto from "crypto";
-import { db, vendorManagersTable, vendorsTable, usersTable, notificationsTable } from "@workspace/db";
+import { db, vendorManagersTable, vendorsTable, usersTable } from "@workspace/db";
+import { createUserNotification } from "../lib/notify";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
@@ -109,10 +110,12 @@ router.post("/partner/managers/invite", requireAuth(["vendor"]), async (req, res
 
   // Create an in-app notification for the invitee
   try {
-    await db.insert(notificationsTable).values({
+    await createUserNotification({
       userId: inviteeId,
       title: "You've been invited as a scanner manager",
       message: `${vendor.businessName} invited you to scan tickets at their venue. Visit your profile to accept or decline.`,
+      url: "/profile",
+      tag: `manager-invite-${vendor.id}`,
     });
   } catch {
     // Non-fatal

@@ -4,9 +4,9 @@ import {
   vendorsTable,
   vendorBankingDetailsTable,
   settlementRequestsTable,
-  notificationsTable,
   commissionLedgerTable,
 } from "@workspace/db";
+import { createUserNotification } from "../lib/notify";
 import { eq, desc, inArray, sql, gte, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
@@ -397,12 +397,14 @@ router.post("/admin/settlement-requests/:id/approve", requireAuth(["admin"]), as
     .where(eq(vendorsTable.id, sr.vendorId))
     .limit(1);
   if (vendor) {
-    await db.insert(notificationsTable).values({
+    await createUserNotification({
       userId: vendor.userId,
       title: "Settlement Approved",
       message: cappedNote
         ? `${cappedNote} Processing will take up to 24 hours.`
         : `Your settlement request of ₹${finalPayoutAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })} has been approved. Processing will take up to 24 hours.`,
+      url: "/dashboard/vendor",
+      tag: `settlement-${id}`,
     });
   }
   res.json(updated);
@@ -460,12 +462,14 @@ router.post("/admin/settlement-requests/:id/reject", requireAuth(["admin"]), asy
     .where(eq(vendorsTable.id, sr.vendorId))
     .limit(1);
   if (vendor) {
-    await db.insert(notificationsTable).values({
+    await createUserNotification({
       userId: vendor.userId,
       title: "Settlement Request Rejected",
       message: note
         ? `Your settlement request has been rejected. Reason: ${note}`
         : "Your settlement request has been rejected. Please contact support for more information.",
+      url: "/dashboard/vendor",
+      tag: `settlement-${id}`,
     });
   }
   res.json(updated);

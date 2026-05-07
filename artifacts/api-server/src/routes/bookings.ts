@@ -9,7 +9,6 @@ import {
   availabilityTable,
   couponsTable,
   referralsTable,
-  notificationsTable,
   partnerBlockedDatesTable,
   paymentsTable,
   vendorManagersTable,
@@ -22,7 +21,7 @@ import {
   classifyBookingType,
 } from "../lib/commission";
 import { sendExpoPushToUser } from "../lib/expoPush";
-import { sendWebPushToUser } from "./webPush";
+import { createUserNotification } from "../lib/notify";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -597,17 +596,13 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
 
   try {
-    await db.insert(notificationsTable).values({
+    await createUserNotification({
       userId: user.id,
       title: "Booking confirmed!",
       message: `Your booking for "${out?.eventTitle ?? evt.title}" is confirmed. See you there!`,
-    });
-    sendWebPushToUser(user.id, {
-      title: "Booking confirmed!",
-      body: `Your booking for "${out?.eventTitle ?? evt.title}" is confirmed. See you there!`,
       url: "/dashboard/bookings",
-      tag: `booking-${out?.id ?? bookingId}`,
-    }).catch(() => {});
+      tag: `booking-${out?.id ?? b.id}`,
+    });
   } catch (err) {
     console.error("Failed to create booking confirmation notification:", err);
   }
@@ -1342,10 +1337,12 @@ router.patch(
           notifMessage = `Your booking for "${out.eventTitle}" is marked as completed. We hope you had a great time!`;
         }
         if (notifTitle) {
-          await db.insert(notificationsTable).values({
+          await createUserNotification({
             userId: b.userId,
             title: notifTitle,
             message: notifMessage,
+            url: "/dashboard/bookings",
+            tag: `booking-status-${b.id}`,
           });
 
           // Send Expo push notification to user's mobile device if they have a token
@@ -1353,12 +1350,6 @@ router.patch(
             title: notifTitle,
             body: notifMessage,
             data: { bookingId: b.id, screen: "bookings" },
-          }).catch(() => {});
-          sendWebPushToUser(b.userId, {
-            title: notifTitle,
-            body: notifMessage,
-            url: "/dashboard/bookings",
-            tag: `booking-status-${b.id}`,
           }).catch(() => {});
         }
       } catch (err) {
@@ -1467,10 +1458,12 @@ router.patch(
           }
           // In-app notification for the vendor owner
           if (vendorUser) {
-            await db.insert(notificationsTable).values({
+            await createUserNotification({
               userId: vendorUser.id,
               title: "Booking cancelled by customer",
               message: `${out.userName} cancelled their booking for "${out.eventTitle}" on ${updated.bookingDate}. Reason: ${reason}`,
+              url: "/dashboard/vendor",
+              tag: `booking-cancelled-${updated.id}`,
             });
           }
         }
@@ -1480,10 +1473,12 @@ router.patch(
 
       // In-app notification for the customer confirming the cancellation
       try {
-        await db.insert(notificationsTable).values({
+        await createUserNotification({
           userId: user.id,
           title: "Booking cancelled",
           message: `Your booking for "${out.eventTitle}" has been cancelled as requested.`,
+          url: "/dashboard/bookings",
+          tag: `booking-cancelled-${updated.id}`,
         });
       } catch (err) {
         console.error("Failed to create customer cancellation notification:", err);
@@ -1614,17 +1609,13 @@ router.patch(
           notifMessage = `Your booking for "${out.eventTitle}" is marked as completed.`;
         }
         if (notifTitle) {
-          await db.insert(notificationsTable).values({
+          await createUserNotification({
             userId: b.userId,
             title: notifTitle,
             message: notifMessage,
-          });
-          sendWebPushToUser(b.userId, {
-            title: notifTitle,
-            body: notifMessage,
             url: "/dashboard/bookings",
             tag: `booking-status-${b.id}`,
-          }).catch(() => {});
+          });
         }
       } catch (err) {
         console.error("Failed to create notification (admin path):", err);
@@ -2050,7 +2041,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       db.update(usersTable)
         .set({ points: sql`${usersTable.points} + 100` })
         .where(eq(usersTable.id, updated.userId)),
-      db.insert(notificationsTable).values({
+      createUserNotification({
         userId: updated.userId,
         title: "You earned 100 points!",
         message: `You earned 100 points for attending "${scanEvt?.title ?? "this event"}"!`,

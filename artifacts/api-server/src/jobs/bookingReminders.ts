@@ -1,7 +1,7 @@
 import { db, bookingsTable, eventsTable, vendorsTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, inArray, and, gte, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { sendWebPushToUser } from "../routes/webPush";
+import { createUserNotification } from "../lib/notify";
 import { sendExpoPushWithToken } from "../lib/expoPush";
 
 export type ReminderSlot = "morning" | "evening";
@@ -125,18 +125,13 @@ export async function runBookingReminders(slot: ReminderSlot): Promise<void> {
         `${refCode}: You have a ${bookingKind} for "${eventTitle}" at ${vendorName} today ${timeRef}. Don't miss it! 🎉`;
 
       try {
-        await db.insert(notificationsTable).values({
+        await createUserNotification({
           userId: booking.userId,
           title: notifTitle,
           message,
-        });
-
-        sendWebPushToUser(booking.userId, {
-          title: notifTitle,
-          body: message,
           url: "/dashboard/bookings",
           tag: `reminder-${booking.id}-${slot}`,
-        }).catch(() => {});
+        });
 
         const expoPushToken = userMap.get(booking.userId);
         if (expoPushToken) {

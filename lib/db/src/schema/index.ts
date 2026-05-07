@@ -690,3 +690,23 @@ export const commissionLedgerTable = pgTable(
 );
 
 export type CommissionLedger = typeof commissionLedgerTable.$inferSelect;
+
+export const webPushSubscriptionsTable = pgTable(
+  "web_push_subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    endpointUniq: uniqueIndex("web_push_subscriptions_endpoint_uniq").on(t.endpoint),
+    userIdx: index("web_push_subscriptions_user_idx").on(t.userId),
+  }),
+);
+
+export type WebPushSubscription = typeof webPushSubscriptionsTable.$inferSelect;

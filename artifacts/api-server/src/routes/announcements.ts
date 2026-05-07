@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, announcementsTable, vendorsTable, eventsTable, bookingsTable, usersTable, notificationsTable } from "@workspace/db";
+import { db, announcementsTable, vendorsTable, eventsTable, bookingsTable, usersTable } from "@workspace/db";
+import { createUserNotification } from "../lib/notify";
 import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
-import { sendWebPushToUser } from "./webPush";
 import { sendExpoPushWithToken } from "../lib/expoPush";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
@@ -85,19 +85,14 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
         await Promise.all(
           batch.map(async ({ id: userId, expoPushToken }) => {
             try {
-              // In-app notification for every user
-              await db.insert(notificationsTable).values({
+              // In-app notification for every user (also fans out web push)
+              await createUserNotification({
                 userId,
                 title: notifTitle,
                 message: notifBody,
-              });
-              // Web push (only fires if the user has a subscription)
-              sendWebPushToUser(userId, {
-                title: notifTitle,
-                body: notifBody,
                 url: `/`,
                 tag,
-              }).catch(() => {});
+              });
               // Expo push (only fires if the user has a registered mobile token)
               if (expoPushToken) {
                 sendExpoPushWithToken(userId, expoPushToken, {
