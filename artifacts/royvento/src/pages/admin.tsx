@@ -3336,7 +3336,7 @@ interface CommissionVendorRow {
 
 interface CommissionReport {
   rows: CommissionVendorRow[];
-  totals: { totalBookings: number; totalRevenue: number; totalCommission: number };
+  totals: { totalBookings: number; totalRevenue: number; totalCommission: number; collectedCommission: number; pendingCommission: number };
 }
 
 function CommissionsAdmin() {
@@ -3578,8 +3578,9 @@ function CommissionsAdmin() {
                 <p className="stat-number text-2xl">{formatINR(report.totals.totalRevenue)}</p>
               </div>
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Platform commission</p>
-                <p className="stat-number text-2xl text-primary">{formatINR(report.totals.totalCommission)}</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Commission collected</p>
+                <p className="stat-number text-2xl text-primary">{formatINR(report.totals.collectedCommission)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Same number as the Analytics “Total commission” tile.</p>
               </div>
             </div>
 
