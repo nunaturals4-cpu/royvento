@@ -18,9 +18,13 @@ import { generateTicketCode } from "../lib/ticketCode";
 import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
 import {
   PatchAdminEventBody,
+  PatchAdminEventParams,
   AdminUpdateVendorBody,
+  AdminUpdateVendorParams,
   SetVendorCommissionBody,
+  SetVendorCommissionParams,
   AdminSendCouponBody,
+  AdminSendCouponParams,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -470,11 +474,12 @@ router.get("/admin/events/pending", requireAuth(["admin"]), async (_req, res) =>
 });
 
 router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
-  const id = Number(req.params["id"]);
-  if (!Number.isFinite(id)) {
+  const paramsParsed = PatchAdminEventParams.safeParse({ eventId: req.params["id"] });
+  if (!paramsParsed.success) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+  const id = paramsParsed.data.eventId;
   const parsed = PatchAdminEventBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input" });
@@ -599,11 +604,12 @@ router.get("/admin/vendors", requireAuth(["admin"]), async (req, res) => {
 });
 
 router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
-  const id = Number(req.params["id"]);
-  if (!Number.isFinite(id)) {
+  const paramsParsed = AdminUpdateVendorParams.safeParse(req.params);
+  if (!paramsParsed.success) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+  const id = paramsParsed.data.id;
   const parsed = AdminUpdateVendorBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input" });
@@ -1532,11 +1538,12 @@ router.get("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
 });
 
 router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, res) => {
-  const vendorId = Number(req.params["id"]);
-  if (!Number.isFinite(vendorId)) {
+  const paramsParsed = SetVendorCommissionParams.safeParse(req.params);
+  if (!paramsParsed.success) {
     res.status(400).json({ error: "Invalid vendor id" });
     return;
   }
+  const vendorId = paramsParsed.data.id;
   const [vendor] = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.id, vendorId)).limit(1);
   if (!vendor) {
     res.status(404).json({ error: "Vendor not found" });
@@ -1791,11 +1798,12 @@ const VALID_COUPON_TYPES = ["general", "event", "loyalty", "referral", "vip"] as
 type CouponType = (typeof VALID_COUPON_TYPES)[number];
 
 router.post("/admin/users/:userId/send-coupon", requireAuth(["admin"]), async (req, res) => {
-  const userId = Number(req.params["userId"]);
-  if (!Number.isFinite(userId)) {
+  const paramsParsed = AdminSendCouponParams.safeParse(req.params);
+  if (!paramsParsed.success) {
     res.status(400).json({ error: "Invalid userId" });
     return;
   }
+  const userId = paramsParsed.data.userId;
 
   const parsed = AdminSendCouponBody.safeParse(req.body);
   if (!parsed.success) {

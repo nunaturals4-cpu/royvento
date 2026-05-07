@@ -10,7 +10,7 @@ import { createUserNotification } from "../lib/notify";
 import { eq, desc, inArray, sql, gte, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
-import { RejectSettlementRequestBody } from "@workspace/api-zod";
+import { RejectSettlementRequestBody, RejectSettlementRequestParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -412,11 +412,12 @@ router.post("/admin/settlement-requests/:id/approve", requireAuth(["admin"]), as
 });
 
 router.post("/admin/settlement-requests/:id/reject", requireAuth(["admin"]), async (req, res) => {
-  const id = Number(req.params["id"]);
-  if (!Number.isFinite(id)) {
+  const paramsParsed = RejectSettlementRequestParams.safeParse(req.params);
+  if (!paramsParsed.success) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+  const id = paramsParsed.data.id;
   const parsed = RejectSettlementRequestBody.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input" });

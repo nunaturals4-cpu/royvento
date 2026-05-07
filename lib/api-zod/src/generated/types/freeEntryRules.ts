@@ -12,6 +12,9 @@ export interface FreeEntryRules {
   enabled: boolean;
   genders: FreeEntryRulesGendersItem[];
   days: FreeEntryRulesDaysItem[];
-  /** Entry cutoff time in 24-hour HH:mm format, e.g. 22:00 */
+  /**
+   * Entry cutoff time in 24-hour HH:mm format, e.g. 22:00
+   * @pattern ^([01][0-9]|2[0-3]):([0-5][0-9])$
+   */
   beforeTime?: string;
 }

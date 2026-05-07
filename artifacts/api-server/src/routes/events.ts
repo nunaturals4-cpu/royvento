@@ -1,7 +1,12 @@
 import { Router, type IRouter } from "express";
 import { db, eventsTable, vendorsTable, drinkPlansTable } from "@workspace/db";
 import { eq, desc, and, ilike, sql, gte, lte, or, inArray } from "drizzle-orm";
-import { CreateEventBody, UpdateEventBody, ListEventsQueryParams } from "@workspace/api-zod";
+import {
+  CreateEventBody,
+  UpdateEventBody,
+  ListEventsQueryParams,
+  UpdateEventParams,
+} from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { getEventRatings } from "../lib/aggregates";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -391,11 +396,12 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
 });
 
 router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
-  const id = Number(req.params["eventId"]);
-  if (!Number.isFinite(id)) {
+  const paramsParsed = UpdateEventParams.safeParse(req.params);
+  if (!paramsParsed.success) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+  const id = paramsParsed.data.eventId;
   const user = await loadUserFromRequest(req);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" });

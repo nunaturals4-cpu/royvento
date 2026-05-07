@@ -11,11 +11,13 @@ import * as zod from "zod";
  * @summary Request a presigned URL for file upload
  */
 
-export const RequestUploadUrlBody = zod.object({
-  name: zod.string().min(1),
-  size: zod.number().min(1),
-  contentType: zod.string().min(1),
-});
+export const RequestUploadUrlBody = zod
+  .object({
+    name: zod.string().min(1),
+    size: zod.number().min(1),
+    contentType: zod.string().min(1),
+  })
+  .strict();
 
 export const RequestUploadUrlResponse = zod.object({
   uploadURL: zod.string().url(),
@@ -41,12 +43,14 @@ export const HealthCheckResponse = zod.object({
  */
 export const registerBodyPasswordMin = 6;
 
-export const RegisterBody = zod.object({
-  email: zod.string(),
-  password: zod.string().min(registerBodyPasswordMin),
-  name: zod.string(),
-  role: zod.enum(["user", "vendor", "admin"]).optional(),
-});
+export const RegisterBody = zod
+  .object({
+    email: zod.string(),
+    password: zod.string().min(registerBodyPasswordMin),
+    name: zod.string(),
+    role: zod.enum(["user", "vendor", "admin"]).optional(),
+  })
+  .strict();
 
 export const RegisterResponse = zod.object({
   token: zod.string(),
@@ -68,10 +72,12 @@ export const RegisterResponse = zod.object({
 /**
  * @summary Log in
  */
-export const LoginBody = zod.object({
-  email: zod.string(),
-  password: zod.string(),
-});
+export const LoginBody = zod
+  .object({
+    email: zod.string(),
+    password: zod.string(),
+  })
+  .strict();
 
 export const LoginResponse = zod.object({
   token: zod.string(),
@@ -148,12 +154,14 @@ export const updateMeBodyAboutMax = 2000;
 
 export const updateMeBodyProfileImageMax = 2048;
 
-export const UpdateMeBody = zod.object({
-  name: zod.string().min(1).max(updateMeBodyNameMax).optional(),
-  phone: zod.string().max(updateMeBodyPhoneMax).optional(),
-  about: zod.string().max(updateMeBodyAboutMax).optional(),
-  profileImage: zod.string().max(updateMeBodyProfileImageMax).optional(),
-});
+export const UpdateMeBody = zod
+  .object({
+    name: zod.string().min(1).max(updateMeBodyNameMax).optional(),
+    phone: zod.string().max(updateMeBodyPhoneMax).optional(),
+    about: zod.string().max(updateMeBodyAboutMax).optional(),
+    profileImage: zod.string().max(updateMeBodyProfileImageMax).optional(),
+  })
+  .strict();
 
 export const UpdateMeResponse = zod.object({
   id: zod.number(),
@@ -172,13 +180,17 @@ export const UpdateMeResponse = zod.object({
 /**
  * @summary Update a user's role (admin only)
  */
-export const UpdateUserRoleParams = zod.object({
-  userId: zod.coerce.number(),
-});
+export const UpdateUserRoleParams = zod
+  .object({
+    userId: zod.coerce.number(),
+  })
+  .strict();
 
-export const UpdateUserRoleBody = zod.object({
-  role: zod.enum(["user", "vendor", "admin"]),
-});
+export const UpdateUserRoleBody = zod
+  .object({
+    role: zod.enum(["user", "vendor", "admin"]),
+  })
+  .strict();
 
 export const UpdateUserRoleResponse = zod.object({
   id: zod.number(),
@@ -197,9 +209,11 @@ export const UpdateUserRoleResponse = zod.object({
 /**
  * @summary Delete a user (admin only)
  */
-export const DeleteUserParams = zod.object({
-  userId: zod.coerce.number(),
-});
+export const DeleteUserParams = zod
+  .object({
+    userId: zod.coerce.number(),
+  })
+  .strict();
 
 export const DeleteUserResponse = zod.object({
   ok: zod.boolean(),
@@ -208,16 +222,22 @@ export const DeleteUserResponse = zod.object({
 /**
  * @summary List approved vendors
  */
-export const ListVendorsQueryParams = zod.object({
-  category: zod.coerce.string().optional(),
-  country: zod.coerce.string().optional(),
-  state: zod.coerce.string().optional(),
-  city: zod.coerce.string().optional(),
-  danceFloor: zod.enum(["dedicated", "general", "none"]).optional(),
-  drinkPlanType: zod
-    .enum(["welcome", "unlimited", "ticket", "custom"])
-    .optional(),
-});
+export const ListVendorsQueryParams = zod
+  .object({
+    category: zod.coerce.string().optional(),
+    country: zod.coerce.string().optional(),
+    state: zod.coerce.string().optional(),
+    city: zod.coerce.string().optional(),
+    danceFloor: zod.enum(["dedicated", "general", "none"]).optional(),
+    drinkPlanType: zod
+      .enum(["welcome", "unlimited", "ticket", "custom"])
+      .optional(),
+  })
+  .strict();
+
+export const listVendorsResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
 
 export const ListVendorsResponseItem = zod.object({
   id: zod.number(),
@@ -249,6 +269,7 @@ export const ListVendorsResponseItem = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(listVendorsResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -265,6 +286,9 @@ export const ListVendorsResponse = zod.array(ListVendorsResponseItem);
 /**
  * @summary Get the current user's vendor profile
  */
+export const getMyVendorResponseVendorOneFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
+
 export const GetMyVendorResponse = zod.object({
   vendor: zod.union([
     zod.object({
@@ -299,6 +323,9 @@ export const GetMyVendorResponse = zod.object({
             ),
             beforeTime: zod
               .string()
+              .regex(
+                getMyVendorResponseVendorOneFreeEntryRulesOneBeforeTimeRegExp,
+              )
               .optional()
               .describe(
                 "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
@@ -319,18 +346,23 @@ export const GetMyVendorResponse = zod.object({
 /**
  * @summary Create or apply for a vendor profile
  */
-export const CreateMyVendorBody = zod.object({
-  businessName: zod.string(),
-  category: zod.string(),
-  description: zod.string(),
-  location: zod.string(),
-  country: zod.string().optional(),
-  state: zod.string().optional(),
-  city: zod.string().optional(),
-  bannerImage: zod.string().optional(),
-  coverImageUrl: zod.string().optional(),
-  portfolioImages: zod.array(zod.string()).optional(),
-});
+export const CreateMyVendorBody = zod
+  .object({
+    businessName: zod.string(),
+    category: zod.string(),
+    description: zod.string(),
+    location: zod.string(),
+    country: zod.string().optional(),
+    state: zod.string().optional(),
+    city: zod.string().optional(),
+    bannerImage: zod.string().optional(),
+    coverImageUrl: zod.string().optional(),
+    portfolioImages: zod.array(zod.string()).optional(),
+  })
+  .strict();
+
+export const createMyVendorResponseFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
 
 export const CreateMyVendorResponse = zod.object({
   id: zod.number(),
@@ -362,6 +394,7 @@ export const CreateMyVendorResponse = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(createMyVendorResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -377,19 +410,24 @@ export const CreateMyVendorResponse = zod.object({
 /**
  * @summary Update the current vendor profile
  */
-export const UpdateMyVendorBody = zod.object({
-  businessName: zod.string().optional(),
-  category: zod.string().optional(),
-  description: zod.string().optional(),
-  location: zod.string().optional(),
-  country: zod.string().optional(),
-  state: zod.string().optional(),
-  city: zod.string().optional(),
-  bannerImage: zod.string().optional(),
-  coverImageUrl: zod.string().optional(),
-  portfolioImages: zod.array(zod.string()).optional(),
-  menuUrl: zod.string().optional(),
-});
+export const UpdateMyVendorBody = zod
+  .object({
+    businessName: zod.string().optional(),
+    category: zod.string().optional(),
+    description: zod.string().optional(),
+    location: zod.string().optional(),
+    country: zod.string().optional(),
+    state: zod.string().optional(),
+    city: zod.string().optional(),
+    bannerImage: zod.string().optional(),
+    coverImageUrl: zod.string().optional(),
+    portfolioImages: zod.array(zod.string()).optional(),
+    menuUrl: zod.string().optional(),
+  })
+  .strict();
+
+export const updateMyVendorResponseFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
 
 export const UpdateMyVendorResponse = zod.object({
   id: zod.number(),
@@ -421,6 +459,7 @@ export const UpdateMyVendorResponse = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(updateMyVendorResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -436,9 +475,15 @@ export const UpdateMyVendorResponse = zod.object({
 /**
  * @summary Get a vendor profile
  */
-export const GetVendorParams = zod.object({
-  vendorId: zod.coerce.number(),
-});
+export const GetVendorParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
+
+export const getVendorResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
 
 export const GetVendorResponse = zod.object({
   id: zod.number(),
@@ -470,6 +515,7 @@ export const GetVendorResponse = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(getVendorResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -485,6 +531,9 @@ export const GetVendorResponse = zod.object({
 /**
  * @summary List vendors pending approval (admin)
  */
+export const listPendingVendorsResponseFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
+
 export const ListPendingVendorsResponseItem = zod.object({
   id: zod.number(),
   userId: zod.number(),
@@ -515,6 +564,7 @@ export const ListPendingVendorsResponseItem = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(listPendingVendorsResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -533,9 +583,14 @@ export const ListPendingVendorsResponse = zod.array(
 /**
  * @summary Approve a vendor (admin)
  */
-export const ApproveVendorParams = zod.object({
-  vendorId: zod.coerce.number(),
-});
+export const ApproveVendorParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
+
+export const approveVendorResponseFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
 
 export const ApproveVendorResponse = zod.object({
   id: zod.number(),
@@ -567,6 +622,7 @@ export const ApproveVendorResponse = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(approveVendorResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -582,9 +638,15 @@ export const ApproveVendorResponse = zod.object({
 /**
  * @summary Reject a vendor (admin)
  */
-export const RejectVendorParams = zod.object({
-  vendorId: zod.coerce.number(),
-});
+export const RejectVendorParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
+
+export const rejectVendorResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
 
 export const RejectVendorResponse = zod.object({
   id: zod.number(),
@@ -616,6 +678,7 @@ export const RejectVendorResponse = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(rejectVendorResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -689,9 +752,11 @@ export const ListVendorDrinkOffersResponse = zod.array(
 /**
  * @summary Get drink plans for a vendor
  */
-export const ListVendorDrinkPlansParams = zod.object({
-  vendorId: zod.coerce.number(),
-});
+export const ListVendorDrinkPlansParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
 
 export const listVendorDrinkPlansResponseLineItemsItemDiscountedPriceMin = 0;
 
@@ -732,29 +797,33 @@ export const createDrinkPlanBodyPriceMin = 0;
 
 export const createDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
 
-export const CreateDrinkPlanBody = zod.object({
-  type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
-  productName: zod.string().optional(),
-  gender: zod.enum(["all", "female"]).optional(),
-  price: zod.number().min(createDrinkPlanBodyPriceMin).optional(),
-  days: zod.array(zod.string()).optional(),
-  timeFrom: zod.string().optional(),
-  timeTo: zod.string().optional(),
-  description: zod.string().optional(),
-  lineItems: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-        qty: zod.number().min(1),
-        discountedPrice: zod
-          .number()
-          .min(createDrinkPlanBodyLineItemsItemDiscountedPriceMin),
-      }),
-    )
-    .nullish(),
-  validUntil: zod.string().nullish(),
-  validFrom: zod.string().nullish(),
-});
+export const CreateDrinkPlanBody = zod
+  .object({
+    type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+    productName: zod.string().optional(),
+    gender: zod.enum(["all", "female"]).optional(),
+    price: zod.number().min(createDrinkPlanBodyPriceMin).optional(),
+    days: zod.array(zod.string()).optional(),
+    timeFrom: zod.string().optional(),
+    timeTo: zod.string().optional(),
+    description: zod.string().optional(),
+    lineItems: zod
+      .array(
+        zod
+          .object({
+            name: zod.string(),
+            qty: zod.number().min(1),
+            discountedPrice: zod
+              .number()
+              .min(createDrinkPlanBodyLineItemsItemDiscountedPriceMin),
+          })
+          .strict(),
+      )
+      .nullish(),
+    validUntil: zod.string().nullish(),
+    validFrom: zod.string().nullish(),
+  })
+  .strict();
 
 export const createDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
 
@@ -788,37 +857,43 @@ export const CreateDrinkPlanResponse = zod.object({
 /**
  * @summary Update a drink plan (vendor)
  */
-export const UpdateDrinkPlanParams = zod.object({
-  planId: zod.coerce.number(),
-});
+export const UpdateDrinkPlanParams = zod
+  .object({
+    planId: zod.coerce.number(),
+  })
+  .strict();
 
 export const updateDrinkPlanBodyPriceMin = 0;
 
 export const updateDrinkPlanBodyLineItemsItemDiscountedPriceMin = 0;
 
-export const UpdateDrinkPlanBody = zod.object({
-  type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
-  productName: zod.string().optional(),
-  gender: zod.enum(["all", "female"]).optional(),
-  price: zod.number().min(updateDrinkPlanBodyPriceMin).optional(),
-  days: zod.array(zod.string()).optional(),
-  timeFrom: zod.string().optional(),
-  timeTo: zod.string().optional(),
-  description: zod.string().optional(),
-  lineItems: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-        qty: zod.number().min(1),
-        discountedPrice: zod
-          .number()
-          .min(updateDrinkPlanBodyLineItemsItemDiscountedPriceMin),
-      }),
-    )
-    .nullish(),
-  validUntil: zod.string().nullish(),
-  validFrom: zod.string().nullish(),
-});
+export const UpdateDrinkPlanBody = zod
+  .object({
+    type: zod.enum(["welcome", "unlimited", "ticket", "custom"]),
+    productName: zod.string().optional(),
+    gender: zod.enum(["all", "female"]).optional(),
+    price: zod.number().min(updateDrinkPlanBodyPriceMin).optional(),
+    days: zod.array(zod.string()).optional(),
+    timeFrom: zod.string().optional(),
+    timeTo: zod.string().optional(),
+    description: zod.string().optional(),
+    lineItems: zod
+      .array(
+        zod
+          .object({
+            name: zod.string(),
+            qty: zod.number().min(1),
+            discountedPrice: zod
+              .number()
+              .min(updateDrinkPlanBodyLineItemsItemDiscountedPriceMin),
+          })
+          .strict(),
+      )
+      .nullish(),
+    validUntil: zod.string().nullish(),
+    validFrom: zod.string().nullish(),
+  })
+  .strict();
 
 export const updateDrinkPlanResponseLineItemsItemDiscountedPriceMin = 0;
 
@@ -852,9 +927,11 @@ export const UpdateDrinkPlanResponse = zod.object({
 /**
  * @summary Delete a drink plan (vendor)
  */
-export const DeleteDrinkPlanParams = zod.object({
-  planId: zod.coerce.number(),
-});
+export const DeleteDrinkPlanParams = zod
+  .object({
+    planId: zod.coerce.number(),
+  })
+  .strict();
 
 export const DeleteDrinkPlanResponse = zod.object({
   ok: zod.boolean(),
@@ -863,21 +940,27 @@ export const DeleteDrinkPlanResponse = zod.object({
 /**
  * @summary List events (supports optional pagination via page param)
  */
-export const ListEventsQueryParams = zod.object({
-  category: zod.coerce.string().optional(),
-  search: zod.coerce.string().optional(),
-  type: zod.coerce.string().optional(),
-  city: zod.coerce.string().optional(),
-  state: zod.coerce.string().optional(),
-  country: zod.coerce.string().optional(),
-  minPrice: zod.coerce.string().optional(),
-  maxPrice: zod.coerce.string().optional(),
-  page: zod.coerce.number().optional(),
-  limit: zod.coerce.number().optional(),
-  drinkPlanType: zod
-    .enum(["welcome", "unlimited", "ticket", "custom"])
-    .optional(),
-});
+export const ListEventsQueryParams = zod
+  .object({
+    category: zod.coerce.string().optional(),
+    search: zod.coerce.string().optional(),
+    type: zod.coerce.string().optional(),
+    city: zod.coerce.string().optional(),
+    state: zod.coerce.string().optional(),
+    country: zod.coerce.string().optional(),
+    minPrice: zod.coerce.string().optional(),
+    maxPrice: zod.coerce.string().optional(),
+    page: zod.coerce.number().optional(),
+    limit: zod.coerce.number().optional(),
+    drinkPlanType: zod
+      .enum(["welcome", "unlimited", "ticket", "custom"])
+      .optional(),
+  })
+  .strict();
+
+export const listEventsResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
 
 export const ListEventsResponseItem = zod.object({
   id: zod.number(),
@@ -921,6 +1004,7 @@ export const ListEventsResponseItem = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(listEventsResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -969,67 +1053,242 @@ export const createEventBodyPriceCoupleMin = 0;
 
 export const createEventBodyPubEventTypesItemMax = 100;
 
-export const createEventBodyDayPricingOneWomenMin = 0;
+export const createEventBodyDayPricingOneMonOneWomenMin = 0;
 
-export const createEventBodyDayPricingOneMenMin = 0;
+export const createEventBodyDayPricingOneMonOneMenMin = 0;
 
-export const createEventBodyDayPricingOneCoupleMin = 0;
+export const createEventBodyDayPricingOneMonOneCoupleMin = 0;
 
-export const CreateEventBody = zod.object({
-  title: zod.string().min(1).max(createEventBodyTitleMax),
-  description: zod.string().max(createEventBodyDescriptionMax),
-  category: zod.string().min(1).max(createEventBodyCategoryMax),
-  location: zod.string().max(createEventBodyLocationMax),
-  price: zod.number().min(createEventBodyPriceMin),
-  capacity: zod.number().min(createEventBodyCapacityMin),
-  imageUrl: zod.string().max(createEventBodyImageUrlMax).optional(),
-  galleryImages: zod
-    .array(zod.string().max(createEventBodyGalleryImagesItemMax))
-    .optional(),
-  galleryVideos: zod
-    .array(zod.string().max(createEventBodyGalleryVideosItemMax))
-    .optional(),
-  type: zod.string().optional(),
-  state: zod.string().max(createEventBodyStateMax).optional(),
-  city: zod.string().max(createEventBodyCityMax).optional(),
-  country: zod.string().max(createEventBodyCountryMax).optional(),
-  pubMode: zod.string().max(createEventBodyPubModeMax).optional(),
-  priceWomen: zod.number().min(createEventBodyPriceWomenMin).optional(),
-  priceMen: zod.number().min(createEventBodyPriceMenMin).optional(),
-  priceCouple: zod.number().min(createEventBodyPriceCoupleMin).optional(),
-  pubEventTypes: zod
-    .array(zod.string().max(createEventBodyPubEventTypesItemMax))
-    .optional(),
-  dayPricing: zod
-    .union([
-      zod.record(
-        zod.string(),
-        zod.object({
-          women: zod.number().min(createEventBodyDayPricingOneWomenMin),
-          men: zod.number().min(createEventBodyDayPricingOneMenMin),
-          couple: zod.number().min(createEventBodyDayPricingOneCoupleMin),
-        }),
-      ),
-      zod.null(),
-    ])
-    .optional(),
-  freeEntryRules: zod
-    .union([
-      zod.object({
-        enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-        days: zod.array(
-          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-        ),
-        beforeTime: zod
-          .string()
-          .optional()
-          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-      }),
-      zod.null(),
-    ])
-    .optional(),
-});
+export const createEventBodyDayPricingOneTueOneWomenMin = 0;
+
+export const createEventBodyDayPricingOneTueOneMenMin = 0;
+
+export const createEventBodyDayPricingOneTueOneCoupleMin = 0;
+
+export const createEventBodyDayPricingOneWedOneWomenMin = 0;
+
+export const createEventBodyDayPricingOneWedOneMenMin = 0;
+
+export const createEventBodyDayPricingOneWedOneCoupleMin = 0;
+
+export const createEventBodyDayPricingOneThuOneWomenMin = 0;
+
+export const createEventBodyDayPricingOneThuOneMenMin = 0;
+
+export const createEventBodyDayPricingOneThuOneCoupleMin = 0;
+
+export const createEventBodyDayPricingOneFriOneWomenMin = 0;
+
+export const createEventBodyDayPricingOneFriOneMenMin = 0;
+
+export const createEventBodyDayPricingOneFriOneCoupleMin = 0;
+
+export const createEventBodyDayPricingOneSatOneWomenMin = 0;
+
+export const createEventBodyDayPricingOneSatOneMenMin = 0;
+
+export const createEventBodyDayPricingOneSatOneCoupleMin = 0;
+
+export const createEventBodyDayPricingOneSunOneWomenMin = 0;
+
+export const createEventBodyDayPricingOneSunOneMenMin = 0;
+
+export const createEventBodyDayPricingOneSunOneCoupleMin = 0;
+
+export const createEventBodyFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
+
+export const CreateEventBody = zod
+  .object({
+    title: zod.string().min(1).max(createEventBodyTitleMax),
+    description: zod.string().max(createEventBodyDescriptionMax),
+    category: zod.string().min(1).max(createEventBodyCategoryMax),
+    location: zod.string().max(createEventBodyLocationMax),
+    price: zod.number().min(createEventBodyPriceMin),
+    capacity: zod.number().min(createEventBodyCapacityMin),
+    imageUrl: zod.string().max(createEventBodyImageUrlMax).optional(),
+    galleryImages: zod
+      .array(zod.string().max(createEventBodyGalleryImagesItemMax))
+      .optional(),
+    galleryVideos: zod
+      .array(zod.string().max(createEventBodyGalleryVideosItemMax))
+      .optional(),
+    type: zod.string().optional(),
+    state: zod.string().max(createEventBodyStateMax).optional(),
+    city: zod.string().max(createEventBodyCityMax).optional(),
+    country: zod.string().max(createEventBodyCountryMax).optional(),
+    pubMode: zod.string().max(createEventBodyPubModeMax).optional(),
+    priceWomen: zod.number().min(createEventBodyPriceWomenMin).optional(),
+    priceMen: zod.number().min(createEventBodyPriceMenMin).optional(),
+    priceCouple: zod.number().min(createEventBodyPriceCoupleMin).optional(),
+    pubEventTypes: zod
+      .array(zod.string().max(createEventBodyPubEventTypesItemMax))
+      .optional(),
+    dayPricing: zod
+      .union([
+        zod
+          .object({
+            Mon: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneMonOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneMonOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneMonOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Tue: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneTueOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneTueOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneTueOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Wed: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneWedOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneWedOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneWedOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Thu: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneThuOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneThuOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneThuOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Fri: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneFriOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneFriOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneFriOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Sat: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneSatOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneSatOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneSatOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Sun: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneSunOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneSunOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(createEventBodyDayPricingOneSunOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+          })
+          .strict(),
+        zod.null(),
+      ])
+      .optional(),
+    freeEntryRules: zod
+      .union([
+        zod
+          .object({
+            enabled: zod.boolean(),
+            genders: zod.array(
+              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+            ),
+            days: zod.array(
+              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+            ),
+            beforeTime: zod
+              .string()
+              .regex(createEventBodyFreeEntryRulesOneBeforeTimeRegExp)
+              .optional()
+              .describe(
+                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+              ),
+          })
+          .strict(),
+        zod.null(),
+      ])
+      .optional(),
+  })
+  .strict();
+
+export const createEventResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
 
 export const CreateEventResponse = zod.object({
   id: zod.number(),
@@ -1073,6 +1332,7 @@ export const CreateEventResponse = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(createEventResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -1086,6 +1346,9 @@ export const CreateEventResponse = zod.object({
 /**
  * @summary Featured events for the homepage
  */
+export const listFeaturedEventsResponseFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
+
 export const ListFeaturedEventsResponseItem = zod.object({
   id: zod.number(),
   vendorId: zod.number(),
@@ -1128,6 +1391,7 @@ export const ListFeaturedEventsResponseItem = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(listFeaturedEventsResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -1144,9 +1408,17 @@ export const ListFeaturedEventsResponse = zod.array(
 /**
  * @summary Event details
  */
-export const GetEventParams = zod.object({
-  eventId: zod.coerce.number(),
-});
+export const GetEventParams = zod
+  .object({
+    eventId: zod.coerce.number(),
+  })
+  .strict();
+
+export const getEventResponseOneFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
+export const getEventResponseTwoVendorFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
 
 export const GetEventResponse = zod
   .object({
@@ -1193,6 +1465,7 @@ export const GetEventResponse = zod
           ),
           beforeTime: zod
             .string()
+            .regex(getEventResponseOneFreeEntryRulesOneBeforeTimeRegExp)
             .optional()
             .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
         }),
@@ -1236,6 +1509,9 @@ export const GetEventResponse = zod
               ),
               beforeTime: zod
                 .string()
+                .regex(
+                  getEventResponseTwoVendorFreeEntryRulesOneBeforeTimeRegExp,
+                )
                 .optional()
                 .describe(
                   "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
@@ -1255,9 +1531,11 @@ export const GetEventResponse = zod
 /**
  * @summary Update an event (owning vendor)
  */
-export const UpdateEventParams = zod.object({
-  eventId: zod.coerce.number(),
-});
+export const UpdateEventParams = zod
+  .object({
+    eventId: zod.coerce.number(),
+  })
+  .strict();
 
 export const updateEventBodyTitleMax = 255;
 
@@ -1293,66 +1571,241 @@ export const updateEventBodyPriceCoupleMin = 0;
 
 export const updateEventBodyPubEventTypesItemMax = 100;
 
-export const updateEventBodyDayPricingOneWomenMin = 0;
+export const updateEventBodyDayPricingOneMonOneWomenMin = 0;
 
-export const updateEventBodyDayPricingOneMenMin = 0;
+export const updateEventBodyDayPricingOneMonOneMenMin = 0;
 
-export const updateEventBodyDayPricingOneCoupleMin = 0;
+export const updateEventBodyDayPricingOneMonOneCoupleMin = 0;
 
-export const UpdateEventBody = zod.object({
-  title: zod.string().min(1).max(updateEventBodyTitleMax).optional(),
-  description: zod.string().max(updateEventBodyDescriptionMax).optional(),
-  category: zod.string().min(1).max(updateEventBodyCategoryMax).optional(),
-  location: zod.string().max(updateEventBodyLocationMax).optional(),
-  price: zod.number().min(updateEventBodyPriceMin).optional(),
-  capacity: zod.number().min(updateEventBodyCapacityMin).optional(),
-  imageUrl: zod.string().max(updateEventBodyImageUrlMax).optional(),
-  galleryImages: zod
-    .array(zod.string().max(updateEventBodyGalleryImagesItemMax))
-    .optional(),
-  galleryVideos: zod
-    .array(zod.string().max(updateEventBodyGalleryVideosItemMax))
-    .optional(),
-  state: zod.string().max(updateEventBodyStateMax).optional(),
-  city: zod.string().max(updateEventBodyCityMax).optional(),
-  country: zod.string().max(updateEventBodyCountryMax).optional(),
-  pubMode: zod.string().max(updateEventBodyPubModeMax).optional(),
-  priceWomen: zod.number().min(updateEventBodyPriceWomenMin).optional(),
-  priceMen: zod.number().min(updateEventBodyPriceMenMin).optional(),
-  priceCouple: zod.number().min(updateEventBodyPriceCoupleMin).optional(),
-  pubEventTypes: zod
-    .array(zod.string().max(updateEventBodyPubEventTypesItemMax))
-    .optional(),
-  dayPricing: zod
-    .union([
-      zod.record(
-        zod.string(),
-        zod.object({
-          women: zod.number().min(updateEventBodyDayPricingOneWomenMin),
-          men: zod.number().min(updateEventBodyDayPricingOneMenMin),
-          couple: zod.number().min(updateEventBodyDayPricingOneCoupleMin),
-        }),
-      ),
-      zod.null(),
-    ])
-    .optional(),
-  freeEntryRules: zod
-    .union([
-      zod.object({
-        enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-        days: zod.array(
-          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-        ),
-        beforeTime: zod
-          .string()
-          .optional()
-          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-      }),
-      zod.null(),
-    ])
-    .optional(),
-});
+export const updateEventBodyDayPricingOneTueOneWomenMin = 0;
+
+export const updateEventBodyDayPricingOneTueOneMenMin = 0;
+
+export const updateEventBodyDayPricingOneTueOneCoupleMin = 0;
+
+export const updateEventBodyDayPricingOneWedOneWomenMin = 0;
+
+export const updateEventBodyDayPricingOneWedOneMenMin = 0;
+
+export const updateEventBodyDayPricingOneWedOneCoupleMin = 0;
+
+export const updateEventBodyDayPricingOneThuOneWomenMin = 0;
+
+export const updateEventBodyDayPricingOneThuOneMenMin = 0;
+
+export const updateEventBodyDayPricingOneThuOneCoupleMin = 0;
+
+export const updateEventBodyDayPricingOneFriOneWomenMin = 0;
+
+export const updateEventBodyDayPricingOneFriOneMenMin = 0;
+
+export const updateEventBodyDayPricingOneFriOneCoupleMin = 0;
+
+export const updateEventBodyDayPricingOneSatOneWomenMin = 0;
+
+export const updateEventBodyDayPricingOneSatOneMenMin = 0;
+
+export const updateEventBodyDayPricingOneSatOneCoupleMin = 0;
+
+export const updateEventBodyDayPricingOneSunOneWomenMin = 0;
+
+export const updateEventBodyDayPricingOneSunOneMenMin = 0;
+
+export const updateEventBodyDayPricingOneSunOneCoupleMin = 0;
+
+export const updateEventBodyFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
+
+export const UpdateEventBody = zod
+  .object({
+    title: zod.string().min(1).max(updateEventBodyTitleMax).optional(),
+    description: zod.string().max(updateEventBodyDescriptionMax).optional(),
+    category: zod.string().min(1).max(updateEventBodyCategoryMax).optional(),
+    location: zod.string().max(updateEventBodyLocationMax).optional(),
+    price: zod.number().min(updateEventBodyPriceMin).optional(),
+    capacity: zod.number().min(updateEventBodyCapacityMin).optional(),
+    imageUrl: zod.string().max(updateEventBodyImageUrlMax).optional(),
+    galleryImages: zod
+      .array(zod.string().max(updateEventBodyGalleryImagesItemMax))
+      .optional(),
+    galleryVideos: zod
+      .array(zod.string().max(updateEventBodyGalleryVideosItemMax))
+      .optional(),
+    state: zod.string().max(updateEventBodyStateMax).optional(),
+    city: zod.string().max(updateEventBodyCityMax).optional(),
+    country: zod.string().max(updateEventBodyCountryMax).optional(),
+    pubMode: zod.string().max(updateEventBodyPubModeMax).optional(),
+    priceWomen: zod.number().min(updateEventBodyPriceWomenMin).optional(),
+    priceMen: zod.number().min(updateEventBodyPriceMenMin).optional(),
+    priceCouple: zod.number().min(updateEventBodyPriceCoupleMin).optional(),
+    pubEventTypes: zod
+      .array(zod.string().max(updateEventBodyPubEventTypesItemMax))
+      .optional(),
+    dayPricing: zod
+      .union([
+        zod
+          .object({
+            Mon: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneMonOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneMonOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneMonOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Tue: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneTueOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneTueOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneTueOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Wed: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneWedOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneWedOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneWedOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Thu: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneThuOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneThuOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneThuOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Fri: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneFriOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneFriOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneFriOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Sat: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneSatOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneSatOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneSatOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+            Sun: zod
+              .union([
+                zod
+                  .object({
+                    women: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneSunOneWomenMin),
+                    men: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneSunOneMenMin),
+                    couple: zod
+                      .number()
+                      .min(updateEventBodyDayPricingOneSunOneCoupleMin),
+                  })
+                  .strict(),
+                zod.null(),
+              ])
+              .optional(),
+          })
+          .strict(),
+        zod.null(),
+      ])
+      .optional(),
+    freeEntryRules: zod
+      .union([
+        zod
+          .object({
+            enabled: zod.boolean(),
+            genders: zod.array(
+              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+            ),
+            days: zod.array(
+              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+            ),
+            beforeTime: zod
+              .string()
+              .regex(updateEventBodyFreeEntryRulesOneBeforeTimeRegExp)
+              .optional()
+              .describe(
+                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+              ),
+          })
+          .strict(),
+        zod.null(),
+      ])
+      .optional(),
+  })
+  .strict();
+
+export const updateEventResponseFreeEntryRulesOneBeforeTimeRegExp = new RegExp(
+  "^([01][0-9]|2[0-3]):([0-5][0-9])$",
+);
 
 export const UpdateEventResponse = zod.object({
   id: zod.number(),
@@ -1396,6 +1849,7 @@ export const UpdateEventResponse = zod.object({
         ),
         beforeTime: zod
           .string()
+          .regex(updateEventResponseFreeEntryRulesOneBeforeTimeRegExp)
           .optional()
           .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
       }),
@@ -1409,9 +1863,11 @@ export const UpdateEventResponse = zod.object({
 /**
  * @summary Delete an event
  */
-export const DeleteEventParams = zod.object({
-  eventId: zod.coerce.number(),
-});
+export const DeleteEventParams = zod
+  .object({
+    eventId: zod.coerce.number(),
+  })
+  .strict();
 
 export const DeleteEventResponse = zod.object({
   ok: zod.boolean(),
@@ -1423,15 +1879,20 @@ export const DeleteEventResponse = zod.object({
 export const listMyVendorEventsQueryPageDefault = 1;
 export const listMyVendorEventsQueryLimitDefault = 20;
 
-export const ListMyVendorEventsQueryParams = zod.object({
-  page: zod.coerce
-    .number()
-    .default(listMyVendorEventsQueryPageDefault)
-    .describe(
-      "When provided, returns a paginated response object instead of a plain array",
-    ),
-  limit: zod.coerce.number().default(listMyVendorEventsQueryLimitDefault),
-});
+export const ListMyVendorEventsQueryParams = zod
+  .object({
+    page: zod.coerce
+      .number()
+      .default(listMyVendorEventsQueryPageDefault)
+      .describe(
+        "When provided, returns a paginated response object instead of a plain array",
+      ),
+    limit: zod.coerce.number().default(listMyVendorEventsQueryLimitDefault),
+  })
+  .strict();
+
+export const listMyVendorEventsResponseDataItemFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
 
 export const ListMyVendorEventsResponse = zod.object({
   data: zod.array(
@@ -1479,6 +1940,9 @@ export const ListMyVendorEventsResponse = zod.object({
             ),
             beforeTime: zod
               .string()
+              .regex(
+                listMyVendorEventsResponseDataItemFreeEntryRulesOneBeforeTimeRegExp,
+              )
               .optional()
               .describe(
                 "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
@@ -1499,29 +1963,31 @@ export const ListMyVendorEventsResponse = zod.object({
 /**
  * @summary Create a booking
  */
-export const CreateBookingBody = zod.object({
-  eventId: zod.number(),
-  bookingDate: zod.string(),
-  guests: zod.number(),
-  notes: zod.string().optional(),
-  phone: zod.string().optional(),
-  paymentMethod: zod
-    .enum(["cod", "online"])
-    .optional()
-    .describe(
-      "cod = pay at venue (skip PhonePe even when configured); online = redirect to PhonePe",
-    ),
-  couponCode: zod.string().optional(),
-  pointsToUse: zod.number().optional(),
-  budgetRange: zod.string().optional(),
-  eventType: zod.string().optional(),
-  personName: zod.string().optional(),
-  pubMode: zod.string().optional(),
-  ticketWomen: zod.number().optional(),
-  ticketMen: zod.number().optional(),
-  ticketCouple: zod.number().optional(),
-  selectedPubEvent: zod.string().optional(),
-});
+export const CreateBookingBody = zod
+  .object({
+    eventId: zod.number(),
+    bookingDate: zod.string(),
+    guests: zod.number(),
+    notes: zod.string().optional(),
+    phone: zod.string().optional(),
+    paymentMethod: zod
+      .enum(["cod", "online"])
+      .optional()
+      .describe(
+        "cod = pay at venue (skip PhonePe even when configured); online = redirect to PhonePe",
+      ),
+    couponCode: zod.string().optional(),
+    pointsToUse: zod.number().optional(),
+    budgetRange: zod.string().optional(),
+    eventType: zod.string().optional(),
+    personName: zod.string().optional(),
+    pubMode: zod.string().optional(),
+    ticketWomen: zod.number().optional(),
+    ticketMen: zod.number().optional(),
+    ticketCouple: zod.number().optional(),
+    selectedPubEvent: zod.string().optional(),
+  })
+  .strict();
 
 export const CreateBookingResponse = zod.object({
   id: zod.number(),
@@ -1665,14 +2131,16 @@ export const ListMyBookingsResponse = zod.array(ListMyBookingsResponseItem);
 export const listVendorBookingsQueryPageDefault = 1;
 export const listVendorBookingsQueryLimitDefault = 20;
 
-export const ListVendorBookingsQueryParams = zod.object({
-  page: zod.coerce.number().default(listVendorBookingsQueryPageDefault),
-  limit: zod.coerce.number().default(listVendorBookingsQueryLimitDefault),
-  from: zod
-    .date()
-    .optional()
-    .describe("Filter bookings on or after this date (YYYY-MM-DD)"),
-});
+export const ListVendorBookingsQueryParams = zod
+  .object({
+    page: zod.coerce.number().default(listVendorBookingsQueryPageDefault),
+    limit: zod.coerce.number().default(listVendorBookingsQueryLimitDefault),
+    from: zod
+      .date()
+      .optional()
+      .describe("Filter bookings on or after this date (YYYY-MM-DD)"),
+  })
+  .strict();
 
 export const ListVendorBookingsResponse = zod.object({
   data: zod.array(
@@ -1754,9 +2222,11 @@ export const ListVendorBookingsResponse = zod.object({
 /**
  * @summary Get the vendor-specific ticket code for a booking
  */
-export const GetBookingTicketCodeParams = zod.object({
-  bookingId: zod.coerce.number(),
-});
+export const GetBookingTicketCodeParams = zod
+  .object({
+    bookingId: zod.coerce.number(),
+  })
+  .strict();
 
 export const GetBookingTicketCodeResponse = zod.object({
   ticketCode: zod.string(),
@@ -1765,14 +2235,18 @@ export const GetBookingTicketCodeResponse = zod.object({
 /**
  * @summary Update a booking status (vendor)
  */
-export const UpdateBookingStatusParams = zod.object({
-  bookingId: zod.coerce.number(),
-});
+export const UpdateBookingStatusParams = zod
+  .object({
+    bookingId: zod.coerce.number(),
+  })
+  .strict();
 
-export const UpdateBookingStatusBody = zod.object({
-  status: zod.enum(["pending", "confirmed", "cancelled", "completed"]),
-  rejectionReason: zod.string().nullish(),
-});
+export const UpdateBookingStatusBody = zod
+  .object({
+    status: zod.enum(["pending", "confirmed", "cancelled", "completed"]),
+    rejectionReason: zod.string().nullish(),
+  })
+  .strict();
 
 export const UpdateBookingStatusResponse = zod.object({
   id: zod.number(),
@@ -1858,9 +2332,11 @@ export const ListNotificationsResponse = zod.array(
 /**
  * @summary Mark a notification as read
  */
-export const MarkNotificationReadParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const MarkNotificationReadParams = zod
+  .object({
+    id: zod.coerce.number(),
+  })
+  .strict();
 
 export const MarkNotificationReadResponse = zod.object({
   id: zod.number(),
@@ -1878,16 +2354,18 @@ export const createReviewBodyRatingMax = 5;
 
 export const createReviewBodyImageUrlsMax = 5;
 
-export const CreateReviewBody = zod.object({
-  eventId: zod.number().optional(),
-  vendorId: zod.number(),
-  rating: zod.number().min(1).max(createReviewBodyRatingMax),
-  comment: zod.string(),
-  imageUrls: zod
-    .array(zod.string())
-    .max(createReviewBodyImageUrlsMax)
-    .optional(),
-});
+export const CreateReviewBody = zod
+  .object({
+    eventId: zod.number().optional(),
+    vendorId: zod.number(),
+    rating: zod.number().min(1).max(createReviewBodyRatingMax),
+    comment: zod.string(),
+    imageUrls: zod
+      .array(zod.string())
+      .max(createReviewBodyImageUrlsMax)
+      .optional(),
+  })
+  .strict();
 
 export const CreateReviewResponse = zod.object({
   id: zod.number(),
@@ -1904,23 +2382,27 @@ export const CreateReviewResponse = zod.object({
 /**
  * @summary Reviews for an event
  */
-export const ListEventReviewsParams = zod.object({
-  eventId: zod.coerce.number(),
-});
+export const ListEventReviewsParams = zod
+  .object({
+    eventId: zod.coerce.number(),
+  })
+  .strict();
 
 export const listEventReviewsQueryPageDefault = 1;
 
 export const listEventReviewsQueryPageSizeDefault = 5;
 export const listEventReviewsQueryPageSizeMax = 50;
 
-export const ListEventReviewsQueryParams = zod.object({
-  page: zod.coerce.number().min(1).default(listEventReviewsQueryPageDefault),
-  pageSize: zod.coerce
-    .number()
-    .min(1)
-    .max(listEventReviewsQueryPageSizeMax)
-    .default(listEventReviewsQueryPageSizeDefault),
-});
+export const ListEventReviewsQueryParams = zod
+  .object({
+    page: zod.coerce.number().min(1).default(listEventReviewsQueryPageDefault),
+    pageSize: zod.coerce
+      .number()
+      .min(1)
+      .max(listEventReviewsQueryPageSizeMax)
+      .default(listEventReviewsQueryPageSizeDefault),
+  })
+  .strict();
 
 export const ListEventReviewsResponse = zod.object({
   items: zod.array(
@@ -1944,23 +2426,27 @@ export const ListEventReviewsResponse = zod.object({
 /**
  * @summary Reviews for a vendor
  */
-export const ListVendorReviewsParams = zod.object({
-  vendorId: zod.coerce.number(),
-});
+export const ListVendorReviewsParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
 
 export const listVendorReviewsQueryPageDefault = 1;
 
 export const listVendorReviewsQueryPageSizeDefault = 5;
 export const listVendorReviewsQueryPageSizeMax = 50;
 
-export const ListVendorReviewsQueryParams = zod.object({
-  page: zod.coerce.number().min(1).default(listVendorReviewsQueryPageDefault),
-  pageSize: zod.coerce
-    .number()
-    .min(1)
-    .max(listVendorReviewsQueryPageSizeMax)
-    .default(listVendorReviewsQueryPageSizeDefault),
-});
+export const ListVendorReviewsQueryParams = zod
+  .object({
+    page: zod.coerce.number().min(1).default(listVendorReviewsQueryPageDefault),
+    pageSize: zod.coerce
+      .number()
+      .min(1)
+      .max(listVendorReviewsQueryPageSizeMax)
+      .default(listVendorReviewsQueryPageSizeDefault),
+  })
+  .strict();
 
 export const ListVendorReviewsResponse = zod.object({
   items: zod.array(
@@ -1984,9 +2470,11 @@ export const ListVendorReviewsResponse = zod.object({
 /**
  * @summary Availability calendar for a vendor
  */
-export const ListVendorAvailabilityParams = zod.object({
-  vendorId: zod.coerce.number(),
-});
+export const ListVendorAvailabilityParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
 
 export const ListVendorAvailabilityResponseItem = zod.object({
   id: zod.number(),
@@ -2001,10 +2489,12 @@ export const ListVendorAvailabilityResponse = zod.array(
 /**
  * @summary Set availability for the current vendor
  */
-export const SetAvailabilityBody = zod.object({
-  date: zod.string(),
-  status: zod.enum(["available", "booked", "blocked"]),
-});
+export const SetAvailabilityBody = zod
+  .object({
+    date: zod.string(),
+    status: zod.enum(["available", "booked", "blocked"]),
+  })
+  .strict();
 
 export const SetAvailabilityResponse = zod.object({
   id: zod.number(),
@@ -2016,9 +2506,11 @@ export const SetAvailabilityResponse = zod.object({
 /**
  * @summary Remove an availability entry
  */
-export const DeleteAvailabilityParams = zod.object({
-  availabilityId: zod.coerce.number(),
-});
+export const DeleteAvailabilityParams = zod
+  .object({
+    availabilityId: zod.coerce.number(),
+  })
+  .strict();
 
 export const DeleteAvailabilityResponse = zod.object({
   ok: zod.boolean(),
@@ -2046,11 +2538,13 @@ export const GetPartnerCommissionResponse = zod
 /**
  * @summary Revenue and commission analytics for the authenticated partner vendor
  */
-export const GetPartnerAnalyticsQueryParams = zod.object({
-  preset: zod.enum(["today", "7d", "30d", "3m", "6m"]).optional(),
-  from: zod.coerce.string().optional(),
-  to: zod.coerce.string().optional(),
-});
+export const GetPartnerAnalyticsQueryParams = zod
+  .object({
+    preset: zod.enum(["today", "7d", "30d", "3m", "6m"]).optional(),
+    from: zod.coerce.string().optional(),
+    to: zod.coerce.string().optional(),
+  })
+  .strict();
 
 export const GetPartnerAnalyticsResponse = zod.object({
   totalEarnings: zod.number(),
@@ -2143,20 +2637,23 @@ export const GetPartnerAnalyticsResponse = zod.object({
 /**
  * @summary Scan and check in a ticket by booking reference code (partner)
  */
-export const PartnerScanTicketBody = zod.object({
-  code: zod.string(),
-  actualEntry: zod
-    .object({
-      women: zod.number().optional(),
-      men: zod.number().optional(),
-      couple: zod.number().optional(),
-      guests: zod.number().optional(),
-    })
-    .optional()
-    .describe(
-      "Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_\* columns and returns the recomputed actualAmountDue.",
-    ),
-});
+export const PartnerScanTicketBody = zod
+  .object({
+    code: zod.string(),
+    actualEntry: zod
+      .object({
+        women: zod.number().optional(),
+        men: zod.number().optional(),
+        couple: zod.number().optional(),
+        guests: zod.number().optional(),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_\* columns and returns the recomputed actualAmountDue.",
+      ),
+  })
+  .strict();
 
 export const PartnerScanTicketResponse = zod.object({
   code: zod.enum(["OK", "ALREADY_CHECKED_IN", "NOT_FOUND", "INVALID_STATUS"]),
@@ -2237,12 +2734,14 @@ export const PartnerScanTicketResponse = zod.object({
 /**
  * @summary Attendance / check-in report for the authenticated vendor
  */
-export const GetPartnerCheckinReportQueryParams = zod.object({
-  page: zod.coerce.number().optional(),
-  date: zod.coerce.string().optional(),
-  eventId: zod.coerce.number().optional(),
-  status: zod.enum(["all", "checkedIn", "notArrived"]).optional(),
-});
+export const GetPartnerCheckinReportQueryParams = zod
+  .object({
+    page: zod.coerce.number().optional(),
+    date: zod.coerce.string().optional(),
+    eventId: zod.coerce.number().optional(),
+    status: zod.enum(["all", "checkedIn", "notArrived"]).optional(),
+  })
+  .strict();
 
 export const GetPartnerCheckinReportResponse = zod.object({
   rows: zod.array(
@@ -2288,9 +2787,11 @@ export const GetPartnerCheckinReportResponse = zod.object({
 /**
  * @summary Set the current crowd level for the authenticated partner venue
  */
-export const SetPartnerCrowdLevelBody = zod.object({
-  crowdLevel: zod.enum(["low", "moderate", "party"]).nullable(),
-});
+export const SetPartnerCrowdLevelBody = zod
+  .object({
+    crowdLevel: zod.enum(["low", "moderate", "party"]).nullable(),
+  })
+  .strict();
 
 export const SetPartnerCrowdLevelResponse = zod.object({
   crowdLevel: zod.enum(["low", "moderate", "party"]).nullable(),
@@ -2336,14 +2837,16 @@ export const savePartnerBankingDetailsBodyIfscCodeRegExp = new RegExp(
   "^[A-Z0-9]{11}$",
 );
 
-export const SavePartnerBankingDetailsBody = zod.object({
-  accountHolderName: zod.string().min(1),
-  bankName: zod.string().min(1),
-  accountNumber: zod
-    .string()
-    .min(savePartnerBankingDetailsBodyAccountNumberMin),
-  ifscCode: zod.string().regex(savePartnerBankingDetailsBodyIfscCodeRegExp),
-});
+export const SavePartnerBankingDetailsBody = zod
+  .object({
+    accountHolderName: zod.string().min(1),
+    bankName: zod.string().min(1),
+    accountNumber: zod
+      .string()
+      .min(savePartnerBankingDetailsBodyAccountNumberMin),
+    ifscCode: zod.string().regex(savePartnerBankingDetailsBodyIfscCodeRegExp),
+  })
+  .strict();
 
 export const SavePartnerBankingDetailsResponse = zod.object({
   id: zod.number(),
@@ -2376,9 +2879,11 @@ export const ListPartnerSettlementRequestsResponse = zod.array(
  */
 export const createPartnerSettlementRequestBodyAmountMin = 0.01;
 
-export const CreatePartnerSettlementRequestBody = zod.object({
-  amount: zod.number().min(createPartnerSettlementRequestBodyAmountMin),
-});
+export const CreatePartnerSettlementRequestBody = zod
+  .object({
+    amount: zod.number().min(createPartnerSettlementRequestBodyAmountMin),
+  })
+  .strict();
 
 export const CreatePartnerSettlementRequestResponse = zod.object({
   id: zod.number(),
@@ -2415,22 +2920,26 @@ export const GetAdminEventsResponse = zod.array(GetAdminEventsResponseItem);
 /**
  * @summary Toggle popular/featured/approvalStatus on an event (admin)
  */
-export const PatchAdminEventParams = zod.object({
-  eventId: zod.coerce.number(),
-});
+export const PatchAdminEventParams = zod
+  .object({
+    eventId: zod.coerce.number(),
+  })
+  .strict();
 
 export const patchAdminEventBodyRejectionReasonMax = 2000;
 
-export const PatchAdminEventBody = zod.object({
-  popular: zod.boolean().optional(),
-  featured: zod.boolean().optional(),
-  approvalStatus: zod.enum(["pending", "approved", "rejected"]).optional(),
-  rejectionReason: zod
-    .string()
-    .max(patchAdminEventBodyRejectionReasonMax)
-    .nullish(),
-  retainForever: zod.boolean().optional(),
-});
+export const PatchAdminEventBody = zod
+  .object({
+    popular: zod.boolean().optional(),
+    featured: zod.boolean().optional(),
+    approvalStatus: zod.enum(["pending", "approved", "rejected"]).optional(),
+    rejectionReason: zod
+      .string()
+      .max(patchAdminEventBodyRejectionReasonMax)
+      .nullish(),
+    retainForever: zod.boolean().optional(),
+  })
+  .strict();
 
 export const PatchAdminEventResponse = zod.object({
   ok: zod.boolean(),
@@ -2439,9 +2948,11 @@ export const PatchAdminEventResponse = zod.object({
 /**
  * @summary Delete an event (admin)
  */
-export const DeleteAdminEventParams = zod.object({
-  eventId: zod.coerce.number(),
-});
+export const DeleteAdminEventParams = zod
+  .object({
+    eventId: zod.coerce.number(),
+  })
+  .strict();
 
 export const DeleteAdminEventResponse = zod.object({
   ok: zod.boolean(),
@@ -2450,15 +2961,17 @@ export const DeleteAdminEventResponse = zod.object({
 /**
  * @summary Resolve a Google place for preview without creating any record (admin)
  */
-export const PreviewGooglePubBody = zod.object({
-  googleUrl: zod
-    .string()
-    .describe("Google Maps or Google Business Profile URL for the pub"),
-  partnerEmail: zod
-    .string()
-    .email()
-    .describe("Email of the approved partner to validate"),
-});
+export const PreviewGooglePubBody = zod
+  .object({
+    googleUrl: zod
+      .string()
+      .describe("Google Maps or Google Business Profile URL for the pub"),
+    partnerEmail: zod
+      .string()
+      .email()
+      .describe("Email of the approved partner to validate"),
+  })
+  .strict();
 
 export const PreviewGooglePubResponse = zod.object({
   vendor: zod.object({
@@ -2503,30 +3016,32 @@ export const PreviewGooglePubResponse = zod.object({
 export const importGooglePubBodyPubModeDefault = `entry`;
 export const importGooglePubBodyCategoryDefault = `bar`;
 
-export const ImportGooglePubBody = zod.object({
-  googleUrl: zod
-    .string()
-    .optional()
-    .describe("Google Maps or Google Business Profile URL for the pub"),
-  placeId: zod
-    .string()
-    .optional()
-    .describe(
-      "Google Place ID from a prior preview call — skips text search if provided",
-    ),
-  partnerEmail: zod
-    .string()
-    .email()
-    .describe("Email of the approved partner who owns this pub"),
-  pubMode: zod
-    .string()
-    .default(importGooglePubBodyPubModeDefault)
-    .describe("Pub mode (entry, bottle, table)"),
-  category: zod
-    .string()
-    .default(importGooglePubBodyCategoryDefault)
-    .describe("Event category (bar, club, lounge, etc.)"),
-});
+export const ImportGooglePubBody = zod
+  .object({
+    googleUrl: zod
+      .string()
+      .optional()
+      .describe("Google Maps or Google Business Profile URL for the pub"),
+    placeId: zod
+      .string()
+      .optional()
+      .describe(
+        "Google Place ID from a prior preview call — skips text search if provided",
+      ),
+    partnerEmail: zod
+      .string()
+      .email()
+      .describe("Email of the approved partner who owns this pub"),
+    pubMode: zod
+      .string()
+      .default(importGooglePubBodyPubModeDefault)
+      .describe("Pub mode (entry, bottle, table)"),
+    category: zod
+      .string()
+      .default(importGooglePubBodyCategoryDefault)
+      .describe("Event category (bar, club, lounge, etc.)"),
+  })
+  .strict();
 
 export const ImportGooglePubResponse = zod.object({
   ok: zod.boolean(),
@@ -2571,19 +3086,21 @@ export const ImportGooglePubResponse = zod.object({
 /**
  * @summary Paginated, filterable booking report (admin)
  */
-export const GetAdminBookingsReportQueryParams = zod.object({
-  page: zod.coerce.number().optional(),
-  vendorId: zod.coerce.number().optional(),
-  userId: zod.coerce.number().optional(),
-  status: zod.coerce.string().optional(),
-  startDate: zod.coerce.string().optional(),
-  endDate: zod.coerce.string().optional(),
-  pubMode: zod.coerce.string().optional(),
-  search: zod.coerce.string().optional(),
-  sortBy: zod.coerce.string().optional(),
-  bookingType: zod.coerce.string().optional(),
-  checkedIn: zod.coerce.string().optional(),
-});
+export const GetAdminBookingsReportQueryParams = zod
+  .object({
+    page: zod.coerce.number().optional(),
+    vendorId: zod.coerce.number().optional(),
+    userId: zod.coerce.number().optional(),
+    status: zod.coerce.string().optional(),
+    startDate: zod.coerce.string().optional(),
+    endDate: zod.coerce.string().optional(),
+    pubMode: zod.coerce.string().optional(),
+    search: zod.coerce.string().optional(),
+    sortBy: zod.coerce.string().optional(),
+    bookingType: zod.coerce.string().optional(),
+    checkedIn: zod.coerce.string().optional(),
+  })
+  .strict();
 
 export const GetAdminBookingsReportResponse = zod.object({
   bookings: zod.array(
@@ -2622,13 +3139,15 @@ export const GetAdminBookingsReportResponse = zod.object({
 /**
  * @summary Attendance / check-in report (admin)
  */
-export const GetAdminCheckinReportQueryParams = zod.object({
-  page: zod.coerce.number().optional(),
-  vendorId: zod.coerce.number().optional(),
-  date: zod.coerce.string().optional(),
-  eventId: zod.coerce.number().optional(),
-  status: zod.enum(["all", "checkedIn", "notArrived"]).optional(),
-});
+export const GetAdminCheckinReportQueryParams = zod
+  .object({
+    page: zod.coerce.number().optional(),
+    vendorId: zod.coerce.number().optional(),
+    date: zod.coerce.string().optional(),
+    eventId: zod.coerce.number().optional(),
+    status: zod.enum(["all", "checkedIn", "notArrived"]).optional(),
+  })
+  .strict();
 
 export const GetAdminCheckinReportResponse = zod.object({
   rows: zod.array(
@@ -2691,14 +3210,16 @@ export const GetAdminBookingsPartnerSummaryResponse = zod.array(
 /**
  * @summary Paginated CRM leads (profile views) with conversion flag (admin)
  */
-export const GetAdminLeadsQueryParams = zod.object({
-  page: zod.coerce.number().optional(),
-  vendorId: zod.coerce.number().optional(),
-  startDate: zod.coerce.string().optional(),
-  endDate: zod.coerce.string().optional(),
-  knownOnly: zod.coerce.string().optional(),
-  anonymousOnly: zod.coerce.string().optional(),
-});
+export const GetAdminLeadsQueryParams = zod
+  .object({
+    page: zod.coerce.number().optional(),
+    vendorId: zod.coerce.number().optional(),
+    startDate: zod.coerce.string().optional(),
+    endDate: zod.coerce.string().optional(),
+    knownOnly: zod.coerce.string().optional(),
+    anonymousOnly: zod.coerce.string().optional(),
+  })
+  .strict();
 
 export const GetAdminLeadsResponse = zod.object({
   leads: zod.array(
@@ -2722,10 +3243,12 @@ export const GetAdminLeadsResponse = zod.object({
 /**
  * @summary CRM leads summary with platform totals and per-vendor breakdown (admin)
  */
-export const GetAdminLeadsSummaryQueryParams = zod.object({
-  startDate: zod.coerce.string().optional(),
-  endDate: zod.coerce.string().optional(),
-});
+export const GetAdminLeadsSummaryQueryParams = zod
+  .object({
+    startDate: zod.coerce.string().optional(),
+    endDate: zod.coerce.string().optional(),
+  })
+  .strict();
 
 export const GetAdminLeadsSummaryResponse = zod.object({
   totalViews: zod.number(),
@@ -2751,9 +3274,11 @@ export const GetAdminLeadsSummaryResponse = zod.object({
 /**
  * @summary Get commission rates for a vendor
  */
-export const GetVendorCommissionParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const GetVendorCommissionParams = zod
+  .object({
+    id: zod.coerce.number(),
+  })
+  .strict();
 
 export const GetVendorCommissionResponse = zod.object({
   id: zod.number().optional(),
@@ -2773,9 +3298,11 @@ export const GetVendorCommissionResponse = zod.object({
 /**
  * @summary Set (upsert) commission rates for a vendor
  */
-export const SetVendorCommissionParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const SetVendorCommissionParams = zod
+  .object({
+    id: zod.coerce.number(),
+  })
+  .strict();
 
 export const setVendorCommissionBodyFreeEntryRateMin = 0;
 export const setVendorCommissionBodyFreeEntryRateMax = 99999.99;
@@ -2786,23 +3313,25 @@ export const setVendorCommissionBodyTicketRateMax = 99999.99;
 export const setVendorCommissionBodyTableBookingRateMin = 0;
 export const setVendorCommissionBodyTableBookingRateMax = 99999.99;
 
-export const SetVendorCommissionBody = zod.object({
-  freeEntryRate: zod
-    .number()
-    .min(setVendorCommissionBodyFreeEntryRateMin)
-    .max(setVendorCommissionBodyFreeEntryRateMax)
-    .describe("Flat fee in INR per person"),
-  ticketRate: zod
-    .number()
-    .min(setVendorCommissionBodyTicketRateMin)
-    .max(setVendorCommissionBodyTicketRateMax)
-    .describe("Flat fee in INR per ticket"),
-  tableBookingRate: zod
-    .number()
-    .min(setVendorCommissionBodyTableBookingRateMin)
-    .max(setVendorCommissionBodyTableBookingRateMax)
-    .describe("Flat fee in INR per table booking"),
-});
+export const SetVendorCommissionBody = zod
+  .object({
+    freeEntryRate: zod
+      .number()
+      .min(setVendorCommissionBodyFreeEntryRateMin)
+      .max(setVendorCommissionBodyFreeEntryRateMax)
+      .describe("Flat fee in INR per person"),
+    ticketRate: zod
+      .number()
+      .min(setVendorCommissionBodyTicketRateMin)
+      .max(setVendorCommissionBodyTicketRateMax)
+      .describe("Flat fee in INR per ticket"),
+    tableBookingRate: zod
+      .number()
+      .min(setVendorCommissionBodyTableBookingRateMin)
+      .max(setVendorCommissionBodyTableBookingRateMax)
+      .describe("Flat fee in INR per table booking"),
+  })
+  .strict();
 
 export const SetVendorCommissionResponse = zod.object({
   id: zod.number().optional(),
@@ -2822,10 +3351,12 @@ export const SetVendorCommissionResponse = zod.object({
 /**
  * @summary Platform commission report
  */
-export const GetCommissionReportQueryParams = zod.object({
-  from: zod.coerce.string().optional(),
-  to: zod.coerce.string().optional(),
-});
+export const GetCommissionReportQueryParams = zod
+  .object({
+    from: zod.coerce.string().optional(),
+    to: zod.coerce.string().optional(),
+  })
+  .strict();
 
 export const GetCommissionReportResponse = zod.object({
   rows: zod.array(
@@ -2896,12 +3427,14 @@ export const GetCommissionReportResponse = zod.object({
 /**
  * @summary Platform analytics
  */
-export const GetAdminAnalyticsQueryParams = zod.object({
-  startDate: zod.coerce.string().optional(),
-  endDate: zod.coerce.string().optional(),
-  page: zod.coerce.number().optional(),
-  limit: zod.coerce.number().optional(),
-});
+export const GetAdminAnalyticsQueryParams = zod
+  .object({
+    startDate: zod.coerce.string().optional(),
+    endDate: zod.coerce.string().optional(),
+    page: zod.coerce.number().optional(),
+    limit: zod.coerce.number().optional(),
+  })
+  .strict();
 
 export const GetAdminAnalyticsResponse = zod.object({
   totalUsers: zod.number(),
@@ -3077,9 +3610,11 @@ export const GetAdminAnalyticsResponse = zod.object({
 /**
  * @summary List all settlement requests (admin)
  */
-export const ListAdminSettlementRequestsQueryParams = zod.object({
-  status: zod.enum(["pending", "approved", "rejected"]).optional(),
-});
+export const ListAdminSettlementRequestsQueryParams = zod
+  .object({
+    status: zod.enum(["pending", "approved", "rejected"]).optional(),
+  })
+  .strict();
 
 export const ListAdminSettlementRequestsResponseItem = zod.object({
   id: zod.number(),
@@ -3110,9 +3645,11 @@ export const ListAdminSettlementRequestsResponse = zod.array(
 /**
  * @summary Approve a settlement request (admin)
  */
-export const ApproveSettlementRequestParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const ApproveSettlementRequestParams = zod
+  .object({
+    id: zod.coerce.number(),
+  })
+  .strict();
 
 export const ApproveSettlementRequestResponse = zod.object({
   id: zod.number(),
@@ -3127,15 +3664,19 @@ export const ApproveSettlementRequestResponse = zod.object({
 /**
  * @summary Reject a settlement request with optional note (admin)
  */
-export const RejectSettlementRequestParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const RejectSettlementRequestParams = zod
+  .object({
+    id: zod.coerce.number(),
+  })
+  .strict();
 
 export const rejectSettlementRequestBodyNoteMax = 2000;
 
-export const RejectSettlementRequestBody = zod.object({
-  note: zod.string().max(rejectSettlementRequestBodyNoteMax).optional(),
-});
+export const RejectSettlementRequestBody = zod
+  .object({
+    note: zod.string().max(rejectSettlementRequestBodyNoteMax).optional(),
+  })
+  .strict();
 
 export const RejectSettlementRequestResponse = zod.object({
   id: zod.number(),
@@ -3150,9 +3691,11 @@ export const RejectSettlementRequestResponse = zod.object({
 /**
  * @summary Admin update a vendor profile
  */
-export const AdminUpdateVendorParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const AdminUpdateVendorParams = zod
+  .object({
+    id: zod.coerce.number(),
+  })
+  .strict();
 
 export const adminUpdateVendorBodyBusinessNameMax = 255;
 
@@ -3187,6 +3730,7 @@ export const AdminUpdateVendorBody = zod
     state: zod.string().max(adminUpdateVendorBodyStateMax).optional(),
     country: zod.string().max(adminUpdateVendorBodyCountryMax).optional(),
   })
+  .strict()
   .describe("Admin-only fields updatable on a vendor profile.");
 
 export const AdminUpdateVendorResponse = zod.object({
@@ -3196,19 +3740,25 @@ export const AdminUpdateVendorResponse = zod.object({
 /**
  * @summary Issue a coupon to a user (admin)
  */
-export const AdminSendCouponParams = zod.object({
-  userId: zod.coerce.number(),
-});
+export const AdminSendCouponParams = zod
+  .object({
+    userId: zod.coerce.number(),
+  })
+  .strict();
 
 export const adminSendCouponBodyCodeMax = 50;
 
 export const adminSendCouponBodyDiscountMax = 100;
 
-export const AdminSendCouponBody = zod.object({
-  code: zod.string().min(1).max(adminSendCouponBodyCodeMax),
-  discount: zod.number().min(1).max(adminSendCouponBodyDiscountMax),
-  type: zod.enum(["general", "event", "loyalty", "referral", "vip"]).optional(),
-});
+export const AdminSendCouponBody = zod
+  .object({
+    code: zod.string().min(1).max(adminSendCouponBodyCodeMax),
+    discount: zod.number().min(1).max(adminSendCouponBodyDiscountMax),
+    type: zod
+      .enum(["general", "event", "loyalty", "referral", "vip"])
+      .optional(),
+  })
+  .strict();
 
 export const AdminSendCouponResponse = zod.object({
   ok: zod.boolean(),
@@ -3217,16 +3767,20 @@ export const AdminSendCouponResponse = zod.object({
 /**
  * @summary Retry the payment flow for a booking still in payment_pending
  */
-export const RetryBookingPaymentParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const RetryBookingPaymentParams = zod
+  .object({
+    id: zod.coerce.number(),
+  })
+  .strict();
 
-export const RetryBookingPaymentBody = zod.object({
-  callbackScheme: zod
-    .enum(["royvento"])
-    .optional()
-    .describe("Custom URL scheme for mobile deep-link callbacks."),
-});
+export const RetryBookingPaymentBody = zod
+  .object({
+    callbackScheme: zod
+      .enum(["royvento"])
+      .optional()
+      .describe("Custom URL scheme for mobile deep-link callbacks."),
+  })
+  .strict();
 
 export const RetryBookingPaymentResponse = zod.object({
   ok: zod.boolean(),
@@ -3235,6 +3789,9 @@ export const RetryBookingPaymentResponse = zod.object({
 /**
  * @summary Get the current user's wishlist
  */
+export const getWishlistResponseOneFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
+
 export const GetWishlistResponseItem = zod
   .object({
     id: zod.number(),
@@ -3280,6 +3837,7 @@ export const GetWishlistResponseItem = zod
           ),
           beforeTime: zod
             .string()
+            .regex(getWishlistResponseOneFreeEntryRulesOneBeforeTimeRegExp)
             .optional()
             .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
         }),
@@ -3299,9 +3857,11 @@ export const GetWishlistResponse = zod.array(GetWishlistResponseItem);
 /**
  * @summary Add an event to the wishlist
  */
-export const AddToWishlistBody = zod.object({
-  eventId: zod.number(),
-});
+export const AddToWishlistBody = zod
+  .object({
+    eventId: zod.number(),
+  })
+  .strict();
 
 export const AddToWishlistResponse = zod.object({
   ok: zod.boolean(),
@@ -3311,9 +3871,11 @@ export const AddToWishlistResponse = zod.object({
 /**
  * @summary Remove an event from the wishlist
  */
-export const RemoveFromWishlistParams = zod.object({
-  eventId: zod.coerce.number(),
-});
+export const RemoveFromWishlistParams = zod
+  .object({
+    eventId: zod.coerce.number(),
+  })
+  .strict();
 
 export const RemoveFromWishlistResponse = zod.object({
   ok: zod.boolean(),

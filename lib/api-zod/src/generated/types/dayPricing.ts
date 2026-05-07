@@ -8,5 +8,11 @@
 import type { DayPricingEntry } from "./dayPricingEntry";
 
 export interface DayPricing {
-  [key: string]: DayPricingEntry;
+  Mon?: DayPricingEntry | null;
+  Tue?: DayPricingEntry | null;
+  Wed?: DayPricingEntry | null;
+  Thu?: DayPricingEntry | null;
+  Fri?: DayPricingEntry | null;
+  Sat?: DayPricingEntry | null;
+  Sun?: DayPricingEntry | null;
 }

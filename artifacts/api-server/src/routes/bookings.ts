@@ -25,7 +25,7 @@ import { createUserNotification } from "../lib/notify";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
-import { UpdateBookingStatusBody, RetryBookingPaymentBody } from "@workspace/api-zod";
+import { UpdateBookingStatusBody, RetryBookingPaymentBody, RetryBookingPaymentParams } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
 import {
   sendBookingCreatedEmails,
@@ -630,9 +630,9 @@ router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const paramId = Array.isArray(req.params["id"]) ? req.params["id"][0] : (req.params["id"] ?? "");
-  const bookingId = parseInt(paramId, 10);
-  if (!bookingId || isNaN(bookingId)) { res.status(400).json({ error: "Invalid booking id" }); return; }
+  const paramsParsed = RetryBookingPaymentParams.safeParse(req.params);
+  if (!paramsParsed.success) { res.status(400).json({ error: "Invalid booking id" }); return; }
+  const bookingId = paramsParsed.data.id;
 
   const [booking] = await db
     .select()
