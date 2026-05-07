@@ -189,7 +189,7 @@ export default function HomeScreen() {
         onSelect={setSelectedCity}
       />
 
-      {/* Popular Pubs — first */}
+      {/* Popular Pubs */}
       {(popular.data?.length ?? 0) > 0 && (
         <Section title={t("home.popular_pubs")} onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
           <FlatList
@@ -329,6 +329,37 @@ export default function HomeScreen() {
         </Section>
       )}
 
+      {/* Featured Events */}
+      {(featured.data?.length ?? 0) > 0 && (
+        <Section title={t("home.featured_events")} onSeeAll={() => router.push("/(tabs)/explore")}>
+          <FlatList
+            horizontal
+            data={sortedFeatured}
+            keyExtractor={(item) => String(item.id)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            scrollEnabled={!!(featured.data?.length)}
+            renderItem={({ item }) => (
+              <EventCard
+                id={item.id}
+                vendorId={item.vendorId}
+                title={item.title}
+                imageUrl={item.imageUrl}
+                location={item.location}
+                price={item.price}
+                category={item.category}
+                type={item.type}
+                popular={(item as { popular?: boolean }).popular}
+                rating={item.rating}
+                reviewCount={item.reviewCount}
+                hasDrinkPlans={item.hasDrinkPlans}
+                freeEntryRules={item.freeEntryRules}
+              />
+            )}
+          />
+        </Section>
+      )}
+
       {/* Announcements */}
       {(announcements?.length ?? 0) > 0 && (
         <Section title={t("home.whats_on")} icon="megaphone-outline">
@@ -393,37 +424,6 @@ export default function HomeScreen() {
                   </View>
                 ) : null}
               </Pressable>
-            )}
-          />
-        </Section>
-      )}
-
-      {/* Featured Events — second */}
-      {(featured.data?.length ?? 0) > 0 && (
-        <Section title={t("home.featured_events")} onSeeAll={() => router.push("/(tabs)/explore")}>
-          <FlatList
-            horizontal
-            data={sortedFeatured}
-            keyExtractor={(item) => String(item.id)}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.row}
-            scrollEnabled={!!(featured.data?.length)}
-            renderItem={({ item }) => (
-              <EventCard
-                id={item.id}
-                vendorId={item.vendorId}
-                title={item.title}
-                imageUrl={item.imageUrl}
-                location={item.location}
-                price={item.price}
-                category={item.category}
-                type={item.type}
-                popular={(item as { popular?: boolean }).popular}
-                rating={item.rating}
-                reviewCount={item.reviewCount}
-                hasDrinkPlans={item.hasDrinkPlans}
-                freeEntryRules={item.freeEntryRules}
-              />
             )}
           />
         </Section>

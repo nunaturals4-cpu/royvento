@@ -220,6 +220,22 @@ export function Home() {
         </div>
       </section>
 
+      {/* Trending / Popular section */}
+      {popular.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-12">
+          <SectionHeader
+            icon={<Flame className="h-3.5 w-3.5" />}
+            eyebrow={t("home.trending_label")}
+            title={t("home.trending_title")}
+            seeAllHref="/explore"
+            seeAllLabel={t("home.view_all_events")}
+          />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {sortedPopular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} />)}
+          </div>
+        </section>
+      )}
+
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (
         <section className="py-16 md:py-24">
@@ -322,6 +338,20 @@ export function Home() {
         </section>
       )}
 
+      {/* Featured events */}
+      <section className="container mx-auto px-4 md:px-6 py-12">
+        <SectionHeader
+          icon={<Sparkles className="h-3.5 w-3.5" />}
+          eyebrow={t("home.featured_label")}
+          title={t("home.featured_title")}
+          seeAllHref="/explore"
+          seeAllLabel={t("home.view_all")}
+        />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {featured.map((e) => <EventCard key={e.id} event={e as any} />)}
+        </div>
+      </section>
+
       {/* What's On — Announcements */}
       {announcements.length > 0 && (
         <section className="relative py-16 md:py-20 overflow-hidden">
@@ -395,52 +425,7 @@ export function Home() {
         </section>
       )}
 
-      {/* Value props */}
-      <section className="container mx-auto px-4 md:px-6 py-20">
-        <div className="grid md:grid-cols-3 gap-5">
-          {features.map((f) => (
-            <div key={f.title} className="rounded-3xl glass-card p-7 lift-3d border border-white/6">
-              <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-5 red-ring">
-                <f.icon className="h-5 w-5" />
-              </div>
-              <h3 className="font-serif text-2xl tracking-tight mb-2">{f.title}</h3>
-              <p className="text-sm text-white/60 leading-relaxed">{f.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Trending / Popular section */}
-      {popular.length > 0 && (
-        <section className="container mx-auto px-4 md:px-6 py-12">
-          <SectionHeader
-            icon={<Flame className="h-3.5 w-3.5" />}
-            eyebrow={t("home.trending_label")}
-            title={t("home.trending_title")}
-            seeAllHref="/explore"
-            seeAllLabel={t("home.view_all_events")}
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {sortedPopular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} />)}
-          </div>
-        </section>
-      )}
-
-      {/* Featured events */}
-      <section className="container mx-auto px-4 md:px-6 py-12">
-        <SectionHeader
-          icon={<Sparkles className="h-3.5 w-3.5" />}
-          eyebrow={t("home.featured_label")}
-          title={t("home.featured_title")}
-          seeAllHref="/explore"
-          seeAllLabel={t("home.view_all")}
-        />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {featured.map((e) => <EventCard key={e.id} event={e as any} />)}
-        </div>
-      </section>
-
-      {/* Pubs */}
+      {/* Pubs — Top Pubs & Clubs */}
       {sortedPubs.length > 0 && (
         <section className="container mx-auto px-4 md:px-6 py-12">
           <SectionHeader
@@ -455,6 +440,21 @@ export function Home() {
           </div>
         </section>
       )}
+
+      {/* Value props */}
+      <section className="container mx-auto px-4 md:px-6 py-20">
+        <div className="grid md:grid-cols-3 gap-5">
+          {features.map((f) => (
+            <div key={f.title} className="rounded-3xl glass-card p-7 lift-3d border border-white/6">
+              <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-5 red-ring">
+                <f.icon className="h-5 w-5" />
+              </div>
+              <h3 className="font-serif text-2xl tracking-tight mb-2">{f.title}</h3>
+              <p className="text-sm text-white/60 leading-relaxed">{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* CTA — Premium */}
       <section className="container mx-auto px-4 md:px-6 py-24">

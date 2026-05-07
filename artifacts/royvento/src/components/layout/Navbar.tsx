@@ -60,8 +60,8 @@ export function Navbar() {
     queryKey: ["notifications"],
     queryFn: () => apiGet<Notification[]>("/api/notifications"),
     enabled: !!user,
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    staleTime: 10 * 60 * 60 * 1000,
+    refetchInterval: false,
   });
 
   const markReadMutation = useMutation({
