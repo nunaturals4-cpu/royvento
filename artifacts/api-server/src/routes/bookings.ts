@@ -256,6 +256,26 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     res.status(404).json({ error: "Event not found" });
     return;
   }
+  // Mode-aware required-field enforcement: pub events MUST send pubMode and
+  // contact details; pubMode/personName/phone/etc. cannot be silently
+  // defaulted away. Mirrors the client's per-field validation.
+  if (evt.type === "pub") {
+    const issues: { path: string; message: string }[] = [];
+    if (!parsed.data.pubMode) issues.push({ path: "pubMode", message: "Booking type is required" });
+    if (!parsed.data.personName.trim()) issues.push({ path: "personName", message: "Person name is required" });
+    if (!/^\d{10}$/.test(parsed.data.phone)) issues.push({ path: "phone", message: "Phone must be 10 digits" });
+    if (parsed.data.pubMode === "ticket" && parsed.data.ticketWomen + parsed.data.ticketMen + parsed.data.ticketCouple <= 0) {
+      issues.push({ path: "ticketWomen", message: "Select at least one ticket" });
+    }
+    if (parsed.data.pubMode === "event" && !parsed.data.arrivalTime.trim()) {
+      issues.push({ path: "arrivalTime", message: "Arrival time is required" });
+    }
+    if (issues.length > 0) {
+      const summary = issues.map((i) => `${i.path}: ${i.message}`).join("; ");
+      res.status(400).json({ error: summary, issues });
+      return;
+    }
+  }
   const rawDate = parsed.data.bookingDate as unknown;
   const dateStr =
     rawDate instanceof Date

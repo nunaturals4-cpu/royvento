@@ -1074,7 +1074,10 @@ export default function EventDetailScreen() {
                 {/* Ticket counters — ticket mode */}
                 {pubMode === "ticket" && (
                   <View style={[styles.pubTickets, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                    <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("events.ticket_counts")}</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("events.ticket_counts")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
+                    {fieldErrors.ticketWomen ? (
+                      <Text style={{ color: "#f87171", fontSize: 11, marginBottom: 6 }}>{fieldErrors.ticketWomen}</Text>
+                    ) : null}
                     {(isFreeEntryDay || isTierFreeMobile("women") || priceWomen > 0) && (
                       <TickerCounter label={t("events.women")} value={ticketWomen}
                         price={isFreeEntryDay || isTierFreeMobile("women") ? undefined : priceWomen}
@@ -1135,14 +1138,17 @@ export default function EventDetailScreen() {
                     <View style={styles.field}>
                       <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.arrival_time")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
                       <TextInput
-                        style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                        style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: fieldErrors.arrivalTime ? "#f87171" : colors.border, color: colors.foreground }]}
                         value={arrivalTime}
-                        onChangeText={setArrivalTime}
+                        onChangeText={(v) => { setArrivalTime(v); clearFieldError("arrivalTime"); }}
                         placeholder="HH:MM"
                         placeholderTextColor={colors.mutedForeground}
                         keyboardType="numbers-and-punctuation"
                         maxLength={5}
                       />
+                      {fieldErrors.arrivalTime ? (
+                        <Text style={{ color: "#f87171", fontSize: 11, marginTop: 4 }}>{fieldErrors.arrivalTime}</Text>
+                      ) : null}
                     </View>
                   </>
                 )}

@@ -1197,7 +1197,8 @@ export function EventDetail() {
 
                   {pubMode === "ticket" && (
                     <div className="space-y-2 rounded-xl border border-white/10 p-3">
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.ticket_counts")}</p>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.ticket_counts")} <span className="text-red-400 normal-case">*</span></p>
+                      {fieldErrors.ticketWomen && <p className="text-xs text-destructive">{fieldErrors.ticketWomen}</p>}
                       <TicketRow label={t("events.women")} price={isTierFree("women") ? 0 : effectiveWomen} value={ticketWomen} onChange={setTicketWomen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("women") && !isFreeEntryDay} />
                       <TicketRow label={t("events.men")} price={isTierFree("men") ? 0 : effectiveMen} value={ticketMen} onChange={setTicketMen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("men") && !isFreeEntryDay} />
                       <TicketRow label={t("events.couple")} price={isTierFree("couple") ? 0 : effectiveCouple} value={ticketCouple} onChange={setTicketCouple} hidePrice={isFreeEntryDay} freeBadge={isTierFree("couple") && !isFreeEntryDay} />
@@ -1231,10 +1232,12 @@ export function EventDetail() {
                           id="arrival-time"
                           type="time"
                           value={arrivalTime}
-                          onChange={(e) => setArrivalTime(e.target.value)}
+                          onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
                           required
-                          className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm mt-1 text-foreground [color-scheme:dark]"
+                          aria-invalid={!!fieldErrors.arrivalTime}
+                          className={`w-full rounded-md border px-3 py-2 text-sm mt-1 text-foreground bg-black/40 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
                         />
+                        {fieldErrors.arrivalTime && <p className="text-xs text-destructive mt-1">{fieldErrors.arrivalTime}</p>}
                       </div>
                     </>
                   )}
