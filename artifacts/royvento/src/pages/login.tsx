@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, MailWarning } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { getEmailError } from "@workspace/validators";
 
 export function Login() {
   const { t } = useTranslation();
@@ -17,6 +18,9 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
   const login = useLogin();
   const { toast } = useToast();
@@ -44,8 +48,15 @@ export function Login() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setUnverifiedEmail("");
+    const next: { email?: string; password?: string } = {};
+    const emailErr = getEmailError(email);
+    if (emailErr) next.email = emailErr;
+    if (!password) next.password = "Password is required.";
+    setErrors(next);
+    if (next.email) { emailRef.current?.focus(); return; }
+    if (next.password) { passwordRef.current?.focus(); return; }
     login.mutate(
-      { data: { email, password } },
+      { data: { email: email.trim(), password } },
       {
         onSuccess: (data) => {
           qc.invalidateQueries();
@@ -119,7 +130,8 @@ export function Login() {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
-            <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+            <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />
+            {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -128,12 +140,14 @@ export function Login() {
             </div>
             <div className="relative mt-1">
               <Input
+                ref={passwordRef}
                 id="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
+                aria-invalid={!!errors.password}
                 className="bg-black/40 border-white/10 pr-10"
               />
               <button
@@ -145,6 +159,7 @@ export function Login() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
           </div>
           <Button type="submit" className="w-full h-11 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0" disabled={login.isPending}>
             {login.isPending ? t("auth.signing_in") : t("auth.sign_in")}

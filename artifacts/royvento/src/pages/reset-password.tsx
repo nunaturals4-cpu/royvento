@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiPost } from "@/lib/api";
-import { Lock, CheckCircle2, ArrowLeft, Smartphone } from "lucide-react";
+import { Lock, CheckCircle2, ArrowLeft, Smartphone, Check, X } from "lucide-react";
+import { PASSWORD_RULES, getPasswordError } from "@workspace/validators";
 
 function getTokenFromSearch() {
   const params = new URLSearchParams(window.location.search);
@@ -22,10 +23,14 @@ export function ResetPassword() {
   const [token] = useState(getTokenFromSearch);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [appLinkAttempted, setAppLinkAttempted] = useState(false);
   const [launchingApp, setLaunchingApp] = useState(false);
+  const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!token || !isMobileBrowser()) return;
@@ -41,10 +46,13 @@ export function ResetPassword() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirm) {
-      toast({ title: "Passwords do not match", variant: "destructive" });
-      return;
-    }
+    const next: typeof errors = {};
+    const pwErr = getPasswordError(password);
+    if (pwErr) next.password = pwErr;
+    if (password !== confirm) next.confirm = "Passwords do not match.";
+    setErrors(next);
+    if (next.password) { setPasswordTouched(true); passwordRef.current?.focus(); return; }
+    if (next.confirm) { confirmRef.current?.focus(); return; }
     setLoading(true);
     try {
       await apiPost("/api/auth/reset-password", { token, newPassword: password });
@@ -124,26 +132,47 @@ export function ResetPassword() {
           <div>
             <Label htmlFor="newpw">New password</Label>
             <Input
+              ref={passwordRef}
               id="newpw"
               type="password"
+              autoComplete="new-password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
+              aria-invalid={!!errors.password}
               className="bg-black/40 border-white/10 mt-1"
             />
+            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+            {passwordTouched && password.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {PASSWORD_RULES.map((rule) => {
+                  const ok = rule.test(password);
+                  return (
+                    <li key={rule.id} className={`flex items-center gap-1.5 text-xs ${ok ? "text-green-400" : "text-muted-foreground"}`}>
+                      {ok ? <Check className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
+                      {rule.label}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
           <div>
             <Label htmlFor="confirmpw">Confirm new password</Label>
             <Input
+              ref={confirmRef}
               id="confirmpw"
               type="password"
+              autoComplete="new-password"
               required
-              minLength={6}
+              minLength={8}
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={(e) => { setConfirm(e.target.value); if (errors.confirm) setErrors((p) => ({ ...p, confirm: undefined })); }}
+              aria-invalid={!!errors.confirm}
               className="bg-black/40 border-white/10 mt-1"
             />
+            {errors.confirm && <p className="text-xs text-destructive mt-1">{errors.confirm}</p>}
           </div>
           <Button
             type="submit"

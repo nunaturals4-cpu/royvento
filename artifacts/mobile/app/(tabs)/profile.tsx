@@ -1,12 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch, useUpdateMe } from "@workspace/api-client-react";
+import { getIndianPhoneError, normalizeIndianPhone } from "@workspace/validators";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
+import { uploadImageToStorage } from "@/lib/uploadImage";
 import {
   ActivityIndicator,
   Alert,
@@ -29,27 +31,6 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { useLogout } from "@/hooks/useLogout";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
-
-async function uploadImageToStorage(localUri: string): Promise<string> {
-  const filename = localUri.split("/").pop() ?? "profile.jpg";
-  const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-  const mimeMap: Record<string, string> = {
-    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
-  };
-  const contentType = mimeMap[ext] ?? "image/jpeg";
-  const fileRes = await fetch(localUri);
-  const blob = await fileRes.blob();
-  const size = blob.size || 1;
-  const { uploadURL, objectPath } = await customFetch<{ uploadURL: string; objectPath: string }>(
-    "/api/storage/uploads/request-url",
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: filename, size, contentType }) },
-  );
-  const putRes = await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
-  if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
-  const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
-}
 
 interface ReferralData {
   code: string;
@@ -108,6 +89,10 @@ export default function ProfileScreen() {
   const [editAbout, setEditAbout] = useState(user?.about ?? "");
   const [editProfileImage, setEditProfileImage] = useState(user?.profileImage ?? "");
   const [imageUploading, setImageUploading] = useState(false);
+  const [editPhoneError, setEditPhoneError] = useState<string | undefined>(undefined);
+  const [editNameError, setEditNameError] = useState<string | undefined>(undefined);
+  const editNameRef = useRef<TextInput>(null);
+  const editPhoneRef = useRef<TextInput>(null);
 
   const updateMeMutation = useUpdateMe({
     mutation: {
@@ -237,8 +222,13 @@ export default function ProfileScreen() {
   };
 
   const handleSave = () => {
-    if (!editName.trim()) { Alert.alert(t("profile.name_required")); return; }
-    const phoneNormalized = editPhone.replace(/\D/g, "").slice(-10) || undefined;
+    const nameErr = !editName.trim() ? t("profile.name_required") : undefined;
+    const phoneErr = getIndianPhoneError(editPhone, { required: false }) ?? undefined;
+    setEditNameError(nameErr);
+    setEditPhoneError(phoneErr);
+    if (nameErr) { editNameRef.current?.focus(); return; }
+    if (phoneErr) { editPhoneRef.current?.focus(); return; }
+    const phoneNormalized = editPhone.trim() ? normalizeIndianPhone(editPhone) : undefined;
     updateMeMutation.mutate({
       data: {
         name: editName.trim(),
@@ -796,22 +786,34 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* Name & Phone fields */}
-              {[
-                { label: t("profile.name"), value: editName, set: setEditName, placeholder: t("profile.name_placeholder"), multiline: false },
-                { label: t("profile.phone"), value: editPhone, set: setEditPhone, placeholder: "+91 XXXXXXXXXX", multiline: false },
-              ].map((f) => (
-                <View key={f.label} style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
-                  <TextInput
-                    style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
-                    value={f.value}
-                    onChangeText={f.set}
-                    placeholder={f.placeholder}
-                    placeholderTextColor={colors.mutedForeground}
-                  />
-                </View>
-              ))}
+              {/* Name field */}
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("profile.name")}</Text>
+                <TextInput
+                  ref={editNameRef}
+                  style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: editNameError ? colors.destructive : colors.border, color: colors.foreground }]}
+                  value={editName}
+                  onChangeText={(v) => { setEditName(v); if (editNameError) setEditNameError(undefined); }}
+                  placeholder={t("profile.name_placeholder")}
+                  placeholderTextColor={colors.mutedForeground}
+                />
+                {editNameError ? <Text style={{ fontSize: 12, color: colors.destructive, fontFamily: "Inter_400Regular", marginTop: 4 }}>{editNameError}</Text> : null}
+              </View>
+
+              {/* Phone field */}
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("profile.phone")}</Text>
+                <TextInput
+                  ref={editPhoneRef}
+                  style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: editPhoneError ? colors.destructive : colors.border, color: colors.foreground }]}
+                  value={editPhone}
+                  onChangeText={(v) => { setEditPhone(v); if (editPhoneError) setEditPhoneError(undefined); }}
+                  placeholder="+91 XXXXXXXXXX"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="phone-pad"
+                />
+                {editPhoneError ? <Text style={{ fontSize: 12, color: colors.destructive, fontFamily: "Inter_400Regular", marginTop: 4 }}>{editPhoneError}</Text> : null}
+              </View>
 
               {/* About */}
               <View style={styles.field}>

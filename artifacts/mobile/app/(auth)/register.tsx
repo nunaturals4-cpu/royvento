@@ -3,7 +3,8 @@ import { useRegister } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { getEmailError, getPasswordError } from "@workspace/validators";
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +36,10 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
+  const nameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const registerMutation = useRegister({
     mutation: {
@@ -50,30 +55,16 @@ export default function RegisterScreen() {
   });
 
   const handleRegister = () => {
-    if (!name.trim() || !email.trim() || !password) {
-      Alert.alert(t("common.error"), t("auth.fill_all_fields"));
-      return;
-    }
-    if (password.length < 8) {
-      Alert.alert("Weak password", "Password must be at least 8 characters long.");
-      return;
-    }
-    if (!/[A-Z]/.test(password)) {
-      Alert.alert("Weak password", "Password must contain at least one uppercase letter.");
-      return;
-    }
-    if (!/[a-z]/.test(password)) {
-      Alert.alert("Weak password", "Password must contain at least one lowercase letter.");
-      return;
-    }
-    if (!/[0-9]/.test(password)) {
-      Alert.alert("Weak password", "Password must contain at least one number.");
-      return;
-    }
-    if (!/[^A-Za-z0-9]/.test(password)) {
-      Alert.alert("Weak password", "Password must contain at least one special character (e.g. !@#$%).");
-      return;
-    }
+    const next: typeof errors = {};
+    if (!name.trim()) next.name = "Name is required.";
+    const emailErr = getEmailError(email);
+    if (emailErr) next.email = emailErr;
+    const pwErr = getPasswordError(password);
+    if (pwErr) next.password = pwErr;
+    setErrors(next);
+    if (next.name) { nameRef.current?.focus(); return; }
+    if (next.email) { emailRef.current?.focus(); return; }
+    if (next.password) { passwordRef.current?.focus(); return; }
     registerMutation.mutate({
       data: {
         name: name.trim(),
@@ -199,9 +190,10 @@ export default function RegisterScreen() {
             <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               <Ionicons name="person-outline" size={16} color={colors.mutedForeground} />
               <TextInput
+                ref={nameRef}
                 style={[styles.input, { color: colors.foreground }]}
                 value={name}
-                onChangeText={setName}
+                onChangeText={(v) => { setName(v); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }}
                 placeholder={t("auth.name_placeholder")}
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="default"
@@ -209,6 +201,7 @@ export default function RegisterScreen() {
                 autoCorrect={false}
               />
             </View>
+            {errors.name ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.name}</Text> : null}
           </View>
 
           <View style={styles.field}>
@@ -216,9 +209,10 @@ export default function RegisterScreen() {
             <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
               <TextInput
+                ref={emailRef}
                 style={[styles.input, { color: colors.foreground }]}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => { setEmail(v); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }}
                 placeholder={t("auth.email_placeholder")}
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="email-address"
@@ -226,6 +220,7 @@ export default function RegisterScreen() {
                 autoCorrect={false}
               />
             </View>
+            {errors.email ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.email}</Text> : null}
           </View>
 
           <View style={styles.field}>
@@ -233,9 +228,10 @@ export default function RegisterScreen() {
             <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
               <TextInput
+                ref={passwordRef}
                 style={[styles.input, { color: colors.foreground }]}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => { setPassword(v); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
                 placeholder={t("auth.password_min")}
                 placeholderTextColor={colors.mutedForeground}
                 secureTextEntry={!showPassword}
@@ -251,6 +247,7 @@ export default function RegisterScreen() {
                 />
               </Pressable>
             </View>
+            {errors.password ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.password}</Text> : null}
           </View>
 
           <View style={styles.field}>
@@ -317,4 +314,5 @@ const styles = StyleSheet.create({
   footer: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
   footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   link: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  errorText: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
 });

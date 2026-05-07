@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,18 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Check, X } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { useTranslation } from "react-i18next";
-
-const PASSWORD_RULES = [
-  { id: "len", label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { id: "upper", label: "Uppercase letter (A–Z)", test: (p: string) => /[A-Z]/.test(p) },
-  { id: "lower", label: "Lowercase letter (a–z)", test: (p: string) => /[a-z]/.test(p) },
-  { id: "num", label: "Number (0–9)", test: (p: string) => /[0-9]/.test(p) },
-  { id: "special", label: "Special character (!@#$…)", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
-];
-
-function isStrongPassword(p: string) {
-  return PASSWORD_RULES.every((r) => r.test(p));
-}
+import {
+  PASSWORD_RULES,
+  isStrongPassword,
+  getEmailError,
+  getIndianPhoneError,
+  normalizeIndianPhone,
+} from "@workspace/validators";
 
 export function Register() {
   const { t } = useTranslation();
@@ -35,6 +30,11 @@ export function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string; password?: string }>({});
+  const nameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     apiGet<{ enabled: boolean }>("/api/auth/google/status")
@@ -49,18 +49,29 @@ export function Register() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const next: typeof errors = {};
+    if (!name.trim()) next.name = "Name is required.";
+    const emailErr = getEmailError(email);
+    if (emailErr) next.email = emailErr;
+    const phoneErr = getIndianPhoneError(phone, { required: false });
+    if (phoneErr) next.phone = phoneErr;
     if (!isStrongPassword(password)) {
       setPasswordTouched(true);
-      toast({ title: "Weak password", description: "Please meet all password requirements before submitting.", variant: "destructive" });
-      return;
+      next.password = "Please meet all password requirements.";
     }
+    setErrors(next);
+    if (next.name) { nameRef.current?.focus(); return; }
+    if (next.email) { emailRef.current?.focus(); return; }
+    if (next.phone) { phoneRef.current?.focus(); return; }
+    if (next.password) { passwordRef.current?.focus(); return; }
     setBusy(true);
     try {
+      const normalizedPhone = phone.trim() ? normalizeIndianPhone(phone) : "";
       await apiPost("/api/auth/register", {
-        name,
-        email,
+        name: name.trim(),
+        email: email.trim(),
         password,
-        phone,
+        phone: normalizedPhone,
         referralCode: referralCode.trim().toUpperCase(),
       });
       setPendingEmail(email);
@@ -157,34 +168,41 @@ export function Register() {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <Label htmlFor="name">{t("auth.full_name")}</Label>
-            <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+            <Input ref={nameRef} id="name" required value={name} onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }} aria-invalid={!!errors.name} className="bg-black/40 border-white/10 mt-1" />
+            {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
           </div>
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
-            <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-white/10 mt-1" />
+            <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />
+            {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
           </div>
           <div>
             <Label htmlFor="phone">{t("auth.phone")}</Label>
             <Input
+              ref={phoneRef}
               id="phone"
               type="tel"
               placeholder="Phone number (optional)"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => { setPhone(e.target.value); if (errors.phone) setErrors((p) => ({ ...p, phone: undefined })); }}
+              aria-invalid={!!errors.phone}
               className="bg-black/40 border-white/10 mt-1"
             />
+            {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
           </div>
           <div>
             <Label htmlFor="password">{t("auth.password")}</Label>
             <div className="relative mt-1">
               <Input
+                ref={passwordRef}
                 id="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 required
                 minLength={8}
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); }}
+                onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
+                aria-invalid={!!errors.password}
                 className="bg-black/40 border-white/10 pr-10"
               />
               <button
@@ -196,6 +214,7 @@ export function Register() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
             {passwordTouched && password.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {PASSWORD_RULES.map((rule) => {

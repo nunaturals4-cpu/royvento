@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { getEmailError, getIndianPhoneError, normalizeIndianPhone } from "@workspace/validators";
 import {
   ActivityIndicator,
   Alert,
@@ -37,18 +38,35 @@ export default function ContactScreen() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string; subject?: string; message?: string }>({});
+  const fieldRefs = useRef<Record<string, TextInput | null>>({});
 
   async function handleSubmit() {
-    if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
-      Alert.alert("Missing fields", "Please fill in all required fields before sending.");
-      return;
+    const next: typeof errors = {};
+    if (!name.trim()) next.name = "Name is required.";
+    const emailErr = getEmailError(email);
+    if (emailErr) next.email = emailErr;
+    const phoneErr = getIndianPhoneError(phone, { required: false });
+    if (phoneErr) next.phone = phoneErr;
+    if (!subject.trim()) next.subject = "Subject is required.";
+    if (!message.trim()) next.message = "Message is required.";
+    setErrors(next);
+    const order: Array<keyof typeof next> = ["name", "email", "phone", "subject", "message"];
+    for (const key of order) {
+      if (next[key]) { fieldRefs.current[key]?.focus(); return; }
     }
     setLoading(true);
     try {
       await customFetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim(), subject: subject.trim(), message: message.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim() ? normalizeIndianPhone(phone) : "",
+          subject: subject.trim(),
+          message: message.trim(),
+        }),
       });
       Alert.alert("Message sent", "Thanks for reaching out! We'll get back to you within 24 hours.");
       setSubject("");
@@ -132,39 +150,43 @@ export default function ContactScreen() {
           <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Send a Message</Text>
 
-            {[
-              { label: "Your Name", value: name, set: setName, placeholder: "John Doe", keyboard: "default" as const },
-              { label: "Email Address", value: email, set: setEmail, placeholder: "you@example.com", keyboard: "email-address" as const },
-              { label: "Phone (optional)", value: phone, set: setPhone, placeholder: "+91 XXXXXXXXXX", keyboard: "phone-pad" as const },
-              { label: "Subject", value: subject, set: setSubject, placeholder: "How can we help?", keyboard: "default" as const },
-            ].map((f) => (
-              <View key={f.label} style={styles.field}>
+            {([
+              { key: "name" as const, label: "Your Name", value: name, set: setName, placeholder: "John Doe", keyboard: "default" as const },
+              { key: "email" as const, label: "Email Address", value: email, set: setEmail, placeholder: "you@example.com", keyboard: "email-address" as const },
+              { key: "phone" as const, label: "Phone (optional)", value: phone, set: setPhone, placeholder: "10-digit Indian mobile", keyboard: "phone-pad" as const },
+              { key: "subject" as const, label: "Subject", value: subject, set: setSubject, placeholder: "How can we help?", keyboard: "default" as const },
+            ]).map((f) => (
+              <View key={f.key} style={styles.field}>
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
                 <TextInput
-                  style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                  ref={(el) => { fieldRefs.current[f.key] = el; }}
+                  style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: errors[f.key] ? colors.destructive : colors.border, color: colors.foreground }]}
                   value={f.value}
-                  onChangeText={f.set}
+                  onChangeText={(v) => { f.set(v); if (errors[f.key]) setErrors((p) => ({ ...p, [f.key]: undefined })); }}
                   placeholder={f.placeholder}
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType={f.keyboard}
                   autoCapitalize={f.keyboard === "email-address" || f.keyboard === "phone-pad" ? "none" : "sentences"}
                   autoCorrect={f.keyboard !== "email-address" && f.keyboard !== "phone-pad"}
                 />
+                {errors[f.key] ? <Text style={{ fontSize: 12, color: colors.destructive, fontFamily: "Inter_400Regular", marginTop: 4 }}>{errors[f.key]}</Text> : null}
               </View>
             ))}
 
             <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Message</Text>
               <TextInput
-                style={[styles.fieldInput, styles.textArea, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                ref={(el) => { fieldRefs.current["message"] = el; }}
+                style={[styles.fieldInput, styles.textArea, { backgroundColor: colors.muted, borderColor: errors.message ? colors.destructive : colors.border, color: colors.foreground }]}
                 value={message}
-                onChangeText={setMessage}
+                onChangeText={(v) => { setMessage(v); if (errors.message) setErrors((p) => ({ ...p, message: undefined })); }}
                 placeholder="Describe your issue or question in detail..."
                 placeholderTextColor={colors.mutedForeground}
                 multiline
                 numberOfLines={5}
                 textAlignVertical="top"
               />
+              {errors.message ? <Text style={{ fontSize: 12, color: colors.destructive, fontFamily: "Inter_400Regular", marginTop: 4 }}>{errors.message}</Text> : null}
             </View>
 
             <TouchableOpacity

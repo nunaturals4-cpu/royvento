@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { getIndianPhoneError, normalizeIndianPhone, isAllowedImageMime, ALLOWED_IMAGE_MIME } from "@workspace/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,8 @@ export function Profile() {
   const [about, setAbout] = useState("");
   const [profileImage, setProfileImage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | undefined>(undefined);
+  const phoneRef = useRef<HTMLInputElement>(null);
   const [request, setRequest] = useState<VendorRequest | null>(null);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [sub, setSub] = useState<Sub | null>(null);
@@ -81,8 +84,18 @@ export function Profile() {
   const handleProfileFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (!isAllowedImageMime(f.type)) {
+      toast({
+        title: "Unsupported image type",
+        description: `Please upload a ${ALLOWED_IMAGE_MIME.map((m) => m.replace("image/", "").toUpperCase()).join(", ")} image.`,
+        variant: "destructive",
+      });
+      e.target.value = "";
+      return;
+    }
     if (f.size > 2 * 1024 * 1024) {
       toast({ title: "Image too large", description: "Max 2 MB.", variant: "destructive" });
+      e.target.value = "";
       return;
     }
     try {
@@ -145,9 +158,13 @@ export function Profile() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    const phoneErr = getIndianPhoneError(phone, { required: false });
+    setPhoneError(phoneErr ?? undefined);
+    if (phoneErr) { phoneRef.current?.focus(); return; }
+    const normalizedPhone = phone.trim() ? normalizeIndianPhone(phone) : "";
     setSaving(true);
     try {
-      await apiPatch("/api/users/me", { name, phone, about, profileImage });
+      await apiPatch("/api/users/me", { name, phone: normalizedPhone, about, profileImage });
       qc.invalidateQueries();
       await refetch();
       toast({ title: "Profile updated" });
@@ -186,7 +203,8 @@ export function Profile() {
             <div><Label htmlFor="pname">Full name</Label><Input id="pname" value={name} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" /></div>
             <div>
               <Label htmlFor="pphone">Phone <span className="text-muted-foreground font-normal text-xs">(used for WhatsApp confirmations)</span></Label>
-              <Input id="pphone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 …" className="bg-black/40 border-white/10" />
+              <Input ref={phoneRef} id="pphone" type="tel" value={phone} onChange={(e) => { setPhone(e.target.value); if (phoneError) setPhoneError(undefined); }} aria-invalid={!!phoneError} placeholder="+91 …" className="bg-black/40 border-white/10" />
+              {phoneError && <p className="text-xs text-destructive mt-1">{phoneError}</p>}
             </div>
           </div>
           <div>
@@ -198,7 +216,7 @@ export function Profile() {
               </Avatar>
               <label className="inline-flex items-center gap-2 px-3 h-10 rounded-md border border-white/15 cursor-pointer text-sm hover:bg-white/5">
                 <Upload className="h-4 w-4" /> Upload image
-                <input id="ppic" type="file" accept="image/*" className="hidden" onChange={handleProfileFile} />
+                <input id="ppic" type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleProfileFile} />
               </label>
               {profileImage && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setProfileImage("")}>

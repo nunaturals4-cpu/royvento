@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { customFetch } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { getPasswordError, PASSWORD_RULES } from "@workspace/validators";
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +31,10 @@ export default function ResetPasswordScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!done) return;
@@ -44,14 +49,13 @@ export default function ResetPasswordScreen() {
       Alert.alert("Invalid link", "No reset token found. Please use the link sent to your email.");
       return;
     }
-    if (!password || password.length < 6) {
-      Alert.alert("Password too short", "Password must be at least 6 characters.");
-      return;
-    }
-    if (password !== confirm) {
-      Alert.alert("Passwords don't match", "Please make sure both passwords are the same.");
-      return;
-    }
+    const next: typeof errors = {};
+    const pwErr = getPasswordError(password);
+    if (pwErr) next.password = pwErr;
+    if (password !== confirm) next.confirm = "Passwords don't match.";
+    setErrors(next);
+    if (next.password) { setPasswordTouched(true); passwordRef.current?.focus(); return; }
+    if (next.confirm) { confirmRef.current?.focus(); return; }
     setLoading(true);
     try {
       await customFetch("/api/auth/reset-password", {
@@ -135,10 +139,11 @@ export default function ResetPasswordScreen() {
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
+                  ref={passwordRef}
                   style={[styles.input, { color: colors.foreground }]}
                   value={password}
-                  onChangeText={setPassword}
-                  placeholder="At least 6 characters"
+                  onChangeText={(v) => { setPassword(v); setPasswordTouched(true); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
+                  placeholder="Min 8 chars, mixed case, number, symbol"
                   placeholderTextColor={colors.mutedForeground}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -154,6 +159,26 @@ export default function ResetPasswordScreen() {
                   />
                 </Pressable>
               </View>
+              {errors.password ? <Text style={[styles.mismatchText, { color: colors.destructive }]}>{errors.password}</Text> : null}
+              {passwordTouched && password.length > 0 ? (
+                <View style={{ gap: 4, marginTop: 4 }}>
+                  {PASSWORD_RULES.map((rule) => {
+                    const ok = rule.test(password);
+                    return (
+                      <View key={rule.id} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Ionicons
+                          name={ok ? "checkmark-circle" : "ellipse-outline"}
+                          size={12}
+                          color={ok ? "#22c55e" : colors.mutedForeground}
+                        />
+                        <Text style={{ fontSize: 11, color: ok ? "#22c55e" : colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
+                          {rule.label}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.field}>
@@ -161,9 +186,10 @@ export default function ResetPasswordScreen() {
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
+                  ref={confirmRef}
                   style={[styles.input, { color: colors.foreground }]}
                   value={confirm}
-                  onChangeText={setConfirm}
+                  onChangeText={(v) => { setConfirm(v); if (errors.confirm) setErrors((p) => ({ ...p, confirm: undefined })); }}
                   placeholder="Repeat your new password"
                   placeholderTextColor={colors.mutedForeground}
                   secureTextEntry={!showConfirm}

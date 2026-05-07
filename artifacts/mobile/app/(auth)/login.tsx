@@ -6,7 +6,8 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { isValidEmail } from "@workspace/validators";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +41,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -100,18 +104,13 @@ export default function LoginScreen() {
   });
 
   const handleLogin = () => {
-    if (!email.trim()) {
-      Alert.alert(t("common.error"), "Please enter your email address.");
-      return;
-    }
-    if (!email.includes("@")) {
-      Alert.alert(t("common.error"), "Please enter a valid email address.");
-      return;
-    }
-    if (!password) {
-      Alert.alert(t("common.error"), "Please enter your password.");
-      return;
-    }
+    const next: { email?: string; password?: string } = {};
+    if (!email.trim()) next.email = "Please enter your email address.";
+    else if (!isValidEmail(email)) next.email = "Please enter a valid email address.";
+    if (!password) next.password = "Please enter your password.";
+    setErrors(next);
+    if (next.email) { emailRef.current?.focus(); return; }
+    if (next.password) { passwordRef.current?.focus(); return; }
     loginMutation.mutate({ data: { email: email.trim(), password } });
   };
 
@@ -182,9 +181,10 @@ export default function LoginScreen() {
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
+                  ref={emailRef}
                   style={[styles.input, { color: colors.foreground }]}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(v) => { setEmail(v); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }}
                   placeholder={t("auth.email_placeholder")}
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType="email-address"
@@ -194,6 +194,7 @@ export default function LoginScreen() {
                   returnKeyType="next"
                 />
               </View>
+              {errors.email ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.email}</Text> : null}
             </View>
 
             <View style={styles.field}>
@@ -201,9 +202,10 @@ export default function LoginScreen() {
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
+                  ref={passwordRef}
                   style={[styles.input, { color: colors.foreground }]}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(v) => { setPassword(v); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
                   placeholder="••••••••"
                   placeholderTextColor={colors.mutedForeground}
                   secureTextEntry={!showPassword}
@@ -222,6 +224,7 @@ export default function LoginScreen() {
                   />
                 </Pressable>
               </View>
+              {errors.password ? <Text style={[styles.errorText, { color: colors.destructive }]}>{errors.password}</Text> : null}
             </View>
 
             <TouchableOpacity
@@ -283,4 +286,5 @@ const styles = StyleSheet.create({
   footer: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
   footerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   link: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  errorText: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
 });
