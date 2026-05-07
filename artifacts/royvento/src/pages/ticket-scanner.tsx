@@ -42,17 +42,29 @@ interface BookingData {
 // Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
 const SCANNER_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Mirrors the rule used in artifacts/royvento/src/pages/bookings.tsx and
-// artifacts/api-server/src/routes/bookings.ts: when the booking date's weekday
-// is in the active free-entry-rules day list, the customer owes ₹0 at the door.
-function bookingIsFreeEntryDay(b: Pick<BookingData, "bookingDate" | "freeEntryRules">): boolean {
+// Mirrors the per-tier rule used in artifacts/mobile/app/scanner.tsx and
+// artifacts/api-server/src/routes/bookings.ts (calcActualAmountDue): a tier
+// is free only when the booking date's weekday is in the active FER day list
+// AND the tier's gender is in fer.genders. The whole booking is free only
+// when every gender is listed.
+function bookingFerState(b: Pick<BookingData, "bookingDate" | "freeEntryRules">): {
+  active: boolean;
+  allGendersFree: boolean;
+  isTierFree: (g: "women" | "men" | "couple") => boolean;
+} {
   const fer = b.freeEntryRules;
-  if (!fer?.enabled) return false;
-  if (!b.bookingDate) return false;
-  const days = Array.isArray(fer.days) ? fer.days : [];
-  const dayName = SCANNER_FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()];
-  if (!dayName || !days.includes(dayName)) return false;
-  return true;
+  const days = Array.isArray(fer?.days) ? fer!.days! : [];
+  const dayName = b.bookingDate
+    ? SCANNER_FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()]
+    : undefined;
+  const active = !!(fer?.enabled && dayName && days.includes(dayName));
+  const ferGenders = active ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+  const allGendersFree = active && ["women", "men", "couple"].every((g) => ferGenders.includes(g));
+  return {
+    active,
+    allGendersFree,
+    isTierFree: (g) => active && ferGenders.includes(g),
+  };
 }
 
 interface ScanSuccess {
@@ -653,25 +665,36 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
   const [g, setG] = useState<number>(initGuests);
   const [saving, setSaving] = useState(false);
   const isCod = b.paymentMethod === "cod";
-  const isFreeEntryDayBooking = bookingIsFreeEntryDay(b);
+  const ferState = bookingFerState(b);
+  // Only suppress the cash callout entirely when EVERY tier in this booking
+  // is free. On a partial FER day (e.g. Ladies-free, Men-paid) we still need
+  // to tell the manager to collect cash for the paid tiers.
+  const wholeBookingFree = isTicket
+    ? (b.ticketWomen === 0 || ferState.isTierFree("women")) &&
+      (b.ticketMen === 0 || ferState.isTierFree("men")) &&
+      (b.ticketCouple === 0 || ferState.isTierFree("couple"))
+    : ferState.allGendersFree;
   const alreadyRecorded = (
     b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null
   );
 
   // LIVE running total computed from current stepper values (not server response,
-  // which is null until the user saves). Only relevant for COD bookings.
-  const priceWomen = b.priceWomen ?? 0;
-  const priceMen = b.priceMen ?? 0;
-  const priceCouple = b.priceCouple ?? 0;
+  // which is null until the user saves). Per-tier zeroing matches server's
+  // calcActualAmountDue: free tiers contribute ₹0 even if booked qty > 0.
+  const priceWomen = ferState.isTierFree("women") ? 0 : (b.priceWomen ?? 0);
+  const priceMen = ferState.isTierFree("men") ? 0 : (b.priceMen ?? 0);
+  const priceCouple = ferState.isTierFree("couple") ? 0 : (b.priceCouple ?? 0);
   const liveTotal = isTicket
     ? w * priceWomen + m * priceMen + c * priceCouple
-    : (g / Math.max(1, b.guests)) * b.finalPrice;
+    : ferState.allGendersFree
+      ? 0
+      : (g / Math.max(1, b.guests)) * b.finalPrice;
   const liveTotalRounded = Math.round(liveTotal * 100) / 100;
-  const subRows: { label: string; qty: number; price: number; subtotal: number }[] = isTicket
+  const subRows: { label: string; qty: number; price: number; subtotal: number; free: boolean }[] = isTicket
     ? [
-        { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen },
-        { label: "Men", qty: m, price: priceMen, subtotal: m * priceMen },
-        { label: "Couples", qty: c, price: priceCouple, subtotal: c * priceCouple },
+        { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen, free: ferState.isTierFree("women") },
+        { label: "Men", qty: m, price: priceMen, subtotal: m * priceMen, free: ferState.isTierFree("men") },
+        { label: "Couples", qty: c, price: priceCouple, subtotal: c * priceCouple, free: ferState.isTierFree("couple") },
       ].filter((r) => r.qty > 0)
     : [];
 
@@ -730,7 +753,7 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
         )}
       </div>
 
-      {isFreeEntryDayBooking ? (
+      {wholeBookingFree ? (
         <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 flex items-center justify-between">
           <span className="text-xs uppercase tracking-wider text-green-300 flex items-center gap-1.5">
             <Banknote className="h-3.5 w-3.5" /> Free entry — no payment to collect
@@ -742,9 +765,17 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
           {isTicket && subRows.length > 0 && (
             <div className="space-y-1">
               {subRows.map((r) => (
-                <div key={r.label} className="flex items-center justify-between text-xs text-amber-100/80">
-                  <span>{r.label} · {r.qty} × ₹{r.price.toLocaleString("en-IN")}</span>
-                  <span className="tabular-nums">₹{r.subtotal.toLocaleString("en-IN")}</span>
+                <div
+                  key={r.label}
+                  className={`flex items-center justify-between text-xs ${r.free ? "text-green-300" : "text-amber-100/80"}`}
+                >
+                  <span>
+                    {r.label} · {r.qty}
+                    {r.free ? " · FREE ENTRY" : ` × ₹${r.price.toLocaleString("en-IN")}`}
+                  </span>
+                  <span className="tabular-nums">
+                    {r.free ? "₹0" : `₹${r.subtotal.toLocaleString("en-IN")}`}
+                  </span>
                 </div>
               ))}
               <div className="h-px bg-amber-300/20 my-1" />
@@ -752,7 +783,7 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
           )}
           <div className="flex items-center justify-between">
             <span className="text-xs uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-              <Banknote className="h-3.5 w-3.5" /> Total to collect (COD)
+              <Banknote className="h-3.5 w-3.5" /> Collect cash (COD)
             </span>
             <span className="text-xl font-semibold text-amber-200 tabular-nums flex items-center gap-1">
               <IndianRupee className="h-4 w-4" />{liveTotalRounded.toLocaleString("en-IN")}
