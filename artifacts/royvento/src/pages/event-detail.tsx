@@ -338,11 +338,11 @@ export function EventDetail() {
       toast({ title: t("events.required_field"), description: t("events.name_on_booking"), variant: "destructive" });
       return;
     }
-    if (!phone.trim()) {
+    if (isPub && !phone.trim()) {
       toast({ title: t("events.required_field"), description: t("events.contact_phone"), variant: "destructive" });
       return;
     }
-    if (!/^\d{10}$/.test(phone.replace(/\D/g, ""))) {
+    if (isPub && !/^\d{10}$/.test(phone.replace(/\D/g, ""))) {
       toast({ title: t("events.invalid_phone"), description: t("events.phone_desc"), variant: "destructive" });
       return;
     }
