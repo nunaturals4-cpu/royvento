@@ -45,16 +45,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation, useSearch } from "wouter";
 import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR } from "@/lib/api";
 
+const ADMIN_TABS = [
+  "analytics", "commissions", "vendors", "requests", "event-approvals",
+  "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
+  "booking-report", "attendance", "crm-leads", "import-pub",
+  "announcement-slider", "settlements",
+] as const;
+const DEFAULT_ADMIN_TAB = "analytics";
+const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
+  !!t && (ADMIN_TABS as readonly string[]).includes(t);
+
 export function AdminPanel() {
   const search = useSearch();
   const [, navigate] = useLocation();
-  const urlTab = new URLSearchParams(search).get("tab") ?? "analytics";
-  const [activeTab, setActiveTab] = useState(urlTab);
+  const rawTab = new URLSearchParams(search).get("tab");
+  const initialTab = isValidAdminTab(rawTab) ? rawTab : DEFAULT_ADMIN_TAB;
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [perVendorPage, setPerVendorPage] = useState(1);
 
   useEffect(() => {
     const t = new URLSearchParams(search).get("tab");
-    if (t && t !== activeTab) setActiveTab(t);
+    const next = isValidAdminTab(t) ? t : DEFAULT_ADMIN_TAB;
+    if (next !== activeTab) setActiveTab(next);
+    if (t && !isValidAdminTab(t)) {
+      navigate(`/admin?tab=${DEFAULT_ADMIN_TAB}`, { replace: true });
+    }
   }, [search]);
 
   const handleTabChange = (t: string) => {
