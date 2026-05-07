@@ -2767,6 +2767,12 @@ export const GetAdminAnalyticsResponse = zod.object({
   totalEvents: zod.number(),
   totalBookings: zod.number(),
   totalRevenue: zod.number(),
+  totalCommission: zod
+    .number()
+    .optional()
+    .describe(
+      "Platform commission earned in the date window. Uses the same per-booking calculation as \/admin\/commission-report (free-entry \/ ticket \/ table rates × planned counts, capped by online-paid amount).",
+    ),
   codRevenue: zod.number(),
   actualCodRevenue: zod
     .number()

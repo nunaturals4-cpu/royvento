@@ -234,6 +234,24 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
 
   const allVendors = await db.select().from(vendorsTable);
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
+
+  // Total platform commission for the same date window. Uses the same
+  // shared helper as /admin/commission-report and applies the same
+  // "approved vendors only" scope + sum-of-round2-amounts policy so the
+  // Analytics tile matches the Commissions tab's totals.totalCommission
+  // byte-for-byte for the same window.
+  const allCommissionRates = await db.select().from(vendorCommissionsTable);
+  const ratesByVendor = new Map(allCommissionRates.map((r) => [r.vendorId, r]));
+  const approvedVendorIds = new Set(
+    allVendors.filter((v) => v.status === "approved").map((v) => v.id),
+  );
+  let totalCommission = 0;
+  for (const b of confirmedBookings) {
+    if (!approvedVendorIds.has(b.vendorId)) continue;
+    const rates = ratesByVendor.get(b.vendorId) ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 };
+    totalCommission += computeCommissionFromPlanned(b, rates).amount;
+  }
+
   const perVendor = Array.from(perVendorMap.values())
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
     .sort((a, b) => b.revenue - a.revenue);
@@ -320,6 +338,10 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalEvents: eventsCount[0]?.c ?? 0,
     totalBookings: bookingsCount[0]?.c ?? 0,
     totalRevenue: Math.round(totalRevenue),
+    // Not Math.round'd: commission-report sums per-booking round2'd amounts
+    // without additional integer rounding. We mirror that policy so the
+    // two endpoints agree to the rupee.
+    totalCommission,
     codRevenue,
     actualCodRevenue: Math.round(actualCodRevenue),
     actualCodRecordedCount,

@@ -1600,6 +1600,7 @@ export default function AdminPanelScreen() {
       { label: "Events", value: a?.["totalEvents"] ?? "—", icon: "calendar-outline" as const, color: "#22c55e" },
       { label: "Total Bookings", value: a?.["totalBookings"] ?? "—", icon: "ticket-outline" as const, color: "#8b5cf6" },
       { label: "Revenue", value: a?.["totalRevenue"] ? `₹${Number(a["totalRevenue"]).toLocaleString("en-IN")}` : "—", icon: "cash-outline" as const, color: colors.primary },
+      { label: "Commission", value: a?.["totalCommission"] != null ? `₹${Number(a["totalCommission"]).toLocaleString("en-IN")}` : "—", icon: "trending-up-outline" as const, color: "#22c55e" },
     ];
     const pendingActuals = Number(a?.["pendingActualsCount"] ?? 0);
 
@@ -1627,9 +1628,6 @@ export default function AdminPanelScreen() {
             </View>
           ))}
         </View>
-        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 4 }}>
-          Revenue = online payments received + actual cash collected at door.
-        </Text>
         {pendingActuals > 0 && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#f59e0b15", borderRadius: 8, padding: 10, marginTop: 4 }}>
             <Ionicons name="warning-outline" size={14} color="#f59e0b" />
@@ -2723,6 +2721,7 @@ export default function AdminPanelScreen() {
 
   const TABS = [
     { key: "analytics" as AdminTab, icon: "bar-chart-outline" as const, label: "Analytics" },
+    { key: "commissions" as AdminTab, icon: "cash-outline" as const, label: "Commissions" },
     { key: "bookings" as AdminTab, icon: "ticket-outline" as const, label: "Bookings" },
     { key: "vendors" as AdminTab, icon: "business-outline" as const, label: "Partners" },
     { key: "users" as AdminTab, icon: "people-outline" as const, label: "Users" },
@@ -2736,7 +2735,6 @@ export default function AdminPanelScreen() {
     { key: "booking-report" as AdminTab, icon: "stats-chart-outline" as const, label: "Report" },
     { key: "crm-leads" as AdminTab, icon: "person-add-outline" as const, label: "CRM" },
     { key: "import-pub" as AdminTab, icon: "cloud-download-outline" as const, label: "Import" },
-    { key: "commissions" as AdminTab, icon: "cash-outline" as const, label: "Commissions" },
     { key: "settlements" as AdminTab, icon: "card-outline" as const, label: "Settlements" },
   ];
 

@@ -73,6 +73,7 @@ export function AdminPanel() {
         <div className="overflow-x-auto scrollbar-hide pb-1">
         <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="vendors">Partners</TabsTrigger>
           <TabsTrigger value="requests">Partner requests</TabsTrigger>
           <TabsTrigger value="event-approvals">Event Approvals</TabsTrigger>
@@ -88,7 +89,6 @@ export function AdminPanel() {
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
-          <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
         </TabsList>
         </div>
@@ -245,11 +245,12 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
           icon={IndianRupee}
           label="Revenue"
           value={formatINR(data.totalRevenue)}
-          subLabel="Online + actual cash"
-          subValue={`${formatINR(data.onlineRevenue)} + ${formatINR(data.actualCodRevenue ?? 0)}`}
-          {...((data as { pendingActualsCount?: number }).pendingActualsCount
-            ? { subHint: `${(data as { pendingActualsCount?: number }).pendingActualsCount} bookings pending actuals` }
-            : {})}
+        />
+        <Stat
+          icon={Percent}
+          label="Total commission"
+          value={formatINR((data as { totalCommission?: number }).totalCommission ?? 0)}
+          valueClassName="text-emerald-300"
         />
         <Stat
           icon={Banknote}
