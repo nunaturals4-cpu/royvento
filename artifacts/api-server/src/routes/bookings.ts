@@ -67,44 +67,26 @@ const CreateBookingBody = z.object({
   ticketMen: z.number().int().nonnegative().default(0),
   ticketCouple: z.number().int().nonnegative().default(0),
   selectedPubEvent: z.string().default(""),
-  // personName / phone / arrivalTime: required for pub bookings only,
-  // enforced via superRefine below. Non-pub flows fall back to the
-  // authenticated user's name and skip phone collection.
   personName: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   paymentMethod: z.enum(["cod", "online"]).default("online"),
   callbackScheme: z.enum(["royvento"]).optional(),
   arrivalTime: z.string().default(""),
 }).superRefine((val, ctx) => {
-  // Pub bookings collect contact details in the UI — enforce them.
+  const issue = (path: string, message: string) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+
   if (val.pubMode) {
-    if (!val.personName.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["personName"], message: "Person name is required" });
+    if (!val.personName.trim()) issue("personName", "Person name is required");
+    if (!/^\d{10}$/.test(val.phone)) issue("phone", "Phone must be 10 digits");
+    if (val.pubMode === "ticket" && val.ticketWomen + val.ticketMen + val.ticketCouple <= 0) {
+      issue("ticketWomen", "Select at least one ticket");
     }
-    if (!/^\d{10}$/.test(val.phone)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Phone must be 10 digits" });
+    if (val.pubMode === "event" && !val.arrivalTime.trim()) {
+      issue("arrivalTime", "Arrival time is required");
     }
-    if (val.pubMode === "ticket") {
-      if (val.ticketWomen + val.ticketMen + val.ticketCouple <= 0) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["ticketWomen"], message: "Select at least one ticket" });
-      }
-    }
-    if (val.pubMode === "event") {
-      if (!val.arrivalTime.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["arrivalTime"], message: "Arrival time is required" });
-      }
-    }
-  } else {
-    // Non-pub event-request flow: eventType + budgetRange come from the form.
-    if (!val.budgetRange.trim() || val.budgetRange === "any") {
-      // budgetRange is intentionally optional in the UI ("optional"
-      // placeholder) — do not enforce. Coupon/points/notes also remain
-      // optional per spec. eventType defaults via the select control.
-    }
-  }
-  // If a phone value is supplied at all (even non-pub), it must be valid.
-  if (!val.pubMode && val.phone && !/^\d{10}$/.test(val.phone)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Phone must be 10 digits" });
+  } else if (val.phone && !/^\d{10}$/.test(val.phone)) {
+    issue("phone", "Phone must be 10 digits");
   }
 });
 

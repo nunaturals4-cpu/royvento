@@ -148,6 +148,8 @@ export default function EventDetailScreen() {
   const [guests, setGuests] = useState("1");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const clearFieldError = (field: string) => setFieldErrors((p) => { if (!(field in p)) return p; const n = { ...p }; delete n[field]; return n; });
   const [showBooking, setShowBooking] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
 
@@ -390,30 +392,24 @@ export default function EventDetailScreen() {
     if (!user) { router.push("/(auth)/login"); return; }
     const today = new Date().toISOString().slice(0, 10);
     if (bookingDate < today) { Alert.alert(t("events.invalid_date"), t("events.date_future")); return; }
+    // Collect per-field validation issues (every booking-request field is
+    // required except couponCode / pointsToUse / notes).
+    const errs: Record<string, string> = {};
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
-      Alert.alert(t("events.add_tickets"), t("events.add_tickets_desc"));
-      return;
+      errs.ticketWomen = t("events.add_tickets_desc");
     }
     if (isPub && pubMode === "event" && (!parseInt(guests) || parseInt(guests) < 10)) {
-      Alert.alert(t("events.min_guests"), t("events.min_guests_desc"));
-      return;
+      errs.guests = t("events.min_guests_desc");
     }
     if (isPub && pubMode === "event" && !arrivalTime.trim()) {
-      Alert.alert(t("events.arrival_time"), "Please enter the expected arrival time (HH:MM).");
-      return;
+      errs.arrivalTime = t("events.required_field");
     }
-
-    // Per-field required validation (everything except couponCode / points / notes).
-    if (isPub && !personName.trim()) {
-      Alert.alert(t("events.required_field"), t("events.name_on_booking"));
-      return;
-    }
-    if (!phone.trim()) {
-      Alert.alert(t("events.required_field"), t("events.contact_phone"));
-      return;
-    }
-    if (!/^\d{10}$/.test(phone.replace(/\D/g, "").slice(-10))) {
-      Alert.alert(t("events.invalid_phone"), t("events.phone_desc"));
+    if (isPub && !personName.trim()) errs.personName = t("events.required_field");
+    if (!phone.trim()) errs.phone = t("events.required_field");
+    else if (!/^\d{10}$/.test(phone.replace(/\D/g, "").slice(-10))) errs.phone = t("events.phone_desc");
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      Alert.alert(t("events.required_field"), Object.values(errs)[0]);
       return;
     }
 
@@ -1153,14 +1149,17 @@ export default function EventDetailScreen() {
 
                 {/* Booking under name */}
                 <View style={styles.field}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.booking_name")}</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.booking_name")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
                   <TextInput
-                    style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                    style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: fieldErrors.personName ? "#f87171" : colors.border, color: colors.foreground }]}
                     value={personName}
-                    onChangeText={setPersonName}
+                    onChangeText={(v) => { setPersonName(v); clearFieldError("personName"); }}
                     placeholder={t("events.name_on_booking")}
                     placeholderTextColor={colors.mutedForeground}
                   />
+                  {fieldErrors.personName ? (
+                    <Text style={{ color: "#f87171", fontSize: 11, marginTop: 4 }}>{fieldErrors.personName}</Text>
+                  ) : null}
                 </View>
               </>
             ) : (
@@ -1179,15 +1178,18 @@ export default function EventDetailScreen() {
 
             {/* Phone */}
             <View style={styles.field}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.contact_phone")}</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.contact_phone")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
               <TextInput
-                style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+                style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: fieldErrors.phone ? "#f87171" : colors.border, color: colors.foreground }]}
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(v) => { setPhone(v); clearFieldError("phone"); }}
                 placeholder="+91 98765 43210"
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="phone-pad"
               />
+              {fieldErrors.phone ? (
+                <Text style={{ color: "#f87171", fontSize: 11, marginTop: 4 }}>{fieldErrors.phone}</Text>
+              ) : null}
             </View>
 
             {/* Coupon code */}

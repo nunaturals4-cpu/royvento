@@ -79,6 +79,8 @@ export function EventDetail() {
   const [notes, setNotes] = useState("");
   const [personName, setPersonName] = useState("");
   const [phone, setPhone] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const clearFieldError = (field: string) => setFieldErrors((p) => { if (!(field in p)) return p; const n = { ...p }; delete n[field]; return n; });
   const [eventType, setEventType] = useState<string>("other");
   const [budget, setBudget] = useState<string>("any");
   const [couponInput, setCouponInput] = useState("");
@@ -324,37 +326,26 @@ export function EventDetail() {
       toast({ title: t("events.select_date"), variant: "destructive" });
       return;
     }
+    // Collect per-field validation issues (every booking-request field is
+    // required except couponCode / pointsToUse / notes).
+    const errs: Record<string, string> = {};
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
-      toast({ title: t("events.add_tickets"), variant: "destructive" });
-      return;
+      errs.ticketWomen = t("events.add_tickets");
     }
     if (isPub && pubMode === "event" && !arrivalTime) {
-      toast({ title: t("events.arrival_time"), description: "Please enter the expected arrival time.", variant: "destructive" });
-      return;
+      errs.arrivalTime = t("events.required_field");
     }
-
-    // Per-field required validation (everything except couponCode / points / notes).
-    if (isPub && !personName.trim()) {
-      toast({ title: t("events.required_field"), description: t("events.name_on_booking"), variant: "destructive" });
-      return;
-    }
-    if (isPub && !phone.trim()) {
-      toast({ title: t("events.required_field"), description: t("events.contact_phone"), variant: "destructive" });
-      return;
-    }
-    if (isPub && !/^\d{10}$/.test(phone.replace(/\D/g, ""))) {
-      toast({ title: t("events.invalid_phone"), description: t("events.phone_desc"), variant: "destructive" });
-      return;
-    }
+    if (isPub && !personName.trim()) errs.personName = t("events.required_field");
+    if (isPub && !phone.trim()) errs.phone = t("events.required_field");
+    else if (isPub && !/^\d{10}$/.test(phone.replace(/\D/g, ""))) errs.phone = t("events.phone_validation");
     if (isPub && pubMode === "event") {
-      if (!eventType) {
-        toast({ title: t("events.required_field"), description: t("events.occasion_label"), variant: "destructive" });
-        return;
-      }
-      if (!budget) {
-        toast({ title: t("events.required_field"), description: t("events.budget_range"), variant: "destructive" });
-        return;
-      }
+      if (!eventType) errs.eventType = t("events.required_field");
+      if (!budget) errs.budget = t("events.required_field");
+    }
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" });
+      return;
     }
     if (isClosedDay) {
       toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" });
@@ -1249,24 +1240,28 @@ export function EventDetail() {
                   )}
 
                   <div>
-                    <Label htmlFor="pname">{t("events.booking_name")}</Label>
-                    <Input id="pname" value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder={t("events.name_on_booking")} className="bg-black/40 border-white/10 mt-1" />
+                    <Label htmlFor="pname">{t("events.booking_name")} <span className="text-red-400 text-xs ml-1">*</span></Label>
+                    <Input id="pname" value={personName} onChange={(e) => { setPersonName(e.target.value); clearFieldError("personName"); }} placeholder={t("events.name_on_booking")} className="bg-black/40 border-white/10 mt-1" aria-invalid={!!fieldErrors.personName} />
+                    {fieldErrors.personName && <p className="text-xs text-destructive mt-1">{fieldErrors.personName}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="pphone">{t("events.phone_number")}</Label>
+                    <Label htmlFor="pphone">{t("events.phone_number")} <span className="text-red-400 text-xs ml-1">*</span></Label>
                     <Input
                       id="pphone"
                       type="tel"
                       inputMode="numeric"
                       maxLength={10}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); clearFieldError("phone"); }}
                       placeholder={t("events.phone_placeholder")}
                       className="bg-black/40 border-white/10 mt-1"
+                      aria-invalid={!!fieldErrors.phone}
                     />
-                    {phone.length > 0 && phone.length < 10 && (
+                    {fieldErrors.phone ? (
+                      <p className="text-xs text-destructive mt-1">{fieldErrors.phone}</p>
+                    ) : phone.length > 0 && phone.length < 10 ? (
                       <p className="text-xs text-destructive mt-1">{t("events.phone_validation")}</p>
-                    )}
+                    ) : null}
                   </div>
                 </>
               ) : (
