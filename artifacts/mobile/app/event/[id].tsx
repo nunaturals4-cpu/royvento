@@ -300,6 +300,13 @@ export default function EventDetailScreen() {
       ? ticketWomen * priceWomen + ticketMen * priceMen + ticketCouple * priceCouple
       : basePrice * (parseInt(guests) || 1);
 
+  useEffect(() => {
+    if (isFreeEntryDay && (couponState || couponInput)) {
+      setCouponState(null);
+      setCouponInput("");
+    }
+  }, [isFreeEntryDay, couponState, couponInput]);
+
   const newUserPercent = discountInfo?.isNewUser && !couponState ? (discountInfo.bookingDiscountPercent || 0) : 0;
   const couponPercent = couponState?.discountPercent ?? 0;
   const discount = couponState
@@ -380,7 +387,7 @@ export default function EventDetailScreen() {
       bookingDate,
       phone: phone.replace(/\D/g, "").slice(-10) || undefined,
       notes: notes.trim() || undefined,
-      couponCode: couponState?.code || undefined,
+      couponCode: !isFreeEntryDay ? (couponState?.code || undefined) : undefined,
       pointsToUse: pointsApplied || undefined,
       paymentMethod,
       callbackScheme: "royvento",

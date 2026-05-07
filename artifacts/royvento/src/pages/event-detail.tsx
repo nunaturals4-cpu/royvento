@@ -146,6 +146,29 @@ export function EventDetail() {
     if (me?.user?.name && !personName) setPersonName(me.user.name);
   }, [me?.user?.name]);
 
+  // Clear any applied coupon if the selected booking date becomes a
+  // free-entry day (subtotal becomes ₹0 and the server refuses to consume
+  // a coupon). Mirrors the isFreeEntryDay computation below but is hoisted
+  // above the early returns to keep hook order stable.
+  useEffect(() => {
+    const ev = event as any;
+    if (!ev || ev?.type !== "pub") return;
+    const DAY_ABBRS_h = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayName = date ? DAY_ABBRS_h[new Date(`${date}T12:00:00`).getDay()] : "";
+    const fer = ev?.freeEntryRules as { enabled?: boolean; days?: string[] } | undefined;
+    const ferActive = !!(fer?.enabled === true && (fer.days ?? []).includes(dayName));
+    const dayPricing = ev?.dayPricing as Record<string, { women: number; men: number; couple: number } | null> | null;
+    const ovr = dayName && dayPricing?.[dayName] ? dayPricing[dayName] : null;
+    const w = ovr ? Number(ovr.women) : Number(ev?.priceWomen || 0);
+    const m = ovr ? Number(ovr.men) : Number(ev?.priceMen || 0);
+    const c = ovr ? Number(ovr.couple) : Number(ev?.priceCouple || 0);
+    const freeDay = ferActive || (w === 0 && m === 0 && c === 0);
+    if (freeDay && (couponState || couponInput)) {
+      setCouponState(null);
+      setCouponInput("");
+    }
+  }, [event, date, couponState, couponInput]);
+
   if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
   if (!event) return <div className="container mx-auto px-4 py-20">{t("events.not_found")}</div>;
 
@@ -301,7 +324,7 @@ export function EventDetail() {
         notes,
         eventType,
         budgetRange: budget === "any" ? "" : budget,
-        couponCode: couponState?.valid ? couponState.code : "",
+        couponCode: !isFreeEntryDay && couponState?.valid ? couponState.code : "",
         personName,
         phone,
         pointsToUse: pointsApplied,
