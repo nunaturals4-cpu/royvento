@@ -3855,9 +3855,12 @@ components:
       properties:
         code:
           type: string
+        confirm:
+          type: boolean
+          description: When true, marks the booking as checked in. When false/omitted (and no actualEntry is provided), the request is treated as a read-only lookup that returns booking details + status without burning the ticket. The mobile scanner uses this two-step flow so the manager must explicitly tap "Confirm entry" before a ticket is consumed.
         actualEntry:
           type: object
-          description: Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue.
+          description: Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns, returns the recomputed actualAmountDue, AND implicitly confirms the check-in (no separate confirm flag needed).
           properties:
             women:
               type: integer
@@ -3961,6 +3964,19 @@ components:
         code:
           type: string
           enum: [OK, ALREADY_CHECKED_IN, NOT_FOUND, INVALID_STATUS]
+        status:
+          type: string
+          description: Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it).
+          enum: [ready_to_check_in, checked_in, already_checked_in]
+        lookupOnly:
+          type: boolean
+          description: True when the response came from a read-only lookup (no `confirm` and no `actualEntry`). The booking has NOT been marked checked in. The client should render a "Confirm entry" affordance that re-POSTs with `confirm: true`.
+        justCheckedIn:
+          type: boolean
+          description: True only when this exact request transitioned the booking from not-checked-in to checked-in. False when the booking was already checked in (whether inside the grace window or not).
+        recentlyCheckedIn:
+          type: boolean
+          description: True when a confirm/actualEntry request landed on an already-checked-in booking but within the ~30s grace window. The server returns 200 OK instead of 409 so duplicate scans (camera double-fire, fast retap) don't surface as errors to the manager.
         message:
           type: string
         checkedInAt:

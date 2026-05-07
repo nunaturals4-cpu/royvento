@@ -1663,6 +1663,13 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     }
     actualEntry = parsed.data;
   }
+  // Two-step scan flow: a request with neither `confirm: true` nor `actualEntry`
+  // performs a read-only lookup and returns booking details without writing
+  // checkedIn. The manager must then re-POST with confirm/actualEntry to
+  // actually mark the ticket used. This stops a stray camera read from
+  // immediately consuming the ticket before the manager has admitted the guest.
+  const confirmRequested = body["confirm"] === true;
+  const GRACE_WINDOW_MS = 30_000;
 
   // Determine booking ID and whether this is a new-format code (needs checksum verification)
   let bookingId: number;
@@ -1812,9 +1819,15 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   }
   const scanCommInfo = calcScanCommission(b);
 
-  // Lazy backfill: if vendor has no prefix/salt yet, generate them now so all future codes are secure
+  // Lazy backfill: if vendor has no prefix/salt yet, generate them now so all
+  // future codes are secure. Skip on lookup-only requests so the read-only
+  // lookup phase performs ZERO writes (Task #539). On a fresh confirm/actualEntry
+  // the backfill will run as before. (Vendors needing the backfill are also
+  // those whose existing tickets are legacy RV-* codes, which don't require
+  // checksum verification — so skipping here doesn't break legacy lookups.)
   let resolvedVendor = scanVendor;
-  if (scanVendor && (!scanVendor.ticketPrefix || !scanVendor.ticketSalt)) {
+  const willMutate = actualEntry !== null || confirmRequested;
+  if (willMutate && scanVendor && (!scanVendor.ticketPrefix || !scanVendor.ticketSalt)) {
     const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
     const newPrefix = await generateUniqueTicketPrefix(
       (await db.select({ name: vendorsTable.businessName }).from(vendorsTable).where(eq(vendorsTable.id, b.vendorId)).limit(1))[0]?.name ?? "VEND",
@@ -1849,6 +1862,27 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   }
   if (b.status !== "confirmed") {
     res.status(422).json({ code: "INVALID_STATUS", message: `Booking is in status "${b.status}" and cannot be used for entry.` });
+    return;
+  }
+
+  // ── Lookup-only path: no actualEntry and confirm not requested → read-only ──
+  // Returns the booking details and a status field WITHOUT marking checkedIn.
+  // The manager must re-POST with `confirm: true` (or actualEntry) to actually
+  // burn the ticket. Loyalty/coupon side effects MUST NOT fire here — they
+  // only run on the real first check-in below.
+  if (!actualEntry && !confirmRequested) {
+    const [out] = await serializeBookings([b]);
+    const lookupActualAmountDue = calcActualAmountDue(b);
+    const checkedInAtIso = b.checkedInAt ? b.checkedInAt.toISOString() : null;
+    res.json({
+      code: b.checkedIn ? "ALREADY_CHECKED_IN" : "OK",
+      status: b.checkedIn ? "already_checked_in" : "ready_to_check_in",
+      lookupOnly: true,
+      checkedInAt: checkedInAtIso,
+      booking: out
+        ? { ...out, ...scanCommInfo, ...scanPriceInfo, actualAmountDue: lookupActualAmountDue, actualEntry: buildActualEntry(b) }
+        : null,
+    });
     return;
   }
 
@@ -1995,7 +2029,9 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     const actualAmountDue = calcActualAmountDue(updatedActuals);
     res.json({
       code: "OK",
+      status: "checked_in",
       checkedInAt: checkedInAtNow.toISOString(),
+      justCheckedIn: !wasCheckedIn,
       booking: out ? { ...out, ...okComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(updatedActuals), justCheckedIn: !wasCheckedIn } : null,
     });
     return;
@@ -2006,11 +2042,30 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     const checkedInAt = b.checkedInAt ? b.checkedInAt.toISOString() : null;
     const [out] = await serializeBookings([b]);
     const actualAmountDue = calcActualAmountDue(b);
+    const bookingPayload = out
+      ? { ...out, ...scanCommInfo, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(b) }
+      : null;
+    // Grace window: if the existing check-in happened in the last ~30s, treat
+    // a fresh confirm as a duplicate scan (camera double-fire / quick retry)
+    // and return success with justCheckedIn=false instead of a red 409.
+    const ageMs = b.checkedInAt ? Date.now() - b.checkedInAt.getTime() : Infinity;
+    if (ageMs >= 0 && ageMs <= GRACE_WINDOW_MS) {
+      res.json({
+        code: "OK",
+        status: "already_checked_in",
+        checkedInAt,
+        justCheckedIn: false,
+        recentlyCheckedIn: true,
+        booking: bookingPayload,
+      });
+      return;
+    }
     res.status(409).json({
       code: "ALREADY_CHECKED_IN",
+      status: "already_checked_in",
       message: "This ticket has already been used for entry.",
       checkedInAt,
-      booking: out ? { ...out, ...scanCommInfo, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(b) } : null,
+      booking: bookingPayload,
     });
     return;
   }
@@ -2034,12 +2089,30 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       const [out] = await serializeBookings([current]);
       const currComm = calcScanCommission(current);
       const actualAmountDue = calcActualAmountDue(current);
-      res.status(409).json({
-        code: "ALREADY_CHECKED_IN",
-        message: "This ticket has already been used for entry.",
-        checkedInAt,
-        booking: out ? { ...out, ...currComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(current) } : null,
-      });
+      const bookingPayload = out
+        ? { ...out, ...currComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(current) }
+        : null;
+      // Same grace window as the pre-check 409: another writer just won the
+      // atomic update; if it was within ~30s, treat as a duplicate confirm.
+      const ageMs = current.checkedInAt ? Date.now() - current.checkedInAt.getTime() : Infinity;
+      if (ageMs >= 0 && ageMs <= GRACE_WINDOW_MS) {
+        res.json({
+          code: "OK",
+          status: "already_checked_in",
+          checkedInAt,
+          justCheckedIn: false,
+          recentlyCheckedIn: true,
+          booking: bookingPayload,
+        });
+      } else {
+        res.status(409).json({
+          code: "ALREADY_CHECKED_IN",
+          status: "already_checked_in",
+          message: "This ticket has already been used for entry.",
+          checkedInAt,
+          booking: bookingPayload,
+        });
+      }
     } else {
       res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
     }
@@ -2083,7 +2156,13 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   const okComm = calcScanCommission(updated);
   const actualAmountDue = calcActualAmountDue(updated);
-  res.json({ code: "OK", checkedInAt: now.toISOString(), booking: out ? { ...out, ...okComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(updated) } : null });
+  res.json({
+    code: "OK",
+    status: "checked_in",
+    checkedInAt: now.toISOString(),
+    justCheckedIn: true,
+    booking: out ? { ...out, ...okComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(updated) } : null,
+  });
 });
 
 router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) => {

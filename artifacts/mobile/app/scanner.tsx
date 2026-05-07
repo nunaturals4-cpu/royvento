@@ -69,6 +69,20 @@ function bookingIsFreeEntryDay(b: Pick<BookingData, "bookingDate" | "freeEntryRu
 
 interface ScanResult {
   code: string;
+  // Higher-resolution status from the server. `ready_to_check_in` is only
+  // returned for the read-only lookup phase (POST {code}); the manager must
+  // tap "Confirm entry" to move the booking to `checked_in`. `already_checked_in`
+  // covers both lookup hits on used tickets and grace-window re-confirms.
+  status?: "ready_to_check_in" | "checked_in" | "already_checked_in";
+  // True when the response came from a read-only lookup. The booking has NOT
+  // been marked checked in — show a Confirm button instead of a green banner.
+  lookupOnly?: boolean;
+  // True only when this exact request burned the ticket. False for grace-window
+  // re-confirms so we can show "Checked in just now" instead of a fresh "Entry granted".
+  justCheckedIn?: boolean;
+  // True when a confirm/actualEntry hit an already-checked-in booking inside
+  // the ~30s grace window (camera double-fire, fast retap).
+  recentlyCheckedIn?: boolean;
   message?: string;
   checkedInAt?: string;
   booking?: BookingData;
@@ -82,15 +96,22 @@ export default function ScannerScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  // Auto-open the bottom sheet whenever a successful (or already-checked-in) scan
-  // surfaces a booking the operator can record actuals against.
+  const [confirming, setConfirming] = useState(false);
+  // Only auto-open the actuals sheet AFTER the manager has confirmed entry —
+  // never on a lookup-only response. The manager should see the booking
+  // details + an explicit "Confirm entry" button first; if they want to log
+  // per-type counts (which also confirms entry), they tap "Record actual entry".
   useEffect(() => {
-    if (result?.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN")) {
+    if (
+      result?.booking &&
+      !result.lookupOnly &&
+      (result.code === "OK" || result.code === "ALREADY_CHECKED_IN")
+    ) {
       setSheetOpen(true);
     } else {
       setSheetOpen(false);
     }
-  }, [result?.code, result?.booking?.id]);
+  }, [result?.code, result?.booking?.id, result?.lookupOnly]);
   const [torchOn, setTorchOn] = useState(false);
   const scanLock = useRef(false);
   const manualInputRef = useRef<TextInput>(null);
@@ -120,6 +141,36 @@ export default function ScannerScreen() {
     }
   };
 
+  // Second leg of the two-step scan: re-POST with confirm:true to actually
+  // burn the ticket. The server returns justCheckedIn=true (success), or
+  // (within the ~30s grace window) status=already_checked_in with
+  // recentlyCheckedIn=true — both render as success in the UI.
+  const confirmEntry = async () => {
+    const code = result?.booking ? `RV-${String(result.booking.id).padStart(6, "0")}` : null;
+    if (!code || confirming) return;
+    setConfirming(true);
+    try {
+      const res = await customFetch<ScanResult>("/api/partner/scan-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, confirm: true }),
+      });
+      setResult(res);
+    } catch (e: unknown) {
+      const err = e as { message?: string; code?: string; checkedInAt?: string; booking?: BookingData };
+      // Outside the grace window the server still returns 409 ALREADY_CHECKED_IN
+      // with the booking payload — surface that to the manager unchanged.
+      setResult({
+        code: err.code ?? "ERROR",
+        message: err.message ?? "Network error. Try again.",
+        checkedInAt: err.checkedInAt,
+        booking: err.booking,
+      });
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   const reset = () => {
     setResult(null);
     setManualCode("");
@@ -133,8 +184,15 @@ export default function ScannerScreen() {
     }
   }, [result]);
 
-  const resultColor = result?.code === "OK" ? "#22c55e"
-    : result?.code === "ALREADY_CHECKED_IN" ? "#f97316"
+  // Color the result banner by the new high-resolution status:
+  //   ready_to_check_in → blue (action required, ticket NOT yet burned)
+  //   checked_in / grace-window OK → green
+  //   already_checked_in (lookup hit on used ticket / out-of-grace re-confirm) → orange
+  //   anything else (not found, invalid status, network) → red
+  const resultColor = result == null ? "#ef4444"
+    : result.status === "ready_to_check_in" ? "#3b82f6"
+    : result.code === "OK" ? "#22c55e"
+    : result.code === "ALREADY_CHECKED_IN" ? "#f97316"
     : "#ef4444";
 
   const hasCameraPermission = permission?.granted;
@@ -258,20 +316,32 @@ export default function ScannerScreen() {
             <View style={styles.resultHeader}>
               <View style={[styles.resultIcon, { backgroundColor: resultColor + "20" }]}>
                 <Ionicons
-                  name={result.code === "OK" ? "checkmark-circle" : result.code === "ALREADY_CHECKED_IN" ? "time-outline" : "close-circle"}
+                  name={
+                    result.status === "ready_to_check_in" ? "qr-code-outline"
+                      : result.code === "OK" ? "checkmark-circle"
+                      : result.code === "ALREADY_CHECKED_IN" ? "time-outline"
+                      : "close-circle"
+                  }
                   size={28}
                   color={resultColor}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.resultTitle, { color: resultColor }]}>
-                  {result.code === "OK" ? "Entry granted"
+                  {result.status === "ready_to_check_in" ? "Ready to check in"
+                    : result.recentlyCheckedIn ? "Checked in just now"
+                    : result.code === "OK" ? "Entry granted"
                     : result.code === "ALREADY_CHECKED_IN" ? "Already used"
                     : "Invalid ticket"}
                 </Text>
-                {result.checkedInAt && (
+                {result.status === "ready_to_check_in" && (
                   <Text style={[styles.resultSub, { color: colors.mutedForeground }]}>
-                    {result.code === "OK" ? "Checked in" : "Was checked in"} at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                    Review the booking, then tap Confirm entry to admit the guest.
+                  </Text>
+                )}
+                {result.checkedInAt && result.status !== "ready_to_check_in" && (
+                  <Text style={[styles.resultSub, { color: colors.mutedForeground }]}>
+                    {result.code === "OK" && !result.recentlyCheckedIn ? "Checked in" : "Was checked in"} at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
                 )}
                 {result.message && result.code !== "OK" && (
@@ -280,7 +350,27 @@ export default function ScannerScreen() {
               </View>
             </View>
 
-            {result.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
+            {/* Confirm entry button — only for read-only lookups on a non-checked-in
+                booking. Sends {code, confirm:true} to actually burn the ticket. */}
+            {result.lookupOnly && result.status === "ready_to_check_in" && result.booking && (
+              <TouchableOpacity
+                onPress={confirmEntry}
+                disabled={confirming}
+                style={{ marginHorizontal: 14, marginBottom: 14, backgroundColor: "#22c55e", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8, opacity: confirming ? 0.6 : 1 }}
+              >
+                {confirming
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+                <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" }}>
+                  {confirming ? "Confirming…" : "Confirm entry"}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* "Record actual entry" sheet — only after the ticket is actually
+                burned. Recording actuals also confirms entry server-side, so
+                showing this on a lookup would skip the explicit Confirm step. */}
+            {result.booking && !result.lookupOnly && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
               <TouchableOpacity
                 onPress={() => setSheetOpen(true)}
                 style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
