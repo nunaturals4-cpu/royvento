@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
  * Service-worker update banner.
  *
  * The SW (public/sw.js) intentionally does NOT call skipWaiting() or
- * clients.claim() any more, because auto-activating a new build caused the
- * page to silently reload mid-session and could interrupt a booking. Instead,
- * we register the SW here, watch for an incoming `waiting` worker, and show a
- * non-intrusive banner. When the user clicks "Refresh", we post SKIP_WAITING
- * to the worker and reload the page exactly once on `controllerchange`.
+ * clients.claim(), because auto-activating a new build caused the page to
+ * silently reload mid-session and could interrupt a booking. We register the
+ * SW here, watch for an incoming `waiting` worker, and show a non-intrusive
+ * banner. When the user clicks "Refresh to update", we post SKIP_WAITING so
+ * the new worker activates, then dismiss the banner — we deliberately do NOT
+ * call window.location.reload(). The new version takes effect on the user's
+ * next natural navigation/refresh. This guarantees no automatic page reloads
+ * are ever triggered by our code.
  */
 export function ServiceWorkerUpdatePrompt() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
@@ -18,7 +21,6 @@ export function ServiceWorkerUpdatePrompt() {
     if (!("serviceWorker" in navigator)) return;
 
     let cancelled = false;
-    let reloading = false;
 
     const trackWaiting = (reg: ServiceWorkerRegistration) => {
       // Only surface the banner when there's already a controller — otherwise
@@ -52,24 +54,19 @@ export function ServiceWorkerUpdatePrompt() {
         // Registration failures are non-fatal; the app still works.
       });
 
-    const onControllerChange = () => {
-      if (reloading) return;
-      reloading = true;
-      window.location.reload();
-    };
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-
     return () => {
       cancelled = true;
-      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
     };
   }, []);
 
   if (!waitingWorker) return null;
 
   const apply = () => {
+    // Tell the waiting SW to activate. We deliberately do NOT reload the page
+    // — the user asked us never to refresh automatically. The new version
+    // will be picked up on the user's next natural navigation/refresh.
     waitingWorker.postMessage({ type: "SKIP_WAITING" });
-    // Page reload happens via `controllerchange` once the new SW activates.
+    setWaitingWorker(null);
   };
 
   return (
