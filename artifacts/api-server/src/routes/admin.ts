@@ -1602,6 +1602,8 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       .select({
         id: bookingsTable.id,
         vendorId: bookingsTable.vendorId,
+        eventId: bookingsTable.eventId,
+        bookingDate: bookingsTable.bookingDate,
         finalPrice: bookingsTable.finalPrice,
         pubMode: bookingsTable.pubMode,
         guests: bookingsTable.guests,
@@ -1640,6 +1642,19 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   ]);
 
   const commissionMap = new Map(commissions.map((c) => [c.vendorId, c]));
+
+  // Pre-fetch every event referenced by these bookings so the per-tier
+  // free-entry commission split can be applied without an N+1 lookup.
+  const reportEventIds = Array.from(new Set(bookings.map((b) => b.eventId)));
+  const reportEventRows = reportEventIds.length > 0
+    ? await db
+        .select({ id: eventsTable.id, freeEntryRules: eventsTable.freeEntryRules })
+        .from(eventsTable)
+        .where(inArray(eventsTable.id, reportEventIds))
+    : [];
+  const eventFerMap = new Map(
+    reportEventRows.map((e) => [e.id, e.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | null]),
+  );
   // Index ledger rows by (vendorId → totalCollected) and the set of bookingIds
   // that have any collected entry so we can mark per-booking pending vs collected.
   const collectedByVendor = new Map<number, number>();
@@ -1731,7 +1746,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     const rates = commissionMap.get(b.vendorId);
     // Use the shared helper so this report always agrees with the live
     // online-payment + COD/free check-in flows.
-    const comm = computeCommissionFromPlanned(b, rates ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 });
+    const comm = computeCommissionFromPlanned(
+      b,
+      rates ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      eventFerMap.get(b.eventId) ?? null,
+    );
     const bookingType = comm.bookingType;
     const feePerUnit = comm.ratePerUnit;
     const unitCount = comm.unitCount;

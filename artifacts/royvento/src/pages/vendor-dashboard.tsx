@@ -51,6 +51,31 @@ const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Hide a booking's price when it falls on a configured free-entry day for which all
 // booked ticket genders are eligible. Mirrors the rule used in the customer bookings
 // page and the mobile bookings tab so partner views stay in sync.
+const FE_GENDER_OPTIONS: { canon: "women" | "men" | "couple"; label: string }[] = [
+  { canon: "women", label: "Ladies" },
+  { canon: "men", label: "Men" },
+  { canon: "couple", label: "Couples" },
+];
+
+function normalizeFreeEntryGenders(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out = new Set<string>();
+  for (const g of raw) {
+    const s = String(g ?? "").trim().toLowerCase();
+    if (!s) continue;
+    if (s === "everyone" || s === "all") {
+      out.add("women"); out.add("men"); out.add("couple");
+    } else if (s === "ladies" || s === "women" || s === "female") {
+      out.add("women");
+    } else if (s === "men" || s === "male") {
+      out.add("men");
+    } else if (s === "couples" || s === "couple") {
+      out.add("couple");
+    }
+  }
+  return Array.from(out);
+}
+
 function bookingIsFreeEntryDay(b: {
   bookingDate?: string | null;
   ticketWomen?: number | null;
@@ -1015,11 +1040,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
                 <div>
                   <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
                   <div className="flex flex-wrap gap-2">
-                    {["Everyone", "Ladies", "Men", "Couples"].map((g) => (
-                      <button key={g} type="button"
-                        onClick={() => setFreeEntryGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g])}
-                        className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(g) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
-                      >{g}</button>
+                    {FE_GENDER_OPTIONS.map(({ canon, label }) => (
+                      <button key={canon} type="button"
+                        onClick={() => setFreeEntryGenders((prev) => prev.includes(canon) ? prev.filter((x) => x !== canon) : [...prev, canon])}
+                        className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(canon) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                      >{label}</button>
                     ))}
                   </div>
                 </div>
@@ -1376,7 +1401,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
     return {};
   });
   const [freeEntryEnabled, setFreeEntryEnabled] = useState<boolean>(!!(event.freeEntryRules?.enabled));
-  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(event.freeEntryRules?.genders ?? []);
+  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(normalizeFreeEntryGenders(event.freeEntryRules?.genders));
   const [freeEntryDays, setFreeEntryDays] = useState<string[]>(event.freeEntryRules?.days ?? []);
   const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>(event.freeEntryRules?.beforeTime ?? "");
   const { toast } = useToast();
@@ -1673,11 +1698,11 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
                   <div>
                     <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
                     <div className="flex flex-wrap gap-2">
-                      {["Everyone", "Ladies", "Men", "Couples"].map((g) => (
-                        <button key={g} type="button"
-                          onClick={() => setFreeEntryGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g])}
-                          className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(g) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
-                        >{g}</button>
+                      {FE_GENDER_OPTIONS.map(({ canon, label }) => (
+                        <button key={canon} type="button"
+                          onClick={() => setFreeEntryGenders((prev) => prev.includes(canon) ? prev.filter((x) => x !== canon) : [...prev, canon])}
+                          className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(canon) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                        >{label}</button>
                       ))}
                     </div>
                   </div>

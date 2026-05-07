@@ -79,11 +79,10 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
 
   // Look up commission rates BEFORE the transaction (read-only) to keep the
   // tx short. The rates table is effectively immutable per vendor in this flow.
-  const [vcRow] = await db
-    .select()
-    .from(vendorCommissionsTable)
-    .where(eq(vendorCommissionsTable.vendorId, booking.vendorId))
-    .limit(1);
+  const [vcRow, evtRow] = await Promise.all([
+    db.select().from(vendorCommissionsTable).where(eq(vendorCommissionsTable.vendorId, booking.vendorId)).limit(1),
+    db.select({ freeEntryRules: eventsTable.freeEntryRules }).from(eventsTable).where(eq(eventsTable.id, booking.eventId)).limit(1),
+  ]);
   const comm = computeCommissionFromPlanned(
     {
       pubMode: booking.pubMode,
@@ -92,8 +91,10 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
       ticketWomen: booking.ticketWomen,
       ticketMen: booking.ticketMen,
       ticketCouple: booking.ticketCouple,
+      bookingDate: booking.bookingDate,
     },
-    vcRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+    vcRow[0] ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+    (evtRow[0]?.freeEntryRules ?? null) as { enabled?: boolean; days?: string[]; genders?: string[] } | null,
   );
   const netCredit = Math.max(0, Number(booking.finalPrice ?? 0) - comm.amount);
 

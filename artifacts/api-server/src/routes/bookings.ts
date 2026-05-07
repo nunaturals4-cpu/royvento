@@ -465,8 +465,10 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         ticketWomen: parsed.data.ticketWomen || 0,
         ticketMen: parsed.data.ticketMen || 0,
         ticketCouple: parsed.data.ticketCouple || 0,
+        bookingDate: dateStr,
       },
       vcRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null }).freeEntryRules ?? null,
     );
     const netCredit = Math.max(0, finalPrice - comm.amount);
     await db.transaction(async (tx) => {
@@ -804,12 +806,93 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const commTicketFee = Number(commRow?.ticketRate ?? 0);
   const commTableFee = Number(commRow?.tableBookingRate ?? 0);
 
-  function calcComm(fp: number, pubMode: string, guests: number, ticketW: number, ticketM: number, ticketC: number): number {
-    let raw: number;
-    if (pubMode === "table") raw = commTableFee;
-    else if (fp === 0 || pubMode === "free") raw = commFreeEntryFee * Math.max(0, guests);
-    else { const ticketCount = ticketW + ticketM + ticketC; raw = commTicketFee * Math.max(0, ticketCount); }
-    return Math.min(raw, fp);
+  // Pre-fetch every event referenced by these bookings so the per-tier free-entry
+  // commission split can read freeEntryRules without an N+1 lookup.
+  const _commEventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
+  const _commEventRows = _commEventIds.length > 0
+    ? await db.select().from(eventsTable).where(inArray(eventsTable.id, _commEventIds))
+    : [];
+  const commEventMap = new Map(_commEventRows.map((e) => [e.id, e]));
+  const COMM_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  function ferStateForBooking(b: { eventId: number; bookingDate: string }) {
+    const evt = commEventMap.get(b.eventId);
+    const fer = (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules;
+    const day = b.bookingDate ? COMM_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()] : "";
+    const active = !!(fer?.enabled && day && Array.isArray(fer.days) && fer.days.includes(day));
+    const genders = active ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+    return { active, isTierFree: (g: "women" | "men" | "couple") => active && genders.includes(g) };
+  }
+
+  // Split a single booking's commission and gross revenue across the
+  // freeEntry/ticket/table buckets. Per spec:
+  //   • table   → tableFee × guests, capped at finalPrice
+  //   • ticket-mode + partial FER → free tiers get freeEntryFee×count, paid
+  //     tiers get ticketFee×count; aggregate capped at finalPrice and gross
+  //     revenue split proportionally to per-tier units
+  //   • whole-day-free / pubMode==="free" → freeEntry bucket, freeEntryFee×guests
+  //   • plain ticket booking (no FER) → ticket bucket, ticketFee×ticketCount
+  function calcCommSplit(b: { eventId: number; bookingDate: string; pubMode: string; guests: number; ticketWomen: number; ticketMen: number; ticketCouple: number; finalPrice: string }, grossRev: number) {
+    const fp = Number(b.finalPrice);
+    const out = {
+      freeEntry: { count: 0, comm: 0, gross: 0 },
+      ticket:    { count: 0, comm: 0, gross: 0 },
+      table:     { count: 0, comm: 0, gross: 0 },
+    };
+    if (b.pubMode === "table") {
+      const guests = Math.max(0, b.guests);
+      out.table.count = 1;
+      out.table.comm = Math.min(commTableFee * guests, fp);
+      out.table.gross = grossRev;
+      return out;
+    }
+    if (b.pubMode !== "ticket") {
+      // event-mode / legacy: bucket by whole-day-free vs paid
+      if (fp === 0 || b.pubMode === "free") {
+        out.freeEntry.count = 1;
+        out.freeEntry.comm = Math.min(commFreeEntryFee * Math.max(0, b.guests), fp);
+        out.freeEntry.gross = grossRev;
+      } else {
+        out.ticket.count = 1;
+        out.ticket.comm = Math.min(commTicketFee * Math.max(0, b.guests), fp);
+        out.ticket.gross = grossRev;
+      }
+      return out;
+    }
+    // pubMode === "ticket"
+    const fer = ferStateForBooking(b);
+    const tw = b.ticketWomen, tm = b.ticketMen, tc = b.ticketCouple;
+    const totalUnits = tw + tm + tc;
+    const freeUnits =
+      (fer.isTierFree("women") ? tw : 0) +
+      (fer.isTierFree("men") ? tm : 0) +
+      (fer.isTierFree("couple") ? tc : 0);
+    const paidUnits = totalUnits - freeUnits;
+    const rawFree = commFreeEntryFee * freeUnits;
+    const rawPaid = commTicketFee * paidUnits;
+    const rawTotal = rawFree + rawPaid;
+    let cFree = rawFree, cPaid = rawPaid;
+    if (rawTotal > fp && rawTotal > 0) {
+      cFree = (rawFree / rawTotal) * fp;
+      cPaid = (rawPaid / rawTotal) * fp;
+    }
+    const gFree = totalUnits > 0 ? grossRev * (freeUnits / totalUnits) : 0;
+    const gPaid = grossRev - gFree;
+    // Booking is counted once in its primary bucket so per-bucket counts still
+    // sum to allBookings.length. Whole-day-free ticket bookings stay in
+    // "freeEntry"; otherwise the booking belongs to "ticket" (commission and
+    // gross are still split per-tier even when the count goes to ticket).
+    if (fp === 0 || paidUnits === 0) {
+      out.freeEntry.count = 1;
+    } else {
+      out.ticket.count = 1;
+    }
+    if (freeUnits > 0) { out.freeEntry.comm = cFree; out.freeEntry.gross = gFree; }
+    if (paidUnits > 0) { out.ticket.comm = cPaid; out.ticket.gross = gPaid; }
+    return out;
+  }
+
+  function commTotal(split: ReturnType<typeof calcCommSplit>) {
+    return split.freeEntry.comm + split.ticket.comm + split.table.comm;
   }
 
   // Summary figures
@@ -845,15 +928,20 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
 
     // Commission is computed on booked finalPrice (per task spec — unchanged).
-    const comm = calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple);
+    const split = calcCommSplit(b, bookingRevenue);
+    const comm = commTotal(split);
     totalCommission += comm;
     if (isCod) codCommission += comm;
     else onlineCommission += comm;
-    // Per-booking-type commission summary (gross uses effective revenue).
-    const bType = b.pubMode === "table" ? "table" : (fp === 0 || b.pubMode === "free") ? "freeEntry" : "ticket";
-    commSummary[bType].count++;
-    commSummary[bType].grossRevenue += bookingRevenue;
-    commSummary[bType].commissionAmount += comm;
+    // Per-booking-type commission summary. Counts are mutually exclusive
+    // (booking goes into a single bucket); commission and gross revenue are
+    // distributed per-tier so partial-FER ticket bookings show their free
+    // tiers under freeEntry and paid tiers under ticket.
+    for (const k of ["freeEntry", "ticket", "table"] as const) {
+      commSummary[k].count += split[k].count;
+      commSummary[k].grossRevenue += split[k].gross;
+      commSummary[k].commissionAmount += split[k].comm;
+    }
   }
   // Compute net per type
   for (const k of Object.keys(commSummary) as (keyof typeof commSummary)[]) {
@@ -909,11 +997,10 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   }
   for (const b of allBookings) {
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
-    const fp = Number(b.finalPrice);
     const rev = revenueByBookingId.get(b.id) ?? 0;
     if (dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
-      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + calcComm(fp, b.pubMode ?? "", b.guests, b.ticketWomen, b.ticketMen, b.ticketCouple));
+      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + commTotal(calcCommSplit(b, rev)));
     }
   }
   const dailyRevenue = Array.from(dailyMap.entries())
@@ -1868,18 +1955,36 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     const freeEntryFee = Number(scanComm?.freeEntryRate ?? 0);
     const ticketFee = Number(scanComm?.ticketRate ?? 0);
     const tableFee = Number(scanComm?.tableBookingRate ?? 0);
+    // Mirror the partner-analytics per-tier split: table → tableFee×guests;
+    // ticket-mode on a partial-FER day → free tiers charge freeEntryFee,
+    // paid tiers charge ticketFee, aggregate capped at finalPrice.
     let commissionAmount: number;
     let feePerUnit: number;
     if (booking.pubMode === "table") {
       feePerUnit = tableFee;
-      commissionAmount = tableFee;
+      commissionAmount = tableFee * Math.max(0, booking.guests);
+    } else if (booking.pubMode === "ticket") {
+      const dayName = booking.bookingDate
+        ? SCAN_FREE_ENTRY_DAY_ABBRS[new Date(`${booking.bookingDate}T12:00:00`).getDay()]
+        : "";
+      const ferActiveLocal = !!(scanFer?.enabled && dayName && Array.isArray(scanFer.days) && scanFer.days.includes(dayName));
+      const ferGendersLocal = ferActiveLocal ? (scanFer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+      const tierFree = (g: "women" | "men" | "couple") => ferActiveLocal && ferGendersLocal.includes(g);
+      const freeUnits =
+        (tierFree("women") ? booking.ticketWomen : 0) +
+        (tierFree("men") ? booking.ticketMen : 0) +
+        (tierFree("couple") ? booking.ticketCouple : 0);
+      const totalUnits = booking.ticketWomen + booking.ticketMen + booking.ticketCouple;
+      const paidUnits = Math.max(0, totalUnits - freeUnits);
+      commissionAmount = freeEntryFee * freeUnits + ticketFee * paidUnits;
+      // Surface the dominant per-unit fee (paid if any paid units, else free).
+      feePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
     } else if (price === 0 || booking.pubMode === "free") {
       feePerUnit = freeEntryFee;
       commissionAmount = freeEntryFee * Math.max(0, booking.guests);
     } else {
       feePerUnit = ticketFee;
-      const ticketCount = booking.ticketWomen + booking.ticketMen + booking.ticketCouple;
-      commissionAmount = ticketFee * Math.max(0, ticketCount);
+      commissionAmount = ticketFee * Math.max(0, booking.guests);
     }
     commissionAmount = Math.round(Math.min(commissionAmount, price) * 100) / 100;
     return {
@@ -2062,6 +2167,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
         updatedActuals,
         scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
         { priceWomen: scanPriceInfo.priceWomen, priceMen: scanPriceInfo.priceMen, priceCouple: scanPriceInfo.priceCouple },
+        scanFer ?? null,
       );
       // No try/catch wrapping: if commission persistence fails, the whole
       // request fails with 500 so the operator sees the error and can retry,

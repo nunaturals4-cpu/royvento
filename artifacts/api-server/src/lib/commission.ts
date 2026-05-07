@@ -28,6 +28,30 @@ export interface PlannedBookingShape {
   ticketWomen: number;
   ticketMen: number;
   ticketCouple: number;
+  bookingDate?: string | null;
+}
+
+export interface FreeEntryRulesShape {
+  enabled?: boolean | null;
+  days?: string[] | null;
+  genders?: string[] | null;
+}
+
+const FER_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Returns which ticket tiers are zero-priced at the door for a given booking
+ * date under the event's free-entry rules. Tokens in `genders` are normalised
+ * to lowercase and matched against canonical "women"/"men"/"couple". */
+export function ferTierFreeFlags(bookingDate: string | null | undefined, fer: FreeEntryRulesShape | null | undefined) {
+  const day = bookingDate ? FER_DAY_ABBRS[new Date(`${bookingDate}T12:00:00`).getDay()] : "";
+  const active = !!(fer?.enabled && day && Array.isArray(fer.days) && fer.days.includes(day));
+  const genders = active ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+  return {
+    active,
+    women: active && genders.includes("women"),
+    men: active && genders.includes("men"),
+    couple: active && genders.includes("couple"),
+  };
 }
 
 export interface ActualBookingShape extends PlannedBookingShape {
@@ -69,6 +93,7 @@ export function classifyBookingType(b: { pubMode: string; finalPrice: string | n
 export function computeCommissionFromPlanned(
   b: PlannedBookingShape,
   rates: CommissionRatesInput,
+  fer?: FreeEntryRulesShape | null,
 ): CommissionResult {
   const price = Number(b.finalPrice);
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
@@ -82,16 +107,31 @@ export function computeCommissionFromPlanned(
   let raw = 0;
   if (bookingType === "table") {
     ratePerUnit = tableFee;
-    unitCount = 1;
-    raw = tableFee;
+    unitCount = Math.max(0, b.guests);
+    raw = tableFee * unitCount;
   } else if (bookingType === "free_entry") {
     ratePerUnit = freeEntryFee;
     unitCount = Math.max(0, b.guests);
     raw = freeEntryFee * unitCount;
   } else {
-    ratePerUnit = ticketFee;
-    unitCount = Math.max(0, b.ticketWomen + b.ticketMen + b.ticketCouple);
-    raw = ticketFee * unitCount;
+    // ticket mode. On a partial-FER day, free tiers are billed at freeEntryFee
+    // and paid tiers at ticketFee; otherwise all tickets bill at ticketFee.
+    const totalUnits = Math.max(0, b.ticketWomen + b.ticketMen + b.ticketCouple);
+    unitCount = totalUnits;
+    const flags = ferTierFreeFlags(b.bookingDate ?? null, fer ?? null);
+    if (flags.active) {
+      const freeUnits =
+        (flags.women ? b.ticketWomen : 0) +
+        (flags.men ? b.ticketMen : 0) +
+        (flags.couple ? b.ticketCouple : 0);
+      const paidUnits = Math.max(0, totalUnits - freeUnits);
+      raw = freeEntryFee * freeUnits + ticketFee * paidUnits;
+      // Surface the dominant per-unit fee (paid if any paid tickets, else free).
+      ratePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
+    } else {
+      ratePerUnit = ticketFee;
+      raw = ticketFee * totalUnits;
+    }
   }
   // Online payments are always capped at the price actually collected.
   const amount = round2(Math.min(raw, price));
@@ -114,6 +154,7 @@ export function computeCommissionFromActuals(
   b: ActualBookingShape,
   rates: CommissionRatesInput,
   event: EventPriceShape,
+  fer?: FreeEntryRulesShape | null,
 ): CommissionResult {
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketFee = Number(rates.ticketRate ?? 0);
@@ -135,21 +176,44 @@ export function computeCommissionFromActuals(
   }
 
   if (bookingType === "table") {
+    // Table commission scales with attendees; cash collected is pro-rated by
+    // attendance ratio so partial no-shows aren't over-charged.
     const ratePerUnit = tableFee;
-    const unitCount = 1;
     const guests = Math.max(1, b.guests);
+    const unitCount = Math.max(0, ag);
     const cashCollected = (ag / guests) * Number(b.finalPrice);
-    return { bookingType, ratePerUnit, unitCount, amount: round2(Math.min(tableFee, Math.max(0, cashCollected))) };
+    const raw = tableFee * unitCount;
+    return { bookingType, ratePerUnit, unitCount, amount: round2(Math.min(raw, Math.max(0, cashCollected))) };
   }
 
-  // ticket mode COD
-  const ratePerUnit = ticketFee;
-  const unitCount = Math.max(0, aw + am + ac);
+  // ticket mode COD — split per-tier when FER is active (free tiers billed
+  // at freeEntryFee × actuals; paid tiers at ticketFee × actuals; aggregate
+  // capped by cash actually collected at the door).
+  const flags = ferTierFreeFlags(b.bookingDate ?? null, fer ?? null);
   const pw = Number(event.priceWomen ?? 0);
   const pm = Number(event.priceMen ?? 0);
   const pc = Number(event.priceCouple ?? 0);
-  const cashCollected = aw * pw + am * pm + ac * pc;
-  const raw = ticketFee * unitCount;
+  const unitCount = Math.max(0, aw + am + ac);
+  let raw: number;
+  let ratePerUnit: number;
+  let cashCollected: number;
+  if (flags.active) {
+    const freeUnits =
+      (flags.women ? aw : 0) +
+      (flags.men ? am : 0) +
+      (flags.couple ? ac : 0);
+    const paidUnits = Math.max(0, unitCount - freeUnits);
+    raw = freeEntryFee * freeUnits + ticketFee * paidUnits;
+    ratePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
+    cashCollected =
+      (flags.women ? 0 : aw * pw) +
+      (flags.men ? 0 : am * pm) +
+      (flags.couple ? 0 : ac * pc);
+  } else {
+    ratePerUnit = ticketFee;
+    raw = ticketFee * unitCount;
+    cashCollected = aw * pw + am * pm + ac * pc;
+  }
   return { bookingType, ratePerUnit, unitCount, amount: round2(Math.min(raw, Math.max(0, cashCollected))) };
 }
 
