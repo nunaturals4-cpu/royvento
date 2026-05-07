@@ -426,6 +426,34 @@ export interface RetryPaymentBody {
   callbackScheme?: RetryPaymentBodyCallbackScheme;
 }
 
+export interface RetryPaymentResult {
+  redirectUrl: string;
+  bookingId: number;
+  requiresPayment: boolean;
+}
+
+export type AdminUpdateVendorResultVendor = {
+  id: number;
+  businessName: string;
+  status: string;
+};
+
+export interface AdminUpdateVendorResult {
+  ok: boolean;
+  vendor: AdminUpdateVendorResultVendor;
+}
+
+export interface Coupon {
+  id: number;
+  userId: number;
+  code: string;
+  discountPercent: number;
+  used: boolean;
+  source: string;
+  vendorId?: number | null;
+  createdAt: string;
+}
+
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
 
 export const BookingStatus = {

@@ -3735,6 +3735,11 @@ export const AdminUpdateVendorBody = zod
 
 export const AdminUpdateVendorResponse = zod.object({
   ok: zod.boolean(),
+  vendor: zod.object({
+    id: zod.number(),
+    businessName: zod.string(),
+    status: zod.string(),
+  }),
 });
 
 /**
@@ -3761,7 +3766,14 @@ export const AdminSendCouponBody = zod
   .strict();
 
 export const AdminSendCouponResponse = zod.object({
-  ok: zod.boolean(),
+  id: zod.number(),
+  userId: zod.number(),
+  code: zod.string(),
+  discountPercent: zod.number(),
+  used: zod.boolean(),
+  source: zod.string(),
+  vendorId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
 });
 
 /**
@@ -3783,7 +3795,9 @@ export const RetryBookingPaymentBody = zod
   .strict();
 
 export const RetryBookingPaymentResponse = zod.object({
-  ok: zod.boolean(),
+  redirectUrl: zod.string(),
+  bookingId: zod.number(),
+  requiresPayment: zod.boolean(),
 });
 
 /**

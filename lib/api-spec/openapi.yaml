@@ -1749,7 +1749,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ok"
+                $ref: "#/components/schemas/AdminUpdateVendorResult"
         "400":
           description: Invalid input
         "404":
@@ -1778,7 +1778,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ok"
+                $ref: "#/components/schemas/Coupon"
         "400":
           description: Invalid input
         "404":
@@ -1809,7 +1809,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ok"
+                $ref: "#/components/schemas/RetryPaymentResult"
 
   /wishlist:
     get:
@@ -2476,6 +2476,57 @@ components:
           type: string
           enum: [royvento]
           description: Custom URL scheme for mobile deep-link callbacks.
+
+    RetryPaymentResult:
+      type: object
+      properties:
+        redirectUrl:
+          type: string
+        bookingId:
+          type: integer
+        requiresPayment:
+          type: boolean
+      required: [redirectUrl, bookingId, requiresPayment]
+
+    AdminUpdateVendorResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        vendor:
+          type: object
+          properties:
+            id:
+              type: integer
+            businessName:
+              type: string
+            status:
+              type: string
+          required: [id, businessName, status]
+      required: [ok, vendor]
+
+    Coupon:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        code:
+          type: string
+        discountPercent:
+          type: integer
+        used:
+          type: boolean
+        source:
+          type: string
+        vendorId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, code, discountPercent, used, source, createdAt]
 
     BookingStatus:
       type: string

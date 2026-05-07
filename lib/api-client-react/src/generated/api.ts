@@ -27,11 +27,13 @@ import type {
   AdminSendCouponBody,
   AdminSettlementRequest,
   AdminUpdateVendorBody,
+  AdminUpdateVendorResult,
   AttendanceReportResponse,
   AuthResponse,
   Availability,
   Booking,
   CommissionReport,
+  Coupon,
   CreateBookingBody,
   CreateEventBody,
   CreateReviewBody,
@@ -77,6 +79,7 @@ import type {
   RegisterBody,
   RejectSettlementBody,
   RetryPaymentBody,
+  RetryPaymentResult,
   Review,
   SaveBankingDetailsBody,
   ScanTicketBody,
@@ -6218,8 +6221,8 @@ export const adminUpdateVendor = async (
   id: number,
   adminUpdateVendorBody: AdminUpdateVendorBody,
   options?: RequestInit,
-): Promise<Ok> => {
-  return customFetch<Ok>(getAdminUpdateVendorUrl(id), {
+): Promise<AdminUpdateVendorResult> => {
+  return customFetch<AdminUpdateVendorResult>(getAdminUpdateVendorUrl(id), {
     ...options,
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -6305,8 +6308,8 @@ export const adminSendCoupon = async (
   userId: number,
   adminSendCouponBody: AdminSendCouponBody,
   options?: RequestInit,
-): Promise<Ok> => {
-  return customFetch<Ok>(getAdminSendCouponUrl(userId), {
+): Promise<Coupon> => {
+  return customFetch<Coupon>(getAdminSendCouponUrl(userId), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -6392,8 +6395,8 @@ export const retryBookingPayment = async (
   id: number,
   retryPaymentBody?: RetryPaymentBody,
   options?: RequestInit,
-): Promise<Ok> => {
-  return customFetch<Ok>(getRetryBookingPaymentUrl(id), {
+): Promise<RetryPaymentResult> => {
+  return customFetch<RetryPaymentResult>(getRetryBookingPaymentUrl(id), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
