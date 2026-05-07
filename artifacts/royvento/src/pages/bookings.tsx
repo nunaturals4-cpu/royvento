@@ -352,12 +352,6 @@ function TicketField({ label, value }: { label: string; value: React.ReactNode }
   );
 }
 
-// Per-gender free-entry billing: only tiers in fer.genders are free; others
-// still owe their normal price. Show "Amount Paid" whenever the booking has a
-// non-zero finalPrice — partial-paid bookings (e.g. women free, men paid)
-// must still display the men's contribution. Hide the line only when the
-// booking is genuinely ₹0. Kept in sync with mobile bookings + event-detail.
-
 function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -516,9 +510,6 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
     w.document.close();
   };
 
-  // Per-gender free-entry annotation — when fer is active for the booking
-  // date and the tier's gender is in fer.genders, show "(free)" so the user
-  // sees which tiers were comped. Mirrors the per-gender pricing rule.
   const _bFerWebDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const _bFer = b.freeEntryRules ?? null;
   const _bDayName = b.bookingDate ? _bFerWebDays[new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;

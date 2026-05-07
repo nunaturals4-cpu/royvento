@@ -54,11 +54,6 @@ interface BookingData {
 // Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
 const SCANNER_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Per-gender free-entry helpers — must mirror the server (bookings.ts create,
-// serializeBookings, scan-ticket calcActualAmountDue, partner attendance) and
-// the web/mobile event-detail pages. On a configured day, only tiers in
-// fer.genders are zero-priced; other tiers still owe their normal price.
-// "Whole booking free" is true only when ALL three genders are listed.
 function bookingFerState(b: Pick<BookingData, "bookingDate" | "freeEntryRules">): {
   active: boolean;
   allGendersFree: boolean;
@@ -565,21 +560,13 @@ function ActualEntrySheet({
   }, [b.id, b.actualWomen, b.actualMen, b.actualCouple, b.actualGuests, b.ticketWomen, b.ticketMen, b.ticketCouple, b.guests]);
 
   const isCod = b.paymentMethod === "cod";
-  // Per-gender free-entry state for THIS booking. Whole-booking free banner
-  // only when ferAllGendersFree (ticket-mode partial free still flows through
-  // the COD breakdown so the manager sees per-tier paid amount). Table-mode
-  // is treated as free only when all genders are listed.
   const ferState = bookingFerState(b);
-  const wholeBookingFree = isTicket
-    ? ferState.allGendersFree
-    : ferState.allGendersFree;
+  const wholeBookingFree = ferState.allGendersFree;
   const alreadyRecorded = b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null;
   const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
   const shouldRender = (isTicket && hasAnyBookedTicket) || (!isTicket && b.guests > 0);
 
-  // LIVE running total from current stepper state (server response is null
-  // until save). Apply per-gender zeroing so partial-free days collect cash
-  // only for non-comped tiers — matches server calcActualAmountDue.
+  // Live total from current stepper state; per-gender zeroing matches server.
   const priceWomen = ferState.isTierFree("women") ? 0 : (b.priceWomen ?? 0);
   const priceMen = ferState.isTierFree("men") ? 0 : (b.priceMen ?? 0);
   const priceCouple = ferState.isTierFree("couple") ? 0 : (b.priceCouple ?? 0);

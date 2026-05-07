@@ -300,11 +300,6 @@ export default function EventDetailScreen() {
     (priceWomen === 0 && priceMen === 0 && priceCouple === 0)
   );
 
-  // Per-gender free-entry zeroing — mirrors the server pricing in bookings.ts.
-  // Pub ticket-mode: only tiers whose gender is in fer.genders are zero-priced;
-  // other tiers still charge normally. Pub event/table-mode (no per-gender
-  // concept) is free only when ALL three genders are listed. Non-pub events
-  // use the flat event price.
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     subtotal =

@@ -232,11 +232,6 @@ export function EventDetail() {
 
   const venueName = ev.vendor?.businessName ?? "This venue";
 
-  // Compute subtotal with PER-GENDER free-entry zeroing — mirrors the server
-  // pricing in bookings.ts. Only tiers whose gender appears in fer.genders
-  // are zero-priced; other tiers still charge their normal per-tier price.
-  // Table-mode (no per-gender concept) is treated as free only when ALL three
-  // genders are listed.
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     const pw = isTierFree("women") ? 0 : effectiveWomen;
@@ -260,10 +255,7 @@ export function EventDetail() {
 
   const startingAt = (() => {
     if (isPub) {
-      // On a partial-free-entry day, "Starting at" must reflect the lowest
-      // PAID tier — comped tiers are excluded so we don't mislead users with
-      // a number they will never be charged. ferAllGendersFree is handled by
-      // the isFreeEntryDay branch above which renders a "Free entry" label.
+      // Exclude comped tiers so "Starting at" reflects the lowest paid tier.
       const tiers = [
         { g: "women" as const, p: Number(ev.priceWomen) },
         { g: "men" as const, p: Number(ev.priceMen) },

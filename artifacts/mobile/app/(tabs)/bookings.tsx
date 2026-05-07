@@ -80,12 +80,6 @@ interface ExtendedBooking {
   } | null;
 }
 
-// Per-gender free-entry billing: only tiers in fer.genders are free; others
-// still owe their normal price. The booking's stored finalPrice is the source
-// of truth — show "Amount Paid" whenever it's > 0 so partial-paid bookings
-// (e.g. women free, men paid) display the paid amount. Kept in sync with web
-// bookings.tsx and event-detail.
-
 export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -505,7 +499,6 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                         <Text style={styles.ptFieldLabel}>{t("bookings.tickets")}</Text>
                         <Text style={styles.ptFieldValue}>
                           {(() => {
-                            // Per-gender free-entry annotation — mirror web bookings.tsx.
                             const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
                             const fer = bx.freeEntryRules ?? null;
                             const dayName = b.bookingDate ? days[new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;

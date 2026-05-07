@@ -127,10 +127,6 @@ async function serializeBookings(rows: BookingRow[]) {
     const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
     const hasActuals = aw != null || am != null || ac != null || ag != null;
     const actualEntry = hasActuals ? { women: aw, men: am, couple: ac, guests: ag } : null;
-    // Per-gender free-entry zeroing — must mirror create-booking,
-    // calcActualAmountDue (scan-ticket), and the partner attendance handler.
-    // Only tiers in fer.genders are zero-priced; table mode is free only when
-    // all genders are listed.
     const serFer = (e as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null } | undefined)?.freeEntryRules ?? null;
     const serDayName = b.bookingDate ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;
     const serFerActive = !!(serFer?.enabled && serDayName && Array.isArray(serFer.days) && serFer.days.includes(serDayName));
@@ -262,14 +258,8 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     }
   }
 
-  // Compute base total based on mode. Apply per-pub, PER-GENDER free-entry
-  // rules: when the pub has freeEntryRules.enabled and the booking date's
-  // weekday is in the configured `days` list, only those tiers whose gender
-  // is in `freeEntryRules.genders` are zero-priced; other tiers are charged
-  // normally. Table-mode (no per-gender concept) is treated as free only when
-  // ALL three genders are listed (matches the legacy whole-booking-free
-  // behavior). Mirrored in event-detail (web), event/[id] (mobile), and the
-  // ticket-card hide rule in bookings.tsx — keep the four in sync.
+  // Per-gender free-entry: only tiers in fer.genders are zero-priced; table
+  // mode is free only when all three genders are listed.
   const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const fer = (evt as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null }).freeEntryRules;
   const bookingDayName = FREE_ENTRY_DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
@@ -989,11 +979,6 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
   const eventMap = new Map(events.map((e) => [e.id, e]));
   const userMap = new Map(users.map((u) => [u.id, u]));
 
-  // Per-gender free-entry helpers — must mirror the create-booking handler and
-  // calcActualAmountDue (`/partner/scan-ticket`). On a configured day, only
-  // tiers whose gender is in fer.genders are zero-priced; other tiers still
-  // owe their normal price. Table-mode is treated as free only when ALL
-  // genders are listed.
   const ATTEND_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const attendEventRows = eventIds.length > 0
     ? await db.select({ id: eventsTable.id, freeEntryRules: eventsTable.freeEntryRules }).from(eventsTable).where(inArray(eventsTable.id, eventIds))

@@ -922,10 +922,6 @@ router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => 
     actualAmountDue: ((): number | null => {
       const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
       const ev = events.find((e) => e.id === b.eventId);
-      // Per-gender free-entry zeroing — must mirror bookings.ts (create,
-      // serializeBookings, scan-ticket, partner attendance). Only tiers in
-      // fer.genders are zero-priced; table mode is free only when all genders
-      // are listed.
       const fer = (ev as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null } | undefined)?.freeEntryRules ?? null;
       const dayName = b.bookingDate ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;
       const ferActive = !!(fer?.enabled && dayName && Array.isArray(fer.days) && fer.days.includes(dayName));
@@ -937,7 +933,6 @@ router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => 
         const pw = isTierFree("women") ? 0 : Number(ev?.priceWomen ?? 0);
         const pm = isTierFree("men") ? 0 : Number(ev?.priceMen ?? 0);
         const pc = isTierFree("couple") ? 0 : Number(ev?.priceCouple ?? 0);
-        // Cash collected at door = per-type counts × per-type price (zero for free tiers, no coupon/points scaling).
         return Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
       }
       if (ag == null) return null;
