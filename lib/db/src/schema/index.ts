@@ -150,7 +150,9 @@ export const bookingsTable = pgTable(
   "bookings",
   {
     id: serial("id").primaryKey(),
-    eventId: integer("event_id").notNull(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => eventsTable.id, { onDelete: "restrict" }),
     userId: integer("user_id").notNull(),
     vendorId: integer("vendor_id").notNull(),
     bookingDate: date("booking_date").notNull(),

@@ -88,6 +88,7 @@ pnpm --filter @workspace/db run push
 - **API Client Regeneration**: After any changes to `openapi.yaml`, always run `pnpm --filter @workspace/api-spec run codegen` to update frontend API hooks and Zod schemas.
 - **DB Schema Changes**: When modifying the database schema, generate a new migration (`pnpm --filter @workspace/db run generate`) and then apply it (`pnpm --filter @workspace/db run migrate` or `pnpm --filter @workspace/db run push`).
 - **Notification Emails**: Email notifications are currently logged to console; a real email provider (e.g., SendGrid) needs to be configured in `artifacts/api-server/src/lib/notifications.ts` for actual delivery.
+- **Password Hash Audit**: On boot the API server runs `auditPasswordHashes()` and logs an `error` if any `users.password_hash` is NULL or doesn't match the bcrypt prefix `$2a/$2b/$2y`. If it fires, identify the rows (`SELECT id, email FROM users WHERE password_hash IS NULL OR password_hash !~ '^\$2[aby]\$'`), force a password reset for real accounts, or delete dummies — never leave plaintext or empty hashes in `users`. `bookings.event_id` is `ON DELETE RESTRICT`, so events with bookings cannot be hard-deleted; cancel/reassign first.
 
 ## Pointers
 

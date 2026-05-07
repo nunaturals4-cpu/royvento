@@ -5,8 +5,30 @@ import { runBookingReminders } from "./jobs/bookingReminders";
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import cron from "node-cron";
 import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+
+async function auditPasswordHashes() {
+  try {
+    const rows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(usersTable)
+      .where(
+        sql`${usersTable.passwordHash} IS NULL OR ${usersTable.passwordHash} !~ '^\\$2[aby]\\$'`,
+      );
+    const bad = rows[0]?.count ?? 0;
+    if (bad > 0) {
+      logger.error(
+        { badPasswordHashCount: bad },
+        "Startup audit: users.password_hash failed bcrypt prefix check. See replit.md gotcha.",
+      );
+    } else {
+      logger.info("Startup audit: all users.password_hash values look like bcrypt");
+    }
+  } catch (err) {
+    logger.error({ err }, "Startup audit failed (password_hash check)");
+  }
+}
 
 const ADMIN_EMAIL = "royvento56@gmail.com";
 const ADMIN_PASSWORD = "admin123@";
@@ -70,7 +92,9 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
-  ensureAdminAccount();
+  ensureAdminAccount()
+    .then(() => auditPasswordHashes())
+    .catch((err) => logger.error({ err }, "Startup admin/audit chain failed"));
   runCleanup();
 
   cron.schedule("0 2 * * *", () => {
