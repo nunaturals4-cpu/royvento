@@ -113,22 +113,12 @@ export function Navbar() {
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, [user, qc]);
 
-  // Also refresh when the tab regains focus / becomes visible, so badges
-  // catch up after the user comes back from another tab or device.
-  useEffect(() => {
-    if (!user) return;
-    const refresh = () => {
-      if (document.visibilityState === "visible") {
-        qc.invalidateQueries({ queryKey: ["notifications"] });
-      }
-    };
-    document.addEventListener("visibilitychange", refresh);
-    window.addEventListener("focus", refresh);
-    return () => {
-      document.removeEventListener("visibilitychange", refresh);
-      window.removeEventListener("focus", refresh);
-    };
-  }, [user, qc]);
+  // Note: we deliberately do NOT refetch notifications on visibilitychange /
+  // window focus. That implicit refetch caused a "page is silently
+  // refreshing" feeling whenever the user came back to the tab. Real-time
+  // updates still arrive via the service-worker push-message listener above,
+  // and the badge updates whenever the user navigates or marks a notification
+  // read. If a stale badge is ever an issue, the user can refresh manually.
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
