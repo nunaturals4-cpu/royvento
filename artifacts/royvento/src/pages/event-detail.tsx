@@ -334,7 +334,7 @@ export function EventDetail() {
     }
 
     // Per-field required validation (everything except couponCode / points / notes).
-    if (!personName.trim()) {
+    if (isPub && !personName.trim()) {
       toast({ title: t("events.required_field"), description: t("events.name_on_booking"), variant: "destructive" });
       return;
     }

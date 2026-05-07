@@ -67,11 +67,21 @@ const CreateBookingBody = z.object({
   ticketMen: z.number().int().nonnegative().default(0),
   ticketCouple: z.number().int().nonnegative().default(0),
   selectedPubEvent: z.string().default(""),
-  personName: z.string().min(1, "Person name is required"),
+  // personName: required for pub bookings only (enforced via superRefine
+  // below). Non-pub flows fall back to the authenticated user's name.
+  personName: z.string().optional().default(""),
   phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits"),
   paymentMethod: z.enum(["cod", "online"]).default("online"),
   callbackScheme: z.enum(["royvento"]).optional(),
   arrivalTime: z.string().default(""),
+}).superRefine((val, ctx) => {
+  if (val.pubMode && !val.personName.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["personName"],
+      message: "Person name is required",
+    });
+  }
 });
 
 const router: IRouter = Router();
@@ -222,7 +232,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
   const parsed = CreateBookingBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    const issues = parsed.error.issues.map((i) => ({
+      path: i.path.join("."),
+      message: i.message,
+    }));
+    const summary = issues.map((i) => `${i.path}: ${i.message}`).join("; ");
+    res.status(400).json({ error: summary || "Invalid input", issues });
     return;
   }
   const eRows = await db
