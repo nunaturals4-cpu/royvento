@@ -5,22 +5,37 @@ import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
 
 export default function PaymentResultScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
-  const { payment, status, eventTitle, bookingId } = useLocalSearchParams<{
+  const { payment, status, eventTitle, bookingId, id } = useLocalSearchParams<{
     payment?: string;
     status?: string;
     eventTitle?: string;
     bookingId?: string;
+    id?: string;
   }>();
 
   const isSuccess = payment === "success" || status === "success";
   const isFailed = payment === "failed" || payment === "cancelled" || status === "failed" || status === "cancelled";
   const success = isSuccess && !isFailed;
   const unknown = !isSuccess && !isFailed;
+
+  const bookingIdNum = (() => {
+    const raw = bookingId ?? id;
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) ? n : null;
+  })();
+  const { data: bookings } = useListMyBookings({
+    query: { queryKey: getListMyBookingsQueryKey(), enabled: success && !!bookingIdNum },
+  });
+  const matched = bookingIdNum && Array.isArray(bookings)
+    ? (bookings as Array<{ id: number; finalPrice?: number | null; totalPrice?: number | null }>).find((b) => b.id === bookingIdNum)
+    : null;
+  const paidAmount = matched ? Number(matched.finalPrice ?? matched.totalPrice ?? 0) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -59,9 +74,17 @@ export default function PaymentResultScreen() {
         ) : null}
 
         {success ? (
-          <Text style={[styles.message, { color: colors.mutedForeground }]}>
-            Your booking has been confirmed. You can view your ticket in My Bookings.
-          </Text>
+          <>
+            <Text style={[styles.message, { color: colors.mutedForeground }]}>
+              Your booking has been confirmed. You can view your ticket in My Bookings.
+            </Text>
+            {paidAmount != null && (
+              <View style={styles.amountBox}>
+                <Text style={styles.amountLabel}>{paidAmount === 0 ? "FREE ENTRY" : "AMOUNT PAID"}</Text>
+                <Text style={styles.amountValue}>₹{paidAmount.toLocaleString("en-IN")}</Text>
+              </View>
+            )}
+          </>
         ) : unknown ? (
           <Text style={[styles.message, { color: colors.mutedForeground }]}>
             We could not determine your payment result. Please check My Bookings or contact support.
@@ -109,4 +132,7 @@ const styles = StyleSheet.create({
   primaryBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
   secondaryBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center", borderWidth: 1 },
   secondaryBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  amountBox: { borderWidth: 1, borderColor: "rgba(212,168,83,0.35)", backgroundColor: "rgba(212,168,83,0.08)", borderRadius: 16, paddingHorizontal: 22, paddingVertical: 14, alignItems: "center", marginTop: 4 },
+  amountLabel: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 2, color: "rgba(212,168,83,0.7)", marginBottom: 4 },
+  amountValue: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#d4a853" },
 });

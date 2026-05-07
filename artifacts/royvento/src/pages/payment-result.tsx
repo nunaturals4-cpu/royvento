@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle } from "lucide-react";
+import { useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
 
 function getQueryParam(search: string, key: string): string | null {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -12,9 +13,19 @@ export function PaymentResult() {
   const status = getQueryParam(search, "status") ?? getQueryParam(search, "payment");
   const type = getQueryParam(search, "type");
   const code = getQueryParam(search, "code");
+  const bookingIdRaw = getQueryParam(search, "id") ?? getQueryParam(search, "bookingId");
+  const bookingId = bookingIdRaw ? Number(bookingIdRaw) : null;
 
   const isSuccess = status === "success";
   const isBooking = type === "booking";
+
+  const { data: bookings = [] } = useListMyBookings({
+    query: { queryKey: getListMyBookingsQueryKey(), enabled: isSuccess && isBooking && !!bookingId },
+  });
+  const booking = bookingId
+    ? (bookings as Array<{ id: number; finalPrice?: number | null; totalPrice?: number | null }>).find((b) => b.id === bookingId)
+    : null;
+  const paidAmount = booking ? Number(booking.finalPrice ?? booking.totalPrice ?? 0) : null;
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-24 flex items-center justify-center min-h-[60vh]">
@@ -30,6 +41,16 @@ export function PaymentResult() {
                 ? "Your booking has been confirmed. You will receive a confirmation email shortly."
                 : "Your subscription is now active. Welcome to Royvento Premium!"}
             </p>
+            {isBooking && paidAmount != null && (
+              <div className="rounded-2xl border border-amber-400/25 bg-amber-400/5 px-5 py-4">
+                <p className="text-[10px] uppercase tracking-[0.28em] text-amber-400/60 mb-1">
+                  {paidAmount === 0 ? "Free entry" : "Amount paid"}
+                </p>
+                <p className="font-serif text-3xl text-amber-300">
+                  ₹{paidAmount.toLocaleString("en-IN")}
+                </p>
+              </div>
+            )}
             <div className="pt-2 flex flex-col gap-3">
               {isBooking ? (
                 <>
