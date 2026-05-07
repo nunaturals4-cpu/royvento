@@ -72,7 +72,7 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
         error: "Payment system not configured. Set PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, and PHONEPE_ENV environment variables, or set PAYMENT_BYPASS=true for development.",
       });
     }
-    console.warn("[subscriptions] PAYMENT_BYPASS=true — auto-activating subscription without payment. Remove PAYMENT_BYPASS before going live.");
+    req.log.warn("PAYMENT_BYPASS=true — auto-activating subscription without payment. Remove PAYMENT_BYPASS before going live.");
   }
 
   const subStatus = usePhonePe ? "pending" : "active";
@@ -137,7 +137,7 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
     });
     return res.json({ redirectUrl, subscriptionId: sub.id, requiresPayment: true });
   } catch (err) {
-    console.error("[subscriptions] PhonePe initiation failed:", err);
+    req.log.error({ err }, "[subscriptions] PhonePe initiation failed");
     await db.update(subscriptionsTable).set({ status: "expired" }).where(eq(subscriptionsTable.id, sub.id));
     await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
     return res.status(502).json({ error: "Payment initiation failed. Please try again." });

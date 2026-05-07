@@ -4,7 +4,20 @@ import type { Request, Response, NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-const SECRET = process.env["SESSION_SECRET"] || "royvento-dev-secret";
+function resolveSessionSecret(): string {
+  const value = process.env["SESSION_SECRET"];
+  if (value && value.length > 0) return value;
+  if (process.env["NODE_ENV"] === "production") {
+    throw new Error(
+      "SESSION_SECRET environment variable is required in production. " +
+        "Set a long random value before starting the server.",
+    );
+  }
+  return "royvento-dev-secret";
+}
+
+export const SESSION_SECRET: string = resolveSessionSecret();
+const SECRET = SESSION_SECRET;
 const COOKIE_NAME = "royvento_token";
 const TOKEN_TTL = "30d";
 

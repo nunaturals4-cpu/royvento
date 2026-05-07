@@ -1,5 +1,6 @@
 import { db, blogsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const blogs = [
   {
@@ -105,18 +106,18 @@ const blogs = [
 ];
 
 async function seed() {
-  console.log("Seeding blogs...");
+  logger.info("Seeding blogs...");
   for (const blog of blogs) {
     const existing = await db.select().from(blogsTable).where(eq(blogsTable.slug, blog.slug)).limit(1);
     if (existing[0]) {
-      console.log(`Blog '${blog.slug}' already exists, skipping.`);
+      logger.info(`Blog '${blog.slug}' already exists, skipping.`);
     } else {
       await db.insert(blogsTable).values(blog);
-      console.log(`Inserted: ${blog.slug}`);
+      logger.info(`Inserted: ${blog.slug}`);
     }
   }
-  console.log("Done.");
+  logger.info("Done.");
   process.exit(0);
 }
 
-seed().catch((e) => { console.error(e); process.exit(1); });
+seed().catch((e) => { logger.error(e); process.exit(1); });

@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { and, eq, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { logger } from "../lib/logger";
 
 async function ensureAdmin() {
   const existing = await db
@@ -18,7 +19,7 @@ async function ensureAdmin() {
       .update(usersTable)
       .set({ role: "admin", passwordHash: await bcrypt.hash("admin123@", 10) })
       .where(eq(usersTable.id, existing[0].id));
-    console.log("Admin user updated.");
+    logger.info("Admin user updated.");
     return existing[0];
   }
   const [admin] = await db
@@ -31,7 +32,7 @@ async function ensureAdmin() {
       phone: "+91 9000000000",
     })
     .returning();
-  console.log("Admin user created.");
+  logger.info("Admin user created.");
   return admin;
 }
 
@@ -218,18 +219,18 @@ async function ensureDemoEvents(vendorId: number) {
       approvalStatus: "approved",
     });
   }
-  console.log(`Seeded ${DEMO_PUBS.length} demo pub listings.`);
+  logger.info(`Seeded ${DEMO_PUBS.length} demo pub listings.`);
 }
 
 async function main() {
   await ensureAdmin();
   const vendor = await ensureDemoPartner();
   await ensureDemoEvents(vendor.id);
-  console.log("Seed complete.");
+  logger.info("Seed complete.");
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error(err);
+  logger.error(err);
   process.exit(1);
 });

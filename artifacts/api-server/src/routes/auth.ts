@@ -163,7 +163,7 @@ router.post("/auth/register", registerLimiter, async (req, res) => {
         status: "pending",
       });
     } catch (e) {
-      console.error("Failed to record referral", e);
+      req.log.error({ err: e }, "Failed to record referral");
     }
   }
 
@@ -173,7 +173,7 @@ router.post("/auth/register", registerLimiter, async (req, res) => {
     toName: created.name,
     token: verifyToken,
   }).catch((err) => {
-    console.error("Failed to send verification email:", err);
+    req.log.error({ err }, "Failed to send verification email");
   });
 
   res.json({
@@ -291,7 +291,7 @@ router.post("/auth/resend-verification", resendVerificationLimiter, async (req, 
     toName: user.name,
     token: verifyToken,
   }).catch((err) => {
-    console.error("Failed to resend verification email:", err);
+    req.log.error({ err }, "Failed to resend verification email");
   });
   res.json({ ok: true, message: "If that email is pending verification, a new link has been sent." });
 });
@@ -388,7 +388,7 @@ router.get("/auth/google/callback", async (req, res) => {
     });
 
     if (!tokenRes.ok) {
-      console.error("Google token exchange failed:", await tokenRes.text());
+      req.log.error({ body: await tokenRes.text() }, "Google token exchange failed");
       res.redirect("/?error=google_auth_failed");
       return;
     }
@@ -472,7 +472,7 @@ router.get("/auth/google/callback", async (req, res) => {
     setAuthCookie(res, token);
     res.redirect("/");
   } catch (err) {
-    console.error("Google OAuth callback error:", err);
+    req.log.error({ err }, "Google OAuth callback error");
     res.redirect("/?error=google_auth_failed");
   }
 });
@@ -507,7 +507,7 @@ router.post("/auth/forgot-password", forgotPasswordLimiter, async (req, res) => 
       token,
     });
   } catch (err) {
-    console.error("Failed to send password reset email:", err);
+    req.log.error({ err }, "Failed to send password reset email");
   }
   res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
 });
@@ -647,7 +647,7 @@ router.post("/auth/google/mobile", async (req, res) => {
     setAuthCookie(res, token);
     res.json({ token, user: userToPublic(user) });
   } catch (err) {
-    console.error("Google mobile auth error:", err);
+    req.log.error({ err }, "Google mobile auth error");
     res.status(500).json({ error: "Google authentication failed" });
   }
 });

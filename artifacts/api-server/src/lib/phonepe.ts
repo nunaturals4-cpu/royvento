@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import https from "https";
+import { logger as phonepeLogger } from "./logger";
 
 function getConfig() {
   const merchantId = process.env["PHONEPE_MERCHANT_ID"] ?? "";
@@ -162,7 +163,7 @@ export async function initiatePayment(params: {
 
   if (!isPhonePeInitiateResponse(raw) || !raw.success) {
     const msg = isPhonePeInitiateResponse(raw) ? raw.message : "Unknown PhonePe error";
-    console.error("[phonepe] Initiate payment failed:", JSON.stringify(raw));
+    phonepeLogger.error({ raw }, "[phonepe] Initiate payment failed");
     throw new Error(msg ?? "PhonePe payment initiation failed");
   }
 

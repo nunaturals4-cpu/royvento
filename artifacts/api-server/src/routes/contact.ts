@@ -1,10 +1,19 @@
 import { Router, type IRouter } from "express";
+import rateLimit from "express-rate-limit";
 import { db, contactMessagesTable } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many contact submissions — please try again later." },
+});
 
 const ContactBody = z.object({
   name: z.string().min(1).max(255),
@@ -14,7 +23,7 @@ const ContactBody = z.object({
   message: z.string().min(1),
 });
 
-router.post("/contact", async (req, res) => {
+router.post("/contact", contactLimiter, async (req, res) => {
   const parsed = ContactBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
@@ -30,9 +39,9 @@ router.post("/contact", async (req, res) => {
       message: parsed.data.message,
     })
     .returning();
-  // eslint-disable-next-line no-console
-  console.log(
-    `\n📨  New contact message from ${parsed.data.name} <${parsed.data.email}> — "${parsed.data.subject}"\n`,
+  req.log.info(
+    { name: parsed.data.name, email: parsed.data.email, subject: parsed.data.subject },
+    "New contact message received",
   );
   res.json(m);
 });

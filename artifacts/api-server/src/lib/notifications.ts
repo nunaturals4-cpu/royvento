@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { logger } from "./logger";
 
 // ─── Required / optional environment variables ───────────────────────────────
 //
@@ -162,8 +163,8 @@ async function deliver(label: string, payload: EmailPayload): Promise<void> {
   const client = getResendClient();
 
   if (!client) {
-    // eslint-disable-next-line no-console
-    console.log(formatEmailConsole(label, payload));
+    logger.info({ label, to: payload.to, subject: payload.subject }, "Email (dev mode, not sent)");
+    logger.debug(formatEmailConsole(label, payload));
     return;
   }
 
@@ -180,9 +181,9 @@ async function deliver(label: string, payload: EmailPayload): Promise<void> {
   });
 
   if (error) {
-    console.error(`[notifications] Failed to send "${label}" to ${payload.to}:`, error);
+    logger.error({ err: error, label, to: payload.to }, "[notifications] Failed to send email");
   } else {
-    console.log(`[notifications] Sent "${label}" to ${payload.to}`);
+    logger.info({ label, to: payload.to }, "[notifications] Sent email");
   }
 }
 
@@ -265,7 +266,7 @@ export async function sendPasswordResetEmail(params: {
   if (templateId) {
     const client = getResendClient();
     if (!client) {
-      console.warn(
+      logger.warn(
         "[notifications] RESEND_FORGOT_PASSWORD_TEMPLATE_ID is set but RESEND_API_KEY is missing — " +
           "falling back to plain-text email. Set RESEND_API_KEY to use the template.",
       );
@@ -284,9 +285,9 @@ export async function sendPasswordResetEmail(params: {
         },
       });
       if (error) {
-        console.error("[notifications] Failed to send templated password reset email:", error);
+        logger.error({ err: error }, "[notifications] Failed to send templated password reset email");
       } else {
-        console.log(`[notifications] Sent templated "Password Reset" to ${params.to}`);
+        logger.info({ to: params.to }, "[notifications] Sent templated Password Reset");
       }
       return;
     }

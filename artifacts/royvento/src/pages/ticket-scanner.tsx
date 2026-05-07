@@ -334,14 +334,10 @@ export function TicketScanner() {
     setLoading(true);
     setResult(null);
     try {
-      const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
       const res = await fetch("/api/partner/scan-ticket", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
       if (res.ok) {
@@ -687,7 +683,6 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
   const submit = async () => {
     setSaving(true);
     try {
-      const token = (() => { try { return localStorage.getItem("royvento_token"); } catch { return null; } })();
       const code = `RV-${String(b.id).padStart(6, "0")}`;
       const actualEntry = isTicket
         ? { women: w, men: m, couple: c }
@@ -695,10 +690,7 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
       const res = await fetch("/api/partner/scan-ticket", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, actualEntry }),
       });
       const json = (await res.json()) as Record<string, unknown>;

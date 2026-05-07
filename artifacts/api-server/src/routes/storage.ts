@@ -2,17 +2,32 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
 import express from "express";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { compressImage } from "../lib/imageCompressor";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, type AuthedRequest } from "../lib/auth";
 import { verifyUploadToken, buildServerUploadUrl } from "../lib/uploadToken";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+
+// Per-user limiter for upload-URL requests; falls back to IP for unauthed.
+const uploadUrlLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const u = (req as AuthedRequest).user;
+    if (u) return `user:${u.id}`;
+    return ipKeyGenerator(req.ip ?? "");
+  },
+  message: { error: "Too many upload requests — please slow down." },
+});
 
 const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -25,7 +40,7 @@ const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
  * Returns a short-lived HMAC-signed server-side upload URL instead of a
  * presigned GCS URL, allowing the server to compress images before storing.
  */
-router.post("/storage/uploads/request-url", requireAuth(), async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });

@@ -1,12 +1,3 @@
-function authHeaders(): Record<string, string> {
-  try {
-    const t = localStorage.getItem("royvento_token");
-    return t ? { Authorization: `Bearer ${t}` } : {};
-  } catch {
-    return {};
-  }
-}
-
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
@@ -25,7 +16,6 @@ async function handle<T>(res: Response): Promise<T> {
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
-    headers: { ...authHeaders() },
   });
   return handle<T>(res);
 }
@@ -34,7 +24,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return handle<T>(res);
@@ -44,7 +34,7 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "PATCH",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return handle<T>(res);
@@ -54,7 +44,6 @@ export async function apiDelete<T>(path: string): Promise<T> {
   const res = await fetch(path, {
     method: "DELETE",
     credentials: "include",
-    headers: { ...authHeaders() },
   });
   return handle<T>(res);
 }
@@ -63,7 +52,7 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "PUT",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   return handle<T>(res);

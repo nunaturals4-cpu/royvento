@@ -360,7 +360,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         code: "PHONEPE_UNCONFIGURED",
       });
     }
-    console.warn("[bookings] PAYMENT_BYPASS=true — auto-confirming booking without payment. Remove PAYMENT_BYPASS before going live.");
+    req.log.warn("PAYMENT_BYPASS=true — auto-confirming booking without payment. Remove PAYMENT_BYPASS before going live.");
   }
 
   const bookingStatus = usePhonePe ? "payment_pending" : "confirmed";
@@ -473,7 +473,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       });
       res.json({ redirectUrl, bookingId: b.id, requiresPayment: true });
     } catch (err) {
-      console.error("[bookings] PhonePe initiation failed:", err);
+      req.log.error({ err }, "PhonePe initiation failed");
       await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
       await db.update(bookingsTable).set({ status: "cancelled", rejectionReason: "Payment initiation failed" }).where(eq(bookingsTable.id, b.id));
       if (validCode) {
@@ -538,7 +538,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Failed to send booking notifications:", err);
+    req.log.error({ err }, "Failed to send booking notifications");
   }
 
   try {
@@ -594,7 +594,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       }
     }
   } catch (err) {
-    console.error("Failed to award referral points at booking creation:", err);
+    req.log.error({ err }, "Failed to award referral points at booking creation");
   }
 
   try {
@@ -606,7 +606,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       tag: `booking-${out?.id ?? b.id}`,
     });
   } catch (err) {
-    console.error("Failed to create booking confirmation notification:", err);
+    req.log.error({ err }, "Failed to create booking confirmation notification");
   }
 
   res.json(out);
@@ -1306,7 +1306,7 @@ router.patch(
           }
         }
       } catch (err) {
-        console.error("Failed to award referral points", err);
+        req.log.error({ err }, "Failed to award referral points");
       }
     }
 
@@ -1324,7 +1324,7 @@ router.patch(
           status: updated.status,
         });
       } catch (err) {
-        console.error("Failed to send status notification:", err);
+        req.log.error({ err }, "Failed to send status notification");
       }
 
       // Create in-app notification for the booking user
@@ -1358,7 +1358,7 @@ router.patch(
           }).catch(() => {});
         }
       } catch (err) {
-        console.error("Failed to create notification:", err);
+        req.log.error({ err }, "Failed to create notification");
       }
     }
 
@@ -1473,7 +1473,7 @@ router.patch(
           }
         }
       } catch (err) {
-        console.error("Failed to send partner cancellation notification:", err);
+        req.log.error({ err }, "Failed to send partner cancellation notification");
       }
 
       // In-app notification for the customer confirming the cancellation
@@ -1486,7 +1486,7 @@ router.patch(
           tag: `booking-cancelled-${updated.id}`,
         });
       } catch (err) {
-        console.error("Failed to create customer cancellation notification:", err);
+        req.log.error({ err }, "Failed to create customer cancellation notification");
       }
     }
 
@@ -1579,7 +1579,7 @@ router.patch(
           }
         }
       } catch (err) {
-        console.error("Failed to award referral points (admin path)", err);
+        req.log.error({ err }, "Failed to award referral points (admin path)");
       }
     }
 
@@ -1596,7 +1596,7 @@ router.patch(
           status: updated.status,
         });
       } catch (err) {
-        console.error("Failed to send status notification (admin path):", err);
+        req.log.error({ err }, "Failed to send status notification (admin path)");
       }
 
       // Create in-app notification for the booking user
@@ -1623,7 +1623,7 @@ router.patch(
           });
         }
       } catch (err) {
-        console.error("Failed to create notification (admin path):", err);
+        req.log.error({ err }, "Failed to create notification (admin path)");
       }
     }
 

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { logger } from "../lib/logger";
 import {
   db,
   paymentsTable,
@@ -180,7 +181,7 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
 
     }
   } catch (err) {
-    console.error("[payments] Failed to send booking notifications:", err);
+    logger.error({ err }, "[payments] Failed to send booking notifications");
   }
 
   try {
@@ -222,7 +223,7 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
       }
     }
   } catch (err) {
-    console.error("[payments] Failed to award referral points after payment:", err);
+    logger.error({ err }, "[payments] Failed to award referral points after payment");
   }
 
   try {
@@ -235,7 +236,7 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
       tag: `booking-${booking.id}`,
     });
   } catch (err) {
-    console.error("[payments] Failed to create booking confirmation notification:", err);
+    logger.error({ err }, "[payments] Failed to create booking confirmation notification");
   }
 }
 
@@ -442,7 +443,7 @@ router.post("/payments/webhook", async (req, res) => {
   }
 
   if (!verifyWebhookSignature(base64Response, xVerify)) {
-    console.warn("[payments] webhook signature mismatch");
+    req.log.warn("[payments] webhook signature mismatch");
     return res.status(401).json({ error: "Invalid signature" });
   }
 
@@ -466,7 +467,7 @@ router.post("/payments/webhook", async (req, res) => {
     .limit(1);
 
   if (!payment) {
-    console.warn(`[payments] webhook: no payment found for ${merchantTransactionId}`);
+    req.log.warn({ merchantTransactionId }, "[payments] webhook: no payment found");
     return res.status(200).json({ ok: true });
   }
 

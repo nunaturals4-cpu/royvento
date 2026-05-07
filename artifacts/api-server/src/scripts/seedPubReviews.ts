@@ -1,3 +1,5 @@
+import { logger } from "../lib/logger";
+
 /**
  * seedPubReviews.ts — Seed realistic fake reviews for every approved pub event.
  *
@@ -68,7 +70,7 @@ async function upsertUser(
 }
 
 async function main() {
-  console.log("Seeding pub reviews…");
+  logger.info("Seeding pub reviews…");
 
   const passwordHash = await bcrypt.hash("Seed@Reviewer#2024!", 10);
 
@@ -78,7 +80,7 @@ async function main() {
     const u = await upsertUser(r.email, r.name, r.code, passwordHash);
     if (u) primaryUsers.push(u);
   }
-  console.log(`Ensured ${primaryUsers.length} primary reviewer accounts.`);
+  logger.info(`Ensured ${primaryUsers.length} primary reviewer accounts.`);
 
   // Stable ordering ensures deterministic (primary event = lowest id) per vendor.
   const pubs = await db
@@ -87,7 +89,7 @@ async function main() {
     .where(and(eq(eventsTable.type, "pub"), eq(eventsTable.approvalStatus, "approved")))
     .orderBy(asc(eventsTable.vendorId), asc(eventsTable.id));
 
-  console.log(`Found ${pubs.length} approved pub events.`);
+  logger.info(`Found ${pubs.length} approved pub events.`);
 
   /**
    * Strategy: attempt each review with the matching primary reviewer first.
@@ -150,11 +152,11 @@ async function main() {
     }
   }
 
-  console.log(`Done! Inserted: ${inserted}, Skipped (already existed): ${skipped}`);
+  logger.info(`Done! Inserted: ${inserted}, Skipped (already existed): ${skipped}`);
   process.exit(0);
 }
 
 main().catch((e: unknown) => {
-  console.error(e instanceof Error ? e.message : e);
+  logger.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });

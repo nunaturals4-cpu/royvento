@@ -143,7 +143,6 @@ export function Navbar() {
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => {
-        localStorage.removeItem("royvento_token");
         refetch();
         setLocation("/");
       },

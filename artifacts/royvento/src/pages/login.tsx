@@ -48,7 +48,6 @@ export function Login() {
       { data: { email, password } },
       {
         onSuccess: (data) => {
-          if (data.token) localStorage.setItem("royvento_token", data.token);
           qc.invalidateQueries();
           toast({ title: `${t("auth.welcome_back")}, ${data.user.name.split(" ")[0]}` });
           setLocation("/");
