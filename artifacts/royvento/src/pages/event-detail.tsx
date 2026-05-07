@@ -230,6 +230,21 @@ export function EventDetail() {
     (effectiveWomen === 0 && effectiveMen === 0 && effectiveCouple === 0)
   );
 
+  // Headline label when a free-entry rule is active for the selected day.
+  // "Free entry for everyone" when all three genders are listed, otherwise
+  // "Free entry for Women, Men…" using the locale-translated tier names.
+  const ferGenderLabels = ferGenders.map((g) => {
+    if (g === "women") return t("events.women");
+    if (g === "men") return t("events.men");
+    if (g === "couple") return t("events.couple");
+    return g;
+  });
+  const ferHeadline = ferDayActive
+    ? (ferAllGendersFree
+        ? t("events.free_entry_for_everyone")
+        : t("events.free_entry_for", { genders: ferGenderLabels.join(" & ") }))
+    : "";
+
   const venueName = ev.vendor?.businessName ?? "This venue";
 
   let subtotal = 0;
@@ -243,6 +258,15 @@ export function EventDetail() {
   } else {
     subtotal = Number(ev.price) * Math.max(1, guests);
   }
+  // Booking-level "fully free" gate. Used to hide coupon/points/payment/totals
+  // when the user's selection has subtotal ₹0 due to per-gender free-entry
+  // rules (or the legacy whole-day-free case).
+  const _ticketsCount = ticketWomen + ticketMen + ticketCouple;
+  const bookingIsFullyFree = isPub && (
+    isFreeEntryDay ||
+    (ferDayActive && pubMode === "ticket" && _ticketsCount > 0 && subtotal === 0)
+  );
+
   const couponDiscount = couponState?.valid ? Math.round(subtotal * (couponState.discountPercent / 100)) : 0;
   const newUserPercent = discountInfo?.isNewUser && !couponState?.valid ? (discountInfo.bookingDiscountPercent || 0) : 0;
   const newUserDiscount = newUserPercent > 0 ? Math.round(subtotal * (newUserPercent / 100)) : 0;
@@ -309,9 +333,28 @@ export function EventDetail() {
       return;
     }
 
-    if (isPub && phone && !/^\d{10}$/.test(phone)) {
+    // Per-field required validation (everything except couponCode / points / notes).
+    if (!personName.trim()) {
+      toast({ title: t("events.required_field"), description: t("events.name_on_booking"), variant: "destructive" });
+      return;
+    }
+    if (!phone.trim()) {
+      toast({ title: t("events.required_field"), description: t("events.contact_phone"), variant: "destructive" });
+      return;
+    }
+    if (!/^\d{10}$/.test(phone.replace(/\D/g, ""))) {
       toast({ title: t("events.invalid_phone"), description: t("events.phone_desc"), variant: "destructive" });
       return;
+    }
+    if (isPub && pubMode === "event") {
+      if (!eventType) {
+        toast({ title: t("events.required_field"), description: t("events.occasion_label"), variant: "destructive" });
+        return;
+      }
+      if (!budget) {
+        toast({ title: t("events.required_field"), description: t("events.budget_range"), variant: "destructive" });
+        return;
+      }
     }
     if (isClosedDay) {
       toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" });
@@ -334,7 +377,7 @@ export function EventDetail() {
         notes,
         eventType,
         budgetRange: budget === "any" ? "" : budget,
-        couponCode: !isFreeEntryDay && couponState?.valid ? couponState.code : "",
+        couponCode: !bookingIsFullyFree && couponState?.valid ? couponState.code : "",
         personName,
         phone,
         pointsToUse: pointsApplied,
@@ -1037,8 +1080,8 @@ export function EventDetail() {
 
         <aside className="lg:sticky lg:top-24 lg:self-start space-y-4 order-first lg:order-none">
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
-            {isFreeEntryDay ? (
-              <p className="font-serif text-5xl mt-1 text-green-400 mb-3">{t("events.free_entry_label")}</p>
+            {ferDayActive ? (
+              <p className="font-serif text-4xl md:text-5xl mt-1 text-green-400 mb-3">{ferHeadline}</p>
             ) : (
               <>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
@@ -1109,7 +1152,7 @@ export function EventDetail() {
               </div>
             )}
 
-            {!isFreeEntryDay && discountInfo?.isNewUser && (
+            {!bookingIsFullyFree && discountInfo?.isNewUser && (
               <div className="mb-4 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs flex items-center gap-2 text-primary">
                 <Sparkle className="h-3.5 w-3.5" />
                 {t("events.new_member_discount", { pct: discountInfo.bookingDiscountPercent })}
@@ -1134,7 +1177,7 @@ export function EventDetail() {
                 )}
               </div>
 
-              {isFreeEntryDay && (
+              {bookingIsFullyFree && (
                 <div className="flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-950/40 px-3 py-2.5">
                   <span className="text-green-400 text-base">✓</span>
                   <p className="text-sm font-medium text-green-300">{t("events.free_entry_form_notice")}</p>
@@ -1260,7 +1303,7 @@ export function EventDetail() {
                 </>
               )}
 
-              {!isFreeEntryDay && pointsAvail > 0 && (
+              {!bookingIsFullyFree && pointsAvail > 0 && (
                 <div>
                   <Label htmlFor="ppoints" className="flex items-center gap-1.5">
                     <Coins className="h-3.5 w-3.5 text-primary" />
@@ -1279,7 +1322,7 @@ export function EventDetail() {
               )}
 
               {/* Coupon — login gated */}
-              {!isFreeEntryDay && <div>
+              {!bookingIsFullyFree && <div>
                 <Label className="flex items-center gap-1">
                   <Tag className="h-3.5 w-3.5 text-primary" /> {t("events.coupon_code_label")}
                   {!me?.user && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
@@ -1320,13 +1363,13 @@ export function EventDetail() {
                 )}
               </div>}
 
-              {!isFreeEntryDay && (
+              {!bookingIsFullyFree && (
                 <div>
                   <Label htmlFor="notes">{t("events.notes_label")}</Label>
                   <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("events.notes_placeholder")} className="bg-black/40 border-white/10 mt-1" />
                 </div>
               )}
-              {!isFreeEntryDay && (
+              {!bookingIsFullyFree && (
                 <div className="space-y-1.5 border-t border-white/10 pt-3 text-sm">
                   <div className="flex items-center justify-between text-muted-foreground">
                     <span>{t("events.subtotal_label")}</span>
@@ -1357,7 +1400,7 @@ export function EventDetail() {
                 </div>
               )}
               {/* Payment method selector */}
-              {!isFreeEntryDay && (
+              {!bookingIsFullyFree && (
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{t("events.payment_method")}</Label>
                   <RadioGroup
@@ -1433,7 +1476,7 @@ export function EventDetail() {
                 disabled={booking || !agreedTerms || (isPub && !confirmedAge)}
               >
                 <CalIcon className="h-4 w-4 mr-2" />
-                {booking ? t("events.booking_processing") : isFreeEntryDay ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
+                {booking ? t("events.booking_processing") : bookingIsFullyFree ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
               </Button>
             </div>
           </div>

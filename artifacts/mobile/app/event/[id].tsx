@@ -300,6 +300,19 @@ export default function EventDetailScreen() {
     (priceWomen === 0 && priceMen === 0 && priceCouple === 0)
   );
 
+  // Headline label when a free-entry rule is active for the selected day.
+  const ferGenderLabelsMobile = ferGendersMobile.map((g) => {
+    if (g === "women") return t("events.women");
+    if (g === "men") return t("events.men");
+    if (g === "couple") return t("events.couple");
+    return g;
+  });
+  const ferHeadlineMobile = ferDayActiveMobile
+    ? (ferAllGendersFreeMobile
+        ? t("events.free_entry_for_everyone")
+        : t("events.free_entry_for", { genders: ferGenderLabelsMobile.join(" & ") }))
+    : "";
+
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     subtotal =
@@ -311,13 +324,18 @@ export default function EventDetailScreen() {
   } else {
     subtotal = basePrice * (parseInt(guests) || 1);
   }
+  const _ticketsCountMobile = ticketWomen + ticketMen + ticketCouple;
+  const bookingIsFullyFreeMobile = isPub && (
+    isFreeEntryDay ||
+    (ferDayActiveMobile && pubMode === "ticket" && _ticketsCountMobile > 0 && subtotal === 0)
+  );
 
   useEffect(() => {
-    if (isFreeEntryDay && (couponState || couponInput)) {
+    if (bookingIsFullyFreeMobile && (couponState || couponInput)) {
       setCouponState(null);
       setCouponInput("");
     }
-  }, [isFreeEntryDay, couponState, couponInput]);
+  }, [bookingIsFullyFreeMobile, couponState, couponInput]);
 
   const newUserPercent = discountInfo?.isNewUser && !couponState ? (discountInfo.bookingDiscountPercent || 0) : 0;
   const couponPercent = couponState?.discountPercent ?? 0;
@@ -385,6 +403,20 @@ export default function EventDetailScreen() {
       return;
     }
 
+    // Per-field required validation (everything except couponCode / points / notes).
+    if (isPub && !personName.trim()) {
+      Alert.alert(t("events.required_field"), t("events.name_on_booking"));
+      return;
+    }
+    if (!phone.trim()) {
+      Alert.alert(t("events.required_field"), t("events.contact_phone"));
+      return;
+    }
+    if (!/^\d{10}$/.test(phone.replace(/\D/g, "").slice(-10))) {
+      Alert.alert(t("events.invalid_phone"), t("events.phone_desc"));
+      return;
+    }
+
     if (!agreedTerms) {
       Alert.alert("Consent required", "Please agree to the Terms & Conditions and Privacy Policy to continue.");
       return;
@@ -399,7 +431,7 @@ export default function EventDetailScreen() {
       bookingDate,
       phone: phone.replace(/\D/g, "").slice(-10) || undefined,
       notes: notes.trim() || undefined,
-      couponCode: !isFreeEntryDay ? (couponState?.code || undefined) : undefined,
+      couponCode: !bookingIsFullyFreeMobile ? (couponState?.code || undefined) : undefined,
       pointsToUse: pointsApplied || undefined,
       paymentMethod,
       callbackScheme: "royvento",
@@ -997,11 +1029,11 @@ export default function EventDetailScreen() {
             </View>
 
             {/* Free-entry day notice */}
-            {isFreeEntryDay ? (
+            {bookingIsFullyFreeMobile ? (
               <View style={[styles.freeEntryNotice, { backgroundColor: "#052e16", borderColor: "#16a34a44" }]}>
                 <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
                 <Text style={[styles.freeEntryNoticeText, { color: "#4ade80" }]}>
-                  {t("events.free_entry_form_notice")}
+                  {ferHeadlineMobile || t("events.free_entry_form_notice")}
                 </Text>
               </View>
             ) : null}
@@ -1151,7 +1183,7 @@ export default function EventDetailScreen() {
             </View>
 
             {/* Coupon code */}
-            {!isFreeEntryDay && <View style={styles.field}>
+            {!bookingIsFullyFreeMobile && <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.coupon_code_field")}</Text>
               <View style={styles.couponRow}>
                 <TextInput
@@ -1184,7 +1216,7 @@ export default function EventDetailScreen() {
             </View>}
 
             {/* Points redemption */}
-            {!isFreeEntryDay && (discountInfo?.points ?? 0) > 0 ? (
+            {!bookingIsFullyFreeMobile && (discountInfo?.points ?? 0) > 0 ? (
               <View style={styles.field}>
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.loyalty_points")}</Text>
                 <View style={[styles.pointsBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
@@ -1220,7 +1252,7 @@ export default function EventDetailScreen() {
             ) : null}
 
             {/* Notes */}
-            {!isFreeEntryDay && <View style={styles.field}>
+            {!bookingIsFullyFreeMobile && <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.notes_optional")}</Text>
               <TextInput
                 style={[styles.fieldInput, styles.fieldTextArea, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
@@ -1234,7 +1266,7 @@ export default function EventDetailScreen() {
             </View>}
 
             {/* Payment method toggle */}
-            {!isFreeEntryDay && <View style={styles.field}>
+            {!bookingIsFullyFreeMobile && <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.payment_method")}</Text>
               <View style={[styles.payToggle, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 {(["cod", "online"] as const).map((m) => (
@@ -1257,7 +1289,7 @@ export default function EventDetailScreen() {
             </View>}
 
             {/* Price summary */}
-            {!isFreeEntryDay && subtotal > 0 ? (
+            {!bookingIsFullyFreeMobile && subtotal > 0 ? (
               <View style={[styles.summary, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{t("events.subtotal_label")}</Text>
@@ -1348,7 +1380,7 @@ export default function EventDetailScreen() {
                   <ActivityIndicator color={colors.primaryForeground} />
                 ) : (
                   <Text style={[styles.submitBtnText, { color: colors.primaryForeground }]}>
-                    {paymentMethod === "online" ? t("events.pay_confirm_btn") : t("events.confirm_btn")}
+                    {bookingIsFullyFreeMobile ? t("events.confirm_btn") : paymentMethod === "online" ? t("events.pay_confirm_btn") : t("events.confirm_btn")}
                   </Text>
                 )}
               </TouchableOpacity>

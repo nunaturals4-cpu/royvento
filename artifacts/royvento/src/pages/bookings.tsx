@@ -58,6 +58,7 @@ interface BookingRecord {
   personName?: string | null;
   userName?: string | null;
   approvedBy?: string | null;
+  paymentMethod?: string | null;
   freeEntryRules?: {
     enabled?: boolean;
     genders?: string[];
@@ -358,6 +359,8 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
   const hideAmountPaid = Number(b.finalPrice ?? b.totalPrice ?? 0) === 0;
+  const isCod = (b.paymentMethod ?? "").toLowerCase() === "cod";
+  const amountLabel = isCod ? t("bookings.amount_due") : t("bookings.amount_paid");
 
   const shareTicket = async () => {
     const url = `${window.location.origin}${import.meta.env.BASE_URL}dashboard/bookings`;
@@ -499,7 +502,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         </div>
         <div class="footer-sec">
           ${hideAmountPaid ? "" : `<div>
-            <div class="price-lbl">${esc(t("bookings.amount_paid"))}</div>
+            <div class="price-lbl">${esc(amountLabel)}</div>
             <div class="price-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</div>
           </div>`}
           <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>${esc(t("bookings.non_transferable"))} &middot; Royvento</div>
@@ -661,7 +664,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         <div className="relative z-10 flex justify-between items-center px-7 py-5">
           {hideAmountPaid ? <div /> : (
             <div>
-              <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>Amount paid</p>
+              <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>{amountLabel}</p>
               <p className="font-serif text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
             </div>
           )}

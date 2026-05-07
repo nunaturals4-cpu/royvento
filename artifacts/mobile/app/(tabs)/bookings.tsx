@@ -64,6 +64,7 @@ interface ExtendedBooking {
   ticketCouple?: number;
   approvedBy?: string;
   finalPrice?: number;
+  paymentMethod?: string;
   cancellationAllowed?: boolean;
   checkedIn?: boolean;
   eventType_?: string;
@@ -208,7 +209,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
   <div class="perf"><div class="notch"></div><div class="dash"></div><div class="notch notch-r"></div></div>
   <div class="tear">${esc(ticketCode)}</div>
   <div class="footer">
-    ${isFreeBooking ? "<div></div>" : `<div><div class="price-lbl">${esc(t("bookings.amount_paid"))}</div><div class="price">${esc(price)}</div></div>`}
+    ${isFreeBooking ? "<div></div>" : `<div><div class="price-lbl">${esc((bx.paymentMethod ?? "").toLowerCase() === "cod" ? t("bookings.amount_due") : t("bookings.amount_paid"))}</div><div class="price">${esc(price)}</div></div>`}
     <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>Royvento</div>
   </div>
 </div>
@@ -544,7 +545,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                     <View style={styles.ptFooter}>
                       {Number(bx.finalPrice ?? b.totalPrice ?? 0) > 0 && (
                         <View style={styles.ptPriceRow}>
-                          <Text style={styles.ptPriceLabel}>{t("bookings.total_label")}</Text>
+                          <Text style={styles.ptPriceLabel}>{(bx.paymentMethod ?? "").toLowerCase() === "cod" ? t("bookings.amount_due") : t("bookings.amount_paid")}</Text>
                           <Text style={styles.ptPriceValue}>
                             {bx.finalPrice != null
                               ? `₹${Number(bx.finalPrice).toLocaleString("en-IN")}`
