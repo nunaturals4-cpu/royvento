@@ -935,28 +935,99 @@ export const ListEventsResponse = zod.array(ListEventsResponseItem);
 /**
  * @summary Create an event (vendor only)
  */
+export const createEventBodyTitleMax = 255;
+
+export const createEventBodyDescriptionMax = 5000;
+
+export const createEventBodyCategoryMax = 100;
+
+export const createEventBodyLocationMax = 255;
+
+export const createEventBodyPriceMin = 0;
+
+export const createEventBodyCapacityMin = 0;
+
+export const createEventBodyImageUrlMax = 2048;
+
+export const createEventBodyGalleryImagesItemMax = 2048;
+
+export const createEventBodyGalleryVideosItemMax = 2048;
+
+export const createEventBodyStateMax = 100;
+
+export const createEventBodyCityMax = 100;
+
+export const createEventBodyCountryMax = 100;
+
+export const createEventBodyPubModeMax = 50;
+
+export const createEventBodyPriceWomenMin = 0;
+
+export const createEventBodyPriceMenMin = 0;
+
+export const createEventBodyPriceCoupleMin = 0;
+
+export const createEventBodyPubEventTypesItemMax = 100;
+
+export const createEventBodyDayPricingOneWomenMin = 0;
+
+export const createEventBodyDayPricingOneMenMin = 0;
+
+export const createEventBodyDayPricingOneCoupleMin = 0;
+
 export const CreateEventBody = zod.object({
-  title: zod.string(),
-  description: zod.string(),
-  category: zod.string(),
-  location: zod.string(),
-  price: zod.number(),
-  capacity: zod.number(),
-  imageUrl: zod.string().optional(),
-  galleryImages: zod.array(zod.string()).optional(),
-  galleryVideos: zod.array(zod.string()).optional(),
-  freeEntryRules: zod
-    .object({
-      enabled: zod.boolean(),
-      genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
-      days: zod.array(
-        zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+  title: zod.string().min(1).max(createEventBodyTitleMax),
+  description: zod.string().max(createEventBodyDescriptionMax),
+  category: zod.string().min(1).max(createEventBodyCategoryMax),
+  location: zod.string().max(createEventBodyLocationMax),
+  price: zod.number().min(createEventBodyPriceMin),
+  capacity: zod.number().min(createEventBodyCapacityMin),
+  imageUrl: zod.string().max(createEventBodyImageUrlMax).optional(),
+  galleryImages: zod
+    .array(zod.string().max(createEventBodyGalleryImagesItemMax))
+    .optional(),
+  galleryVideos: zod
+    .array(zod.string().max(createEventBodyGalleryVideosItemMax))
+    .optional(),
+  type: zod.string().optional(),
+  state: zod.string().max(createEventBodyStateMax).optional(),
+  city: zod.string().max(createEventBodyCityMax).optional(),
+  country: zod.string().max(createEventBodyCountryMax).optional(),
+  pubMode: zod.string().max(createEventBodyPubModeMax).optional(),
+  priceWomen: zod.number().min(createEventBodyPriceWomenMin).optional(),
+  priceMen: zod.number().min(createEventBodyPriceMenMin).optional(),
+  priceCouple: zod.number().min(createEventBodyPriceCoupleMin).optional(),
+  pubEventTypes: zod
+    .array(zod.string().max(createEventBodyPubEventTypesItemMax))
+    .optional(),
+  dayPricing: zod
+    .union([
+      zod.record(
+        zod.string(),
+        zod.object({
+          women: zod.number().min(createEventBodyDayPricingOneWomenMin),
+          men: zod.number().min(createEventBodyDayPricingOneMenMin),
+          couple: zod.number().min(createEventBodyDayPricingOneCoupleMin),
+        }),
       ),
-      beforeTime: zod
-        .string()
-        .optional()
-        .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
-    })
+      zod.null(),
+    ])
+    .optional(),
+  freeEntryRules: zod
+    .union([
+      zod.object({
+        enabled: zod.boolean(),
+        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        days: zod.array(
+          zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+        ),
+        beforeTime: zod
+          .string()
+          .optional()
+          .describe("Entry cutoff time in 24-hour HH:mm format, e.g. 22:00"),
+      }),
+      zod.null(),
+    ])
     .optional(),
 });
 
@@ -1188,16 +1259,83 @@ export const UpdateEventParams = zod.object({
   eventId: zod.coerce.number(),
 });
 
+export const updateEventBodyTitleMax = 255;
+
+export const updateEventBodyDescriptionMax = 5000;
+
+export const updateEventBodyCategoryMax = 100;
+
+export const updateEventBodyLocationMax = 255;
+
+export const updateEventBodyPriceMin = 0;
+
+export const updateEventBodyCapacityMin = 0;
+
+export const updateEventBodyImageUrlMax = 2048;
+
+export const updateEventBodyGalleryImagesItemMax = 2048;
+
+export const updateEventBodyGalleryVideosItemMax = 2048;
+
+export const updateEventBodyStateMax = 100;
+
+export const updateEventBodyCityMax = 100;
+
+export const updateEventBodyCountryMax = 100;
+
+export const updateEventBodyPubModeMax = 50;
+
+export const updateEventBodyPriceWomenMin = 0;
+
+export const updateEventBodyPriceMenMin = 0;
+
+export const updateEventBodyPriceCoupleMin = 0;
+
+export const updateEventBodyPubEventTypesItemMax = 100;
+
+export const updateEventBodyDayPricingOneWomenMin = 0;
+
+export const updateEventBodyDayPricingOneMenMin = 0;
+
+export const updateEventBodyDayPricingOneCoupleMin = 0;
+
 export const UpdateEventBody = zod.object({
-  title: zod.string().optional(),
-  description: zod.string().optional(),
-  category: zod.string().optional(),
-  location: zod.string().optional(),
-  price: zod.number().optional(),
-  capacity: zod.number().optional(),
-  imageUrl: zod.string().optional(),
-  galleryImages: zod.array(zod.string()).optional(),
-  galleryVideos: zod.array(zod.string()).optional(),
+  title: zod.string().min(1).max(updateEventBodyTitleMax).optional(),
+  description: zod.string().max(updateEventBodyDescriptionMax).optional(),
+  category: zod.string().min(1).max(updateEventBodyCategoryMax).optional(),
+  location: zod.string().max(updateEventBodyLocationMax).optional(),
+  price: zod.number().min(updateEventBodyPriceMin).optional(),
+  capacity: zod.number().min(updateEventBodyCapacityMin).optional(),
+  imageUrl: zod.string().max(updateEventBodyImageUrlMax).optional(),
+  galleryImages: zod
+    .array(zod.string().max(updateEventBodyGalleryImagesItemMax))
+    .optional(),
+  galleryVideos: zod
+    .array(zod.string().max(updateEventBodyGalleryVideosItemMax))
+    .optional(),
+  state: zod.string().max(updateEventBodyStateMax).optional(),
+  city: zod.string().max(updateEventBodyCityMax).optional(),
+  country: zod.string().max(updateEventBodyCountryMax).optional(),
+  pubMode: zod.string().max(updateEventBodyPubModeMax).optional(),
+  priceWomen: zod.number().min(updateEventBodyPriceWomenMin).optional(),
+  priceMen: zod.number().min(updateEventBodyPriceMenMin).optional(),
+  priceCouple: zod.number().min(updateEventBodyPriceCoupleMin).optional(),
+  pubEventTypes: zod
+    .array(zod.string().max(updateEventBodyPubEventTypesItemMax))
+    .optional(),
+  dayPricing: zod
+    .union([
+      zod.record(
+        zod.string(),
+        zod.object({
+          women: zod.number().min(updateEventBodyDayPricingOneWomenMin),
+          men: zod.number().min(updateEventBodyDayPricingOneMenMin),
+          couple: zod.number().min(updateEventBodyDayPricingOneCoupleMin),
+        }),
+      ),
+      zod.null(),
+    ])
+    .optional(),
   freeEntryRules: zod
     .union([
       zod.object({
@@ -2281,11 +2419,16 @@ export const PatchAdminEventParams = zod.object({
   eventId: zod.coerce.number(),
 });
 
+export const patchAdminEventBodyRejectionReasonMax = 2000;
+
 export const PatchAdminEventBody = zod.object({
   popular: zod.boolean().optional(),
   featured: zod.boolean().optional(),
-  approvalStatus: zod.string().optional(),
-  rejectionReason: zod.string().nullish(),
+  approvalStatus: zod.enum(["pending", "approved", "rejected"]).optional(),
+  rejectionReason: zod
+    .string()
+    .max(patchAdminEventBodyRejectionReasonMax)
+    .nullish(),
   retainForever: zod.boolean().optional(),
 });
 
@@ -2988,8 +3131,10 @@ export const RejectSettlementRequestParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const rejectSettlementRequestBodyNoteMax = 2000;
+
 export const RejectSettlementRequestBody = zod.object({
-  note: zod.string().optional(),
+  note: zod.string().max(rejectSettlementRequestBodyNoteMax).optional(),
 });
 
 export const RejectSettlementRequestResponse = zod.object({
@@ -3000,6 +3145,91 @@ export const RejectSettlementRequestResponse = zod.object({
   adminNote: zod.string(),
   requestedAt: zod.string(),
   processedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Admin update a vendor profile
+ */
+export const AdminUpdateVendorParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const adminUpdateVendorBodyBusinessNameMax = 255;
+
+export const adminUpdateVendorBodyDescriptionMax = 5000;
+
+export const adminUpdateVendorBodyCategoryMax = 100;
+
+export const adminUpdateVendorBodyCityMax = 100;
+
+export const adminUpdateVendorBodyStateMax = 100;
+
+export const adminUpdateVendorBodyCountryMax = 100;
+
+export const AdminUpdateVendorBody = zod
+  .object({
+    businessName: zod
+      .string()
+      .min(1)
+      .max(adminUpdateVendorBodyBusinessNameMax)
+      .optional(),
+    description: zod
+      .string()
+      .max(adminUpdateVendorBodyDescriptionMax)
+      .optional(),
+    category: zod
+      .string()
+      .min(1)
+      .max(adminUpdateVendorBodyCategoryMax)
+      .optional(),
+    status: zod.enum(["pending", "approved", "rejected"]).optional(),
+    city: zod.string().max(adminUpdateVendorBodyCityMax).optional(),
+    state: zod.string().max(adminUpdateVendorBodyStateMax).optional(),
+    country: zod.string().max(adminUpdateVendorBodyCountryMax).optional(),
+  })
+  .describe("Admin-only fields updatable on a vendor profile.");
+
+export const AdminUpdateVendorResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Issue a coupon to a user (admin)
+ */
+export const AdminSendCouponParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const adminSendCouponBodyCodeMax = 50;
+
+export const adminSendCouponBodyDiscountMax = 100;
+
+export const AdminSendCouponBody = zod.object({
+  code: zod.string().min(1).max(adminSendCouponBodyCodeMax),
+  discount: zod.number().min(1).max(adminSendCouponBodyDiscountMax),
+  type: zod.enum(["general", "event", "loyalty", "referral", "vip"]).optional(),
+});
+
+export const AdminSendCouponResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Retry the payment flow for a booking still in payment_pending
+ */
+export const RetryBookingPaymentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RetryBookingPaymentBody = zod.object({
+  callbackScheme: zod
+    .enum(["royvento"])
+    .optional()
+    .describe("Custom URL scheme for mobile deep-link callbacks."),
+});
+
+export const RetryBookingPaymentResponse = zod.object({
+  ok: zod.boolean(),
 });
 
 /**

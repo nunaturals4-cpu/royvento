@@ -16,6 +16,12 @@ import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzl
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
 import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
+import {
+  PatchAdminEventBody,
+  AdminUpdateVendorBody,
+  SetVendorCommissionBody,
+  AdminSendCouponBody,
+} from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -469,24 +475,24 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  const body = req.body as Record<string, unknown>;
+  const parsed = PatchAdminEventBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid input" });
+    return;
+  }
+  const data = parsed.data;
   const updates: Record<string, unknown> = {};
 
-  if (typeof body["popular"] === "boolean") {
-    updates["popular"] = body["popular"];
-    updates["popularSince"] = body["popular"] ? new Date() : null;
+  if (data.popular !== undefined) {
+    updates["popular"] = data.popular;
+    updates["popularSince"] = data.popular ? new Date() : null;
   }
-  if (typeof body["featured"] === "boolean") updates["featured"] = body["featured"];
-  if (typeof body["retainForever"] === "boolean") updates["retainForever"] = body["retainForever"];
-  if (typeof body["approvalStatus"] === "string") {
-    const status = body["approvalStatus"];
-    if (!["approved", "rejected", "pending"].includes(status)) {
-      res.status(400).json({ error: "Invalid approvalStatus" });
-      return;
-    }
-    updates["approvalStatus"] = status;
-    updates["rejectionReason"] = typeof body["rejectionReason"] === "string"
-      ? body["rejectionReason"]
+  if (data.featured !== undefined) updates["featured"] = data.featured;
+  if (data.retainForever !== undefined) updates["retainForever"] = data.retainForever;
+  if (data.approvalStatus !== undefined) {
+    updates["approvalStatus"] = data.approvalStatus;
+    updates["rejectionReason"] = typeof data.rejectionReason === "string"
+      ? data.rejectionReason
       : null;
   }
 
@@ -598,23 +604,23 @@ router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  const body = req.body as Record<string, unknown>;
+  const parsed = AdminUpdateVendorBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid input" });
+    return;
+  }
+  const data = parsed.data;
   const updates: Record<string, unknown> = {};
 
-  if (typeof body["businessName"] === "string" && body["businessName"].trim())
-    updates["businessName"] = body["businessName"].trim();
-  if (typeof body["description"] === "string")
-    updates["description"] = body["description"];
-  if (typeof body["category"] === "string" && body["category"].trim())
-    updates["category"] = body["category"].trim();
-  if (
-    typeof body["status"] === "string" &&
-    ["approved", "pending", "rejected"].includes(body["status"])
-  )
-    updates["status"] = body["status"];
-  if (typeof body["city"] === "string") updates["city"] = body["city"];
-  if (typeof body["state"] === "string") updates["state"] = body["state"];
-  if (typeof body["country"] === "string") updates["country"] = body["country"];
+  if (data.businessName !== undefined && data.businessName.trim())
+    updates["businessName"] = data.businessName.trim();
+  if (data.description !== undefined) updates["description"] = data.description;
+  if (data.category !== undefined && data.category.trim())
+    updates["category"] = data.category.trim();
+  if (data.status !== undefined) updates["status"] = data.status;
+  if (data.city !== undefined) updates["city"] = data.city;
+  if (data.state !== undefined) updates["state"] = data.state;
+  if (data.country !== undefined) updates["country"] = data.country;
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No valid fields to update" });
@@ -1536,18 +1542,12 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
     res.status(404).json({ error: "Vendor not found" });
     return;
   }
-  const body = req.body as Record<string, unknown>;
-  const freeEntryRate = Number(body["freeEntryRate"] ?? 0);
-  const ticketRate = Number(body["ticketRate"] ?? 0);
-  const tableBookingRate = Number(body["tableBookingRate"] ?? 0);
-  if (
-    !Number.isFinite(freeEntryRate) || freeEntryRate < 0 || freeEntryRate > 99999.99 ||
-    !Number.isFinite(ticketRate) || ticketRate < 0 || ticketRate > 99999.99 ||
-    !Number.isFinite(tableBookingRate) || tableBookingRate < 0 || tableBookingRate > 99999.99
-  ) {
+  const parsed = SetVendorCommissionBody.safeParse(req.body);
+  if (!parsed.success) {
     res.status(400).json({ error: "Rates must be valid non-negative numbers" });
     return;
   }
+  const { freeEntryRate, ticketRate, tableBookingRate } = parsed.data;
   const [upserted] = await db
     .insert(vendorCommissionsTable)
     .values({
@@ -1797,15 +1797,16 @@ router.post("/admin/users/:userId/send-coupon", requireAuth(["admin"]), async (r
     return;
   }
 
-  const body = req.body as Record<string, unknown>;
-  const code = typeof body["code"] === "string" ? body["code"].trim().toUpperCase() : "";
-  const discount = typeof body["discount"] === "number" ? body["discount"] : Number(body["discount"]);
-  const typeRaw = typeof body["type"] === "string" ? body["type"] : "general";
-  const couponType: CouponType = VALID_COUPON_TYPES.includes(typeRaw as CouponType)
-    ? (typeRaw as CouponType)
-    : "general";
+  const parsed = AdminSendCouponBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Provide a valid code and discount (1–100)" });
+    return;
+  }
+  const code = parsed.data.code.trim().toUpperCase();
+  const discount = parsed.data.discount;
+  const couponType: CouponType = parsed.data.type ?? "general";
 
-  if (!code || !Number.isFinite(discount) || discount < 1 || discount > 100) {
+  if (!code) {
     res.status(400).json({ error: "Provide a valid code and discount (1–100)" });
     return;
   }

@@ -25,7 +25,7 @@ import { createUserNotification } from "../lib/notify";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
-import { UpdateBookingStatusBody } from "@workspace/api-zod";
+import { UpdateBookingStatusBody, RetryBookingPaymentBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
 import {
   sendBookingCreatedEmails,
@@ -653,9 +653,12 @@ router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
   const finalPrice = parseFloat(String(booking.finalPrice ?? booking.totalPrice ?? 0));
   if (finalPrice <= 0) { res.status(400).json({ error: "No payment required for this booking" }); return; }
 
-  const ALLOWED_RETRY_SCHEMES = new Set(["royvento"]);
-  const rawScheme = typeof req.body?.callbackScheme === "string" ? req.body.callbackScheme : undefined;
-  const retryCallbackScheme = rawScheme && ALLOWED_RETRY_SCHEMES.has(rawScheme) ? rawScheme : undefined;
+  const parsedBody = RetryBookingPaymentBody.safeParse(req.body ?? {});
+  if (!parsedBody.success) {
+    res.status(400).json({ error: "Invalid request body" });
+    return;
+  }
+  const retryCallbackScheme = parsedBody.data.callbackScheme;
 
   const merchantTransactionId = `BK${booking.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
   const appUrl = getAppUrl();

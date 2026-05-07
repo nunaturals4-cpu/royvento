@@ -5,11 +5,13 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { PatchAdminEventBodyApprovalStatus } from "./patchAdminEventBodyApprovalStatus";
 
 export interface PatchAdminEventBody {
   popular?: boolean;
   featured?: boolean;
-  approvalStatus?: string;
+  approvalStatus?: PatchAdminEventBodyApprovalStatus;
+  /** @maxLength 2000 */
   rejectionReason?: string | null;
   retainForever?: boolean;
 }

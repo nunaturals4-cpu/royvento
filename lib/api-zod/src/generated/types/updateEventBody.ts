@@ -5,17 +5,47 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { DayPricing } from "./dayPricing";
 import type { FreeEntryRules } from "./freeEntryRules";
 
 export interface UpdateEventBody {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   title?: string;
+  /** @maxLength 5000 */
   description?: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
   category?: string;
+  /** @maxLength 255 */
   location?: string;
+  /** @minimum 0 */
   price?: number;
+  /** @minimum 0 */
   capacity?: number;
+  /** @maxLength 2048 */
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
+  /** @maxLength 100 */
+  state?: string;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 100 */
+  country?: string;
+  /** @maxLength 50 */
+  pubMode?: string;
+  /** @minimum 0 */
+  priceWomen?: number;
+  /** @minimum 0 */
+  priceMen?: number;
+  /** @minimum 0 */
+  priceCouple?: number;
+  pubEventTypes?: string[];
+  dayPricing?: DayPricing | null;
   freeEntryRules?: FreeEntryRules | null;
 }

@@ -6,7 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface RejectSettlementBody {
-  /** @maxLength 2000 */
-  note?: string;
+export interface DayPricingEntry {
+  /** @minimum 0 */
+  women: number;
+  /** @minimum 0 */
+  men: number;
+  /** @minimum 0 */
+  couple: number;
 }

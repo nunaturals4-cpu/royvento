@@ -1725,6 +1725,91 @@ paths:
         "409":
           description: Already processed
 
+  /admin/vendors/{id}:
+    patch:
+      operationId: adminUpdateVendor
+      tags: [admin]
+      summary: Admin update a vendor profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateVendorBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Invalid input
+        "404":
+          description: Not found
+
+  /admin/users/{userId}/send-coupon:
+    post:
+      operationId: adminSendCoupon
+      tags: [admin]
+      summary: Issue a coupon to a user (admin)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSendCouponBody"
+      responses:
+        "200":
+          description: Coupon created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+        "400":
+          description: Invalid input
+        "404":
+          description: User not found
+        "409":
+          description: Coupon code already exists
+
+  /bookings/{id}/retry-payment:
+    post:
+      operationId: retryBookingPayment
+      tags: [bookings]
+      summary: Retry the payment flow for a booking still in payment_pending
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetryPaymentBody"
+      responses:
+        "200":
+          description: Redirect details for the new payment attempt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
   /wishlist:
     get:
       operationId: getWishlist
@@ -2136,33 +2221,101 @@ components:
               $ref: "#/components/schemas/Vendor"
           required: [vendor]
 
+    DayPricingEntry:
+      type: object
+      properties:
+        women:
+          type: number
+          minimum: 0
+        men:
+          type: number
+          minimum: 0
+        couple:
+          type: number
+          minimum: 0
+      required: [women, men, couple]
+
+    DayPricing:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/DayPricingEntry"
+
+    EventType:
+      type: string
+      enum: [event, pub, conference, festival, party]
+
     CreateEventBody:
       type: object
       properties:
         title:
           type: string
+          minLength: 1
+          maxLength: 255
         description:
           type: string
+          maxLength: 5000
         category:
           type: string
+          minLength: 1
+          maxLength: 100
         location:
           type: string
+          maxLength: 255
         price:
           type: number
+          minimum: 0
         capacity:
           type: integer
+          minimum: 0
         imageUrl:
           type: string
+          maxLength: 2048
         galleryImages:
           type: array
           items:
             type: string
+            maxLength: 2048
         galleryVideos:
           type: array
           items:
             type: string
+            maxLength: 2048
+        type:
+          type: string
+        state:
+          type: string
+          maxLength: 100
+        city:
+          type: string
+          maxLength: 100
+        country:
+          type: string
+          maxLength: 100
+        pubMode:
+          type: string
+          maxLength: 50
+        priceWomen:
+          type: number
+          minimum: 0
+        priceMen:
+          type: number
+          minimum: 0
+        priceCouple:
+          type: number
+          minimum: 0
+        pubEventTypes:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+        dayPricing:
+          anyOf:
+            - $ref: "#/components/schemas/DayPricing"
+            - type: "null"
         freeEntryRules:
-          $ref: "#/components/schemas/FreeEntryRules"
+          anyOf:
+            - $ref: "#/components/schemas/FreeEntryRules"
+            - type: "null"
       required: [title, description, category, location, price, capacity]
 
     UpdateEventBody:
@@ -2170,30 +2323,122 @@ components:
       properties:
         title:
           type: string
+          minLength: 1
+          maxLength: 255
         description:
           type: string
+          maxLength: 5000
         category:
           type: string
+          minLength: 1
+          maxLength: 100
         location:
           type: string
+          maxLength: 255
         price:
           type: number
+          minimum: 0
         capacity:
           type: integer
+          minimum: 0
         imageUrl:
           type: string
+          maxLength: 2048
         galleryImages:
           type: array
           items:
             type: string
+            maxLength: 2048
         galleryVideos:
           type: array
           items:
             type: string
+            maxLength: 2048
+        state:
+          type: string
+          maxLength: 100
+        city:
+          type: string
+          maxLength: 100
+        country:
+          type: string
+          maxLength: 100
+        pubMode:
+          type: string
+          maxLength: 50
+        priceWomen:
+          type: number
+          minimum: 0
+        priceMen:
+          type: number
+          minimum: 0
+        priceCouple:
+          type: number
+          minimum: 0
+        pubEventTypes:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+        dayPricing:
+          anyOf:
+            - $ref: "#/components/schemas/DayPricing"
+            - type: "null"
         freeEntryRules:
           anyOf:
             - $ref: "#/components/schemas/FreeEntryRules"
             - type: "null"
+
+    AdminUpdateVendorBody:
+      type: object
+      description: Admin-only fields updatable on a vendor profile.
+      properties:
+        businessName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 5000
+        category:
+          type: string
+          minLength: 1
+          maxLength: 100
+        status:
+          $ref: "#/components/schemas/VendorStatus"
+        city:
+          type: string
+          maxLength: 100
+        state:
+          type: string
+          maxLength: 100
+        country:
+          type: string
+          maxLength: 100
+
+    AdminSendCouponBody:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        discount:
+          type: number
+          minimum: 1
+          maximum: 100
+        type:
+          type: string
+          enum: [general, event, loyalty, referral, vip]
+      required: [code, discount]
+
+    RetryPaymentBody:
+      type: object
+      properties:
+        callbackScheme:
+          type: string
+          enum: [royvento]
+          description: Custom URL scheme for mobile deep-link callbacks.
 
     BookingStatus:
       type: string
@@ -2681,9 +2926,11 @@ components:
           type: boolean
         approvalStatus:
           type: string
+          enum: [pending, approved, rejected]
         rejectionReason:
           type: string
           nullable: true
+          maxLength: 2000
         retainForever:
           type: boolean
 
@@ -3735,3 +3982,4 @@ components:
       properties:
         note:
           type: string
+          maxLength: 2000

@@ -24,7 +24,9 @@ import type {
   AdminLeadsResponse,
   AdminLeadsSummary,
   AdminPartnerSummary,
+  AdminSendCouponBody,
   AdminSettlementRequest,
+  AdminUpdateVendorBody,
   AttendanceReportResponse,
   AuthResponse,
   Availability,
@@ -74,6 +76,7 @@ import type {
   PreviewGooglePubResponse,
   RegisterBody,
   RejectSettlementBody,
+  RetryPaymentBody,
   Review,
   SaveBankingDetailsBody,
   ScanTicketBody,
@@ -6202,6 +6205,267 @@ export const useRejectSettlementRequest = <
   TContext
 > => {
   return useMutation(getRejectSettlementRequestMutationOptions(options));
+};
+
+/**
+ * @summary Admin update a vendor profile
+ */
+export const getAdminUpdateVendorUrl = (id: number) => {
+  return `/api/admin/vendors/${id}`;
+};
+
+export const adminUpdateVendor = async (
+  id: number,
+  adminUpdateVendorBody: AdminUpdateVendorBody,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getAdminUpdateVendorUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminUpdateVendorBody),
+  });
+};
+
+export const getAdminUpdateVendorMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminUpdateVendor>>,
+    TError,
+    { id: number; data: BodyType<AdminUpdateVendorBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminUpdateVendor>>,
+  TError,
+  { id: number; data: BodyType<AdminUpdateVendorBody> },
+  TContext
+> => {
+  const mutationKey = ["adminUpdateVendor"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminUpdateVendor>>,
+    { id: number; data: BodyType<AdminUpdateVendorBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return adminUpdateVendor(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminUpdateVendorMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUpdateVendor>>
+>;
+export type AdminUpdateVendorMutationBody = BodyType<AdminUpdateVendorBody>;
+export type AdminUpdateVendorMutationError = ErrorType<void>;
+
+/**
+ * @summary Admin update a vendor profile
+ */
+export const useAdminUpdateVendor = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminUpdateVendor>>,
+    TError,
+    { id: number; data: BodyType<AdminUpdateVendorBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminUpdateVendor>>,
+  TError,
+  { id: number; data: BodyType<AdminUpdateVendorBody> },
+  TContext
+> => {
+  return useMutation(getAdminUpdateVendorMutationOptions(options));
+};
+
+/**
+ * @summary Issue a coupon to a user (admin)
+ */
+export const getAdminSendCouponUrl = (userId: number) => {
+  return `/api/admin/users/${userId}/send-coupon`;
+};
+
+export const adminSendCoupon = async (
+  userId: number,
+  adminSendCouponBody: AdminSendCouponBody,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getAdminSendCouponUrl(userId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminSendCouponBody),
+  });
+};
+
+export const getAdminSendCouponMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminSendCoupon>>,
+    TError,
+    { userId: number; data: BodyType<AdminSendCouponBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminSendCoupon>>,
+  TError,
+  { userId: number; data: BodyType<AdminSendCouponBody> },
+  TContext
+> => {
+  const mutationKey = ["adminSendCoupon"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminSendCoupon>>,
+    { userId: number; data: BodyType<AdminSendCouponBody> }
+  > = (props) => {
+    const { userId, data } = props ?? {};
+
+    return adminSendCoupon(userId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminSendCouponMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminSendCoupon>>
+>;
+export type AdminSendCouponMutationBody = BodyType<AdminSendCouponBody>;
+export type AdminSendCouponMutationError = ErrorType<void>;
+
+/**
+ * @summary Issue a coupon to a user (admin)
+ */
+export const useAdminSendCoupon = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminSendCoupon>>,
+    TError,
+    { userId: number; data: BodyType<AdminSendCouponBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminSendCoupon>>,
+  TError,
+  { userId: number; data: BodyType<AdminSendCouponBody> },
+  TContext
+> => {
+  return useMutation(getAdminSendCouponMutationOptions(options));
+};
+
+/**
+ * @summary Retry the payment flow for a booking still in payment_pending
+ */
+export const getRetryBookingPaymentUrl = (id: number) => {
+  return `/api/bookings/${id}/retry-payment`;
+};
+
+export const retryBookingPayment = async (
+  id: number,
+  retryPaymentBody?: RetryPaymentBody,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getRetryBookingPaymentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(retryPaymentBody),
+  });
+};
+
+export const getRetryBookingPaymentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof retryBookingPayment>>,
+    TError,
+    { id: number; data: BodyType<RetryPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof retryBookingPayment>>,
+  TError,
+  { id: number; data: BodyType<RetryPaymentBody> },
+  TContext
+> => {
+  const mutationKey = ["retryBookingPayment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof retryBookingPayment>>,
+    { id: number; data: BodyType<RetryPaymentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return retryBookingPayment(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RetryBookingPaymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof retryBookingPayment>>
+>;
+export type RetryBookingPaymentMutationBody = BodyType<RetryPaymentBody>;
+export type RetryBookingPaymentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Retry the payment flow for a booking still in payment_pending
+ */
+export const useRetryBookingPayment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof retryBookingPayment>>,
+    TError,
+    { id: number; data: BodyType<RetryPaymentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof retryBookingPayment>>,
+  TError,
+  { id: number; data: BodyType<RetryPaymentBody> },
+  TContext
+> => {
+  return useMutation(getRetryBookingPaymentMutationOptions(options));
 };
 
 /**

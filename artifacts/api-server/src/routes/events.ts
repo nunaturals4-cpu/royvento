@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, eventsTable, vendorsTable, drinkPlansTable } from "@workspace/db";
 import { eq, desc, and, ilike, sql, gte, lte, or, inArray } from "drizzle-orm";
-import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
+import { CreateEventBody, UpdateEventBody, ListEventsQueryParams } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { getEventRatings } from "../lib/aggregates";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -9,72 +9,6 @@ import { ObjectStorageService } from "../lib/objectStorage";
 const objectStorage = new ObjectStorageService();
 
 const router: IRouter = Router();
-
-const VALID_DAY_KEYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-
-function validateDayPricing(
-  dp: unknown,
-): Record<string, { women: number; men: number; couple: number } | null> | null {
-  if (dp === null || dp === undefined) return null;
-  if (typeof dp !== "object" || Array.isArray(dp)) {
-    throw Object.assign(new Error("dayPricing must be a plain object or null"), { status: 400 });
-  }
-  const result: Record<string, { women: number; men: number; couple: number } | null> = {};
-  for (const [key, val] of Object.entries(dp as Record<string, unknown>)) {
-    if (!VALID_DAY_KEYS.has(key)) {
-      throw Object.assign(new Error(`Invalid day key: ${key}. Must be Mon/Tue/Wed/Thu/Fri/Sat/Sun`), { status: 400 });
-    }
-    if (val === null) { result[key] = null; continue; }
-    if (typeof val !== "object" || Array.isArray(val)) {
-      throw Object.assign(new Error(`dayPricing.${key} must be an object or null`), { status: 400 });
-    }
-    const v = val as Record<string, unknown>;
-    const women = Number(v["women"]);
-    const men = Number(v["men"]);
-    const couple = Number(v["couple"]);
-    if (!isFinite(women) || !isFinite(men) || !isFinite(couple)) {
-      throw Object.assign(new Error(`dayPricing.${key}: women, men, couple must be finite numbers`), { status: 400 });
-    }
-    if (women < 0 || men < 0 || couple < 0) {
-      throw Object.assign(new Error(`dayPricing.${key}: prices must be >= 0`), { status: 400 });
-    }
-    result[key] = { women, men, couple };
-  }
-  return result;
-}
-
-const FREE_ENTRY_GENDERS = new Set(["Everyone", "Ladies", "Men", "Couples"]);
-const FREE_ENTRY_DAYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
-const FREE_ENTRY_TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-function validateFreeEntryRules(
-  val: unknown,
-): { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null {
-  if (val === null || val === undefined) return null;
-  if (typeof val !== "object" || Array.isArray(val)) {
-    throw Object.assign(new Error("freeEntryRules must be a plain object or null"), { status: 400 });
-  }
-  const v = val as Record<string, unknown>;
-  const enabled = !!v["enabled"];
-  const rawGenders = Array.isArray(v["genders"]) ? (v["genders"] as unknown[]) : [];
-  const genders = rawGenders.filter((g): g is string => typeof g === "string" && FREE_ENTRY_GENDERS.has(g));
-  if (rawGenders.length !== genders.length) {
-    throw Object.assign(new Error(`freeEntryRules.genders contains invalid values; allowed: ${[...FREE_ENTRY_GENDERS].join(", ")}`), { status: 400 });
-  }
-  const rawDays = Array.isArray(v["days"]) ? (v["days"] as unknown[]) : [];
-  const days = rawDays.filter((d): d is string => typeof d === "string" && FREE_ENTRY_DAYS.has(d));
-  if (rawDays.length !== days.length) {
-    throw Object.assign(new Error(`freeEntryRules.days contains invalid values; allowed: ${[...FREE_ENTRY_DAYS].join(", ")}`), { status: 400 });
-  }
-  let beforeTime: string | undefined;
-  if (typeof v["beforeTime"] === "string" && v["beforeTime"]) {
-    if (!FREE_ENTRY_TIME_RE.test(v["beforeTime"])) {
-      throw Object.assign(new Error("freeEntryRules.beforeTime must be in HH:mm format"), { status: 400 });
-    }
-    beforeTime = v["beforeTime"];
-  }
-  return { enabled, genders, days, ...(beforeTime !== undefined ? { beforeTime } : {}) };
-}
 
 interface EventRow {
   id: number;
@@ -175,18 +109,24 @@ async function serializeEvents(rows: EventRow[]) {
 }
 
 router.get("/events", async (req, res) => {
-  const q = req.query as Record<string, string | undefined>;
+  const parsedQ = ListEventsQueryParams.safeParse(req.query);
+  if (!parsedQ.success) {
+    res.status(400).json({ error: "Invalid query parameters" });
+    return;
+  }
+  const q = parsedQ.data;
+  const hasPage = q.page !== undefined;
   const conditions = [eq(eventsTable.approvalStatus, "approved")];
-  if (q["category"]) conditions.push(eq(eventsTable.category, q["category"]));
-  if (q["type"]) conditions.push(eq(eventsTable.type, q["type"]));
-  if (q["state"]) conditions.push(ilike(eventsTable.state, `%${q["state"]}%`));
-  if (q["city"]) conditions.push(ilike(eventsTable.city, `%${q["city"]}%`));
-  if (q["country"])
-    conditions.push(ilike(eventsTable.country, `%${q["country"]}%`));
-  if (q["minPrice"]) conditions.push(gte(eventsTable.price, q["minPrice"]));
-  if (q["maxPrice"]) conditions.push(lte(eventsTable.price, q["maxPrice"]));
-  if (q["search"]) {
-    const s = `%${q["search"]}%`;
+  if (q.category) conditions.push(eq(eventsTable.category, q.category));
+  if (q.type) conditions.push(eq(eventsTable.type, q.type));
+  if (q.state) conditions.push(ilike(eventsTable.state, `%${q.state}%`));
+  if (q.city) conditions.push(ilike(eventsTable.city, `%${q.city}%`));
+  if (q.country)
+    conditions.push(ilike(eventsTable.country, `%${q.country}%`));
+  if (q.minPrice) conditions.push(gte(eventsTable.price, q.minPrice));
+  if (q.maxPrice) conditions.push(lte(eventsTable.price, q.maxPrice));
+  if (q.search) {
+    const s = `%${q.search}%`;
     const searchCond = or(
       ilike(eventsTable.title, s),
       ilike(eventsTable.description, s),
@@ -194,16 +134,16 @@ router.get("/events", async (req, res) => {
     );
     if (searchCond) conditions.push(searchCond);
   }
-  if (q["drinkPlanType"]) {
+  if (q.drinkPlanType) {
     const vendorIdsWithPlan = await db
       .selectDistinct({ vendorId: drinkPlansTable.vendorId })
       .from(drinkPlansTable)
-      .where(eq(drinkPlansTable.type, q["drinkPlanType"]));
+      .where(eq(drinkPlansTable.type, q.drinkPlanType));
     const ids = vendorIdsWithPlan.map((r) => r.vendorId);
     if (ids.length === 0) {
-      if (q["page"] !== undefined) {
-        const page = Math.max(1, parseInt(q["page"], 10) || 1);
-        const limit = Math.min(50, Math.max(1, parseInt(q["limit"] ?? "20", 10) || 20));
+      if (hasPage) {
+        const page = Math.max(1, q.page ?? 1);
+        const limit = Math.min(50, Math.max(1, q.limit ?? 20));
         res.json({ data: [], page, limit, hasMore: false });
       } else {
         res.json([]);
@@ -213,9 +153,9 @@ router.get("/events", async (req, res) => {
     conditions.push(inArray(eventsTable.vendorId, ids));
   }
 
-  if (q["page"] !== undefined) {
-    const page = Math.max(1, parseInt(q["page"], 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(q["limit"] ?? "20", 10) || 20));
+  if (hasPage) {
+    const page = Math.max(1, q.page ?? 1);
+    const limit = Math.min(50, Math.max(1, q.limit ?? 20));
     const offset = (page - 1) * limit;
 
     const rows = await db
@@ -366,6 +306,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     res.status(400).json({ error: "Invalid input" });
     return;
   }
+  const data = parsed.data;
   const vrows = await db
     .select()
     .from(vendorsTable)
@@ -380,9 +321,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     res.status(403).json({ error: "Partner not approved yet" });
     return;
   }
-  const body = req.body as Record<string, unknown>;
-  const newType =
-    typeof body["type"] === "string" ? (body["type"] as string) : "event";
+  const newType = data.type ?? "event";
 
   // Mutual exclusivity: if first event is pub, only pubs allowed; if first is non-pub, no pubs allowed.
   const existingRows = await db
@@ -416,56 +355,30 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     }
   }
 
-  const pubMode =
-    typeof body["pubMode"] === "string" ? (body["pubMode"] as string) : "";
-  const priceWomen = body["priceWomen"];
-  const priceMen = body["priceMen"];
-  const priceCouple = body["priceCouple"];
-  const pubEventTypes = Array.isArray(body["pubEventTypes"])
-    ? (body["pubEventTypes"] as string[])
-    : [];
-  let dayPricing: Record<string, { women: number; men: number; couple: number } | null> | null;
-  try {
-    dayPricing = validateDayPricing(body["dayPricing"]);
-  } catch (e: unknown) {
-    res.status(400).json({ error: (e as Error).message });
-    return;
-  }
-  let freeEntryRules: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
-  try {
-    freeEntryRules = validateFreeEntryRules(body["freeEntryRules"]);
-  } catch (e: unknown) {
-    res.status(400).json({ error: (e as Error).message });
-    return;
-  }
-
   const [created] = await db
     .insert(eventsTable)
     .values({
       vendorId: vendor.id,
-      title: parsed.data.title,
-      description: parsed.data.description ?? "",
-      category: parsed.data.category,
+      title: data.title,
+      description: data.description ?? "",
+      category: data.category,
       type: newType,
-      location: parsed.data.location ?? "",
-      state: typeof body["state"] === "string" ? (body["state"] as string) : "",
-      city: typeof body["city"] === "string" ? (body["city"] as string) : "",
-      country:
-        typeof body["country"] === "string"
-          ? (body["country"] as string)
-          : "India",
-      price: String(parsed.data.price),
-      capacity: parsed.data.capacity,
-      imageUrl: parsed.data.imageUrl ?? "",
-      pubMode,
-      priceWomen: priceWomen != null ? String(priceWomen) : "0",
-      priceMen: priceMen != null ? String(priceMen) : "0",
-      priceCouple: priceCouple != null ? String(priceCouple) : "0",
-      pubEventTypes,
-      dayPricing,
-      freeEntryRules,
-      galleryImages: parsed.data.galleryImages ?? null,
-      galleryVideos: parsed.data.galleryVideos ?? null,
+      location: data.location ?? "",
+      state: data.state ?? "",
+      city: data.city ?? "",
+      country: data.country ?? "India",
+      price: String(data.price),
+      capacity: data.capacity,
+      imageUrl: data.imageUrl ?? "",
+      pubMode: data.pubMode ?? "",
+      priceWomen: data.priceWomen != null ? String(data.priceWomen) : "0",
+      priceMen: data.priceMen != null ? String(data.priceMen) : "0",
+      priceCouple: data.priceCouple != null ? String(data.priceCouple) : "0",
+      pubEventTypes: data.pubEventTypes ?? [],
+      dayPricing: data.dayPricing ?? null,
+      freeEntryRules: data.freeEntryRules ?? null,
+      galleryImages: data.galleryImages ?? null,
+      galleryVideos: data.galleryVideos ?? null,
       approvalStatus: "pending",
     })
     .returning();
@@ -513,51 +426,27 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     res.status(400).json({ error: parsed.error.issues });
     return;
   }
+  const data = parsed.data;
   const updates: Record<string, unknown> = {};
-  const body = req.body as Record<string, unknown>;
-  for (const k of [
-    "title",
-    "description",
-    "category",
-    "location",
-    "imageUrl",
-    "state",
-    "city",
-    "country",
-    "pubMode",
-  ]) {
-    if (typeof body[k] === "string") updates[k] = body[k];
-  }
-  if (typeof body["capacity"] === "number") updates["capacity"] = body["capacity"];
-  if (body["price"] !== undefined) updates["price"] = String(body["price"]);
-  if (body["priceWomen"] !== undefined)
-    updates["priceWomen"] = String(body["priceWomen"]);
-  if (body["priceMen"] !== undefined)
-    updates["priceMen"] = String(body["priceMen"]);
-  if (body["priceCouple"] !== undefined)
-    updates["priceCouple"] = String(body["priceCouple"]);
-  if (Array.isArray(body["pubEventTypes"]))
-    updates["pubEventTypes"] = body["pubEventTypes"];
-  if ("dayPricing" in body) {
-    try {
-      updates["dayPricing"] = validateDayPricing(body["dayPricing"]);
-    } catch (e: unknown) {
-      res.status(400).json({ error: (e as Error).message });
-      return;
-    }
-  }
-  if ("freeEntryRules" in body) {
-    try {
-      updates["freeEntryRules"] = validateFreeEntryRules(body["freeEntryRules"]);
-    } catch (e: unknown) {
-      res.status(400).json({ error: (e as Error).message });
-      return;
-    }
-  }
-  if (parsed.data.galleryImages !== undefined)
-    updates["galleryImages"] = parsed.data.galleryImages;
-  if (parsed.data.galleryVideos !== undefined)
-    updates["galleryVideos"] = parsed.data.galleryVideos;
+  if (data.title !== undefined) updates["title"] = data.title;
+  if (data.description !== undefined) updates["description"] = data.description;
+  if (data.category !== undefined) updates["category"] = data.category;
+  if (data.location !== undefined) updates["location"] = data.location;
+  if (data.imageUrl !== undefined) updates["imageUrl"] = data.imageUrl;
+  if (data.state !== undefined) updates["state"] = data.state;
+  if (data.city !== undefined) updates["city"] = data.city;
+  if (data.country !== undefined) updates["country"] = data.country;
+  if (data.pubMode !== undefined) updates["pubMode"] = data.pubMode;
+  if (data.capacity !== undefined) updates["capacity"] = data.capacity;
+  if (data.price !== undefined) updates["price"] = String(data.price);
+  if (data.priceWomen !== undefined) updates["priceWomen"] = String(data.priceWomen);
+  if (data.priceMen !== undefined) updates["priceMen"] = String(data.priceMen);
+  if (data.priceCouple !== undefined) updates["priceCouple"] = String(data.priceCouple);
+  if (data.pubEventTypes !== undefined) updates["pubEventTypes"] = data.pubEventTypes;
+  if (data.dayPricing !== undefined) updates["dayPricing"] = data.dayPricing;
+  if (data.freeEntryRules !== undefined) updates["freeEntryRules"] = data.freeEntryRules;
+  if (data.galleryImages !== undefined) updates["galleryImages"] = data.galleryImages;
+  if (data.galleryVideos !== undefined) updates["galleryVideos"] = data.galleryVideos;
 
   const [updated] = await db
     .update(eventsTable)

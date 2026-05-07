@@ -5,8 +5,8 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { DayPricingEntry } from "./dayPricingEntry";
 
-export interface RejectSettlementBody {
-  /** @maxLength 2000 */
-  note?: string;
+export interface DayPricing {
+  [key: string]: DayPricingEntry;
 }

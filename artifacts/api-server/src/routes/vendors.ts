@@ -5,6 +5,7 @@ import {
   CreateMyVendorBody,
   UpdateMyVendorBody,
   ListVendorsQueryParams,
+  SetPartnerCrowdLevelBody,
 } from "@workspace/api-zod";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest, type Role } from "../lib/auth";
@@ -315,16 +316,14 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
   res.json(await serializeVendor(v));
 });
 
-const VALID_CROWD_LEVELS = new Set(["low", "moderate", "party"]);
-
 router.patch("/partner/crowd-level", requireAuth(["vendor"]), async (req, res) => {
   const user = (req as import("../lib/auth").AuthedRequest).user;
-  const body = req.body as Record<string, unknown>;
-  const crowdLevel = typeof body["crowdLevel"] === "string" ? body["crowdLevel"] : null;
-  if (crowdLevel !== null && !VALID_CROWD_LEVELS.has(crowdLevel)) {
+  const parsed = SetPartnerCrowdLevelBody.safeParse(req.body);
+  if (!parsed.success) {
     res.status(400).json({ error: "crowdLevel must be low, moderate, or party" });
     return;
   }
+  const crowdLevel = parsed.data.crowdLevel;
   const [v] = await db
     .update(vendorsTable)
     .set({ crowdLevel: crowdLevel })

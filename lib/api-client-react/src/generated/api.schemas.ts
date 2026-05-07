@@ -244,30 +244,177 @@ export type EventDetail = Event & {
   vendor: Vendor;
 };
 
+export interface DayPricingEntry {
+  /** @minimum 0 */
+  women: number;
+  /** @minimum 0 */
+  men: number;
+  /** @minimum 0 */
+  couple: number;
+}
+
+export interface DayPricing {
+  [key: string]: DayPricingEntry;
+}
+
+export type EventType = (typeof EventType)[keyof typeof EventType];
+
+export const EventType = {
+  event: "event",
+  pub: "pub",
+  conference: "conference",
+  festival: "festival",
+  party: "party",
+} as const;
+
 export interface CreateEventBody {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   title: string;
+  /** @maxLength 5000 */
   description: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
   category: string;
+  /** @maxLength 255 */
   location: string;
+  /** @minimum 0 */
   price: number;
+  /** @minimum 0 */
   capacity: number;
+  /** @maxLength 2048 */
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
-  freeEntryRules?: FreeEntryRules;
+  type?: string;
+  /** @maxLength 100 */
+  state?: string;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 100 */
+  country?: string;
+  /** @maxLength 50 */
+  pubMode?: string;
+  /** @minimum 0 */
+  priceWomen?: number;
+  /** @minimum 0 */
+  priceMen?: number;
+  /** @minimum 0 */
+  priceCouple?: number;
+  pubEventTypes?: string[];
+  dayPricing?: DayPricing | null;
+  freeEntryRules?: FreeEntryRules | null;
 }
 
 export interface UpdateEventBody {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
   title?: string;
+  /** @maxLength 5000 */
   description?: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
   category?: string;
+  /** @maxLength 255 */
   location?: string;
+  /** @minimum 0 */
   price?: number;
+  /** @minimum 0 */
   capacity?: number;
+  /** @maxLength 2048 */
   imageUrl?: string;
   galleryImages?: string[];
   galleryVideos?: string[];
+  /** @maxLength 100 */
+  state?: string;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 100 */
+  country?: string;
+  /** @maxLength 50 */
+  pubMode?: string;
+  /** @minimum 0 */
+  priceWomen?: number;
+  /** @minimum 0 */
+  priceMen?: number;
+  /** @minimum 0 */
+  priceCouple?: number;
+  pubEventTypes?: string[];
+  dayPricing?: DayPricing | null;
   freeEntryRules?: FreeEntryRules | null;
+}
+
+/**
+ * Admin-only fields updatable on a vendor profile.
+ */
+export interface AdminUpdateVendorBody {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  businessName?: string;
+  /** @maxLength 5000 */
+  description?: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  category?: string;
+  status?: VendorStatus;
+  /** @maxLength 100 */
+  city?: string;
+  /** @maxLength 100 */
+  state?: string;
+  /** @maxLength 100 */
+  country?: string;
+}
+
+export type AdminSendCouponBodyType =
+  (typeof AdminSendCouponBodyType)[keyof typeof AdminSendCouponBodyType];
+
+export const AdminSendCouponBodyType = {
+  general: "general",
+  event: "event",
+  loyalty: "loyalty",
+  referral: "referral",
+  vip: "vip",
+} as const;
+
+export interface AdminSendCouponBody {
+  /**
+   * @minLength 1
+   * @maxLength 50
+   */
+  code: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  discount: number;
+  type?: AdminSendCouponBodyType;
+}
+
+/**
+ * Custom URL scheme for mobile deep-link callbacks.
+ */
+export type RetryPaymentBodyCallbackScheme =
+  (typeof RetryPaymentBodyCallbackScheme)[keyof typeof RetryPaymentBodyCallbackScheme];
+
+export const RetryPaymentBodyCallbackScheme = {
+  royvento: "royvento",
+} as const;
+
+export interface RetryPaymentBody {
+  /** Custom URL scheme for mobile deep-link callbacks. */
+  callbackScheme?: RetryPaymentBodyCallbackScheme;
 }
 
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
@@ -558,10 +705,20 @@ export interface AdminEvent {
   createdAt?: string;
 }
 
+export type PatchAdminEventBodyApprovalStatus =
+  (typeof PatchAdminEventBodyApprovalStatus)[keyof typeof PatchAdminEventBodyApprovalStatus];
+
+export const PatchAdminEventBodyApprovalStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
 export interface PatchAdminEventBody {
   popular?: boolean;
   featured?: boolean;
-  approvalStatus?: string;
+  approvalStatus?: PatchAdminEventBodyApprovalStatus;
+  /** @maxLength 2000 */
   rejectionReason?: string | null;
   retainForever?: boolean;
 }
@@ -1221,6 +1378,7 @@ export interface AdminSettlementRequest {
 }
 
 export interface RejectSettlementBody {
+  /** @maxLength 2000 */
   note?: string;
 }
 
