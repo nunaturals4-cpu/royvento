@@ -1038,10 +1038,7 @@ export function EventDetail() {
         <aside className="lg:sticky lg:top-24 lg:self-start space-y-4 order-first lg:order-none">
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
             {isFreeEntryDay ? (
-              <>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
-                <p className="font-serif text-5xl mt-1 text-green-400 mb-3">{t("events.free_entry_label")}</p>
-              </>
+              <p className="font-serif text-5xl mt-1 text-green-400 mb-3">{t("events.free_entry_label")}</p>
             ) : (
               <>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.starting_at")}</p>
