@@ -368,10 +368,13 @@ export default function ScannerScreen() {
               </TouchableOpacity>
             )}
 
-            {/* "Record actual entry" sheet — only after the ticket is actually
-                burned. Recording actuals also confirms entry server-side, so
-                showing this on a lookup would skip the explicit Confirm step. */}
-            {result.booking && !result.lookupOnly && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
+            {/* "Record actual entry" sheet. Available from both lookup and
+                post-confirm states — submitting actuals from lookup state is
+                equivalent to confirming (the server's actualEntry branch
+                implicitly checks the booking in), so it's a valid alternative
+                to the "Confirm entry" button when the manager wants to log
+                who actually showed up at the same time as admitting them. */}
+            {result.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
               <TouchableOpacity
                 onPress={() => setSheetOpen(true)}
                 style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
