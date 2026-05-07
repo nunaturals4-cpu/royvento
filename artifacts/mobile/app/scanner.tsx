@@ -192,6 +192,7 @@ export default function ScannerScreen() {
   const resultColor = result == null ? "#ef4444"
     : result.status === "ready_to_check_in" ? "#3b82f6"
     : result.code === "OK" ? "#22c55e"
+    : result.code === "ALREADY_CHECKED_IN" && result.recentlyCheckedIn ? "#22c55e"
     : result.code === "ALREADY_CHECKED_IN" ? "#f97316"
     : "#ef4444";
 

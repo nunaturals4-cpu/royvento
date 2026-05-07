@@ -1874,10 +1874,19 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     const [out] = await serializeBookings([b]);
     const lookupActualAmountDue = calcActualAmountDue(b);
     const checkedInAtIso = b.checkedInAt ? b.checkedInAt.toISOString() : null;
+    // Grace window: if this booking was checked in within the last 30s, treat
+    // a lookup-only re-scan as a benign duplicate ("Checked in just now")
+    // rather than the orange "Already used" state. This is what the manager
+    // sees when they scan the same QR twice in quick succession at the door.
+    const recentlyCheckedIn =
+      b.checkedIn && b.checkedInAt
+        ? Date.now() - b.checkedInAt.getTime() <= GRACE_WINDOW_MS
+        : false;
     res.json({
       code: b.checkedIn ? "ALREADY_CHECKED_IN" : "OK",
       status: b.checkedIn ? "already_checked_in" : "ready_to_check_in",
       lookupOnly: true,
+      recentlyCheckedIn,
       checkedInAt: checkedInAtIso,
       booking: out
         ? { ...out, ...scanCommInfo, ...scanPriceInfo, actualAmountDue: lookupActualAmountDue, actualEntry: buildActualEntry(b) }
