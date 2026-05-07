@@ -152,3 +152,33 @@ export function computeCommissionFromActuals(
   const raw = ticketFee * unitCount;
   return { bookingType, ratePerUnit, unitCount, amount: round2(Math.min(raw, Math.max(0, cashCollected))) };
 }
+
+/**
+ * Sum platform commission across a set of bookings using the same scope
+ * rules as `/admin/commission-report` (only bookings whose vendor is
+ * `approved` count) and the same per-booking math as
+ * `computeCommissionFromPlanned`. Returned as the un-rounded sum of
+ * per-booking round2'd amounts so the figure matches the Commission
+ * Report's `totals.totalCommission` to the rupee.
+ *
+ * Used by both `/admin/analytics` (for the Total Commission KPI) and
+ * `/admin/commission-report` (for `totals.totalCommission`) so the two
+ * endpoints can never silently drift apart.
+ */
+export function aggregatePlatformCommission(
+  bookings: PlannedBookingShape[] & ReadonlyArray<{ vendorId: number }>,
+  ratesByVendor: Map<number, CommissionRatesInput>,
+  approvedVendorIds: Set<number>,
+): number {
+  let total = 0;
+  for (const b of bookings) {
+    if (!approvedVendorIds.has(b.vendorId)) continue;
+    const rates = ratesByVendor.get(b.vendorId) ?? {
+      freeEntryRate: 0,
+      ticketRate: 0,
+      tableBookingRate: 0,
+    };
+    total += computeCommissionFromPlanned(b, rates).amount;
+  }
+  return total;
+}

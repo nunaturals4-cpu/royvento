@@ -11,7 +11,7 @@ import {
   vendorCommissionsTable,
   commissionLedgerTable,
 } from "@workspace/db";
-import { computeCommissionFromPlanned } from "../lib/commission";
+import { computeCommissionFromPlanned, aggregatePlatformCommission } from "../lib/commission";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
@@ -235,22 +235,20 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const allVendors = await db.select().from(vendorsTable);
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
 
-  // Total platform commission for the same date window. Uses the same
-  // shared helper as /admin/commission-report and applies the same
-  // "approved vendors only" scope + sum-of-round2-amounts policy so the
-  // Analytics tile matches the Commissions tab's totals.totalCommission
-  // byte-for-byte for the same window.
+  // Total platform commission for the same date window. Delegates to the
+  // shared `aggregatePlatformCommission` helper so this matches
+  // /admin/commission-report.totals.totalCommission to the rupee for
+  // the same window — both endpoints now share a single source of truth.
   const allCommissionRates = await db.select().from(vendorCommissionsTable);
   const ratesByVendor = new Map(allCommissionRates.map((r) => [r.vendorId, r]));
   const approvedVendorIds = new Set(
     allVendors.filter((v) => v.status === "approved").map((v) => v.id),
   );
-  let totalCommission = 0;
-  for (const b of confirmedBookings) {
-    if (!approvedVendorIds.has(b.vendorId)) continue;
-    const rates = ratesByVendor.get(b.vendorId) ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 };
-    totalCommission += computeCommissionFromPlanned(b, rates).amount;
-  }
+  const totalCommission = aggregatePlatformCommission(
+    confirmedBookings,
+    ratesByVendor,
+    approvedVendorIds,
+  );
 
   const perVendor = Array.from(perVendorMap.values())
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
@@ -1744,6 +1742,15 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       return acc;
     },
     { totalBookings: 0, totalRevenue: 0, totalCommission: 0, collectedCommission: 0, pendingCommission: 0 },
+  );
+
+  // Overwrite totalCommission with the shared aggregator's result so
+  // /admin/analytics and /admin/commission-report can never drift —
+  // both endpoints derive this number from the exact same helper.
+  totals.totalCommission = aggregatePlatformCommission(
+    bookings,
+    commissionMap,
+    new Set(approvedVendors.map((v) => v.id)),
   );
 
   res.json({ rows, totals });
