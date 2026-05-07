@@ -37,5 +37,13 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(clients.claim()));
+// Intentionally NOT calling skipWaiting() / clients.claim() here.
+// Auto-activating a new SW caused mid-session page reloads (users mid-booking
+// would lose their state). Instead, the new SW sits in `waiting` state until
+// the user explicitly clicks "Refresh to update" in the app's update banner,
+// which posts a SKIP_WAITING message to this worker (handled below).
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});

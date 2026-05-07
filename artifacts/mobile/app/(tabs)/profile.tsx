@@ -28,6 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { useLogout } from "@/hooks/useLogout";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 
 async function uploadImageToStorage(localUri: string): Promise<string> {
   const filename = localUri.split("/").pop() ?? "profile.jpg";
@@ -202,14 +203,9 @@ export default function ProfileScreen() {
     enabled: !!user,
   });
 
-  const { data: notificationData } = useQuery<{ id: number; isRead: boolean }[]>({
-    queryKey: ["notifications"],
-    queryFn: () => customFetch<{ id: number; isRead: boolean }[]>("/api/notifications"),
-    enabled: !!user,
-    staleTime: 60_000,
-    refetchInterval: 90_000,
-  });
-  const unreadCount = (notificationData ?? []).filter((n) => !n.isRead).length;
+  // Shared with the persistent bottom-nav so we only poll /api/notifications
+  // once per 90 s for the whole app — see hooks/useNotifications.ts.
+  const unreadCount = useUnreadNotificationCount();
 
   const [actingInv, setActingInv] = useState<number | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);

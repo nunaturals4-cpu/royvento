@@ -1,13 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { customFetch } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSegments } from "expo-router";
 import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/context/LanguageContext";
-import { useAuth } from "@/context/AuthContext";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 
 export const BOTTOM_NAV_HEIGHT = 60;
 
@@ -57,11 +55,6 @@ const TABS: Tab[] = [
   },
 ];
 
-interface NotificationItem {
-  id: number;
-  isRead: boolean;
-}
-
 export function PersistentBottomNav() {
   const { t } = useLanguage();
   const colors = useColors();
@@ -69,18 +62,11 @@ export function PersistentBottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const segments = useSegments();
-  const { user } = useAuth();
 
-  const { data: notifications } = useQuery<NotificationItem[]>({
-    queryKey: ["notifications"],
-    queryFn: () => customFetch<NotificationItem[]>("/api/notifications"),
-    enabled: !!user,
-    staleTime: 60_000,
-    refetchInterval: 90_000,
-    select: (data) => data,
-  });
-
-  const unreadCount = (notifications ?? []).filter((n) => !n.isRead).length;
+  // Shared notifications poll — see hooks/useNotifications.ts for rationale.
+  // The hook reads `user` from AuthContext internally and disables the query
+  // when nobody's logged in, so we don't need useAuth() here.
+  const unreadCount = useUnreadNotificationCount();
 
   const isAuth = segments[0] === "(auth)";
   if (isAuth) return null;
