@@ -373,9 +373,14 @@ export function Navbar() {
                     </>
                   )}
                   {user.role === "admin" && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin" className="cursor-pointer w-full">{t("nav.admin_panel")}</Link>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard/bookings" className="cursor-pointer w-full">{t("nav.my_bookings")}</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="cursor-pointer w-full">{t("nav.admin_panel")}</Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">

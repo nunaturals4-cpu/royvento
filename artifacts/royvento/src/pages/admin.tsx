@@ -44,7 +44,6 @@ import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation, useSearch } from "wouter";
 import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR } from "@/lib/api";
-import { Bookings as MyBookingsPage } from "@/pages/bookings";
 
 export function AdminPanel() {
   const search = useSearch();
@@ -91,7 +90,6 @@ export function AdminPanel() {
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
           <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
-          <TabsTrigger value="my-bookings">My Bookings</TabsTrigger>
         </TabsList>
         </div>
         <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
@@ -112,7 +110,6 @@ export function AdminPanel() {
         <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
         <TabsContent value="commissions"><CommissionsAdmin /></TabsContent>
         <TabsContent value="settlements"><SettlementsAdmin /></TabsContent>
-        <TabsContent value="my-bookings"><MyBookingsPage /></TabsContent>
       </Tabs>
     </div>
   );
