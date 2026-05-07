@@ -185,6 +185,17 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   let totalWomen = 0;
   let totalMen = 0;
   let totalCouple = 0;
+  // Real check-ins captured at the door (sum of `actualWomen / actualMen /
+  // actualCouple` across all confirmed/completed bookings in the window,
+  // regardless of payment method). `actualsRecordedCount` is how many of
+  // those bookings have ANY actuals recorded; `actualsEligibleCount` is
+  // every confirmed/completed booking in the window. Together they let
+  // the UI show a "X of Y bookings recorded" completeness hint.
+  let actualWomenTotal = 0;
+  let actualMenTotal = 0;
+  let actualCoupleTotal = 0;
+  let actualsRecordedCount = 0;
+  const actualsEligibleCount = confirmedBookings.length;
   // Daily chart: last 30 days clamped to [rangeStart, rangeEnd]
   const dayMs = 24 * 60 * 60 * 1000;
   const dailyMap = new Map<string, number>();
@@ -202,6 +213,17 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalWomen += b.ticketWomen;
     totalMen += b.ticketMen;
     totalCouple += b.ticketCouple;
+    actualWomenTotal += b.actualWomen ?? 0;
+    actualMenTotal += b.actualMen ?? 0;
+    actualCoupleTotal += b.actualCouple ?? 0;
+    if (
+      b.actualWomen != null ||
+      b.actualMen != null ||
+      b.actualCouple != null ||
+      b.actualGuests != null
+    ) {
+      actualsRecordedCount += 1;
+    }
     const rev = (b as unknown as { _rev: number })._rev ?? 0;
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
     if (new Date(b.createdAt) >= dailyStart && dailyMap.has(day)) {
@@ -327,7 +349,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       bookingDate: b.bookingDate,
       guests: b.guests,
       totalPrice: Number(b.totalPrice),
-      notes: b.notes,
+      notes: b.notes ?? "",
       status: b.status,
       createdAt: b.createdAt.toISOString(),
       eventTitle: e?.title ?? "",
@@ -335,6 +357,10 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       vendorName: v?.businessName ?? "",
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
+      // Required by the Booking schema. Was previously omitted, which
+      // tripped client-side Zod validation on the generated React Query
+      // hook and broke the entire Admin Analytics dashboard load.
+      phone: b.phone ?? u?.phone ?? "",
     };
   });
 
@@ -363,6 +389,11 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalWomen,
     totalMen,
     totalCouple,
+    actualWomen: actualWomenTotal,
+    actualMen: actualMenTotal,
+    actualCouple: actualCoupleTotal,
+    actualsRecordedCount,
+    actualsEligibleCount,
     dailyRevenue: adminDailyRevenue,
     monthlyRevenue,
     perVendorPaginated: {

@@ -173,6 +173,11 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
     totalWomen?: number;
     totalMen?: number;
     totalCouple?: number;
+    actualWomen?: number;
+    actualMen?: number;
+    actualCouple?: number;
+    actualsRecordedCount?: number;
+    actualsEligibleCount?: number;
     dailyRevenue?: { date: string; revenue: number }[];
     monthlyRevenue?: { month: string; revenue: number }[];
     perVendor?: { vendorId: number; vendorName: string; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }[];
@@ -270,40 +275,91 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
 
       {/* Platform ticket breakdown */}
       {hasTickets && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <h3 className="font-serif text-xl">Platform ticket breakdown</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
-                <span className="text-pink-400 text-base">♀</span>
+
+          {/* Tickets sold (booked) */}
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Tickets sold</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
+                  <span className="text-pink-400 text-base">♀</span>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
+                  <p className="stat-number text-2xl text-pink-300">{adminData.totalWomen ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
-                <p className="stat-number text-2xl text-pink-300">{adminData.totalWomen ?? 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+              <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+                  <span className="text-blue-400 text-base">♂</span>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
+                  <p className="stat-number text-2xl text-blue-300">{adminData.totalMen ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+                </div>
               </div>
-            </div>
-            <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-                <span className="text-blue-400 text-base">♂</span>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
-                <p className="stat-number text-2xl text-blue-300">{adminData.totalMen ?? 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
-              </div>
-            </div>
-            <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-                <span className="text-purple-400 text-base">⚭</span>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
-                <p className="stat-number text-2xl text-purple-300">{adminData.totalCouple ?? 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+              <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
+                  <span className="text-purple-400 text-base">⚭</span>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
+                  <p className="stat-number text-2xl text-purple-300">{adminData.totalCouple ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Real check-ins (actuals captured at the door). Only show
+              once there's at least one eligible booking in the window;
+              numbers will be 0 until staff scan/record actuals. */}
+          {(adminData.actualsEligibleCount ?? 0) > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Real check-ins</p>
+                <p className="text-xs text-muted-foreground">
+                  {adminData.actualsRecordedCount ?? 0} of {adminData.actualsEligibleCount ?? 0} bookings recorded
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
+                    <span className="text-pink-400 text-base">♀</span>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
+                    <p className="stat-number text-2xl text-pink-300">{adminData.actualWomen ?? 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">checked in</p>
+                  </div>
+                </div>
+                <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+                    <span className="text-blue-400 text-base">♂</span>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
+                    <p className="stat-number text-2xl text-blue-300">{adminData.actualMen ?? 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">checked in</p>
+                  </div>
+                </div>
+                <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
+                    <span className="text-purple-400 text-base">⚭</span>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
+                    <p className="stat-number text-2xl text-purple-300">{adminData.actualCouple ?? 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">checked in</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

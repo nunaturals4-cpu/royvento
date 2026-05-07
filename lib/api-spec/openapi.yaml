@@ -2485,6 +2485,21 @@ components:
           description: COD confirmed/completed bookings still missing actual entry counts. These contribute ₹0 to totalRevenue until actuals are recorded.
         onlineRevenue:
           type: number
+        actualWomen:
+          type: integer
+          description: Sum of `actualWomen` across all confirmed/completed bookings in the date window — i.e. women actually checked in at the door.
+        actualMen:
+          type: integer
+          description: Sum of `actualMen` across all confirmed/completed bookings in the date window.
+        actualCouple:
+          type: integer
+          description: Sum of `actualCouple` across all confirmed/completed bookings in the date window.
+        actualsRecordedCount:
+          type: integer
+          description: Number of confirmed/completed bookings in the window that have ANY actuals recorded (women / men / couple / guests).
+        actualsEligibleCount:
+          type: integer
+          description: Total confirmed/completed bookings in the window (denominator for the "X of Y bookings recorded" completeness hint).
         bookingsByStatus:
           type: array
           items:

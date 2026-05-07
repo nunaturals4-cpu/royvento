@@ -28,6 +28,16 @@ export interface AdminAnalytics {
   /** COD confirmed/completed bookings still missing actual entry counts. These contribute ₹0 to totalRevenue until actuals are recorded. */
   pendingActualsCount?: number;
   onlineRevenue: number;
+  /** Sum of `actualWomen` across all confirmed/completed bookings in the date window — i.e. women actually checked in at the door. */
+  actualWomen?: number;
+  /** Sum of `actualMen` across all confirmed/completed bookings in the date window. */
+  actualMen?: number;
+  /** Sum of `actualCouple` across all confirmed/completed bookings in the date window. */
+  actualCouple?: number;
+  /** Number of confirmed/completed bookings in the window that have ANY actuals recorded (women / men / couple / guests). */
+  actualsRecordedCount?: number;
+  /** Total confirmed/completed bookings in the window (denominator for the "X of Y bookings recorded" completeness hint). */
+  actualsEligibleCount?: number;
   bookingsByStatus: AdminAnalyticsBookingsByStatusItem[];
   recentBookings: Booking[];
   topVendors: AdminAnalyticsTopVendorsItem[];

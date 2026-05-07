@@ -2790,6 +2790,36 @@ export const GetAdminAnalyticsResponse = zod.object({
       "COD confirmed\/completed bookings still missing actual entry counts. These contribute ₹0 to totalRevenue until actuals are recorded.",
     ),
   onlineRevenue: zod.number(),
+  actualWomen: zod
+    .number()
+    .optional()
+    .describe(
+      "Sum of `actualWomen` across all confirmed\/completed bookings in the date window — i.e. women actually checked in at the door.",
+    ),
+  actualMen: zod
+    .number()
+    .optional()
+    .describe(
+      "Sum of `actualMen` across all confirmed\/completed bookings in the date window.",
+    ),
+  actualCouple: zod
+    .number()
+    .optional()
+    .describe(
+      "Sum of `actualCouple` across all confirmed\/completed bookings in the date window.",
+    ),
+  actualsRecordedCount: zod
+    .number()
+    .optional()
+    .describe(
+      "Number of confirmed\/completed bookings in the window that have ANY actuals recorded (women \/ men \/ couple \/ guests).",
+    ),
+  actualsEligibleCount: zod
+    .number()
+    .optional()
+    .describe(
+      'Total confirmed\/completed bookings in the window (denominator for the \"X of Y bookings recorded\" completeness hint).',
+    ),
   bookingsByStatus: zod.array(
     zod.object({
       status: zod.string(),
