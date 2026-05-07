@@ -18,7 +18,7 @@ export interface AdminAnalytics {
   totalEvents: number;
   totalBookings: number;
   totalRevenue: number;
-  /** Platform commission earned in the date window. Uses the same per-booking calculation as /admin/commission-report (free-entry / ticket / table rates × planned counts, capped by online-paid amount). */
+  /** Platform commission realised in the date window. Sourced directly from `commission_ledger` (triggers `online_payment`, `cod_checkin`, `free_checkin`) — same number the Commissions tab shows as `totals.collectedCommission`. Online bookings earn at payment, COD at check-in (capped by actual cash collected), free-entry at check-in (`freeEntryRate × heads`). */
   totalCommission?: number;
   codRevenue: number;
   /** Sum of actual cash collected at the door for COD bookings (per-type entry counts × event prices for ticket mode, pro-rated finalPrice otherwise). */

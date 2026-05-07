@@ -11,7 +11,7 @@ import {
   vendorCommissionsTable,
   commissionLedgerTable,
 } from "@workspace/db";
-import { computeCommissionFromPlanned, aggregatePlatformCommission } from "../lib/commission";
+import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
@@ -235,20 +235,29 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const allVendors = await db.select().from(vendorsTable);
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
 
-  // Total platform commission for the same date window. Delegates to the
-  // shared `aggregatePlatformCommission` helper so this matches
-  // /admin/commission-report.totals.totalCommission to the rupee for
-  // the same window — both endpoints now share a single source of truth.
-  const allCommissionRates = await db.select().from(vendorCommissionsTable);
-  const ratesByVendor = new Map(allCommissionRates.map((r) => [r.vendorId, r]));
-  const approvedVendorIds = new Set(
-    allVendors.filter((v) => v.status === "approved").map((v) => v.id),
-  );
-  const totalCommission = aggregatePlatformCommission(
-    confirmedBookings,
-    ratesByVendor,
-    approvedVendorIds,
-  );
+  // Total platform commission realised in the same date window. Reads
+  // directly from `commission_ledger` (online_payment + cod_checkin +
+  // free_checkin triggers) — the single source of truth for "money the
+  // platform has actually earned". This matches the user spec exactly:
+  // an online booking earns its commission at payment; a COD booking
+  // earns at check-in (capped by cash collected); a free-entry booking
+  // earns `freeEntryRate × heads` at check-in (and ₹0 if never scanned
+  // in). It is also the same value the Commissions tab already exposes
+  // as `totals.collectedCommission`, so the two surfaces agree to the
+  // rupee for any date window.
+  const realisedCommissionRow = await db
+    .select({
+      total: sql<string>`coalesce(sum(${commissionLedgerTable.amount}), 0)::text`,
+    })
+    .from(commissionLedgerTable)
+    .where(
+      and(
+        inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
+        gte(commissionLedgerTable.createdAt, rangeStart),
+        lte(commissionLedgerTable.createdAt, rangeEnd),
+      ),
+    );
+  const totalCommission = Number(realisedCommissionRow[0]?.total ?? 0);
 
   const perVendor = Array.from(perVendorMap.values())
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
@@ -1742,15 +1751,6 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       return acc;
     },
     { totalBookings: 0, totalRevenue: 0, totalCommission: 0, collectedCommission: 0, pendingCommission: 0 },
-  );
-
-  // Overwrite totalCommission with the shared aggregator's result so
-  // /admin/analytics and /admin/commission-report can never drift —
-  // both endpoints derive this number from the exact same helper.
-  totals.totalCommission = aggregatePlatformCommission(
-    bookings,
-    commissionMap,
-    new Set(approvedVendors.map((v) => v.id)),
   );
 
   res.json({ rows, totals });
