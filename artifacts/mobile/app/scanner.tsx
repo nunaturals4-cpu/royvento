@@ -54,17 +54,27 @@ interface BookingData {
 // Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
 const SCANNER_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Mirrors the rule used in artifacts/mobile/app/(tabs)/bookings.tsx and
-// artifacts/api-server/src/routes/bookings.ts: when the booking date's weekday
-// is in the active free-entry-rules day list, the customer owes ₹0 at the door.
-function bookingIsFreeEntryDay(b: Pick<BookingData, "bookingDate" | "freeEntryRules">): boolean {
+// Per-gender free-entry helpers — must mirror the server (bookings.ts create,
+// serializeBookings, scan-ticket calcActualAmountDue, partner attendance) and
+// the web/mobile event-detail pages. On a configured day, only tiers in
+// fer.genders are zero-priced; other tiers still owe their normal price.
+// "Whole booking free" is true only when ALL three genders are listed.
+function bookingFerState(b: Pick<BookingData, "bookingDate" | "freeEntryRules">): {
+  active: boolean;
+  allGendersFree: boolean;
+  isTierFree: (g: "women" | "men" | "couple") => boolean;
+} {
   const fer = b.freeEntryRules;
-  if (!fer?.enabled) return false;
-  if (!b.bookingDate) return false;
-  const days = Array.isArray(fer.days) ? fer.days : [];
-  const dayName = SCANNER_FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()];
-  if (!dayName || !days.includes(dayName)) return false;
-  return true;
+  const days = Array.isArray(fer?.days) ? fer!.days! : [];
+  const dayName = b.bookingDate ? SCANNER_FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;
+  const active = !!(fer?.enabled && dayName && days.includes(dayName));
+  const ferGenders = active ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+  const allGendersFree = active && ["women", "men", "couple"].every((g) => ferGenders.includes(g));
+  return {
+    active,
+    allGendersFree,
+    isTierFree: (g) => active && ferGenders.includes(g),
+  };
 }
 
 interface ScanResult {
@@ -383,7 +393,7 @@ export default function ScannerScreen() {
                   <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>Record actual entry</Text>
                   <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
                     {result.booking.actualAmountDue != null
-                      ? bookingIsFreeEntryDay(result.booking)
+                      ? result.booking.actualAmountDue === 0
                         ? "Recorded · Free Entry"
                         : `Recorded · ₹${result.booking.actualAmountDue.toLocaleString("en-IN")} due`
                       : "Tap to log who actually showed up"}
@@ -555,24 +565,35 @@ function ActualEntrySheet({
   }, [b.id, b.actualWomen, b.actualMen, b.actualCouple, b.actualGuests, b.ticketWomen, b.ticketMen, b.ticketCouple, b.guests]);
 
   const isCod = b.paymentMethod === "cod";
-  const isFreeEntryDayBooking = bookingIsFreeEntryDay(b);
+  // Per-gender free-entry state for THIS booking. Whole-booking free banner
+  // only when ferAllGendersFree (ticket-mode partial free still flows through
+  // the COD breakdown so the manager sees per-tier paid amount). Table-mode
+  // is treated as free only when all genders are listed.
+  const ferState = bookingFerState(b);
+  const wholeBookingFree = isTicket
+    ? ferState.allGendersFree
+    : ferState.allGendersFree;
   const alreadyRecorded = b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null;
   const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
   const shouldRender = (isTicket && hasAnyBookedTicket) || (!isTicket && b.guests > 0);
 
-  // LIVE running total from current stepper state (server response is null until save).
-  const priceWomen = b.priceWomen ?? 0;
-  const priceMen = b.priceMen ?? 0;
-  const priceCouple = b.priceCouple ?? 0;
+  // LIVE running total from current stepper state (server response is null
+  // until save). Apply per-gender zeroing so partial-free days collect cash
+  // only for non-comped tiers — matches server calcActualAmountDue.
+  const priceWomen = ferState.isTierFree("women") ? 0 : (b.priceWomen ?? 0);
+  const priceMen = ferState.isTierFree("men") ? 0 : (b.priceMen ?? 0);
+  const priceCouple = ferState.isTierFree("couple") ? 0 : (b.priceCouple ?? 0);
   const liveTotal = isTicket
     ? w * priceWomen + m * priceMen + c * priceCouple
-    : (g / Math.max(1, b.guests)) * (b.finalPrice ?? 0);
+    : ferState.allGendersFree
+      ? 0
+      : (g / Math.max(1, b.guests)) * (b.finalPrice ?? 0);
   const liveTotalRounded = Math.round(liveTotal * 100) / 100;
   const subRows = isTicket
     ? [
-        { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen },
-        { label: "Men", qty: m, price: priceMen, subtotal: m * priceMen },
-        { label: "Couples", qty: c, price: priceCouple, subtotal: c * priceCouple },
+        { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen, free: ferState.isTierFree("women") },
+        { label: "Men", qty: m, price: priceMen, subtotal: m * priceMen, free: ferState.isTierFree("men") },
+        { label: "Couples", qty: c, price: priceCouple, subtotal: c * priceCouple, free: ferState.isTierFree("couple") },
       ].filter((r) => r.qty > 0)
     : [];
 
@@ -620,7 +641,7 @@ function ActualEntrySheet({
               <StepperRow label="Guests" value={g} max={Math.max(b.guests, 1)} color={colors.primary} onChange={setG} />
             )}
           </ScrollView>
-          {isFreeEntryDayBooking ? (
+          {wholeBookingFree ? (
             <View style={{ marginTop: 4, borderRadius: 10, padding: 10, backgroundColor: "#16a34a18", borderWidth: 1, borderColor: "#16a34a55", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>Free entry — no payment to collect</Text>
               <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: "#22c55e" }}>₹0</Text>
@@ -631,8 +652,12 @@ function ActualEntrySheet({
                 <>
                   {subRows.map((r) => (
                     <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#fcd34d" }}>{r.label} · {r.qty} × ₹{r.price.toLocaleString("en-IN")}</Text>
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#fcd34d" }}>₹{r.subtotal.toLocaleString("en-IN")}</Text>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: r.free ? "#22c55e" : "#fcd34d" }}>
+                        {r.label} · {r.qty}{r.free ? " · FREE ENTRY" : ` × ₹${r.price.toLocaleString("en-IN")}`}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: r.free ? "#22c55e" : "#fcd34d" }}>
+                        {r.free ? "₹0" : `₹${r.subtotal.toLocaleString("en-IN")}`}
+                      </Text>
                     </View>
                   ))}
                   <View style={{ height: 1, backgroundColor: "#f59e0b30" }} />

@@ -504,11 +504,23 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
                       <View style={styles.ptField}>
                         <Text style={styles.ptFieldLabel}>{t("bookings.tickets")}</Text>
                         <Text style={styles.ptFieldValue}>
-                          {[
-                            bx.ticketWomen ? `${bx.ticketWomen}× ${t("bookings.women")}` : "",
-                            bx.ticketMen ? `${bx.ticketMen}× ${t("bookings.men")}` : "",
-                            bx.ticketCouple ? `${bx.ticketCouple}× ${t("bookings.couple")}` : "",
-                          ].filter(Boolean).join("  ") || `${b.guests} ${t("bookings.guests_label")}`}
+                          {(() => {
+                            // Per-gender free-entry annotation — mirror web bookings.tsx.
+                            const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+                            const fer = bx.freeEntryRules ?? null;
+                            const dayName = b.bookingDate ? days[new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;
+                            const active = !!(fer?.enabled && dayName && Array.isArray(fer.days) && fer.days.includes(dayName));
+                            const ferGenders = active ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+                            const isFree = (g: "women" | "men" | "couple") => active && ferGenders.includes(g);
+                            const tag = (n: number, lbl: string, g: "women" | "men" | "couple") =>
+                              isFree(g) ? `${n}× ${lbl} (${t("bookings.free_entry") ?? "free"})` : `${n}× ${lbl}`;
+                            const parts = [
+                              bx.ticketWomen ? tag(bx.ticketWomen, t("bookings.women"), "women") : "",
+                              bx.ticketMen ? tag(bx.ticketMen, t("bookings.men"), "men") : "",
+                              bx.ticketCouple ? tag(bx.ticketCouple, t("bookings.couple"), "couple") : "",
+                            ].filter(Boolean);
+                            return parts.join("  ") || `${b.guests} ${t("bookings.guests_label")}`;
+                          })()}
                         </Text>
                       </View>
                       <View style={styles.ptField}>

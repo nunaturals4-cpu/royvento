@@ -260,7 +260,18 @@ export function EventDetail() {
 
   const startingAt = (() => {
     if (isPub) {
-      const tiers = [Number(ev.priceWomen), Number(ev.priceMen), Number(ev.priceCouple)].filter((n) => n > 0);
+      // On a partial-free-entry day, "Starting at" must reflect the lowest
+      // PAID tier — comped tiers are excluded so we don't mislead users with
+      // a number they will never be charged. ferAllGendersFree is handled by
+      // the isFreeEntryDay branch above which renders a "Free entry" label.
+      const tiers = [
+        { g: "women" as const, p: Number(ev.priceWomen) },
+        { g: "men" as const, p: Number(ev.priceMen) },
+        { g: "couple" as const, p: Number(ev.priceCouple) },
+      ]
+        .filter((t) => !isTierFree(t.g))
+        .map((t) => t.p)
+        .filter((n) => n > 0);
       if (tiers.length > 0) return Math.min(...tiers);
     }
     return ev.startingPrice ?? ev.price ?? 0;

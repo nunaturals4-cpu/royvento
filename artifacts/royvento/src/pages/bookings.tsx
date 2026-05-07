@@ -516,10 +516,21 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
     w.document.close();
   };
 
+  // Per-gender free-entry annotation — when fer is active for the booking
+  // date and the tier's gender is in fer.genders, show "(free)" so the user
+  // sees which tiers were comped. Mirrors the per-gender pricing rule.
+  const _bFerWebDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const _bFer = b.freeEntryRules ?? null;
+  const _bDayName = b.bookingDate ? _bFerWebDays[new Date(`${b.bookingDate}T12:00:00`).getDay()] : undefined;
+  const _bFerActive = !!(_bFer?.enabled && _bDayName && Array.isArray(_bFer.days) && _bFer.days.includes(_bDayName));
+  const _bFerGenders = _bFerActive ? (_bFer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
+  const isBookingTierFree = (g: "women" | "men" | "couple") => _bFerActive && _bFerGenders.includes(g);
+  const fmtTier = (count: number, label: string, g: "women" | "men" | "couple") =>
+    isBookingTierFree(g) ? `${count}× ${label} (${t("bookings.free_entry") ?? "free"})` : `${count}× ${label}`;
   const ticketBreakdownParts = [
-    b.ticketWomen ? `${b.ticketWomen}× ${t("bookings.women")}` : "",
-    b.ticketMen ? `${b.ticketMen}× ${t("bookings.men")}` : "",
-    b.ticketCouple ? `${b.ticketCouple}× ${t("bookings.couple")}` : "",
+    b.ticketWomen ? fmtTier(b.ticketWomen, t("bookings.women"), "women") : "",
+    b.ticketMen ? fmtTier(b.ticketMen, t("bookings.men"), "men") : "",
+    b.ticketCouple ? fmtTier(b.ticketCouple, t("bookings.couple"), "couple") : "",
   ].filter(Boolean);
 
   return (

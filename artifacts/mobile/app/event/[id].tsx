@@ -88,16 +88,20 @@ function formatINR(v: number) {
 }
 
 function TickerCounter({
-  label, value, price, onChange, color, mutedColor,
+  label, value, price, onChange, color, mutedColor, freeBadge,
 }: {
   label: string; value: number; price?: number; onChange: (v: number) => void;
-  color: string; mutedColor: string;
+  color: string; mutedColor: string; freeBadge?: boolean;
 }) {
   return (
     <View style={styles.tickerRow}>
       <View style={{ flex: 1 }}>
         <Text style={[styles.tickerLabel, { color }]}>{label}</Text>
-        {price != null && price > 0 && (
+        {freeBadge ? (
+          <View style={{ alignSelf: "flex-start", marginTop: 2, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: "#16a34a22", borderWidth: 1, borderColor: "#16a34a55" }}>
+            <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "#22c55e", letterSpacing: 0.5 }}>FREE ENTRY</Text>
+          </View>
+        ) : price != null && price > 0 && (
           <Text style={[styles.tickerPrice, { color: mutedColor }]}>{formatINR(price)} each</Text>
         )}
       </View>
@@ -1040,16 +1044,25 @@ export default function EventDetailScreen() {
                 {pubMode === "ticket" && (
                   <View style={[styles.pubTickets, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                     <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("events.ticket_counts")}</Text>
-                    {(isFreeEntryDay || priceWomen > 0) && (
-                      <TickerCounter label={t("events.women")} value={ticketWomen} price={isFreeEntryDay ? undefined : priceWomen} onChange={setTicketWomen}
+                    {(isFreeEntryDay || isTierFreeMobile("women") || priceWomen > 0) && (
+                      <TickerCounter label={t("events.women")} value={ticketWomen}
+                        price={isFreeEntryDay || isTierFreeMobile("women") ? undefined : priceWomen}
+                        freeBadge={isTierFreeMobile("women") && !isFreeEntryDay}
+                        onChange={setTicketWomen}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
-                    {(isFreeEntryDay || priceMen > 0) && (
-                      <TickerCounter label={t("events.men")} value={ticketMen} price={isFreeEntryDay ? undefined : priceMen} onChange={setTicketMen}
+                    {(isFreeEntryDay || isTierFreeMobile("men") || priceMen > 0) && (
+                      <TickerCounter label={t("events.men")} value={ticketMen}
+                        price={isFreeEntryDay || isTierFreeMobile("men") ? undefined : priceMen}
+                        freeBadge={isTierFreeMobile("men") && !isFreeEntryDay}
+                        onChange={setTicketMen}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
-                    {(isFreeEntryDay || priceCouple > 0) && (
-                      <TickerCounter label={t("events.couple")} value={ticketCouple} price={isFreeEntryDay ? undefined : priceCouple} onChange={setTicketCouple}
+                    {(isFreeEntryDay || isTierFreeMobile("couple") || priceCouple > 0) && (
+                      <TickerCounter label={t("events.couple")} value={ticketCouple}
+                        price={isFreeEntryDay || isTierFreeMobile("couple") ? undefined : priceCouple}
+                        freeBadge={isTierFreeMobile("couple") && !isFreeEntryDay}
+                        onChange={setTicketCouple}
                         color={colors.foreground} mutedColor={colors.mutedForeground} />
                     )}
                   </View>
