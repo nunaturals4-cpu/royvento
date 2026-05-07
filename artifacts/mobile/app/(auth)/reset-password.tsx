@@ -209,7 +209,12 @@ export default function ResetPasswordScreen() {
               </View>
             </View>
 
-            {confirm.length > 0 && password !== confirm ? (
+            {errors.confirm ? (
+              <View style={styles.mismatchRow}>
+                <Ionicons name="close-circle" size={14} color={colors.destructive} />
+                <Text style={[styles.mismatchText, { color: colors.destructive }]}>{errors.confirm}</Text>
+              </View>
+            ) : confirm.length > 0 && password !== confirm ? (
               <View style={styles.mismatchRow}>
                 <Ionicons name="close-circle" size={14} color={colors.destructive} />
                 <Text style={[styles.mismatchText, { color: colors.destructive }]}>Passwords don't match</Text>

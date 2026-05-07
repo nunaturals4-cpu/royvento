@@ -3,10 +3,12 @@ export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
 
 export function normalizeIndianPhone(input: string): string {
-  const digits = (input ?? "").replace(/\D/g, "");
+  const raw = (input ?? "").trim();
+  const hadPlus = raw.startsWith("+");
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return digits;
   if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
-  if (digits.length === 13 && digits.startsWith("091")) return digits.slice(3);
-  if (digits.length > 10) return digits.slice(-10);
+  if (digits.length === 11 && hadPlus && digits.startsWith("91")) return digits.slice(2);
   return digits;
 }
 
