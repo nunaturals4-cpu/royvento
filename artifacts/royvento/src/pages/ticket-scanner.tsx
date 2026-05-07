@@ -32,6 +32,27 @@ interface BookingData {
   actualCouple?: number | null;
   actualGuests?: number | null;
   actualAmountDue?: number | null;
+  freeEntryRules?: {
+    enabled?: boolean;
+    days?: string[];
+    genders?: string[];
+  } | null;
+}
+
+// Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
+const SCANNER_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Mirrors the rule used in artifacts/royvento/src/pages/bookings.tsx and
+// artifacts/api-server/src/routes/bookings.ts: when the booking date's weekday
+// is in the active free-entry-rules day list, the customer owes ₹0 at the door.
+function bookingIsFreeEntryDay(b: Pick<BookingData, "bookingDate" | "freeEntryRules">): boolean {
+  const fer = b.freeEntryRules;
+  if (!fer?.enabled) return false;
+  if (!b.bookingDate) return false;
+  const days = Array.isArray(fer.days) ? fer.days : [];
+  const dayName = SCANNER_FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()];
+  if (!dayName || !days.includes(dayName)) return false;
+  return true;
 }
 
 interface ScanSuccess {
@@ -636,6 +657,7 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
   const [g, setG] = useState<number>(initGuests);
   const [saving, setSaving] = useState(false);
   const isCod = b.paymentMethod === "cod";
+  const isFreeEntryDayBooking = bookingIsFreeEntryDay(b);
   const alreadyRecorded = (
     b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null
   );
@@ -716,7 +738,14 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
         )}
       </div>
 
-      {isCod && (
+      {isFreeEntryDayBooking ? (
+        <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 flex items-center justify-between">
+          <span className="text-xs uppercase tracking-wider text-green-300 flex items-center gap-1.5">
+            <Banknote className="h-3.5 w-3.5" /> Free entry — no payment to collect
+          </span>
+          <span className="text-sm font-semibold text-green-200 tabular-nums">₹0</span>
+        </div>
+      ) : isCod && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
           {isTicket && subRows.length > 0 && (
             <div className="space-y-1">

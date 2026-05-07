@@ -1733,14 +1733,26 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   const scanEvent = evtRows[0];
 
   // Compute actualAmountDue from per-type actuals using event prices (ticket mode) or pro-rated finalPrice (otherwise).
-  // Returns null if no actuals are recorded yet.
+  // Returns null if no actuals are recorded yet. On a free-entry day (mirrors the
+  // create-booking handler's `ferActive` rule), returns 0 regardless of the
+  // event's per-type prices: the customer owes nothing at the door even though
+  // admin commission still accrues via the existing `freeEntryRate` path.
+  const SCAN_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const scanFer = (scanEvent as { freeEntryRules?: { enabled?: boolean; days?: string[] } | null } | undefined)?.freeEntryRules;
   function calcActualAmountDue(
-    booking: { pubMode: string; ticketWomen: number; ticketMen: number; ticketCouple: number; guests: number; finalPrice: string; totalPrice: string; actualWomen: number | null; actualMen: number | null; actualCouple: number | null; actualGuests: number | null },
+    booking: { pubMode: string; ticketWomen: number; ticketMen: number; ticketCouple: number; guests: number; finalPrice: string; totalPrice: string; bookingDate: string; actualWomen: number | null; actualMen: number | null; actualCouple: number | null; actualGuests: number | null },
   ): number | null {
     const aw = booking.actualWomen, am = booking.actualMen, ac = booking.actualCouple, ag = booking.actualGuests;
     const isTicketMode = booking.pubMode === "ticket";
+    const dayName = booking.bookingDate
+      ? SCAN_FREE_ENTRY_DAY_ABBRS[new Date(`${booking.bookingDate}T12:00:00`).getDay()]
+      : undefined;
+    const ferActive = !!(scanFer?.enabled && dayName && Array.isArray(scanFer.days) && scanFer.days.includes(dayName));
     if (isTicketMode) {
       if (aw == null && am == null && ac == null) return null;
+      // Free-entry day → no cash to collect from the customer regardless of
+      // per-type prices or which genders showed up.
+      if (ferActive) return 0;
       const w = aw ?? 0, m = am ?? 0, c = ac ?? 0;
       const pw = Number(scanEvent?.priceWomen ?? 0);
       const pm = Number(scanEvent?.priceMen ?? 0);
@@ -1749,6 +1761,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       return Math.round((w * pw + m * pm + c * pc) * 100) / 100;
     }
     if (ag == null) return null;
+    if (ferActive) return 0;
     const guests = Math.max(1, booking.guests);
     const final = Number(booking.finalPrice);
     return Math.round((ag / guests) * final * 100) / 100;

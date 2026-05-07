@@ -44,6 +44,27 @@ interface BookingData {
   actualCouple?: number | null;
   actualGuests?: number | null;
   actualAmountDue?: number | null;
+  freeEntryRules?: {
+    enabled?: boolean;
+    days?: string[];
+    genders?: string[];
+  } | null;
+}
+
+// Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
+const SCANNER_FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Mirrors the rule used in artifacts/mobile/app/(tabs)/bookings.tsx and
+// artifacts/api-server/src/routes/bookings.ts: when the booking date's weekday
+// is in the active free-entry-rules day list, the customer owes ₹0 at the door.
+function bookingIsFreeEntryDay(b: Pick<BookingData, "bookingDate" | "freeEntryRules">): boolean {
+  const fer = b.freeEntryRules;
+  if (!fer?.enabled) return false;
+  if (!b.bookingDate) return false;
+  const days = Array.isArray(fer.days) ? fer.days : [];
+  const dayName = SCANNER_FREE_ENTRY_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()];
+  if (!dayName || !days.includes(dayName)) return false;
+  return true;
 }
 
 interface ScanResult {
@@ -268,7 +289,9 @@ export default function ScannerScreen() {
                   <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>Record actual entry</Text>
                   <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
                     {result.booking.actualAmountDue != null
-                      ? `Recorded · ₹${result.booking.actualAmountDue.toLocaleString("en-IN")} due`
+                      ? bookingIsFreeEntryDay(result.booking)
+                        ? "Recorded · Free Entry"
+                        : `Recorded · ₹${result.booking.actualAmountDue.toLocaleString("en-IN")} due`
                       : "Tap to log who actually showed up"}
                   </Text>
                 </View>
@@ -438,6 +461,7 @@ function ActualEntrySheet({
   }, [b.id, b.actualWomen, b.actualMen, b.actualCouple, b.actualGuests, b.ticketWomen, b.ticketMen, b.ticketCouple, b.guests]);
 
   const isCod = b.paymentMethod === "cod";
+  const isFreeEntryDayBooking = bookingIsFreeEntryDay(b);
   const alreadyRecorded = b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null;
   const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
   const shouldRender = (isTicket && hasAnyBookedTicket) || (!isTicket && b.guests > 0);
@@ -502,7 +526,12 @@ function ActualEntrySheet({
               <StepperRow label="Guests" value={g} max={Math.max(b.guests, 1)} color={colors.primary} onChange={setG} />
             )}
           </ScrollView>
-          {isCod && (
+          {isFreeEntryDayBooking ? (
+            <View style={{ marginTop: 4, borderRadius: 10, padding: 10, backgroundColor: "#16a34a18", borderWidth: 1, borderColor: "#16a34a55", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>Free entry — no payment to collect</Text>
+              <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: "#22c55e" }}>₹0</Text>
+            </View>
+          ) : isCod && (
             <View style={{ marginTop: 4, borderRadius: 10, padding: 10, backgroundColor: "#f59e0b18", borderWidth: 1, borderColor: "#f59e0b40", gap: 6 }}>
               {isTicket && subRows.length > 0 && (
                 <>
