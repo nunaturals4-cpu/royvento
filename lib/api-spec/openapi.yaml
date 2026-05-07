@@ -2554,7 +2554,7 @@ components:
             totalPages:
               type: integer
           required: [data, total, page, totalPages]
-      required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, codRevenue, onlineRevenue, bookingsByStatus, recentBookings, topVendors, monthlyRevenue]
+      required: [totalUsers, totalVendors, pendingVendors, totalEvents, totalBookings, totalRevenue, totalCommission, codRevenue, onlineRevenue, bookingsByStatus, recentBookings, topVendors, monthlyRevenue]
     ListEventsPaginatedResponse:
       type: object
       properties:

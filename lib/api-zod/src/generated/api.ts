@@ -2769,7 +2769,6 @@ export const GetAdminAnalyticsResponse = zod.object({
   totalRevenue: zod.number(),
   totalCommission: zod
     .number()
-    .optional()
     .describe(
       "Platform commission realised in the date window. Sourced directly from `commission_ledger` (triggers `online_payment`, `cod_checkin`, `free_checkin`) — same number the Commissions tab shows as `totals.collectedCommission`. Online bookings earn at payment, COD at check-in (capped by actual cash collected), free-entry at check-in (`freeEntryRate × heads`).",
     ),

@@ -1588,7 +1588,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       .from(commissionLedgerTable)
       .where(
         and(
-          inArray(commissionLedgerTable.trigger, ["online_payment", "cod_checkin", "free_checkin"]),
+          inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
           ...(from ? [gte(commissionLedgerTable.createdAt, from)] : []),
           ...(to ? [lte(commissionLedgerTable.createdAt, to)] : []),
         ),
