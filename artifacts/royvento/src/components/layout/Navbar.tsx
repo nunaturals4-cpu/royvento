@@ -99,6 +99,37 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handler);
   }, [notifOpen]);
 
+  // Refresh the notifications cache instantly when the service worker
+  // receives a web-push for this user, so the badge updates without polling.
+  useEffect(() => {
+    if (!user) return;
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === "royvento-notification") {
+        qc.invalidateQueries({ queryKey: ["notifications"] });
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [user, qc]);
+
+  // Also refresh when the tab regains focus / becomes visible, so badges
+  // catch up after the user comes back from another tab or device.
+  useEffect(() => {
+    if (!user) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        qc.invalidateQueries({ queryKey: ["notifications"] });
+      }
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [user, qc]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {

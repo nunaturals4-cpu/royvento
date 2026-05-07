@@ -10,7 +10,18 @@ self.addEventListener("push", (event) => {
     data: { url: payload.url ?? "/", ...(payload.data ?? {}) },
     tag: payload.tag ?? "royvento-push",
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((list) => {
+          for (const client of list) {
+            client.postMessage({ type: "royvento-notification", payload });
+          }
+        }),
+    ])
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
