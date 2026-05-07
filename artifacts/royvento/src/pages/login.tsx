@@ -127,7 +127,7 @@ export function Login() {
           <div className="h-px flex-1 bg-white/10" />
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
             <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />

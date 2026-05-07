@@ -128,7 +128,7 @@ export function ResetPassword() {
             No reset token found. Please use the link from the forgot-password email or demo page.
           </div>
         )}
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <div>
             <Label htmlFor="newpw">New password</Label>
             <Input

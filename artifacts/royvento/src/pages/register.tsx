@@ -165,7 +165,7 @@ export function Register() {
           <div className="h-px flex-1 bg-white/10" />
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <div>
             <Label htmlFor="name">{t("auth.full_name")}</Label>
             <Input ref={nameRef} id="name" required value={name} onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }} aria-invalid={!!errors.name} className="bg-black/40 border-white/10 mt-1" />
