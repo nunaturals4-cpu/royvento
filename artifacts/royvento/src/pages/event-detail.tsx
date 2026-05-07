@@ -195,7 +195,6 @@ export function EventDetail() {
 
   const _fer = (ev as any)?.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | undefined;
   const ferDayActive = !!(_fer?.enabled === true && (_fer.days ?? []).includes(selectedDayName));
-  const ferGenders = new Set(ferDayActive && Array.isArray(_fer?.genders) ? (_fer!.genders as string[]) : []);
   const isFreeEntryDay = isPub && (
     ferDayActive ||
     (effectiveWomen === 0 && effectiveMen === 0 && effectiveCouple === 0)
@@ -204,17 +203,18 @@ export function EventDetail() {
   const venueName = ev.vendor?.businessName ?? "This venue";
 
   // Compute subtotal based on mode. Mirrors the server's free-entry zeroing in
-  // bookings.ts so the form preview matches the actual charge: any booked
-  // gender listed in the active rule contributes ₹0.
-  const subtotalWomenPrice = ferGenders.has("women") ? 0 : effectiveWomen;
-  const subtotalMenPrice = ferGenders.has("men") ? 0 : effectiveMen;
-  const subtotalCouplePrice = ferGenders.has("couple") ? 0 : effectiveCouple;
+  // bookings.ts: when the rule is active for the selected weekday, the ENTIRE
+  // booking is ₹0 regardless of which gender tabs were ticked or whether the
+  // booking is ticket-mode or table-mode. The `genders` field is purely
+  // informational marketing copy for the badge below.
   let subtotal = 0;
-  if (isPub && pubMode === "ticket") {
+  if (ferDayActive && isPub) {
+    subtotal = 0;
+  } else if (isPub && pubMode === "ticket") {
     subtotal =
-      ticketWomen * subtotalWomenPrice +
-      ticketMen * subtotalMenPrice +
-      ticketCouple * subtotalCouplePrice;
+      ticketWomen * effectiveWomen +
+      ticketMen * effectiveMen +
+      ticketCouple * effectiveCouple;
   } else {
     subtotal = Number(ev.price) * Math.max(1, guests);
   }

@@ -83,15 +83,18 @@ interface ExtendedBooking {
 // Day abbreviations matching server's free-entry-rules day list (e.g. "Wed", "Thu").
 const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Hide the Amount Paid block when the booking falls on a configured free-entry day
-// for which all booked ticket genders are eligible. Mirrors the rule in
+// Hide the Amount Paid block when the booking falls on a configured free-entry day.
+// Per product rule: if the rule is enabled and the booking date's weekday is in the
+// rule's `days` list, the ENTIRE booking is free regardless of which genders were
+// booked or whether it's ticket- or table-mode. The `genders` field is purely
+// informational marketing copy on the event-detail badge. Mirrors the rule in
 // artifacts/royvento/src/pages/bookings.tsx and event-detail.tsx so web and mobile
 // stay in sync.
 function bookingIsFreeEntryDay(
   bookingDate: string | null | undefined,
-  ticketWomen: number,
-  ticketMen: number,
-  ticketCouple: number,
+  _ticketWomen: number,
+  _ticketMen: number,
+  _ticketCouple: number,
   fer: ExtendedBooking["freeEntryRules"],
 ): boolean {
   if (!fer?.enabled) return false;
@@ -99,15 +102,6 @@ function bookingIsFreeEntryDay(
   const days = Array.isArray(fer.days) ? fer.days : [];
   const dayName = FREE_ENTRY_DAY_ABBRS[new Date(`${bookingDate}T12:00:00`).getDay()];
   if (!dayName || !days.includes(dayName)) return false;
-  const genders = new Set(Array.isArray(fer.genders) ? fer.genders : []);
-  const totalTickets = ticketWomen + ticketMen + ticketCouple;
-  // Free-entry rules apply to ticket-mode bookings only. Table-mode bookings have
-  // zero ticket-gender counts and may still owe a table cover even on a free-entry
-  // day, so we don't hide Amount Paid for them.
-  if (totalTickets === 0) return false;
-  if (ticketWomen > 0 && !genders.has("women")) return false;
-  if (ticketMen > 0 && !genders.has("men")) return false;
-  if (ticketCouple > 0 && !genders.has("couple")) return false;
   return true;
 }
 

@@ -250,15 +250,17 @@ router.post("/bookings", requireAuth(), async (req, res) => {
 
   // Compute base total based on mode. Apply per-pub free-entry rules: when the
   // pub has freeEntryRules.enabled and the booking date's weekday is in the
-  // configured days list, drop the price contribution of every booked gender
-  // that appears in the rule's genders list. This must mirror the client-side
-  // calc in event-detail (web) and event/[id] (mobile) and the ticket-card
-  // hide rule in bookings.tsx so the user is never charged for a free ticket.
+  // configured days list, the ENTIRE booking is free regardless of which
+  // genders were booked or whether the booking is ticket-mode or table-mode.
+  // The `genders` field on the rule is purely informational marketing copy
+  // for the event-detail badge; it does not gate pricing here. This mirrors
+  // the client-side calc in event-detail (web) and event/[id] (mobile) and
+  // the ticket-card hide rule in bookings.tsx so the user is never charged
+  // anything for a free-entry-day booking.
   const FREE_ENTRY_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const fer = (evt as { freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[] } | null }).freeEntryRules;
   const bookingDayName = FREE_ENTRY_DAY_ABBRS[new Date(`${dateStr}T12:00:00`).getDay()];
   const ferActive = !!(fer?.enabled && bookingDayName && Array.isArray(fer.days) && fer.days.includes(bookingDayName));
-  const ferGenders = new Set(ferActive && Array.isArray(fer?.genders) ? fer!.genders! : []);
 
   let totalPrice = 0;
   let guestsCount = parsed.data.guests || 0;
@@ -267,27 +269,27 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     const w = parsed.data.ticketWomen || 0;
     const m = parsed.data.ticketMen || 0;
     const c = parsed.data.ticketCouple || 0;
-    const womenPrice = ferGenders.has("women") ? 0 : Number(evt.priceWomen);
-    const menPrice = ferGenders.has("men") ? 0 : Number(evt.priceMen);
-    const couplePrice = ferGenders.has("couple") ? 0 : Number(evt.priceCouple);
-    totalPrice = w * womenPrice + m * menPrice + c * couplePrice;
+    // Free-entry day → whole booking is ₹0 regardless of gender mix.
+    totalPrice = ferActive
+      ? 0
+      : w * Number(evt.priceWomen) + m * Number(evt.priceMen) + c * Number(evt.priceCouple);
     guestsCount = w + m + c * 2;
   } else {
-    // Table / event-mode: free-entry rules apply only when no per-gender ticket
-    // counts were supplied AND a free-entry day is active. Treating this as a
-    // free booking matches the customer ticket card's hide rule for table-mode
-    // bookings on a free-entry day. Otherwise charge the regular cover.
-    const tableModeFree = ferActive && (parsed.data.ticketWomen ?? 0) === 0 &&
-      (parsed.data.ticketMen ?? 0) === 0 && (parsed.data.ticketCouple ?? 0) === 0;
-    totalPrice = tableModeFree ? 0 : Number(evt.price) * Math.max(1, guestsCount);
+    // Table / event-mode: free-entry day → ₹0 regardless of guest count or
+    // whether per-gender ticket counts were supplied. Otherwise charge the
+    // regular cover.
+    totalPrice = ferActive ? 0 : Number(evt.price) * Math.max(1, guestsCount);
     if (guestsCount === 0) guestsCount = 1;
   }
 
   // Apply coupon — mark used immediately to prevent double-spend across concurrent pending bookings.
-  // Restored on payment failure.
+  // Restored on payment failure. Skip entirely on free-entry days (totalPrice === 0):
+  // a coupon discount on ₹0 is ₹0, so consuming the user's one-shot coupon would
+  // be a pure regression. The web/mobile UIs hide the coupon input on free-entry
+  // days, but stale couponCode in the request payload is still possible.
   let discountAmount = 0;
   let validCode = "";
-  if (parsed.data.couponCode) {
+  if (parsed.data.couponCode && totalPrice > 0) {
     const couponRows = await db
       .select()
       .from(couponsTable)

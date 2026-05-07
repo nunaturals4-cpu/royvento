@@ -285,24 +285,20 @@ export default function EventDetailScreen() {
 
   const freeEntryRules = (event as unknown as { freeEntryRules?: { enabled?: boolean; days?: string[] } })?.freeEntryRules;
   const ferDayActiveMobile = !!(freeEntryRules?.enabled === true && (freeEntryRules.days ?? []).includes(bookingDayName));
-  const ferGendersMobile = new Set(
-    ferDayActiveMobile && Array.isArray((freeEntryRules as { genders?: string[] })?.genders)
-      ? ((freeEntryRules as { genders?: string[] }).genders as string[])
-      : [],
-  );
   const isFreeEntryDay = isPub && (
     ferDayActiveMobile ||
     (priceWomen === 0 && priceMen === 0 && priceCouple === 0)
   );
 
-  // Mirrors server-side free-entry zeroing in bookings.ts: any booked gender
-  // listed in the active rule's genders contributes ₹0 to the subtotal.
-  const subtotalPriceWomen = ferGendersMobile.has("women") ? 0 : priceWomen;
-  const subtotalPriceMen = ferGendersMobile.has("men") ? 0 : priceMen;
-  const subtotalPriceCouple = ferGendersMobile.has("couple") ? 0 : priceCouple;
-  const subtotal = isPub
-    ? ticketWomen * subtotalPriceWomen + ticketMen * subtotalPriceMen + ticketCouple * subtotalPriceCouple
-    : basePrice * (parseInt(guests) || 1);
+  // Mirrors server-side free-entry zeroing in bookings.ts: when the rule is
+  // active for the selected weekday, the ENTIRE booking is ₹0 regardless of
+  // gender mix or pubMode. The `genders` field is purely informational copy
+  // for the event-detail free-entry badge.
+  const subtotal = ferDayActiveMobile && isPub
+    ? 0
+    : isPub
+      ? ticketWomen * priceWomen + ticketMen * priceMen + ticketCouple * priceCouple
+      : basePrice * (parseInt(guests) || 1);
 
   const newUserPercent = discountInfo?.isNewUser && !couponState ? (discountInfo.bookingDiscountPercent || 0) : 0;
   const couponPercent = couponState?.discountPercent ?? 0;
