@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
+import { SEO } from "@/components/SEO";
 import {
   ArrowRight, Calendar, Clock, GlassWater, Megaphone,
   ChevronLeft, ChevronRight,
@@ -281,6 +282,11 @@ export function PubOffers() {
 
   return (
     <div className="pb-14">
+      <SEO
+        title="Hot Pub Offers in India — Free Entry, Happy Hours & More | Royvento"
+        description="Live pub offers from across India: ladies' nights, happy hours, free entry, unlimited drinks and weekend deals. Updated daily on Royvento."
+        canonical="/pub-offers"
+      />
       {/* Page header — hidden when slider is active */}
       {!hasSlider && (
         <header className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">

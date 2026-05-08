@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SEO } from "@/components/SEO";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -80,6 +81,7 @@ export function BecomeVendor() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
+      <SEO title="Become a Royvento Partner" canonical="/dashboard/become-vendor" noindex />
       <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Partner application</p>
       <div className="flex items-center gap-3 mb-2">
         <Sparkles className="h-7 w-7 text-primary" />

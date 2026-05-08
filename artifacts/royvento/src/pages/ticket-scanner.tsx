@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import jsQR from "jsqr";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -407,6 +408,7 @@ export function TicketScanner() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
+      <SEO title="Ticket scanner | Royvento" canonical="/dashboard/vendor/scanner" noindex />
       <ManagerInvitations />
       <header className="mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Partner tool</p>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation } from "wouter";
+import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import {
   useGetEvent,
   useListEventReviews,
@@ -456,8 +457,62 @@ export function EventDetail() {
 
   const vendorCover = ev.vendor?.coverImageUrl;
 
+  const evCity = ev.vendor?.city || "";
+  const evVenueName = ev.vendor?.businessName || ev.vendorName || "";
+  const seoTitle = `${event.title}${evVenueName ? ` — ${evVenueName}` : ""}${evCity ? `, ${evCity}` : ""} | Royvento`;
+  const seoDesc = `${event.title}${evVenueName ? ` at ${evVenueName}` : ""}${evCity ? `, ${evCity}` : ""}. ${event.description ? event.description.slice(0, 140) : "Book your table or ticket on Royvento."}`.slice(0, 200);
+  const eventStartIso = event.createdAt ? new Date(event.createdAt).toISOString() : undefined;
+  const priceCandidates: number[] = [event.price, event.priceWomen, event.priceMen, event.priceCouple]
+    .filter((n): n is number => typeof n === "number" && n > 0);
+  const lowestPrice = priceCandidates.length > 0 ? Math.min(...priceCandidates) : 0;
+  const eventJsonLd: Record<string, unknown>[] = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Event",
+      name: event.title,
+      description: event.description,
+      ...(event.imageUrl ? { image: [event.imageUrl] } : {}),
+      ...(eventStartIso ? { startDate: eventStartIso } : {}),
+      eventStatus: "https://schema.org/EventScheduled",
+      eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+      location: evVenueName
+        ? {
+            "@type": "Place",
+            name: evVenueName,
+            address: {
+              "@type": "PostalAddress",
+              streetAddress: ev.vendor?.address || ev.vendor?.location || undefined,
+              addressLocality: evCity,
+              addressRegion: ev.vendor?.state,
+              addressCountry: ev.vendor?.country,
+            },
+          }
+        : undefined,
+      offers: {
+        "@type": "Offer",
+        price: lowestPrice,
+        priceCurrency: "INR",
+        availability: "https://schema.org/InStock",
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+      },
+    },
+    buildBreadcrumbList([
+      { name: "Home", url: "/" },
+      { name: "Explore", url: "/explore" },
+      { name: event.title, url: `/events/${event.id}` },
+    ]),
+  ];
+
   return (
     <div>
+      <SEO
+        title={seoTitle}
+        description={seoDesc}
+        canonical={`/events/${event.id}`}
+        ogImage={event.imageUrl || ev.vendor?.coverImageUrl}
+        ogType="event"
+        jsonLd={eventJsonLd}
+      />
       {/* Cinematic hero — full-bleed cover image */}
       <div className="relative h-[62vh] md:h-[72vh] w-full overflow-hidden">
         {/* Full-bleed cover image */}

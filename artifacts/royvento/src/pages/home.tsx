@@ -19,6 +19,7 @@ import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-r
 import { EventCard } from "@/components/EventCard";
 import { apiGet, formatINR } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { SEO } from "@/components/SEO";
 
 interface PublicEvent {
   id: number;
@@ -147,6 +148,35 @@ export function Home() {
 
   return (
     <div>
+      <SEO
+        title="Royvento — Book Pubs, Parties & Events Across India"
+        description="Discover and book pubs, parties and events across India — rooftop bars in Bandra, microbreweries in Indiranagar, ladies' nights and verified offers. Instant table booking on Royvento."
+        canonical="/"
+        jsonLd={[
+          {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Royvento",
+            url: "https://royvento.com",
+            logo: "https://royvento.com/favicon.svg",
+            sameAs: [
+              "https://www.instagram.com/royvento",
+              "https://www.facebook.com/royvento",
+            ],
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: "Royvento",
+            url: "https://royvento.com",
+            potentialAction: {
+              "@type": "SearchAction",
+              target: "https://royvento.com/explore?search={search_term_string}",
+              "query-input": "required name=search_term_string",
+            },
+          },
+        ]}
+      />
       {/* Hero — full viewport */}
       <section className="relative overflow-hidden min-h-[100svh] flex items-center">
         <div className="absolute inset-0 -z-10">

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SEO } from "@/components/SEO";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +60,11 @@ export function Contact() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-20 grid lg:grid-cols-2 gap-12">
+      <SEO
+        title="Contact Royvento — Talk to Our Team"
+        description="Have a question or planning something out of the ordinary? Reach the Royvento team — we typically respond within 24 hours."
+        canonical="/contact"
+      />
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Contact</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Talk to our team</h1>

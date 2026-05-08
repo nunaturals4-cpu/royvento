@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiDelete } from "@/lib/api";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,7 @@ export function Wishlist() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO title="My Wishlist | Royvento" canonical="/wishlist" noindex />
       <div className="flex items-center gap-3 mb-2">
         <Heart className="h-7 w-7 text-primary fill-primary" />
         <h1 className="font-serif text-4xl tracking-tight">My Wishlist</h1>

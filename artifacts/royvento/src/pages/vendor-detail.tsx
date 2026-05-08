@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
+import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import {
   useGetVendor,
   useListVendorReviews,
@@ -126,8 +127,64 @@ export function VendorDetail() {
     return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
   };
 
+  const vendorCity = vendor.city || "";
+  const vendorTitle = `${vendor.businessName}${vendor.location ? `, ${vendor.location}` : vendorCity ? `, ${vendorCity}` : ""} — Book a Table | Royvento`;
+  const vendorDesc = `Book a table at ${vendor.businessName}${vendor.location ? `, ${vendor.location}` : ""}${vendorCity ? `, ${vendorCity}` : ""}. ${vendor.category ? `${vendor.category}. ` : ""}${vendor.description ? vendor.description.slice(0, 140) : "Verified by Royvento."}`.slice(0, 200);
+  const vendorOgImage = vendor.coverImageUrl || vendor.bannerImage || (vendor.portfolioImages?.[0] ?? "");
+  const vendorJsonLd: Record<string, unknown>[] = [
+    {
+      "@context": "https://schema.org",
+      "@type": "BarOrPub",
+      name: vendor.businessName,
+      description: vendor.description,
+      image: [vendorOgImage].filter(Boolean),
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: vendor.address || vendor.location || undefined,
+        addressLocality: vendor.city,
+        addressRegion: vendor.state,
+        addressCountry: vendor.country,
+      },
+      ...(vendor.menuUrl ? { hasMenu: vendor.menuUrl } : {}),
+      ...((vendor.rating ?? 0) > 0 && (vendor.reviewCount ?? 0) > 0
+        ? {
+            aggregateRating: {
+              "@type": "AggregateRating",
+              ratingValue: vendor.rating,
+              reviewCount: vendor.reviewCount,
+            },
+          }
+        : {}),
+    },
+    buildBreadcrumbList([
+      { name: "Home", url: "/" },
+      { name: "Partners", url: "/partners" },
+      { name: vendor.businessName, url: `/vendors/${vendor.id}` },
+    ]),
+  ];
+  if (reviews.length > 0) {
+    vendorJsonLd.push(
+      ...reviews.slice(0, 5).map((r) => ({
+        "@context": "https://schema.org",
+        "@type": "Review",
+        itemReviewed: { "@type": "BarOrPub", name: vendor.businessName },
+        reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5 },
+        author: { "@type": "Person", name: r.userName || "Royvento user" },
+        reviewBody: r.comment || "",
+      })),
+    );
+  }
+
   return (
     <div>
+      <SEO
+        title={vendorTitle}
+        description={vendorDesc}
+        canonical={`/vendors/${vendor.id}`}
+        ogImage={vendorOgImage}
+        ogType="business.business"
+        jsonLd={vendorJsonLd}
+      />
       {/* Cinematic venue hero */}
       <div className="relative h-[420px] md:h-[540px] w-full overflow-hidden">
         {/* Full-bleed cover image */}

@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useListMyBookings, getListMyBookingsQueryKey } from "@workspace/api-client-react";
+import { SEO } from "@/components/SEO";
 
 function getQueryParam(search: string, key: string): string | null {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -29,6 +30,7 @@ export function PaymentResult() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-24 flex items-center justify-center min-h-[60vh]">
+      <SEO title="Payment status | Royvento" canonical="/payment-result" noindex />
       <div className="max-w-md w-full rounded-3xl glass-card-strong p-10 text-center space-y-6">
         {isSuccess ? (
           <>

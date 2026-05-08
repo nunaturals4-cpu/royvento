@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { SEO } from "@/components/SEO";
 // Eagerly loaded pages (small, frequently visited)
 import { Home } from "@/pages/home";
 import { Explore } from "@/pages/explore";
@@ -137,7 +138,7 @@ function Router() {
           <Route path="/register" component={Register} />
           <Route path="/contact" component={Contact} />
           <Route path="/hot-deals">{() => <Redirect to="/pub-offers" />}</Route>
-          <Route path="/profile">{() => <Redirect to="/dashboard/profile" />}</Route>
+          <Route path="/profile">{() => (<><SEO title="My Profile | Royvento" canonical="/dashboard/profile" noindex /><Redirect to="/dashboard/profile" /></>)}</Route>
           <Route path="/dashboard">{() => <DashboardRedirect />}</Route>
           <Route path="/blog">{() => <Redirect to="/blogs" />}</Route>
           <Route path="/premium">{() => <Redirect to="/subscription" />}</Route>

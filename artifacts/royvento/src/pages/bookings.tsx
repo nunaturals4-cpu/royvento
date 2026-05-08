@@ -3,6 +3,7 @@ import { useState } from "react";
 import QRCode from "qrcode";
 import { useTranslation } from "react-i18next";
 import { useListMyBookings } from "@workspace/api-client-react";
+import { SEO } from "@/components/SEO";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,6 +84,7 @@ export function Bookings() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO title="My Bookings | Royvento" canonical="/dashboard/bookings" noindex />
       <header className="mb-8">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">{t("bookings.your_account")}</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">{t("bookings.title")}</h1>

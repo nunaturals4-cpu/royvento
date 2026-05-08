@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useListVendors } from "@workspace/api-client-react";
+import { SEO } from "@/components/SEO";
 import type { ListVendorsParams } from "@workspace/api-client-react";
 import { VendorCard } from "@/components/VendorCard";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,11 @@ export function Vendors() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO
+        title="Royvento Partners — Verified Pubs & Event Venues in India"
+        description="Browse verified Royvento partner venues across India. Real portfolios, real reviews and instant booking — find the right pub or event venue for your night out."
+        canonical="/partners"
+      />
       <header className="max-w-2xl mb-10">
         <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">Partners</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Browse our partners</h1>

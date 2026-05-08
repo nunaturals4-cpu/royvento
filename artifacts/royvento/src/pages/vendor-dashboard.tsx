@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch, useRoute } from "wouter";
+import { SEO } from "@/components/SEO";
 import {
   useGetMyVendor,
   useCreateMyVendor,
@@ -188,6 +189,7 @@ export function VendorDashboard() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO title="Partner dashboard | Royvento" canonical="/dashboard/vendor" noindex />
       <header className="mb-10 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Partner</p>
@@ -1778,6 +1780,7 @@ export function VendorListingEditPage() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">
+      <SEO title="Edit listing | Royvento" noindex />
       <div className="flex items-center gap-3 mb-8">
         <button
           type="button"

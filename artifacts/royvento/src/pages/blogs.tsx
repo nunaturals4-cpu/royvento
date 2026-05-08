@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
+import { SEO } from "@/components/SEO";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search, BookOpen, ArrowRight } from "lucide-react";
@@ -98,6 +99,11 @@ export function Blogs() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO
+        title="Royvento Blog — Nightlife Stories & City Guides"
+        description="City guides, pub crawls, occasion planning and behind-the-scenes stories from India's nightlife — fresh stories from the Royvento editorial team."
+        canonical="/blogs"
+      />
       {/* Page header */}
       <header className="max-w-2xl mb-12">
         <p className="text-xs uppercase tracking-[0.22em] text-primary mb-3 flex items-center gap-2">

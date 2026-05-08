@@ -1,10 +1,16 @@
 import { Link } from "wouter";
+import { SEO } from "@/components/SEO";
 
 const LAST_UPDATED = "1 May 2026";
 
 export function Terms() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-16 max-w-3xl">
+      <SEO
+        title="Terms & Conditions | Royvento"
+        description="The terms and conditions that govern your use of Royvento — booking, payments, cancellations and partner obligations."
+        canonical="/terms"
+      />
       <div className="mb-10">
         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Legal</p>
         <h1 className="font-serif text-4xl font-bold mb-3">Terms &amp; Conditions</h1>

@@ -1,3 +1,4 @@
+import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
   useListPendingVendors,
@@ -79,6 +80,7 @@ export function AdminPanel() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO title="Admin | Royvento" canonical="/admin" noindex />
       <header className="mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Admin</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">Royvento control room</h1>

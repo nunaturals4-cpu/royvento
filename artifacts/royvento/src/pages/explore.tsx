@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { SEO } from "@/components/SEO";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { customFetch, type ListEventsPaginatedResponse } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
@@ -97,6 +98,11 @@ export function Explore() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO
+        title="Explore Pubs, Parties & Events in India | Royvento"
+        description="Browse verified pubs, microbreweries, rooftop bars and live events across India. Filter by city, category and rating to find your next night out — book instantly on Royvento."
+        canonical="/explore"
+      />
       <header className="max-w-3xl mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-block">{t("explore.eyebrow")}</p>
         <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("explore.title")}</h1>

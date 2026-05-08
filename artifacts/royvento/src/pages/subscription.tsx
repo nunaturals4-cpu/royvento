@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -88,6 +89,11 @@ export function Subscription() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-16">
+      <SEO
+        title="Royvento Premium — Coupons, Perks & Partner Tools"
+        description="Unlock premium perks: priority booking, exclusive coupons, partner CRM tools and more. Pick a plan that fits your nightlife or your venue."
+        canonical="/subscription"
+      />
       {paymentParam === "success" && (
         <div className="max-w-3xl mx-auto mb-8 rounded-2xl border border-green-500/40 bg-green-900/20 p-5 flex items-center gap-4">
           <CheckCircle className="h-6 w-6 text-green-400 shrink-0" />

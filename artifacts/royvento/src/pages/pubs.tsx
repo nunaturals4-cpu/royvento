@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { EventCard } from "@/components/EventCard";
+import { SEO } from "@/components/SEO";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -125,6 +126,11 @@ export function Pubs() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14">
+      <SEO
+        title="Pubs in India — Book a Table | Royvento"
+        description="Find the best pubs, microbreweries, sports bars and rooftop lounges across India. Filter by city, vibe, dance floor and free entry — book a table instantly on Royvento."
+        canonical="/pubs"
+      />
       <header className="max-w-3xl mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
           <Wine className="h-3.5 w-3.5" /> {t("pubs.nightlife_badge")}

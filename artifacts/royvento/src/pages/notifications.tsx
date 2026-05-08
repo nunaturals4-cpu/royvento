@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import { apiGet, apiPatch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +68,7 @@ export function Notifications() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
+      <SEO title="Notifications | Royvento" canonical="/notifications" noindex />
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <Bell className="h-7 w-7 text-primary" />

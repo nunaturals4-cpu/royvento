@@ -1,6 +1,7 @@
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
+import { SEO, buildBreadcrumbList, buildFAQPage } from "@/components/SEO";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, BookOpen } from "lucide-react";
@@ -51,8 +52,58 @@ export function BlogDetail() {
     );
   }
 
+  const blogJsonLd: Record<string, unknown>[] = [
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: blog.title,
+      description: blog.excerpt,
+      image: blog.imageUrl ? [blog.imageUrl] : undefined,
+      datePublished: blog.createdAt,
+      dateModified: blog.createdAt,
+      author: { "@type": "Person", name: blog.authorName || "Royvento" },
+      publisher: {
+        "@type": "Organization",
+        name: "Royvento",
+        logo: { "@type": "ImageObject", url: "https://royvento.com/favicon.svg" },
+      },
+      mainEntityOfPage: { "@type": "WebPage", "@id": `https://royvento.com/blogs/${blog.slug}` },
+    },
+    buildBreadcrumbList([
+      { name: "Home", url: "/" },
+      { name: "Blog", url: "/blogs" },
+      { name: blog.title, url: `/blogs/${blog.slug}` },
+    ]),
+    buildFAQPage([
+      {
+        question: `What is "${blog.title}" about?`,
+        answer:
+          blog.excerpt ||
+          `Read the full guide on Royvento for nightlife tips, venue picks and booking advice.`,
+      },
+      {
+        question: "How do I book a pub or event on Royvento?",
+        answer:
+          "Browse pubs and events on Royvento, pick a date and tier (women / men / couple), and confirm your booking instantly. You'll get a QR ticket for entry.",
+      },
+      {
+        question: "Are Royvento partner venues verified?",
+        answer:
+          "Yes — every partner venue is reviewed and approved by the Royvento team before going live, so you book with confidence.",
+      },
+    ]),
+  ];
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-12 max-w-3xl">
+      <SEO
+        title={`${blog.title} | Royvento Blog`}
+        description={blog.excerpt}
+        canonical={`/blogs/${blog.slug}`}
+        ogImage={blog.imageUrl}
+        ogType="article"
+        jsonLd={blogJsonLd}
+      />
       <Link href="/blogs" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
         <ArrowLeft className="h-4 w-4" /> Back to blog
       </Link>

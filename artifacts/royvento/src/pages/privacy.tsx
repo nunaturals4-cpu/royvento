@@ -1,10 +1,16 @@
 import { Link } from "wouter";
+import { SEO } from "@/components/SEO";
 
 const LAST_UPDATED = "1 May 2026";
 
 export function Privacy() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-16 max-w-3xl">
+      <SEO
+        title="Privacy Policy | Royvento"
+        description="How Royvento collects, uses and safeguards your personal data — including bookings, payments and marketing preferences."
+        canonical="/privacy"
+      />
       <div className="mb-10">
         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Legal</p>
         <h1 className="font-serif text-4xl font-bold mb-3">Privacy Policy</h1>

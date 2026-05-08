@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,6 +103,7 @@ export function Login() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-20">
+      <SEO title="Sign in | Royvento" canonical="/login" noindex />
       <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring">
         <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">{t("auth.welcome_back")}</p>
         <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">{t("auth.sign_in_to")}</h1>

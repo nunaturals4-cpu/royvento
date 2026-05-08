@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { getIndianPhoneError, normalizeIndianPhone, isAllowedImageMime, ALLOWED_IMAGE_MIME } from "@workspace/validators";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -177,6 +178,7 @@ export function Profile() {
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-5xl">
+      <SEO title="My Profile | Royvento" canonical="/dashboard/profile" noindex />
       <header className="mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">My account</p>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">Profile</h1>
