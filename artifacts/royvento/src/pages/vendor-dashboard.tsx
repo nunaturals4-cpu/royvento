@@ -743,8 +743,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     try {
       const url = await uploadImageToStorage(finalFile);
       setGalleryVideos([url]);
+      formErrors.clearField("galleryVideos");
     } catch (e) {
-      toast({ title: "Video upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" });
+      const msg = e instanceof Error ? e.message : "Video upload failed";
+      formErrors.setFieldError("galleryVideos", msg);
+      toast({ title: "Video upload failed", description: msg, variant: "destructive" });
     }
   };
 
@@ -1702,8 +1705,11 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
     try {
       const url = await uploadImageToStorage(finalFile);
       setGalleryVideos([url]);
+      formErrors.clearField("galleryVideos");
     } catch (e) {
-      toast({ title: "Video upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" });
+      const msg = e instanceof Error ? e.message : "Video upload failed";
+      formErrors.setFieldError("galleryVideos", msg);
+      toast({ title: "Video upload failed", description: msg, variant: "destructive" });
     }
   };
 
