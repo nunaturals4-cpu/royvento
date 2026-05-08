@@ -1,0 +1,167 @@
+Act as a world-class SEO expert, local SEO strategist, technical SEO consultant, and conversion copywriter.
+
+My website is an event and pub booking platform where users can:
+- Discover pubs, clubs, lounges, cafes, rooftop bars, events, DJs, live music, parties, and offers
+- Book tables, parties, birthdays, couple dates, corporate events, and nightlife experiences
+- Search by city, location, music type, budget, and offers
+
+Your task is to fully optimize my website for Google SEO so that my pages rank on top when users search for:
+- “Best pubs near me”
+- “Pub booking in [city]”
+- “Nightclubs in [city]”
+- “Best party places”
+- “Couple friendly pubs”
+- “Rooftop pubs”
+- “Live music pubs”
+- “DJ night booking”
+- “Birthday party venue”
+- “Events this weekend”
+- “Pub offers today”
+- “Table booking app”
+- “Pub reservation website”
+- “Best nightlife in [city]”
+
+Now do the following professionally:
+
+1. KEYWORD RESEARCH
+- Find high-traffic low-competition keywords
+- Include local SEO keywords
+- Include long-tail keywords
+- Include trending nightlife/event keywords
+- Include intent-based keywords
+- Separate keywords by:
+  - Homepage
+  - City pages
+  - Pub pages
+  - Event pages
+  - Blog pages
+
+2. WEBSITE STRUCTURE SEO
+Suggest perfect SEO architecture for:
+- Homepage
+- City landing pages
+- Pub details pages
+- Event pages
+- Offer pages
+- Blog pages
+- Category pages
+
+3. ON-PAGE SEO
+Generate:
+- SEO title
+- Meta description
+- H1/H2/H3 headings
+- SEO-friendly URL slug
+- Internal linking strategy
+- Image ALT tags
+- Schema markup suggestions
+- FAQ schema
+- Breadcrumb schema
+
+4. LOCAL SEO
+Optimize for:
+- Google Business Profile
+- Local citations
+- NAP consistency
+- Location keywords
+- “Near me” searches
+- Maps ranking
+- Local backlinks
+
+5. TECHNICAL SEO
+Analyze and improve:
+- Core Web Vitals
+- Mobile optimization
+- Page speed
+- Lazy loading
+- Sitemap.xml
+- Robots.txt
+- Canonical tags
+- Structured data
+- Indexing issues
+- Crawl optimization
+
+6. CONTENT SEO
+Generate:
+- SEO blog ideas
+- Viral nightlife content ideas
+- Event promotion content
+- City nightlife guides
+- Pub comparison articles
+- Weekend party blogs
+- Seasonal content
+- Festival-based content
+
+7. PROGRAMMATIC SEO
+Suggest scalable SEO pages such as:
+- Best pubs in [city]
+- Best rooftop pubs in [city]
+- Cheap pubs in [area]
+- Couple friendly pubs in [location]
+- Saturday DJ night in [city]
+- Pub offers today in [city]
+
+8. CONVERSION SEO
+Optimize for:
+- More bookings
+- Better CTA buttons
+- Higher click-through rate
+- Better engagement
+- Lower bounce rate
+- Trust signals
+- Reviews strategy
+
+9. BACKLINK STRATEGY
+Suggest:
+- High-authority backlinks
+- Local backlinks
+- Event promotion backlinks
+- Influencer collaborations
+- Guest posting opportunities
+- Social bookmarking
+- PR campaigns
+
+10. CONTENT CALENDAR
+Create a 90-day SEO plan with:
+- Weekly blog topics
+- Keyword targets
+- Ranking strategy
+- Internal linking plan
+- Social media support strategy
+
+11. COMPETITOR ANALYSIS
+Analyze top competitors in nightlife/event booking industry and explain:
+- Their keyword strategy
+- Backlink strategy
+- Content strategy
+- Technical SEO strengths
+- How I can outrank them
+
+12. AI SEO OPTIMIZATION
+Optimize content for:
+- Google AI Overview
+- Voice search
+- Featured snippets
+- ChatGPT recommendations
+- Conversational search
+
+13. E-E-A-T OPTIMIZATION
+Improve:
+- Experience
+- Expertise
+- Authority
+- Trustworthiness
+
+14. GENERATE ACTION PLAN
+At the end provide:
+- Priority-wise SEO tasks
+- Easy wins
+- Medium difficulty tasks
+- Long-term ranking strategy
+- Expected SEO growth timeline
+
+Website Name: [YOUR WEBSITE NAME]
+Target Cities: [YOUR TARGET CITIES]
+Target Audience: [AGE GROUP]
+Main Services: [SERVICES]
+Competitors: [COMPETITOR NAMES]
