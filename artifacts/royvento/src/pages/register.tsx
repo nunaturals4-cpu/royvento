@@ -18,7 +18,13 @@ import {
 export function Register() {
   const { t } = useTranslation();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("email") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [passwordTouched, setPasswordTouched] = useState(false);

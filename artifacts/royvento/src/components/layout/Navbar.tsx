@@ -386,7 +386,7 @@ export function Navbar() {
                       <Palette className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                       <span>Theme</span>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent collisionPadding={8} className="bg-card border border-border shadow-xl w-44 max-w-[calc(100vw-1rem)]">
+                    <DropdownMenuSubContent alignOffset={-4} collisionPadding={8} className="bg-card border border-border shadow-xl w-44 max-w-[calc(100vw-1rem)]">
                       {THEMES.map((th) => (
                         <DropdownMenuItem
                           key={th.id}
@@ -408,7 +408,7 @@ export function Navbar() {
                       <Globe className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                       <span className="flex-1">{currentLang.native}</span>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent collisionPadding={8} className="bg-card border border-border shadow-xl w-44 max-w-[calc(100vw-1rem)]">
+                    <DropdownMenuSubContent alignOffset={-4} collisionPadding={8} className="bg-card border border-border shadow-xl w-44 max-w-[calc(100vw-1rem)]">
                       {LANGUAGES.map((lang) => (
                         <DropdownMenuItem
                           key={lang.code}

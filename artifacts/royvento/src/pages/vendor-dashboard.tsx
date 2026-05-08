@@ -309,15 +309,20 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (description.trim().length > 300) {
-      setDescError("Description must be 300 characters or fewer.");
-      return;
+    let descToSave = description;
+    if (description.length > 300) {
+      descToSave = description.slice(0, 300);
+      setDescription(descToSave);
+      toast({
+        title: "Description shortened",
+        description: "We trimmed your description to the 300-character limit before saving.",
+      });
     }
     setDescError("");
     const city = vendor.city ?? "";
     const stateF = vendor.state ?? "";
     update.mutate(
-      { data: { businessName, category: vendor.category, description, location: `${city}${stateF ? ", " + stateF : ""}`, country: vendor.country || "India", state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
+      { data: { businessName, category: vendor.category, description: descToSave, location: `${city}${stateF ? ", " + stateF : ""}`, country: vendor.country || "India", state: stateF, city, bannerImage: vendor.bannerImage ?? "", portfolioImages: [] } },
       {
         onSuccess: () => {
           toast({ title: "Profile updated" });
