@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
+import { eventDetailSlug } from "@/lib/seo-slug";
 import {
   useGetEvent,
   useListEventReviews,
@@ -508,7 +509,7 @@ export function EventDetail() {
       <SEO
         title={seoTitle}
         description={seoDesc}
-        canonical={`/events/${event.id}`}
+        canonical={eventDetailSlug({ id: event.id, title: event.title, city: (event as any).city ?? (event as any).vendor?.city, date: (event as any).eventDate })}
         ogImage={event.imageUrl || ev.vendor?.coverImageUrl}
         ogType="event"
         jsonLd={eventJsonLd}

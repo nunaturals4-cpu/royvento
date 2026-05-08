@@ -32,6 +32,9 @@ import { ResetPassword } from "@/pages/reset-password";
 import { PaymentResult } from "@/pages/payment-result";
 import { Terms } from "@/pages/terms";
 import { Privacy } from "@/pages/privacy";
+import { City } from "@/pages/city";
+import { CitySecondary } from "@/pages/city-secondary";
+import { VendorSlugRoute, EventSlugRoute } from "@/pages/slugged-detail-redirect";
 
 // Lazily loaded heavy/role-gated pages
 const VendorDashboard = lazy(() => import("@/pages/vendor-dashboard").then((m) => ({ default: m.VendorDashboard })));
@@ -181,6 +184,17 @@ function Router() {
           <Route path="/admin">
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}
           </Route>
+
+          {/* SEO-friendly slugged detail URLs (canonical) — redirect to legacy
+              detail components which set rel=canonical back to the slug URL. */}
+          <Route path="/pubs/:city/:slug" component={VendorSlugRoute} />
+          <Route path="/events/:city/:slug" component={EventSlugRoute} />
+
+          {/* Programmatic city / locality / category landing pages.
+              These greedy patterns must come AFTER all specific top-level
+              routes so they only catch unmatched URLs. */}
+          <Route path="/:city/:second" component={CitySecondary} />
+          <Route path="/:city" component={City} />
 
           <Route component={NotFound} />
         </Switch>

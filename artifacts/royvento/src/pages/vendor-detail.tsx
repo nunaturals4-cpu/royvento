@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
+import { pubDetailSlug } from "@/lib/seo-slug";
 import {
   useGetVendor,
   useListVendorReviews,
@@ -180,7 +181,7 @@ export function VendorDetail() {
       <SEO
         title={vendorTitle}
         description={vendorDesc}
-        canonical={`/vendors/${vendor.id}`}
+        canonical={pubDetailSlug({ id: vendor.id, name: vendor.businessName, city: vendor.city })}
         ogImage={vendorOgImage}
         ogType="business.business"
         jsonLd={vendorJsonLd}

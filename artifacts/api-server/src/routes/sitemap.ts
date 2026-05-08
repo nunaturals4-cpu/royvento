@@ -147,12 +147,106 @@ router.get("/sitemap-static.xml", (req, res) => {
   }
 });
 
-// Programmatic city/locality/category/occasion pages ship in Task #566.
-// Until then this shard is intentionally empty but valid so the index works
-// and Search Console accepts the index now without surfacing 404 city URLs.
-router.get("/sitemap-cities.xml", (req, res) => {
+// Programmatic city / locality / category landing pages (Task #566).
+// City and category slugs are derived directly from approved vendor data;
+// only city/category combos with at least 4 pubs are listed (matches the
+// "thin content" noindex threshold in the page templates).
+const CITY_ALIASES: Record<string, string> = {
+  bengaluru: "bangalore",
+  bombay: "mumbai",
+  gurugram: "gurgaon",
+  calcutta: "kolkata",
+};
+
+function slugifyCity(input: string | null | undefined): string {
+  if (!input) return "";
+  const s = String(input)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return CITY_ALIASES[s] ?? s;
+}
+
+const CATEGORY_SLUGS = [
+  "rooftop",
+  "microbrewery",
+  "sports-bar",
+  "live-music",
+  "couple-friendly",
+  "lounge",
+  "club",
+  "pubs",
+];
+
+const THIN_THRESHOLD = 4;
+
+router.get("/sitemap-cities.xml", async (req, res) => {
   try {
-    sendXml(res, renderUrlset(siteOrigin(req), []));
+    const rows = await db
+      .select({
+        businessName: vendorsTable.businessName,
+        city: vendorsTable.city,
+        category: vendorsTable.category,
+        address: vendorsTable.address,
+        location: vendorsTable.location,
+      })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.status, "approved"))
+      .limit(50000);
+
+    const cityCounts = new Map<string, number>();
+    const cityCategoryCounts = new Map<string, number>();
+    const cityLocalityCounts = new Map<string, number>();
+
+    for (const r of rows) {
+      const city = slugifyCity(r.city);
+      if (!city) continue;
+      cityCounts.set(city, (cityCounts.get(city) ?? 0) + 1);
+
+      const blob = `${r.businessName ?? ""} ${r.category ?? ""} ${r.address ?? ""} ${r.location ?? ""}`.toLowerCase();
+      for (const cat of CATEGORY_SLUGS) {
+        const needle = cat.replace(/-/g, " ");
+        if (blob.includes(needle) || (cat === "pubs" && (r.category ?? "").toLowerCase().includes("pub"))) {
+          const key = `${city}/${cat}`;
+          cityCategoryCounts.set(key, (cityCategoryCounts.get(key) ?? 0) + 1);
+        }
+      }
+
+      // Derive locality from first useful comma-segment of the address
+      const parts = (r.address ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const p of parts) {
+        const s = slugifyCity(p);
+        if (!s || s === city || s.length < 3 || /^\d/.test(s)) continue;
+        const key = `${city}/${s}`;
+        cityLocalityCounts.set(key, (cityLocalityCounts.get(key) ?? 0) + 1);
+        break;
+      }
+    }
+
+    const urls: UrlEntry[] = [];
+    for (const [city, n] of cityCounts) {
+      if (n >= THIN_THRESHOLD) {
+        urls.push({ loc: `/${city}`, changefreq: "daily", priority: 0.8 });
+      }
+    }
+    for (const [key, n] of cityLocalityCounts) {
+      if (n >= THIN_THRESHOLD) {
+        urls.push({ loc: `/${key}`, changefreq: "weekly", priority: 0.7 });
+      }
+    }
+    for (const [key, n] of cityCategoryCounts) {
+      if (n >= THIN_THRESHOLD) {
+        urls.push({ loc: `/${key}`, changefreq: "weekly", priority: 0.7 });
+      }
+    }
+
+    sendXml(res, renderUrlset(siteOrigin(req), urls));
   } catch (err) {
     req.log.error({ err }, "Failed to render cities sitemap");
     res.status(500).type("application/xml").send("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<error/>\n");
