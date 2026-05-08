@@ -34,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFormErrors, fieldClass } from "@/lib/formErrors";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -1216,17 +1217,20 @@ function CouponsAdmin() {
   const [email, setEmail] = useState("");
   const [discount, setDiscount] = useState(10);
   const { toast } = useToast();
+  const formErrors = useFormErrors();
   const load = () => apiGet<AdminCoupon[]>("/api/admin/coupons").then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const grant = async (e: React.FormEvent) => {
     e.preventDefault();
+    formErrors.reset();
     try {
       await apiPost("/api/admin/coupons", { email, discountPercent: discount });
       toast({ title: "Coupon granted" });
       setEmail("");
       load();
     } catch (e: any) {
+      formErrors.setFromError(e);
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
     }
   };
@@ -1236,14 +1240,17 @@ function CouponsAdmin() {
       <form onSubmit={grant} className="rounded-2xl glass-card-strong p-5 grid md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
         <div>
           <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5 text-primary" /> Grant coupon to user (email)</Label>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" required className="bg-black/40 border-white/10 mt-1" />
+          <Input value={email} onChange={(e) => { setEmail(e.target.value); formErrors.clearField("email"); }} placeholder="user@example.com" required className={fieldClass("bg-black/40 border-white/10 mt-1", formErrors.fieldError("email"))} />
+          {formErrors.fieldError("email") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("email")}</p>}
         </div>
         <div>
           <Label>Discount %</Label>
-          <Input type="number" min={1} max={50} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
+          <Input type="number" min={1} max={50} value={discount} onChange={(e) => { setDiscount(Number(e.target.value)); formErrors.clearField("discountPercent"); }} className={fieldClass("bg-black/40 border-white/10 mt-1", formErrors.fieldError("discountPercent"))} />
+          {formErrors.fieldError("discountPercent") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("discountPercent")}</p>}
         </div>
         <Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">Grant</Button>
       </form>
+      {formErrors.topError && <p className="text-sm text-red-400">{formErrors.topError}</p>}
 
       <div className="rounded-2xl glass-card overflow-hidden">
         {items.length === 0 ? (
@@ -1757,6 +1764,7 @@ function BookingReport() {
   const [couponType, setCouponType] = useState<string>("general");
   const [couponSending, setCouponSending] = useState(false);
   const { toast } = useToast();
+  const couponFormErrors = useFormErrors();
 
   useEffect(() => {
     let cancelled = false;
@@ -1785,6 +1793,7 @@ function BookingReport() {
       return;
     }
     setCouponSending(true);
+    couponFormErrors.reset();
     try {
       await apiPost(`/api/admin/users/${couponUser.userId}/send-coupon`, { code, discount, type: couponType });
       toast({ title: "Coupon sent", description: `${code} (${discount}% off) sent to ${couponUser.name}.` });
@@ -1793,6 +1802,7 @@ function BookingReport() {
       setCouponDiscount("10");
       setCouponType("general");
     } catch (err: unknown) {
+      couponFormErrors.setFromError(err);
       const msg = err instanceof Error ? err.message : "Failed to send coupon";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
@@ -2038,14 +2048,16 @@ function BookingReport() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {couponFormErrors.topError && <p className="text-xs text-red-400">{couponFormErrors.topError}</p>}
             <div className="space-y-1.5">
               <Label className="text-xs">Coupon Code</Label>
               <Input
                 placeholder="e.g. SAVE20"
                 value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                className="h-9"
+                onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); couponFormErrors.clearField("code"); }}
+                className={fieldClass("h-9", couponFormErrors.fieldError("code"))}
               />
+              {couponFormErrors.fieldError("code") && <p className="mt-1 text-xs text-red-400">{couponFormErrors.fieldError("code")}</p>}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -2056,9 +2068,10 @@ function BookingReport() {
                   max={100}
                   placeholder="10"
                   value={couponDiscount}
-                  onChange={(e) => setCouponDiscount(e.target.value)}
-                  className="h-9"
+                  onChange={(e) => { setCouponDiscount(e.target.value); couponFormErrors.clearField("discount"); }}
+                  className={fieldClass("h-9", couponFormErrors.fieldError("discount"))}
                 />
+                {couponFormErrors.fieldError("discount") && <p className="mt-1 text-xs text-red-400">{couponFormErrors.fieldError("discount")}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Coupon Type</Label>

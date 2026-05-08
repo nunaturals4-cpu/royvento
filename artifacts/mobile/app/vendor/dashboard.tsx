@@ -2178,6 +2178,8 @@ export default function VendorDashboardScreen() {
   // ─── MANAGERS TAB ────────────────────────────────────────────────────────────
   const [mgEmail, setMgEmail] = useState("");
   const [mgInviting, setMgInviting] = useState(false);
+  const [mgFieldErrors, setMgFieldErrors] = useState<Record<string, string>>({});
+  const [mgTopError, setMgTopError] = useState<string | null>(null);
   const [mgList, setMgList] = useState<{ id: number; invitedEmail: string; status: string; manager: { name: string } | null }[]>([]);
   const [mgLoading, setMgLoading] = useState(false);
 
@@ -2196,6 +2198,7 @@ export default function VendorDashboardScreen() {
   async function inviteManager() {
     if (!mgEmail.trim()) return;
     setMgInviting(true);
+    setMgFieldErrors({}); setMgTopError(null);
     try {
       await customFetch("/api/partner/managers/invite", {
         method: "POST",
@@ -2206,8 +2209,12 @@ export default function VendorDashboardScreen() {
       setMgEmail("");
       fetchMgList();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      Alert.alert("Error", err?.message ?? "Failed to send invitation.");
+      const err = e as { message?: string; data?: { fieldErrors?: Record<string, string>; error?: string }; fieldErrors?: Record<string, string> };
+      const fe = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+      setMgFieldErrors(fe);
+      const top = err?.data?.error ?? err?.message ?? "Failed to send invitation.";
+      setMgTopError(top);
+      Alert.alert("Error", top);
     } finally {
       setMgInviting(false);
     }
@@ -2229,11 +2236,12 @@ export default function VendorDashboardScreen() {
         <Text style={[{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 12 }]}>
           Managers can scan tickets at your venue. They cannot access bookings or settings.
         </Text>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
+        {mgTopError && <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 12, marginBottom: 6 }}>{mgTopError}</Text>}
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: mgFieldErrors.email ? 4 : 20 }}>
           <TextInput
-            style={[styles.fieldInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }]}
+            style={[styles.fieldInput, { flex: 1, backgroundColor: colors.card, borderColor: mgFieldErrors.email ? "#ef4444" : colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground }]}
             value={mgEmail}
-            onChangeText={setMgEmail}
+            onChangeText={(v) => { setMgEmail(v); if (mgFieldErrors.email) setMgFieldErrors((p) => { const n = { ...p }; delete n.email; return n; }); }}
             placeholder="manager@example.com"
             placeholderTextColor={colors.mutedForeground}
             keyboardType="email-address"
@@ -2247,6 +2255,7 @@ export default function VendorDashboardScreen() {
             {mgInviting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Invite</Text>}
           </TouchableOpacity>
         </View>
+        {mgFieldErrors.email && <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 12, marginBottom: 16 }}>{mgFieldErrors.email}</Text>}
 
         <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>YOUR MANAGERS</Text>
         {mgLoading ? (
@@ -4298,6 +4307,7 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   const [reqAmount, setReqAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bankingFieldErrors, setBankingFieldErrors] = useState<Record<string, string>>({});
   const [onlineBalance, setOnlineBalance] = useState<number>(0);
 
   async function loadData() {
@@ -4320,13 +4330,17 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   useEffect(() => { loadData(); }, []);
 
   async function saveBanking() {
-    if (!/^[A-Z0-9]{11}$/.test(form.ifscCode)) { setError("IFSC must be 11 uppercase alphanumeric characters."); return; }
+    if (!/^[A-Z0-9]{11}$/.test(form.ifscCode)) { setError("IFSC must be 11 uppercase alphanumeric characters."); setBankingFieldErrors({ ifscCode: "IFSC must be 11 uppercase alphanumeric characters." }); return; }
     if (!form.accountHolderName.trim() || !form.bankName.trim() || !form.accountNumber.trim()) { setError("All fields are required."); return; }
-    setError(null); setSaving(true);
+    setError(null); setBankingFieldErrors({}); setSaving(true);
     try {
       const saved = await customFetch<BankingDetails>("/api/partner/banking-details", { method: "PUT", body: JSON.stringify(form) });
       setBanking(saved);
-    } catch (e: any) { setError(e?.message ?? "Failed to save"); } finally { setSaving(false); }
+    } catch (e: any) {
+      const fe: Record<string, string> = e?.data?.fieldErrors ?? e?.fieldErrors ?? {};
+      setBankingFieldErrors(fe);
+      setError(e?.data?.error ?? e?.message ?? "Failed to save");
+    } finally { setSaving(false); }
   }
 
   async function submitRequest() {
@@ -4367,12 +4381,13 @@ function BankingTab({ colors }: { colors: ReturnType<typeof useColors> }) {
                 <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.mutedForeground }}>{f.label}</Text>
                 <TextInput
                   value={form[f.key]}
-                  onChangeText={(v) => setForm((prev) => ({ ...prev, [f.key]: f.upper ? v.toUpperCase() : v }))}
+                  onChangeText={(v) => { setForm((prev) => ({ ...prev, [f.key]: f.upper ? v.toUpperCase() : v })); if (bankingFieldErrors[f.key]) setBankingFieldErrors((p) => { const n = { ...p }; delete n[f.key]; return n; }); }}
                   placeholder={f.placeholder}
                   placeholderTextColor={colors.mutedForeground}
                   autoCapitalize={f.upper ? "characters" : "words"}
-                  style={{ backgroundColor: colors.muted, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, fontFamily: "Inter_400Regular", fontSize: 14, color: colors.foreground }}
+                  style={{ backgroundColor: colors.muted, borderRadius: 10, borderWidth: 1, borderColor: bankingFieldErrors[f.key] ? "#ef4444" : colors.border, paddingHorizontal: 12, paddingVertical: 10, fontFamily: "Inter_400Regular", fontSize: 14, color: colors.foreground }}
                 />
+                {bankingFieldErrors[f.key] && <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 12 }}>{bankingFieldErrors[f.key]}</Text>}
               </View>
             ))}
             {error && <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 12 }}>{error}</Text>}

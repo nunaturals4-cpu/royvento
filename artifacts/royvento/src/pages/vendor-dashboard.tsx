@@ -657,30 +657,36 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     return errors;
   });
 
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(0);
+
   const onImageFile = async (f: File | null) => {
     if (!f) return;
     const v = validateImageFile(f);
     if (v) { formErrors.setFieldError("imageUrl", v); toast({ title: v, variant: "destructive" }); return; }
+    setCoverUploading(true);
     try { setImageUrl(await uploadImageToStorage(f)); formErrors.clearField("imageUrl"); }
     catch (e) {
       const msg = e instanceof Error ? e.message : "Image upload failed";
       formErrors.setFieldError("imageUrl", msg);
       toast({ title: "Image upload failed", description: msg, variant: "destructive" });
-    }
+    } finally { setCoverUploading(false); }
   };
 
   const onGalleryImagesChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const urls: string[] = [];
+    setGalleryUploading(files.length);
+    let remaining = files.length;
     for (const file of Array.from(files)) {
       const v = validateImageFile(file);
-      if (v) { formErrors.setFieldError("galleryImages", v); toast({ title: v, variant: "destructive" }); continue; }
+      if (v) { formErrors.setFieldError("galleryImages", v); toast({ title: v, variant: "destructive" }); remaining -= 1; setGalleryUploading(remaining); continue; }
       try { urls.push(await uploadImageToStorage(file)); }
       catch (e) {
         const msg = e instanceof Error ? e.message : "Image upload failed";
         formErrors.setFieldError("galleryImages", msg);
         toast({ title: "Image upload failed", description: msg, variant: "destructive" });
-      }
+      } finally { remaining -= 1; setGalleryUploading(remaining); }
     }
     if (urls.length > 0) { setGalleryImages((prev) => [...prev, ...urls]); formErrors.clearField("galleryImages"); }
   };
@@ -1196,11 +1202,12 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
 
       {/* Gallery media */}
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
-        <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos</p>
+        <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos {galleryUploading > 0 && <span className="text-xs text-primary animate-pulse">Uploading {galleryUploading}…</span>}</p>
         <Input
           type="file"
           accept="image/*"
           multiple
+          disabled={galleryUploading > 0}
           onChange={(e) => onGalleryImagesChange(e.target.files)}
           className="bg-black/40 border-white/10"
         />
@@ -1593,30 +1600,36 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
     }
   };
 
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(0);
+
   const onImageFile = async (f: File | null) => {
     if (!f) return;
     const v = validateImageFile(f);
     if (v) { formErrors.setFieldError("imageUrl", v); toast({ title: v, variant: "destructive" }); return; }
+    setCoverUploading(true);
     try { setImageUrl(await uploadImageToStorage(f)); formErrors.clearField("imageUrl"); }
     catch (e) {
       const msg = e instanceof Error ? e.message : "Image upload failed";
       formErrors.setFieldError("imageUrl", msg);
       toast({ title: "Image upload failed", description: msg, variant: "destructive" });
-    }
+    } finally { setCoverUploading(false); }
   };
 
   const onGalleryImagesChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const urls: string[] = [];
+    setGalleryUploading(files.length);
+    let remaining = files.length;
     for (const file of Array.from(files)) {
       const v = validateImageFile(file);
-      if (v) { formErrors.setFieldError("galleryImages", v); toast({ title: v, variant: "destructive" }); continue; }
+      if (v) { formErrors.setFieldError("galleryImages", v); toast({ title: v, variant: "destructive" }); remaining -= 1; setGalleryUploading(remaining); continue; }
       try { urls.push(await uploadImageToStorage(file)); }
       catch (e) {
         const msg = e instanceof Error ? e.message : "Image upload failed";
         formErrors.setFieldError("galleryImages", msg);
         toast({ title: "Image upload failed", description: msg, variant: "destructive" });
-      }
+      } finally { remaining -= 1; setGalleryUploading(remaining); }
     }
     if (urls.length > 0) { setGalleryImages((prev) => [...prev, ...urls]); formErrors.clearField("galleryImages"); }
   };
@@ -1759,14 +1772,15 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
-          <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
+          <Input type="file" accept="image/*" disabled={coverUploading} onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
+          {coverUploading && <p className="mt-1 text-xs text-primary animate-pulse">Uploading cover…</p>}
           {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
         </div>
 
         {/* Gallery media */}
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
-          <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos</p>
-          <Input type="file" accept="image/*" multiple onChange={(e) => onGalleryImagesChange(e.target.files)} className="bg-black/40 border-white/10" />
+          <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos {galleryUploading > 0 && <span className="text-xs text-primary animate-pulse">Uploading {galleryUploading}…</span>}</p>
+          <Input type="file" accept="image/*" multiple disabled={galleryUploading > 0} onChange={(e) => onGalleryImagesChange(e.target.files)} className="bg-black/40 border-white/10" />
           {galleryImages.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-1">
               {galleryImages.map((src, i) => (
