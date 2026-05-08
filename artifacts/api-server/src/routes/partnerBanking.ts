@@ -11,6 +11,7 @@ import { eq, desc, inArray, sql, gte, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
 import { RejectSettlementRequestBody, RejectSettlementRequestParams } from "@workspace/api-zod";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -71,7 +72,7 @@ router.put("/partner/banking-details", requireAuth(["vendor"]), async (req, res)
   }
   const parsed = BankingDetailsBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const { accountHolderName, bankName, accountNumber, ifscCode } = parsed.data;
@@ -149,7 +150,7 @@ router.post("/partner/settlement/request", requireAuth(["vendor"]), async (req, 
 
   const parsed = SettlementRequestBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
 
@@ -420,7 +421,7 @@ router.post("/admin/settlement-requests/:id/reject", requireAuth(["admin"]), asy
   const id = paramsParsed.data.id;
   const parsed = RejectSettlementRequestBody.safeParse(req.body ?? {});
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const note = parsed.data.note?.trim() ?? "";

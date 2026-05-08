@@ -71,6 +71,8 @@ export * from "./drinkPlanSummary";
 export * from "./drinkPlanSummaryGender";
 export * from "./drinkPlanSummaryType";
 export * from "./drinkPlanType";
+export * from "./error";
+export * from "./errorFieldErrors";
 export * from "./event";
 export * from "./eventDayPricing";
 export * from "./eventDetail";

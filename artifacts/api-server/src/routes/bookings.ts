@@ -43,6 +43,7 @@ import {
 } from "../lib/notifications";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 import { computeEffectiveRevenues } from "../lib/effectiveRevenue";
+import { respondInvalid } from "../lib/validationError";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
 const CANCELLATION_CUTOFF_HOURS = Number(process.env["CANCELLATION_CUTOFF_HOURS"] ?? 24);
@@ -249,12 +250,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
   const parsed = CreateBookingBody.safeParse(req.body);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => ({
-      path: i.path.join("."),
-      message: i.message,
-    }));
-    const summary = issues.map((i) => `${i.path}: ${i.message}`).join("; ");
-    res.status(400).json({ error: summary || "Invalid input", issues });
+    respondInvalid(res, parsed.error);
     return;
   }
   const eRows = await db
@@ -1349,7 +1345,7 @@ router.patch(
     }
     const parsed = UpdateBookingStatusBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input" });
+      respondInvalid(res, parsed.error);
       return;
     }
     const user = await loadUserFromRequest(req);
@@ -1671,7 +1667,7 @@ router.patch(
     }
     const parsed = UpdateBookingStatusBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input" });
+      respondInvalid(res, parsed.error);
       return;
     }
     const bRows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id)).limit(1);

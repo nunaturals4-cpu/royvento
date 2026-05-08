@@ -35,9 +35,11 @@ import {
 } from "recharts";
 import {
   apiGet, apiPost, apiDelete, apiPatch, apiPut,
-  EVENT_CATEGORIES, PUB_EVENT_TYPES, formatINR, fileToDataUrl,
+  EVENT_CATEGORIES, PUB_EVENT_TYPES, formatINR,
 } from "@/lib/api";
 import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
+import { uploadImage as uploadImageToStorage, validateImageFile } from "@/lib/uploadImage";
+import { useFormErrors, fieldClass } from "@/lib/formErrors";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const CATEGORIES = [...EVENT_CATEGORIES];
@@ -582,6 +584,7 @@ function EventsManager({ vendor, events, refetchEvents, onSaved }: { vendor: any
 function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   vendor: any; lockedType: "pub" | "event" | null; onCancel: () => void; onSaved: () => void; onVenueSaved?: () => void;
 }) {
+  const formErrors = useFormErrors();
   const [category, setCategory] = useState(vendor.category);
   const [type, setType] = useState<string>(lockedType ?? "pub");
   const [description, setDescription] = useState("");
@@ -647,16 +650,22 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
 
   const onImageFile = async (f: File | null) => {
     if (!f) return;
-    try { setImageUrl(await fileToDataUrl(f)); } catch { /* ignore */ }
+    const v = validateImageFile(f);
+    if (v) { toast({ title: v, variant: "destructive" }); return; }
+    try { setImageUrl(await uploadImageToStorage(f)); }
+    catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
   };
 
   const onGalleryImagesChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const urls: string[] = [];
     for (const file of Array.from(files)) {
-      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+      const v = validateImageFile(file);
+      if (v) { toast({ title: v, variant: "destructive" }); continue; }
+      try { urls.push(await uploadImageToStorage(file)); }
+      catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
     }
-    setGalleryImages((prev) => [...prev, ...urls]);
+    if (urls.length > 0) setGalleryImages((prev) => [...prev, ...urls]);
   };
 
   const onGalleryVideosChange = async (files: FileList | null) => {
@@ -709,10 +718,10 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
       }
     }
     try {
-      const url = await fileToDataUrl(finalFile);
+      const url = await uploadImageToStorage(finalFile);
       setGalleryVideos([url]);
-    } catch {
-      toast({ title: "Failed to process video", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Video upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" });
     }
   };
 
@@ -916,8 +925,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     create.mutate(
       { data: body },
       {
-        onSuccess: () => { toast({ title: "Submitted for review! An admin will approve your listing shortly." }); onSaved(); },
+        onSuccess: () => { formErrors.reset(); toast({ title: "Submitted for review! An admin will approve your listing shortly." }); onSaved(); },
         onError: (e: any) => {
+          formErrors.setFromError(e);
           const serverMsg = e?.data?.error ?? (e instanceof Error ? e.message : undefined);
           toast({ title: "Couldn't create listing", description: serverMsg, variant: "destructive" });
         },
@@ -936,6 +946,18 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
 
   return (
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
+      {(formErrors.topError || Object.keys(formErrors.fieldErrors).length > 0) && (
+        <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
+          <p className="font-medium text-red-300">{formErrors.topError || "Please correct the highlighted fields."}</p>
+          {Object.keys(formErrors.fieldErrors).length > 0 && (
+            <ul className="mt-1.5 space-y-0.5 text-xs text-red-200/90 list-disc pl-5">
+              {Object.entries(formErrors.fieldErrors).map(([k, v]) => (
+                <li key={k}><span className="font-mono opacity-80">{k}</span>: {v}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-2">
         <p className="text-xs text-muted-foreground mb-0.5">Business name (listing title)</p>
         <p className="font-serif text-lg">{vendor.businessName}</p>
@@ -1454,6 +1476,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
 }
 
 function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { event: any; vendor: any; onBack: () => void; onSaved: () => void; onVenueSaved?: () => void }) {
+  const formErrors = useFormErrors();
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   const [imageUrl, setImageUrl] = useState(event.imageUrl ?? "");
@@ -1546,16 +1569,22 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
 
   const onImageFile = async (f: File | null) => {
     if (!f) return;
-    try { setImageUrl(await fileToDataUrl(f)); } catch { /* ignore */ }
+    const v = validateImageFile(f);
+    if (v) { toast({ title: v, variant: "destructive" }); return; }
+    try { setImageUrl(await uploadImageToStorage(f)); }
+    catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
   };
 
   const onGalleryImagesChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const urls: string[] = [];
     for (const file of Array.from(files)) {
-      try { urls.push(await fileToDataUrl(file)); } catch { /* ignore */ }
+      const v = validateImageFile(file);
+      if (v) { toast({ title: v, variant: "destructive" }); continue; }
+      try { urls.push(await uploadImageToStorage(file)); }
+      catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
     }
-    setGalleryImages((prev) => [...prev, ...urls]);
+    if (urls.length > 0) setGalleryImages((prev) => [...prev, ...urls]);
   };
 
   const onGalleryVideosChange = async (files: FileList | null) => {
@@ -1608,10 +1637,10 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
       }
     }
     try {
-      const url = await fileToDataUrl(finalFile);
+      const url = await uploadImageToStorage(finalFile);
       setGalleryVideos([url]);
-    } catch {
-      toast({ title: "Failed to process video", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Video upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" });
     }
   };
 
@@ -1656,9 +1685,11 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
           },
         } : {}),
       });
+      formErrors.reset();
       toast({ title: "Updated" });
       onSaved();
     } catch (err: any) {
+      formErrors.setFromError(err);
       const serverMsg = err?.data?.error ?? err?.message;
       toast({ title: "Couldn't update listing", description: serverMsg, variant: "destructive" });
     }
@@ -1670,8 +1701,28 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
   return (
     <form onSubmit={save} className="space-y-4">
         <p className="font-serif text-2xl sr-only">Edit listing</p>
-        <div><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-black/40 border-white/10" /></div>
-        <div><Label>Description</Label><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
+        {(formErrors.topError || Object.keys(formErrors.fieldErrors).length > 0) && (
+          <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
+            <p className="font-medium text-red-300">{formErrors.topError || "Please correct the highlighted fields."}</p>
+            {Object.keys(formErrors.fieldErrors).length > 0 && (
+              <ul className="mt-1.5 space-y-0.5 text-xs text-red-200/90 list-disc pl-5">
+                {Object.entries(formErrors.fieldErrors).map(([k, v]) => (
+                  <li key={k}><span className="font-mono opacity-80">{k}</span>: {v}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        <div>
+          <Label>Title</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("title"))} />
+          {formErrors.fieldError("title") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("title")}</p>}
+        </div>
+        <div>
+          <Label>Description</Label>
+          <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("description"))} />
+          {formErrors.fieldError("description") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("description")}</p>}
+        </div>
         <div>
           <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
           <Input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />

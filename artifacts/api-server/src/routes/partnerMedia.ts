@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { buildServerUploadUrl } from "../lib/uploadToken";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -57,7 +58,7 @@ router.post("/partner/media", requireAuth(["vendor"]), async (req, res) => {
   if (!vendor)
     return res.status(400).json({ error: "Partner profile required" });
   const parsed = AddMediaBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const [m] = await db
     .insert(partnerMediaTable)
     .values({
@@ -133,7 +134,7 @@ router.patch(
       return res.status(400).json({ error: "Partner profile required" });
     const parsed = UpdatePartnerProfileBody.safeParse(req.body);
     if (!parsed.success)
-      return res.status(400).json({ error: "Invalid input" });
+      return respondInvalid(res, parsed.error);
     const updates: Record<string, unknown> = {};
     if (parsed.data.eventTypes !== undefined)
       updates["eventTypes"] = parsed.data.eventTypes;

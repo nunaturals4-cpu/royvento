@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { UpdateUserRoleBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, userToPublic, type Role } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -22,7 +23,7 @@ router.patch("/users/me", requireAuth(), async (req, res) => {
   }
   const parsed = UpdateMeBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const patch: Record<string, string> = {};
@@ -65,7 +66,7 @@ router.patch(
     }
     const parsed = UpdateUserRoleBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Invalid input" });
+      respondInvalid(res, parsed.error);
       return;
     }
     const role: Role = parsed.data.role as Role;

@@ -11,6 +11,7 @@ import { eq, desc, and, gt } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -56,7 +57,7 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = SubscribeBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const { planType, planPeriod, callbackScheme } = parsed.data;
   let price = PLAN_PRICES[planType][planPeriod];
   if (isNewUser(user.createdAt)) {

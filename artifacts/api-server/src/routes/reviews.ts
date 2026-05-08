@@ -3,6 +3,7 @@ import { db, reviewsTable, reviewDeletionsTable, usersTable, bookingsTable, vend
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 import { CreateReviewBody, UpdateReviewBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -213,7 +214,7 @@ router.post("/reviews", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
   const parsed = CreateReviewBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
 
   // Eligibility: must have a checked-in booking at this vendor.
   const eligible = await hasCheckInForVendor(user.id, parsed.data.vendorId);
@@ -262,7 +263,7 @@ router.patch("/reviews/:reviewId", requireAuth(), async (req, res) => {
   const reviewId = Number(req.params["reviewId"]);
   if (!Number.isFinite(reviewId)) { res.status(400).json({ error: "Invalid id" }); return; }
   const parsed = UpdateReviewBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
 
   const [existing] = await db.select().from(reviewsTable).where(eq(reviewsTable.id, reviewId)).limit(1);
   if (!existing) { res.status(404).json({ error: "Review not found" }); return; }

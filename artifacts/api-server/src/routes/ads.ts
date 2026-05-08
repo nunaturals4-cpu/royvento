@@ -12,6 +12,7 @@ import {
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 async function genUniqueCode(prefix: string, maxAttempts = 8): Promise<string> {
   for (let i = 0; i < maxAttempts; i++) {
@@ -46,7 +47,7 @@ router.post(
       .object({ message: z.string().optional().default("") })
       .safeParse(req.body);
     if (!parsed.success)
-      return res.status(400).json({ error: "Invalid input" });
+      return respondInvalid(res, parsed.error);
     const [r] = await db
       .insert(adsRequestsTable)
       .values({
@@ -311,7 +312,7 @@ router.post(
     if (!view.viewerUserId) return res.status(400).json({ error: "This visitor is anonymous and has no account to receive a code" });
 
     const parsed = SendDiscountBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    if (!parsed.success) return respondInvalid(res, parsed.error);
 
     const code = await genUniqueCode("PUB");
     const [coupon] = await db

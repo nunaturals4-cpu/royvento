@@ -3,6 +3,7 @@ import { db, couponsTable, usersTable, vendorsTable } from "@workspace/db";
 import { eq, desc, and, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -35,7 +36,7 @@ router.post("/coupons/validate", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = z.object({ code: z.string(), vendorId: z.number().int().positive().optional() }).safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const rows = await db
     .select({
       id: couponsTable.id,
@@ -78,7 +79,7 @@ router.post(
   async (req, res) => {
     const parsed = AdminGrantBody.safeParse(req.body);
     if (!parsed.success)
-      return res.status(400).json({ error: "Invalid input" });
+      return respondInvalid(res, parsed.error);
     const userExists = await db
       .select()
       .from(usersTable)

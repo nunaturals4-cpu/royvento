@@ -1,13 +1,37 @@
+export class ApiError extends Error {
+  status: number;
+  fieldErrors: Record<string, string>;
+  data?: unknown;
+  constructor(message: string, status: number, fieldErrors: Record<string, string> = {}, data?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.fieldErrors = fieldErrors;
+    this.data = data;
+  }
+}
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
+    let fieldErrors: Record<string, string> = {};
+    let data: unknown = undefined;
     try {
       const j = await res.json();
-      if (j?.error) msg = j.error;
+      data = j;
+      if (j && typeof j === "object") {
+        if (typeof (j as { error?: unknown }).error === "string") {
+          msg = (j as { error: string }).error;
+        }
+        const fe = (j as { fieldErrors?: unknown }).fieldErrors;
+        if (fe && typeof fe === "object") {
+          fieldErrors = fe as Record<string, string>;
+        }
+      }
     } catch {
       // ignore
     }
-    throw new Error(msg);
+    throw new ApiError(msg, res.status, fieldErrors, data);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

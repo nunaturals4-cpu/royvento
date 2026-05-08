@@ -14,6 +14,7 @@ import {
   userToPublic,
   type Role,
 } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 import {
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
@@ -88,8 +89,7 @@ const LoginBodyExt = z.object({
 router.post("/auth/register", registerLimiter, async (req, res) => {
   const parsed = RegisterBodyExt.safeParse(req.body);
   if (!parsed.success) {
-    const firstMsg = parsed.error.errors[0]?.message ?? "Invalid input";
-    res.status(400).json({ error: firstMsg });
+    respondInvalid(res, parsed.error);
     return;
   }
   const { email, password, name, role, phone, referralCode } = parsed.data;
@@ -185,7 +185,7 @@ router.post("/auth/register", registerLimiter, async (req, res) => {
 router.post("/auth/login", loginLimiter, async (req, res) => {
   const parsed = LoginBodyExt.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const { email, password } = parsed.data;
@@ -266,7 +266,7 @@ const ResendVerificationBody = z.object({ email: z.string().email() });
 router.post("/auth/resend-verification", resendVerificationLimiter, async (req, res) => {
   const parsed = ResendVerificationBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid email" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const rows = await db
@@ -482,7 +482,7 @@ const ForgotPasswordBody = z.object({ email: z.string().email() });
 router.post("/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
   const parsed = ForgotPasswordBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid email" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const rows = await db
@@ -520,7 +520,7 @@ const ResetPasswordBody = z.object({
 router.post("/auth/reset-password", async (req, res) => {
   const parsed = ResetPasswordBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const { token, newPassword } = parsed.data;

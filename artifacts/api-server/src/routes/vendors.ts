@@ -11,6 +11,7 @@ import { z } from "zod";
 import { requireAuth, loadUserFromRequest, type Role } from "../lib/auth";
 import { getVendorRatings, getVendorRating } from "../lib/aggregates";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -261,7 +262,7 @@ router.post("/vendors/me", requireAuth(), async (req, res) => {
   }
   const parsed = CreateMyVendorBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const existing = await db
@@ -314,7 +315,7 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
   }
   const parsed = UpdateMyVendorBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const updates: Record<string, unknown> = {};
@@ -604,7 +605,7 @@ router.post("/vendors/me/drink-plans", requireAuth(["vendor"]), async (req, res)
   const vendor = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
   if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
   const parsed = DrinkPlanBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
   const conflict = await checkDrinkPlanConflict(vendor[0].id, parsed.data.type, parsed.data.days, parsed.data.timeFrom, parsed.data.timeTo);
   if (conflict) {
     res.status(409).json({ error: describeConflict(conflict) });
@@ -625,7 +626,7 @@ router.patch("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (
   const vendor = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
   if (!vendor[0]) { res.status(404).json({ error: "Vendor profile not found" }); return; }
   const parsed = DrinkPlanBody.partial().safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
 
   // Load the existing plan so we can compute effective values even for partial patches
   const [existingPlan] = await db

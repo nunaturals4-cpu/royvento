@@ -3,6 +3,7 @@ import { db, blogsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { z } from "zod";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -26,7 +27,7 @@ router.post("/admin/blogs", requireAuth(["admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = BlogBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const [blog] = await db.insert(blogsTable).values(parsed.data).returning();
   res.json(blog);
 });
@@ -35,7 +36,7 @@ router.patch("/admin/blogs/:id", requireAuth(["admin"]), async (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
   const parsed = BlogBody.partial().safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const [blog] = await db
     .update(blogsTable)
     .set(parsed.data)

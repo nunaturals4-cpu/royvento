@@ -7,6 +7,7 @@ import {
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -65,7 +66,7 @@ router.post(
       return res.status(400).json({ error: "Partner profile required" });
     const parsed = AddBody.safeParse(req.body);
     if (!parsed.success)
-      return res.status(400).json({ error: "Invalid input" });
+      return respondInvalid(res, parsed.error);
     const dateStr = parsed.data.date.slice(0, 10);
     try {
       const [b] = await db

@@ -5,6 +5,21 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
+/**
+ * Map of dot-path field name to validation message.
+ */
+export type ErrorFieldErrors = { [key: string]: string };
+
+export interface Error {
+  /** Top-level human-readable error message. */
+  error: string;
+  /** Map of dot-path field name to validation message. */
+  fieldErrors?: ErrorFieldErrors;
+  /** Machine-readable error code (optional). */
+  code?: string;
+  [key: string]: unknown;
+}
+
 export type FreeEntryRulesGendersItem =
   (typeof FreeEntryRulesGendersItem)[keyof typeof FreeEntryRulesGendersItem];
 

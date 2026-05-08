@@ -5,6 +5,7 @@ import { createUserNotification } from "../lib/notify";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -53,7 +54,7 @@ router.post("/partner/managers/invite", requireAuth(["vendor"]), async (req, res
 
   const parsed = InviteManagerBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
 

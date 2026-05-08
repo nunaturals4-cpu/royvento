@@ -10,6 +10,7 @@ import {
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { getEventRatings } from "../lib/aggregates";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { respondInvalid } from "../lib/validationError";
 
 const objectStorage = new ObjectStorageService();
 
@@ -116,7 +117,7 @@ async function serializeEvents(rows: EventRow[]) {
 router.get("/events", async (req, res) => {
   const parsedQ = ListEventsQueryParams.safeParse(req.query);
   if (!parsedQ.success) {
-    res.status(400).json({ error: "Invalid query parameters" });
+    respondInvalid(res, parsedQ.error, "Invalid query parameters");
     return;
   }
   const q = parsedQ.data;
@@ -308,7 +309,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
   }
   const parsed = CreateEventBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const data = parsed.data;
@@ -429,7 +430,7 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   }
   const parsed = UpdateEventBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues });
+    respondInvalid(res, parsed.error);
     return;
   }
   const data = parsed.data;

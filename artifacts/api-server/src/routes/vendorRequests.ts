@@ -8,6 +8,7 @@ import {
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -43,7 +44,7 @@ router.post("/vendor-requests", requireAuth(), async (req, res) => {
   }
   const parsed = CreateBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const existing = await db

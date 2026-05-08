@@ -29,8 +29,11 @@ const uploadUrlLimiter = rateLimit({
   message: { error: "Too many upload requests — please slow down." },
 });
 
-const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ALLOWED_VIDEO_TYPES = new Set(["video/mp4"]);
+const ALLOWED_UPLOAD_TYPES = new Set([...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES]);
+const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024;
+const MAX_VIDEO_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 
 /**
@@ -50,11 +53,13 @@ router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, asy
   const { name, size, contentType } = parsed.data;
 
   if (!ALLOWED_UPLOAD_TYPES.has(contentType)) {
-    res.status(400).json({ error: "Only JPEG, PNG, WebP, and GIF images are allowed" });
+    res.status(400).json({ error: "Only JPEG, PNG, WebP, GIF images and MP4 videos are allowed" });
     return;
   }
-  if (size > MAX_UPLOAD_BYTES) {
-    res.status(400).json({ error: "Image must be under 8 MB" });
+  const isVideo = ALLOWED_VIDEO_TYPES.has(contentType);
+  const cap = isVideo ? MAX_VIDEO_UPLOAD_BYTES : MAX_IMAGE_UPLOAD_BYTES;
+  if (size > cap) {
+    res.status(400).json({ error: isVideo ? "Video must be under 4 MB" : "Image must be under 8 MB" });
     return;
   }
 
@@ -137,16 +142,24 @@ router.put(
     }
 
     try {
-      const { buffer, contentType, compressed } = await compressImage(rawBody, allowedType);
-      await objectStorageService.uploadBuffer(uuid, buffer, contentType);
-      req.log.info(
-        { uuid, inputBytes: rawBody.length, outputBytes: buffer.length, compressed },
-        "Image uploaded and compressed",
-      );
+      if (ALLOWED_VIDEO_TYPES.has(allowedType)) {
+        await objectStorageService.uploadBuffer(uuid, rawBody, allowedType);
+        req.log.info(
+          { uuid, inputBytes: rawBody.length, contentType: allowedType },
+          "Video uploaded",
+        );
+      } else {
+        const { buffer, contentType, compressed } = await compressImage(rawBody, allowedType);
+        await objectStorageService.uploadBuffer(uuid, buffer, contentType);
+        req.log.info(
+          { uuid, inputBytes: rawBody.length, outputBytes: buffer.length, compressed },
+          "Image uploaded and compressed",
+        );
+      }
       res.status(200).json({ ok: true });
     } catch (error) {
-      req.log.error({ err: error }, "Error uploading/compressing image");
-      res.status(500).json({ error: "Failed to store image" });
+      req.log.error({ err: error }, "Error uploading file");
+      res.status(500).json({ error: "Failed to store file" });
     }
   },
 );

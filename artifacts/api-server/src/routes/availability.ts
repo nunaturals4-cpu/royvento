@@ -3,6 +3,7 @@ import { db, availabilityTable, vendorsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { SetAvailabilityBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -43,7 +44,7 @@ router.post("/availability", requireAuth(["vendor"]), async (req, res) => {
   }
   const parsed = SetAvailabilityBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const vRows = await db

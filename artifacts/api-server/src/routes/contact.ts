@@ -4,6 +4,7 @@ import { db, contactMessagesTable } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -26,7 +27,7 @@ const ContactBody = z.object({
 router.post("/contact", contactLimiter, async (req, res) => {
   const parsed = ContactBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
+    respondInvalid(res, parsed.error);
     return;
   }
   const [m] = await db

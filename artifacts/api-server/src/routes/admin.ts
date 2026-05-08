@@ -16,6 +16,7 @@ import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzl
 import { requireAuth } from "../lib/auth";
 import { generateTicketCode } from "../lib/ticketCode";
 import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
+import { respondInvalid } from "../lib/validationError";
 import {
   PatchAdminEventBody,
   PatchAdminEventParams,
@@ -482,7 +483,7 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
   const id = paramsParsed.data.eventId;
   const parsed = PatchAdminEventBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const data = parsed.data;
@@ -612,7 +613,7 @@ router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
   const id = paramsParsed.data.id;
   const parsed = AdminUpdateVendorBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid input" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const data = parsed.data;

@@ -6,6 +6,7 @@ import { sendExpoPushWithToken } from "../lib/expoPush";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { respondInvalid } from "../lib/validationError";
 
 const objectStorage = new ObjectStorageService();
 
@@ -49,7 +50,7 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
   const vendor = await getMyVendor(user.id);
   if (!vendor) return res.status(403).json({ error: "No partner profile" });
   const parsed = AnnouncementBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const [row] = await db
     .insert(announcementsTable)
     .values({
@@ -128,7 +129,7 @@ router.patch("/partner/announcements/:id", requireAuth(["vendor"]), async (req, 
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const parsed = AnnouncementBody.partial().safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const [row] = await db
     .update(announcementsTable)
     .set(parsed.data)
@@ -287,7 +288,7 @@ const AdminAnnouncementBody = z.object({
 
 router.post("/admin/announcements", requireAuth(["admin"]), async (req, res) => {
   const parsed = AdminAnnouncementBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const vendorRows = await db
     .select({ id: vendorsTable.id })
     .from(vendorsTable)
