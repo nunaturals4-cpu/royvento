@@ -30,6 +30,16 @@ export function setBaseUrl(url: string | null): void {
 }
 
 /**
+ * Read the currently-configured base URL.
+ *
+ * Useful for code that needs to construct absolute URLs to the API
+ * (e.g. uploads to presigned URLs whose host must match the API host).
+ */
+export function getBaseUrl(): string | null {
+  return _baseUrl;
+}
+
+/**
  * Register a getter that supplies a bearer auth token.  Before every fetch
  * the getter is invoked; when it returns a non-null string, an
  * `Authorization: Bearer <token>` header is attached to the request.

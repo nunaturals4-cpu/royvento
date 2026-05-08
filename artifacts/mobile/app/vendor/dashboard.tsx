@@ -3,6 +3,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   customFetch,
+  getBaseUrl,
   getGetMyVendorQueryKey,
   getGetPartnerCheckinReportQueryKey,
   useCreateEvent,
@@ -41,6 +42,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { G, Line, Rect, Text as SvgText } from "react-native-svg";
 import { EmptyState } from "@/components/EmptyState";
 import { LocationPicker } from "@/components/LocationPicker";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
@@ -159,8 +161,8 @@ async function uploadMenuFileToStorage(localUri: string, filename: string, conte
     body: blob,
   });
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
+  const base = getBaseUrl() ?? "";
+  return `${base}/api/storage/objects/${pathAfterObjects}`;
 }
 
 async function uploadImageToStorage(localUri: string): Promise<string> {
@@ -188,8 +190,122 @@ async function uploadImageToStorage(localUri: string): Promise<string> {
 
   // Construct the serving URL
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
+  const base = getBaseUrl() ?? "";
+  return `${base}/api/storage/objects/${pathAfterObjects}`;
+}
+
+// ─── SVG charts (analytics) ──────────────────────────────────────────────────
+
+function abbreviateAmount(n: number): string {
+  if (n >= 10000000) return `${(n / 10000000).toFixed(1)}Cr`;
+  if (n >= 100000) return `${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+  return String(Math.round(n));
+}
+
+interface DailyRevenuePoint { date: string; revenue: number }
+interface DailyCommissionPoint { date: string; commission: number }
+
+function DailyRevenueChart({
+  data,
+  dailyComm,
+  primary,
+  border,
+  muted,
+}: {
+  data: DailyRevenuePoint[];
+  dailyComm: DailyCommissionPoint[];
+  primary: string;
+  border: string;
+  muted: string;
+}) {
+  const W = 320;
+  const H = 170;
+  const PAD = { top: 10, right: 10, bottom: 24, left: 38 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+  const max = Math.max(...data.map((d) => d.revenue), 1);
+  const commByDate = new Map(dailyComm.map((c) => [c.date, c.commission]));
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => max * t);
+  const slot = innerW / Math.max(1, data.length);
+  const barW = Math.max(2, slot * 0.7);
+  return (
+    <Svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+      {ticks.map((t, i) => {
+        const y = PAD.top + innerH - (t / max) * innerH;
+        return (
+          <G key={i}>
+            <Line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke={border} strokeWidth={0.5} />
+            <SvgText x={PAD.left - 4} y={y + 3} fontSize="9" fill={muted} textAnchor="end">{`₹${abbreviateAmount(t)}`}</SvgText>
+          </G>
+        );
+      })}
+      {data.map((d, i) => {
+        const xLeft = PAD.left + i * slot + (slot - barW) / 2;
+        const comm = Math.min(d.revenue, commByDate.get(d.date) ?? 0);
+        const totalH = (d.revenue / max) * innerH;
+        const commH = (comm / max) * innerH;
+        const netH = Math.max(0, totalH - commH);
+        const yNet = PAD.top + innerH - netH;
+        const yComm = yNet - commH;
+        return (
+          <G key={d.date}>
+            {commH > 0 && <Rect x={xLeft} y={yComm} width={barW} height={commH} fill="#f59e0b" />}
+            <Rect x={xLeft} y={yNet} width={barW} height={Math.max(d.revenue > 0 ? 1 : 0, netH)} fill={d.revenue > 0 ? primary : border} />
+          </G>
+        );
+      })}
+      <Line x1={PAD.left} y1={PAD.top + innerH} x2={W - PAD.right} y2={PAD.top + innerH} stroke={border} strokeWidth={1} />
+      <SvgText x={PAD.left} y={H - 6} fontSize="9" fill={muted}>{data[0]?.date?.slice(5) ?? ""}</SvgText>
+      <SvgText x={W - PAD.right} y={H - 6} fontSize="9" fill={muted} textAnchor="end">{data[data.length - 1]?.date?.slice(5) ?? ""}</SvgText>
+    </Svg>
+  );
+}
+
+interface TopEventPoint { eventId: number; eventTitle: string; revenue: number; bookingCount: number }
+
+function TopEventsChart({
+  data,
+  primary,
+  foreground,
+  muted,
+  border,
+}: {
+  data: TopEventPoint[];
+  primary: string;
+  foreground: string;
+  muted: string;
+  border: string;
+}) {
+  const items = data.slice(0, 5);
+  const W = 320;
+  const ROW_H = 38;
+  const H = items.length * ROW_H + 6;
+  const PAD_L = 8;
+  const PAD_R = 8;
+  const max = Math.max(...items.map((e) => e.revenue), 1);
+  const labelW = 60;
+  const trackX = PAD_L + 22;
+  const trackW = W - trackX - PAD_R - labelW;
+  return (
+    <Svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+      {items.map((e, i) => {
+        const y = i * ROW_H + 4;
+        const barH = 16;
+        const w = (e.revenue / max) * trackW;
+        const title = e.eventTitle.length > 30 ? `${e.eventTitle.slice(0, 30)}…` : e.eventTitle;
+        return (
+          <G key={e.eventId}>
+            <SvgText x={PAD_L} y={y + 12} fontSize="11" fill={primary} fontWeight="700">{`#${i + 1}`}</SvgText>
+            <Rect x={trackX} y={y} width={trackW} height={barH} rx={3} fill={border} />
+            <Rect x={trackX} y={y} width={Math.max(2, w)} height={barH} rx={3} fill={primary} />
+            <SvgText x={W - PAD_R} y={y + 12} fontSize="11" fill={foreground} fontWeight="700" textAnchor="end">{`₹${abbreviateAmount(e.revenue)}`}</SvgText>
+            <SvgText x={trackX} y={y + 30} fontSize="9" fill={muted}>{`${title} · ${e.bookingCount} booking${e.bookingCount !== 1 ? "s" : ""}`}</SvgText>
+          </G>
+        );
+      })}
+    </Svg>
+  );
 }
 
 // ─── Event form state shape ───────────────────────────────────────────────────
@@ -1014,6 +1130,7 @@ export default function VendorDashboardScreen() {
   const [eventItems, setEventItems] = useState<VendorEvent[]>([]);
   const [eventPage, setEventPage] = useState(1);
   const [eventTotal, setEventTotal] = useState(0);
+  const hasPubListing = eventItems.some((e: VendorEvent & { type?: string }) => e.type === "pub");
 
   const isApprovedAndListed = vendor?.status === "approved" && eventTotal > 0;
   // If the dashboard becomes locked while the manager is on a hidden tab
@@ -1460,7 +1577,6 @@ export default function VendorDashboardScreen() {
           dayHours: dayHoursPayload,
           danceFloor: profDanceFloor || null,
           danceFloorPhotos: profDanceFloorPhotos,
-          menuUrl: "",
           menuUrls: profMenuUrls,
         }),
       });
@@ -1934,10 +2050,7 @@ export default function VendorDashboardScreen() {
 
   function renderEvents() {
     if (eventLoading && eventItems.length === 0) return <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />;
-    const hasPub = eventItems.some((e: any) => e.type === "pub");
-
-    // venue details are rendered inside the Create Event modal below
-
+    const hasPub = hasPubListing;
     return (
       <FlatList
         data={eventItems}
@@ -2164,6 +2277,26 @@ export default function VendorDashboardScreen() {
               )}
             </TouchableOpacity>
           ))}
+
+          {hasPubListing && (
+            <>
+              <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>VENUE DETAILS</Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground, marginBottom: 10 }}>
+                Address, opening hours, dance floor and pub menu shown on your venue page.
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowVenueDetailsModal(true)}
+                style={{ flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 14, paddingVertical: 12 }}
+              >
+                <Ionicons name="location-outline" size={16} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.foreground }}>Edit venue details</Text>
+                  <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 2 }}>Location, hours, menu &amp; dance floor</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </>
+          )}
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -2567,70 +2700,44 @@ export default function VendorDashboardScreen() {
             </View>
           ))}
         </View>
-        {(a?.dailyRevenue ?? []).length > 0 && (() => {
-          const daily = a?.dailyRevenue ?? [];
-          const dailyCommByDate = new Map((a?.dailyCommission ?? []).map((c) => [c.date, c.commission]));
-          const max = Math.max(...daily.map((d) => d.revenue), 1);
-          return (
-            <>
-              <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DAILY REVENUE</Text>
-              <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 12 }]}>
-                <View style={{ flexDirection: "row", alignItems: "flex-end", height: 60, gap: 3 }}>
-                  {daily.map((d) => {
-                    const commAmt = dailyCommByDate.get(d.date) ?? 0;
-                    const netH = Math.max(4, Math.round(((d.revenue - commAmt) / max) * 56));
-                    const commH = d.revenue > 0 ? Math.max(0, Math.round((commAmt / max) * 56)) : 0;
-                    return (
-                      <View key={d.date} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", height: 60 }}>
-                        {commH > 0 && <View style={{ width: "80%", height: commH, backgroundColor: "#f59e0b", borderRadius: 0 }} />}
-                        <View style={{ width: "80%", height: d.revenue > 0 ? netH : 4, backgroundColor: d.revenue > 0 ? colors.primary : colors.muted, borderRadius: commH > 0 ? 0 : 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 }} />
-                      </View>
-                    );
-                  })}
-                </View>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[0]?.date?.slice(5) ?? ""}</Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 10, fontFamily: "Inter_400Regular" }}>{daily[daily.length - 1]?.date?.slice(5) ?? ""}</Text>
-                </View>
-                {(a?.totalCommission ?? 0) > 0 && (
-                  <View style={{ flexDirection: "row", gap: 12, marginTop: 6, justifyContent: "center" }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colors.primary }} />
-                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Net</Text>
-                    </View>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: "#f59e0b" }} />
-                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Platform fee</Text>
-                    </View>
+        {(a?.dailyRevenue ?? []).length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>DAILY REVENUE</Text>
+            <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 12 }]}>
+              <DailyRevenueChart
+                data={a?.dailyRevenue ?? []}
+                dailyComm={a?.dailyCommission ?? []}
+                primary={colors.primary}
+                border={colors.border}
+                muted={colors.mutedForeground}
+              />
+              {(a?.totalCommission ?? 0) > 0 && (
+                <View style={{ flexDirection: "row", gap: 12, marginTop: 8, justifyContent: "center" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colors.primary }} />
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Net</Text>
                   </View>
-                )}
-              </View>
-            </>
-          );
-        })()}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: "#f59e0b" }} />
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Platform fee</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </>
+        )}
         {(a?.perEvent ?? []).length > 0 && (
           <>
             <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>TOP EVENTS BY REVENUE</Text>
-            {(a?.perEvent ?? []).slice(0, 5).map((e, idx) => {
-              const maxRev = Math.max(...(a?.perEvent ?? []).map((x) => x.revenue), 1);
-              return (
-                <View key={e.eventId} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 4 }]}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <View style={[{ width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", marginRight: 8 }, { backgroundColor: colors.primary + "20" }]}>
-                      <Text style={{ color: colors.primary, fontSize: 11, fontFamily: "Inter_700Bold" }}>{idx + 1}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }} numberOfLines={1}>{e.eventTitle}</Text>
-                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{e.bookingCount} booking{e.bookingCount !== 1 ? "s" : ""}</Text>
-                    </View>
-                    <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 15 }}>₹{e.revenue.toLocaleString("en-IN")}</Text>
-                  </View>
-                  <View style={{ height: 4, backgroundColor: colors.muted, borderRadius: 2 }}>
-                    <View style={{ height: 4, width: `${(e.revenue / maxRev) * 100}%`, backgroundColor: colors.primary, borderRadius: 2 }} />
-                  </View>
-                </View>
-              );
-            })}
+            <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, paddingVertical: 12 }]}>
+              <TopEventsChart
+                data={a?.perEvent ?? []}
+                primary={colors.primary}
+                foreground={colors.foreground}
+                muted={colors.mutedForeground}
+                border={colors.border}
+              />
+            </View>
           </>
         )}
       </ScrollView>
@@ -3080,7 +3187,10 @@ export default function VendorDashboardScreen() {
         </View>
         {showAttendanceDatePicker && (
           <DateTimePicker
-            value={attendanceDate ? new Date(attendanceDate + "T00:00:00") : new Date()}
+            value={attendanceDate ? (() => {
+              const [y, m, d] = attendanceDate.split("-").map(Number);
+              return new Date(y!, (m ?? 1) - 1, d ?? 1);
+            })() : new Date()}
             mode="date"
             display={Platform.OS === "ios" ? "inline" : "default"}
             maximumDate={new Date()}
@@ -3106,20 +3216,20 @@ export default function VendorDashboardScreen() {
           ))}
         </View>
 
-        {/* Stats row */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+        {/* Stats row — horizontal scroll keeps cards readable on narrow screens */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={{ gap: 8 }}>
           {[
             { label: "Expected", value: attendanceStats.total, color: colors.foreground, bg: colors.card },
             { label: "Checked in", value: attendanceStats.checkedIn, color: "#22c55e", bg: "#22c55e18" },
             { label: "Not arrived", value: attendanceStats.notArrived, color: "#ef4444", bg: "#ef444418" },
             { label: "Rate", value: `${attendanceRate}%`, color: attendanceRate >= 70 ? "#22c55e" : attendanceRate >= 40 ? "#f59e0b" : "#ef4444", bg: colors.card },
           ].map((s) => (
-            <View key={s.label} style={{ flex: 1, borderRadius: 12, padding: 10, alignItems: "center", backgroundColor: s.bg, borderWidth: 1, borderColor: colors.border }}>
+            <View key={s.label} style={{ minWidth: 96, borderRadius: 12, padding: 10, alignItems: "center", backgroundColor: s.bg, borderWidth: 1, borderColor: colors.border }}>
               <Text style={{ color: s.color, fontFamily: "Inter_700Bold", fontSize: 16 }}>{s.value}</Text>
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 10, marginTop: 2, textAlign: "center" }}>{s.label}</Text>
             </View>
           ))}
-        </View>
+        </ScrollView>
 
         {/* Guest list */}
         {attendanceLoading ? (
