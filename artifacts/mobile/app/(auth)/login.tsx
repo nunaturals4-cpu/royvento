@@ -35,9 +35,10 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
   const { t } = useLanguage();
-  const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo: rawReturnTo, email: rawPrefillEmail } = useLocalSearchParams<{ returnTo?: string; email?: string }>();
   const returnTo = typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") ? rawReturnTo : undefined;
-  const [email, setEmail] = useState("");
+  const prefillEmail = typeof rawPrefillEmail === "string" ? rawPrefillEmail : "";
+  const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -88,16 +89,25 @@ export default function LoginScreen() {
         await login(data.token, data.user as AuthUser);
         router.replace(returnTo ? (returnTo as never) : "/(tabs)");
       },
-      onError: (err: Error) => {
+      onError: (err: any) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        const msg = err?.message ?? "";
-        if (msg.includes("EMAIL_NOT_VERIFIED") || msg.includes("verify your email")) {
+        const code = err?.data?.code ?? err?.code;
+        const status = err?.status;
+        const serverMsg = err?.data?.error ?? err?.message ?? "";
+        if (code === "EMAIL_NOT_VERIFIED" || /EMAIL_NOT_VERIFIED|verify your email/i.test(serverMsg)) {
           Alert.alert(
             t("auth.email_not_verified"),
             t("auth.email_not_verified_desc"),
           );
+        } else if (code === "NO_ACCOUNT" || status === 404) {
+          setErrors((p) => ({
+            ...p,
+            email: "No account found for that email. Tap “Sign Up” below to create one.",
+          }));
+          emailRef.current?.focus();
         } else {
-          Alert.alert(t("auth.login_failed"), msg || t("auth.invalid_credentials"));
+          setErrors((p) => ({ ...p, password: serverMsg || "Incorrect password. Please try again." }));
+          passwordRef.current?.focus();
         }
       },
     },
@@ -253,7 +263,18 @@ export default function LoginScreen() {
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
             {t("auth.dont_have_account")}{" "}
           </Text>
-          <Pressable onPress={() => router.push(returnTo ? { pathname: "/(auth)/register", params: { returnTo } } : "/(auth)/register")}>
+          <Pressable
+            onPress={() => {
+              const params: Record<string, string> = {};
+              if (returnTo) params.returnTo = returnTo;
+              if (email.trim()) params.email = email.trim();
+              router.push(
+                Object.keys(params).length > 0
+                  ? { pathname: "/(auth)/register", params }
+                  : "/(auth)/register",
+              );
+            }}
+          >
             <Text style={[styles.link, { color: colors.primary }]}>{t("auth.sign_up")}</Text>
           </Pressable>
         </View>

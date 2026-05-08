@@ -3,7 +3,7 @@ export interface CountryData {
   states: { name: string; cities: string[] }[];
 }
 
-export const COUNTRIES: CountryData[] = [
+const RAW_COUNTRIES: CountryData[] = [
   {
     name: "India",
     states: [
@@ -73,6 +73,18 @@ export const COUNTRIES: CountryData[] = [
     states: [{ name: "Singapore", cities: ["Singapore"] }],
   },
 ];
+
+const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+const sortStr = (a: string, b: string) => a.localeCompare(b);
+
+export const COUNTRIES: CountryData[] = [...RAW_COUNTRIES]
+  .sort(byName)
+  .map((c) => ({
+    ...c,
+    states: [...c.states]
+      .sort(byName)
+      .map((s) => ({ ...s, cities: [...s.cities].sort(sortStr) })),
+  }));
 
 export const COUNTRY_NAMES = COUNTRIES.map((c) => c.name);
 

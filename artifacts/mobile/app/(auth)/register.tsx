@@ -27,10 +27,11 @@ export default function RegisterScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo: rawReturnTo, email: rawPrefillEmail } = useLocalSearchParams<{ returnTo?: string; email?: string }>();
   const returnTo = typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") ? rawReturnTo : undefined;
+  const prefillEmail = typeof rawPrefillEmail === "string" ? rawPrefillEmail : "";
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,9 +48,20 @@ export default function RegisterScreen() {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setPendingEmail((variables as any)?.data?.email ?? email);
       },
-      onError: (err: Error) => {
+      onError: (err: any) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert(t("auth.registration_failed"), err?.message ?? t("common.error"));
+        const status = err?.status;
+        const serverMsg = err?.data?.error ?? err?.message ?? "";
+        const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);
+        if (isDuplicate) {
+          setErrors((p) => ({
+            ...p,
+            email: "An account with this email already exists. Tap “Sign In” below to log in.",
+          }));
+          emailRef.current?.focus();
+        } else {
+          Alert.alert(t("auth.registration_failed"), serverMsg || t("common.error"));
+        }
       },
     },
   });
@@ -289,7 +301,18 @@ export default function RegisterScreen() {
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
             {t("auth.already_have_account")}{" "}
           </Text>
-          <Pressable onPress={() => router.push(returnTo ? { pathname: "/(auth)/login", params: { returnTo } } : "/(auth)/login")}>
+          <Pressable
+            onPress={() => {
+              const params: Record<string, string> = {};
+              if (returnTo) params.returnTo = returnTo;
+              if (email.trim()) params.email = email.trim();
+              router.push(
+                Object.keys(params).length > 0
+                  ? { pathname: "/(auth)/login", params }
+                  : "/(auth)/login",
+              );
+            }}
+          >
             <Text style={[styles.link, { color: colors.primary }]}>{t("auth.sign_in_link")}</Text>
           </Pressable>
         </View>

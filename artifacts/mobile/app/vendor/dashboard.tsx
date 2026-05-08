@@ -1159,11 +1159,17 @@ export default function VendorDashboardScreen() {
 
   async function saveProfile() {
     setProfSaving(true);
+    let descToSave = profDesc.trim();
+    let descTrimmed = false;
+    if (descToSave.length > 300) {
+      descToSave = descToSave.slice(0, 300);
+      descTrimmed = true;
+    }
     try {
       await updateVendorMut.mutateAsync({
         data: {
           businessName: profName.trim(),
-          description: profDesc.trim(),
+          description: descToSave,
           category: profCategory || vendor?.category || "Cultural",
           location: `${vendor?.city ?? ""}${vendor?.state ? ", " + vendor.state : ""}`,
           country: vendor?.country || "India",
@@ -1182,8 +1188,14 @@ export default function VendorDashboardScreen() {
         await updateUser({ phone: profPhone.trim() });
       }
       qc.invalidateQueries({ queryKey: getGetMyVendorQueryKey() });
+      if (descTrimmed) setProfDesc(descToSave);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Saved", "Your profile has been updated.");
+      Alert.alert(
+        "Saved",
+        descTrimmed
+          ? "We trimmed your description to the 300-character limit before saving."
+          : "Your profile has been updated.",
+      );
     } catch {
       Alert.alert("Error", "Failed to save profile. Please try again.");
     } finally {
@@ -1855,7 +1867,9 @@ export default function VendorDashboardScreen() {
           </View>
 
           <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Description</Text>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+              Description <Text style={{ opacity: 0.7 }}>(max 300 characters)</Text>
+            </Text>
             <TextInput
               style={[styles.fieldInput, styles.textArea, { color: colors.foreground }]}
               value={profDesc}
@@ -1864,7 +1878,19 @@ export default function VendorDashboardScreen() {
               placeholderTextColor={colors.mutedForeground}
               multiline
               numberOfLines={4}
+              maxLength={300}
             />
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: 11,
+                marginTop: 4,
+                textAlign: "right",
+                color: profDesc.length > 300 ? colors.destructive : colors.mutedForeground,
+              }}
+            >
+              {profDesc.length} / 300
+            </Text>
           </View>
           <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 8 }]}>CONTACT INFO</Text>
 
