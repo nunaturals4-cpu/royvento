@@ -27,7 +27,7 @@ import {
 import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
-  TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck,
+  TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck, Check,
   Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent,
 } from "lucide-react";
 import {
@@ -558,7 +558,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [country, setCountry] = useState(vendor.country ?? "India");
   const [price, setPrice] = useState<number | "">("");
-  const [capacity, setCapacity] = useState(50);
+  const [capacity, setCapacity] = useState<number | "">("");
   const [imageUrl, setImageUrl] = useState("");
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [galleryVideos, setGalleryVideos] = useState<string[]>([]);
@@ -844,7 +844,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         const t = [w, m, c].filter((n) => n > 0);
         return t.length > 0 ? Math.min(...t) : basePrice;
       })(),
-      capacity, imageUrl,
+      capacity: capacity === "" ? 0 : capacity, imageUrl,
       type, city, state: stateF, country,
       pubMode,
       priceWomen: type === "pub" ? (priceWomen === "" ? 0 : priceWomen) : 0,
@@ -938,7 +938,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         {type !== "pub" && (
           <div><Label>Minimum price per person (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
         )}
-        <div><Label>Capacity</Label><Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+        <div><Label>Capacity</Label><Input type="number" min={1} placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
       </div>
 
       {type === "pub" && (
@@ -980,7 +980,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
                 <span className="text-white/70">Vary prices by day</span>
               </label>
               {varyByDay && (
-                <div className="overflow-x-auto rounded-lg border border-white/10">
+                <div className="rounded-lg border border-white/10">
                   <div className="flex items-center justify-between px-3 pt-2">
                     <p className="text-xs text-white/40">Clear a cell to use the default price for that day.</p>
                     <button
@@ -998,21 +998,21 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
                       Reset all to defaults
                     </button>
                   </div>
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs" style={{ tableLayout: "fixed" }}>
                     <thead>
                       <tr className="border-b border-white/10">
-                        <th className="text-left px-3 py-2 text-white/50 font-medium w-14">Day</th>
-                        <th className="px-2 py-2 text-white/50 font-medium text-center">Women (₹)</th>
-                        <th className="px-2 py-2 text-white/50 font-medium text-center">Men (₹)</th>
-                        <th className="px-2 py-2 text-white/50 font-medium text-center">Couple (₹)</th>
+                        <th className="text-left px-2 py-2 text-white/50 font-medium" style={{ width: "2.75rem" }}>Day</th>
+                        <th className="px-1 py-2 text-white/50 font-medium text-center">Women</th>
+                        <th className="px-1 py-2 text-white/50 font-medium text-center">Men</th>
+                        <th className="px-1 py-2 text-white/50 font-medium text-center">Couple</th>
                       </tr>
                     </thead>
                     <tbody>
                       {ALL_DAYS.map((day) => (
                         <tr key={day} className="border-b border-white/5 last:border-0">
-                          <td className="px-3 py-1.5 font-semibold text-white/70">{day}</td>
+                          <td className="px-2 py-1.5 font-semibold text-white/70">{day}</td>
                           {(["women", "men", "couple"] as const).map((field) => (
-                            <td key={field} className="px-1.5 py-1">
+                            <td key={field} className="px-1 py-1">
                               <Input
                                 type="number"
                                 min={0}
@@ -1026,7 +1026,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
                                   });
                                 }}
                                 placeholder={String(field === "women" ? priceWomen : field === "men" ? priceMen : priceCouple)}
-                                className="bg-black/40 border-white/10 h-7 text-xs px-2"
+                                className="bg-black/40 border-white/10 h-7 text-xs px-1.5 w-full"
                               />
                             </td>
                           ))}
@@ -1059,10 +1059,12 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           )}
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
             <button type="button" onClick={() => setFreeEntryEnabled((v) => !v)}
+              aria-expanded={freeEntryEnabled}
               className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
               <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
-                <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)}
-                  onClick={(e) => e.stopPropagation()} />
+                <span className={`inline-flex h-4 w-4 items-center justify-center rounded border ${freeEntryEnabled ? "border-emerald-500 bg-emerald-500" : "border-emerald-500/40 bg-transparent"}`}>
+                  {freeEntryEnabled && <Check className="h-3 w-3 text-black" />}
+                </span>
                 Free Entry
               </span>
               <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${freeEntryEnabled ? "rotate-180" : ""}`} />
@@ -1422,7 +1424,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
   const [priceWomen, setPriceWomen] = useState(Number(event.priceWomen ?? 0));
   const [priceMen, setPriceMen] = useState(Number(event.priceMen ?? 0));
   const [priceCouple, setPriceCouple] = useState(Number(event.priceCouple ?? 0));
-  const [capacity, setCapacity] = useState(Number(event.capacity ?? 0));
+  const [capacity, setCapacity] = useState<number | "">(event.capacity ? Number(event.capacity) : "");
   const [pubEventTypes, setPubEventTypes] = useState<string[]>(event.pubEventTypes ?? []);
   const [pubMode, setPubMode] = useState<string>(event.pubMode ?? "");
   const [varyByDay, setVaryByDay] = useState<boolean>(!!(event.dayPricing && Object.keys(event.dayPricing).length > 0));
@@ -1523,7 +1525,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
         ? (tierArr.length > 0 ? Math.min(...tierArr) : price)
         : price;
       await apiPatch(`/api/events/${event.id}`, {
-        title, description, imageUrl, capacity,
+        title, description, imageUrl, capacity: capacity === "" ? 0 : capacity,
         price: recalcPrice, galleryImages, galleryVideos,
         ...(isPub ? {
           pubMode, priceWomen, priceMen, priceCouple, pubEventTypes,
@@ -1608,7 +1610,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
 
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Price (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-          <div><Label>Capacity</Label><Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+          <div><Label>Capacity</Label><Input type="number" min={1} placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
         </div>
         {isPub && (
           <>
@@ -1645,7 +1647,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
                 <span className="text-white/70">Vary prices by day</span>
               </label>
               {varyByDay && (
-                <div className="overflow-x-auto rounded-lg border border-white/10">
+                <div className="rounded-lg border border-white/10">
                   <div className="flex items-center justify-between px-3 pt-2">
                     <p className="text-xs text-white/40">Clear a cell to use the default price for that day.</p>
                     <button
@@ -1663,21 +1665,21 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
                       Reset all to defaults
                     </button>
                   </div>
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs" style={{ tableLayout: "fixed" }}>
                     <thead>
                       <tr className="border-b border-white/10">
-                        <th className="text-left px-3 py-2 text-white/50 font-medium w-14">Day</th>
-                        <th className="px-2 py-2 text-white/50 font-medium text-center">Women (₹)</th>
-                        <th className="px-2 py-2 text-white/50 font-medium text-center">Men (₹)</th>
-                        <th className="px-2 py-2 text-white/50 font-medium text-center">Couple (₹)</th>
+                        <th className="text-left px-2 py-2 text-white/50 font-medium" style={{ width: "2.75rem" }}>Day</th>
+                        <th className="px-1 py-2 text-white/50 font-medium text-center">Women</th>
+                        <th className="px-1 py-2 text-white/50 font-medium text-center">Men</th>
+                        <th className="px-1 py-2 text-white/50 font-medium text-center">Couple</th>
                       </tr>
                     </thead>
                     <tbody>
                       {ALL_DAYS.map((day) => (
                         <tr key={day} className="border-b border-white/5 last:border-0">
-                          <td className="px-3 py-1.5 font-semibold text-white/70">{day}</td>
+                          <td className="px-2 py-1.5 font-semibold text-white/70">{day}</td>
                           {(["women", "men", "couple"] as const).map((field) => (
-                            <td key={field} className="px-1.5 py-1">
+                            <td key={field} className="px-1 py-1">
                               <Input
                                 type="number"
                                 min={0}
@@ -1691,7 +1693,7 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
                                   });
                                 }}
                                 placeholder={String(field === "women" ? priceWomen : field === "men" ? priceMen : priceCouple)}
-                                className="bg-black/40 border-white/10 h-7 text-xs px-2"
+                                className="bg-black/40 border-white/10 h-7 text-xs px-1.5 w-full"
                               />
                             </td>
                           ))}
@@ -1721,10 +1723,12 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
             </div>
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
               <button type="button" onClick={() => setFreeEntryEnabled((v) => !v)}
+                aria-expanded={freeEntryEnabled}
                 className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
                 <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
-                  <Checkbox checked={freeEntryEnabled} onCheckedChange={(v) => setFreeEntryEnabled(!!v)}
-                    onClick={(e) => e.stopPropagation()} />
+                  <span className={`inline-flex h-4 w-4 items-center justify-center rounded border ${freeEntryEnabled ? "border-emerald-500 bg-emerald-500" : "border-emerald-500/40 bg-transparent"}`}>
+                    {freeEntryEnabled && <Check className="h-3 w-3 text-black" />}
+                  </span>
                   Free Entry
                 </span>
                 <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${freeEntryEnabled ? "rotate-180" : ""}`} />
@@ -3733,6 +3737,56 @@ interface DrinkPlan {
 
 const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: 0 });
 
+function LineItemsEditor({
+  items,
+  onChange,
+}: {
+  items: DrinkPlanLineItem[];
+  onChange: (items: DrinkPlanLineItem[]) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((item, idx) => (
+        <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <Input
+            placeholder="Offer / product name"
+            value={item.name}
+            onChange={(e) => { const next = [...items]; next[idx] = { ...item, name: e.target.value }; onChange(next); }}
+            className="bg-black/40 border-white/10 w-full sm:flex-1 sm:min-w-0"
+          />
+          <div className="flex gap-2 items-center">
+            <Input
+              type="number" min="1" placeholder="Qty"
+              value={item.qty}
+              onChange={(e) => { const next = [...items]; next[idx] = { ...item, qty: Math.max(1, parseInt(e.target.value) || 1) }; onChange(next); }}
+              className="bg-black/40 border-white/10 w-20 flex-shrink-0"
+            />
+            <div className="relative w-32 flex-shrink-0">
+              <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                type="number" min="0" placeholder="Price"
+                value={item.discountedPrice}
+                onChange={(e) => { const next = [...items]; next[idx] = { ...item, discountedPrice: Math.max(0, parseInt(e.target.value) || 0) }; onChange(next); }}
+                className="bg-black/40 border-white/10 pl-7"
+              />
+            </div>
+            {items.length > 1 && (
+              <button type="button" onClick={() => onChange(items.filter((_, i) => i !== idx))}
+                className="rounded-lg border border-destructive/30 p-1.5 text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0 ml-auto sm:ml-0">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...items, emptyItem()])}
+        className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-1">
+        <Plus className="h-3.5 w-3.5" /> Add item
+      </button>
+    </div>
+  );
+}
+
 function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const { toast } = useToast();
   const [plans, setPlans] = useState<DrinkPlan[]>([]);
@@ -3946,54 +4000,6 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
           {day}
         </button>
       ))}
-    </div>
-  );
-
-  const LineItemsEditor = ({
-    items,
-    onChange,
-  }: {
-    items: DrinkPlanLineItem[];
-    onChange: (items: DrinkPlanLineItem[]) => void;
-  }) => (
-    <div className="space-y-2">
-      {items.map((item, idx) => (
-        <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <Input
-            placeholder="Offer / product name"
-            value={item.name}
-            onChange={(e) => { const next = [...items]; next[idx] = { ...item, name: e.target.value }; onChange(next); }}
-            className="bg-black/40 border-white/10 w-full sm:flex-1 sm:min-w-0"
-          />
-          <div className="flex gap-2 items-center">
-            <Input
-              type="number" min="1" placeholder="Qty"
-              value={item.qty}
-              onChange={(e) => { const next = [...items]; next[idx] = { ...item, qty: Math.max(1, parseInt(e.target.value) || 1) }; onChange(next); }}
-              className="bg-black/40 border-white/10 w-20 flex-shrink-0"
-            />
-            <div className="relative w-32 flex-shrink-0">
-              <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="number" min="0" placeholder="Price"
-                value={item.discountedPrice}
-                onChange={(e) => { const next = [...items]; next[idx] = { ...item, discountedPrice: Math.max(0, parseInt(e.target.value) || 0) }; onChange(next); }}
-                className="bg-black/40 border-white/10 pl-7"
-              />
-            </div>
-            {items.length > 1 && (
-              <button type="button" onClick={() => onChange(items.filter((_, i) => i !== idx))}
-                className="rounded-lg border border-destructive/30 p-1.5 text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0 ml-auto sm:ml-0">
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-      <button type="button" onClick={() => onChange([...items, emptyItem()])}
-        className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-1">
-        <Plus className="h-3.5 w-3.5" /> Add item
-      </button>
     </div>
   );
 

@@ -558,8 +558,8 @@ async function checkDrinkPlanConflict(
   timeFrom: string,
   timeTo: string,
   excludePlanId?: number,
-): Promise<boolean> {
-  if (type !== "welcome" && type !== "ticket") return false;
+): Promise<{ type: string; days: string[]; timeFrom: string; timeTo: string } | null> {
+  if (type !== "welcome" && type !== "ticket") return null;
   const incomingDays = effectiveDays(days);
   const existing = await db
     .select()
@@ -573,9 +573,18 @@ async function checkDrinkPlanConflict(
     const planDays = effectiveDays(plan.days);
     const sharedDay = incomingDays.some((d) => planDays.includes(d));
     if (!sharedDay) continue;
-    if (timesOverlap(timeFrom, timeTo, plan.timeFrom, plan.timeTo)) return true;
+    if (timesOverlap(timeFrom, timeTo, plan.timeFrom, plan.timeTo)) {
+      return { type: plan.type, days: plan.days, timeFrom: plan.timeFrom, timeTo: plan.timeTo };
+    }
   }
-  return false;
+  return null;
+}
+
+function describeConflict(c: { type: string; days: string[]; timeFrom: string; timeTo: string }): string {
+  const label = c.type === "welcome" ? "Free Entry" : "Ticket";
+  const dayPart = c.days.length > 0 && c.days.length < 7 ? c.days.join(", ") : "every day";
+  const timePart = c.timeFrom && c.timeTo ? ` ${c.timeFrom}–${c.timeTo}` : "";
+  return `A ${label} plan already exists on ${dayPart}${timePart}. Please choose a different day or time, or edit the existing plan.`;
 }
 
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {
@@ -598,7 +607,7 @@ router.post("/vendors/me/drink-plans", requireAuth(["vendor"]), async (req, res)
   if (!parsed.success) { res.status(400).json({ error: "Invalid input", issues: parsed.error.issues }); return; }
   const conflict = await checkDrinkPlanConflict(vendor[0].id, parsed.data.type, parsed.data.days, parsed.data.timeFrom, parsed.data.timeTo);
   if (conflict) {
-    res.status(409).json({ error: "A conflicting free-entry or ticket plan already exists for this day and time." });
+    res.status(409).json({ error: describeConflict(conflict) });
     return;
   }
   const [plan] = await db.insert(drinkPlansTable).values({
@@ -633,7 +642,7 @@ router.patch("/vendors/me/drink-plans/:planId", requireAuth(["vendor"]), async (
 
   const conflict = await checkDrinkPlanConflict(vendor[0].id, effectiveType, effectiveDaysVal, effectiveTimeFrom, effectiveTimeTo, planId);
   if (conflict) {
-    res.status(409).json({ error: "A conflicting free-entry or ticket plan already exists for this day and time." });
+    res.status(409).json({ error: describeConflict(conflict) });
     return;
   }
 

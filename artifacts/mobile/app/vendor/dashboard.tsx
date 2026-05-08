@@ -342,8 +342,10 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
       setEditId(null);
       setForm({ ...BLANK_PLAN });
       setFreeEntryTypes(["welcome"]);
-    } catch {
-      Alert.alert("Error", "Failed to save drink plan.");
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "";
+      const msg = raw.replace(/^HTTP\s+\d+\s+[^:]+:\s*/i, "").trim() || "Failed to save drink plan.";
+      Alert.alert("Couldn't save drink plan", msg);
     } finally {
       setSaving(false);
     }
@@ -1010,7 +1012,7 @@ export default function VendorDashboardScreen() {
       category: event.category,
       location: event.location,
       price: String(event.price),
-      capacity: String(event.capacity),
+      capacity: event.capacity ? String(event.capacity) : "",
       imageUrl: event.imageUrl,
       imageUri: event.imageUrl,
       freeEntryEnabled: !!(fer?.enabled),

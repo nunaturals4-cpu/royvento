@@ -36,15 +36,15 @@ export function LanguageSwitcher() {
           <span className="text-sm font-medium hidden sm:inline">{current.native}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44 glass-card-strong">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-52 max-w-[calc(100vw-1rem)] glass-card-strong">
         {LANGUAGES.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
             onClick={() => i18n.changeLanguage(lang.code)}
-            className={`cursor-pointer flex justify-between ${lang.code === i18n.language ? "text-primary font-semibold" : ""}`}
+            className={`cursor-pointer flex items-center justify-between gap-3 ${lang.code === i18n.language ? "text-primary font-semibold" : ""}`}
           >
-            <span>{lang.native}</span>
-            <span className="text-xs text-muted-foreground">{lang.label}</span>
+            <span className="truncate">{lang.native}</span>
+            <span className="text-xs text-muted-foreground shrink-0">{lang.label}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

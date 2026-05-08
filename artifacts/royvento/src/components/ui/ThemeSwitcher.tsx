@@ -33,7 +33,7 @@ export function ThemeSwitcher() {
           <Palette className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44 glass-card-strong">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-52 max-w-[calc(100vw-1rem)] glass-card-strong">
         <DropdownMenuLabel className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Theme</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {THEMES.map((t) => (
@@ -46,7 +46,7 @@ export function ThemeSwitcher() {
               className="h-3.5 w-3.5 rounded-full shrink-0"
               style={{ background: t.color }}
             />
-            <span className="flex-1">{t.label}</span>
+            <span className="flex-1 truncate">{t.label}</span>
             {theme === t.id && <Check className="h-3.5 w-3.5 text-primary" />}
           </DropdownMenuItem>
         ))}
