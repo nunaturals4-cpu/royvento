@@ -1146,6 +1146,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/Ok"
 
+  /partners/{vendorId}/view:
+    post:
+      operationId: trackPartnerProfileView
+      tags: [vendors]
+      summary: Record a profile view for a partner (anonymous or authenticated). Self-views by the owner are dropped server-side.
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: View recorded (or skipped for self-views)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackProfileViewResult"
+
+  /partner/leads/me:
+    get:
+      operationId: getPartnerLeads
+      tags: [vendors]
+      summary: Get the authenticated partner's CRM leads (aggregated profile views, scoped to this vendor only)
+      responses:
+        "200":
+          description: Aggregated leads for this partner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerLeadsResponse"
+
   /partner/commission:
     get:
       operationId: getPartnerCommission
@@ -2539,7 +2571,70 @@ components:
       properties:
         ok:
           type: boolean
+
+    TrackProfileViewResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        skipped:
+          type: string
+          nullable: true
       required: [ok]
+
+    PartnerLeadView:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Latest profileViewId for this aggregated row (used by send-discount).
+        viewerUserId:
+          type: integer
+          nullable: true
+        viewerName:
+          type: string
+        viewerEmail:
+          type: string
+        phone:
+          type: string
+        visitCount:
+          type: integer
+        lastViewedAt:
+          type: string
+          format: date-time
+        viewedAt:
+          type: string
+          format: date-time
+          description: Alias of lastViewedAt for back-compat.
+        hasBooked:
+          type: boolean
+        existingCode:
+          type: string
+          nullable: true
+      required: [id, viewerUserId, viewerName, viewerEmail, phone, visitCount, lastViewedAt, viewedAt, hasBooked, existingCode]
+
+    PartnerLeadsResponse:
+      type: object
+      properties:
+        premium:
+          type: boolean
+        crmAccessGranted:
+          type: boolean
+        crmTrialActive:
+          type: boolean
+        crmTrialDaysRemaining:
+          type: integer
+        totalViews:
+          type: integer
+        bookedCount:
+          type: integer
+        message:
+          type: string
+        views:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartnerLeadView"
+      required: [premium, crmAccessGranted, crmTrialActive, crmTrialDaysRemaining, views]
 
     Role:
       type: string

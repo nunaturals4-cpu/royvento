@@ -4240,7 +4240,9 @@ const PLAN_TYPE_BADGE: Record<string, string> = {
   custom: "Custom Package",
 };
 
-interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number; }
+// `discountedPrice` is held as `number | ""` while editing so the input can
+// render an empty placeholder for fresh rows. Save handlers coerce `""` → 0.
+interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number | ""; }
 
 interface DrinkPlan {
   id: number; vendorId: number; type: string; productName: string; gender: string;
@@ -4252,7 +4254,14 @@ interface DrinkPlan {
   validFrom?: string | null;
 }
 
-const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: 0 });
+const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: "" });
+
+// Coerce a line item's editable shape to the wire shape (numbers only).
+const itemForWire = (i: DrinkPlanLineItem) => ({
+  name: i.name,
+  qty: i.qty,
+  discountedPrice: i.discountedPrice === "" ? 0 : Math.max(0, Number(i.discountedPrice) || 0),
+});
 
 function LineItemsEditor({
   items,
@@ -4282,12 +4291,16 @@ function LineItemsEditor({
               <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input
                 type="number" min="0" placeholder="Price"
-                value={item.discountedPrice ? item.discountedPrice : ""}
+                value={item.discountedPrice === "" ? "" : item.discountedPrice}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  const parsed = raw === "" ? 0 : Math.max(0, parseInt(raw) || 0);
                   const next = [...items];
-                  next[idx] = { ...item, discountedPrice: parsed };
+                  // Keep "" in state while the field is empty so the
+                  // placeholder stays visible. Save handlers coerce to 0.
+                  next[idx] = {
+                    ...item,
+                    discountedPrice: raw === "" ? "" : Math.max(0, parseInt(raw) || 0),
+                  };
                   onChange(next);
                 }}
                 className="bg-black/40 border-white/10 pl-7"
@@ -4445,7 +4458,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       if (ticketChecked) {
         await apiPost("/api/vendors/me/drink-plans", {
           type: "ticket", productName: "Included with Ticket", gender: "all", price: 0,
-          lineItems: ticketItems.filter((i) => i.name.trim()),
+          lineItems: ticketItems.filter((i) => i.name.trim()).map(itemForWire),
           days: ticketDays, timeFrom: ticketTimeFrom.trim(), timeTo: ticketTimeTo.trim(),
           description: ticketDescription.trim(),
           drinksOfferLabel: ticketDrinksOffer.trim(),
@@ -4468,8 +4481,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const filledTicketItems = editItems.filter((i) => i.name.trim());
-    if (editType === "ticket" && editItems.some((i) => !i.name.trim() && (i.qty !== 1 || i.discountedPrice !== 0))) {
+    const filledTicketItems = editItems.filter((i) => i.name.trim()).map(itemForWire);
+    if (editType === "ticket" && editItems.some((i) => !i.name.trim() && (i.qty !== 1 || (i.discountedPrice !== 0 && i.discountedPrice !== "")))) {
       toast({ title: "Each item must have a name", variant: "destructive" }); return;
     }
     setEditSaving(true);

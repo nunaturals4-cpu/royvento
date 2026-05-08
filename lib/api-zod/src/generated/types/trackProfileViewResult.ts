@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Ok {
-  ok?: boolean;
+export interface TrackProfileViewResult {
+  ok: boolean;
+  skipped?: string | null;
 }

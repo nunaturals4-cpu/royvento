@@ -153,7 +153,38 @@ export interface HealthStatus {
 }
 
 export interface Ok {
+  ok?: boolean;
+}
+
+export interface TrackProfileViewResult {
   ok: boolean;
+  skipped?: string | null;
+}
+
+export interface PartnerLeadView {
+  /** Latest profileViewId for this aggregated row (used by send-discount). */
+  id: number;
+  viewerUserId: number | null;
+  viewerName: string;
+  viewerEmail: string;
+  phone: string;
+  visitCount: number;
+  lastViewedAt: string;
+  /** Alias of lastViewedAt for back-compat. */
+  viewedAt: string;
+  hasBooked: boolean;
+  existingCode: string | null;
+}
+
+export interface PartnerLeadsResponse {
+  premium: boolean;
+  crmAccessGranted: boolean;
+  crmTrialActive: boolean;
+  crmTrialDaysRemaining: number;
+  totalViews?: number;
+  bookedCount?: number;
+  message?: string;
+  views: PartnerLeadView[];
 }
 
 export type Role = (typeof Role)[keyof typeof Role];

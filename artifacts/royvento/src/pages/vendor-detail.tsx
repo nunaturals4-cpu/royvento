@@ -94,7 +94,10 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   // double-mounts or quick remounts.
   useEffect(() => {
     if (!id || !vendor) return;
-    if (me?.user && (vendor as any).userId === me.user.id) return;
+    // `vendor` is the generated Vendor schema (already includes `userId`).
+    // Self-skip is also enforced server-side as defense in depth against
+    // auth-load races where `me` resolves after the page mounts.
+    if (me?.user && vendor.userId === me.user.id) return;
     const storageKey = `royvento:viewed:${id}`;
     try {
       if (sessionStorage.getItem(storageKey)) return;

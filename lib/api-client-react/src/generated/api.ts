@@ -85,6 +85,7 @@ import type {
   PaginatedReviews,
   PartnerAnalyticsResult,
   PartnerCommissionRates,
+  PartnerLeadsResponse,
   PatchAdminEventBody,
   PreviewGooglePubBody,
   PreviewGooglePubResponse,
@@ -104,6 +105,7 @@ import type {
   SetPartnerCrowdLevelBody,
   SetVendorCommissionBody,
   SettlementRequest,
+  TrackProfileViewResult,
   UpdateBookingStatusBody,
   UpdateEventBody,
   UpdateMeBody,
@@ -4335,6 +4337,168 @@ export const useDeleteAvailability = <
 > => {
   return useMutation(getDeleteAvailabilityMutationOptions(options));
 };
+
+/**
+ * @summary Record a profile view for a partner (anonymous or authenticated). Self-views by the owner are dropped server-side.
+ */
+export const getTrackPartnerProfileViewUrl = (vendorId: number) => {
+  return `/api/partners/${vendorId}/view`;
+};
+
+export const trackPartnerProfileView = async (
+  vendorId: number,
+  options?: RequestInit,
+): Promise<TrackProfileViewResult> => {
+  return customFetch<TrackProfileViewResult>(
+    getTrackPartnerProfileViewUrl(vendorId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getTrackPartnerProfileViewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof trackPartnerProfileView>>,
+    TError,
+    { vendorId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof trackPartnerProfileView>>,
+  TError,
+  { vendorId: number },
+  TContext
+> => {
+  const mutationKey = ["trackPartnerProfileView"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof trackPartnerProfileView>>,
+    { vendorId: number }
+  > = (props) => {
+    const { vendorId } = props ?? {};
+
+    return trackPartnerProfileView(vendorId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TrackPartnerProfileViewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof trackPartnerProfileView>>
+>;
+
+export type TrackPartnerProfileViewMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Record a profile view for a partner (anonymous or authenticated). Self-views by the owner are dropped server-side.
+ */
+export const useTrackPartnerProfileView = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof trackPartnerProfileView>>,
+    TError,
+    { vendorId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof trackPartnerProfileView>>,
+  TError,
+  { vendorId: number },
+  TContext
+> => {
+  return useMutation(getTrackPartnerProfileViewMutationOptions(options));
+};
+
+/**
+ * @summary Get the authenticated partner's CRM leads (aggregated profile views, scoped to this vendor only)
+ */
+export const getGetPartnerLeadsUrl = () => {
+  return `/api/partner/leads/me`;
+};
+
+export const getPartnerLeads = async (
+  options?: RequestInit,
+): Promise<PartnerLeadsResponse> => {
+  return customFetch<PartnerLeadsResponse>(getGetPartnerLeadsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPartnerLeadsQueryKey = () => {
+  return [`/api/partner/leads/me`] as const;
+};
+
+export const getGetPartnerLeadsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerLeads>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerLeads>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPartnerLeadsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartnerLeads>>> = ({
+    signal,
+  }) => getPartnerLeads({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerLeads>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerLeadsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerLeads>>
+>;
+export type GetPartnerLeadsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the authenticated partner's CRM leads (aggregated profile views, scoped to this vendor only)
+ */
+
+export function useGetPartnerLeads<
+  TData = Awaited<ReturnType<typeof getPartnerLeads>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerLeads>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerLeadsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get commission rates configured for the authenticated partner vendor

@@ -100,7 +100,7 @@ export const LoginResponse = zod.object({
  * @summary Log out
  */
 export const LogoutResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**
@@ -216,7 +216,7 @@ export const DeleteUserParams = zod
   .strict();
 
 export const DeleteUserResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**
@@ -932,7 +932,7 @@ export const DeleteDrinkPlanParams = zod
   .strict();
 
 export const DeleteDrinkPlanResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**
@@ -1856,7 +1856,7 @@ export const DeleteEventParams = zod
   .strict();
 
 export const DeleteEventResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**
@@ -2553,7 +2553,7 @@ export const DeleteReviewParams = zod
   .strict();
 
 export const DeleteReviewResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**
@@ -2696,7 +2696,54 @@ export const DeleteAvailabilityParams = zod
   .strict();
 
 export const DeleteAvailabilityResponse = zod.object({
+  ok: zod.boolean().optional(),
+});
+
+/**
+ * @summary Record a profile view for a partner (anonymous or authenticated). Self-views by the owner are dropped server-side.
+ */
+export const TrackPartnerProfileViewParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
+
+export const TrackPartnerProfileViewResponse = zod.object({
   ok: zod.boolean(),
+  skipped: zod.string().nullish(),
+});
+
+/**
+ * @summary Get the authenticated partner's CRM leads (aggregated profile views, scoped to this vendor only)
+ */
+export const GetPartnerLeadsResponse = zod.object({
+  premium: zod.boolean(),
+  crmAccessGranted: zod.boolean(),
+  crmTrialActive: zod.boolean(),
+  crmTrialDaysRemaining: zod.number(),
+  totalViews: zod.number().optional(),
+  bookedCount: zod.number().optional(),
+  message: zod.string().optional(),
+  views: zod.array(
+    zod.object({
+      id: zod
+        .number()
+        .describe(
+          "Latest profileViewId for this aggregated row (used by send-discount).",
+        ),
+      viewerUserId: zod.number().nullable(),
+      viewerName: zod.string(),
+      viewerEmail: zod.string(),
+      phone: zod.string(),
+      visitCount: zod.number(),
+      lastViewedAt: zod.coerce.date(),
+      viewedAt: zod.coerce
+        .date()
+        .describe("Alias of lastViewedAt for back-compat."),
+      hasBooked: zod.boolean(),
+      existingCode: zod.string().nullable(),
+    }),
+  ),
 });
 
 /**
@@ -3574,7 +3621,7 @@ export const PatchAdminEventBody = zod
   .strict();
 
 export const PatchAdminEventResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**
@@ -3587,7 +3634,7 @@ export const DeleteAdminEventParams = zod
   .strict();
 
 export const DeleteAdminEventResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**
@@ -4522,7 +4569,7 @@ export const RemoveFromWishlistParams = zod
   .strict();
 
 export const RemoveFromWishlistResponse = zod.object({
-  ok: zod.boolean(),
+  ok: zod.boolean().optional(),
 });
 
 /**

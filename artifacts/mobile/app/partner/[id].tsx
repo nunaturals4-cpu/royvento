@@ -264,7 +264,9 @@ export default function PartnerDetailScreen() {
   const viewedRef = React.useRef<Set<number>>(new Set());
   useEffect(() => {
     if (!vendorId || !vendor) return;
-    if (user && (vendor as any).userId === user.id) return;
+    // `vendor` is the generated Vendor schema and includes `userId`.
+    // Server also drops self-views as defense in depth.
+    if (user && vendor.userId === user.id) return;
     if (viewedRef.current.has(vendorId)) return;
     viewedRef.current.add(vendorId);
     customFetch(`/api/partners/${vendorId}/view`, { method: "POST", body: JSON.stringify({}) }).catch(() => {});
