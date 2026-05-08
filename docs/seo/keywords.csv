@@ -1,0 +1,182 @@
+keyword,intent,page_type,priority_tier,est_difficulty,notes
+royvento,navigational,homepage,quick-win,low,Brand term; must rank #1
+royvento app,navigational,homepage,quick-win,low,Brand + app modifier
+royvento book pub,navigational,homepage,quick-win,low,Brand + action
+book a pub online india,transactional,homepage,medium,medium,Core value prop
+book pub table online,transactional,homepage,medium,medium,Map to homepage + city CTA
+pub booking app india,transactional,homepage,medium,medium,Compete with Magicpin/EazyDiner
+event booking platform india,transactional,homepage,medium,high,Competitor: Insider/BMS
+nightlife booking app,transactional,homepage,medium,medium,Strong intent
+party venue booking online,transactional,homepage,medium,medium,Sub-intent: parties
+best pubs in bangalore,transactional,city,quick-win,medium,High volume; tier-1
+best pubs in mumbai,transactional,city,quick-win,medium,High volume; tier-1
+best pubs in delhi,transactional,city,quick-win,medium,High volume; tier-1
+best pubs in hyderabad,transactional,city,quick-win,medium,High volume; tier-1
+best pubs in pune,transactional,city,quick-win,medium,High volume; tier-1
+best pubs in chennai,transactional,city,quick-win,medium,High volume; tier-1
+best pubs in kolkata,transactional,city,quick-win,medium,High volume; tier-1
+best pubs in goa,transactional,city,quick-win,medium,Tourist demand; high volume
+best pubs in gurgaon,transactional,city,quick-win,medium,Cyber Hub demand
+best pubs in noida,transactional,city,quick-win,medium,Sec-18/Sec-104 demand
+best pubs in chandigarh,transactional,city,medium,low,Tier-2 quick win
+best pubs in jaipur,transactional,city,medium,low,Tier-2 quick win
+best pubs in lucknow,transactional,city,medium,low,Tier-2 quick win
+best pubs in ahmedabad,transactional,city,medium,low,Tier-2; gujarat liquor caveat
+best pubs in indore,transactional,city,medium,low,Tier-2 quick win
+best pubs in kochi,transactional,city,medium,low,Tier-2 quick win
+best pubs in kolkata park street,transactional,locality,quick-win,low,Famous strip
+pubs near me,transactional,city,medium,high,GBP-driven; low SERP without GBP
+pubs open now near me,transactional,city,medium,medium,Time-sensitive
+pubs in indiranagar bangalore,transactional,locality,quick-win,low,High volume locality
+pubs in koramangala bangalore,transactional,locality,quick-win,low,High volume locality
+pubs in mg road bangalore,transactional,locality,quick-win,low,Famous strip
+pubs in brigade road bangalore,transactional,locality,quick-win,low,Famous strip
+pubs in koregaon park pune,transactional,locality,quick-win,low,Premier nightlife strip
+pubs in viman nagar pune,transactional,locality,medium,low,Locality
+pubs in baner pune,transactional,locality,medium,low,Locality
+pubs in bandra mumbai,transactional,locality,quick-win,low,High volume locality
+pubs in andheri mumbai,transactional,locality,quick-win,low,High volume locality
+pubs in lower parel mumbai,transactional,locality,quick-win,low,High-end strip
+pubs in juhu mumbai,transactional,locality,medium,low,Coastal nightlife
+pubs in connaught place delhi,transactional,locality,quick-win,low,CP nightlife
+pubs in hauz khas village delhi,transactional,locality,quick-win,low,Famous strip
+pubs in cyber hub gurgaon,transactional,locality,quick-win,low,Famous strip
+pubs in sector 29 gurgaon,transactional,locality,quick-win,low,Famous strip
+pubs in jubilee hills hyderabad,transactional,locality,quick-win,low,High demand
+pubs in gachibowli hyderabad,transactional,locality,medium,low,Tech corridor
+pubs in baga goa,transactional,locality,medium,low,Tourist heavy
+pubs in anjuna goa,transactional,locality,medium,low,Tourist heavy
+rooftop pubs in bangalore,transactional,category,quick-win,medium,Strong category
+rooftop bars in mumbai,transactional,category,quick-win,medium,Strong category
+rooftop restaurants delhi,transactional,category,medium,medium,Hybrid intent
+sports bar bangalore,transactional,category,medium,low,IPL/F1 hook
+sports bar mumbai,transactional,category,medium,low,IPL hook
+couple friendly pubs bangalore,transactional,category,quick-win,low,High intent
+couple friendly cafes pune,transactional,category,medium,low,Date intent
+live music pubs bangalore,transactional,category,quick-win,low,Music modifier
+live music venues delhi,transactional,category,medium,medium,Compete with BMS
+karaoke bars in bangalore,transactional,category,medium,low,Niche modifier
+hookah lounge in bangalore,transactional,category,medium,low,Legality varies; check city
+hookah lounge in pune,transactional,category,medium,low,Niche
+microbreweries in bangalore,transactional,category,quick-win,medium,Famous category
+microbreweries in pune,transactional,category,medium,low,Tier-2 quick win
+microbreweries in gurgaon,transactional,category,medium,low,Cyber Hub
+ladies night bangalore,transactional,category,quick-win,low,Day-of-week modifier
+ladies night mumbai,transactional,category,quick-win,low,Day-of-week modifier
+ladies night pune,transactional,category,quick-win,low,Day-of-week modifier
+saturday dj night bangalore,transactional,category,medium,low,Day modifier
+friday party in mumbai,transactional,category,medium,low,Day modifier
+sunday brunch pubs bangalore,transactional,category,medium,low,Sunday brunch hook
+new year party bangalore 2026,transactional,seasonal,quick-win,medium,NYE; refresh annually
+new year party mumbai 2026,transactional,seasonal,quick-win,medium,NYE; refresh annually
+new year party delhi 2026,transactional,seasonal,quick-win,medium,NYE; refresh annually
+new year party goa 2026,transactional,seasonal,quick-win,high,NYE; tourist heavy
+new year party pune 2026,transactional,seasonal,quick-win,medium,NYE; refresh annually
+christmas party venues bangalore,transactional,seasonal,medium,low,Dec hook
+holi party bangalore,transactional,seasonal,medium,low,Mar hook
+holi party pune,transactional,seasonal,medium,low,Mar hook
+diwali party venues mumbai,transactional,seasonal,medium,low,Oct/Nov hook
+valentines day pubs bangalore,transactional,seasonal,medium,low,Feb hook
+valentines day couple dinner bangalore,transactional,seasonal,medium,low,Date funnel
+halloween party bangalore,transactional,seasonal,medium,low,Oct hook
+ipl screening pubs bangalore,transactional,seasonal,quick-win,low,Mar-May; sports bar tie-in
+ipl screening pubs mumbai,transactional,seasonal,quick-win,low,Mar-May
+fifa world cup screening bangalore,transactional,seasonal,medium,low,Periodic
+oktoberfest bangalore,transactional,seasonal,medium,low,Beer category
+monsoon offers pubs bangalore,transactional,seasonal,medium,low,Jun-Sep monsoon hook
+birthday party venues in bangalore,transactional,programmatic,quick-win,medium,High-converting
+birthday party venues in mumbai,transactional,programmatic,quick-win,medium,High-converting
+birthday party venues in pune,transactional,programmatic,medium,medium,Quick-win tier-2
+birthday party places near me,transactional,programmatic,medium,high,GBP-driven
+surprise birthday venues bangalore,transactional,programmatic,quick-win,low,Long-tail
+corporate event venues bangalore,transactional,programmatic,medium,medium,B2B intent
+corporate party venues mumbai,transactional,programmatic,medium,medium,B2B intent
+office offsite venues bangalore,transactional,programmatic,medium,low,B2B niche
+bachelor party venues bangalore,transactional,programmatic,quick-win,low,Long-tail
+bachelorette party places mumbai,transactional,programmatic,quick-win,low,Long-tail
+anniversary dinner pubs bangalore,transactional,programmatic,medium,low,Couple funnel
+pub offers today in bangalore,transactional,offer,quick-win,low,Time-sensitive
+pub offers today in mumbai,transactional,offer,quick-win,low,Time-sensitive
+unlimited drinks pubs bangalore,transactional,offer,quick-win,medium,Drink-plan tie-in
+buy 1 get 1 pubs delhi,transactional,offer,medium,low,Promo modifier
+happy hours pubs bangalore,transactional,offer,quick-win,low,Strong intent
+happy hours pubs mumbai,transactional,offer,quick-win,low,Strong intent
+free entry pubs bangalore,transactional,offer,quick-win,low,Free entry hook
+free entry for couples bangalore,transactional,offer,medium,low,Free entry rule modifier
+free entry for ladies bangalore,transactional,offer,quick-win,low,Free entry + ladies night
+discounted cover charge bangalore,transactional,offer,medium,low,Promo
+how to plan a birthday party at a pub,informational,blog,quick-win,low,Top-of-funnel guide
+how to book a pub online,informational,blog,quick-win,low,Top-of-funnel + brand bridge
+what to wear to a pub night out,informational,blog,medium,low,Lifestyle
+best time to book a pub for new year,informational,blog,medium,low,Seasonal evergreen
+how to plan a corporate offsite in bangalore,informational,blog,medium,low,B2B funnel
+guide to nightlife in koregaon park pune,informational,blog,medium,low,Locality guide
+nightlife guide bangalore,informational,blog,medium,medium,Pillar content
+nightlife guide mumbai,informational,blog,medium,medium,Pillar content
+nightlife guide goa,informational,blog,medium,medium,Pillar content
+nightlife guide delhi ncr,informational,blog,medium,medium,Pillar content
+what is a microbrewery,informational,blog,medium,low,Definition snippet
+craft beer guide india,informational,blog,medium,medium,Pillar content
+how does pub table booking work,informational,blog,quick-win,low,Brand-bridge guide
+royvento vs district by zomato,navigational,blog,medium,low,Comparison capture
+royvento vs paytm insider,navigational,blog,medium,low,Comparison capture
+become a partner pub on royvento,transactional,partner,quick-win,low,Vendor acquisition funnel
+list your pub online india,transactional,partner,medium,medium,Vendor acquisition
+how to list pub on royvento,informational,partner,quick-win,low,Vendor onboarding
+pub partner login,navigational,partner,quick-win,low,Brand + role
+toit indiranagar booking,transactional,pub,quick-win,low,Pub-specific brand long-tail; vendor-detail page
+toit bangalore reviews,navigational,pub,quick-win,low,Pub-specific brand long-tail; vendor-detail page
+social offline koramangala booking,transactional,pub,quick-win,low,Pub-specific brand long-tail
+hard rock cafe bangalore booking,transactional,pub,quick-win,low,Branded pub query
+hard rock cafe mumbai reservation,transactional,pub,quick-win,low,Branded pub query
+aer worli mumbai booking,transactional,pub,quick-win,low,Rooftop branded pub query
+skye lounge bangalore reservation,transactional,pub,quick-win,low,Rooftop branded pub query
+{pub name} {city} table booking,transactional,pub,quick-win,low,Template; populate per vendor; vendor-detail
+{pub name} cover charge,informational,pub,quick-win,low,Template; common branded info query
+{pub name} menu price,informational,pub,quick-win,low,Template; per-vendor info intent
+{pub name} ladies night,transactional,pub,quick-win,low,Template; per-vendor offer intent
+{pub name} happy hours,transactional,pub,quick-win,low,Template; per-vendor offer intent
+{pub name} dress code,informational,pub,quick-win,low,Template; common branded info query
+{pub name} reviews,informational,pub,quick-win,low,Template; vendor-detail with Review schema
+{pub name} timings,informational,pub,quick-win,low,Template; vendor-detail openingHours
+{pub name} {locality} address,informational,pub,quick-win,low,Template; NAP consistency
+how to reach {pub name} {city},informational,pub,quick-win,low,Template; map block on vendor-detail
+events this weekend in bangalore,transactional,event,quick-win,medium,Events list / city events hub
+events this weekend in mumbai,transactional,event,quick-win,medium,Events list / city events hub
+events this weekend in delhi,transactional,event,quick-win,medium,Events list / city events hub
+events this weekend in pune,transactional,event,quick-win,low,Events list / city events hub
+events tonight in bangalore,transactional,event,quick-win,low,Time-sensitive events list
+events tonight in mumbai,transactional,event,quick-win,low,Time-sensitive events list
+live music events bangalore today,transactional,event,quick-win,medium,Event detail + category-event hub
+live music events mumbai this weekend,transactional,event,medium,medium,Event detail + category-event hub
+dj night events bangalore tickets,transactional,event,quick-win,medium,Event detail (Event+Offer schema)
+dj events mumbai booking,transactional,event,quick-win,medium,Event detail (Event+Offer schema)
+edm events bangalore this weekend,transactional,event,medium,medium,Event detail; genre modifier
+techno party bangalore tickets,transactional,event,medium,low,Event detail; genre modifier
+bollywood night events delhi,transactional,event,medium,low,Event detail; genre modifier
+sufi night events delhi,transactional,event,medium,low,Event detail; genre modifier
+ladies night events bangalore tonight,transactional,event,quick-win,low,Event detail with day modifier
+saturday night events pune,transactional,event,medium,low,Event hub day-modified
+sunday brunch events bangalore,transactional,event,medium,low,Event hub day-modified
+karaoke night events bangalore,transactional,event,medium,low,Event detail; category modifier
+open mic events bangalore,transactional,event,medium,low,Event detail; category modifier
+standup comedy events bangalore tickets,transactional,event,medium,medium,Event detail; competes with BMS/Insider
+ipl screening events bangalore,transactional,event,quick-win,low,Event detail; seasonal category
+fifa watch party events mumbai,transactional,event,medium,low,Event detail; seasonal category
+new year eve events bangalore tickets,transactional,event,quick-win,medium,NYE event detail
+nye events goa booking,transactional,event,quick-win,high,NYE tourist demand; event detail
+christmas eve events mumbai,transactional,event,medium,low,Seasonal event detail
+holi party events delhi tickets,transactional,event,medium,low,Seasonal event detail
+diwali party events bangalore,transactional,event,medium,low,Seasonal event detail
+upcoming events near me,transactional,event,medium,high,GBP+events sitemap dependent
+weekend party events near me,transactional,event,medium,medium,Events list city default
+events booking near me,transactional,event,medium,medium,Events list with geolocation default
+party events bangalore booking,transactional,event,quick-win,medium,Events list city default
+nightlife events mumbai this weekend,transactional,event,medium,medium,Events list city default
+how to book event tickets online india,informational,event,medium,medium,Brand-bridge guide; events index
+what to expect at a dj night,informational,event,medium,low,Pre-event guide; event detail FAQ
+what to wear to a club night,informational,event,medium,low,Pre-event guide; supporting blog
+event refund policy royvento,navigational,event,quick-win,low,Trust signal; event detail link
+buy 1 get 1 cocktails bangalore,transactional,offer,quick-win,low,Offer page; bogo modifier
+unlimited drinks offer mumbai,transactional,offer,quick-win,low,Offer page; drink-plan tie-in
+free entry events bangalore tonight,transactional,offer,quick-win,low,Free-entry + tonight modifier; offer + event hubs
