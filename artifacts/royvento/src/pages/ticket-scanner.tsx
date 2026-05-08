@@ -757,7 +757,7 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
           </div>
         )}
         {(from || to || vendorFilter !== "all" || statuses.size > 0 || q) && (
-          <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); setVendorFilter("all"); setStatuses(new Set()); setQ(""); }}>
+          <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); setVendorFilter(vendorOptions.length === 1 ? String(vendorOptions[0]!.id) : "all"); setStatuses(new Set()); setQ(""); }}>
             Clear
           </Button>
         )}
