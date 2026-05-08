@@ -351,7 +351,7 @@ router.patch("/partner/crowd-level", requireAuth(["vendor"]), async (req, res) =
   const user = (req as import("../lib/auth").AuthedRequest).user;
   const parsed = SetPartnerCrowdLevelBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "crowdLevel must be low, moderate, or party" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const crowdLevel = parsed.data.crowdLevel;

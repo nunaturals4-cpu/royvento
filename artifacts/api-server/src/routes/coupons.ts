@@ -108,7 +108,7 @@ const AdminGrantByEmailBody = z.object({
 
 router.post("/admin/coupons", requireAuth(["admin"]), async (req, res) => {
   const parsed = AdminGrantByEmailBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Provide a valid email and discount" });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const userRows = await db
     .select({ id: usersTable.id })
     .from(usersTable)

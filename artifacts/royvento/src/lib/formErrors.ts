@@ -65,12 +65,16 @@ export function useFormErrors() {
     });
   }, []);
 
+  const setFieldError = useCallback((path: string, message: string) => {
+    setFieldErrors((prev) => ({ ...prev, [path]: message }));
+  }, []);
+
   const fieldError = useCallback(
     (path: string): string | undefined => fieldErrors[path],
     [fieldErrors],
   );
 
-  return { topError, fieldErrors, fieldError, setFromError, reset, clearField };
+  return { topError, fieldErrors, fieldError, setFromError, setFieldError, reset, clearField };
 }
 
 /** Tailwind className that highlights a field as invalid when an error is present. */

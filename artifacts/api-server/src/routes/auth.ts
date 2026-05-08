@@ -547,7 +547,7 @@ const GoogleMobileBody = z.object({ idToken: z.string() });
 router.post("/auth/google/mobile", async (req, res) => {
   const parsed = GoogleMobileBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "idToken required" });
+    respondInvalid(res, parsed.error);
     return;
   }
 
@@ -662,7 +662,7 @@ router.put("/auth/push-token", async (req, res) => {
   }
   const parsed = PushTokenBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "pushToken is required" });
+    respondInvalid(res, parsed.error);
     return;
   }
   await db

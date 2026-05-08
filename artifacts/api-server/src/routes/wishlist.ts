@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, wishlistsTable, eventsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
+import { respondInvalid } from "../lib/validationError";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -23,7 +24,7 @@ router.post("/wishlist", requireAuth(["user", "vendor", "admin"]), async (req, r
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = WishlistBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Invalid body" });
+  if (!parsed.success) return respondInvalid(res, parsed.error);
   const existing = await db
     .select()
     .from(wishlistsTable)

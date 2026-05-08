@@ -8,6 +8,7 @@ import {
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { respondInvalid } from "../lib/validationError";
 import { compressImage } from "../lib/imageCompressor";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
 import { verifyUploadToken, buildServerUploadUrl } from "../lib/uploadToken";
@@ -46,7 +47,7 @@ const MAX_VIDEO_UPLOAD_BYTES = 4 * 1024 * 1024;
 router.post("/storage/uploads/request-url", requireAuth(), uploadUrlLimiter, async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Missing or invalid required fields" });
+    respondInvalid(res, parsed.error);
     return;
   }
 

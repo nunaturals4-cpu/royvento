@@ -5,6 +5,7 @@ import { z } from "zod";
 import { UpsertSeoPageBody } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
 import { getVendorRatings } from "../lib/aggregates";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -100,7 +101,7 @@ const GetSeoPageQuery = z.object({
 router.get("/seo-pages", async (req, res) => {
   const parsed = GetSeoPageQuery.safeParse(req.query);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid query" });
+    respondInvalid(res, parsed.error);
     return;
   }
   const { template, citySlug, secondSlug } = parsed.data;
@@ -134,7 +135,7 @@ router.get("/seo-pages", async (req, res) => {
 router.put("/seo-pages", requireAuth(["admin"]), async (req, res) => {
   const parsed = UpsertSeoPageBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+    respondInvalid(res, parsed.error);
     return;
   }
   const body = parsed.data;

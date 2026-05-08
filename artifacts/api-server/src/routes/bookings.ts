@@ -692,7 +692,7 @@ router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const paramsParsed = RetryBookingPaymentParams.safeParse(req.params);
-  if (!paramsParsed.success) { res.status(400).json({ error: "Invalid booking id" }); return; }
+  if (!paramsParsed.success) { respondInvalid(res, paramsParsed.error); return; }
   const bookingId = paramsParsed.data.id;
 
   const [booking] = await db
@@ -716,7 +716,7 @@ router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
 
   const parsedBody = RetryBookingPaymentBody.safeParse(req.body ?? {});
   if (!parsedBody.success) {
-    res.status(400).json({ error: "Invalid request body" });
+    respondInvalid(res, parsedBody.error);
     return;
   }
   const retryCallbackScheme = parsedBody.data.callbackScheme;
@@ -1543,7 +1543,7 @@ router.patch(
     }
     const parsed = CustomerCancelBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "A cancellation reason is required." });
+      respondInvalid(res, parsed.error);
       return;
     }
     const user = await loadUserFromRequest(req);
@@ -1819,7 +1819,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   if (actualEntryRaw && typeof actualEntryRaw === "object") {
     const parsed = ScanActualEntry.safeParse(actualEntryRaw);
     if (!parsed.success) {
-      res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Invalid actualEntry payload." });
+      respondInvalid(res, parsed.error, "Invalid actualEntry payload.");
       return;
     }
     actualEntry = parsed.data;
@@ -2488,7 +2488,7 @@ router.post("/partner/checkout-ticket", requireAuth(), async (req, res) => {
   // contract enforced server-side and rejects unknown fields.
   const parsedBody = PartnerCheckoutTicketBody.safeParse(req.body ?? {});
   if (!parsedBody.success) {
-    res.status(400).json({ code: "INVALID_CODE", message: "Invalid request body.", issues: parsedBody.error.issues });
+    respondInvalid(res, parsedBody.error);
     return;
   }
   const body = parsedBody.data;
@@ -2921,7 +2921,7 @@ router.get("/partner/scanner/bookings", requireAuth(), async (req, res) => {
   // Validate query params with the generated zod schema.
   const parsedQuery = GetPartnerScannerBookingsQueryParams.safeParse(req.query);
   if (!parsedQuery.success) {
-    res.status(400).json({ error: "Invalid query", issues: parsedQuery.error.issues });
+    respondInvalid(res, parsedQuery.error, "Invalid query parameters");
     return;
   }
   const qp = parsedQuery.data;
@@ -3008,7 +3008,7 @@ router.get("/partner/scanner/occupancy", requireAuth(), async (req, res) => {
 router.get("/admin/live-occupancy", requireAuth(["admin"]), async (req, res) => {
   const parsedQuery = GetAdminLiveOccupancyQueryParams.safeParse(req.query);
   if (!parsedQuery.success) {
-    res.status(400).json({ error: "Invalid query", issues: parsedQuery.error.issues });
+    respondInvalid(res, parsedQuery.error, "Invalid query parameters");
     return;
   }
   const cityRaw = parsedQuery.data.city ? parsedQuery.data.city.trim().toLowerCase() : "";
@@ -3027,12 +3027,16 @@ router.get("/admin/live-occupancy", requireAuth(["admin"]), async (req, res) => 
 router.get("/admin/live-occupancy/:vendorId/bookings", requireAuth(["admin"]), async (req, res) => {
   const parsedParams = GetAdminLiveOccupancyBookingsParams.safeParse(req.params);
   if (!parsedParams.success || !Number.isFinite(parsedParams.data.vendorId) || parsedParams.data.vendorId <= 0) {
-    res.status(400).json({ error: "Invalid vendorId" });
+    if (!parsedParams.success) {
+      respondInvalid(res, parsedParams.error);
+    } else {
+      res.status(400).json({ error: "Invalid vendorId", fieldErrors: { vendorId: "Invalid vendorId" } });
+    }
     return;
   }
   const parsedQuery = GetAdminLiveOccupancyBookingsQueryParams.safeParse(req.query);
   if (!parsedQuery.success) {
-    res.status(400).json({ error: "Invalid query", issues: parsedQuery.error.issues });
+    respondInvalid(res, parsedQuery.error, "Invalid query parameters");
     return;
   }
   const vendorId = parsedParams.data.vendorId;

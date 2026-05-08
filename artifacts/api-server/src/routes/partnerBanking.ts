@@ -415,7 +415,7 @@ router.post("/admin/settlement-requests/:id/approve", requireAuth(["admin"]), as
 router.post("/admin/settlement-requests/:id/reject", requireAuth(["admin"]), async (req, res) => {
   const paramsParsed = RejectSettlementRequestParams.safeParse(req.params);
   if (!paramsParsed.success) {
-    res.status(400).json({ error: "Invalid id" });
+    respondInvalid(res, paramsParsed.error);
     return;
   }
   const id = paramsParsed.data.id;

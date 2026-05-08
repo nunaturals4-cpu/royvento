@@ -399,7 +399,7 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
 router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   const paramsParsed = UpdateEventParams.safeParse(req.params);
   if (!paramsParsed.success) {
-    res.status(400).json({ error: "Invalid id" });
+    respondInvalid(res, paramsParsed.error);
     return;
   }
   const id = paramsParsed.data.eventId;

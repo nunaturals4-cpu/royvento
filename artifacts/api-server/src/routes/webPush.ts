@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { logger } from "../lib/logger";
 import { z } from "zod";
+import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
@@ -49,7 +50,7 @@ router.post("/push/subscribe", requireAuth(), async (req, res) => {
   const me = await loadUserFromRequest(req);
   if (!me) { res.status(401).json({ error: "Unauthorized" }); return; }
   const parsed = SubscribeBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "Invalid subscription" }); return; }
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
   const sub = parsed.data.subscription;
 
   // Upsert by endpoint so resubscribing on the same browser refreshes keys

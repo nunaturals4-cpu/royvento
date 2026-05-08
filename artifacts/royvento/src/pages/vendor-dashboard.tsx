@@ -660,9 +660,13 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   const onImageFile = async (f: File | null) => {
     if (!f) return;
     const v = validateImageFile(f);
-    if (v) { toast({ title: v, variant: "destructive" }); return; }
-    try { setImageUrl(await uploadImageToStorage(f)); }
-    catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
+    if (v) { formErrors.setFieldError("imageUrl", v); toast({ title: v, variant: "destructive" }); return; }
+    try { setImageUrl(await uploadImageToStorage(f)); formErrors.clearField("imageUrl"); }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : "Image upload failed";
+      formErrors.setFieldError("imageUrl", msg);
+      toast({ title: "Image upload failed", description: msg, variant: "destructive" });
+    }
   };
 
   const onGalleryImagesChange = async (files: FileList | null) => {
@@ -670,11 +674,15 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     const urls: string[] = [];
     for (const file of Array.from(files)) {
       const v = validateImageFile(file);
-      if (v) { toast({ title: v, variant: "destructive" }); continue; }
+      if (v) { formErrors.setFieldError("galleryImages", v); toast({ title: v, variant: "destructive" }); continue; }
       try { urls.push(await uploadImageToStorage(file)); }
-      catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
+      catch (e) {
+        const msg = e instanceof Error ? e.message : "Image upload failed";
+        formErrors.setFieldError("galleryImages", msg);
+        toast({ title: "Image upload failed", description: msg, variant: "destructive" });
+      }
     }
-    if (urls.length > 0) setGalleryImages((prev) => [...prev, ...urls]);
+    if (urls.length > 0) { setGalleryImages((prev) => [...prev, ...urls]); formErrors.clearField("galleryImages"); }
   };
 
   const onGalleryVideosChange = async (files: FileList | null) => {
@@ -1002,14 +1010,19 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           </Select>
         </div>
         {type !== "pub" && (
-          <div><Label>Minimum price per person (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+          <div>
+            <Label>Minimum price per person (₹)</Label>
+            <Input type="number" min={0} value={price} onChange={(e) => { setPrice(Number(e.target.value)); formErrors.clearField("price"); }} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("price"))} />
+            {formErrors.fieldError("price") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("price")}</p>}
+          </div>
         )}
         <div>
           <Label>Capacity</Label>
-          <Input type="number" min={1} required placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className={`bg-black/40 ${capacity === "" || Number(capacity) < 1 ? "border-red-500/60" : "border-white/10"}`} />
+          <Input type="number" min={1} required placeholder="e.g. 100" value={capacity} onChange={(e) => { setCapacity(e.target.value === "" ? "" : Number(e.target.value)); formErrors.clearField("capacity"); }} className={fieldClass(`bg-black/40 ${capacity === "" || Number(capacity) < 1 ? "border-red-500/60" : "border-white/10"}`, formErrors.fieldError("capacity"))} />
           {(capacity === "" || Number(capacity) < 1) && (
             <p className="mt-1 text-xs text-red-400">Capacity is required and must be at least 1.</p>
           )}
+          {formErrors.fieldError("capacity") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("capacity")}</p>}
         </div>
       </div>
 
@@ -1175,7 +1188,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         </div>
       )}
 
-      <div><Label>Description</Label><Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} className="bg-black/40 border-white/10" /></div>
+      <div>
+        <Label>Description</Label>
+        <Textarea rows={4} value={description} onChange={(e) => { setDescription(e.target.value); formErrors.clearField("description"); }} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("description"))} />
+        {formErrors.fieldError("description") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("description")}</p>}
+      </div>
 
       {/* Gallery media */}
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
@@ -1579,9 +1596,13 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
   const onImageFile = async (f: File | null) => {
     if (!f) return;
     const v = validateImageFile(f);
-    if (v) { toast({ title: v, variant: "destructive" }); return; }
-    try { setImageUrl(await uploadImageToStorage(f)); }
-    catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
+    if (v) { formErrors.setFieldError("imageUrl", v); toast({ title: v, variant: "destructive" }); return; }
+    try { setImageUrl(await uploadImageToStorage(f)); formErrors.clearField("imageUrl"); }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : "Image upload failed";
+      formErrors.setFieldError("imageUrl", msg);
+      toast({ title: "Image upload failed", description: msg, variant: "destructive" });
+    }
   };
 
   const onGalleryImagesChange = async (files: FileList | null) => {
@@ -1589,11 +1610,15 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
     const urls: string[] = [];
     for (const file of Array.from(files)) {
       const v = validateImageFile(file);
-      if (v) { toast({ title: v, variant: "destructive" }); continue; }
+      if (v) { formErrors.setFieldError("galleryImages", v); toast({ title: v, variant: "destructive" }); continue; }
       try { urls.push(await uploadImageToStorage(file)); }
-      catch (e) { toast({ title: "Image upload failed", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
+      catch (e) {
+        const msg = e instanceof Error ? e.message : "Image upload failed";
+        formErrors.setFieldError("galleryImages", msg);
+        toast({ title: "Image upload failed", description: msg, variant: "destructive" });
+      }
     }
-    if (urls.length > 0) setGalleryImages((prev) => [...prev, ...urls]);
+    if (urls.length > 0) { setGalleryImages((prev) => [...prev, ...urls]); formErrors.clearField("galleryImages"); }
   };
 
   const onGalleryVideosChange = async (files: FileList | null) => {
@@ -1775,13 +1800,18 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div><Label>Price (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+          <div>
+            <Label>Price (₹)</Label>
+            <Input type="number" min={0} value={price} onChange={(e) => { setPrice(Number(e.target.value)); formErrors.clearField("price"); }} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("price"))} />
+            {formErrors.fieldError("price") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("price")}</p>}
+          </div>
           <div>
             <Label>Capacity</Label>
-            <Input type="number" min={1} required placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className={`bg-black/40 ${capacity === "" || Number(capacity) < 1 ? "border-red-500/60" : "border-white/10"}`} />
+            <Input type="number" min={1} required placeholder="e.g. 100" value={capacity} onChange={(e) => { setCapacity(e.target.value === "" ? "" : Number(e.target.value)); formErrors.clearField("capacity"); }} className={fieldClass(`bg-black/40 ${capacity === "" || Number(capacity) < 1 ? "border-red-500/60" : "border-white/10"}`, formErrors.fieldError("capacity"))} />
             {(capacity === "" || Number(capacity) < 1) && (
               <p className="mt-1 text-xs text-red-400">Capacity is required and must be at least 1.</p>
             )}
+            {formErrors.fieldError("capacity") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("capacity")}</p>}
           </div>
         </div>
         {isPub && (

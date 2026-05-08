@@ -193,8 +193,7 @@ router.delete(
       return res.status(400).json({ error: "Partner profile required" });
 
     const parsed = DeleteMenuFileBody.safeParse(req.body);
-    if (!parsed.success)
-      return res.status(400).json({ error: "Missing or invalid url" });
+    if (!parsed.success) return respondInvalid(res, parsed.error);
 
     const { url } = parsed.data;
 
@@ -250,8 +249,7 @@ router.post(
       return res.status(400).json({ error: "Partner profile required" });
 
     const parsed = MenuUploadRequestBody.safeParse(req.body);
-    if (!parsed.success)
-      return res.status(400).json({ error: "Missing or invalid required fields" });
+    if (!parsed.success) return respondInvalid(res, parsed.error);
 
     const { name, size, contentType } = parsed.data;
 

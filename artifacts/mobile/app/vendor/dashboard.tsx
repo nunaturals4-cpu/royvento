@@ -1532,6 +1532,7 @@ export default function VendorDashboardScreen() {
     setShowCatPicker,
     uploadingImage,
     onPickImage,
+    formErrors,
   }: {
     form: EventFormState;
     setForm: React.Dispatch<React.SetStateAction<EventFormState>>;
@@ -1539,7 +1540,10 @@ export default function VendorDashboardScreen() {
     setShowCatPicker: (v: boolean) => void;
     uploadingImage: boolean;
     onPickImage: () => void;
+    formErrors?: Record<string, string>;
   }) {
+    const fe = formErrors ?? {};
+    const errBorder = (key: string) => fe[key] ? "#ef4444" : colors.border;
     return (
       <>
         {/* Image picker */}
@@ -1587,7 +1591,7 @@ export default function VendorDashboardScreen() {
           )}
         </TouchableOpacity>
 
-        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: errBorder("title") }]}>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Title *</Text>
           <TextInput
             style={[styles.fieldInput, { color: colors.foreground }]}
@@ -1596,6 +1600,7 @@ export default function VendorDashboardScreen() {
             placeholder="Event or venue name"
             placeholderTextColor={colors.mutedForeground}
           />
+          {fe.title ? <Text style={{ color: "#ef4444", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4 }}>{fe.title}</Text> : null}
         </View>
 
         <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1624,7 +1629,7 @@ export default function VendorDashboardScreen() {
           </View>
         ) : null}
 
-        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: errBorder("description") }]}>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Description *</Text>
           <TextInput
             style={[styles.fieldInput, styles.textArea, { color: colors.foreground }]}
@@ -1635,9 +1640,10 @@ export default function VendorDashboardScreen() {
             multiline
             numberOfLines={3}
           />
+          {fe.description ? <Text style={{ color: "#ef4444", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4 }}>{fe.description}</Text> : null}
         </View>
 
-        <View style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.field, { backgroundColor: colors.card, borderColor: errBorder("location") }]}>
           <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Location / Venue Address *</Text>
           <TextInput
             style={[styles.fieldInput, { color: colors.foreground }]}
@@ -1646,10 +1652,11 @@ export default function VendorDashboardScreen() {
             placeholder="e.g. Bandra, Mumbai"
             placeholderTextColor={colors.mutedForeground}
           />
+          {fe.location ? <Text style={{ color: "#ef4444", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4 }}>{fe.location}</Text> : null}
         </View>
 
         <View style={{ flexDirection: "row", gap: 12 }}>
-          <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: errBorder("price") }]}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Price (₹)</Text>
             <TextInput
               style={[styles.fieldInput, { color: colors.foreground }]}
@@ -1659,8 +1666,9 @@ export default function VendorDashboardScreen() {
               placeholderTextColor={colors.mutedForeground}
               keyboardType="numeric"
             />
+            {fe.price ? <Text style={{ color: "#ef4444", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4 }}>{fe.price}</Text> : null}
           </View>
-          <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.field, { flex: 1, backgroundColor: colors.card, borderColor: errBorder("capacity") }]}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Capacity</Text>
             <TextInput
               style={[styles.fieldInput, { color: colors.foreground }]}
@@ -1670,6 +1678,7 @@ export default function VendorDashboardScreen() {
               placeholderTextColor={colors.mutedForeground}
               keyboardType="numeric"
             />
+            {fe.capacity ? <Text style={{ color: "#ef4444", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4 }}>{fe.capacity}</Text> : null}
           </View>
         </View>
 
@@ -3176,6 +3185,7 @@ export default function VendorDashboardScreen() {
                 setShowCatPicker={setShowCreateCatPicker}
                 uploadingImage={imageUploading}
                 onPickImage={() => pickEventImage(setCreateForm)}
+                formErrors={createFormErrors}
               />
 
               {/* ── Venue Details ── */}
@@ -3536,6 +3546,7 @@ export default function VendorDashboardScreen() {
                 showCatPicker={showEditCatPicker}
                 setShowCatPicker={setShowEditCatPicker}
                 uploadingImage={editImageUploading}
+                formErrors={editFormErrors}
                 onPickImage={async () => {
                   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
                   if (status !== "granted") {
