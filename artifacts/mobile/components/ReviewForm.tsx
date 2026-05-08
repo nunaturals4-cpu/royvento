@@ -130,7 +130,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
         </Text>
       </View>
 
-      {!eligibility.eligible ? (
+      {!eligibility.eligible && eligibility.reason === "already_reviewed" ? (
         <View
           style={{
             flexDirection: "row",
@@ -156,9 +156,38 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
             {reasonMessage}
           </Text>
         </View>
-      ) : (
+      ) : (() => {
+        const formDisabled = !eligibility.eligible;
+        return (
         <>
-          <View style={{ gap: 6 }}>
+          {formDisabled ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                padding: 12,
+                borderRadius: 10,
+                backgroundColor: "#f59e0b15",
+                borderWidth: 1,
+                borderColor: "#f59e0b55",
+              }}
+            >
+              <Ionicons name="lock-closed-outline" size={16} color="#f59e0b" />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: "Inter_400Regular",
+                  color: "#f59e0b",
+                  flex: 1,
+                  lineHeight: 18,
+                }}
+              >
+                {reasonMessage}
+              </Text>
+            </View>
+          ) : null}
+          <View style={{ gap: 6, opacity: formDisabled ? 0.55 : 1 }}>
             <Text
               style={{
                 fontSize: 12,
@@ -175,6 +204,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
                 <TouchableOpacity
                   key={s}
                   onPress={() => setRating(s)}
+                  disabled={formDisabled}
                   activeOpacity={0.7}
                   hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                 >
@@ -188,7 +218,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
             </View>
           </View>
 
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 6, opacity: formDisabled ? 0.55 : 1 }}>
             <Text
               style={{
                 fontSize: 12,
@@ -215,6 +245,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
               }}
               value={comment}
               onChangeText={setComment}
+              editable={!formDisabled}
               placeholder="Share your experience..."
               placeholderTextColor={colors.mutedForeground}
               multiline
@@ -222,7 +253,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
             />
           </View>
 
-          <View style={{ gap: 8 }}>
+          <View style={{ gap: 8, opacity: formDisabled ? 0.55 : 1 }}>
             <Text
               style={{
                 fontSize: 12,
@@ -240,6 +271,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
                   <View key={i} style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border, position: "relative" }}>
                     <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} />
                     <TouchableOpacity
+                      disabled={formDisabled}
                       onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
                       style={{
                         position: "absolute",
@@ -261,7 +293,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
             ) : null}
             <TouchableOpacity
               onPress={pickImages}
-              disabled={uploading || images.length >= 5}
+              disabled={formDisabled || uploading || images.length >= 5}
               activeOpacity={0.7}
               style={{
                 flexDirection: "row",
@@ -274,7 +306,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
                 borderColor: colors.border,
                 backgroundColor: colors.muted,
                 alignSelf: "flex-start",
-                opacity: uploading || images.length >= 5 ? 0.5 : 1,
+                opacity: formDisabled || uploading || images.length >= 5 ? 0.5 : 1,
               }}
             >
               {uploading ? (
@@ -293,7 +325,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
 
           <TouchableOpacity
             onPress={handleSubmit}
-            disabled={createReview.isPending || uploading}
+            disabled={formDisabled || createReview.isPending || uploading}
             activeOpacity={0.8}
             style={{
               backgroundColor: colors.primary,
@@ -304,7 +336,7 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
               justifyContent: "center",
               flexDirection: "row",
               gap: 8,
-              opacity: createReview.isPending || uploading ? 0.6 : 1,
+              opacity: formDisabled || createReview.isPending || uploading ? 0.6 : 1,
             }}
           >
             {createReview.isPending ? (
@@ -325,7 +357,8 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
             )}
           </TouchableOpacity>
         </>
-      )}
+        );
+      })()}
     </View>
   );
 }

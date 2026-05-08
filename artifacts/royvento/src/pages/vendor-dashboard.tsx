@@ -829,6 +829,10 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
       toast({ title: "Invalid before time", description: "Please use HH:mm 24-hour format (e.g. 22:00)", variant: "destructive" });
       return;
     }
+    if (capacity === "" || Number(capacity) < 1) {
+      toast({ title: "Capacity required", description: "Capacity must be at least 1.", variant: "destructive" });
+      return;
+    }
     const pubMode = type === "pub"
       ? (enableTickets && enableEvents ? "both" : enableTickets ? "ticket" : "event")
       : "";
@@ -844,7 +848,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         const t = [w, m, c].filter((n) => n > 0);
         return t.length > 0 ? Math.min(...t) : basePrice;
       })(),
-      capacity: capacity === "" || Number(capacity) < 1 ? 1 : capacity, imageUrl,
+      capacity, imageUrl,
       type, city, state: stateF, country,
       pubMode,
       priceWomen: type === "pub" ? (priceWomen === "" ? 0 : priceWomen) : 0,
@@ -938,7 +942,13 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         {type !== "pub" && (
           <div><Label>Minimum price per person (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
         )}
-        <div><Label>Capacity</Label><Input type="number" min={1} placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+        <div>
+          <Label>Capacity</Label>
+          <Input type="number" min={1} required placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className={`bg-black/40 ${capacity === "" || Number(capacity) < 1 ? "border-red-500/60" : "border-white/10"}`} />
+          {(capacity === "" || Number(capacity) < 1) && (
+            <p className="mt-1 text-xs text-red-400">Capacity is required and must be at least 1.</p>
+          )}
+        </div>
       </div>
 
       {type === "pub" && (
@@ -1580,13 +1590,17 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
       toast({ title: "Invalid before time", description: "Please use HH:mm 24-hour format (e.g. 22:00)", variant: "destructive" });
       return;
     }
+    if (capacity === "" || Number(capacity) < 1) {
+      toast({ title: "Capacity required", description: "Capacity must be at least 1.", variant: "destructive" });
+      return;
+    }
     try {
       const tierArr = [priceWomen, priceMen, priceCouple].filter((n) => n > 0);
       const recalcPrice = isPub
         ? (tierArr.length > 0 ? Math.min(...tierArr) : price)
         : price;
       await apiPatch(`/api/events/${event.id}`, {
-        title, description, imageUrl, capacity: capacity === "" || Number(capacity) < 1 ? 1 : capacity,
+        title, description, imageUrl, capacity,
         price: recalcPrice, galleryImages, galleryVideos,
         ...(isPub ? {
           pubMode, priceWomen, priceMen, priceCouple, pubEventTypes,
@@ -1671,7 +1685,13 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
 
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Price (₹)</Label><Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-          <div><Label>Capacity</Label><Input type="number" min={1} placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+          <div>
+            <Label>Capacity</Label>
+            <Input type="number" min={1} required placeholder="e.g. 100" value={capacity} onChange={(e) => setCapacity(e.target.value === "" ? "" : Number(e.target.value))} className={`bg-black/40 ${capacity === "" || Number(capacity) < 1 ? "border-red-500/60" : "border-white/10"}`} />
+            {(capacity === "" || Number(capacity) < 1) && (
+              <p className="mt-1 text-xs text-red-400">Capacity is required and must be at least 1.</p>
+            )}
+          </div>
         </div>
         {isPub && (
           <>
