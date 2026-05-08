@@ -207,7 +207,7 @@ export function VendorDashboard() {
         </div>
       ) : (
         <Tabs defaultValue={initialTab} className="space-y-6">
-          <div className="overflow-x-auto scrollbar-hide pb-1">
+          <div className="overflow-x-auto scrollbar-thin-x pb-2">
           <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
             <TabsTrigger value="overview">Profile</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
@@ -309,8 +309,8 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (description.trim().length < 300) {
-      setDescError("Description must be at least 300 characters.");
+    if (description.trim().length > 300) {
+      setDescError("Description must be 300 characters or fewer.");
       return;
     }
     setDescError("");
@@ -354,9 +354,10 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           <Input value={businessName} onChange={(e) => setName(e.target.value)} className="bg-black/40 border-white/10" />
         </div>
         <div>
-          <Label>Description <span className="text-muted-foreground text-xs">(min 300 characters)</span></Label>
+          <Label>Description <span className="text-muted-foreground text-xs">(max 300 characters)</span></Label>
           <Textarea
             rows={6}
+            maxLength={300}
             value={description}
             onChange={(e) => { setDescription(e.target.value); if (descError) setDescError(""); }}
             className="bg-black/40 border-white/10"
@@ -367,7 +368,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             ) : (
               <span />
             )}
-            <p className={`text-xs ml-auto ${description.length >= 300 ? "text-green-400" : "text-muted-foreground"}`}>
+            <p className={`text-xs ml-auto ${description.length > 300 ? "text-destructive" : "text-muted-foreground"}`}>
               {description.length} / 300
             </p>
           </div>
@@ -545,7 +546,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   const [city, setCity] = useState(vendor.city ?? "");
   const [stateF, setStateF] = useState(vendor.state ?? "");
   const [country, setCountry] = useState(vendor.country ?? "India");
-  const [price, setPrice] = useState(0);
+  const [price, setPrice] = useState<number | "">("");
   const [capacity, setCapacity] = useState(50);
   const [imageUrl, setImageUrl] = useState("");
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
@@ -553,9 +554,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   // pub-specific
   const [enableTickets, setEnableTickets] = useState(true);
   const [enableEvents, setEnableEvents] = useState(false);
-  const [priceWomen, setPriceWomen] = useState(0);
-  const [priceMen, setPriceMen] = useState(0);
-  const [priceCouple, setPriceCouple] = useState(0);
+  const [priceWomen, setPriceWomen] = useState<number | "">("");
+  const [priceMen, setPriceMen] = useState<number | "">("");
+  const [priceCouple, setPriceCouple] = useState<number | "">("");
   const [pubEventTypes, setPubEventTypes] = useState<string[]>([]);
   const [varyByDay, setVaryByDay] = useState(false);
   const [dayPricingOverrides, setDayPricingOverrides] = useState<Record<string, { women: number | ""; men: number | ""; couple: number | "" }>>({});
@@ -823,13 +824,21 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     const body: any = {
       title: vendor.businessName, description, category,
       location: `${city}${stateF ? ", " + stateF : ""}`,
-      price: (() => { if (type !== "pub" || !enableTickets) return price; const t = [priceWomen, priceMen, priceCouple].filter((n) => n > 0); return t.length > 0 ? Math.min(...t) : (price || 0); })(),
+      price: (() => {
+        const basePrice = price === "" ? 0 : price;
+        if (type !== "pub" || !enableTickets) return basePrice;
+        const w = priceWomen === "" ? 0 : priceWomen;
+        const m = priceMen === "" ? 0 : priceMen;
+        const c = priceCouple === "" ? 0 : priceCouple;
+        const t = [w, m, c].filter((n) => n > 0);
+        return t.length > 0 ? Math.min(...t) : basePrice;
+      })(),
       capacity, imageUrl,
       type, city, state: stateF, country,
       pubMode,
-      priceWomen: type === "pub" ? priceWomen : 0,
-      priceMen: type === "pub" ? priceMen : 0,
-      priceCouple: type === "pub" ? priceCouple : 0,
+      priceWomen: type === "pub" ? (priceWomen === "" ? 0 : priceWomen) : 0,
+      priceMen: type === "pub" ? (priceMen === "" ? 0 : priceMen) : 0,
+      priceCouple: type === "pub" ? (priceCouple === "" ? 0 : priceCouple) : 0,
       pubEventTypes: type === "pub" ? pubEventTypes : [],
       dayPricing: (() => {
         if (type !== "pub" || !enableTickets || !varyByDay) return null;
@@ -840,7 +849,10 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           const m = ov.men === "" ? null : ov.men;
           const c = ov.couple === "" ? null : ov.couple;
           if (w === null && m === null && c === null) continue;
-          result[day] = { women: w ?? priceWomen, men: m ?? priceMen, couple: c ?? priceCouple };
+          const fbW = priceWomen === "" ? 0 : priceWomen;
+          const fbM = priceMen === "" ? 0 : priceMen;
+          const fbC = priceCouple === "" ? 0 : priceCouple;
+          result[day] = { women: w ?? fbW, men: m ?? fbM, couple: c ?? fbC };
         }
         return Object.keys(result).length > 0 ? result : null;
       })(),
@@ -859,7 +871,10 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
       { data: body },
       {
         onSuccess: () => { toast({ title: "Submitted for review! An admin will approve your listing shortly." }); onSaved(); },
-        onError: (e: unknown) => toast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+        onError: (e: any) => {
+          const serverMsg = e?.data?.error ?? (e instanceof Error ? e.message : undefined);
+          toast({ title: "Couldn't create listing", description: serverMsg, variant: "destructive" });
+        },
       },
     );
   };
@@ -931,9 +946,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           {enableTickets && (
             <div className="space-y-3">
               <div className="grid md:grid-cols-3 gap-3">
-                <div><Label>Women (₹)</Label><Input type="number" min={0} value={priceWomen} onChange={(e) => setPriceWomen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-                <div><Label>Men (₹)</Label><Input type="number" min={0} value={priceMen} onChange={(e) => setPriceMen(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
-                <div><Label>Couple (₹)</Label><Input type="number" min={0} value={priceCouple} onChange={(e) => setPriceCouple(Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+                <div><Label>Women (₹)</Label><Input type="number" min={0} placeholder="0" value={priceWomen} onChange={(e) => setPriceWomen(e.target.value === "" ? "" : Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+                <div><Label>Men (₹)</Label><Input type="number" min={0} placeholder="0" value={priceMen} onChange={(e) => setPriceMen(e.target.value === "" ? "" : Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
+                <div><Label>Couple (₹)</Label><Input type="number" min={0} placeholder="0" value={priceCouple} onChange={(e) => setPriceCouple(e.target.value === "" ? "" : Number(e.target.value))} className="bg-black/40 border-white/10" /></div>
               </div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <Checkbox
@@ -942,8 +957,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
                     const on = !!v;
                     setVaryByDay(on);
                     if (on) {
+                      const fbW = priceWomen === "" ? 0 : priceWomen;
+                      const fbM = priceMen === "" ? 0 : priceMen;
+                      const fbC = priceCouple === "" ? 0 : priceCouple;
                       const pre: Record<string, { women: number; men: number; couple: number }> = {};
-                      for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                      for (const d of ALL_DAYS) pre[d] = { women: fbW, men: fbM, couple: fbC };
                       setDayPricingOverrides(pre);
                     }
                   }}
@@ -957,8 +975,11 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
                     <button
                       type="button"
                       onClick={() => {
+                        const fbW = (priceWomen as number | "") === "" ? 0 : (priceWomen as number);
+                        const fbM = (priceMen as number | "") === "" ? 0 : (priceMen as number);
+                        const fbC = (priceCouple as number | "") === "" ? 0 : (priceCouple as number);
                         const pre: Record<string, { women: number; men: number; couple: number }> = {};
-                        for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                        for (const d of ALL_DAYS) pre[d] = { women: fbW, men: fbM, couple: fbC };
                         setDayPricingOverrides(pre);
                       }}
                       className="text-xs text-primary/70 hover:text-primary underline"
@@ -1519,7 +1540,8 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
       toast({ title: "Updated" });
       onSaved();
     } catch (err: any) {
-      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+      const serverMsg = err?.data?.error ?? err?.message;
+      toast({ title: "Couldn't update listing", description: serverMsg, variant: "destructive" });
     }
   };
 
@@ -1618,8 +1640,11 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
                     <button
                       type="button"
                       onClick={() => {
+                        const fbW = (priceWomen as number | "") === "" ? 0 : (priceWomen as number);
+                        const fbM = (priceMen as number | "") === "" ? 0 : (priceMen as number);
+                        const fbC = (priceCouple as number | "") === "" ? 0 : (priceCouple as number);
                         const pre: Record<string, { women: number; men: number; couple: number }> = {};
-                        for (const d of ALL_DAYS) pre[d] = { women: priceWomen, men: priceMen, couple: priceCouple };
+                        for (const d of ALL_DAYS) pre[d] = { women: fbW, men: fbM, couple: fbC };
                         setDayPricingOverrides(pre);
                       }}
                       className="text-xs text-primary/70 hover:text-primary underline"

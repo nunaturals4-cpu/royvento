@@ -76,7 +76,15 @@ export function Register() {
       });
       setPendingEmail(email);
     } catch (err: any) {
-      toast({ title: t("common.error"), description: err?.message, variant: "destructive" });
+      const status = err?.status;
+      const serverMsg = err?.data?.error ?? err?.message ?? "";
+      const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);
+      if (isDuplicate) {
+        setErrors((p) => ({ ...p, email: "An account with this email already exists." }));
+        emailRef.current?.focus();
+      } else {
+        toast({ title: t("common.error"), description: serverMsg || undefined, variant: "destructive" });
+      }
     } finally {
       setBusy(false);
     }
@@ -174,7 +182,16 @@ export function Register() {
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
             <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />
-            {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
+            {errors.email && (
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <p className="text-xs text-destructive">{errors.email}</p>
+                {/already exists/i.test(errors.email) && (
+                  <Link href={`/login?email=${encodeURIComponent(email)}`} className="text-xs text-primary hover:underline">
+                    Sign in instead
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <Label htmlFor="phone">{t("auth.phone")}</Label>

@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wo
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -10,7 +10,7 @@ import NotFound from "@/pages/not-found";
 
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-// Pages
+// Eagerly loaded pages (small, frequently visited)
 import { Home } from "@/pages/home";
 import { Explore } from "@/pages/explore";
 import { Pubs } from "@/pages/pubs";
@@ -21,15 +21,9 @@ import { VendorDetail } from "@/pages/vendor-detail";
 import { Login } from "@/pages/login";
 import { Register } from "@/pages/register";
 import { Contact } from "@/pages/contact";
-import { VendorDashboard, VendorListingEditPage } from "@/pages/vendor-dashboard";
-import { TicketScanner } from "@/pages/ticket-scanner";
 import { Bookings } from "@/pages/bookings";
-import { AdminPanel } from "@/pages/admin";
 import { Profile } from "@/pages/profile";
 import { BecomeVendor } from "@/pages/become-vendor";
-import { Subscription } from "@/pages/subscription";
-import { Blogs } from "@/pages/blogs";
-import { BlogDetail } from "@/pages/blog-detail";
 import { Wishlist } from "@/pages/wishlist";
 import { Notifications } from "@/pages/notifications";
 import { ForgotPassword } from "@/pages/forgot-password";
@@ -37,6 +31,23 @@ import { ResetPassword } from "@/pages/reset-password";
 import { PaymentResult } from "@/pages/payment-result";
 import { Terms } from "@/pages/terms";
 import { Privacy } from "@/pages/privacy";
+
+// Lazily loaded heavy/role-gated pages
+const VendorDashboard = lazy(() => import("@/pages/vendor-dashboard").then((m) => ({ default: m.VendorDashboard })));
+const VendorListingEditPage = lazy(() => import("@/pages/vendor-dashboard").then((m) => ({ default: m.VendorListingEditPage })));
+const TicketScanner = lazy(() => import("@/pages/ticket-scanner").then((m) => ({ default: m.TicketScanner })));
+const AdminPanel = lazy(() => import("@/pages/admin").then((m) => ({ default: m.AdminPanel })));
+const Subscription = lazy(() => import("@/pages/subscription").then((m) => ({ default: m.Subscription })));
+const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs })));
+const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ default: m.BlogDetail })));
+
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center py-32">
+      <Spinner />
+    </div>
+  );
+}
 
 import { RequireAuth } from "@/components/RequireAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -111,6 +122,7 @@ function Router() {
       <OAuthErrorHandler />
       <Navbar />
       <main className="flex-1">
+        <Suspense fallback={<PageFallback />}>
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/explore" component={Explore} />
@@ -171,6 +183,7 @@ function Router() {
 
           <Route component={NotFound} />
         </Switch>
+        </Suspense>
       </main>
       <Footer />
     </div>

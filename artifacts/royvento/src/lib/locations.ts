@@ -74,16 +74,19 @@ export const COUNTRIES: CountryData[] = [
   },
 ];
 
-export const COUNTRY_NAMES = COUNTRIES.map((c) => c.name);
+const sortAZ = (arr: string[]): string[] =>
+  [...arr].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+export const COUNTRY_NAMES = sortAZ(COUNTRIES.map((c) => c.name));
 
 export function getStates(country: string): string[] {
   const c = COUNTRIES.find((x) => x.name === country);
-  return c ? c.states.map((s) => s.name) : [];
+  return c ? sortAZ(c.states.map((s) => s.name)) : [];
 }
 
 export function getCities(country: string, state: string): string[] {
   const c = COUNTRIES.find((x) => x.name === country);
   if (!c) return [];
   const s = c.states.find((x) => x.name === state);
-  return s ? s.cities : [];
+  return s ? sortAZ(s.cities) : [];
 }

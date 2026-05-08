@@ -85,7 +85,7 @@ export function AdminPanel() {
       </header>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <div className="overflow-x-auto scrollbar-hide pb-1">
+        <div className="overflow-x-auto scrollbar-thin-x pb-2">
         <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="commissions">Commissions</TabsTrigger>

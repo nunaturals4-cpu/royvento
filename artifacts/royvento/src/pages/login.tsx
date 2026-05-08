@@ -13,11 +13,18 @@ import { getEmailError } from "@workspace/validators";
 
 export function Login() {
   const { t } = useTranslation();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("email") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
+  const [noAccount, setNoAccount] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -48,6 +55,7 @@ export function Login() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setUnverifiedEmail("");
+    setNoAccount(false);
     const next: { email?: string; password?: string } = {};
     const emailErr = getEmailError(email);
     if (emailErr) next.email = emailErr;
@@ -64,10 +72,17 @@ export function Login() {
           setLocation("/");
         },
         onError: (err: any) => {
-          if (err?.code === "EMAIL_NOT_VERIFIED" || err?.message?.includes("EMAIL_NOT_VERIFIED") || err?.message?.includes("verify your email")) {
+          const code = err?.data?.code ?? err?.code;
+          const serverMsg = err?.data?.error ?? err?.message ?? "";
+          if (code === "EMAIL_NOT_VERIFIED" || /EMAIL_NOT_VERIFIED|verify your email/i.test(serverMsg)) {
             setUnverifiedEmail(email);
+          } else if (code === "NO_ACCOUNT" || err?.status === 404) {
+            setNoAccount(true);
+            setErrors((p) => ({ ...p, email: "No account found for that email." }));
+            emailRef.current?.focus();
           } else {
-            toast({ title: t("common.error"), description: err?.message ?? "Check your credentials.", variant: "destructive" });
+            setErrors((p) => ({ ...p, password: serverMsg || "Incorrect password." }));
+            passwordRef.current?.focus();
           }
         },
       },
@@ -130,8 +145,17 @@ export function Login() {
         <form onSubmit={submit} noValidate className="space-y-4">
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
-            <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />
-            {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
+            <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); if (noAccount) setNoAccount(false); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />
+            {errors.email && (
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <p className="text-xs text-destructive">{errors.email}</p>
+                {noAccount && (
+                  <Link href={`/register?email=${encodeURIComponent(email)}`} className="text-xs text-primary hover:underline">
+                    Create an account
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">

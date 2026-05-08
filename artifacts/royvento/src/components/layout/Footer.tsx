@@ -1,10 +1,10 @@
 import { Link } from "wouter";
-import { Crown, Instagram, Facebook, Twitter, QrCode } from "lucide-react";
+import { Crown, Instagram, Facebook, Twitter } from "lucide-react";
 
 export function Footer() {
   return (
     <footer className="border-t border-border/60 bg-black/40 backdrop-blur mt-24">
-      <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+      <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
         {/* Brand */}
         <div className="space-y-4">
           <div className="flex items-center gap-2.5">
@@ -83,16 +83,6 @@ export function Footer() {
           </ul>
         </div>
 
-        {/* Download App */}
-        <div className="space-y-3 min-w-[140px]">
-          <h4 className="font-semibold text-xs tracking-[0.18em] uppercase text-foreground/70">Get the App</h4>
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-card/30 p-4">
-            <div className="h-24 w-24 rounded-xl bg-white flex items-center justify-center">
-              <QrCode className="h-16 w-16 text-black" strokeWidth={1.5} />
-            </div>
-            <p className="text-[11px] text-muted-foreground text-center leading-tight">Scan to download<br />Royvento Mobile</p>
-          </div>
-        </div>
       </div>
 
       <div className="border-t border-border/40">

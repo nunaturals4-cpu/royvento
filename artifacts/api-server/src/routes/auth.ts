@@ -196,12 +196,12 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
     .limit(1);
   const u = rows[0];
   if (!u) {
-    res.status(401).json({ error: "Invalid credentials" });
+    res.status(404).json({ error: "No account found for that email.", code: "NO_ACCOUNT" });
     return;
   }
   const ok = await comparePassword(password, u.passwordHash);
   if (!ok) {
-    res.status(401).json({ error: "Invalid credentials" });
+    res.status(401).json({ error: "Incorrect password. Please try again.", code: "INVALID_PASSWORD" });
     return;
   }
   if (!u.emailVerified) {

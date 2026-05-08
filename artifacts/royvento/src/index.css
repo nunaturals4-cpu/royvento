@@ -435,6 +435,25 @@
     display: none;
   }
 
+  /* Thin, themed horizontal scrollbar for tab strips */
+  .scrollbar-thin-x {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.18) transparent;
+  }
+  .scrollbar-thin-x::-webkit-scrollbar {
+    height: 6px;
+  }
+  .scrollbar-thin-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin-x::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin-x::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.32);
+  }
+
   /* Premium glassmorphism card — default (noir) */
   .glass-card {
     background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));

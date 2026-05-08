@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import { requireAuth } from "../lib/auth";
 import { TtlCache } from "../lib/ttlCache";
 
 const router: IRouter = Router();
@@ -13,7 +12,7 @@ type DetailsResult = { address: string | null; city: string | null; state: strin
 const autocompleteCache = new TtlCache<AutocompleteResult>();
 const detailsCache      = new TtlCache<DetailsResult>();
 
-router.get("/places/autocomplete", requireAuth(["vendor", "admin"]), async (req, res) => {
+router.get("/places/autocomplete", async (req, res) => {
   const q = String(req.query.q ?? "").trim().toLowerCase();
   if (q.length < 3) {
     res.json([]);
@@ -64,7 +63,7 @@ router.get("/places/autocomplete", requireAuth(["vendor", "admin"]), async (req,
   }
 });
 
-router.get("/places/details", requireAuth(["vendor", "admin"]), async (req, res) => {
+router.get("/places/details", async (req, res) => {
   const placeId = String(req.query.place_id ?? "").trim();
   if (!placeId) {
     res.status(400).json({ error: "place_id is required" });

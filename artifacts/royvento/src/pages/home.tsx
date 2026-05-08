@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSelectedCity } from "@/components/LocationContext";
 import {
   ArrowRight,
@@ -12,7 +12,10 @@ import {
   Megaphone,
   Clock,
   GlassWater,
+  MapPin,
+  Search,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents, useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
@@ -128,7 +131,56 @@ export function Home() {
   const [popular, setPopular] = useState<PublicEvent[]>([]);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const { selectedCity: userCity } = useSelectedCity();
+  const { selectedCity: userCity, setSelectedCity } = useSelectedCity();
+
+  // Google Places city search
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeSuggestions, setPlaceSuggestions] = useState<{ place_id: string; description: string }[]>([]);
+  const [showPlaceSugg, setShowPlaceSugg] = useState(false);
+  const [placeLoading, setPlaceLoading] = useState(false);
+  const placeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (placeDebounce.current) clearTimeout(placeDebounce.current);
+    const q = placeQuery.trim();
+    if (q.length < 3) {
+      setPlaceSuggestions([]);
+      setShowPlaceSugg(false);
+      return;
+    }
+    placeDebounce.current = setTimeout(async () => {
+      setPlaceLoading(true);
+      try {
+        const data = await apiGet<{ place_id: string; description: string }[]>(
+          `/api/places/autocomplete?q=${encodeURIComponent(q)}`,
+        );
+        setPlaceSuggestions(data);
+        setShowPlaceSugg(data.length > 0);
+      } catch {
+        setPlaceSuggestions([]);
+        setShowPlaceSugg(false);
+      } finally {
+        setPlaceLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (placeDebounce.current) clearTimeout(placeDebounce.current);
+    };
+  }, [placeQuery]);
+
+  const choosePlace = async (s: { place_id: string; description: string }) => {
+    setPlaceQuery(s.description);
+    setShowPlaceSugg(false);
+    try {
+      const details = await apiGet<{ city: string | null; state: string | null; country: string | null }>(
+        `/api/places/details?place_id=${encodeURIComponent(s.place_id)}`,
+      );
+      const city = details.city ?? details.state ?? "";
+      if (city) setSelectedCity(city);
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     apiGet<PublicEvent[]>("/api/events/popular").then(setPopular).catch(() => {});
@@ -171,7 +223,49 @@ export function Home() {
             <p className="mt-6 text-lg md:text-xl text-white/65 max-w-2xl leading-relaxed">
               {t("home.hero_subtitle")}
             </p>
-            <div className="mt-10 flex flex-wrap gap-3">
+
+            {/* City / place search */}
+            <div className="mt-8 max-w-xl relative">
+              <div className="flex items-center gap-2 rounded-full glass-card-strong border border-white/15 px-4 py-2.5 focus-within:border-primary/50 transition-colors">
+                <Search className="h-4 w-4 text-primary shrink-0" />
+                <Input
+                  value={placeQuery}
+                  onChange={(e) => setPlaceQuery(e.target.value)}
+                  onFocus={() => placeSuggestions.length > 0 && setShowPlaceSugg(true)}
+                  onBlur={() => setTimeout(() => setShowPlaceSugg(false), 150)}
+                  placeholder={userCity ? `Showing for ${userCity} — search another city or place` : "Search a city or place to personalise your view"}
+                  className="bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-9 px-0 text-white placeholder:text-white/45"
+                  aria-label="Search a city or place"
+                />
+                {userCity && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-xs text-white/55 px-2 py-1 rounded-full bg-white/5 shrink-0">
+                    <MapPin className="h-3 w-3" />
+                    {userCity}
+                  </span>
+                )}
+              </div>
+              {showPlaceSugg && (
+                <div className="absolute z-20 left-0 right-0 mt-2 rounded-2xl border border-white/10 bg-zinc-950/95 backdrop-blur shadow-2xl overflow-hidden">
+                  {placeLoading && (
+                    <div className="px-4 py-3 text-xs text-white/50">Searching…</div>
+                  )}
+                  {placeSuggestions.map((s) => (
+                    <button
+                      key={s.place_id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => choosePlace(s)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-white/85 hover:bg-white/8 transition-colors flex items-center gap-2 border-b border-white/5 last:border-0"
+                    >
+                      <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="truncate">{s.description}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/pubs">
                 <Button
                   size="lg"
