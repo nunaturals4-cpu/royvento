@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -114,7 +114,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [occasion, setOccasion] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
   const [pointsToUse, setPointsToUse] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("online");
+  const [hoursExpanded, setHoursExpanded] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [confirmedAge, setConfirmedAge] = useState(false);
 
@@ -871,7 +872,12 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             const rightDays = DAY_ORDER_h.slice(4);
             return (
               <section>
-                <div className="flex items-center justify-between mb-4">
+                <button
+                  type="button"
+                  onClick={() => setHoursExpanded((v) => !v)}
+                  aria-expanded={hoursExpanded}
+                  className="w-full flex items-center justify-between mb-4 text-left group"
+                >
                   <h2 className="font-serif text-3xl accent-underline inline-block">{t("events.opening_hours")}</h2>
                   <div className="flex items-center gap-3">
                     {todayTimes && (
@@ -889,9 +895,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         {t("events.closed_now")}
                       </span>
                     )}
+                    <ChevronDown className={`h-5 w-5 text-white/60 transition-transform ${hoursExpanded ? "rotate-180" : ""}`} />
                   </div>
-                </div>
-                {todayTimes && (
+                </button>
+                {hoursExpanded && todayTimes && (
                   <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
                     <Clock className="h-4 w-4 text-primary shrink-0" />
                     <span className="text-sm text-white/60">{t("events.today_tag")} ({DAY_FULL_h[todayKey]}):</span>
@@ -915,6 +922,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </span>
                   </div>
                 )}
+                {hoursExpanded && (
                 <div className="grid md:grid-cols-2 gap-1.5">
                   {[leftDays, rightDays].map((col, ci) => (
                     <div key={ci} className="space-y-0.5">
@@ -964,6 +972,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </div>
                   ))}
                 </div>
+                )}
               </section>
             );
           })()}
@@ -1602,28 +1611,6 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             </div>
           </div>
 
-          {availability.length > 0 && (
-            <div className="rounded-3xl glass-card p-6">
-              <p className="font-serif text-lg mb-3">{t("events.calendar_section")}</p>
-              <div className="grid grid-cols-7 gap-1 text-xs">
-                {availability.slice(0, 28).map((a) => (
-                  <div
-                    key={a.id}
-                    className={`aspect-square rounded flex items-center justify-center ${
-                      a.status === "available"
-                        ? "bg-primary/10 text-primary"
-                        : a.status === "booked"
-                          ? "bg-muted text-muted-foreground line-through"
-                          : "bg-destructive/10 text-destructive"
-                    }`}
-                    title={`${a.date} — ${a.status}`}
-                  >
-                    {Number(a.date.slice(8, 10))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </aside>
         </div>
       </div>

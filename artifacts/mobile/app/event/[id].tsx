@@ -192,7 +192,8 @@ export default function EventDetailScreen() {
     }
   }, [isLoading, event, book, user, authLoading]);
 
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("online");
+  const [hoursExpanded, setHoursExpanded] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [confirmedAge, setConfirmedAge] = useState(false);
   const [couponInput, setCouponInput] = useState("");
@@ -815,40 +816,74 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
-          {/* Day hours (pub) */}
-          {vendor?.dayHours && Object.keys(vendor.dayHours).length > 0 ? (
-            <View style={{ gap: 8 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.opening_hours")}</Text>
-              <View style={[{ borderRadius: 12, borderWidth: 1, overflow: "hidden", borderColor: colors.border }]}>
-                {Object.entries(vendor.dayHours).map(([day, times], i) => (
-                  <View
-                    key={day}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      backgroundColor: i % 2 === 0 ? colors.card : colors.muted,
-                      borderBottomWidth: i < Object.keys(vendor!.dayHours!).length - 1 ? 1 : 0,
-                      borderBottomColor: colors.border,
-                    }}
-                  >
-                    <Text style={{ width: 40, fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{day}</Text>
-                    {times ? (
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
-                        {fmtTime(times.open)} – {fmtTime(times.close)}
+          {/* Day hours (pub) — collapsible */}
+          {vendor?.dayHours && Object.keys(vendor.dayHours).length > 0 ? (() => {
+            const DAY_ABBRS_M = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const todayKeyM = DAY_ABBRS_M[new Date().getDay()];
+            const todayHrs = vendor.dayHours[todayKeyM] ?? null;
+            return (
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setHoursExpanded((v) => !v)}
+                  style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+                >
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.opening_hours")}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {todayHrs ? (
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
+                        {t("events.today_tag")}: {fmtTime(todayHrs.open)} – {fmtTime(todayHrs.close)}
                       </Text>
                     ) : (
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, fontStyle: "italic" }}>{t("events.closed_label")}</Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground, fontStyle: "italic" }}>
+                        {t("events.closed_label")}
+                      </Text>
                     )}
+                    <Ionicons name={hoursExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
                   </View>
-                ))}
+                </TouchableOpacity>
+                {hoursExpanded ? (
+                  <View style={[{ borderRadius: 12, borderWidth: 1, overflow: "hidden", borderColor: colors.border }]}>
+                    {Object.entries(vendor.dayHours).map(([day, times], i) => (
+                      <View
+                        key={day}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          backgroundColor: i % 2 === 0 ? colors.card : colors.muted,
+                          borderBottomWidth: i < Object.keys(vendor!.dayHours!).length - 1 ? 1 : 0,
+                          borderBottomColor: colors.border,
+                        }}
+                      >
+                        <Text style={{ width: 40, fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{day}</Text>
+                        {times ? (
+                          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                            {fmtTime(times.open)} – {fmtTime(times.close)}
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, fontStyle: "italic" }}>{t("events.closed_label")}</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
-            </View>
-          ) : vendor?.openDays && vendor.openDays.length > 0 ? (
+            );
+          })() : vendor?.openDays && vendor.openDays.length > 0 ? (
             <View style={{ gap: 6 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.open_days")}</Text>
-              <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.openDays.join(", ")}</Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setHoursExpanded((v) => !v)}
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+              >
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.open_days")}</Text>
+                <Ionicons name={hoursExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+              </TouchableOpacity>
+              {hoursExpanded ? (
+                <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.openDays.join(", ")}</Text>
+              ) : null}
             </View>
           ) : null}
 
