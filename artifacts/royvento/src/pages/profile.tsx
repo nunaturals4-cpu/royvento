@@ -10,8 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useGetMe, useListMyReviews, useUpdateReview, useDeleteReview } from "@workspace/api-client-react";
-import { Star } from "lucide-react";
+import { useGetMe } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiPatch, apiGet, apiPost, fileToDataUrl } from "@/lib/api";
 import { CalendarCheck, Sparkles, Tag, Crown, Gift, Sparkle, Copy, Upload, Bell, ScanLine, Share2, TrendingUp, TrendingDown, Coins } from "lucide-react";
@@ -462,103 +461,7 @@ export function Profile() {
           </div>
         </aside>
       </div>
-
-      <div className="mt-10">
-        <MyReviewsSection />
-      </div>
     </div>
   );
 }
 
-function MyReviewsSection() {
-  const { data: reviews = [], refetch, isLoading } = useListMyReviews();
-  const updateReview = useUpdateReview();
-  const deleteReview = useDeleteReview();
-  const { toast } = useToast();
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editRating, setEditRating] = useState(5);
-  const [editComment, setEditComment] = useState("");
-  const startEdit = (r: { id: number; rating: number; comment: string }) => {
-    setEditingId(r.id); setEditRating(r.rating); setEditComment(r.comment ?? "");
-  };
-  const save = (rid: number) => {
-    updateReview.mutate(
-      { reviewId: rid, data: { rating: editRating, comment: editComment } },
-      {
-        onSuccess: () => { setEditingId(null); refetch(); toast({ title: "Review updated" }); },
-        onError: (e) => toast({ title: "Could not update review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
-      },
-    );
-  };
-  const remove = (rid: number) => {
-    if (!window.confirm("Delete your review? This cannot be undone.")) return;
-    deleteReview.mutate(
-      { reviewId: rid },
-      {
-        onSuccess: () => { refetch(); toast({ title: "Review deleted" }); },
-        onError: (e) => toast({ title: "Could not delete review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
-      },
-    );
-  };
-  return (
-    <div className="rounded-3xl glass-card p-6">
-      <div className="flex items-center gap-2 mb-3">
-        <Star className="h-5 w-5 text-primary" />
-        <h2 className="font-serif text-xl">My reviews</h2>
-        <Badge variant="secondary" className="ml-2">{reviews.length}</Badge>
-      </div>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : reviews.length === 0 ? (
-        <p className="text-sm text-muted-foreground">You haven't reviewed any pubs yet. After you check in to a booking, you can leave a review.</p>
-      ) : (
-        <div className="space-y-3">
-          {reviews.map((r) => {
-            const isEditing = editingId === r.id;
-            return (
-              <div key={r.id} className="rounded-2xl border border-white/10 p-4 bg-black/20">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <Link href={pubDetailSlug({ id: r.vendorId, name: r.vendorName, city: null })} className="font-medium text-sm hover:underline">
-                      {r.vendorName || `Pub #${r.vendorId}`}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</p>
-                  </div>
-                  <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className={`h-4 w-4 ${i < (isEditing ? editRating : r.rating) ? "fill-amber-400 text-amber-400" : "text-white/15"}`} />
-                    ))}
-                  </div>
-                </div>
-                {isEditing ? (
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center gap-1">
-                      {[1,2,3,4,5].map((n) => (
-                        <button key={n} type="button" onClick={() => setEditRating(n)}>
-                          <Star className={`h-5 w-5 ${n <= editRating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                        </button>
-                      ))}
-                    </div>
-                    <Textarea value={editComment} onChange={(e) => setEditComment(e.target.value)} className="bg-black/40 border-white/10" />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => save(r.id)} disabled={updateReview.isPending}>Save</Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {r.comment && <p className="mt-2 text-sm text-white/65 leading-relaxed">{r.comment}</p>}
-                    <div className="mt-3 flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => startEdit(r)}>Edit</Button>
-                      <Button size="sm" variant="outline" onClick={() => remove(r.id)} disabled={deleteReview.isPending}>Delete</Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
