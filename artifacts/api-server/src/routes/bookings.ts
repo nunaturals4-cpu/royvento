@@ -276,7 +276,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     if (parsed.data.pubMode === "ticket" && parsed.data.ticketWomen + parsed.data.ticketMen + parsed.data.ticketCouple <= 0) {
       issues.push({ path: "ticketWomen", message: "Select at least one ticket" });
     }
-    if (parsed.data.pubMode === "event" && !parsed.data.arrivalTime.trim()) {
+    if (parsed.data.pubMode && !parsed.data.arrivalTime.trim()) {
       issues.push({ path: "arrivalTime", message: "Arrival time is required" });
     }
     if (issues.length > 0) {
