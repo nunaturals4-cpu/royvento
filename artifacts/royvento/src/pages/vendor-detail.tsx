@@ -262,7 +262,19 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
             />
           </div>
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 to-black" />
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-stone-900 to-black">
+            <div
+              className="absolute inset-0 opacity-30"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 20% 30%, rgba(244,63,94,0.25), transparent 40%), radial-gradient(circle at 80% 70%, rgba(217,119,6,0.18), transparent 45%)",
+              }}
+              aria-hidden
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <GlassWater className="h-32 w-32 md:h-40 md:w-40 text-white/5" />
+            </div>
+          </div>
         )}
         {/* Top scrim */}
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
@@ -343,6 +355,25 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
               </a>
             )}
           </div>
+          {/* Primary booking CTA */}
+          {pubEvent && (
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Link
+                href={`/events/${pubEvent.id}`}
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary/90 transition-colors"
+              >
+                Book a Table
+              </Link>
+              {events.filter((e) => e.type !== "pub").length > 0 && (
+                <a
+                  href="#events"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-5 py-3 text-sm font-medium text-white hover:bg-black/60 transition-colors"
+                >
+                  See upcoming events
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -727,7 +758,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
         )}
 
         {events.length > 0 && (
-          <section>
+          <section id="events">
             <h2 className="font-serif text-2xl mb-5">Events by {vendor.businessName}</h2>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {events.map((e) => <EventCard key={e.id} event={e} />)}
