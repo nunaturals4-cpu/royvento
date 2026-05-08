@@ -1263,66 +1263,6 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               </>
             )}
 
-            {isPub && !isFreeEntryDay && (Number(ev.priceWomen) > 0 || Number(ev.priceMen) > 0 || Number(ev.priceCouple) > 0 || (dayPricingMap && Object.keys(dayPricingMap).length > 0)) && (
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-5 space-y-2">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                  {dayPricingMap && Object.keys(dayPricingMap).length > 0 ? t("events.entry_prices_by_day") : t("events.entry_prices")}
-                </p>
-                {dayPricingMap && Object.keys(dayPricingMap).length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-white/10 text-white/40">
-                          <th className="text-left pb-1 font-medium">{t("events.day_col")}</th>
-                          <th className="text-right pb-1 font-medium">{t("events.women")}</th>
-                          <th className="text-right pb-1 font-medium">{t("events.men")}</th>
-                          <th className="text-right pb-1 font-medium">{t("events.couple")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map((day) => {
-                          const ov = dayPricingMap[day] ?? null;
-                          const fw = ov ? Number(ov.women) : Number(ev.priceWomen || 0);
-                          const fm = ov ? Number(ov.men) : Number(ev.priceMen || 0);
-                          const fc = ov ? Number(ov.couple) : Number(ev.priceCouple || 0);
-                          const isActive = selectedDayName === day;
-                          return (
-                            <tr key={day} className={isActive ? "text-primary font-semibold" : "text-white/60"}>
-                              <td className="py-0.5">{day}</td>
-                              <td className="text-right py-0.5">{fw > 0 ? formatINRExact(fw) : "—"}</td>
-                              <td className="text-right py-0.5">{fm > 0 ? formatINRExact(fm) : "—"}</td>
-                              <td className="text-right py-0.5">{fc > 0 ? formatINRExact(fc) : "—"}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <>
-                    {Number(ev.priceWomen) > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/70">{t("events.women")}</span>
-                        <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceWomen))}</span>
-                      </div>
-                    )}
-                    {Number(ev.priceMen) > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/70">{t("events.men")}</span>
-                        <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceMen))}</span>
-                      </div>
-                    )}
-                    {Number(ev.priceCouple) > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/70">{t("events.couple")}</span>
-                        <span className="font-semibold text-primary">{formatINRExact(Number(ev.priceCouple))}</span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
             {!bookingIsFullyFree && discountInfo?.isNewUser && (
               <div className="mb-4 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs flex items-center gap-2 text-primary">
                 <Sparkle className="h-3.5 w-3.5" />

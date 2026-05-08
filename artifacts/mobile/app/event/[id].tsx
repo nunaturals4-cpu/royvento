@@ -643,22 +643,6 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
-          {/* Pub pricing */}
-          {isPub && !isFreeEntryDay && (priceWomen > 0 || priceMen > 0) ? (
-            <View style={[styles.pubPricing, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-              {[
-                { label: t("events.women"), p: priceWomen },
-                { label: t("events.men"), p: priceMen },
-                { label: t("events.couple"), p: priceCouple },
-              ].filter((x) => x.p > 0).map((x) => (
-                <View key={x.label} style={styles.pubPriceItem}>
-                  <Text style={[styles.pubPriceLabel, { color: colors.mutedForeground }]}>{x.label}</Text>
-                  <Text style={[styles.pubPriceVal, { color: colors.foreground }]}>{formatINR(x.p)}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
           {/* Free entry block (pub) */}
           {isPub && (() => {
             const fer = event?.freeEntryRules;
@@ -1563,10 +1547,6 @@ const styles = StyleSheet.create({
   priceRow: { borderRadius: 12, borderWidth: 1, padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   priceLabel: { fontSize: 12, fontFamily: "Inter_400Regular" },
   priceValue: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  pubPricing: { borderRadius: 12, borderWidth: 1, padding: 14, flexDirection: "row", gap: 20 },
-  pubPriceItem: { alignItems: "center", gap: 3 },
-  pubPriceLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  pubPriceVal: { fontSize: 14, fontFamily: "Inter_700Bold" },
   freeEntryBox: { borderRadius: 12, borderWidth: 1, padding: 14, gap: 6 },
   freeEntryHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   freeEntryDot: { width: 8, height: 8, borderRadius: 4 },
