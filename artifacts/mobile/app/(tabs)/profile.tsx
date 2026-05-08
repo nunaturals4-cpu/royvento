@@ -867,35 +867,42 @@ export default function ProfileScreen() {
                   <Ionicons name="close" size={22} color={colors.mutedForeground} />
                 </Pressable>
               </View>
-              {languages.map((lang) => {
-                const active = locale === lang.code;
-                return (
-                  <Pressable
-                    key={lang.code}
-                    onPress={async () => {
-                      await setLocale(lang.code);
-                      setLangModal(false);
-                    }}
-                    style={({ pressed }) => [{
-                      flexDirection: "row" as const,
-                      alignItems: "center" as const,
-                      paddingVertical: 14,
-                      paddingHorizontal: 4,
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.border,
-                      opacity: pressed ? 0.7 : 1,
-                    }]}
-                  >
-                    <Text style={{ flex: 1, fontSize: 16, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular", color: active ? colors.primary : colors.foreground }}>
-                      {lang.native}
-                    </Text>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginRight: 8 }}>
-                      {lang.english}
-                    </Text>
-                    {active && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
-                  </Pressable>
-                );
-              })}
+              <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                {languages.map((lang) => {
+                  const active = locale === lang.code;
+                  return (
+                    <Pressable
+                      key={lang.code}
+                      onPress={async () => {
+                        await setLocale(lang.code);
+                        setLangModal(false);
+                      }}
+                      style={({ pressed }) => [{
+                        flexDirection: "row" as const,
+                        alignItems: "center" as const,
+                        gap: 12,
+                        paddingVertical: 14,
+                        paddingHorizontal: 4,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.border,
+                        opacity: pressed ? 0.7 : 1,
+                      }]}
+                    >
+                      <Text
+                        style={{ flexShrink: 1, fontSize: 16, lineHeight: 22, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular", color: active ? colors.primary : colors.foreground }}
+                      >
+                        {lang.native}
+                      </Text>
+                      <Text
+                        style={{ flex: 1, textAlign: "right", fontSize: 13, lineHeight: 18, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}
+                      >
+                        {lang.english}
+                      </Text>
+                      {active && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
           </View>
         </View>
