@@ -904,14 +904,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
       return;
     }
     if (type === "pub" && freeEntryEnabled && (freeEntryGenders.length === 0 || freeEntryDays.length === 0)) {
-      formErrors.setFieldError(
-        freeEntryGenders.length === 0 ? "freeEntryGenders" : "freeEntryDays",
-        freeEntryGenders.length === 0 && freeEntryDays.length === 0
-          ? "Pick at least one gender and at least one day."
-          : freeEntryGenders.length === 0
-            ? "Pick at least one gender."
-            : "Pick at least one day.",
-      );
+      if (freeEntryGenders.length === 0) formErrors.setFieldError("freeEntryGenders", "Pick at least one gender.");
+      if (freeEntryDays.length === 0) formErrors.setFieldError("freeEntryDays", "Pick at least one day.");
       toast({ title: "Free entry needs a rule", description: "Pick at least one gender and at least one day for free entry.", variant: "destructive" });
       return;
     }
@@ -1742,14 +1736,8 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
       return;
     }
     if (isPub && freeEntryEnabled && (freeEntryGenders.length === 0 || freeEntryDays.length === 0)) {
-      formErrors.setFieldError(
-        freeEntryGenders.length === 0 ? "freeEntryGenders" : "freeEntryDays",
-        freeEntryGenders.length === 0 && freeEntryDays.length === 0
-          ? "Pick at least one gender and at least one day."
-          : freeEntryGenders.length === 0
-            ? "Pick at least one gender."
-            : "Pick at least one day.",
-      );
+      if (freeEntryGenders.length === 0) formErrors.setFieldError("freeEntryGenders", "Pick at least one gender.");
+      if (freeEntryDays.length === 0) formErrors.setFieldError("freeEntryDays", "Pick at least one day.");
       toast({ title: "Free entry needs a rule", description: "Pick at least one gender and at least one day for free entry.", variant: "destructive" });
       return;
     }
