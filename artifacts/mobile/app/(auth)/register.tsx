@@ -52,6 +52,14 @@ export default function RegisterScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         const status = err?.status;
         const serverMsg = err?.data?.error ?? err?.message ?? "";
+        const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+        if (Object.keys(fe).length > 0) {
+          setErrors((p) => ({ ...p, ...(fe.name ? { name: fe.name } : {}), ...(fe.email ? { email: fe.email } : {}), ...(fe.password ? { password: fe.password } : {}) }));
+          if (fe.name) nameRef.current?.focus();
+          else if (fe.email) emailRef.current?.focus();
+          else if (fe.password) passwordRef.current?.focus();
+          return;
+        }
         const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);
         if (isDuplicate) {
           setErrors((p) => ({
@@ -199,7 +207,7 @@ export default function RegisterScreen() {
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.full_name")}</Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.name ? colors.destructive : colors.border }]}>
               <Ionicons name="person-outline" size={16} color={colors.mutedForeground} />
               <TextInput
                 ref={nameRef}
@@ -218,7 +226,7 @@ export default function RegisterScreen() {
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.email")}</Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.email ? colors.destructive : colors.border }]}>
               <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
               <TextInput
                 ref={emailRef}
@@ -237,7 +245,7 @@ export default function RegisterScreen() {
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.password")}</Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.password ? colors.destructive : colors.border }]}>
               <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
               <TextInput
                 ref={passwordRef}

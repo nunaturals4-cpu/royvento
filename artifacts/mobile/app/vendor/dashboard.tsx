@@ -776,8 +776,13 @@ function AdsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
       setShowForm(false);
       Alert.alert("Request Submitted", "Your ad request has been sent for review.");
     },
-    onError: () => {
-      Alert.alert("Error", "Failed to submit request.");
+    onError: (err: any) => {
+      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+      if (fe.message) {
+        Alert.alert("Please fix this field", `message: ${fe.message}`);
+      } else {
+        Alert.alert("Error", err?.data?.error ?? err?.message ?? "Failed to submit request.");
+      }
     },
   });
 
@@ -981,6 +986,18 @@ export default function VendorDashboardScreen() {
   const [createForm, setCreateForm] = useState<EventFormState>({ ...DEFAULT_EVENT_FORM });
   const [showCreateCatPicker, setShowCreateCatPicker] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const [createFormErrors, setCreateFormErrors] = useState<Record<string, string>>({});
+
+  function handleMutationError(err: any, fallback: string, setFieldErrors?: (fe: Record<string, string>) => void) {
+    const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+    if (Object.keys(fe).length > 0) {
+      if (setFieldErrors) setFieldErrors(fe);
+      const summary = Object.entries(fe).map(([k, v]) => `• ${k}: ${v}`).join("\n");
+      Alert.alert("Please fix these fields", summary);
+      return;
+    }
+    Alert.alert("Error", err?.data?.error ?? err?.message ?? fallback);
+  }
 
   const createEventMut = useCreateEvent({
     mutation: {
@@ -988,9 +1005,10 @@ export default function VendorDashboardScreen() {
         loadEvents(1, true);
         setShowCreateModal(false);
         setCreateForm({ ...DEFAULT_EVENT_FORM });
+        setCreateFormErrors({});
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
-      onError: () => Alert.alert("Error", "Failed to create listing. Please try again."),
+      onError: (err: any) => handleMutationError(err, "Failed to create listing. Please try again.", setCreateFormErrors),
     },
   });
 
@@ -1026,22 +1044,21 @@ export default function VendorDashboardScreen() {
   }
 
   function submitCreateEvent() {
+    setCreateFormErrors({});
     const price = parseFloat(createForm.price);
     const capacity = parseInt(createForm.capacity, 10);
-    if (!createForm.title.trim() || !createForm.description.trim() || !createForm.location.trim()) {
-      Alert.alert("Missing fields", "Title, description and location are required.");
-      return;
-    }
-    if (isNaN(price) || price < 0) {
-      Alert.alert("Invalid price", "Please enter a valid price.");
-      return;
-    }
-    if (isNaN(capacity) || capacity < 1) {
-      Alert.alert("Invalid capacity", "Please enter a valid capacity.");
-      return;
-    }
+    const localErrs: Record<string, string> = {};
+    if (!createForm.title.trim()) localErrs.title = "Title is required.";
+    if (!createForm.description.trim()) localErrs.description = "Description is required.";
+    if (!createForm.location.trim()) localErrs.location = "Location is required.";
+    if (isNaN(price) || price < 0) localErrs.price = "Please enter a valid price.";
+    if (isNaN(capacity) || capacity < 1) localErrs.capacity = "Please enter a valid capacity.";
     if (createForm.category === "Pubs" && createForm.freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(createForm.freeEntryBeforeTime)) {
-      Alert.alert("Invalid before time", "Please use HH:mm 24-hour format (e.g. 22:00).");
+      localErrs.freeEntryBeforeTime = "Use HH:mm 24-hour format (e.g. 22:00).";
+    }
+    if (Object.keys(localErrs).length > 0) {
+      setCreateFormErrors(localErrs);
+      Alert.alert("Please fix these fields", Object.entries(localErrs).map(([k, v]) => `• ${k}: ${v}`).join("\n"));
       return;
     }
     createEventMut.mutate({
@@ -1071,14 +1088,16 @@ export default function VendorDashboardScreen() {
   const [showEditCatPicker, setShowEditCatPicker] = useState(false);
   const [editImageUploading, setEditImageUploading] = useState(false);
 
+  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
   const updateEventMut = useUpdateEvent({
     mutation: {
       onSuccess: () => {
         loadEvents(1, true);
         setEditingEvent(null);
+        setEditFormErrors({});
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
-      onError: () => Alert.alert("Error", "Failed to save changes. Please try again."),
+      onError: (err: any) => handleMutationError(err, "Failed to save changes. Please try again.", setEditFormErrors),
     },
   });
 
@@ -1104,22 +1123,21 @@ export default function VendorDashboardScreen() {
 
   function submitEditEvent() {
     if (!editingEvent) return;
+    setEditFormErrors({});
     const price = parseFloat(editForm.price);
     const capacity = parseInt(editForm.capacity, 10);
-    if (!editForm.title.trim() || !editForm.description.trim() || !editForm.location.trim()) {
-      Alert.alert("Missing fields", "Title, description and location are required.");
-      return;
-    }
-    if (isNaN(price) || price < 0) {
-      Alert.alert("Invalid price", "Please enter a valid price.");
-      return;
-    }
-    if (isNaN(capacity) || capacity < 1) {
-      Alert.alert("Invalid capacity", "Please enter a valid capacity.");
-      return;
-    }
+    const localErrs: Record<string, string> = {};
+    if (!editForm.title.trim()) localErrs.title = "Title is required.";
+    if (!editForm.description.trim()) localErrs.description = "Description is required.";
+    if (!editForm.location.trim()) localErrs.location = "Location is required.";
+    if (isNaN(price) || price < 0) localErrs.price = "Please enter a valid price.";
+    if (isNaN(capacity) || capacity < 1) localErrs.capacity = "Please enter a valid capacity.";
     if ((editingEvent.type === "pub" || editForm.category === "Pubs") && editForm.freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(editForm.freeEntryBeforeTime)) {
-      Alert.alert("Invalid before time", "Please use HH:mm 24-hour format (e.g. 22:00).");
+      localErrs.freeEntryBeforeTime = "Use HH:mm 24-hour format (e.g. 22:00).";
+    }
+    if (Object.keys(localErrs).length > 0) {
+      setEditFormErrors(localErrs);
+      Alert.alert("Please fix these fields", Object.entries(localErrs).map(([k, v]) => `• ${k}: ${v}`).join("\n"));
       return;
     }
     updateEventMut.mutate({
@@ -1276,8 +1294,8 @@ export default function VendorDashboardScreen() {
           ? "We trimmed your description to the 300-character limit before saving."
           : "Your profile has been updated.",
       );
-    } catch {
-      Alert.alert("Error", "Failed to save profile. Please try again.");
+    } catch (err: any) {
+      handleMutationError(err, "Failed to save profile. Please try again.");
     } finally {
       setProfSaving(false);
     }
@@ -1347,8 +1365,8 @@ export default function VendorDashboardScreen() {
       qc.invalidateQueries({ queryKey: getGetMyVendorQueryKey() });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Saved", "Venue details have been updated.");
-    } catch {
-      Alert.alert("Error", "Failed to save venue details. Please try again.");
+    } catch (err: any) {
+      handleMutationError(err, "Failed to save venue details. Please try again.");
     } finally {
       setListingSaving(false);
     }

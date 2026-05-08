@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -25,12 +24,14 @@ export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   async function handleSubmit() {
+    setEmailError("");
     if (!email.trim()) {
-      Alert.alert(t("common.error"), t("auth.enter_email"));
+      setEmailError(t("auth.enter_email"));
       return;
     }
     setLoading(true);
@@ -41,8 +42,13 @@ export default function ForgotPasswordScreen() {
         headers: { "Content-Type": "application/json" },
       });
       setSent(true);
-    } catch {
-      setSent(true);
+    } catch (e: any) {
+      const fe: Record<string, string> = e?.data?.fieldErrors ?? e?.fieldErrors ?? {};
+      if (fe.email) {
+        setEmailError(fe.email);
+      } else {
+        setSent(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,12 +103,12 @@ export default function ForgotPasswordScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.field}>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>{t("auth.email_address")}</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: emailError ? colors.destructive : colors.border }]}>
                 <Ionicons name="mail-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(v) => { setEmail(v); if (emailError) setEmailError(""); }}
                   placeholder={t("auth.email_placeholder")}
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType="email-address"
@@ -111,6 +117,7 @@ export default function ForgotPasswordScreen() {
                   autoFocus
                 />
               </View>
+              {emailError ? <Text style={{ fontSize: 12, color: colors.destructive, marginTop: 2, fontFamily: "Inter_400Regular" }}>{emailError}</Text> : null}
             </View>
 
             <TouchableOpacity

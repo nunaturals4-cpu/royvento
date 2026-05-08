@@ -85,8 +85,21 @@ export function Register() {
     } catch (err: any) {
       const status = err?.status;
       const serverMsg = err?.data?.error ?? err?.message ?? "";
+      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
       const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);
-      if (isDuplicate) {
+      if (Object.keys(fe).length > 0) {
+        setErrors((p) => ({
+          ...p,
+          ...(fe.name ? { name: fe.name } : {}),
+          ...(fe.email ? { email: fe.email } : {}),
+          ...(fe.phone ? { phone: fe.phone } : {}),
+          ...(fe.password ? { password: fe.password } : {}),
+        }));
+        if (fe.name) nameRef.current?.focus();
+        else if (fe.email) emailRef.current?.focus();
+        else if (fe.phone) phoneRef.current?.focus();
+        else if (fe.password) passwordRef.current?.focus();
+      } else if (isDuplicate) {
         setErrors((p) => ({ ...p, email: "An account with this email already exists." }));
         emailRef.current?.focus();
       } else {

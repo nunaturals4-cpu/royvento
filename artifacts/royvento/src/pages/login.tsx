@@ -75,7 +75,16 @@ export function Login() {
         onError: (err: any) => {
           const code = err?.data?.code ?? err?.code;
           const serverMsg = err?.data?.error ?? err?.message ?? "";
-          if (code === "EMAIL_NOT_VERIFIED" || /EMAIL_NOT_VERIFIED|verify your email/i.test(serverMsg)) {
+          const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+          if (fe.email || fe.password) {
+            setErrors((p) => ({
+              ...p,
+              ...(fe.email ? { email: fe.email } : {}),
+              ...(fe.password ? { password: fe.password } : {}),
+            }));
+            if (fe.email) emailRef.current?.focus();
+            else passwordRef.current?.focus();
+          } else if (code === "EMAIL_NOT_VERIFIED" || /EMAIL_NOT_VERIFIED|verify your email/i.test(serverMsg)) {
             setUnverifiedEmail(email);
           } else if (code === "NO_ACCOUNT" || err?.status === 404) {
             setNoAccount(true);

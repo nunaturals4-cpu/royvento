@@ -15,9 +15,11 @@ export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [emailError, setEmailError] = useState<string>("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEmailError("");
     setLoading(true);
     try {
       await apiPost<{ ok: boolean; message: string }>(
@@ -26,7 +28,9 @@ export function ForgotPassword() {
       );
       setSubmitted(true);
     } catch (err: any) {
-      toast({ title: t("auth.error"), description: err?.message, variant: "destructive" });
+      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+      if (fe.email) setEmailError(fe.email);
+      toast({ title: t("auth.error"), description: err?.data?.error ?? err?.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -73,10 +77,12 @@ export function ForgotPassword() {
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(""); }}
+              aria-invalid={!!emailError}
               placeholder="you@example.com"
-              className="bg-black/40 border-white/10 mt-1"
+              className={`bg-black/40 mt-1 ${emailError ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`}
             />
+            {emailError && <p className="text-xs text-destructive mt-1">{emailError}</p>}
           </div>
           <Button
             type="submit"

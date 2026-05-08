@@ -60,7 +60,16 @@ export function ResetPassword() {
       setDone(true);
       setTimeout(() => setLocation("/login"), 3000);
     } catch (err: any) {
-      toast({ title: "Reset failed", description: err?.message ?? "Invalid or expired token.", variant: "destructive" });
+      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+      if (Object.keys(fe).length > 0) {
+        setErrors((p) => ({
+          ...p,
+          ...(fe.newPassword ? { password: fe.newPassword } : {}),
+          ...(fe.password ? { password: fe.password } : {}),
+        }));
+        if (fe.newPassword || fe.password) passwordRef.current?.focus();
+      }
+      toast({ title: "Reset failed", description: err?.data?.error ?? err?.message ?? "Invalid or expired token.", variant: "destructive" });
     } finally {
       setLoading(false);
     }

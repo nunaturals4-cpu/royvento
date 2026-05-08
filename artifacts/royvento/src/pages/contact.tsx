@@ -52,7 +52,18 @@ export function Contact() {
       toast({ title: "Message sent", description: "Our team will get back to you shortly." });
       setName(""); setEmail(""); setPhone(""); setSubject(""); setMessage("");
     } catch (err: any) {
-      toast({ title: "Failed to send", description: err?.message, variant: "destructive" });
+      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+      if (Object.keys(fe).length > 0) {
+        setErrors((p) => ({
+          ...p,
+          ...(fe.name ? { name: fe.name } : {}),
+          ...(fe.email ? { email: fe.email } : {}),
+          ...(fe.phone ? { phone: fe.phone } : {}),
+          ...(fe.subject ? { subject: fe.subject } : {}),
+          ...(fe.message ? { message: fe.message } : {}),
+        }));
+      }
+      toast({ title: "Failed to send", description: err?.data?.error ?? err?.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }

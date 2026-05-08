@@ -106,8 +106,16 @@ export default function ProfileScreen() {
         setEditModal(false);
         Alert.alert(t("profile.saved_title"), t("profile.profile_updated_mobile"));
       },
-      onError: (err: Error) => {
-        Alert.alert(t("common.error"), err.message || t("profile.update_failed"));
+      onError: (err: any) => {
+        const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
+        if (Object.keys(fe).length > 0) {
+          if (fe.name) setEditNameError(fe.name);
+          if (fe.phone) setEditPhoneError(fe.phone);
+          if (fe.name) editNameRef.current?.focus();
+          else if (fe.phone) editPhoneRef.current?.focus();
+          return;
+        }
+        Alert.alert(t("common.error"), err?.data?.error ?? err?.message ?? t("profile.update_failed"));
       },
     },
   });

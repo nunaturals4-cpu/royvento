@@ -64,9 +64,20 @@ export default function ResetPasswordScreen() {
         body: JSON.stringify({ token: resolvedToken, newPassword: password }),
       });
       setDone(true);
-    } catch (e: unknown) {
-      const err = e as { message?: string };
-      Alert.alert("Reset failed", err?.message ?? "Invalid or expired reset token. Please request a new link.");
+    } catch (e: any) {
+      const fe: Record<string, string> = e?.data?.fieldErrors ?? e?.fieldErrors ?? {};
+      if (fe.newPassword || fe.token) {
+        const next: typeof errors = {};
+        if (fe.newPassword) next.password = fe.newPassword;
+        setErrors((p) => ({ ...p, ...next }));
+        if (fe.token) {
+          Alert.alert("Reset failed", fe.token);
+        } else {
+          passwordRef.current?.focus();
+        }
+      } else {
+        Alert.alert("Reset failed", e?.data?.error ?? e?.message ?? "Invalid or expired reset token. Please request a new link.");
+      }
     } finally {
       setLoading(false);
     }
@@ -136,7 +147,7 @@ export default function ResetPasswordScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.field}>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>New Password</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.password ? colors.destructive : colors.border }]}>
                 <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
                   ref={passwordRef}
@@ -183,7 +194,7 @@ export default function ResetPasswordScreen() {
 
             <View style={styles.field}>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>Confirm Password</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.confirm ? colors.destructive : colors.border }]}>
                 <Ionicons name="lock-closed-outline" size={16} color={colors.mutedForeground} />
                 <TextInput
                   ref={confirmRef}
