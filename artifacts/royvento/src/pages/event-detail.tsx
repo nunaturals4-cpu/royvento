@@ -186,6 +186,20 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (me?.user?.name && !personName) setPersonName(me.user.name);
   }, [me?.user?.name]);
 
+  // When arriving with #book in the URL (e.g. from a pub's "Book a Table"
+  // CTA), scroll the booking form into view once the event has loaded so
+  // the user lands directly on the form instead of the cover/intro.
+  useEffect(() => {
+    if (isLoading || !event) return;
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#book") return;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById("book");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isLoading, event]);
+
   // Clear any applied coupon if the selected booking date becomes a
   // free-entry day (subtotal becomes ₹0 and the server refuses to consume
   // a coupon). Mirrors the isFreeEntryDay computation below but is hoisted
@@ -1211,7 +1225,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           )}
         </div>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start space-y-4 order-first lg:order-none">
+        <aside id="book" className="lg:sticky lg:top-24 lg:self-start space-y-4 order-first lg:order-none scroll-mt-24">
           <div className="rounded-3xl glass-card-strong p-7 red-ring">
             {ferDayActive ? (
               <p className="font-serif text-4xl md:text-5xl mt-1 text-green-400 mb-3">{ferHeadline}</p>

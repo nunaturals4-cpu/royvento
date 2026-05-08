@@ -305,7 +305,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
           {pubEvent && (
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <Link
-                href={`/events/${pubEvent.id}`}
+                href={`/events/${pubEvent.id}#book`}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary/90 transition-colors"
               >
                 Book a Table
