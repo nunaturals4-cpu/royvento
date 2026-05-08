@@ -3951,34 +3951,36 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   }) => (
     <div className="space-y-2">
       {items.map((item, idx) => (
-        <div key={idx} className="flex gap-2 items-center">
+        <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <Input
             placeholder="Offer / product name"
             value={item.name}
             onChange={(e) => { const next = [...items]; next[idx] = { ...item, name: e.target.value }; onChange(next); }}
-            className="bg-black/40 border-white/10 flex-1"
+            className="bg-black/40 border-white/10 w-full sm:flex-1 sm:min-w-0"
           />
-          <Input
-            type="number" min="1" placeholder="Qty"
-            value={item.qty}
-            onChange={(e) => { const next = [...items]; next[idx] = { ...item, qty: Math.max(1, parseInt(e.target.value) || 1) }; onChange(next); }}
-            className="bg-black/40 border-white/10 w-20"
-          />
-          <div className="relative w-32">
-            <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <div className="flex gap-2 items-center">
             <Input
-              type="number" min="0" placeholder="Price"
-              value={item.discountedPrice}
-              onChange={(e) => { const next = [...items]; next[idx] = { ...item, discountedPrice: Math.max(0, parseInt(e.target.value) || 0) }; onChange(next); }}
-              className="bg-black/40 border-white/10 pl-7"
+              type="number" min="1" placeholder="Qty"
+              value={item.qty}
+              onChange={(e) => { const next = [...items]; next[idx] = { ...item, qty: Math.max(1, parseInt(e.target.value) || 1) }; onChange(next); }}
+              className="bg-black/40 border-white/10 w-20 flex-shrink-0"
             />
+            <div className="relative w-32 flex-shrink-0">
+              <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                type="number" min="0" placeholder="Price"
+                value={item.discountedPrice}
+                onChange={(e) => { const next = [...items]; next[idx] = { ...item, discountedPrice: Math.max(0, parseInt(e.target.value) || 0) }; onChange(next); }}
+                className="bg-black/40 border-white/10 pl-7"
+              />
+            </div>
+            {items.length > 1 && (
+              <button type="button" onClick={() => onChange(items.filter((_, i) => i !== idx))}
+                className="rounded-lg border border-destructive/30 p-1.5 text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0 ml-auto sm:ml-0">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          {items.length > 1 && (
-            <button type="button" onClick={() => onChange(items.filter((_, i) => i !== idx))}
-              className="rounded-lg border border-destructive/30 p-1.5 text-destructive hover:bg-destructive/10 transition-colors">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
         </div>
       ))}
       <button type="button" onClick={() => onChange([...items, emptyItem()])}

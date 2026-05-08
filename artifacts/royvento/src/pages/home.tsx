@@ -552,30 +552,19 @@ export function Home() {
 
       {/* CTA — Premium */}
       <section className="container mx-auto px-4 md:px-6 py-24">
-        <div className="relative rounded-[2rem] overflow-hidden glass-card-strong red-glow p-10 md:p-16 grid md:grid-cols-[1.4fr_1fr] gap-10 items-center border border-primary/20">
-          <div className="absolute -top-20 -right-20 h-80 w-80 rounded-full bg-primary/25 blur-3xl pointer-events-none" />
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-5">
+        <div className="relative rounded-[2rem] overflow-hidden glass-card-strong red-glow p-10 md:p-16 border border-primary/20 text-center">
+          <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-80 w-[32rem] max-w-full rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 h-72 w-[28rem] max-w-full rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+          <div className="relative mx-auto max-w-3xl flex flex-col items-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-6">
               <Crown className="h-3.5 w-3.5" /> {t("home.premium_badge")}
             </div>
             <h2 className="font-serif text-3xl md:text-5xl tracking-tight italic leading-tight">
               {t("home.premium_heading")}
             </h2>
-            <p className="mt-5 text-white/70 max-w-xl leading-relaxed">
+            <p className="mt-5 text-white/70 leading-relaxed md:text-lg">
               {t("home.premium_sub")}
             </p>
-          </div>
-          <div className="relative flex flex-col gap-3">
-            <Link href="/subscription">
-              <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0 h-12 rounded-full">
-                {t("profile.subscription_premium")}
-              </Button>
-            </Link>
-            <Link href="/dashboard/become-vendor">
-              <Button size="lg" variant="outline" className="w-full border-white/20 hover:bg-white/5 h-12 rounded-full">
-                {t("profile.become_partner")}
-              </Button>
-            </Link>
           </div>
         </div>
       </section>
