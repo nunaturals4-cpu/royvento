@@ -617,6 +617,7 @@ function AllVendorsAdmin() {
   const [editForm, setEditForm] = useState<Partial<AdminVendor>>({});
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const vendorFormErrors = useFormErrors();
   const approve = useApproveVendor();
   const reject = useRejectVendor();
 
@@ -639,16 +640,19 @@ function AllVendorsAdmin() {
   const startEdit = (v: AdminVendor) => {
     setEditingId(v.id);
     setEditForm({ businessName: v.businessName, description: v.description, category: v.category, status: v.status, city: v.city, state: v.state, country: v.country });
+    vendorFormErrors.reset();
   };
 
   const saveEdit = async (id: number) => {
     setSaving(true);
+    vendorFormErrors.reset();
     try {
       await apiPatch(`/api/admin/vendors/${id}`, editForm);
       toast({ title: "Partner updated" });
       setEditingId(null);
       load(page);
     } catch (e: any) {
+      vendorFormErrors.setFromError(e);
       toast({ title: "Failed to save", description: e?.message, variant: "destructive" });
     } finally {
       setSaving(false);
@@ -731,22 +735,25 @@ function AllVendorsAdmin() {
           {editingId === v.id && (
             <div className="border-t border-white/10 p-5 bg-black/20 space-y-4">
               <p className="text-sm font-medium">Edit partner profile</p>
+              {vendorFormErrors.topError && <p className="text-xs text-red-400">{vendorFormErrors.topError}</p>}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Business name</Label>
                   <Input
                     value={editForm.businessName ?? ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, businessName: e.target.value }))}
-                    className="bg-black/40 border-white/10 h-9 text-sm"
+                    onChange={(e) => { setEditForm((f) => ({ ...f, businessName: e.target.value })); vendorFormErrors.clearField("businessName"); }}
+                    className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("businessName"))}
                   />
+                  {vendorFormErrors.fieldError("businessName") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("businessName")}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Category</Label>
                   <Input
                     value={editForm.category ?? ""}
-                    onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
-                    className="bg-black/40 border-white/10 h-9 text-sm"
+                    onChange={(e) => { setEditForm((f) => ({ ...f, category: e.target.value })); vendorFormErrors.clearField("category"); }}
+                    className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("category"))}
                   />
+                  {vendorFormErrors.fieldError("category") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("category")}</p>}
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-xs">Location</Label>
@@ -754,17 +761,20 @@ function AllVendorsAdmin() {
                     country={editForm.country ?? ""}
                     state={editForm.state ?? ""}
                     city={editForm.city ?? ""}
-                    onChange={(loc) => setEditForm((f) => ({ ...f, country: loc.country, state: loc.state, city: loc.city }))}
+                    onChange={(loc) => { setEditForm((f) => ({ ...f, country: loc.country, state: loc.state, city: loc.city })); vendorFormErrors.clearField("country"); vendorFormErrors.clearField("state"); vendorFormErrors.clearField("city"); }}
                     className="[&>button]:bg-black/40 [&>button]:border-white/10"
                   />
+                  {(vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")) && (
+                    <p className="text-xs text-red-400">{vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Status</Label>
                   <Select
                     value={editForm.status ?? "pending"}
-                    onValueChange={(val) => setEditForm((f) => ({ ...f, status: val }))}
+                    onValueChange={(val) => { setEditForm((f) => ({ ...f, status: val })); vendorFormErrors.clearField("status"); }}
                   >
-                    <SelectTrigger className="bg-black/40 border-white/10 h-9 text-sm">
+                    <SelectTrigger className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("status"))}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -773,6 +783,7 @@ function AllVendorsAdmin() {
                       <SelectItem value="rejected">Rejected</SelectItem>
                     </SelectContent>
                   </Select>
+                  {vendorFormErrors.fieldError("status") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("status")}</p>}
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -780,9 +791,10 @@ function AllVendorsAdmin() {
                 <Textarea
                   rows={3}
                   value={editForm.description ?? ""}
-                  onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-                  className="bg-black/40 border-white/10 text-sm"
+                  onChange={(e) => { setEditForm((f) => ({ ...f, description: e.target.value })); vendorFormErrors.clearField("description"); }}
+                  className={fieldClass("bg-black/40 border-white/10 text-sm", vendorFormErrors.fieldError("description"))}
                 />
+                {vendorFormErrors.fieldError("description") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("description")}</p>}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -852,6 +864,7 @@ function EventApprovalsAdmin() {
   const [rejecting, setRejecting] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const { toast } = useToast();
+  const eventFormErrors = useFormErrors();
 
   const load = () => {
     setLoading(true);
@@ -874,9 +887,11 @@ function EventApprovalsAdmin() {
 
   const reject = async (id: number) => {
     if (!reason.trim()) {
+      eventFormErrors.setFieldError("rejectionReason", "Please provide a reason for rejection.");
       toast({ title: "Please provide a reason for rejection", variant: "destructive" });
       return;
     }
+    eventFormErrors.reset();
     try {
       await apiPatch(`/api/admin/events/${id}`, { approvalStatus: "rejected", rejectionReason: reason.trim() });
       toast({ title: "Event rejected" });
@@ -884,6 +899,7 @@ function EventApprovalsAdmin() {
       setReason("");
       load();
     } catch (e: any) {
+      eventFormErrors.setFromError(e);
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
     }
   };
@@ -940,13 +956,15 @@ function EventApprovalsAdmin() {
           {rejecting === e.id ? (
             <div className="border-t border-white/10 p-4 space-y-3 bg-red-900/10">
               <p className="text-sm font-medium text-red-300">Reason for rejection (required)</p>
+              {eventFormErrors.topError && <p className="text-xs text-red-400">{eventFormErrors.topError}</p>}
               <Textarea
                 value={reason}
-                onChange={(ev) => setReason(ev.target.value)}
+                onChange={(ev) => { setReason(ev.target.value); eventFormErrors.clearField("rejectionReason"); }}
                 rows={2}
                 placeholder="E.g. Incomplete information, inappropriate content…"
-                className="bg-black/40 border-white/10"
+                className={fieldClass("bg-black/40 border-white/10", eventFormErrors.fieldError("rejectionReason"))}
               />
+              {eventFormErrors.fieldError("rejectionReason") && <p className="text-xs text-red-400">{eventFormErrors.fieldError("rejectionReason")}</p>}
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => reject(e.id)} className="bg-red-700 hover:bg-red-600 border-0">
                   <XCircle className="h-4 w-4 mr-1" /> Confirm rejection
