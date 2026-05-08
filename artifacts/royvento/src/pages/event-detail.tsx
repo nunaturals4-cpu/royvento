@@ -6,6 +6,9 @@ import { eventDetailSlug, pubDetailSlug } from "@/lib/seo-slug";
 import {
   useGetEvent,
   useListEventReviews,
+  getListEventReviewsQueryKey,
+  getListVendorReviewsQueryKey,
+  getGetReviewEligibilityQueryKey,
   useListVendorAvailability,
   useCreateReview,
   useUpdateReview,
@@ -131,11 +134,20 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const handleEditReview = (r: { id: number; rating: number; comment?: string | null }) => {
     setEditingReviewId(r.id); setEditRating(r.rating); setEditComment(r.comment ?? "");
   };
+  const invalidateReviewQueries = () => {
+    refetchReviews();
+    refetchEligibility();
+    qc.invalidateQueries({ queryKey: getListEventReviewsQueryKey(id) });
+    if (eventVendorId > 0) {
+      qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(eventVendorId) });
+      qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(eventVendorId) });
+    }
+  };
   const saveEditReview = (rid: number) => {
     updateReview.mutate(
       { reviewId: rid, data: { rating: editRating, comment: editComment } },
       {
-        onSuccess: () => { setEditingReviewId(null); refetchReviews(); toast({ title: "Review updated" }); },
+        onSuccess: () => { setEditingReviewId(null); invalidateReviewQueries(); toast({ title: "Review updated" }); },
         onError: (e: unknown) => toast({ title: "Could not update review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
       },
     );
@@ -145,7 +157,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     deleteReview.mutate(
       { reviewId: rid },
       {
-        onSuccess: () => { refetchReviews(); refetchEligibility(); toast({ title: "Review deleted" }); },
+        onSuccess: () => { invalidateReviewQueries(); toast({ title: "Review deleted" }); },
         onError: (e: unknown) => toast({ title: "Could not delete review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
       },
     );

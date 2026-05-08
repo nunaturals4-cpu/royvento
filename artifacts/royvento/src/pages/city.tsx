@@ -205,7 +205,7 @@ export function City() {
           <h2 className="font-serif text-2xl mb-6">Top {Math.min(10, topPubs.length)} pubs in {cityName}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {topPubs.map((v) => (
-              <EventCard key={v.id} event={vendorToCardEvent(v)} hidePubBadge />
+              <EventCard key={v.id} event={vendorToCardEvent(v)} hidePubBadge directBooking />
             ))}
           </div>
         </>

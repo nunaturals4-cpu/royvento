@@ -11,11 +11,16 @@ interface WishlistEvent {
   id: number;
   title: string;
   category: string;
+  type?: string;
   city: string;
   country: string;
   price: number | null;
   imageUrl: string;
   wishlistId: number;
+}
+
+function detailHref(item: WishlistEvent): string {
+  return item.type === "pub" ? `/events/${item.id}#book` : `/events/${item.id}`;
 }
 
 export function Wishlist() {
@@ -66,7 +71,7 @@ export function Wishlist() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map((item) => (
             <div key={item.id} className="group glass-card-strong rounded-2xl overflow-hidden border border-border hover:border-primary/30 transition-all flex flex-col">
-              <Link href={`/events/${item.id}`} className="block">
+              <Link href={detailHref(item)} className="block">
                 <div className="relative aspect-[4/3] overflow-hidden">
                   {item.imageUrl ? (
                     <img
@@ -84,7 +89,7 @@ export function Wishlist() {
               </Link>
               <div className="p-4 flex flex-col flex-1">
                 <Badge variant="secondary" className="mb-2 w-fit text-xs">{item.category}</Badge>
-                <Link href={`/events/${item.id}`}>
+                <Link href={detailHref(item)}>
                   <h3 className="font-semibold leading-snug hover:text-primary transition-colors cursor-pointer line-clamp-2">
                     {item.title}
                   </h3>
@@ -100,8 +105,8 @@ export function Wishlist() {
                   </p>
                 )}
                 <div className="mt-auto pt-3 flex gap-2">
-                  <Link href={`/events/${item.id}`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full text-xs">View listing</Button>
+                  <Link href={detailHref(item)} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs">{item.type === "pub" ? "Book a table" : "View listing"}</Button>
                   </Link>
                   <Button
                     variant="ghost"

@@ -109,6 +109,7 @@ export default function WishlistScreen() {
                 type={item.type}
                 rating={item.rating}
                 reviewCount={item.reviewCount}
+                directBooking={item.type === "pub"}
                 compact
                 style={{ width: "100%" }}
               />

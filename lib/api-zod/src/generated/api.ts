@@ -263,7 +263,7 @@ export const ListVendorsResponseItem = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -315,9 +315,7 @@ export const GetMyVendorResponse = zod.object({
         .union([
           zod.object({
             enabled: zod.boolean(),
-            genders: zod.array(
-              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-            ),
+            genders: zod.array(zod.enum(["women", "men", "couple"])),
             days: zod.array(
               zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
             ),
@@ -388,7 +386,7 @@ export const CreateMyVendorResponse = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -453,7 +451,7 @@ export const UpdateMyVendorResponse = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -509,7 +507,7 @@ export const GetVendorResponse = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -558,7 +556,7 @@ export const ListPendingVendorsResponseItem = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -616,7 +614,7 @@ export const ApproveVendorResponse = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -672,7 +670,7 @@ export const RejectVendorResponse = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -998,7 +996,7 @@ export const ListEventsResponseItem = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -1265,9 +1263,7 @@ export const CreateEventBody = zod
         zod
           .object({
             enabled: zod.boolean(),
-            genders: zod.array(
-              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-            ),
+            genders: zod.array(zod.enum(["women", "men", "couple"])),
             days: zod.array(
               zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
             ),
@@ -1326,7 +1322,7 @@ export const CreateEventResponse = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -1385,7 +1381,7 @@ export const ListFeaturedEventsResponseItem = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -1457,9 +1453,7 @@ export const GetEventResponse = zod
       .union([
         zod.object({
           enabled: zod.boolean(),
-          genders: zod.array(
-            zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-          ),
+          genders: zod.array(zod.enum(["women", "men", "couple"])),
           days: zod.array(
             zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
           ),
@@ -1501,9 +1495,7 @@ export const GetEventResponse = zod
           .union([
             zod.object({
               enabled: zod.boolean(),
-              genders: zod.array(
-                zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-              ),
+              genders: zod.array(zod.enum(["women", "men", "couple"])),
               days: zod.array(
                 zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
               ),
@@ -1782,9 +1774,7 @@ export const UpdateEventBody = zod
         zod
           .object({
             enabled: zod.boolean(),
-            genders: zod.array(
-              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-            ),
+            genders: zod.array(zod.enum(["women", "men", "couple"])),
             days: zod.array(
               zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
             ),
@@ -1843,7 +1833,7 @@ export const UpdateEventResponse = zod.object({
     .union([
       zod.object({
         enabled: zod.boolean(),
-        genders: zod.array(zod.enum(["Everyone", "Ladies", "Men", "Couples"])),
+        genders: zod.array(zod.enum(["women", "men", "couple"])),
         days: zod.array(
           zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
         ),
@@ -1932,9 +1922,7 @@ export const ListMyVendorEventsResponse = zod.object({
         .union([
           zod.object({
             enabled: zod.boolean(),
-            genders: zod.array(
-              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-            ),
+            genders: zod.array(zod.enum(["women", "men", "couple"])),
             days: zod.array(
               zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
             ),
@@ -4072,9 +4060,7 @@ export const GetWishlistResponseItem = zod
       .union([
         zod.object({
           enabled: zod.boolean(),
-          genders: zod.array(
-            zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-          ),
+          genders: zod.array(zod.enum(["women", "men", "couple"])),
           days: zod.array(
             zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
           ),

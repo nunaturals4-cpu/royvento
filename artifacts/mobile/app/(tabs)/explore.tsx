@@ -316,6 +316,7 @@ export default function ExploreScreen() {
               reviewCount={item.reviewCount}
               freeEntryRules={item.freeEntryRules}
               hasDrinkPlans={item.hasDrinkPlans}
+              directBooking={item.type === "pub"}
               compact
               style={{ width: "100%" }}
             />

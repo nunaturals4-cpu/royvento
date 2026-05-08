@@ -272,7 +272,7 @@ export function CitySecondary() {
           {topPubs.length > 0 && (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
               {topPubs.map((v) => (
-                <EventCard key={v.id} event={vendorToCardEvent(v)} hidePubBadge />
+                <EventCard key={v.id} event={vendorToCardEvent(v)} hidePubBadge directBooking />
               ))}
             </div>
           )}
@@ -282,7 +282,7 @@ export function CitySecondary() {
           <h2 className="font-serif text-2xl mb-6">Top picks {!isCategory ? `in ${localityName}` : ""}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {topPubs.map((v) => (
-              <EventCard key={v.id} event={vendorToCardEvent(v)} hidePubBadge />
+              <EventCard key={v.id} event={vendorToCardEvent(v)} hidePubBadge directBooking />
             ))}
           </div>
         </>

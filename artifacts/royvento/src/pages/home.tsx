@@ -262,7 +262,7 @@ export function Home() {
             seeAllLabel={t("home.view_all_events")}
           />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {sortedPopular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} />)}
+            {sortedPopular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} directBooking={e.type === "pub"} />)}
           </div>
         </section>
       )}
@@ -379,7 +379,7 @@ export function Home() {
           seeAllLabel={t("home.view_all")}
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {featured.map((e) => <EventCard key={e.id} event={e as any} />)}
+          {featured.map((e) => <EventCard key={e.id} event={e as any} directBooking={(e as any).type === "pub"} />)}
         </div>
       </section>
 
@@ -467,7 +467,7 @@ export function Home() {
             seeAllLabel={t("home.view_all_pubs")}
           />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge />)}
+            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
           </div>
         </section>
       )}

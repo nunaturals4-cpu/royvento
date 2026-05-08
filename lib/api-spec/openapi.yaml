@@ -2163,7 +2163,7 @@ components:
           type: array
           items:
             type: string
-            enum: [Everyone, Ladies, Men, Couples]
+            enum: [women, men, couple]
         days:
           type: array
           items:

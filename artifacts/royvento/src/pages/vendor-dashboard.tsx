@@ -1412,7 +1412,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   );
 }
 
-function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () => void; onSaved: () => void }) {
+function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { event: any; vendor: any; onBack: () => void; onSaved: () => void; onVenueSaved?: () => void }) {
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? "");
   const [imageUrl, setImageUrl] = useState(event.imageUrl ?? "");
@@ -1441,6 +1441,67 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
   const { toast } = useToast();
   const isPub = event.type === "pub";
   const [videoCompressing, setVideoCompressing] = useState(false);
+
+  // ── Venue details state (pub-only, mirrors EventForm) ──
+  const [venueDanceFloor, setVenueDanceFloor] = useState<string>(vendor?.danceFloor ?? "");
+  const [venueDanceFloorPhotos, setVenueDanceFloorPhotos] = useState<string[]>(
+    Array.isArray(vendor?.danceFloorPhotos) ? vendor.danceFloorPhotos : []
+  );
+  const [uploadingDfPhoto, setUploadingDfPhoto] = useState(false);
+  const [venueMenuUrls, setVenueMenuUrls] = useState<string[]>(
+    Array.isArray(vendor?.menuUrls) && vendor.menuUrls.length > 0
+      ? vendor.menuUrls
+      : vendor?.menuUrl ? [vendor.menuUrl] : []
+  );
+  const [uploadingVenueMenu, setUploadingVenueMenu] = useState(false);
+  const [savingVenue, setSavingVenue] = useState(false);
+
+  const uploadVenueMenuFile = async (file: File): Promise<string> => {
+    const res = await fetch("/api/partner/menu-upload", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error ?? "Could not get upload URL");
+    }
+    const { uploadURL, objectPath } = await res.json();
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    if (!put.ok) throw new Error("Upload failed");
+    return `${window.location.origin}/api/storage${objectPath}`;
+  };
+
+  const uploadVenueDanceFloorPhoto = async (file: File): Promise<string> => {
+    const res = await fetch("/api/storage/uploads/request-url", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+    });
+    if (!res.ok) throw new Error("Could not get upload URL");
+    const { uploadURL, objectPath } = await res.json();
+    const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+    if (!put.ok) throw new Error("Upload failed");
+    return `/api/storage${objectPath}`;
+  };
+
+  const saveVenueDetails = async () => {
+    setSavingVenue(true);
+    try {
+      await apiPatch("/api/partner/profile", {
+        danceFloor: venueDanceFloor || null,
+        danceFloorPhotos: venueDanceFloorPhotos,
+        menuUrl: venueMenuUrls[0] ?? "",
+        menuUrls: venueMenuUrls,
+      });
+      toast({ title: "Venue details saved" });
+      onVenueSaved?.();
+    } catch (err: unknown) {
+      toast({ title: "Venue details not saved", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingVenue(false);
+    }
+  };
 
   const onImageFile = async (f: File | null) => {
     if (!f) return;
@@ -1766,6 +1827,110 @@ function EditListingForm({ event, onBack, onSaved }: { event: any; onBack: () =>
             </div>
           </>
         )}
+        {isPub && (
+          <div className="border-t border-white/10 pt-5 space-y-5">
+            <p className="font-serif text-lg flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" />Venue Details
+            </p>
+
+            {/* Dance floor */}
+            <div>
+              <Label className="mb-3 block text-sm font-medium">Dance floor</Label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                {DANCE_FLOOR_OPTIONS.map(({ value, label }) => (
+                  <label
+                    key={value}
+                    className={`flex items-center gap-2.5 cursor-pointer rounded-xl border px-4 py-3 text-sm transition-colors flex-1 ${
+                      venueDanceFloor === value
+                        ? "border-primary/50 bg-primary/10 text-foreground"
+                        : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"
+                    }`}
+                  >
+                    <input type="radio" name="editVenueDanceFloor" value={value} checked={venueDanceFloor === value} onChange={() => setVenueDanceFloor(value)} className="accent-primary" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {venueDanceFloor === "dedicated" && (
+              <div>
+                <Label className="mb-2 block text-sm font-medium flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5 text-primary" />Dance floor photos
+                  <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                </Label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {venueDanceFloorPhotos.map((url, i) => (
+                    <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-white/10">
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => setVenueDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 className="h-4 w-4 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                  <label className={`flex flex-col items-center justify-center w-20 h-20 rounded-lg border border-dashed cursor-pointer transition-colors ${uploadingDfPhoto ? "opacity-50 pointer-events-none" : "border-white/20 hover:border-primary/50 bg-black/20 hover:bg-primary/5"}`}>
+                    {uploadingDfPhoto ? (
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <><Upload className="h-4 w-4 text-muted-foreground mb-1" /><span className="text-xs text-muted-foreground">Add</span></>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" multiple onChange={async (e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      if (!files.length) return;
+                      setUploadingDfPhoto(true);
+                      try {
+                        const urls = await Promise.all(files.map((f) => uploadVenueDanceFloorPhoto(f)));
+                        setVenueDanceFloorPhotos((prev) => [...prev, ...urls]);
+                      } catch { toast({ title: "Photo upload failed", variant: "destructive" }); }
+                      finally { setUploadingDfPhoto(false); e.target.value = ""; }
+                    }} />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Pub menu */}
+            <div>
+              <Label className="flex items-center gap-1.5 mb-2">
+                <Upload className="h-3.5 w-3.5 text-primary" />
+                Pub menu <span className="text-muted-foreground font-normal text-xs">(PDF or image, up to 5 files)</span>
+              </Label>
+              <div className="space-y-2">
+                {venueMenuUrls.length > 0 && (
+                  <div className="space-y-1.5">
+                    {venueMenuUrls.map((url, idx) => (
+                      <div key={idx} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex-1 truncate">Menu {idx + 1}</a>
+                        <button type="button" onClick={() => setVenueMenuUrls((prev) => prev.filter((_, i) => i !== idx))} className="text-xs text-muted-foreground hover:text-destructive shrink-0">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {venueMenuUrls.length < 5 && (
+                  <label className={`flex items-center gap-2 cursor-pointer rounded-xl border border-dashed px-4 py-3 transition-colors ${uploadingVenueMenu ? "opacity-50 pointer-events-none border-white/10" : "border-white/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+                    <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground text-xs">{uploadingVenueMenu ? "Uploading…" : `Add menu file (${venueMenuUrls.length}/5)`}</span>
+                    <input type="file" accept="application/pdf,image/*" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadingVenueMenu(true);
+                      try {
+                        const url = await uploadVenueMenuFile(file);
+                        setVenueMenuUrls((prev) => [...prev, url]);
+                        toast({ title: "Menu uploaded" });
+                      } catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
+                      finally { setUploadingVenueMenu(false); e.target.value = ""; }
+                    }} />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            <Button type="button" disabled={savingVenue} onClick={saveVenueDetails} variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
+              {savingVenue ? "Saving…" : "Save Venue Details"}
+            </Button>
+          </div>
+        )}
         <div className="flex gap-3 justify-end pt-2 border-t border-white/10">
           <Button type="button" variant="outline" onClick={onBack}>Cancel</Button>
           <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">Save changes</Button>
@@ -1778,7 +1943,7 @@ export function VendorListingEditPage() {
   const [, params] = useRoute("/dashboard/vendor/listings/:id/edit");
   const eventId = params ? Number(params.id) : null;
   const [, navigate] = useLocation();
-  const { data: vendorData, isLoading: vendorLoading } = useGetMyVendor();
+  const { data: vendorData, isLoading: vendorLoading, refetch: refetchVendor } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
   const { data: eventsResp2, isLoading: eventsLoading } = useListMyVendorEvents(undefined, { query: { enabled: !!vendor } as any });
   const event = (eventsResp2?.data ?? []).find((e: any) => e.id === eventId) ?? null;
@@ -1805,7 +1970,7 @@ export function VendorListingEditPage() {
         <div className="text-muted-foreground text-sm py-10 text-center">Listing not found.</div>
       ) : (
         <div className="rounded-3xl glass-card-strong p-6">
-          <EditListingForm event={event} onBack={goBack} onSaved={goBack} />
+          <EditListingForm event={event} vendor={vendor} onBack={goBack} onSaved={goBack} onVenueSaved={() => { refetchVendor(); }} />
         </div>
       )}
     </div>

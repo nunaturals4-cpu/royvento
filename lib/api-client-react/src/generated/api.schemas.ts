@@ -9,10 +9,9 @@ export type FreeEntryRulesGendersItem =
   (typeof FreeEntryRulesGendersItem)[keyof typeof FreeEntryRulesGendersItem];
 
 export const FreeEntryRulesGendersItem = {
-  Everyone: "Everyone",
-  Ladies: "Ladies",
-  Men: "Men",
-  Couples: "Couples",
+  women: "women",
+  men: "men",
+  couple: "couple",
 } as const;
 
 export type FreeEntryRulesDaysItem =

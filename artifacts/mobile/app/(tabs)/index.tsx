@@ -213,6 +213,7 @@ export default function HomeScreen() {
                 reviewCount={item.reviewCount}
                 hasDrinkPlans={item.hasDrinkPlans}
                 freeEntryRules={item.freeEntryRules}
+                directBooking
               />
             )}
           />
@@ -354,6 +355,7 @@ export default function HomeScreen() {
                 reviewCount={item.reviewCount}
                 hasDrinkPlans={item.hasDrinkPlans}
                 freeEntryRules={item.freeEntryRules}
+                directBooking={item.type === "pub"}
               />
             )}
           />

@@ -237,7 +237,7 @@ export function Explore() {
       ) : (
         <>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEvents.map((e) => <EventCard key={e.id} event={e} />)}
+            {filteredEvents.map((e) => <EventCard key={e.id} event={e} directBooking={e.type === "pub"} />)}
           </div>
           {hasNextPage && (
             <div className="flex justify-center mt-10">
