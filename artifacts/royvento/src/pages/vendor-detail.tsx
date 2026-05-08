@@ -89,18 +89,18 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
 
   // Track this profile view for the partner's leads/CRM. Skipped when the
   // visitor IS the partner who owns this pub (defence-in-depth — server
-  // also drops self-views). A useRef boolean blocks React StrictMode's
-  // intentional double-invocation in dev (same component instance =>
-  // same ref) but does NOT suppress legitimate revisits: navigating away
-  // and back creates a new mount with a fresh ref, so visitCount /
-  // lastViewedAt update on every real visit.
-  const viewedFiredRef = useRef(false);
+  // also drops self-views). The ref tracks the last vendorId we already
+  // POSTed for in this component instance: it blocks React StrictMode's
+  // intentional double-invocation in dev (same component => same ref =>
+  // same id) but legitimate navigations to a different partner reset the
+  // guard so the new vendor's profile view is recorded exactly once.
+  const lastTrackedVendorIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (!id || !vendor) return;
     // `vendor` is the generated Vendor schema (already includes `userId`).
     if (me?.user && vendor.userId === me.user.id) return;
-    if (viewedFiredRef.current) return;
-    viewedFiredRef.current = true;
+    if (lastTrackedVendorIdRef.current === id) return;
+    lastTrackedVendorIdRef.current = id;
     apiPost(`/api/partners/${id}/view`, {}).catch(() => {});
   }, [id, vendor, me?.user?.id]);
 

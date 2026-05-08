@@ -217,6 +217,23 @@ const DEFAULT_EVENT_FORM: EventFormState = {
 
 // ─── Drink Plans Tab Component ────────────────────────────────────────────────
 
+// Wire shape for ticket-plan line items (always numeric, as returned by
+// the API and persisted to the DB).
+interface DrinkPlanLineItemWire { name: string; qty: number; discountedPrice: number; }
+
+// Editor shape — `discountedPrice` is `number | ""` so a fresh row's price
+// field renders an empty placeholder instead of "0". Coerced to a number
+// at submit time via `lineItemForWire()`.
+interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number | ""; }
+
+const lineItemForWire = (i: DrinkPlanLineItem): DrinkPlanLineItemWire => ({
+  name: i.name,
+  qty: Math.max(1, Number(i.qty) || 1),
+  discountedPrice: i.discountedPrice === "" ? 0 : Math.max(0, Number(i.discountedPrice) || 0),
+});
+
+const emptyLineItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: "" });
+
 interface DrinkPlan {
   id: number;
   type: string;
@@ -227,7 +244,7 @@ interface DrinkPlan {
   timeFrom: string;
   timeTo: string;
   description: string;
-  lineItems: { name: string; qty: number; discountedPrice: number }[] | null;
+  lineItems: DrinkPlanLineItemWire[] | null;
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
   validUntil?: string | null;
@@ -250,6 +267,7 @@ interface DrinkPlanFormState {
   foodDiscountLabel: string;
   validFrom: string;
   validUntil: string;
+  lineItems: DrinkPlanLineItem[];
 }
 
 const BLANK_PLAN: DrinkPlanFormState = {
@@ -265,6 +283,7 @@ const BLANK_PLAN: DrinkPlanFormState = {
   foodDiscountLabel: "",
   validFrom: "",
   validUntil: "",
+  lineItems: [emptyLineItem()],
 };
 
 function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: ReturnType<typeof useColors> }) {
@@ -286,6 +305,20 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
     setSaving(true);
     const isFreeEntryAdd = !editId && (freeEntryTypes.includes("welcome") || freeEntryTypes.includes("unlimited"))
       && (form.type === "welcome" || form.type === "unlimited");
+    // For ticket plans, drop empty-name rows then coerce editor "" → 0 on
+    // discountedPrice. Mirrors the web LineItemsEditor flow.
+    const isTicket = form.type === "ticket";
+    if (isTicket && form.lineItems.some((i) => !i.name.trim())) {
+      const allBlank = form.lineItems.every((i) => !i.name.trim());
+      if (!allBlank) {
+        Alert.alert("Each ticket item must have a name");
+        setSaving(false);
+        return;
+      }
+    }
+    const ticketLineItems = isTicket
+      ? form.lineItems.filter((i) => i.name.trim()).map(lineItemForWire)
+      : undefined;
     try {
       const commonBody = {
         productName: form.productName.trim(),
@@ -299,6 +332,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
         foodDiscountLabel: form.foodDiscountLabel.trim(),
         validFrom: form.validFrom.trim() || null,
         validUntil: form.validUntil.trim() || null,
+        ...(isTicket ? { lineItems: ticketLineItems } : {}),
       };
       if (editId) {
         await customFetch(`/api/vendors/me/drink-plans/${editId}`, {
@@ -426,6 +460,12 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   foodDiscountLabel: plan.foodDiscountLabel ?? "",
                   validFrom: plan.validFrom ?? "",
                   validUntil: plan.validUntil ?? "",
+                  // Hydrate ticket plans' line items into the editor shape
+                  // (`number | ""`). Wire shape comes back numeric so it's
+                  // a safe widening — lineItemForWire handles the inverse.
+                  lineItems: (plan.lineItems && plan.lineItems.length > 0)
+                    ? plan.lineItems.map((i) => ({ name: i.name, qty: i.qty, discountedPrice: i.discountedPrice }))
+                    : [emptyLineItem()],
                 });
                 setEditId(plan.id);
                 setShowForm(true);
@@ -576,18 +616,82 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   ))}
                 </View>
               </View>
-              {/* Price */}
-              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRICE (₹)</Text>
-                <TextInput
-                  value={form.price}
-                  onChangeText={(v) => setForm((p) => ({ ...p, price: v }))}
-                  placeholder="0"
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType="numeric"
-                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
-                />
-              </View>
+              {/* Price — hidden for ticket plans, which use per-line-item pricing instead */}
+              {form.type !== "ticket" && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRICE (₹)</Text>
+                  <TextInput
+                    value={form.price}
+                    onChangeText={(v) => setForm((p) => ({ ...p, price: v }))}
+                    placeholder="0"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="numeric"
+                    style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                  />
+                </View>
+              )}
+              {/* Ticket line items — mirrors web LineItemsEditor. Each row's
+                  `discountedPrice` is held as `number | ""` so a freshly
+                  added row's price field renders an empty placeholder
+                  instead of "0"; lineItemForWire() coerces "" → 0 at save. */}
+              {form.type === "ticket" && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 10 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>TICKET LINE ITEMS</Text>
+                  {form.lineItems.map((item, idx) => (
+                    <View key={idx} style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                      <TextInput
+                        value={item.name}
+                        onChangeText={(v) => setForm((p) => {
+                          const next = [...p.lineItems];
+                          next[idx] = { ...next[idx], name: v };
+                          return { ...p, lineItems: next };
+                        })}
+                        placeholder="Item name"
+                        placeholderTextColor={colors.mutedForeground}
+                        style={{ flex: 1, color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 }}
+                      />
+                      <TextInput
+                        value={String(item.qty)}
+                        onChangeText={(v) => setForm((p) => {
+                          const next = [...p.lineItems];
+                          next[idx] = { ...next[idx], qty: Math.max(1, parseInt(v) || 1) };
+                          return { ...p, lineItems: next };
+                        })}
+                        keyboardType="numeric"
+                        placeholder="Qty"
+                        placeholderTextColor={colors.mutedForeground}
+                        style={{ width: 50, color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 6, textAlign: "center" }}
+                      />
+                      <TextInput
+                        value={item.discountedPrice === "" ? "" : String(item.discountedPrice)}
+                        onChangeText={(v) => setForm((p) => {
+                          const next = [...p.lineItems];
+                          // Keep "" while the field is empty so the
+                          // placeholder stays visible; save coerces to 0.
+                          next[idx] = { ...next[idx], discountedPrice: v === "" ? "" : Math.max(0, parseInt(v) || 0) };
+                          return { ...p, lineItems: next };
+                        })}
+                        keyboardType="numeric"
+                        placeholder="Price"
+                        placeholderTextColor={colors.mutedForeground}
+                        style={{ width: 80, color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 6, textAlign: "center" }}
+                      />
+                      {form.lineItems.length > 1 && (
+                        <TouchableOpacity onPress={() => setForm((p) => ({ ...p, lineItems: p.lineItems.filter((_, i) => i !== idx) }))}>
+                          <Ionicons name="close-circle" size={20} color="#ef4444" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    onPress={() => setForm((p) => ({ ...p, lineItems: [...p.lineItems, emptyLineItem()] }))}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4 }}
+                  >
+                    <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.primary }}>Add item</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               {/* Days */}
               <View style={{ gap: 6 }}>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>AVAILABLE DAYS</Text>
