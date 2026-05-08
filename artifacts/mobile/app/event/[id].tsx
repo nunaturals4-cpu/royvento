@@ -821,6 +821,14 @@ export default function EventDetailScreen() {
             const DAY_ABBRS_M = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
             const todayKeyM = DAY_ABBRS_M[new Date().getDay()];
             const todayHrs = vendor.dayHours[todayKeyM] ?? null;
+            const toMinM = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+            const nowMinM = new Date().getHours() * 60 + new Date().getMinutes();
+            let isOpenNowM = false;
+            if (todayHrs) {
+              const o = toMinM(todayHrs.open);
+              const c = toMinM(todayHrs.close);
+              isOpenNowM = c < o ? (nowMinM >= o || nowMinM < c) : (nowMinM >= o && nowMinM < c);
+            }
             return (
               <View style={{ gap: 8 }}>
                 <TouchableOpacity
@@ -829,16 +837,30 @@ export default function EventDetailScreen() {
                   style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
                 >
                   <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.opening_hours")}</Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
                     {todayHrs ? (
                       <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
-                        {t("events.today_tag")}: {fmtTime(todayHrs.open)} – {fmtTime(todayHrs.close)}
+                        {fmtTime(todayHrs.open)} – {fmtTime(todayHrs.close)}
                       </Text>
-                    ) : (
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground, fontStyle: "italic" }}>
-                        {t("events.closed_label")}
+                    ) : null}
+                    <View
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 999,
+                        backgroundColor: isOpenNowM ? "#10b98122" : "#ef444422",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontFamily: "Inter_600SemiBold",
+                          color: isOpenNowM ? "#10b981" : "#ef4444",
+                        }}
+                      >
+                        {isOpenNowM ? t("events.open_now") : t("events.closed_now")}
                       </Text>
-                    )}
+                    </View>
                     <Ionicons name={hoursExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
                   </View>
                 </TouchableOpacity>
@@ -879,7 +901,15 @@ export default function EventDetailScreen() {
                 style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
               >
                 <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.open_days")}</Text>
-                <Ionicons name={hoursExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground, maxWidth: 180 }}
+                  >
+                    {vendor.openDays.join(", ")}
+                  </Text>
+                  <Ionicons name={hoursExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+                </View>
               </TouchableOpacity>
               {hoursExpanded ? (
                 <Text style={[styles.description, { color: colors.mutedForeground }]}>{vendor.openDays.join(", ")}</Text>
