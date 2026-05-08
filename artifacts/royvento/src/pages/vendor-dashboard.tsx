@@ -1200,6 +1200,20 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         {formErrors.fieldError("description") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("description")}</p>}
       </div>
 
+      <div>
+        <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
+        <Input
+          type="file"
+          accept="image/*"
+          disabled={coverUploading}
+          onChange={(e) => onImageFile(e.target.files?.[0] ?? null)}
+          className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("imageUrl"))}
+        />
+        {coverUploading && <p className="mt-1 text-xs text-primary animate-pulse">Uploading cover…</p>}
+        {formErrors.fieldError("imageUrl") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("imageUrl")}</p>}
+        {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
+      </div>
+
       {/* Gallery media */}
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
         <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos {galleryUploading > 0 && <span className="text-xs text-primary animate-pulse">Uploading {galleryUploading}…</span>}</p>
@@ -1209,8 +1223,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           multiple
           disabled={galleryUploading > 0}
           onChange={(e) => onGalleryImagesChange(e.target.files)}
-          className="bg-black/40 border-white/10"
+          className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("galleryImages"))}
         />
+        {formErrors.fieldError("galleryImages") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("galleryImages")}</p>}
         {galleryImages.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-1">
             {galleryImages.map((src, i) => (
@@ -1246,8 +1261,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           accept="video/mp4"
           disabled={videoCompressing}
           onChange={(e) => onGalleryVideosChange(e.target.files)}
-          className="bg-black/40 border-white/10"
+          className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("galleryVideos"))}
         />
+        {formErrors.fieldError("galleryVideos") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("galleryVideos")}</p>}
         {galleryVideos.length > 0 && !videoCompressing && (
           <p className="text-xs text-muted-foreground">Select a new file to replace the current video</p>
         )}
@@ -1772,15 +1788,17 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5 text-primary" />Listing image (cover)</Label>
-          <Input type="file" accept="image/*" disabled={coverUploading} onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className="bg-black/40 border-white/10" />
+          <Input type="file" accept="image/*" disabled={coverUploading} onChange={(e) => onImageFile(e.target.files?.[0] ?? null)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("imageUrl"))} />
           {coverUploading && <p className="mt-1 text-xs text-primary animate-pulse">Uploading cover…</p>}
+          {formErrors.fieldError("imageUrl") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("imageUrl")}</p>}
           {imageUrl && <img src={imageUrl} alt="" className="mt-2 rounded-xl max-h-32 object-cover" />}
         </div>
 
         {/* Gallery media */}
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
           <p className="text-sm font-medium flex items-center gap-2"><ImageIcon className="h-4 w-4 text-primary" />Gallery photos {galleryUploading > 0 && <span className="text-xs text-primary animate-pulse">Uploading {galleryUploading}…</span>}</p>
-          <Input type="file" accept="image/*" multiple disabled={galleryUploading > 0} onChange={(e) => onGalleryImagesChange(e.target.files)} className="bg-black/40 border-white/10" />
+          <Input type="file" accept="image/*" multiple disabled={galleryUploading > 0} onChange={(e) => onGalleryImagesChange(e.target.files)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("galleryImages"))} />
+          {formErrors.fieldError("galleryImages") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("galleryImages")}</p>}
           {galleryImages.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-1">
               {galleryImages.map((src, i) => (
@@ -1804,7 +1822,8 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
               ))}
             </div>
           )}
-          <Input type="file" accept="video/mp4" disabled={videoCompressing} onChange={(e) => onGalleryVideosChange(e.target.files)} className="bg-black/40 border-white/10" />
+          <Input type="file" accept="video/mp4" disabled={videoCompressing} onChange={(e) => onGalleryVideosChange(e.target.files)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("galleryVideos"))} />
+          {formErrors.fieldError("galleryVideos") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("galleryVideos")}</p>}
           {galleryVideos.length > 0 && !videoCompressing && (
             <p className="text-xs text-muted-foreground">Select a new file to replace the current video</p>
           )}
