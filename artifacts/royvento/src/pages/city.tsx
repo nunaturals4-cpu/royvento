@@ -100,8 +100,8 @@ export function City() {
   const isThin = summary.vendorCount < THIN_THRESHOLD;
 
   // Render an empty/thin state page (still indexable structure but noindex)
-  const title = `Best Pubs in ${cityName} — Book a Table | Royvento`;
-  const description = `${summary.vendorCount}+ pubs and party venues in ${cityName} — rooftop bars, microbreweries, live music, couple-friendly. Today's offers, ladies nights, NYE parties — instant booking on Royvento.`;
+  const defaultTitle = `Best Pubs in ${cityName} — Book a Table | Royvento`;
+  const defaultDescription = `${summary.vendorCount}+ pubs and party venues in ${cityName} — rooftop bars, microbreweries, live music, couple-friendly. Today's offers, ladies nights, NYE parties — instant booking on Royvento.`;
   const canonical = `/${citySlug}`;
   const breadcrumbs = buildBreadcrumbList([
     { name: "Home", url: "/" },
@@ -153,6 +153,8 @@ export function City() {
   }));
   const faqs = overrideFaqs.length > 0 ? overrideFaqs : buildCityFAQs(cityName);
   const introCopy = seoOverride?.introMd?.trim() || null;
+  const title = seoOverride?.title?.trim() || defaultTitle;
+  const description = seoOverride?.metaDescription?.trim() || defaultDescription;
   const jsonLd = [breadcrumbs, itemList, buildFAQPage(faqs)];
 
   return (

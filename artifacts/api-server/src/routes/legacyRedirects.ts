@@ -55,6 +55,17 @@ async function vendorRedirect(
   return { status: 301, location: `/pubs/${citySlug}/${nameSlug}-${v.id}` };
 }
 
+// The artifact.toml claims the `/vendors` and `/partners` prefixes so the
+// proxy forwards every path beneath them (not just `/:id`). Redirect the
+// bare listing URLs to the canonical SPA listing so we don't accidentally
+// 404 traffic that used to hit the SPA's listing page.
+router.get("/vendors", (_req, res) => {
+  res.redirect(301, "/pubs");
+});
+router.get("/partners", (_req, res) => {
+  res.redirect(301, "/pubs");
+});
+
 router.get("/vendors/:id", async (req, res) => {
   const result = await vendorRedirect(String(req.params.id ?? ""));
   if (result.status === 404 || !result.location) {

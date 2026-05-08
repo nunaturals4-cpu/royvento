@@ -138,10 +138,10 @@ export function CitySecondary() {
 
   const subjectLabel = isCategory ? category!.label : "Pubs";
   const subjectName = isCategory ? category!.label : `${localityName}`;
-  const title = isCategory
+  const defaultTitle = isCategory
     ? `${category!.label} in ${cityName} — Book a Table | Royvento`
     : `Best Pubs in ${localityName}, ${cityName} — Book Online | Royvento`;
-  const description = isCategory
+  const defaultDescription = isCategory
     ? `${count || "Top-rated"} ${category!.label.toLowerCase()} venues in ${cityName} with instant booking, prices, photos and offers. Updated weekly on Royvento.`
     : `Top pubs in ${localityName}, ${cityName} with instant table booking, ladies' nights, happy hours and weekend parties. ${count} verified pubs on Royvento.`;
 
@@ -212,6 +212,8 @@ export function CitySecondary() {
     : buildLocalityFAQs(localityName, cityName);
   const faqs = overrideFaqs.length > 0 ? overrideFaqs : programmaticFaqs;
   const introOverride = seoOverride?.introMd?.trim() || null;
+  const title = seoOverride?.title?.trim() || defaultTitle;
+  const description = seoOverride?.metaDescription?.trim() || defaultDescription;
   const jsonLd = [breadcrumbs, itemList, buildFAQPage(faqs)];
 
   // Cross-link rails
