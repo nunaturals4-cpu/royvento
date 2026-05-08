@@ -119,7 +119,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const updateReview = useUpdateReview();
   const deleteReview = useDeleteReview();
   const qc = useQueryClient();
-  const eventVendorId = (event as any)?.vendor?.id ?? (event as any)?.vendorId ?? 0;
+  const eventVendorId = event?.vendor?.id ?? 0;
   const eligibilityQueryOptions = getGetReviewEligibilityQueryOptions(eventVendorId);
   const { data: eligibility, refetch: refetchEligibility } = useQuery({
     ...eligibilityQueryOptions,

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { pubDetailSlug } from "@/lib/seo-slug";
 import { getIndianPhoneError, normalizeIndianPhone, isAllowedImageMime, ALLOWED_IMAGE_MIME } from "@workspace/validators";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
@@ -387,7 +388,7 @@ export function Profile() {
                     <div className="min-w-0">
                       <span className="font-mono text-xs text-red-200 block">{c.code}</span>
                       {c.vendorName && c.vendorId && (
-                        <Link href={`/vendors/${c.vendorId}`} /* legacy redirect handles slug */>
+                        <Link href={pubDetailSlug({ id: c.vendorId, name: c.vendorName, city: null })}>
                           <span className="text-[10px] text-primary/80 hover:text-primary mt-0.5 block underline underline-offset-2 cursor-pointer">
                             Exclusive to {c.vendorName} ↗
                           </span>
@@ -518,7 +519,7 @@ function MyReviewsSection() {
               <div key={r.id} className="rounded-2xl border border-white/10 p-4 bg-black/20">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <Link href={`/pubs/${r.vendorId}`} className="font-medium text-sm hover:underline">
+                    <Link href={pubDetailSlug({ id: r.vendorId, name: r.vendorName, city: null })} className="font-medium text-sm hover:underline">
                       {r.vendorName || `Pub #${r.vendorId}`}
                     </Link>
                     <p className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</p>

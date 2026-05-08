@@ -47,6 +47,7 @@ import {
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation, useSearch } from "wouter";
+import { pubDetailSlug } from "@/lib/seo-slug";
 import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR } from "@/lib/api";
 
 const ADMIN_TABS = [
@@ -2878,7 +2879,7 @@ function CrmLeads() {
                         <td className="py-3 px-3 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <Link
-                              href={`/vendors/${lead.vendorId}`}
+                              href={pubDetailSlug({ id: lead.vendorId, name: lead.vendorName, city: lead.vendorCity })}
                               className="text-xs text-primary underline-offset-2 hover:underline whitespace-nowrap"
                               onClick={(e) => e.stopPropagation()}
                             >
