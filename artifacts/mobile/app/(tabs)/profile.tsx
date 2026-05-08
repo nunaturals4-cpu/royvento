@@ -306,14 +306,12 @@ export default function ProfileScreen() {
                         }]}
                       >
                         <Text
-                          numberOfLines={1}
-                          style={{ flexShrink: 1, fontSize: 16, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular", color: active ? colors.primary : colors.foreground }}
+                          style={{ flexShrink: 1, fontSize: 16, lineHeight: 22, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular", color: active ? colors.primary : colors.foreground }}
                         >
                           {lang.native}
                         </Text>
                         <Text
-                          numberOfLines={1}
-                          style={{ flex: 1, textAlign: "right", fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}
+                          style={{ flex: 1, textAlign: "right", fontSize: 13, lineHeight: 18, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}
                         >
                           {lang.english}
                         </Text>

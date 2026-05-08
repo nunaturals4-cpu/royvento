@@ -46,7 +46,7 @@ export function ThemeSwitcher() {
               className="h-3.5 w-3.5 rounded-full shrink-0"
               style={{ background: t.color }}
             />
-            <span className="flex-1 truncate">{t.label}</span>
+            <span className="flex-1 whitespace-normal break-words leading-tight">{t.label}</span>
             {theme === t.id && <Check className="h-3.5 w-3.5 text-primary" />}
           </DropdownMenuItem>
         ))}

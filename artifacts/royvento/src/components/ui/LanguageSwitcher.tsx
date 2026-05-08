@@ -41,10 +41,10 @@ export function LanguageSwitcher() {
           <DropdownMenuItem
             key={lang.code}
             onClick={() => i18n.changeLanguage(lang.code)}
-            className={`cursor-pointer flex items-center justify-between gap-3 ${lang.code === i18n.language ? "text-primary font-semibold" : ""}`}
+            className={`cursor-pointer flex items-start justify-between gap-3 py-2 ${lang.code === i18n.language ? "text-primary font-semibold" : ""}`}
           >
-            <span className="truncate">{lang.native}</span>
-            <span className="text-xs text-muted-foreground shrink-0">{lang.label}</span>
+            <span className="whitespace-normal break-words leading-tight">{lang.native}</span>
+            <span className="text-xs text-muted-foreground whitespace-normal break-words text-right leading-tight">{lang.label}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
