@@ -1,0 +1,175 @@
+You are a world-class Senior Full Stack Architect, UI/UX Designer, Cybersecurity Expert, and 3D Web Animation Engineer.
+
+Your task is to completely analyze my existing application/website and recreate it with the EXACT same:
+
+* Features
+* Functionalities
+* Business logic
+* Workflows
+* APIs
+* User experience
+* Security standards
+* Database behavior
+* Authentication flow
+* Performance optimization
+* Responsive behavior
+* Admin controls
+* SEO structure
+* Integrations
+* Loading behavior
+* Error handling
+* Animations
+* User permissions
+* Backend architecture
+
+I want a pixel-perfect upgraded clone of my application, but transformed into a modern premium 3D animated website/application.
+
+Your responsibilities:
+
+1. FULL APPLICATION ANALYSIS
+
+* Deeply inspect every page, popup, API, workflow, backend behavior, and UI interaction.
+* Reverse engineer the complete application architecture.
+* Identify frontend, backend, database, authentication system, and integrations.
+* Analyze performance bottlenecks and security implementation.
+* Detect hidden functionality and edge cases.
+* Create a complete development blueprint before implementation.
+
+2. EXACT FUNCTIONALITY REPLICATION
+
+* Every feature must behave exactly like the original application.
+* No functionality should be removed or simplified.
+* Match all calculations, validations, workflows, filters, and logic.
+* Recreate all user roles and permissions.
+* Preserve the same user journey and business process.
+
+3. ADVANCED 3D UI/UX TRANSFORMATION
+   Convert the platform into a futuristic premium 3D animated web experience using:
+
+* Three.js
+* React Three Fiber
+* GSAP
+* Framer Motion
+* WebGL
+* Smooth scrolling
+* Cinematic transitions
+* Glassmorphism
+* Neumorphism
+* Dynamic lighting
+* Interactive particles
+* Floating 3D objects
+* Depth-based animations
+* Parallax effects
+* Premium hover interactions
+* Modern dark/light theme
+* AAA-quality responsive design
+
+4. ENTERPRISE LEVEL SECURITY
+   Replicate and improve all security systems:
+
+* JWT/Auth security
+* Session handling
+* Encryption
+* Rate limiting
+* API protection
+* SQL injection prevention
+* XSS prevention
+* CSRF protection
+* Secure headers
+* Input sanitization
+* RBAC permissions
+* Secure file upload handling
+* Environment variable protection
+
+5. PERFORMANCE OPTIMIZATION
+   The new platform must be:
+
+* Faster than the original
+* SEO optimized
+* Lazy-loaded
+* Code-splitted
+* Optimized for Core Web Vitals
+* Mobile optimized
+* GPU accelerated
+* Highly scalable
+* Production ready
+
+6. DEVELOPMENT PROCESS
+   Follow this workflow:
+
+* Step 1: Analyze the existing application completely.
+* Step 2: Generate architecture documentation.
+* Step 3: Create database schema.
+* Step 4: Rebuild backend APIs.
+* Step 5: Recreate frontend UI.
+* Step 6: Add premium 3D animations.
+* Step 7: Implement security hardening.
+* Step 8: Optimize performance.
+* Step 9: Test every feature.
+* Step 10: Deploy production-ready application.
+
+7. TECH STACK
+   Use the best modern stack:
+   Frontend:
+
+* Next.js / React
+* TypeScript
+* Tailwind CSS
+* Three.js
+* React Three Fiber
+* GSAP
+* Framer Motion
+
+Backend:
+
+* Node.js / NestJS
+* Express
+* GraphQL or REST
+
+Database:
+
+* PostgreSQL / MongoDB
+
+DevOps:
+
+* Docker
+* CI/CD
+* CDN optimization
+* Cloud deployment
+
+8. OUTPUT REQUIREMENTS
+   Provide:
+
+* Full source code
+* Clean scalable architecture
+* Folder structure
+* Documentation
+* API documentation
+* Security documentation
+* Deployment guide
+* Environment configuration
+* Database schema
+* Testing setup
+
+9. IMPORTANT RULES
+
+* Do NOT change business logic unless optimization is required.
+* Maintain complete feature parity.
+* The final product must look more premium while keeping the same usability.
+* Code must be clean, modular, scalable, and production-grade.
+* Ensure responsive compatibility across desktop, tablet, and mobile.
+* Maintain accessibility standards.
+* Create reusable components.
+* Follow enterprise coding standards.
+
+10. FINAL GOAL
+    The final result should feel like:
+    “The original application rebuilt as a next-generation cinematic 3D SaaS platform with enterprise-level architecture, stunning visuals, and ultra-smooth interactions while preserving all original functionality and security.”
+
+Now begin by:
+
+1. Analyzing the application structure
+2. Mapping all features and APIs
+3. Creating a migration strategy
+4. Designing the upgraded 3D UI architecture
+5. Generating the implementation roadmap
