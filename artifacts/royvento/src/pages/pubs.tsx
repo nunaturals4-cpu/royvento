@@ -293,7 +293,7 @@ export function Pubs() {
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayedPubs.map((p) => <EventCard key={p.id} event={p} hidePubBadge />)}
+          {displayedPubs.map((p) => <EventCard key={p.id} event={p} hidePubBadge directBooking />)}
         </div>
       )}
     </div>

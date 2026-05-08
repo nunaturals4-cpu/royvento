@@ -26,6 +26,7 @@ interface Props {
     vendorCrowdLevel?: string | null;
   };
   hidePubBadge?: boolean;
+  directBooking?: boolean;
 }
 
 const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -36,7 +37,7 @@ const CROWD_BADGE: Record<string, { label: string; color: string }> = {
   party: { label: "High Crowd 🔥", color: "bg-red-600" },
 };
 
-export function EventCard({ event, hidePubBadge }: Props) {
+export function EventCard({ event, hidePubBadge, directBooking }: Props) {
   const partner = event.partnerName ?? event.vendorName ?? "";
   const loc = event.city
     ? `${event.city}${event.state ? ", " + event.state : ""}`
@@ -62,10 +63,14 @@ export function EventCard({ event, hidePubBadge }: Props) {
   // vendorToCardEvent), `id` already equals the vendor id and `vendorId` is
   // undefined, so the fallback works.
   const pubLinkId = event.vendorId ?? event.id;
-  const href =
-    event.type === "pub"
+  const eventHref = eventDetailSlug({ id: event.id, title: event.title, city: event.city });
+  const href = directBooking
+    // Skip the partner/details page and land directly on the event detail
+    // page with the booking form auto-scrolled into view (Task #574 hash flow).
+    ? `${eventHref}#book`
+    : event.type === "pub"
       ? pubDetailSlug({ id: pubLinkId, name: event.title, city: event.city })
-      : eventDetailSlug({ id: event.id, title: event.title, city: event.city });
+      : eventHref;
 
   return (
     <Link href={href}>

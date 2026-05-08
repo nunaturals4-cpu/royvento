@@ -294,6 +294,7 @@ export default function PubsScreen() {
               freeEntryRules={item.freeEntryRules}
               hasDrinkPlans={item.hasDrinkPlans}
               vendorCrowdLevel={(item as unknown as { vendorCrowdLevel?: string | null }).vendorCrowdLevel}
+              directBooking
             />
           )}
         />

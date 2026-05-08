@@ -37,6 +37,7 @@ interface EventCardProps {
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   hasDrinkPlans?: boolean;
   vendorCrowdLevel?: string | null;
+  directBooking?: boolean;
 }
 
 export function EventCard({
@@ -56,6 +57,7 @@ export function EventCard({
   freeEntryRules,
   hasDrinkPlans,
   vendorCrowdLevel,
+  directBooking,
 }: EventCardProps) {
   const colors = useColors();
   const { t } = useLanguage();
@@ -85,7 +87,11 @@ export function EventCard({
   return (
     <Pressable
       onPress={() => {
-        if (type === "pub") {
+        if (directBooking) {
+          // Skip the partner/details page and land directly on the event
+          // detail screen with the booking form auto-opened (Task #575).
+          router.push({ pathname: "/event/[id]", params: { id: String(id), book: "1" } } as never);
+        } else if (type === "pub") {
           const targetId = vendorId ?? id;
           router.push(`/partner/${targetId}` as never);
         } else {
