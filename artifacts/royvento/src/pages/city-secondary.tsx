@@ -4,6 +4,7 @@ import { SEO, buildBreadcrumbList, buildFAQPage } from "@/components/SEO";
 import { EventCard } from "@/components/EventCard";
 import { CrossLinkRail } from "@/components/CrossLinkRail";
 import { apiGet } from "@/lib/api";
+import { useGetSeoPage } from "@workspace/api-client-react";
 import {
   PUB_CATEGORY_SLUGS,
   canonicalCitySlug,
@@ -201,9 +202,24 @@ export function CitySecondary() {
       },
     })),
   };
-  const faqs = isCategory
+  // Editorial override from the admin-editable seo_pages table.
+  const { data: seoOverride } = useGetSeoPage(
+    {
+      template: isCategory ? "category" : "locality",
+      citySlug,
+      secondSlug: isCategory ? category!.slug : localitySlug,
+    },
+    { query: { retry: false, staleTime: 5 * 60 * 1000 } as any },
+  );
+  const overrideFaqs = (seoOverride?.faqs ?? []).map((f: any) => ({
+    question: f.q,
+    answer: f.a,
+  }));
+  const programmaticFaqs = isCategory
     ? buildCategoryFAQs(category!.label, cityName)
     : buildLocalityFAQs(localityName, cityName);
+  const faqs = overrideFaqs.length > 0 ? overrideFaqs : programmaticFaqs;
+  const introOverride = seoOverride?.introMd?.trim() || null;
   const jsonLd = [breadcrumbs, itemList, buildFAQPage(faqs)];
 
   // Cross-link rails
@@ -238,10 +254,11 @@ export function CitySecondary() {
           <MapPin className="h-3.5 w-3.5" /> {cityName}
         </p>
         <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{h1}</h1>
-        <p className="mt-4 text-white/60 leading-relaxed">
-          {isCategory
-            ? `Hand-picked ${category!.label.toLowerCase()} in ${cityName} with instant table booking, photos, ratings and current offers. Filter further by locality, free-entry days and drink deals.`
-            : `Top pubs and party venues in ${localityName}, ${cityName} with verified ratings, instant booking and weekly offers.`}
+        <p className="mt-4 text-white/60 leading-relaxed whitespace-pre-line">
+          {introOverride
+            ?? (isCategory
+              ? `Hand-picked ${category!.label.toLowerCase()} in ${cityName} with instant table booking, photos, ratings and current offers. Filter further by locality, free-entry days and drink deals.`
+              : `Top pubs and party venues in ${localityName}, ${cityName} with verified ratings, instant booking and weekly offers.`)}
         </p>
       </header>
 

@@ -32,6 +32,7 @@ import type {
   AuthResponse,
   Availability,
   Booking,
+  CitySummary,
   CommissionReport,
   Coupon,
   CreateBookingBody,
@@ -53,6 +54,7 @@ import type {
   GetPartnerAnalyticsParams,
   GetPartnerCheckinReportParams,
   GetPartnerSettlementBalance200,
+  GetSeoPageParams,
   HealthStatus,
   ImportGooglePubBody,
   ImportGooglePubResponse,
@@ -84,6 +86,7 @@ import type {
   SaveBankingDetailsBody,
   ScanTicketBody,
   ScanTicketResult,
+  SeoPage,
   SetAvailabilityBody,
   SetPartnerCrowdLevel200,
   SetPartnerCrowdLevelBody,
@@ -96,6 +99,7 @@ import type {
   UpdateVendorBody,
   UploadUrlRequest,
   UploadUrlResponse,
+  UpsertSeoPageBody,
   User,
   Vendor,
   VendorBankingDetails,
@@ -6715,3 +6719,279 @@ export const useRemoveFromWishlist = <
 > => {
   return useMutation(getRemoveFromWishlistMutationOptions(options));
 };
+
+/**
+ * Returns the SEO page row for a (template, citySlug, secondSlug) tuple if
+an admin has overridden the default programmatic intro/FAQ. 404 when
+nothing is stored — frontend falls back to its built-in template copy.
+
+ * @summary Fetch admin-editable editorial copy for a programmatic SEO landing page
+ */
+export const getGetSeoPageUrl = (params: GetSeoPageParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/seo-pages?${stringifiedParams}`
+    : `/api/seo-pages`;
+};
+
+export const getSeoPage = async (
+  params: GetSeoPageParams,
+  options?: RequestInit,
+): Promise<SeoPage> => {
+  return customFetch<SeoPage>(getGetSeoPageUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSeoPageQueryKey = (params?: GetSeoPageParams) => {
+  return [`/api/seo-pages`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetSeoPageQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSeoPage>>,
+  TError = ErrorType<void>,
+>(
+  params: GetSeoPageParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSeoPage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSeoPageQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSeoPage>>> = ({
+    signal,
+  }) => getSeoPage(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSeoPage>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSeoPageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSeoPage>>
+>;
+export type GetSeoPageQueryError = ErrorType<void>;
+
+/**
+ * @summary Fetch admin-editable editorial copy for a programmatic SEO landing page
+ */
+
+export function useGetSeoPage<
+  TData = Awaited<ReturnType<typeof getSeoPage>>,
+  TError = ErrorType<void>,
+>(
+  params: GetSeoPageParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSeoPage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSeoPageQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Upsert admin-editable editorial copy for a landing page
+ */
+export const getUpsertSeoPageUrl = () => {
+  return `/api/seo-pages`;
+};
+
+export const upsertSeoPage = async (
+  upsertSeoPageBody: UpsertSeoPageBody,
+  options?: RequestInit,
+): Promise<SeoPage> => {
+  return customFetch<SeoPage>(getUpsertSeoPageUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(upsertSeoPageBody),
+  });
+};
+
+export const getUpsertSeoPageMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof upsertSeoPage>>,
+    TError,
+    { data: BodyType<UpsertSeoPageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof upsertSeoPage>>,
+  TError,
+  { data: BodyType<UpsertSeoPageBody> },
+  TContext
+> => {
+  const mutationKey = ["upsertSeoPage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof upsertSeoPage>>,
+    { data: BodyType<UpsertSeoPageBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return upsertSeoPage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpsertSeoPageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof upsertSeoPage>>
+>;
+export type UpsertSeoPageMutationBody = BodyType<UpsertSeoPageBody>;
+export type UpsertSeoPageMutationError = ErrorType<void>;
+
+/**
+ * @summary Upsert admin-editable editorial copy for a landing page
+ */
+export const useUpsertSeoPage = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof upsertSeoPage>>,
+    TError,
+    { data: BodyType<UpsertSeoPageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof upsertSeoPage>>,
+  TError,
+  { data: BodyType<UpsertSeoPageBody> },
+  TContext
+> => {
+  return useMutation(getUpsertSeoPageMutationOptions(options));
+};
+
+/**
+ * Returns the vendor count, top vendors, locality counts, and category
+counts for the given city slug. Used by /:city programmatic landing
+pages so the page can render link rails and JSON-LD without N+1 calls.
+
+ * @summary Aggregated counts for a city landing page
+ */
+export const getGetCitySummaryUrl = (citySlug: string) => {
+  return `/api/cities/${citySlug}/summary`;
+};
+
+export const getCitySummary = async (
+  citySlug: string,
+  options?: RequestInit,
+): Promise<CitySummary> => {
+  return customFetch<CitySummary>(getGetCitySummaryUrl(citySlug), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCitySummaryQueryKey = (citySlug: string) => {
+  return [`/api/cities/${citySlug}/summary`] as const;
+};
+
+export const getGetCitySummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCitySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  citySlug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCitySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCitySummaryQueryKey(citySlug);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCitySummary>>> = ({
+    signal,
+  }) => getCitySummary(citySlug, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!citySlug,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCitySummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCitySummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCitySummary>>
+>;
+export type GetCitySummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Aggregated counts for a city landing page
+ */
+
+export function useGetCitySummary<
+  TData = Awaited<ReturnType<typeof getCitySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  citySlug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCitySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCitySummaryQueryOptions(citySlug, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

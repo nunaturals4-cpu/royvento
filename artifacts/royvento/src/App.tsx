@@ -17,8 +17,6 @@ import { Explore } from "@/pages/explore";
 import { Pubs } from "@/pages/pubs";
 import { PubOffers } from "@/pages/pub-offers";
 import { Vendors } from "@/pages/vendors";
-import { EventDetail } from "@/pages/event-detail";
-import { VendorDetail } from "@/pages/vendor-detail";
 import { Login } from "@/pages/login";
 import { Register } from "@/pages/register";
 import { Contact } from "@/pages/contact";
@@ -34,7 +32,12 @@ import { Terms } from "@/pages/terms";
 import { Privacy } from "@/pages/privacy";
 import { City } from "@/pages/city";
 import { CitySecondary } from "@/pages/city-secondary";
-import { VendorSlugRoute, EventSlugRoute } from "@/pages/slugged-detail-redirect";
+import {
+  VendorSlugRoute,
+  EventSlugRoute,
+  VendorLegacyRedirect,
+  EventLegacyRedirect,
+} from "@/pages/slugged-detail-redirect";
 
 // Lazily loaded heavy/role-gated pages
 const VendorDashboard = lazy(() => import("@/pages/vendor-dashboard").then((m) => ({ default: m.VendorDashboard })));
@@ -134,9 +137,13 @@ function Router() {
           <Route path="/pub-offers" component={PubOffers} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/partners" component={Vendors} />
-          <Route path="/events/:id" component={EventDetail} />
-          <Route path="/vendors/:id" component={VendorDetail} />
-          <Route path="/partners/:id" component={VendorDetail} />
+          {/* Legacy ID URLs auto-redirect to the slugged canonical URL.
+              The wrapper still renders VendorDetail/EventDetail so non-JS
+              crawlers (and the brief moment before the SPA navigation)
+              still see the full detail content with the canonical tag. */}
+          <Route path="/events/:id" component={EventLegacyRedirect} />
+          <Route path="/vendors/:id" component={VendorLegacyRedirect} />
+          <Route path="/partners/:id" component={VendorLegacyRedirect} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/contact" component={Contact} />

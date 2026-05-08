@@ -712,3 +712,29 @@ export const webPushSubscriptionsTable = pgTable(
 );
 
 export type WebPushSubscription = typeof webPushSubscriptionsTable.$inferSelect;
+
+// Admin-editable editorial overrides for programmatic SEO landing pages.
+// (template, citySlug, secondSlug) is the natural key. `secondSlug` is the
+// locality or category slug for /:city/:second pages, NULL for /:city.
+export const seoPagesTable = pgTable(
+  "seo_pages",
+  {
+    id: serial("id").primaryKey(),
+    template: varchar("template", { length: 32 }).notNull(),
+    citySlug: varchar("city_slug", { length: 64 }).notNull(),
+    secondSlug: varchar("second_slug", { length: 64 }),
+    title: text("title"),
+    metaDescription: text("meta_description"),
+    introMd: text("intro_md").notNull().default(""),
+    faqs: jsonb("faqs").notNull().default(sql`'[]'::jsonb`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    keyUniq: uniqueIndex("seo_pages_key_uniq").on(t.template, t.citySlug, t.secondSlug),
+    cityIdx: index("seo_pages_city_idx").on(t.citySlug),
+  }),
+);
+
+export type SeoPage = typeof seoPagesTable.$inferSelect;

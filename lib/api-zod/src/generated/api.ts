@@ -2640,6 +2640,12 @@ export const GetPartnerAnalyticsResponse = zod.object({
 export const PartnerScanTicketBody = zod
   .object({
     code: zod.string(),
+    confirm: zod
+      .boolean()
+      .optional()
+      .describe(
+        'When true, marks the booking as checked in. When false\/omitted (and no actualEntry is provided), the request is treated as a read-only lookup that returns booking details + status without burning the ticket. The mobile scanner uses this two-step flow so the manager must explicitly tap \"Confirm entry\" before a ticket is consumed.',
+      ),
     actualEntry: zod
       .object({
         women: zod.number().optional(),
@@ -2650,13 +2656,37 @@ export const PartnerScanTicketBody = zod
       .strict()
       .optional()
       .describe(
-        "Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_\* columns and returns the recomputed actualAmountDue.",
+        "Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_\* columns, returns the recomputed actualAmountDue, AND implicitly confirms the check-in (no separate confirm flag needed).",
       ),
   })
   .strict();
 
 export const PartnerScanTicketResponse = zod.object({
   code: zod.enum(["OK", "ALREADY_CHECKED_IN", "NOT_FOUND", "INVALID_STATUS"]),
+  status: zod
+    .enum(["ready_to_check_in", "checked_in", "already_checked_in"])
+    .optional()
+    .describe(
+      "Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm\/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it).",
+    ),
+  lookupOnly: zod
+    .boolean()
+    .optional()
+    .describe(
+      'True when the response came from a read-only lookup (no `confirm` and no `actualEntry`). The booking has NOT been marked checked in. The client should render a \"Confirm entry\" affordance that re-POSTs with `confirm: true`.',
+    ),
+  justCheckedIn: zod
+    .boolean()
+    .optional()
+    .describe(
+      "True only when this exact request transitioned the booking from not-checked-in to checked-in. False when the booking was already checked in (whether inside the grace window or not).",
+    ),
+  recentlyCheckedIn: zod
+    .boolean()
+    .optional()
+    .describe(
+      "True when a confirm\/actualEntry request landed on an already-checked-in booking but within the ~30s grace window. The server returns 200 OK instead of 409 so duplicate scans (camera double-fire, fast retap) don't surface as errors to the manager.",
+    ),
   message: zod.string().optional(),
   checkedInAt: zod.string().nullish(),
   booking: zod
@@ -3893,4 +3923,161 @@ export const RemoveFromWishlistParams = zod
 
 export const RemoveFromWishlistResponse = zod.object({
   ok: zod.boolean(),
+});
+
+/**
+ * Returns the SEO page row for a (template, citySlug, secondSlug) tuple if
+an admin has overridden the default programmatic intro/FAQ. 404 when
+nothing is stored — frontend falls back to its built-in template copy.
+
+ * @summary Fetch admin-editable editorial copy for a programmatic SEO landing page
+ */
+export const GetSeoPageQueryParams = zod
+  .object({
+    template: zod.enum(["city", "locality", "category"]),
+    citySlug: zod.coerce.string(),
+    secondSlug: zod.coerce.string().optional(),
+  })
+  .strict();
+
+export const GetSeoPageResponse = zod.object({
+  id: zod.number(),
+  template: zod.enum(["city", "locality", "category"]),
+  citySlug: zod.string(),
+  secondSlug: zod.string().nullish(),
+  title: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  introMd: zod.string(),
+  faqs: zod.array(
+    zod.object({
+      q: zod.string(),
+      a: zod.string(),
+    }),
+  ),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Upsert admin-editable editorial copy for a landing page
+ */
+
+export const UpsertSeoPageBody = zod
+  .object({
+    template: zod.enum(["city", "locality", "category"]),
+    citySlug: zod.string().min(1),
+    secondSlug: zod.string().nullish(),
+    title: zod.string().nullish(),
+    metaDescription: zod.string().nullish(),
+    introMd: zod.string(),
+    faqs: zod.array(
+      zod
+        .object({
+          q: zod.string(),
+          a: zod.string(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const UpsertSeoPageResponse = zod.object({
+  id: zod.number(),
+  template: zod.enum(["city", "locality", "category"]),
+  citySlug: zod.string(),
+  secondSlug: zod.string().nullish(),
+  title: zod.string().nullish(),
+  metaDescription: zod.string().nullish(),
+  introMd: zod.string(),
+  faqs: zod.array(
+    zod.object({
+      q: zod.string(),
+      a: zod.string(),
+    }),
+  ),
+  updatedAt: zod.string(),
+});
+
+/**
+ * Returns the vendor count, top vendors, locality counts, and category
+counts for the given city slug. Used by /:city programmatic landing
+pages so the page can render link rails and JSON-LD without N+1 calls.
+
+ * @summary Aggregated counts for a city landing page
+ */
+export const GetCitySummaryParams = zod
+  .object({
+    citySlug: zod.coerce.string(),
+  })
+  .strict();
+
+export const getCitySummaryResponseTopVendorsItemFreeEntryRulesOneBeforeTimeRegExp =
+  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
+
+export const GetCitySummaryResponse = zod.object({
+  citySlug: zod.string(),
+  canonicalCity: zod.string(),
+  vendorCount: zod.number(),
+  localityCounts: zod.array(
+    zod.object({
+      slug: zod.string(),
+      name: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  categoryCounts: zod.array(
+    zod.object({
+      slug: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  topVendors: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      businessName: zod.string(),
+      category: zod.string(),
+      description: zod.string(),
+      location: zod.string(),
+      bannerImage: zod.string(),
+      coverImageUrl: zod.string(),
+      portfolioImages: zod.array(zod.string()),
+      status: zod.enum(["pending", "approved", "rejected"]),
+      rating: zod.number(),
+      reviewCount: zod.number(),
+      createdAt: zod.string(),
+      openDays: zod.array(zod.string()),
+      address: zod.string().nullish(),
+      dayHours: zod.object({}).passthrough().nullish(),
+      city: zod.string(),
+      state: zod.string(),
+      country: zod.string(),
+      freeEntryRules: zod
+        .union([
+          zod.object({
+            enabled: zod.boolean(),
+            genders: zod.array(
+              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
+            ),
+            days: zod.array(
+              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+            ),
+            beforeTime: zod
+              .string()
+              .regex(
+                getCitySummaryResponseTopVendorsItemFreeEntryRulesOneBeforeTimeRegExp,
+              )
+              .optional()
+              .describe(
+                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
+              ),
+          }),
+          zod.null(),
+        ])
+        .optional(),
+      danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
+      danceFloorPhotos: zod.array(zod.string()).nullish(),
+      menuUrl: zod.string().optional(),
+      crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+    }),
+  ),
 });

@@ -7,7 +7,7 @@
  */
 
 /**
- * Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue.
+ * Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns, returns the recomputed actualAmountDue, AND implicitly confirms the check-in (no separate confirm flag needed).
  */
 export type ScanTicketBodyActualEntry = {
   women?: number;

@@ -7,9 +7,18 @@
  */
 import type { ScanTicketBooking } from "./scanTicketBooking";
 import type { ScanTicketResultCode } from "./scanTicketResultCode";
+import type { ScanTicketResultStatus } from "./scanTicketResultStatus";
 
 export interface ScanTicketResult {
   code: ScanTicketResultCode;
+  /** Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it). */
+  status?: ScanTicketResultStatus;
+  /** True when the response came from a read-only lookup (no `confirm` and no `actualEntry`). The booking has NOT been marked checked in. The client should render a "Confirm entry" affordance that re-POSTs with `confirm: true`. */
+  lookupOnly?: boolean;
+  /** True only when this exact request transitioned the booking from not-checked-in to checked-in. False when the booking was already checked in (whether inside the grace window or not). */
+  justCheckedIn?: boolean;
+  /** True when a confirm/actualEntry request landed on an already-checked-in booking but within the ~30s grace window. The server returns 200 OK instead of 409 so duplicate scans (camera double-fire, fast retap) don't surface as errors to the manager. */
+  recentlyCheckedIn?: boolean;
   message?: string;
   checkedInAt?: string | null;
   booking?: ScanTicketBooking | null;

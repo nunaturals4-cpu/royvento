@@ -4,6 +4,7 @@ import { SEO, buildBreadcrumbList, buildFAQPage } from "@/components/SEO";
 import { EventCard } from "@/components/EventCard";
 import { CrossLinkRail } from "@/components/CrossLinkRail";
 import { apiGet } from "@/lib/api";
+import { useGetSeoPage } from "@workspace/api-client-react";
 import {
   PUB_CATEGORY_SLUGS,
   canonicalCitySlug,
@@ -175,7 +176,19 @@ export function City() {
       },
     })),
   };
-  const faqs = buildCityFAQs(cityName);
+  // Editorial override: if an admin has saved bespoke copy for this city
+  // landing page in the seo_pages table, prefer it over the programmatic
+  // template. Silently falls back on 404.
+  const { data: seoOverride } = useGetSeoPage(
+    { template: "city", citySlug },
+    { query: { retry: false, staleTime: 5 * 60 * 1000 } as any },
+  );
+  const overrideFaqs = (seoOverride?.faqs ?? []).map((f: any) => ({
+    question: f.q,
+    answer: f.a,
+  }));
+  const faqs = overrideFaqs.length > 0 ? overrideFaqs : buildCityFAQs(cityName);
+  const introCopy = seoOverride?.introMd?.trim() || null;
   const jsonLd = [breadcrumbs, itemList, buildFAQPage(faqs)];
 
   return (
@@ -201,10 +214,14 @@ export function City() {
         <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">
           Best Pubs in {cityName} — Book a Table Tonight
         </h1>
-        <p className="mt-4 text-white/60 leading-relaxed">
-          Discover {vendors.length || "the best"} verified pubs and party venues in {cityName} on Royvento.
-          Filter by rooftop bars, microbreweries, live music or couple-friendly lounges.
-          Book a table instantly with today's offers, ladies nights and weekend deals.
+        <p className="mt-4 text-white/60 leading-relaxed whitespace-pre-line">
+          {introCopy ?? (
+            <>
+              Discover {vendors.length || "the best"} verified pubs and party venues in {cityName} on Royvento.
+              Filter by rooftop bars, microbreweries, live music or couple-friendly lounges.
+              Book a table instantly with today's offers, ladies nights and weekend deals.
+            </>
+          )}
         </p>
       </header>
 

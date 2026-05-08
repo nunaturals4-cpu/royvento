@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, vendorsTable, usersTable, eventsTable, drinkPlansTable } from "@workspace/db";
-import { eq, desc, and, ilike, inArray } from "drizzle-orm";
+import { eq, desc, and, ilike, inArray, or, sql } from "drizzle-orm";
 import {
   CreateMyVendorBody,
   UpdateMyVendorBody,
@@ -15,6 +15,27 @@ import { generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCod
 const router: IRouter = Router();
 
 const CRM_TRIAL_DAYS = 60;
+
+// Mirror of artifacts/royvento/src/lib/seo-slug.ts CITY_ALIASES so server
+// queries match what the SEO routes canonicalise to.
+// First entry in each group is the canonical slug.
+const CITY_ALIAS_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
+  ["bangalore", "bengaluru"],
+  ["mumbai", "bombay"],
+  ["gurgaon", "gurugram"],
+  ["kolkata", "calcutta"],
+  ["chennai", "madras"],
+  ["pune", "poona"],
+];
+
+function expandCityAliases(input: string): string[] {
+  const norm = input.trim().toLowerCase();
+  if (!norm) return [input];
+  for (const group of CITY_ALIAS_GROUPS) {
+    if (group.includes(norm)) return [...group];
+  }
+  return [norm];
+}
 
 interface VendorRow {
   id: number;
@@ -180,7 +201,16 @@ router.get("/vendors", async (req, res) => {
   if (filters.category) conditions.push(eq(vendorsTable.category, filters.category));
   if (filters.country) conditions.push(ilike(vendorsTable.country, `%${filters.country}%`));
   if (filters.state) conditions.push(ilike(vendorsTable.state, `%${filters.state}%`));
-  if (filters.city) conditions.push(ilike(vendorsTable.city, `%${filters.city}%`));
+  if (filters.city) {
+    // Expand the user-supplied city to its known aliases so that a request
+    // for `?city=bangalore` also returns vendors stored as "Bengaluru" (and
+    // vice-versa). Keeps SEO-friendly slug routes (`/bangalore`) in sync
+    // with whatever spelling the data actually uses.
+    const variants = expandCityAliases(filters.city);
+    const cityConds = variants.map((v) => ilike(vendorsTable.city, `%${v}%`));
+    const combined = cityConds.length === 1 ? cityConds[0]! : or(...cityConds)!;
+    conditions.push(combined);
+  }
   if (filters.danceFloor) conditions.push(eq(vendorsTable.danceFloor, filters.danceFloor));
   if (filters.drinkPlanType) {
     const vendorIdsWithPlan = await db

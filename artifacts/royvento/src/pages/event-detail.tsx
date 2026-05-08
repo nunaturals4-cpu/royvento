@@ -38,10 +38,10 @@ function getPlanSummary(plan: { type: string; gender: string; productName?: stri
   return plan.productName || t("events.drink_offer_generic");
 }
 
-export function EventDetail() {
+export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const { t } = useTranslation();
   const params = useParams();
-  const id = Number(params["id"]);
+  const id = eventIdProp ?? Number(params["id"]);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { data: event, isLoading } = useGetEvent(id);

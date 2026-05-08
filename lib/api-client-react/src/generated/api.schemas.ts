@@ -39,6 +39,129 @@ export interface FreeEntryRules {
   beforeTime?: string;
 }
 
+export type SeoPageTemplate =
+  (typeof SeoPageTemplate)[keyof typeof SeoPageTemplate];
+
+export const SeoPageTemplate = {
+  city: "city",
+  locality: "locality",
+  category: "category",
+} as const;
+
+export interface SeoFaqItem {
+  q: string;
+  a: string;
+}
+
+export interface SeoPage {
+  id: number;
+  template: SeoPageTemplate;
+  citySlug: string;
+  secondSlug?: string | null;
+  title?: string | null;
+  metaDescription?: string | null;
+  introMd: string;
+  faqs: SeoFaqItem[];
+  updatedAt: string;
+}
+
+export type UpsertSeoPageBodyTemplate =
+  (typeof UpsertSeoPageBodyTemplate)[keyof typeof UpsertSeoPageBodyTemplate];
+
+export const UpsertSeoPageBodyTemplate = {
+  city: "city",
+  locality: "locality",
+  category: "category",
+} as const;
+
+export interface UpsertSeoPageBody {
+  template: UpsertSeoPageBodyTemplate;
+  /** @minLength 1 */
+  citySlug: string;
+  secondSlug?: string | null;
+  title?: string | null;
+  metaDescription?: string | null;
+  introMd: string;
+  faqs: SeoFaqItem[];
+}
+
+export interface LocalityCount {
+  slug: string;
+  name: string;
+  count: number;
+}
+
+export interface CategoryCount {
+  slug: string;
+  count: number;
+}
+
+export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
+
+export const VendorStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export type VendorDanceFloor =
+  | (typeof VendorDanceFloor)[keyof typeof VendorDanceFloor]
+  | null;
+
+export const VendorDanceFloor = {
+  dedicated: "dedicated",
+  general: "general",
+  none: "none",
+} as const;
+
+export type VendorCrowdLevel =
+  | (typeof VendorCrowdLevel)[keyof typeof VendorCrowdLevel]
+  | null;
+
+export const VendorCrowdLevel = {
+  low: "low",
+  moderate: "moderate",
+  party: "party",
+} as const;
+
+export type VendorDayHours = { [key: string]: unknown } | null;
+
+export interface Vendor {
+  id: number;
+  userId: number;
+  businessName: string;
+  category: string;
+  description: string;
+  location: string;
+  bannerImage: string;
+  coverImageUrl: string;
+  portfolioImages: string[];
+  status: VendorStatus;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+  openDays: string[];
+  address?: string | null;
+  dayHours?: VendorDayHours;
+  city: string;
+  state: string;
+  country: string;
+  freeEntryRules?: FreeEntryRules | null;
+  danceFloor?: VendorDanceFloor;
+  danceFloorPhotos?: string[] | null;
+  menuUrl?: string;
+  crowdLevel?: VendorCrowdLevel;
+}
+
+export interface CitySummary {
+  citySlug: string;
+  canonicalCity: string;
+  vendorCount: number;
+  localityCounts: LocalityCount[];
+  categoryCounts: CategoryCount[];
+  topVendors: Vendor[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -107,63 +230,6 @@ export interface UpdateMeBody {
   about?: string;
   /** @maxLength 2048 */
   profileImage?: string;
-}
-
-export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
-
-export const VendorStatus = {
-  pending: "pending",
-  approved: "approved",
-  rejected: "rejected",
-} as const;
-
-export type VendorDayHours = { [key: string]: unknown } | null;
-
-export type VendorDanceFloor =
-  | (typeof VendorDanceFloor)[keyof typeof VendorDanceFloor]
-  | null;
-
-export const VendorDanceFloor = {
-  dedicated: "dedicated",
-  general: "general",
-  none: "none",
-} as const;
-
-export type VendorCrowdLevel =
-  | (typeof VendorCrowdLevel)[keyof typeof VendorCrowdLevel]
-  | null;
-
-export const VendorCrowdLevel = {
-  low: "low",
-  moderate: "moderate",
-  party: "party",
-} as const;
-
-export interface Vendor {
-  id: number;
-  userId: number;
-  businessName: string;
-  category: string;
-  description: string;
-  location: string;
-  bannerImage: string;
-  coverImageUrl: string;
-  portfolioImages: string[];
-  status: VendorStatus;
-  rating: number;
-  reviewCount: number;
-  createdAt: string;
-  openDays: string[];
-  address?: string | null;
-  dayHours?: VendorDayHours;
-  city: string;
-  state: string;
-  country: string;
-  freeEntryRules?: FreeEntryRules | null;
-  danceFloor?: VendorDanceFloor;
-  danceFloorPhotos?: string[] | null;
-  menuUrl?: string;
-  crowdLevel?: VendorCrowdLevel;
 }
 
 export interface MyVendorResponse {
@@ -1266,7 +1332,7 @@ export interface PartnerAnalyticsResult {
 }
 
 /**
- * Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue.
+ * Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns, returns the recomputed actualAmountDue, AND implicitly confirms the check-in (no separate confirm flag needed).
  */
 export type ScanTicketBodyActualEntry = {
   women?: number;
@@ -1277,7 +1343,9 @@ export type ScanTicketBodyActualEntry = {
 
 export interface ScanTicketBody {
   code: string;
-  /** Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue. */
+  /** When true, marks the booking as checked in. When false/omitted (and no actualEntry is provided), the request is treated as a read-only lookup that returns booking details + status without burning the ticket. The mobile scanner uses this two-step flow so the manager must explicitly tap "Confirm entry" before a ticket is consumed. */
+  confirm?: boolean;
+  /** Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns, returns the recomputed actualAmountDue, AND implicitly confirms the check-in (no separate confirm flag needed). */
   actualEntry?: ScanTicketBodyActualEntry;
 }
 
@@ -1339,8 +1407,28 @@ export const ScanTicketResultCode = {
   INVALID_STATUS: "INVALID_STATUS",
 } as const;
 
+/**
+ * Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it).
+ */
+export type ScanTicketResultStatus =
+  (typeof ScanTicketResultStatus)[keyof typeof ScanTicketResultStatus];
+
+export const ScanTicketResultStatus = {
+  ready_to_check_in: "ready_to_check_in",
+  checked_in: "checked_in",
+  already_checked_in: "already_checked_in",
+} as const;
+
 export interface ScanTicketResult {
   code: ScanTicketResultCode;
+  /** Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it). */
+  status?: ScanTicketResultStatus;
+  /** True when the response came from a read-only lookup (no `confirm` and no `actualEntry`). The booking has NOT been marked checked in. The client should render a "Confirm entry" affordance that re-POSTs with `confirm: true`. */
+  lookupOnly?: boolean;
+  /** True only when this exact request transitioned the booking from not-checked-in to checked-in. False when the booking was already checked in (whether inside the grace window or not). */
+  justCheckedIn?: boolean;
+  /** True when a confirm/actualEntry request landed on an already-checked-in booking but within the ~30s grace window. The server returns 200 OK instead of 409 so duplicate scans (camera double-fire, fast retap) don't surface as errors to the manager. */
+  recentlyCheckedIn?: boolean;
   message?: string;
   checkedInAt?: string | null;
   booking?: ScanTicketBooking | null;
@@ -1679,4 +1767,19 @@ export const ListAdminSettlementRequestsStatus = {
   pending: "pending",
   approved: "approved",
   rejected: "rejected",
+} as const;
+
+export type GetSeoPageParams = {
+  template: GetSeoPageTemplate;
+  citySlug: string;
+  secondSlug?: string;
+};
+
+export type GetSeoPageTemplate =
+  (typeof GetSeoPageTemplate)[keyof typeof GetSeoPageTemplate];
+
+export const GetSeoPageTemplate = {
+  city: "city",
+  locality: "locality",
+  category: "category",
 } as const;

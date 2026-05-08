@@ -46,9 +46,9 @@ const PLAN_TYPE_LABELS: Record<string, string> = {
   custom: "Custom Package",
 };
 
-export function VendorDetail() {
+export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const params = useParams();
-  const id = Number(params["id"]);
+  const id = vendorIdProp ?? Number(params["id"]);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();

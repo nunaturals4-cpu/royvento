@@ -9,6 +9,8 @@ import type { ScanTicketBodyActualEntry } from "./scanTicketBodyActualEntry";
 
 export interface ScanTicketBody {
   code: string;
-  /** Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns and returns the recomputed actualAmountDue. */
+  /** When true, marks the booking as checked in. When false/omitted (and no actualEntry is provided), the request is treated as a read-only lookup that returns booking details + status without burning the ticket. The mobile scanner uses this two-step flow so the manager must explicitly tap "Confirm entry" before a ticket is consumed. */
+  confirm?: boolean;
+  /** Optional per-type actual attendance recorded by the scanner. When provided, updates the booking's actual_* columns, returns the recomputed actualAmountDue, AND implicitly confirms the check-in (no separate confirm flag needed). */
   actualEntry?: ScanTicketBodyActualEntry;
 }

@@ -253,11 +253,40 @@ router.get("/sitemap-cities.xml", async (req, res) => {
   }
 });
 
+function buildPubSlugLoc(args: {
+  id: number;
+  businessName: string | null;
+  city: string | null;
+}): string {
+  const citySeg = slugifyCity(args.city ?? "city") || "city";
+  const namePart = slugifyCity(args.businessName ?? "pub") || "pub";
+  return `/pubs/${citySeg}/${namePart}-${args.id}`;
+}
+
+function buildEventSlugLoc(args: {
+  id: number;
+  title: string | null;
+  city: string | null;
+  date: Date | string | null;
+}): string {
+  const citySeg = slugifyCity(args.city ?? "city") || "city";
+  const namePart = slugifyCity(args.title ?? "event") || "event";
+  const datePart = args.date
+    ? slugifyCity(
+        (args.date instanceof Date ? args.date.toISOString() : String(args.date)).slice(0, 10),
+      )
+    : "";
+  const slug = [namePart, datePart].filter(Boolean).join("-");
+  return `/events/${citySeg}/${slug}-${args.id}`;
+}
+
 router.get("/sitemap-pubs.xml", async (req, res) => {
   try {
     const rows = await db
       .select({
         id: vendorsTable.id,
+        businessName: vendorsTable.businessName,
+        city: vendorsTable.city,
         approvedAt: vendorsTable.approvedAt,
         createdAt: vendorsTable.createdAt,
       })
@@ -266,7 +295,7 @@ router.get("/sitemap-pubs.xml", async (req, res) => {
       .orderBy(desc(vendorsTable.id))
       .limit(50000);
     const urls: UrlEntry[] = rows.map((r) => ({
-      loc: `/vendors/${r.id}`,
+      loc: buildPubSlugLoc({ id: r.id, businessName: r.businessName, city: r.city }),
       lastmod: toIsoDate(r.approvedAt ?? r.createdAt),
       changefreq: "weekly",
       priority: 0.8,
@@ -283,6 +312,8 @@ router.get("/sitemap-events.xml", async (req, res) => {
     const rows = await db
       .select({
         id: eventsTable.id,
+        title: eventsTable.title,
+        city: eventsTable.city,
         eventDate: eventsTable.eventDate,
         createdAt: eventsTable.createdAt,
       })
@@ -299,7 +330,12 @@ router.get("/sitemap-events.xml", async (req, res) => {
         return Number.isNaN(d.getTime()) ? true : d >= today;
       })
       .map((r) => ({
-        loc: `/events/${r.id}`,
+        loc: buildEventSlugLoc({
+          id: r.id,
+          title: r.title,
+          city: r.city,
+          date: r.eventDate,
+        }),
         lastmod: toIsoDate(r.createdAt),
         changefreq: "daily",
         priority: 0.8,
@@ -324,6 +360,8 @@ router.get("/sitemap-offers.xml", async (req, res) => {
     const rows = await db
       .select({
         vendorId: drinkPlansTable.vendorId,
+        businessName: vendorsTable.businessName,
+        city: vendorsTable.city,
         lastCreatedAt: sql<Date>`MAX(${drinkPlansTable.createdAt})`.as("last_created_at"),
       })
       .from(drinkPlansTable)
@@ -334,7 +372,7 @@ router.get("/sitemap-offers.xml", async (req, res) => {
           sql`(${drinkPlansTable.validUntil} IS NULL OR ${drinkPlansTable.validUntil} >= ${todayStr})`,
         ),
       )
-      .groupBy(drinkPlansTable.vendorId)
+      .groupBy(drinkPlansTable.vendorId, vendorsTable.businessName, vendorsTable.city)
       .limit(50000);
     const offersMax = await maxTimestamp("drink_plans");
     const urls: UrlEntry[] = [
@@ -345,7 +383,11 @@ router.get("/sitemap-offers.xml", async (req, res) => {
         priority: 0.8,
       },
       ...rows.map((r) => ({
-        loc: `/vendors/${r.vendorId}`,
+        loc: buildPubSlugLoc({
+          id: r.vendorId,
+          businessName: r.businessName,
+          city: r.city,
+        }),
         lastmod: toIsoDate(r.lastCreatedAt),
         changefreq: "weekly" as const,
         priority: 0.6,

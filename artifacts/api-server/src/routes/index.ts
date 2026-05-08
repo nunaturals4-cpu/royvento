@@ -27,6 +27,7 @@ import paymentsRouter from "./payments";
 import managersRouter from "./managers";
 import placesRouter from "./places";
 import webPushRouter from "./webPush";
+import seoRouter from "./seo";
 
 const router: IRouter = Router();
 
@@ -58,5 +59,6 @@ router.use(paymentsRouter);
 router.use(managersRouter);
 router.use(placesRouter);
 router.use(webPushRouter);
+router.use(seoRouter);
 
 export default router;
