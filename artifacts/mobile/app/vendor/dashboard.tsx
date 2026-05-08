@@ -1902,7 +1902,6 @@ export default function VendorDashboardScreen() {
             )}
             <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push(`/event/${e.id}`)}>
               <Text style={[styles.eventTitle, { color: colors.foreground }]} numberOfLines={1}>{e.title}</Text>
-              <Text style={[styles.eventCat, { color: colors.mutedForeground }]}>{e.category}</Text>
             </TouchableOpacity>
             <View style={[styles.badge, { backgroundColor: e.approvalStatus === "approved" ? "#22c55e20" : "#f59e0b20" }]}>
               <Text style={[styles.badgeText, { color: e.approvalStatus === "approved" ? "#22c55e" : "#f59e0b" }]}>
@@ -4266,7 +4265,6 @@ const styles = StyleSheet.create({
   eventThumb: { width: 48, height: 48, borderRadius: 10 },
   eventThumbEmpty: { alignItems: "center", justifyContent: "center" },
   eventTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  eventCat: { fontSize: 12, fontFamily: "Inter_400Regular" },
   actionBtn: { borderRadius: 8, padding: 8, alignItems: "center", justifyContent: "center" },
   blockedRow: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
   blockedDate: { fontSize: 14, fontFamily: "Inter_600SemiBold" },

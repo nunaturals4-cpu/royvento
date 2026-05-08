@@ -536,7 +536,6 @@ function EventsManager({ vendor, events, refetchEvents, onSaved }: { vendor: any
                 <div className="flex-1 p-4 flex flex-col justify-between">
                   <div>
                     <div className="flex gap-1 mb-2 flex-wrap">
-                      <Badge variant="secondary" className="bg-white/10 border-white/10">{e.category}</Badge>
                       {(e.type === "pub") && <Badge className="bg-primary/20 border-primary/40 text-primary"><Wine className="h-3 w-3 mr-1" />Pub</Badge>}
                       {e.type === "pub" && e.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />Tickets</Badge>}
                       {e.type === "pub" && e.pubMode === "event" && <Badge variant="outline">Events</Badge>}
