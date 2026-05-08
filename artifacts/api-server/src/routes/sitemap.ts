@@ -228,9 +228,9 @@ router.get("/sitemap-offers.xml", async (req, res) => {
     today.setHours(0, 0, 0, 0);
     const todayStr = today.toISOString().slice(0, 10);
     const rows = await db
-      .selectDistinct({
+      .select({
         vendorId: drinkPlansTable.vendorId,
-        createdAt: drinkPlansTable.createdAt,
+        lastCreatedAt: sql<Date>`MAX(${drinkPlansTable.createdAt})`.as("last_created_at"),
       })
       .from(drinkPlansTable)
       .innerJoin(vendorsTable, eq(vendorsTable.id, drinkPlansTable.vendorId))
@@ -240,6 +240,7 @@ router.get("/sitemap-offers.xml", async (req, res) => {
           sql`(${drinkPlansTable.validUntil} IS NULL OR ${drinkPlansTable.validUntil} >= ${todayStr})`,
         ),
       )
+      .groupBy(drinkPlansTable.vendorId)
       .limit(50000);
     const offersMax = await maxTimestamp("drink_plans");
     const urls: UrlEntry[] = [
@@ -251,7 +252,7 @@ router.get("/sitemap-offers.xml", async (req, res) => {
       },
       ...rows.map((r) => ({
         loc: `/vendors/${r.vendorId}`,
-        lastmod: toIsoDate(r.createdAt),
+        lastmod: toIsoDate(r.lastCreatedAt),
         changefreq: "weekly" as const,
         priority: 0.6,
       })),
