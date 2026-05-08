@@ -354,21 +354,29 @@ export function TicketScanner() {
   const [cameraMode, setCameraMode] = useState(true);
   const { toast } = useToast();
   const { accessStatus, managedVendors } = useAccessCheck();
+  const queryClient = useQueryClient();
 
   const validateCode = async (code: string) => {
     if (!code) return;
     setLoading(true);
     setResult(null);
     try {
+      // Auto check-in: scanning a QR / submitting a manual code now checks
+      // the guest in immediately (single-step). The duplicate-scan guard on
+      // the server still returns ALREADY_CHECKED_IN for repeat scans.
       const res = await fetch("/api/partner/scan-ticket", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, confirm: true }),
       });
       if (res.ok) {
         const json = (await res.json()) as ScanSuccess;
         setResult(json);
+        // Refresh occupancy + bookings panels immediately so the new
+        // "currently inside" count appears without waiting for the poll.
+        void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerOccupancyQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerBookingsQueryKey() });
       } else {
         const json = (await res.json()) as Record<string, unknown>;
         const errCode = typeof json.code === "string" ? json.code : "UNKNOWN";
@@ -673,7 +681,12 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
     apiGet<{ vendors: { id: number; businessName: string }[] }>("/api/partner/scanner/allowed-vendors")
       .then((r) => {
         if (cancelled) return;
-        setVendorOptions(r.vendors.map((v) => ({ id: v.id, name: v.businessName })));
+        const opts = r.vendors.map((v) => ({ id: v.id, name: v.businessName }));
+        setVendorOptions(opts);
+        // When the user has exactly one allowed pub, lock the filter to that
+        // vendorId so the table can never show another partner's pub. The
+        // dropdown is hidden in this case.
+        if (opts.length === 1) setVendorFilter(String(opts[0]!.id));
       })
       .catch(() => { if (!cancelled) setVendorOptions([]); });
     return () => { cancelled = true; };

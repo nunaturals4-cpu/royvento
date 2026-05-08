@@ -84,22 +84,18 @@ function bookingFerState(b: Pick<BookingData, "bookingDate" | "freeEntryRules">)
 
 interface ScanResult {
   code: string;
-  // Higher-resolution status from the server. `ready_to_check_in` is only
-  // returned for the read-only lookup phase (POST {code}); the manager must
-  // tap "Confirm entry" to move the booking to `checked_in`. `already_checked_in`
-  // covers both lookup hits on used tickets and grace-window re-confirms.
+  // Higher-resolution status from the server. Scanning auto-confirms now,
+  // so `ready_to_check_in` no longer reaches the client. `already_checked_in`
+  // covers grace-window re-confirms and out-of-grace duplicate scans.
   // `checked_out` is set after a successful POST /partner/checkout-ticket.
-  status?: "ready_to_check_in" | "checked_in" | "already_checked_in" | "checked_out" | "ready_to_check_out" | "already_checked_out" | "not_checked_in";
+  status?: "checked_in" | "already_checked_in" | "checked_out" | "ready_to_check_out" | "already_checked_out" | "not_checked_in";
   checkedOutAt?: string | null;
   justCheckedOut?: boolean;
-  // True when the response came from a read-only lookup. The booking has NOT
-  // been marked checked in — show a Confirm button instead of a green banner.
-  lookupOnly?: boolean;
   // True only when this exact request burned the ticket. False for grace-window
   // re-confirms so we can show "Checked in just now" instead of a fresh "Entry granted".
   justCheckedIn?: boolean;
-  // True when a confirm/actualEntry hit an already-checked-in booking inside
-  // the ~30s grace window (camera double-fire, fast retap).
+  // True when a re-scan hit an already-checked-in booking inside the ~30s
+  // grace window (camera double-fire, fast retap).
   recentlyCheckedIn?: boolean;
   message?: string;
   checkedInAt?: string;
@@ -114,22 +110,22 @@ export default function ScannerScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  // Only auto-open the actuals sheet AFTER the manager has confirmed entry —
-  // never on a lookup-only response. The manager should see the booking
-  // details + an explicit "Confirm entry" button first; if they want to log
-  // per-type counts (which also confirms entry), they tap "Record actual entry".
+  // Bump this to force the occupancy + bookings panels to refetch immediately
+  // after a successful auto check-in, instead of waiting for the next poll.
+  const [panelsTick, setPanelsTick] = useState(0);
+  // Auto-open the actuals sheet on a successful check-in or already-checked-in
+  // result so the manager can immediately log per-tier counts without an
+  // extra tap. There is no longer a lookup-only state — scanning auto-confirms.
   useEffect(() => {
     if (
       result?.booking &&
-      !result.lookupOnly &&
       (result.code === "OK" || result.code === "ALREADY_CHECKED_IN")
     ) {
       setSheetOpen(true);
     } else {
       setSheetOpen(false);
     }
-  }, [result?.code, result?.booking?.id, result?.lookupOnly]);
+  }, [result?.code, result?.booking?.id]);
   const [torchOn, setTorchOn] = useState(false);
   const scanLock = useRef(false);
   const manualInputRef = useRef<TextInput>(null);
@@ -144,44 +140,22 @@ export default function ScannerScreen() {
     setLoading(true);
     setResult(null);
     try {
+      // Auto check-in: a single POST with `confirm: true` performs the
+      // check-in immediately. The server's duplicate-scan guard still returns
+      // ALREADY_CHECKED_IN (or, within the grace window, status=already_checked_in
+      // with recentlyCheckedIn=true) for repeat scans of the same QR.
       const res = await customFetch<ScanResult>("/api/partner/scan-ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: trimmed }),
+        body: JSON.stringify({ code: trimmed, confirm: true }),
       });
       setResult(res);
-    } catch (e: unknown) {
-      const err = e as { message?: string; code?: string };
-      setResult({ code: err.code ?? "ERROR", message: err.message ?? "Network error. Try again." });
-    } finally {
-      setLoading(false);
-      setTimeout(() => { scanLock.current = false; }, 2500);
-    }
-  };
-
-  // Second leg of the two-step scan: re-POST with confirm:true to actually
-  // burn the ticket. The server returns justCheckedIn=true (success), or
-  // (within the ~30s grace window) status=already_checked_in with
-  // recentlyCheckedIn=true — both render as success in the UI.
-  const confirmEntry = async () => {
-    // Use the per-pub ticketCode (PREFIX-NNNNNN-XX) from the lookup response
-    // — never the legacy `RV-` fallback. The server now requires a real
-    // vendor prefix, so deriving an `RV-` code here would always fail
-    // checksum verification.
-    const bk = result?.booking as (BookingData & { ticketCode?: string }) | undefined;
-    const code = bk?.ticketCode ?? null;
-    if (!code || confirming) return;
-    setConfirming(true);
-    try {
-      const res = await customFetch<ScanResult>("/api/partner/scan-ticket", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, confirm: true }),
-      });
-      setResult(res);
+      // Refresh live occupancy + bookings so the new "currently inside" count
+      // appears without waiting for the 15s/20s poll.
+      if (res.code === "OK") setPanelsTick((t) => t + 1);
     } catch (e: unknown) {
       const err = e as { message?: string; code?: string; checkedInAt?: string; booking?: BookingData };
-      // Outside the grace window the server still returns 409 ALREADY_CHECKED_IN
+      // Outside the grace window the server returns 409 ALREADY_CHECKED_IN
       // with the booking payload — surface that to the manager unchanged.
       setResult({
         code: err.code ?? "ERROR",
@@ -190,7 +164,8 @@ export default function ScannerScreen() {
         booking: err.booking,
       });
     } finally {
-      setConfirming(false);
+      setLoading(false);
+      setTimeout(() => { scanLock.current = false; }, 2500);
     }
   };
 
@@ -233,13 +208,12 @@ export default function ScannerScreen() {
     }
   }, [result]);
 
-  // Color the result banner by the new high-resolution status:
-  //   ready_to_check_in → blue (action required, ticket NOT yet burned)
+  // Color the result banner by the high-resolution status:
   //   checked_in / grace-window OK → green
-  //   already_checked_in (lookup hit on used ticket / out-of-grace re-confirm) → orange
+  //   already_checked_in (out-of-grace re-confirm) → orange
+  //   ready_to_check_out / checked_out → purple/green
   //   anything else (not found, invalid status, network) → red
   const resultColor = result == null ? "#ef4444"
-    : result.status === "ready_to_check_in" ? "#3b82f6"
     : result.status === "ready_to_check_out" ? "#a855f7"
     : result.status === "checked_out" || result.justCheckedOut ? "#22c55e"
     : result.status === "already_checked_out" ? "#f97316"
@@ -370,8 +344,7 @@ export default function ScannerScreen() {
               <View style={[styles.resultIcon, { backgroundColor: resultColor + "20" }]}>
                 <Ionicons
                   name={
-                    result.status === "ready_to_check_in" ? "qr-code-outline"
-                      : result.code === "OK" ? "checkmark-circle"
+                    result.code === "OK" ? "checkmark-circle"
                       : result.code === "ALREADY_CHECKED_IN" ? "time-outline"
                       : "close-circle"
                   }
@@ -381,18 +354,12 @@ export default function ScannerScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.resultTitle, { color: resultColor }]}>
-                  {result.status === "ready_to_check_in" ? "Ready to check in"
-                    : result.recentlyCheckedIn ? "Checked in just now"
+                  {result.recentlyCheckedIn ? "Checked in just now"
                     : result.code === "OK" ? "Entry granted"
                     : result.code === "ALREADY_CHECKED_IN" ? "Already used"
                     : "Invalid ticket"}
                 </Text>
-                {result.status === "ready_to_check_in" && (
-                  <Text style={[styles.resultSub, { color: colors.mutedForeground }]}>
-                    Review the booking, then tap Confirm entry to admit the guest.
-                  </Text>
-                )}
-                {result.checkedInAt && result.status !== "ready_to_check_in" && (
+                {result.checkedInAt && (
                   <Text style={[styles.resultSub, { color: colors.mutedForeground }]}>
                     {result.code === "OK" && !result.recentlyCheckedIn ? "Checked in" : "Was checked in"} at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
@@ -429,29 +396,9 @@ export default function ScannerScreen() {
               </View>
             )}
 
-            {/* Confirm entry button — only for read-only lookups on a non-checked-in
-                booking. Sends {code, confirm:true} to actually burn the ticket. */}
-            {result.lookupOnly && result.status === "ready_to_check_in" && result.booking && (
-              <TouchableOpacity
-                onPress={confirmEntry}
-                disabled={confirming}
-                style={{ marginHorizontal: 14, marginBottom: 14, backgroundColor: "#22c55e", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8, opacity: confirming ? 0.6 : 1 }}
-              >
-                {confirming
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="checkmark-circle" size={20} color="#fff" />}
-                <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" }}>
-                  {confirming ? "Confirming…" : "Confirm entry"}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* "Record actual entry" sheet. Available from both lookup and
-                post-confirm states — submitting actuals from lookup state is
-                equivalent to confirming (the server's actualEntry branch
-                implicitly checks the booking in), so it's a valid alternative
-                to the "Confirm entry" button when the manager wants to log
-                who actually showed up at the same time as admitting them. */}
+            {/* "Record actual entry" sheet — opens automatically after a
+                successful auto check-in so the manager can log per-tier
+                counts and (for COD) collect cash without an extra tap. */}
             {result.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
               <TouchableOpacity
                 onPress={() => setSheetOpen(true)}
@@ -561,7 +508,7 @@ export default function ScannerScreen() {
           </View>
         )}
 
-        <ScannerPanels />
+        <ScannerPanels externalRefetchKey={panelsTick} />
 
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
@@ -756,15 +703,17 @@ function ActualEntrySheet({
 // ─── Occupancy + bookings panels (Task #581) ───────────────────────────────
 type ScannerLiveStatus = "notArrived" | "inside" | "checkedOut";
 
-function ScannerPanels() {
+function ScannerPanels({ externalRefetchKey = 0 }: { externalRefetchKey?: number }) {
   // Lift a "mutation tick" so a successful checkout in the bookings panel
   // forces an immediate refresh in the occupancy panel above instead of
-  // waiting for the next 15s poll.
+  // waiting for the next 15s poll. `externalRefetchKey` is bumped by the
+  // parent after a successful auto check-in so both panels refresh too.
   const [tick, setTick] = useState(0);
+  const combinedKey = tick + externalRefetchKey;
   return (
     <>
-      <ScannerOccupancyPanel refetchKey={tick} />
-      <ScannerBookingsPanel onCheckedOut={() => setTick((t) => t + 1)} />
+      <ScannerOccupancyPanel refetchKey={combinedKey} />
+      <ScannerBookingsPanel onCheckedOut={() => setTick((t) => t + 1)} externalRefetchKey={externalRefetchKey} />
     </>
   );
 }
@@ -819,7 +768,7 @@ function ScannerOccupancyPanel({ refetchKey = 0 }: { refetchKey?: number }) {
   );
 }
 
-function ScannerBookingsPanel({ onCheckedOut }: { onCheckedOut: () => void }) {
+function ScannerBookingsPanel({ onCheckedOut, externalRefetchKey = 0 }: { onCheckedOut: () => void; externalRefetchKey?: number }) {
   const colors = useColors();
   const [rows, setRows] = useState<ApiScannerBookingRow[]>([]);
   const [statuses, setStatuses] = useState<Set<ScannerLiveStatus>>(() => new Set());
@@ -848,7 +797,7 @@ function ScannerBookingsPanel({ onCheckedOut }: { onCheckedOut: () => void }) {
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [statusKey, statuses, q, from, to, vendorFilter, tick]);
+  }, [statusKey, statuses, q, from, to, vendorFilter, tick, externalRefetchKey]);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 20000);
@@ -864,7 +813,12 @@ function ScannerBookingsPanel({ onCheckedOut }: { onCheckedOut: () => void }) {
     customFetch<{ vendors: { id: number; businessName: string }[] }>("/api/partner/scanner/allowed-vendors")
       .then((r) => {
         if (cancelled) return;
-        setVendorOptions(r.vendors.map((v) => ({ id: v.id, name: v.businessName })));
+        const opts = r.vendors.map((v) => ({ id: v.id, name: v.businessName }));
+        setVendorOptions(opts);
+        // When the user has exactly one allowed pub, lock the filter to that
+        // vendorId so the table can never show another partner's pub. The
+        // venue chip strip is hidden in this case.
+        if (opts.length === 1) setVendorFilter(opts[0]!.id);
       })
       .catch(() => { if (!cancelled) setVendorOptions([]); });
     return () => { cancelled = true; };
