@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
 import router from "./routes";
+import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
 import { SESSION_SECRET } from "./lib/auth";
 
@@ -95,5 +96,11 @@ const globalApiLimiter = rateLimit({
 });
 
 app.use("/api", globalApiLimiter, router);
+
+// Sitemap shards live at the site root (e.g. /sitemap-index.xml) so search
+// engines can discover them at the conventional location. The shared proxy
+// only forwards these paths to api-server because they are listed in
+// .replit-artifact/artifact.toml's services.paths.
+app.use(sitemapRouter);
 
 export default app;

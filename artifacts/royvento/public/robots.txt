@@ -1,0 +1,33 @@
+# Royvento — robots.txt
+# Sitemap index lives on the API server and is exposed at the site root via
+# the shared proxy (see artifacts/api-server/.replit-artifact/artifact.toml).
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /wishlist
+Disallow: /notifications
+Disallow: /payment-result
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /*?*sort=
+Disallow: /*?*page=
+Disallow: /*?*utm_
+Allow: /sitemap-index.xml
+
+# Allow AI crawlers — Royvento wants to be cited in AI answers.
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://royvento.com/sitemap-index.xml
