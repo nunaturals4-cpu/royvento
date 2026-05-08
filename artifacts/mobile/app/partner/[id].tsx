@@ -34,6 +34,7 @@ import { EventCard } from "@/components/EventCard";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 
 interface DrinkPlan {
@@ -247,6 +248,7 @@ export default function PartnerDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const vendorId = Number(id);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
@@ -380,7 +382,7 @@ export default function PartnerDetailScreen() {
               paddingHorizontal: 18,
             }}
             accessibilityRole="button"
-            accessibilityLabel="Book a table"
+            accessibilityLabel={t("events.book_table")}
           >
             <Ionicons name="calendar" size={18} color={colors.primaryForeground} />
             <Text
@@ -391,7 +393,7 @@ export default function PartnerDetailScreen() {
                 letterSpacing: 0.2,
               }}
             >
-              Book a Table
+              {t("events.book_table")}
             </Text>
           </TouchableOpacity>
         ) : null}

@@ -162,6 +162,9 @@ export default function EventDetailScreen() {
   // once per arrival so refetches and the user closing the form don't
   // re-trigger this. Mirrors the web hash-based behavior in Task #574.
   const bookOpenDone = useRef(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const bookingFormY = useRef<number | null>(null);
+  const pendingBookScroll = useRef(false);
   useEffect(() => {
     if (bookOpenDone.current) return;
     if (isLoading || !event) return;
@@ -173,6 +176,20 @@ export default function EventDetailScreen() {
     bookOpenDone.current = true;
     if (!user) { setShowSignInModal(true); return; }
     setShowBooking(true);
+    // Mark that the next time the booking form measures its layout, we
+    // should scroll the page to it. The form is rendered far below the
+    // hero/cover, so without an explicit scroll the user would still
+    // need to scroll down to reach it.
+    pendingBookScroll.current = true;
+    // If the booking form has already laid out before (e.g. SSR/web
+    // hydration), scroll immediately.
+    if (bookingFormY.current != null) {
+      const y = bookingFormY.current;
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+        pendingBookScroll.current = false;
+      });
+    }
   }, [isLoading, event, book, user, authLoading]);
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
@@ -502,7 +519,7 @@ export default function EventDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
         {/* Hero image */}
         <View style={styles.imageContainer}>
           {event.imageUrl ? (
@@ -1003,7 +1020,19 @@ export default function EventDetailScreen() {
 
         {/* ─── Booking form ─── */}
         {showBooking ? (
-          <View style={[styles.bookingForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View
+            style={[styles.bookingForm, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onLayout={(e) => {
+              const y = e.nativeEvent.layout.y;
+              bookingFormY.current = y;
+              if (pendingBookScroll.current) {
+                pendingBookScroll.current = false;
+                requestAnimationFrame(() => {
+                  scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+                });
+              }
+            }}
+          >
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.book_this")}</Text>
 
             {/* Open-days note */}
