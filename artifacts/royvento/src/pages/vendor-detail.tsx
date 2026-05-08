@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import { pubDetailSlug } from "@/lib/seo-slug";
@@ -87,22 +87,20 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
       .catch(() => {});
   }, [id]);
 
-  // Track this profile view for the partner's leads/CRM. We skip the call
-  // when the visitor IS the partner who owns this pub (no point logging
-  // self-views in their own leads list). Guarded by sessionStorage so a
-  // single tab session only counts once per pub even with React StrictMode
-  // double-mounts or quick remounts.
+  // Track this profile view for the partner's leads/CRM. Skipped when the
+  // visitor IS the partner who owns this pub (defence-in-depth — server
+  // also drops self-views). A useRef boolean blocks React StrictMode's
+  // intentional double-invocation in dev (same component instance =>
+  // same ref) but does NOT suppress legitimate revisits: navigating away
+  // and back creates a new mount with a fresh ref, so visitCount /
+  // lastViewedAt update on every real visit.
+  const viewedFiredRef = useRef(false);
   useEffect(() => {
     if (!id || !vendor) return;
     // `vendor` is the generated Vendor schema (already includes `userId`).
-    // Self-skip is also enforced server-side as defense in depth against
-    // auth-load races where `me` resolves after the page mounts.
     if (me?.user && vendor.userId === me.user.id) return;
-    const storageKey = `royvento:viewed:${id}`;
-    try {
-      if (sessionStorage.getItem(storageKey)) return;
-      sessionStorage.setItem(storageKey, "1");
-    } catch { /* private mode etc — fall through and still POST */ }
+    if (viewedFiredRef.current) return;
+    viewedFiredRef.current = true;
     apiPost(`/api/partners/${id}/view`, {}).catch(() => {});
   }, [id, vendor, me?.user?.id]);
 

@@ -100,7 +100,7 @@ export const LoginResponse = zod.object({
  * @summary Log out
  */
 export const LogoutResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -216,7 +216,7 @@ export const DeleteUserParams = zod
   .strict();
 
 export const DeleteUserResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -932,7 +932,7 @@ export const DeleteDrinkPlanParams = zod
   .strict();
 
 export const DeleteDrinkPlanResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -1856,7 +1856,7 @@ export const DeleteEventParams = zod
   .strict();
 
 export const DeleteEventResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -2553,7 +2553,7 @@ export const DeleteReviewParams = zod
   .strict();
 
 export const DeleteReviewResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -2696,7 +2696,7 @@ export const DeleteAvailabilityParams = zod
   .strict();
 
 export const DeleteAvailabilityResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -3621,7 +3621,7 @@ export const PatchAdminEventBody = zod
   .strict();
 
 export const PatchAdminEventResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -3634,7 +3634,7 @@ export const DeleteAdminEventParams = zod
   .strict();
 
 export const DeleteAdminEventResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**
@@ -4569,7 +4569,7 @@ export const RemoveFromWishlistParams = zod
   .strict();
 
 export const RemoveFromWishlistResponse = zod.object({
-  ok: zod.boolean().optional(),
+  ok: zod.boolean(),
 });
 
 /**

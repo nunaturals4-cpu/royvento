@@ -4240,14 +4240,19 @@ const PLAN_TYPE_BADGE: Record<string, string> = {
   custom: "Custom Package",
 };
 
-// `discountedPrice` is held as `number | ""` while editing so the input can
-// render an empty placeholder for fresh rows. Save handlers coerce `""` → 0.
+// Wire/display shape — line items as they come back from the API and are
+// rendered. Always numeric.
+interface DrinkPlanLineItemWire { name: string; qty: number; discountedPrice: number; }
+
+// Editor-only shape — `discountedPrice` is held as `number | ""` while
+// editing so the input can render an empty placeholder for fresh rows.
+// `itemForWire()` coerces `""` → 0 right before POST/PATCH.
 interface DrinkPlanLineItem { name: string; qty: number; discountedPrice: number | ""; }
 
 interface DrinkPlan {
   id: number; vendorId: number; type: string; productName: string; gender: string;
   price: number; days: string[]; timeFrom: string; timeTo: string; description: string; createdAt: string;
-  lineItems?: DrinkPlanLineItem[] | null;
+  lineItems?: DrinkPlanLineItemWire[] | null;
   drinksOfferLabel?: string;
   foodDiscountLabel?: string;
   validUntil?: string | null;

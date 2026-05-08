@@ -257,18 +257,20 @@ export default function PartnerDetailScreen() {
   const [reviewsPage, setReviewsPage] = useState(1);
   useEffect(() => { setReviewsPage(1); }, [vendorId]);
 
-  // Track this partner page view for the partner's leads/CRM. We skip the
-  // call when the viewer is the partner who owns this pub. The view is
-  // fired at most once per session per vendorId so quick remounts don't
-  // inflate the count.
-  const viewedRef = React.useRef<Set<number>>(new Set());
+  // Track this partner page view for the partner's leads/CRM. Skipped
+  // when the viewer is the partner who owns this pub (server also drops
+  // self-views as defence in depth). The boolean ref blocks React
+  // StrictMode's intentional double-invocation in dev (same component
+  // instance => same ref) but legitimate revisits create a fresh mount
+  // with a new ref, so visitCount / lastViewedAt update on every real
+  // navigation back to this page.
+  const viewedFiredRef = React.useRef(false);
   useEffect(() => {
     if (!vendorId || !vendor) return;
     // `vendor` is the generated Vendor schema and includes `userId`.
-    // Server also drops self-views as defense in depth.
     if (user && vendor.userId === user.id) return;
-    if (viewedRef.current.has(vendorId)) return;
-    viewedRef.current.add(vendorId);
+    if (viewedFiredRef.current) return;
+    viewedFiredRef.current = true;
     customFetch(`/api/partners/${vendorId}/view`, { method: "POST", body: JSON.stringify({}) }).catch(() => {});
   }, [vendorId, vendor, user?.id]);
   const reviewsQc = useQC();

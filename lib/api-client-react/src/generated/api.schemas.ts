@@ -153,7 +153,7 @@ export interface HealthStatus {
 }
 
 export interface Ok {
-  ok?: boolean;
+  ok: boolean;
 }
 
 export interface TrackProfileViewResult {

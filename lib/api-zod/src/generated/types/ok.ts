@@ -7,5 +7,5 @@
  */
 
 export interface Ok {
-  ok?: boolean;
+  ok: boolean;
 }
