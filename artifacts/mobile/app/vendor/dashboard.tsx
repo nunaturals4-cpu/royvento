@@ -161,7 +161,8 @@ async function uploadMenuFileToStorage(localUri: string, filename: string, conte
     body: blob,
   });
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
-  const base = getBaseUrl() ?? "";
+  const base = getBaseUrl();
+  if (!base) throw new Error("API base URL is not configured; cannot build storage URL.");
   return `${base}/api/storage/objects/${pathAfterObjects}`;
 }
 
@@ -190,7 +191,8 @@ async function uploadImageToStorage(localUri: string): Promise<string> {
 
   // Construct the serving URL
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
-  const base = getBaseUrl() ?? "";
+  const base = getBaseUrl();
+  if (!base) throw new Error("API base URL is not configured; cannot build storage URL.");
   return `${base}/api/storage/objects/${pathAfterObjects}`;
 }
 
