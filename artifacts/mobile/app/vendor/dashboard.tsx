@@ -1056,6 +1056,10 @@ export default function VendorDashboardScreen() {
     if (createForm.category === "Pubs" && createForm.freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(createForm.freeEntryBeforeTime)) {
       localErrs.freeEntryBeforeTime = "Use HH:mm 24-hour format (e.g. 22:00).";
     }
+    if (createForm.category === "Pubs" && createForm.freeEntryEnabled) {
+      if (createForm.freeEntryGenders.length === 0) localErrs.freeEntryGenders = "Pick at least one gender for free entry.";
+      if (createForm.freeEntryDays.length === 0) localErrs.freeEntryDays = "Pick at least one day for free entry.";
+    }
     if (Object.keys(localErrs).length > 0) {
       setCreateFormErrors(localErrs);
       Alert.alert("Please fix these fields", Object.entries(localErrs).map(([k, v]) => `• ${k}: ${v}`).join("\n"));
@@ -1134,6 +1138,10 @@ export default function VendorDashboardScreen() {
     if (isNaN(capacity) || capacity < 1) localErrs.capacity = "Please enter a valid capacity.";
     if ((editingEvent.type === "pub" || editForm.category === "Pubs") && editForm.freeEntryBeforeTime && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(editForm.freeEntryBeforeTime)) {
       localErrs.freeEntryBeforeTime = "Use HH:mm 24-hour format (e.g. 22:00).";
+    }
+    if ((editingEvent.type === "pub" || editForm.category === "Pubs") && editForm.freeEntryEnabled) {
+      if (editForm.freeEntryGenders.length === 0) localErrs.freeEntryGenders = "Pick at least one gender for free entry.";
+      if (editForm.freeEntryDays.length === 0) localErrs.freeEntryDays = "Pick at least one day for free entry.";
     }
     if (Object.keys(localErrs).length > 0) {
       setEditFormErrors(localErrs);

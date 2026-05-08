@@ -190,10 +190,14 @@ export function VendorDashboard() {
   const hasPub = events.some((e: any) => e.type === "pub");
 
   // Lock the dashboard down to Profile + Events&Pubs until the partner is
-  // approved AND has at least one listed event/pub. Hides the rest of the
-  // tabs and the scanner button so unapproved partners can't poke at empty
-  // panels (or scan tickets they shouldn't be able to).
-  const isApprovedAndListed = vendor?.status === "approved" && events.length > 0;
+  // approved AND has at least one ADMIN-APPROVED event/pub. A freshly created
+  // pub starts at approvalStatus="pending" — the studio tools (Bookings,
+  // Analytics, Scanner, etc.) only make sense once the listing is live, so
+  // they shouldn't appear the moment the partner finishes the form.
+  const hasApprovedEvent = events.some((e: any) => e.approvalStatus === "approved");
+  const isApprovedAndListed = vendor?.status === "approved" && hasApprovedEvent;
+  const hasPendingEvent = events.some((e: any) => e.approvalStatus === "pending");
+  const allRejected = events.length > 0 && !hasApprovedEvent && !hasPendingEvent;
   const ALLOWED_LOCKED_TABS = ["overview", "events"] as const;
   const safeInitialTab = isApprovedAndListed
     ? initialTab
@@ -228,14 +232,22 @@ export function VendorDashboard() {
               <Megaphone className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
               <div>
                 <p className="font-serif text-lg text-amber-100">
-                  {vendor.status === "approved"
-                    ? "Add your first event or pub to unlock the full dashboard"
-                    : "Your partner profile is awaiting Royvento approval"}
+                  {vendor.status !== "approved"
+                    ? "Your partner profile is awaiting Royvento approval"
+                    : hasPendingEvent
+                      ? "Your listing is awaiting Royvento approval"
+                      : allRejected
+                        ? "Your listings need updates before going live"
+                        : "Add your first event or pub to unlock the full dashboard"}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {vendor.status === "approved"
-                    ? "Once you list an event or pub, Bookings, Analytics, Scanner and the rest of the studio tools become available."
-                    : "We're reviewing your profile. As soon as it's approved (and you list at least one event or pub), Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."}
+                  {vendor.status !== "approved"
+                    ? "We're reviewing your profile. As soon as it's approved (and you list at least one event or pub that we approve), Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."
+                    : hasPendingEvent
+                      ? "Your listing is in review. As soon as our team approves it, Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."
+                      : allRejected
+                        ? "None of your listings are currently approved. Edit them to address the reviewer's notes (or add a new one) — once we approve a listing, Bookings, Analytics, Scanner and the rest of the studio tools will appear here."
+                        : "Once you list an event or pub and we approve it, Bookings, Analytics, Scanner and the rest of the studio tools become available."}
                 </p>
               </div>
             </div>
@@ -891,6 +903,18 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
       toast({ title: "Invalid before time", description: "Please use HH:mm 24-hour format (e.g. 22:00)", variant: "destructive" });
       return;
     }
+    if (type === "pub" && freeEntryEnabled && (freeEntryGenders.length === 0 || freeEntryDays.length === 0)) {
+      formErrors.setFieldError(
+        freeEntryGenders.length === 0 ? "freeEntryGenders" : "freeEntryDays",
+        freeEntryGenders.length === 0 && freeEntryDays.length === 0
+          ? "Pick at least one gender and at least one day."
+          : freeEntryGenders.length === 0
+            ? "Pick at least one gender."
+            : "Pick at least one day.",
+      );
+      toast({ title: "Free entry needs a rule", description: "Pick at least one gender and at least one day for free entry.", variant: "destructive" });
+      return;
+    }
     if (capacity === "" || Number(capacity) < 1) {
       toast({ title: "Capacity required", description: "Capacity must be at least 1.", variant: "destructive" });
       return;
@@ -1162,26 +1186,28 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
             {freeEntryEnabled && (
               <div className="space-y-3 px-4 pb-4 pt-1">
                 <div>
-                  <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders? <span className="text-red-400">*</span></Label>
                   <div className="flex flex-wrap gap-2">
                     {FE_GENDER_OPTIONS.map(({ canon, label }) => (
                       <button key={canon} type="button"
-                        onClick={() => setFreeEntryGenders((prev) => prev.includes(canon) ? prev.filter((x) => x !== canon) : [...prev, canon])}
+                        onClick={() => { setFreeEntryGenders((prev) => prev.includes(canon) ? prev.filter((x) => x !== canon) : [...prev, canon]); formErrors.clearField("freeEntryGenders"); }}
                         className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(canon) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
                       >{label}</button>
                     ))}
                   </div>
+                  {formErrors.fieldError("freeEntryGenders") && <p className="text-xs text-destructive mt-1">{formErrors.fieldError("freeEntryGenders")}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days?</Label>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days? <span className="text-red-400">*</span></Label>
                   <div className="flex flex-wrap gap-2">
                     {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
                       <button key={d} type="button"
-                        onClick={() => setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
+                        onClick={() => { setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]); formErrors.clearField("freeEntryDays"); }}
                         className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
                       >{d}</button>
                     ))}
                   </div>
+                  {formErrors.fieldError("freeEntryDays") && <p className="text-xs text-destructive mt-1">{formErrors.fieldError("freeEntryDays")}</p>}
                 </div>
                 <div>
                   <Label className="text-xs text-white/60 mb-1 block">Before time (optional, 24-hour format)</Label>
@@ -1715,6 +1741,18 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
       toast({ title: "Invalid before time", description: "Please use HH:mm 24-hour format (e.g. 22:00)", variant: "destructive" });
       return;
     }
+    if (isPub && freeEntryEnabled && (freeEntryGenders.length === 0 || freeEntryDays.length === 0)) {
+      formErrors.setFieldError(
+        freeEntryGenders.length === 0 ? "freeEntryGenders" : "freeEntryDays",
+        freeEntryGenders.length === 0 && freeEntryDays.length === 0
+          ? "Pick at least one gender and at least one day."
+          : freeEntryGenders.length === 0
+            ? "Pick at least one gender."
+            : "Pick at least one day.",
+      );
+      toast({ title: "Free entry needs a rule", description: "Pick at least one gender and at least one day for free entry.", variant: "destructive" });
+      return;
+    }
     if (capacity === "" || Number(capacity) < 1) {
       toast({ title: "Capacity required", description: "Capacity must be at least 1.", variant: "destructive" });
       return;
@@ -1973,26 +2011,28 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
               {freeEntryEnabled && (
                 <div className="space-y-3 px-4 pb-4 pt-1">
                   <div>
-                    <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders?</Label>
+                    <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders? <span className="text-red-400">*</span></Label>
                     <div className="flex flex-wrap gap-2">
                       {FE_GENDER_OPTIONS.map(({ canon, label }) => (
                         <button key={canon} type="button"
-                          onClick={() => setFreeEntryGenders((prev) => prev.includes(canon) ? prev.filter((x) => x !== canon) : [...prev, canon])}
+                          onClick={() => { setFreeEntryGenders((prev) => prev.includes(canon) ? prev.filter((x) => x !== canon) : [...prev, canon]); formErrors.clearField("freeEntryGenders"); }}
                           className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryGenders.includes(canon) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
                         >{label}</button>
                       ))}
                     </div>
+                    {formErrors.fieldError("freeEntryGenders") && <p className="text-xs text-destructive mt-1">{formErrors.fieldError("freeEntryGenders")}</p>}
                   </div>
                   <div>
-                    <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days?</Label>
+                    <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days? <span className="text-red-400">*</span></Label>
                     <div className="flex flex-wrap gap-2">
                       {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
                         <button key={d} type="button"
-                          onClick={() => setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
+                          onClick={() => { setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]); formErrors.clearField("freeEntryDays"); }}
                           className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
                         >{d}</button>
                       ))}
                     </div>
+                    {formErrors.fieldError("freeEntryDays") && <p className="text-xs text-destructive mt-1">{formErrors.fieldError("freeEntryDays")}</p>}
                   </div>
                   <div>
                     <Label className="text-xs text-white/60 mb-1 block">Before time (optional, 24-hour format)</Label>
@@ -3591,6 +3631,8 @@ function ManagersPanel() {
   const [myVendors, setMyVendors] = useState<{ id: number; businessName: string }[]>([]);
   const [leavingId, setLeavingId] = useState<number | null>(null);
   const [confirmLeave, setConfirmLeave] = useState<{ id: number; name: string } | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{ id: number; label: string } | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
   const [email, setEmail] = useState("");
   const inviteFormErrors = useFormErrors();
   const [loading, setLoading] = useState(false);
@@ -3653,12 +3695,20 @@ function ManagersPanel() {
   };
 
   const remove = async (id: number) => {
+    setRemovingId(id);
     try {
       await apiDelete(`/api/partner/managers/${id}`);
       toast({ title: "Manager removed" });
       setManagers((prev) => prev.filter((m) => m.id !== id));
-    } catch {
-      toast({ title: "Failed to remove manager", variant: "destructive" });
+      setConfirmRemove(null);
+    } catch (err: any) {
+      toast({
+        title: "Failed to remove manager",
+        description: err?.data?.error ?? (err instanceof Error ? err.message : undefined),
+        variant: "destructive",
+      });
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -3730,6 +3780,27 @@ function ManagersPanel() {
         </div>
       )}
 
+      {confirmRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => removingId == null && setConfirmRemove(null)}>
+          <div className="w-full max-w-md rounded-2xl glass-card-strong p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-xl">Remove {confirmRemove.label}?</h3>
+            <p className="text-sm text-muted-foreground">
+              They'll lose scanner access for your venue immediately. You can re-invite them anytime from this page.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" disabled={removingId != null} onClick={() => setConfirmRemove(null)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                disabled={removingId != null}
+                onClick={() => remove(confirmRemove.id)}
+              >
+                {removingId === confirmRemove.id ? "Removing…" : "Remove manager"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmLeave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => leavingId == null && setConfirmLeave(null)}>
           <div className="w-full max-w-md rounded-2xl glass-card-strong p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
@@ -3780,7 +3851,8 @@ function ManagersPanel() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => remove(m.id)}
+                        disabled={removingId === m.id}
+                        onClick={() => setConfirmRemove({ id: m.id, label: m.manager?.name ?? m.invitedEmail })}
                         className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

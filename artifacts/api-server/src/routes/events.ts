@@ -361,6 +361,18 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     }
   }
 
+  // An "enabled" free-entry rule with no genders or no days never matches any
+  // booking — it just silently misleads the partner. Reject it here so neither
+  // web nor mobile can persist a broken promotion.
+  if (
+    data.freeEntryRules?.enabled &&
+    ((data.freeEntryRules.genders?.length ?? 0) === 0 ||
+      (data.freeEntryRules.days?.length ?? 0) === 0)
+  ) {
+    res.status(400).json({ error: "Free entry needs at least one gender and at least one day." });
+    return;
+  }
+
   const [created] = await db
     .insert(eventsTable)
     .values({
@@ -451,7 +463,14 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   if (data.priceCouple !== undefined) updates["priceCouple"] = String(data.priceCouple);
   if (data.pubEventTypes !== undefined) updates["pubEventTypes"] = data.pubEventTypes;
   if (data.dayPricing !== undefined) updates["dayPricing"] = data.dayPricing;
-  if (data.freeEntryRules !== undefined) updates["freeEntryRules"] = data.freeEntryRules;
+  if (data.freeEntryRules !== undefined) {
+    const fer = data.freeEntryRules;
+    if (fer && fer.enabled && ((fer.genders?.length ?? 0) === 0 || (fer.days?.length ?? 0) === 0)) {
+      res.status(400).json({ error: "Free entry needs at least one gender and at least one day." });
+      return;
+    }
+    updates["freeEntryRules"] = fer;
+  }
   if (data.galleryImages !== undefined) updates["galleryImages"] = data.galleryImages;
   if (data.galleryVideos !== undefined) updates["galleryVideos"] = data.galleryVideos;
 
