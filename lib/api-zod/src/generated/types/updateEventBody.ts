@@ -25,7 +25,7 @@ export interface UpdateEventBody {
   location?: string;
   /** @minimum 0 */
   price?: number;
-  /** @minimum 0 */
+  /** @minimum 1 */
   capacity?: number;
   /** @maxLength 2048 */
   imageUrl?: string;

@@ -440,7 +440,7 @@ export default function EventDetailScreen() {
     if (isPub && pubMode === "event" && (!parseInt(guests) || parseInt(guests) < 10)) {
       errs.guests = t("events.min_guests_desc");
     }
-    if (isPub && pubMode === "event" && !arrivalTime.trim()) {
+    if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime.trim()) {
       errs.arrivalTime = t("events.required_field");
     }
     if (isPub && !personName.trim()) errs.personName = t("events.required_field");
@@ -484,8 +484,8 @@ export default function EventDetailScreen() {
         payload.guests = parseInt(guests) || 10;
         payload.notes = occasion;
         payload.selectedPubEvent = "";
-        payload.arrivalTime = arrivalTime.trim();
       }
+      payload.arrivalTime = arrivalTime.trim();
     } else {
       payload.guests = parseInt(guests) || 1;
     }
@@ -1172,22 +1172,25 @@ export default function EventDetailScreen() {
                         keyboardType="number-pad"
                       />
                     </View>
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.arrival_time")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
-                      <TextInput
-                        style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: fieldErrors.arrivalTime ? "#f87171" : colors.border, color: colors.foreground }]}
-                        value={arrivalTime}
-                        onChangeText={(v) => { setArrivalTime(v); clearFieldError("arrivalTime"); }}
-                        placeholder="HH:MM"
-                        placeholderTextColor={colors.mutedForeground}
-                        keyboardType="numbers-and-punctuation"
-                        maxLength={5}
-                      />
-                      {fieldErrors.arrivalTime ? (
-                        <Text style={{ color: "#f87171", fontSize: 11, marginTop: 4 }}>{fieldErrors.arrivalTime}</Text>
-                      ) : null}
-                    </View>
                   </>
+                )}
+
+                {(pubMode === "ticket" || pubMode === "event") && (
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{t("events.arrival_time")} <Text style={{ color: "#f87171", fontSize: 11 }}>*</Text></Text>
+                    <TextInput
+                      style={[styles.fieldInput, { backgroundColor: colors.muted, borderColor: fieldErrors.arrivalTime ? "#f87171" : colors.border, color: colors.foreground }]}
+                      value={arrivalTime}
+                      onChangeText={(v) => { setArrivalTime(v); clearFieldError("arrivalTime"); }}
+                      placeholder="HH:MM"
+                      placeholderTextColor={colors.mutedForeground}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
+                    {fieldErrors.arrivalTime ? (
+                      <Text style={{ color: "#f87171", fontSize: 11, marginTop: 4 }}>{fieldErrors.arrivalTime}</Text>
+                    ) : null}
+                  </View>
                 )}
 
                 {/* Booking under name */}

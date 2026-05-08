@@ -844,7 +844,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
         const t = [w, m, c].filter((n) => n > 0);
         return t.length > 0 ? Math.min(...t) : basePrice;
       })(),
-      capacity: capacity === "" ? 0 : capacity, imageUrl,
+      capacity: capacity === "" || Number(capacity) < 1 ? 1 : capacity, imageUrl,
       type, city, state: stateF, country,
       pubMode,
       priceWomen: type === "pub" ? (priceWomen === "" ? 0 : priceWomen) : 0,
@@ -1586,7 +1586,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         ? (tierArr.length > 0 ? Math.min(...tierArr) : price)
         : price;
       await apiPatch(`/api/events/${event.id}`, {
-        title, description, imageUrl, capacity: capacity === "" ? 0 : capacity,
+        title, description, imageUrl, capacity: capacity === "" || Number(capacity) < 1 ? 1 : capacity,
         price: recalcPrice, galleryImages, galleryVideos,
         ...(isPub ? {
           pubMode, priceWomen, priceMen, priceCouple, pubEventTypes,

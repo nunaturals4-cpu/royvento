@@ -7,8 +7,10 @@ import {
   getGetPartnerCheckinReportQueryKey,
   useCreateEvent,
   useDeleteEvent,
+  useDeleteReview,
   useGetMyVendor,
   useGetPartnerCheckinReport,
+  useListReviewsPartner,
   useUpdateBookingStatus,
   useUpdateEvent,
   useUpdateMyVendor,
@@ -45,7 +47,7 @@ import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads" | "attendance" | "banking";
+type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads" | "attendance" | "banking" | "reviews";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending:   { bg: "#f59e0b20", text: "#f59e0b" },
@@ -677,6 +679,67 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
           </KeyboardAvoidingView>
         </View>
       </Modal>
+    </ScrollView>
+  );
+}
+
+// ─── Partner Reviews Tab ──────────────────────────────────────────────────────
+function PartnerReviewsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [page, setPage] = useState(1);
+  const { data, refetch, isLoading } = useListReviewsPartner({ page, pageSize: 20 });
+  const deleteReview = useDeleteReview();
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / 20));
+
+  const onDelete = (reviewId: number) => {
+    Alert.alert("Remove review?", "This cannot be undone. The deletion will be logged for audit.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => {
+        deleteReview.mutate({ reviewId }, { onSuccess: () => refetch() });
+      }},
+    ]);
+  };
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}>
+      <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground }}>Reviews on your pubs ({total})</Text>
+      <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
+        Remove inappropriate or off-topic reviews. Removed reviews are recorded for audit.
+      </Text>
+      {isLoading ? (
+        <ActivityIndicator color={colors.primary} />
+      ) : items.length === 0 ? (
+        <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No reviews yet.</Text>
+      ) : items.map((r) => (
+        <View key={r.id} style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 6 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{r.userName}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+                on {r.vendorName} · {new Date(r.createdAt).toLocaleString()}
+                {r.verifiedBooking ? " · ✓ verified" : ""}
+              </Text>
+            </View>
+            <Text style={{ color: "#f59e0b", fontSize: 12 }}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</Text>
+          </View>
+          {r.comment ? <Text style={{ color: colors.foreground, fontSize: 13, lineHeight: 18 }}>{r.comment}</Text> : null}
+          <TouchableOpacity onPress={() => onDelete(r.id)} disabled={deleteReview.isPending} style={{ alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#ef444455" }}>
+            <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Remove review</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+      {pages > 1 ? (
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+          <TouchableOpacity disabled={page <= 1} onPress={() => setPage((p) => Math.max(1, p - 1))} style={{ opacity: page <= 1 ? 0.4 : 1, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ color: colors.foreground }}>Prev</Text>
+          </TouchableOpacity>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Page {page} of {pages}</Text>
+          <TouchableOpacity disabled={page >= pages} onPress={() => setPage((p) => Math.min(pages, p + 1))} style={{ opacity: page >= pages ? 0.4 : 1, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ color: colors.foreground }}>Next</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -2963,6 +3026,7 @@ export default function VendorDashboardScreen() {
             { key: "calendar",      icon: "calendar-clear-outline",   label: "Calendar" },
             { key: "managers",      icon: "person-add-outline",       label: "Managers" },
             { key: "banking",       icon: "card-outline",             label: "Banking" },
+            { key: "reviews",       icon: "star-outline",             label: "Reviews" },
           ] as const).map((t) => (
             <TouchableOpacity
               key={t.key}
@@ -2991,6 +3055,7 @@ export default function VendorDashboardScreen() {
       {activeTab === "calendar"       && renderCalendar()}
       {activeTab === "managers"       && renderManagers()}
       {activeTab === "banking"        && <BankingTab colors={colors} />}
+      {activeTab === "reviews"        && <PartnerReviewsTab colors={colors} />}
 
       {/* ── Create Event Modal ── */}
       <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">

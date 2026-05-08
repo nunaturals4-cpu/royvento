@@ -5,9 +5,12 @@ import {
   getGetAdminAnalyticsQueryKey,
   getGetAdminBookingsReportQueryKey,
   getGetAdminLeadsSummaryQueryKey,
+  useDeleteReview,
   useGetAdminAnalytics,
   useGetAdminBookingsReport,
   useGetAdminLeadsSummary,
+  useListReviewsAdmin,
+  useUpdateReview,
 } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -29,7 +32,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews";
 
 interface ContactMessage {
   id: number;
@@ -2738,6 +2741,7 @@ export default function AdminPanelScreen() {
     { key: "import-pub" as AdminTab, icon: "cloud-download-outline" as const, label: "Import" },
     { key: "settlements" as AdminTab, icon: "card-outline" as const, label: "Settlements" },
     { key: "live-occupancy" as AdminTab, icon: "pulse-outline" as const, label: "Live Occ" },
+    { key: "reviews" as AdminTab, icon: "star-outline" as const, label: "Reviews" },
   ];
 
   if (!user || user.role !== "admin") {
@@ -2806,7 +2810,142 @@ export default function AdminPanelScreen() {
       {activeTab === "commissions" && <AdminCommissionsTab colors={colors} />}
       {activeTab === "settlements" && <AdminSettlementsTab colors={colors} />}
       {activeTab === "live-occupancy" && <AdminLiveOccupancyTab colors={colors} />}
+      {activeTab === "reviews" && <AdminReviewsTab colors={colors} />}
     </View>
+  );
+}
+
+function AdminReviewsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [page, setPage] = useState(1);
+  const [vendorIdInput, setVendorIdInput] = useState("");
+  const [rating, setRating] = useState<number | "">("");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editComment, setEditComment] = useState("");
+  const [editRating, setEditRating] = useState(5);
+
+  const params: { page: number; pageSize: number; vendorId?: number; rating?: number; verified?: boolean } = { page, pageSize: 20 };
+  const vidNum = Number(vendorIdInput);
+  if (Number.isFinite(vidNum) && vidNum > 0) params.vendorId = vidNum;
+  if (rating !== "") params.rating = rating;
+  if (verifiedOnly) params.verified = true;
+
+  const { data, refetch, isLoading } = useListReviewsAdmin(params);
+  const deleteReview = useDeleteReview();
+  const updateReview = useUpdateReview();
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / 20));
+
+  const onDelete = (id: number) => {
+    Alert.alert("Remove review?", "This will be recorded for audit.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => deleteReview.mutate({ reviewId: id }, { onSuccess: () => refetch() }) },
+    ]);
+  };
+
+  const onSaveEdit = () => {
+    if (editingId == null) return;
+    updateReview.mutate(
+      { reviewId: editingId, data: { rating: editRating, comment: editComment } },
+      { onSuccess: () => { setEditingId(null); refetch(); } },
+    );
+  };
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground }}>All Reviews ({total})</Text>
+      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+        <TextInput
+          value={vendorIdInput}
+          onChangeText={(v) => { setVendorIdInput(v); setPage(1); }}
+          placeholder="Vendor ID"
+          keyboardType="number-pad"
+          placeholderTextColor={colors.mutedForeground}
+          style={{ width: 110, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: colors.foreground, fontSize: 13 }}
+        />
+        {([1,2,3,4,5] as const).map((n) => (
+          <TouchableOpacity key={n} onPress={() => { setRating(rating === n ? "" : n); setPage(1); }}
+            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, backgroundColor: rating === n ? colors.primary : colors.muted, borderColor: rating === n ? colors.primary : colors.border }}>
+            <Text style={{ color: rating === n ? colors.primaryForeground : colors.mutedForeground, fontSize: 12 }}>{n}★</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={() => { setVerifiedOnly((v) => !v); setPage(1); }}
+          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, backgroundColor: verifiedOnly ? colors.primary : colors.muted, borderColor: verifiedOnly ? colors.primary : colors.border }}>
+          <Text style={{ color: verifiedOnly ? colors.primaryForeground : colors.mutedForeground, fontSize: 12 }}>Verified only</Text>
+        </TouchableOpacity>
+      </View>
+
+      {isLoading ? (
+        <ActivityIndicator color={colors.primary} />
+      ) : items.length === 0 ? (
+        <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No reviews match.</Text>
+      ) : items.map((r) => (
+        <View key={r.id} style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 6 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{r.userName}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+                on {r.vendorName} (#{r.vendorId}) · {new Date(r.createdAt).toLocaleString()}
+                {r.verifiedBooking ? " · ✓ verified" : ""}
+              </Text>
+            </View>
+            <Text style={{ color: "#f59e0b", fontSize: 12 }}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</Text>
+          </View>
+          {editingId === r.id ? (
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {[1,2,3,4,5].map((n) => (
+                  <TouchableOpacity key={n} onPress={() => setEditRating(n)}>
+                    <Ionicons name={n <= editRating ? "star" : "star-outline"} size={22} color={n <= editRating ? "#f59e0b" : colors.mutedForeground} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                value={editComment}
+                onChangeText={setEditComment}
+                multiline
+                placeholderTextColor={colors.mutedForeground}
+                style={{ minHeight: 60, backgroundColor: colors.muted, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, color: colors.foreground, fontSize: 13 }}
+              />
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity onPress={onSaveEdit} disabled={updateReview.isPending} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primary }}>
+                  <Text style={{ color: colors.primaryForeground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setEditingId(null)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ color: colors.foreground, fontSize: 12 }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <>
+              {r.comment ? <Text style={{ color: colors.foreground, fontSize: 13, lineHeight: 18 }}>{r.comment}</Text> : null}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity onPress={() => { setEditingId(r.id); setEditComment(r.comment ?? ""); setEditRating(r.rating); }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ color: colors.foreground, fontSize: 12 }}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => onDelete(r.id)} disabled={deleteReview.isPending}
+                  style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#ef444455" }}>
+                  <Text style={{ color: "#ef4444", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      ))}
+      {pages > 1 ? (
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+          <TouchableOpacity disabled={page <= 1} onPress={() => setPage((p) => Math.max(1, p - 1))} style={{ opacity: page <= 1 ? 0.4 : 1, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ color: colors.foreground }}>Prev</Text>
+          </TouchableOpacity>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Page {page} of {pages}</Text>
+          <TouchableOpacity disabled={page >= pages} onPress={() => setPage((p) => Math.min(pages, p + 1))} style={{ opacity: page >= pages ? 0.4 : 1, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ color: colors.foreground }}>Next</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </ScrollView>
   );
 }
 

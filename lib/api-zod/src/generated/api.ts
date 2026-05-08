@@ -1027,8 +1027,6 @@ export const createEventBodyLocationMax = 255;
 
 export const createEventBodyPriceMin = 0;
 
-export const createEventBodyCapacityMin = 0;
-
 export const createEventBodyImageUrlMax = 2048;
 
 export const createEventBodyGalleryImagesItemMax = 2048;
@@ -1104,7 +1102,7 @@ export const CreateEventBody = zod
     category: zod.string().min(1).max(createEventBodyCategoryMax),
     location: zod.string().max(createEventBodyLocationMax),
     price: zod.number().min(createEventBodyPriceMin),
-    capacity: zod.number().min(createEventBodyCapacityMin),
+    capacity: zod.number().min(1),
     imageUrl: zod.string().max(createEventBodyImageUrlMax).optional(),
     galleryImages: zod
       .array(zod.string().max(createEventBodyGalleryImagesItemMax))
@@ -1539,8 +1537,6 @@ export const updateEventBodyLocationMax = 255;
 
 export const updateEventBodyPriceMin = 0;
 
-export const updateEventBodyCapacityMin = 0;
-
 export const updateEventBodyImageUrlMax = 2048;
 
 export const updateEventBodyGalleryImagesItemMax = 2048;
@@ -1616,7 +1612,7 @@ export const UpdateEventBody = zod
     category: zod.string().min(1).max(updateEventBodyCategoryMax).optional(),
     location: zod.string().max(updateEventBodyLocationMax).optional(),
     price: zod.number().min(updateEventBodyPriceMin).optional(),
-    capacity: zod.number().min(updateEventBodyCapacityMin).optional(),
+    capacity: zod.number().min(1).optional(),
     imageUrl: zod.string().max(updateEventBodyImageUrlMax).optional(),
     galleryImages: zod
       .array(zod.string().max(updateEventBodyGalleryImagesItemMax))

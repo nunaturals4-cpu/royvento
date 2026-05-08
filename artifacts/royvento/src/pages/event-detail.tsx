@@ -401,7 +401,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) {
       errs.ticketWomen = t("events.add_tickets");
     }
-    if (isPub && pubMode === "event" && !arrivalTime) {
+    if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime) {
       errs.arrivalTime = t("events.required_field");
     }
     if (isPub && !personName.trim()) errs.personName = t("events.required_field");
@@ -448,7 +448,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               ticketWomen, ticketMen, ticketCouple,
               selectedPubEvent: "",
               notes: pubMode === "event" ? occasion : notes,
-              arrivalTime: pubMode === "event" ? arrivalTime : undefined,
+              arrivalTime: isPub && (pubMode === "ticket" || pubMode === "event") ? arrivalTime : undefined,
             }
           : {}),
       });
@@ -1141,27 +1141,32 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               </>
             )}
 
-            {me?.user && eligibility && !eligibility.eligible && (
+            {me?.user && eligibility && eligibility.reason === "already_reviewed" && (
               <div className="mt-8 rounded-2xl glass-card-strong p-5 text-sm text-white/65">
-                {eligibility.reason === "no_checkin" && (
-                  <p>Only verified guests can review — book and check in first.</p>
-                )}
-                {eligibility.reason === "already_reviewed" && (
-                  <p>You've already reviewed this pub. Scroll up to edit or delete your review.</p>
-                )}
+                <p>You've already reviewed this pub. Scroll up to edit or delete your review.</p>
               </div>
             )}
-            {me?.user && eligibility?.eligible && (
-              <div className="mt-8 rounded-2xl glass-card-strong p-6 space-y-3">
+            {me?.user && eligibility && eligibility.reason !== "already_reviewed" && (() => {
+              const disabled = !eligibility.eligible;
+              const reasonText = eligibility.reason === "no_checkin"
+                ? "Only verified guests can review — book and check in first."
+                : "";
+              return (
+              <div className={`mt-8 rounded-2xl glass-card-strong p-6 space-y-3 ${disabled ? "opacity-70" : ""}`}>
                 <p className="font-serif text-xl">{t("events.leave_review")}</p>
+                {disabled && reasonText && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+                    {reasonText}
+                  </div>
+                )}
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} type="button" onClick={() => setReviewRating(n)}>
+                    <button key={n} type="button" disabled={disabled} onClick={() => !disabled && setReviewRating(n)}>
                       <Star className={`h-6 w-6 ${n <= reviewRating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
                     </button>
                   ))}
                 </div>
-                <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder={t("events.review_placeholder")} className="bg-black/40 border-white/10" />
+                <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder={t("events.review_placeholder")} className="bg-black/40 border-white/10" disabled={disabled} />
 
                 <div className="space-y-2">
                   {reviewImages.length > 0 && (
@@ -1171,6 +1176,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           <img src={url} alt="" className="w-full h-full object-cover" />
                           <button
                             type="button"
+                            disabled={disabled}
                             onClick={() => setReviewImages((prev) => prev.filter((_, idx) => idx !== i))}
                             className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black"
                             aria-label="Remove image"
@@ -1182,7 +1188,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </div>
                   )}
                   <div className="flex items-center gap-3 flex-wrap">
-                    <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 text-sm cursor-pointer hover:bg-white/5 transition-colors ${reviewUploading || reviewImages.length >= 5 ? "opacity-50 pointer-events-none" : ""}`}>
+                    <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/15 text-sm cursor-pointer hover:bg-white/5 transition-colors ${disabled || reviewUploading || reviewImages.length >= 5 ? "opacity-50 pointer-events-none" : ""}`}>
                       <ImagePlus className="h-4 w-4" />
                       <span>{reviewUploading ? "Uploading…" : reviewImages.length === 0 ? "Add photos" : "Add more"}</span>
                       <input
@@ -1190,7 +1196,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         accept="image/jpeg,image/png,image/webp,image/gif"
                         multiple
                         className="hidden"
-                        disabled={reviewUploading || reviewImages.length >= 5}
+                        disabled={disabled || reviewUploading || reviewImages.length >= 5}
                         onChange={(e) => {
                           handleReviewImagesPicked(e.target.files);
                           e.target.value = "";
@@ -1201,9 +1207,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   </div>
                 </div>
 
-                <Button onClick={handleReview} disabled={createReview.isPending || reviewUploading || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">{t("events.post_review")}</Button>
+                <Button onClick={handleReview} disabled={disabled || createReview.isPending || reviewUploading || !reviewComment.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">{t("events.post_review")}</Button>
               </div>
-            )}
+              );
+            })()}
           </section>
 
           {similarPubs.length > 0 && (
@@ -1399,20 +1406,23 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         <Label htmlFor="guests">{t("events.guests_field")} <span className="text-muted-foreground font-normal text-xs">{t("events.guests_min_10")}</span></Label>
                         <Input id="guests" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-1" />
                       </div>
-                      <div>
-                        <Label htmlFor="arrival-time">{t("events.arrival_time")} <span className="text-red-400 text-xs ml-1">*</span></Label>
-                        <input
-                          id="arrival-time"
-                          type="time"
-                          value={arrivalTime}
-                          onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
-                          required
-                          aria-invalid={!!fieldErrors.arrivalTime}
-                          className={`w-full rounded-md border px-3 py-2 text-sm mt-1 text-foreground bg-black/40 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
-                        />
-                        {fieldErrors.arrivalTime && <p className="text-xs text-destructive mt-1">{fieldErrors.arrivalTime}</p>}
-                      </div>
                     </>
+                  )}
+
+                  {(pubMode === "ticket" || pubMode === "event") && (
+                    <div>
+                      <Label htmlFor="arrival-time">{t("events.arrival_time")} <span className="text-red-400 text-xs ml-1">*</span></Label>
+                      <input
+                        id="arrival-time"
+                        type="time"
+                        value={arrivalTime}
+                        onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
+                        required
+                        aria-invalid={!!fieldErrors.arrivalTime}
+                        className={`w-full rounded-md border px-3 py-2 text-sm mt-1 text-foreground bg-black/40 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
+                      />
+                      {fieldErrors.arrivalTime && <p className="text-xs text-destructive mt-1">{fieldErrors.arrivalTime}</p>}
+                    </div>
                   )}
 
                   <div>

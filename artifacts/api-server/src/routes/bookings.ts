@@ -91,7 +91,7 @@ const CreateBookingBody = z.object({
     if (val.pubMode === "ticket" && val.ticketWomen + val.ticketMen + val.ticketCouple <= 0) {
       issue("ticketWomen", "Select at least one ticket");
     }
-    if (val.pubMode === "event" && !val.arrivalTime.trim()) {
+    if (!val.arrivalTime.trim()) {
       issue("arrivalTime", "Arrival time is required");
     }
   } else if (val.phone && !/^\d{10}$/.test(val.phone)) {

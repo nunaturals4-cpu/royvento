@@ -405,6 +405,29 @@ export type Vendor = typeof vendorsTable.$inferSelect;
 export type Event = typeof eventsTable.$inferSelect;
 export type Booking = typeof bookingsTable.$inferSelect;
 export type Review = typeof reviewsTable.$inferSelect;
+
+export const reviewDeletionsTable = pgTable(
+  "review_deletions",
+  {
+    id: serial("id").primaryKey(),
+    reviewId: integer("review_id").notNull(),
+    vendorId: integer("vendor_id").notNull(),
+    deletedByUserId: integer("deleted_by_user_id").notNull(),
+    deletedByRole: varchar("deleted_by_role", { length: 20 }).notNull(),
+    originalUserId: integer("original_user_id").notNull(),
+    originalRating: integer("original_rating").notNull(),
+    originalComment: text("original_comment").notNull().default(""),
+    deletedAt: timestamp("deleted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("review_deletions_vendor_idx").on(t.vendorId),
+    reviewIdx: index("review_deletions_review_idx").on(t.reviewId),
+  }),
+);
+
+export type ReviewDeletion = typeof reviewDeletionsTable.$inferSelect;
 export type Availability = typeof availabilityTable.$inferSelect;
 export type ContactMessage = typeof contactMessagesTable.$inferSelect;
 export type VendorRequest = typeof vendorRequestsTable.$inferSelect;

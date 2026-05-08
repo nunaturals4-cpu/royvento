@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, reviewsTable, usersTable, bookingsTable, vendorsTable, vendorManagersTable } from "@workspace/db";
+import { db, reviewsTable, reviewDeletionsTable, usersTable, bookingsTable, vendorsTable, vendorManagersTable } from "@workspace/db";
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 import { CreateReviewBody, UpdateReviewBody } from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
@@ -314,7 +314,20 @@ router.delete("/reviews/:reviewId", requireAuth(), async (req, res) => {
     return;
   }
 
-  await db.delete(reviewsTable).where(eq(reviewsTable.id, reviewId));
+  await db.transaction(async (tx) => {
+    await tx.delete(reviewsTable).where(eq(reviewsTable.id, reviewId));
+    if (!isOwner) {
+      await tx.insert(reviewDeletionsTable).values({
+        reviewId: existing.id,
+        vendorId: existing.vendorId,
+        deletedByUserId: user.id,
+        deletedByRole: user.role,
+        originalUserId: existing.userId,
+        originalRating: existing.rating,
+        originalComment: existing.comment,
+      });
+    }
+  });
   req.log.info({ reviewId, deletedBy: user.id, role: user.role }, "Review deleted");
   res.json({ ok: true });
 });
