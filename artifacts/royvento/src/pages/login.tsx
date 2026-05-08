@@ -11,6 +11,7 @@ import { Eye, EyeOff, MailWarning } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { getEmailError } from "@workspace/validators";
+import { useFormErrors, fieldClass } from "@/lib/formErrors";
 
 export function Login() {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export function Login() {
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
   const [noAccount, setNoAccount] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const formErrors = useFormErrors();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
@@ -57,13 +58,12 @@ export function Login() {
     e.preventDefault();
     setUnverifiedEmail("");
     setNoAccount(false);
-    const next: { email?: string; password?: string } = {};
+    formErrors.reset();
     const emailErr = getEmailError(email);
-    if (emailErr) next.email = emailErr;
-    if (!password) next.password = "Password is required.";
-    setErrors(next);
-    if (next.email) { emailRef.current?.focus(); return; }
-    if (next.password) { passwordRef.current?.focus(); return; }
+    if (emailErr) formErrors.setFieldError("email", emailErr);
+    if (!password) formErrors.setFieldError("password", "Password is required.");
+    if (emailErr) { emailRef.current?.focus(); return; }
+    if (!password) { passwordRef.current?.focus(); return; }
     login.mutate(
       { data: { email: email.trim(), password } },
       {
@@ -77,21 +77,18 @@ export function Login() {
           const serverMsg = err?.data?.error ?? err?.message ?? "";
           const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
           if (fe.email || fe.password) {
-            setErrors((p) => ({
-              ...p,
-              ...(fe.email ? { email: fe.email } : {}),
-              ...(fe.password ? { password: fe.password } : {}),
-            }));
+            if (fe.email) formErrors.setFieldError("email", fe.email);
+            if (fe.password) formErrors.setFieldError("password", fe.password);
             if (fe.email) emailRef.current?.focus();
             else passwordRef.current?.focus();
           } else if (code === "EMAIL_NOT_VERIFIED" || /EMAIL_NOT_VERIFIED|verify your email/i.test(serverMsg)) {
             setUnverifiedEmail(email);
           } else if (code === "NO_ACCOUNT" || err?.status === 404) {
             setNoAccount(true);
-            setErrors((p) => ({ ...p, email: "No account found for that email." }));
+            formErrors.setFieldError("email", "No account found for that email.");
             emailRef.current?.focus();
           } else {
-            setErrors((p) => ({ ...p, password: serverMsg || "Incorrect password." }));
+            formErrors.setFieldError("password", serverMsg || "Incorrect password.");
             passwordRef.current?.focus();
           }
         },
@@ -109,6 +106,9 @@ export function Login() {
     }
     window.location.href = "/api/auth/google/start";
   };
+
+  const emailError = formErrors.fieldError("email");
+  const passwordError = formErrors.fieldError("password");
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-20">
@@ -156,10 +156,20 @@ export function Login() {
         <form onSubmit={submit} noValidate className="space-y-4">
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
-            <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); if (noAccount) setNoAccount(false); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />
-            {errors.email && (
+            <Input
+              ref={emailRef}
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); formErrors.clearField("email"); if (noAccount) setNoAccount(false); }}
+              aria-invalid={!!emailError}
+              className={fieldClass("bg-black/40 border-white/10 mt-1", emailError)}
+            />
+            {emailError && (
               <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <p className="text-xs text-destructive">{errors.email}</p>
+                <p className="text-xs text-destructive">{emailError}</p>
                 {noAccount && (
                   <Link href={`/register?email=${encodeURIComponent(email)}`} className="text-xs text-primary hover:underline">
                     Create an account
@@ -181,9 +191,9 @@ export function Login() {
                 autoComplete="current-password"
                 required
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
-                aria-invalid={!!errors.password}
-                className="bg-black/40 border-white/10 pr-10"
+                onChange={(e) => { setPassword(e.target.value); formErrors.clearField("password"); }}
+                aria-invalid={!!passwordError}
+                className={fieldClass("bg-black/40 border-white/10 pr-10", passwordError)}
               />
               <button
                 type="button"
@@ -194,7 +204,7 @@ export function Login() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+            {passwordError && <p className="text-xs text-destructive mt-1">{passwordError}</p>}
           </div>
           <Button type="submit" className="w-full h-11 bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 border-0" disabled={login.isPending}>
             {login.isPending ? t("auth.signing_in") : t("auth.sign_in")}

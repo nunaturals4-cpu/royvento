@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiPost } from "@/lib/api";
 import { Mail, CheckCircle2, ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useFormErrors, fieldClass } from "@/lib/formErrors";
 
 export function ForgotPassword() {
   const { t } = useTranslation();
@@ -15,11 +16,11 @@ export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [emailError, setEmailError] = useState<string>("");
+  const formErrors = useFormErrors();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEmailError("");
+    formErrors.reset();
     setLoading(true);
     try {
       await apiPost<{ ok: boolean; message: string }>(
@@ -28,8 +29,7 @@ export function ForgotPassword() {
       );
       setSubmitted(true);
     } catch (err: any) {
-      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
-      if (fe.email) setEmailError(fe.email);
+      formErrors.setFromError(err);
       toast({ title: t("auth.error"), description: err?.data?.error ?? err?.message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -55,6 +55,8 @@ export function ForgotPassword() {
     );
   }
 
+  const emailError = formErrors.fieldError("email");
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-20">
       <SEO title="Forgot password | Royvento" canonical="/forgot-password" noindex />
@@ -77,10 +79,10 @@ export function ForgotPassword() {
               type="email"
               required
               value={email}
-              onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(""); }}
+              onChange={(e) => { setEmail(e.target.value); formErrors.clearField("email"); }}
               aria-invalid={!!emailError}
               placeholder="you@example.com"
-              className={`bg-black/40 mt-1 ${emailError ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`}
+              className={fieldClass("bg-black/40 border-white/10 mt-1", emailError)}
             />
             {emailError && <p className="text-xs text-destructive mt-1">{emailError}</p>}
           </div>

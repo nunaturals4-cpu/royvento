@@ -340,8 +340,7 @@ const CROWD_LEVELS = [
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
-  const [descError, setDescError] = useState("");
-  const [nameError, setNameError] = useState("");
+  const profileFormErrors = useFormErrors();
   const [crowdLevel, setCrowdLevel] = useState<string | null>(vendor.crowdLevel ?? null);
   const [savingCrowd, setSavingCrowd] = useState(false);
   const update = useUpdateMyVendor();
@@ -358,8 +357,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
         description: "We trimmed your description to the 300-character limit before saving.",
       });
     }
-    setDescError("");
-    setNameError("");
+    profileFormErrors.reset();
     const city = vendor.city ?? "";
     const stateF = vendor.state ?? "";
     update.mutate(
@@ -370,9 +368,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
           onSaved();
         },
         onError: (err: any) => {
-          const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
-          if (fe.businessName) setNameError(fe.businessName);
-          if (fe.description) setDescError(fe.description);
+          profileFormErrors.setFromError(err);
           toast({ title: "Failed", description: err?.data?.error ?? (err instanceof Error ? err.message : undefined), variant: "destructive" });
         },
       },
@@ -402,8 +398,8 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div>
           <Label>Business name</Label>
-          <Input value={businessName} onChange={(e) => { setName(e.target.value); if (nameError) setNameError(""); }} aria-invalid={!!nameError} className={`bg-black/40 ${nameError ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`} />
-          {nameError && <p className="text-xs text-destructive mt-1">{nameError}</p>}
+          <Input value={businessName} onChange={(e) => { setName(e.target.value); profileFormErrors.clearField("businessName"); }} aria-invalid={!!profileFormErrors.fieldError("businessName")} className={fieldClass("bg-black/40 border-white/10", profileFormErrors.fieldError("businessName"))} />
+          {profileFormErrors.fieldError("businessName") && <p className="text-xs text-destructive mt-1">{profileFormErrors.fieldError("businessName")}</p>}
         </div>
         <div>
           <Label>Description <span className="text-muted-foreground text-xs">(max 300 characters)</span></Label>
@@ -411,13 +407,13 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
             rows={6}
             maxLength={300}
             value={description}
-            onChange={(e) => { setDescription(e.target.value); if (descError) setDescError(""); }}
-            aria-invalid={!!descError}
-            className={`bg-black/40 ${descError ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`}
+            onChange={(e) => { setDescription(e.target.value); profileFormErrors.clearField("description"); }}
+            aria-invalid={!!profileFormErrors.fieldError("description")}
+            className={fieldClass("bg-black/40 border-white/10", profileFormErrors.fieldError("description"))}
           />
           <div className="flex items-center justify-between mt-1">
-            {descError ? (
-              <p className="text-xs text-destructive">{descError}</p>
+            {profileFormErrors.fieldError("description") ? (
+              <p className="text-xs text-destructive">{profileFormErrors.fieldError("description")}</p>
             ) : (
               <span />
             )}
@@ -2837,7 +2833,7 @@ function AnnouncementsPanel() {
   const [items, setItems] = useState<Announcement[]>([]);
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState(emptyAnnForm);
-  const [annErrors, setAnnErrors] = useState<Record<string, string>>({});
+  const annFormErrors = useFormErrors();
   const [saving, setSaving] = useState(false);
   const [annGenreFilter, setAnnGenreFilter] = useState("");
   const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
@@ -2922,9 +2918,9 @@ function AnnouncementsPanel() {
   };
 
   const save = async () => {
-    setAnnErrors({});
+    annFormErrors.reset();
     if (!form.title.trim()) {
-      setAnnErrors({ title: "Title is required." });
+      annFormErrors.setFieldError("title", "Title is required.");
       toast({ title: "Title is required", variant: "destructive" }); return;
     }
     setSaving(true);
@@ -2947,8 +2943,7 @@ function AnnouncementsPanel() {
       setForm(emptyAnnForm);
       load();
     } catch (e: any) {
-      const fe: Record<string, string> = e?.data?.fieldErrors ?? e?.fieldErrors ?? {};
-      if (Object.keys(fe).length > 0) setAnnErrors(fe);
+      annFormErrors.setFromError(e);
       toast({ title: "Failed", description: e?.data?.error ?? e?.message, variant: "destructive" });
     } finally {
       setSaving(false);
@@ -2974,24 +2969,24 @@ function AnnouncementsPanel() {
         </p>
         <div>
           <Label htmlFor="ann-title">Title</Label>
-          <Input id="ann-title" value={form.title} onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value })); if (annErrors.title) setAnnErrors((p) => ({ ...p, title: "" })); }} aria-invalid={!!annErrors.title} placeholder="What's happening?" className={`bg-black/40 mt-1 ${annErrors.title ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`} />
-          {annErrors.title && <p className="text-xs text-destructive mt-1">{annErrors.title}</p>}
+          <Input id="ann-title" value={form.title} onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value })); annFormErrors.clearField("title"); }} aria-invalid={!!annFormErrors.fieldError("title")} placeholder="What's happening?" className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("title"))} />
+          {annFormErrors.fieldError("title") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("title")}</p>}
         </div>
         <div>
           <Label htmlFor="ann-body">Details</Label>
-          <Textarea id="ann-body" rows={4} value={form.body} onChange={(e) => { setForm((f) => ({ ...f, body: e.target.value })); if (annErrors.body) setAnnErrors((p) => ({ ...p, body: "" })); }} aria-invalid={!!annErrors.body} placeholder="More info…" className={`bg-black/40 mt-1 ${annErrors.body ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`} />
-          {annErrors.body && <p className="text-xs text-destructive mt-1">{annErrors.body}</p>}
+          <Textarea id="ann-body" rows={4} value={form.body} onChange={(e) => { setForm((f) => ({ ...f, body: e.target.value })); annFormErrors.clearField("body"); }} aria-invalid={!!annFormErrors.fieldError("body")} placeholder="More info…" className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("body"))} />
+          {annFormErrors.fieldError("body") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("body")}</p>}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label htmlFor="ann-date">Date</Label>
-            <Input id="ann-date" type="date" value={form.announceDate} onChange={(e) => { setForm((f) => ({ ...f, announceDate: e.target.value })); if (annErrors.announceDate) setAnnErrors((p) => ({ ...p, announceDate: "" })); }} aria-invalid={!!annErrors.announceDate} className={`bg-black/40 mt-1 ${annErrors.announceDate ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`} />
-            {annErrors.announceDate && <p className="text-xs text-destructive mt-1">{annErrors.announceDate}</p>}
+            <Input id="ann-date" type="date" value={form.announceDate} onChange={(e) => { setForm((f) => ({ ...f, announceDate: e.target.value })); annFormErrors.clearField("announceDate"); }} aria-invalid={!!annFormErrors.fieldError("announceDate")} className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("announceDate"))} />
+            {annFormErrors.fieldError("announceDate") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("announceDate")}</p>}
           </div>
           <div>
             <Label htmlFor="ann-time">Time</Label>
-            <Input id="ann-time" type="time" value={form.announceTime} onChange={(e) => { setForm((f) => ({ ...f, announceTime: e.target.value })); if (annErrors.announceTime) setAnnErrors((p) => ({ ...p, announceTime: "" })); }} aria-invalid={!!annErrors.announceTime} className={`bg-black/40 mt-1 ${annErrors.announceTime ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`} />
-            {annErrors.announceTime && <p className="text-xs text-destructive mt-1">{annErrors.announceTime}</p>}
+            <Input id="ann-time" type="time" value={form.announceTime} onChange={(e) => { setForm((f) => ({ ...f, announceTime: e.target.value })); annFormErrors.clearField("announceTime"); }} aria-invalid={!!annFormErrors.fieldError("announceTime")} className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("announceTime"))} />
+            {annFormErrors.fieldError("announceTime") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("announceTime")}</p>}
           </div>
         </div>
 
@@ -3594,7 +3589,7 @@ function ManagersPanel() {
   const { toast } = useToast();
   const [managers, setManagers] = useState<ManagerRow[]>([]);
   const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState("");
+  const inviteFormErrors = useFormErrors();
   const [loading, setLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
 
@@ -3610,8 +3605,8 @@ function ManagersPanel() {
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEmailError("");
-    if (!email.trim()) { setEmailError("Email is required."); return; }
+    inviteFormErrors.reset();
+    if (!email.trim()) { inviteFormErrors.setFieldError("email", "Email is required."); return; }
     setInviting(true);
     try {
       await apiPost("/api/partner/managers/invite", { email: email.trim() });
@@ -3619,8 +3614,7 @@ function ManagersPanel() {
       setEmail("");
       fetchManagers();
     } catch (err: any) {
-      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
-      if (fe.email) setEmailError(fe.email);
+      inviteFormErrors.setFromError(err);
       const msg = err?.data?.error ?? (err instanceof Error ? err.message : "Could not send invitation.");
       toast({ title: "Failed", description: msg, variant: "destructive" });
     } finally {
@@ -3657,15 +3651,15 @@ function ManagersPanel() {
               type="email"
               placeholder="manager@example.com"
               value={email}
-              onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(""); }}
-              aria-invalid={!!emailError}
-              className={`bg-black/40 ${emailError ? "border-red-500 focus-visible:ring-red-500" : "border-white/10"}`}
+              onChange={(e) => { setEmail(e.target.value); inviteFormErrors.clearField("email"); }}
+              aria-invalid={!!inviteFormErrors.fieldError("email")}
+              className={fieldClass("bg-black/40 border-white/10", inviteFormErrors.fieldError("email"))}
             />
             <Button type="submit" disabled={inviting || !email.trim()} className="bg-primary hover:bg-primary/90 border-0 text-primary-foreground shrink-0">
               {inviting ? "Sending…" : "Send invite"}
             </Button>
           </div>
-          {emailError && <p className="text-xs text-destructive mt-1">{emailError}</p>}
+          {inviteFormErrors.fieldError("email") && <p className="text-xs text-destructive mt-1">{inviteFormErrors.fieldError("email")}</p>}
         </form>
       </div>
 
@@ -4734,8 +4728,8 @@ function BankingPanel() {
   const { toast } = useToast();
   const [banking, setBanking] = useState<{ accountHolderName: string; bankName: string; accountNumber: string; ifscCode: string } | null>(null);
   const [form, setForm] = useState({ accountHolderName: "", bankName: "", accountNumber: "", ifscCode: "" });
-  const [bankErrors, setBankErrors] = useState<Record<string, string>>({});
-  const [amountError, setAmountError] = useState("");
+  const bankFormErrors = useFormErrors();
+  const settlementFormErrors = useFormErrors();
   const [saving, setSaving] = useState(false);
   const [loadingBanking, setLoadingBanking] = useState(true);
   const [requests, setRequests] = useState<Array<{ id: number; amount: string; status: string; adminNote: string; requestedAt: string }>>([]);
@@ -4779,9 +4773,9 @@ function BankingPanel() {
 
   async function saveBanking(e: React.FormEvent) {
     e.preventDefault();
-    setBankErrors({});
+    bankFormErrors.reset();
     if (!/^[A-Z0-9]{11}$/.test(form.ifscCode)) {
-      setBankErrors({ ifscCode: "IFSC must be 11 uppercase alphanumeric characters." });
+      bankFormErrors.setFieldError("ifscCode", "IFSC must be 11 uppercase alphanumeric characters.");
       toast({ title: "Invalid IFSC", description: "IFSC must be 11 uppercase alphanumeric characters.", variant: "destructive" });
       return;
     }
@@ -4791,8 +4785,7 @@ function BankingPanel() {
       setBanking(saved);
       toast({ title: "Banking details saved" });
     } catch (err: any) {
-      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
-      if (Object.keys(fe).length > 0) setBankErrors(fe);
+      bankFormErrors.setFromError(err);
       toast({ title: "Failed to save banking details", description: err?.data?.error ?? err?.message, variant: "destructive" });
     } finally {
       setSaving(false);
@@ -4801,14 +4794,14 @@ function BankingPanel() {
 
   async function submitRequest(e: React.FormEvent) {
     e.preventDefault();
-    setAmountError("");
+    settlementFormErrors.reset();
     const amount = parseFloat(requestAmount);
     if (!amount || amount <= 0) {
-      setAmountError("Enter a valid amount.");
+      settlementFormErrors.setFieldError("amount", "Enter a valid amount.");
       return;
     }
     if (amount > onlineBalance) {
-      setAmountError(`Amount exceeds available balance of ${formatINR(onlineBalance)}.`);
+      settlementFormErrors.setFieldError("amount", `Amount exceeds available balance of ${formatINR(onlineBalance)}.`);
       return;
     }
     setSubmitting(true);
@@ -4820,8 +4813,7 @@ function BankingPanel() {
       setOnlineBalance(0);
       toast({ title: "Settlement request submitted" });
     } catch (err: any) {
-      const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
-      if (fe.amount) setAmountError(fe.amount);
+      settlementFormErrors.setFromError(err);
       const msg = err?.data?.error ?? (err instanceof Error ? err.message : "Failed to submit request");
       toast({ title: msg, variant: "destructive" });
     } finally {
@@ -4848,23 +4840,23 @@ function BankingPanel() {
           <form onSubmit={saveBanking} className="space-y-4 max-w-lg">
             <div className="space-y-1.5">
               <Label>Account Holder Name</Label>
-              <Input value={form.accountHolderName} onChange={(e) => { setForm((f) => ({ ...f, accountHolderName: e.target.value })); if (bankErrors.accountHolderName) setBankErrors((p) => ({ ...p, accountHolderName: "" })); }} aria-invalid={!!bankErrors.accountHolderName} required placeholder="Full name as per bank records" className={bankErrors.accountHolderName ? "border-red-500 focus-visible:ring-red-500" : ""} />
-              {bankErrors.accountHolderName && <p className="text-xs text-destructive">{bankErrors.accountHolderName}</p>}
+              <Input value={form.accountHolderName} onChange={(e) => { setForm((f) => ({ ...f, accountHolderName: e.target.value })); bankFormErrors.clearField("accountHolderName"); }} aria-invalid={!!bankFormErrors.fieldError("accountHolderName")} required placeholder="Full name as per bank records" className={fieldClass("", bankFormErrors.fieldError("accountHolderName"))} />
+              {bankFormErrors.fieldError("accountHolderName") && <p className="text-xs text-destructive">{bankFormErrors.fieldError("accountHolderName")}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Bank Name</Label>
-              <Input value={form.bankName} onChange={(e) => { setForm((f) => ({ ...f, bankName: e.target.value })); if (bankErrors.bankName) setBankErrors((p) => ({ ...p, bankName: "" })); }} aria-invalid={!!bankErrors.bankName} required placeholder="e.g. HDFC Bank" className={bankErrors.bankName ? "border-red-500 focus-visible:ring-red-500" : ""} />
-              {bankErrors.bankName && <p className="text-xs text-destructive">{bankErrors.bankName}</p>}
+              <Input value={form.bankName} onChange={(e) => { setForm((f) => ({ ...f, bankName: e.target.value })); bankFormErrors.clearField("bankName"); }} aria-invalid={!!bankFormErrors.fieldError("bankName")} required placeholder="e.g. HDFC Bank" className={fieldClass("", bankFormErrors.fieldError("bankName"))} />
+              {bankFormErrors.fieldError("bankName") && <p className="text-xs text-destructive">{bankFormErrors.fieldError("bankName")}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Account Number</Label>
-              <Input value={form.accountNumber} onChange={(e) => { setForm((f) => ({ ...f, accountNumber: e.target.value })); if (bankErrors.accountNumber) setBankErrors((p) => ({ ...p, accountNumber: "" })); }} aria-invalid={!!bankErrors.accountNumber} required placeholder="Bank account number" className={bankErrors.accountNumber ? "border-red-500 focus-visible:ring-red-500" : ""} />
-              {bankErrors.accountNumber && <p className="text-xs text-destructive">{bankErrors.accountNumber}</p>}
+              <Input value={form.accountNumber} onChange={(e) => { setForm((f) => ({ ...f, accountNumber: e.target.value })); bankFormErrors.clearField("accountNumber"); }} aria-invalid={!!bankFormErrors.fieldError("accountNumber")} required placeholder="Bank account number" className={fieldClass("", bankFormErrors.fieldError("accountNumber"))} />
+              {bankFormErrors.fieldError("accountNumber") && <p className="text-xs text-destructive">{bankFormErrors.fieldError("accountNumber")}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>IFSC Code</Label>
-              <Input value={form.ifscCode} onChange={(e) => { setForm((f) => ({ ...f, ifscCode: e.target.value.toUpperCase() })); if (bankErrors.ifscCode) setBankErrors((p) => ({ ...p, ifscCode: "" })); }} aria-invalid={!!bankErrors.ifscCode} required placeholder="e.g. HDFC0001234" maxLength={11} className={`uppercase ${bankErrors.ifscCode ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-              {bankErrors.ifscCode ? <p className="text-xs text-destructive">{bankErrors.ifscCode}</p> : <p className="text-xs text-muted-foreground">11 alphanumeric characters</p>}
+              <Input value={form.ifscCode} onChange={(e) => { setForm((f) => ({ ...f, ifscCode: e.target.value.toUpperCase() })); bankFormErrors.clearField("ifscCode"); }} aria-invalid={!!bankFormErrors.fieldError("ifscCode")} required placeholder="e.g. HDFC0001234" maxLength={11} className={fieldClass("uppercase", bankFormErrors.fieldError("ifscCode"))} />
+              {bankFormErrors.fieldError("ifscCode") ? <p className="text-xs text-destructive">{bankFormErrors.fieldError("ifscCode")}</p> : <p className="text-xs text-muted-foreground">11 alphanumeric characters</p>}
             </div>
             <Button type="submit" disabled={saving} className="gap-2">
               <CreditCard className="h-4 w-4" />
@@ -4941,8 +4933,8 @@ function BankingPanel() {
               )}
               <div className="space-y-1.5">
                 <Label>Amount (₹)</Label>
-                <Input type="number" min="1" max={onlineBalance > 0 ? onlineBalance : undefined} step="0.01" value={requestAmount} onChange={(e) => { setRequestAmount(e.target.value); if (amountError) setAmountError(""); }} aria-invalid={!!amountError} placeholder="Enter amount" required className={amountError ? "border-red-500 focus-visible:ring-red-500" : ""} />
-                {amountError ? <p className="text-xs text-destructive">{amountError}</p> : (onlineBalance > 0 && <p className="text-xs text-muted-foreground">Max: {formatINR(onlineBalance)}</p>)}
+                <Input type="number" min="1" max={onlineBalance > 0 ? onlineBalance : undefined} step="0.01" value={requestAmount} onChange={(e) => { setRequestAmount(e.target.value); settlementFormErrors.clearField("amount"); }} aria-invalid={!!settlementFormErrors.fieldError("amount")} placeholder="Enter amount" required className={fieldClass("", settlementFormErrors.fieldError("amount"))} />
+                {settlementFormErrors.fieldError("amount") ? <p className="text-xs text-destructive">{settlementFormErrors.fieldError("amount")}</p> : (onlineBalance > 0 && <p className="text-xs text-muted-foreground">Max: {formatINR(onlineBalance)}</p>)}
               </div>
               <div className="flex gap-3">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setShowRequestModal(false)}>Cancel</Button>

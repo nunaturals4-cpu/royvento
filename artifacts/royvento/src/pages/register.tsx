@@ -15,6 +15,7 @@ import {
   getIndianPhoneError,
   normalizeIndianPhone,
 } from "@workspace/validators";
+import { useFormErrors, fieldClass } from "@/lib/formErrors";
 
 export function Register() {
   const { t } = useTranslation();
@@ -37,7 +38,7 @@ export function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [googleEnabled, setGoogleEnabled] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string; password?: string }>({});
+  const formErrors = useFormErrors();
   const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -56,7 +57,8 @@ export function Register() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const next: typeof errors = {};
+    formErrors.reset();
+    const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Name is required.";
     const emailErr = getEmailError(email);
     if (emailErr) next.email = emailErr;
@@ -66,7 +68,7 @@ export function Register() {
       setPasswordTouched(true);
       next.password = "Please meet all password requirements.";
     }
-    setErrors(next);
+    Object.entries(next).forEach(([k, v]) => formErrors.setFieldError(k, v));
     if (next.name) { nameRef.current?.focus(); return; }
     if (next.email) { emailRef.current?.focus(); return; }
     if (next.phone) { phoneRef.current?.focus(); return; }
@@ -88,19 +90,13 @@ export function Register() {
       const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
       const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);
       if (Object.keys(fe).length > 0) {
-        setErrors((p) => ({
-          ...p,
-          ...(fe.name ? { name: fe.name } : {}),
-          ...(fe.email ? { email: fe.email } : {}),
-          ...(fe.phone ? { phone: fe.phone } : {}),
-          ...(fe.password ? { password: fe.password } : {}),
-        }));
+        Object.entries(fe).forEach(([k, v]) => formErrors.setFieldError(k, v));
         if (fe.name) nameRef.current?.focus();
         else if (fe.email) emailRef.current?.focus();
         else if (fe.phone) phoneRef.current?.focus();
         else if (fe.password) passwordRef.current?.focus();
       } else if (isDuplicate) {
-        setErrors((p) => ({ ...p, email: "An account with this email already exists." }));
+        formErrors.setFieldError("email", "An account with this email already exists.");
         emailRef.current?.focus();
       } else {
         toast({ title: t("common.error"), description: serverMsg || undefined, variant: "destructive" });
@@ -132,6 +128,11 @@ export function Register() {
     }
     window.location.href = "/api/auth/google/start";
   };
+
+  const nameError = formErrors.fieldError("name");
+  const emailError = formErrors.fieldError("email");
+  const phoneError = formErrors.fieldError("phone");
+  const passwordError = formErrors.fieldError("password");
 
   // ── Pending verification screen ──
   if (pendingEmail) {
@@ -197,16 +198,34 @@ export function Register() {
         <form onSubmit={submit} noValidate className="space-y-4">
           <div>
             <Label htmlFor="name">{t("auth.full_name")}</Label>
-            <Input ref={nameRef} id="name" required value={name} onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }} aria-invalid={!!errors.name} className="bg-black/40 border-white/10 mt-1" />
-            {errors.name && <p className="text-xs text-destructive mt-1">{errors.name}</p>}
+            <Input
+              ref={nameRef}
+              id="name"
+              required
+              value={name}
+              onChange={(e) => { setName(e.target.value); formErrors.clearField("name"); }}
+              aria-invalid={!!nameError}
+              className={fieldClass("bg-black/40 border-white/10 mt-1", nameError)}
+            />
+            {nameError && <p className="text-xs text-destructive mt-1">{nameError}</p>}
           </div>
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
-            <Input ref={emailRef} id="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); if (errors.email) setErrors((p) => ({ ...p, email: undefined })); }} aria-invalid={!!errors.email} className="bg-black/40 border-white/10 mt-1" />
-            {errors.email && (
+            <Input
+              ref={emailRef}
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); formErrors.clearField("email"); }}
+              aria-invalid={!!emailError}
+              className={fieldClass("bg-black/40 border-white/10 mt-1", emailError)}
+            />
+            {emailError && (
               <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <p className="text-xs text-destructive">{errors.email}</p>
-                {/already exists/i.test(errors.email) && (
+                <p className="text-xs text-destructive">{emailError}</p>
+                {/already exists/i.test(emailError) && (
                   <Link href={`/login?email=${encodeURIComponent(email)}`} className="text-xs text-primary hover:underline">
                     Sign in instead
                   </Link>
@@ -222,11 +241,11 @@ export function Register() {
               type="tel"
               placeholder="Phone number (optional)"
               value={phone}
-              onChange={(e) => { setPhone(e.target.value); if (errors.phone) setErrors((p) => ({ ...p, phone: undefined })); }}
-              aria-invalid={!!errors.phone}
-              className="bg-black/40 border-white/10 mt-1"
+              onChange={(e) => { setPhone(e.target.value); formErrors.clearField("phone"); }}
+              aria-invalid={!!phoneError}
+              className={fieldClass("bg-black/40 border-white/10 mt-1", phoneError)}
             />
-            {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
+            {phoneError && <p className="text-xs text-destructive mt-1">{phoneError}</p>}
           </div>
           <div>
             <Label htmlFor="password">{t("auth.password")}</Label>
@@ -239,9 +258,9 @@ export function Register() {
                 required
                 minLength={8}
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
-                aria-invalid={!!errors.password}
-                className="bg-black/40 border-white/10 pr-10"
+                onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); formErrors.clearField("password"); }}
+                aria-invalid={!!passwordError}
+                className={fieldClass("bg-black/40 border-white/10 pr-10", passwordError)}
               />
               <button
                 type="button"
@@ -252,7 +271,7 @@ export function Register() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+            {passwordError && <p className="text-xs text-destructive mt-1">{passwordError}</p>}
             {passwordTouched && password.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {PASSWORD_RULES.map((rule) => {

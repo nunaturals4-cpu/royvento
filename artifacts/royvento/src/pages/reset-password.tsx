@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiPost } from "@/lib/api";
 import { Lock, CheckCircle2, ArrowLeft, Smartphone, Check, X } from "lucide-react";
 import { PASSWORD_RULES, getPasswordError } from "@workspace/validators";
+import { useFormErrors, fieldClass } from "@/lib/formErrors";
 
 function getTokenFromSearch() {
   const params = new URLSearchParams(window.location.search);
@@ -29,7 +30,7 @@ export function ResetPassword() {
   const [done, setDone] = useState(false);
   const [appLinkAttempted, setAppLinkAttempted] = useState(false);
   const [launchingApp, setLaunchingApp] = useState(false);
-  const [errors, setErrors] = useState<{ password?: string; confirm?: string }>({});
+  const formErrors = useFormErrors();
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLInputElement>(null);
 
@@ -47,13 +48,13 @@ export function ResetPassword() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const next: typeof errors = {};
+    formErrors.reset();
     const pwErr = getPasswordError(password);
-    if (pwErr) next.password = pwErr;
-    if (password !== confirm) next.confirm = "Passwords do not match.";
-    setErrors(next);
-    if (next.password) { setPasswordTouched(true); passwordRef.current?.focus(); return; }
-    if (next.confirm) { confirmRef.current?.focus(); return; }
+    const confirmErr = password !== confirm ? "Passwords do not match." : "";
+    if (pwErr) formErrors.setFieldError("password", pwErr);
+    if (confirmErr) formErrors.setFieldError("confirm", confirmErr);
+    if (pwErr) { setPasswordTouched(true); passwordRef.current?.focus(); return; }
+    if (confirmErr) { confirmRef.current?.focus(); return; }
     setLoading(true);
     try {
       await apiPost("/api/auth/reset-password", { token, newPassword: password });
@@ -62,11 +63,8 @@ export function ResetPassword() {
     } catch (err: any) {
       const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
       if (Object.keys(fe).length > 0) {
-        setErrors((p) => ({
-          ...p,
-          ...(fe.newPassword ? { password: fe.newPassword } : {}),
-          ...(fe.password ? { password: fe.password } : {}),
-        }));
+        if (fe.newPassword) formErrors.setFieldError("password", fe.newPassword);
+        if (fe.password) formErrors.setFieldError("password", fe.password);
         if (fe.newPassword || fe.password) passwordRef.current?.focus();
       }
       toast({ title: "Reset failed", description: err?.data?.error ?? err?.message ?? "Invalid or expired token.", variant: "destructive" });
@@ -104,6 +102,9 @@ export function ResetPassword() {
       </div>
     );
   }
+
+  const passwordError = formErrors.fieldError("password");
+  const confirmError = formErrors.fieldError("confirm");
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-20">
@@ -151,11 +152,11 @@ export function ResetPassword() {
               required
               minLength={8}
               value={password}
-              onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); if (errors.password) setErrors((p) => ({ ...p, password: undefined })); }}
-              aria-invalid={!!errors.password}
-              className="bg-black/40 border-white/10 mt-1"
+              onChange={(e) => { setPassword(e.target.value); setPasswordTouched(true); formErrors.clearField("password"); }}
+              aria-invalid={!!passwordError}
+              className={fieldClass("bg-black/40 border-white/10 mt-1", passwordError)}
             />
-            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+            {passwordError && <p className="text-xs text-destructive mt-1">{passwordError}</p>}
             {passwordTouched && password.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {PASSWORD_RULES.map((rule) => {
@@ -180,11 +181,11 @@ export function ResetPassword() {
               required
               minLength={8}
               value={confirm}
-              onChange={(e) => { setConfirm(e.target.value); if (errors.confirm) setErrors((p) => ({ ...p, confirm: undefined })); }}
-              aria-invalid={!!errors.confirm}
-              className="bg-black/40 border-white/10 mt-1"
+              onChange={(e) => { setConfirm(e.target.value); formErrors.clearField("confirm"); }}
+              aria-invalid={!!confirmError}
+              className={fieldClass("bg-black/40 border-white/10 mt-1", confirmError)}
             />
-            {errors.confirm && <p className="text-xs text-destructive mt-1">{errors.confirm}</p>}
+            {confirmError && <p className="text-xs text-destructive mt-1">{confirmError}</p>}
           </div>
           <Button
             type="submit"
