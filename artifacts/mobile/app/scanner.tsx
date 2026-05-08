@@ -30,6 +30,7 @@ import { useColors } from "@/hooks/useColors";
 
 interface BookingData {
   id: number;
+  ticketCode?: string;
   eventTitle: string;
   vendorName: string;
   bookingDate: string;
@@ -163,7 +164,12 @@ export default function ScannerScreen() {
   // (within the ~30s grace window) status=already_checked_in with
   // recentlyCheckedIn=true — both render as success in the UI.
   const confirmEntry = async () => {
-    const code = result?.booking ? `RV-${String(result.booking.id).padStart(6, "0")}` : null;
+    // Use the per-pub ticketCode (PREFIX-NNNNNN-XX) from the lookup response
+    // — never the legacy `RV-` fallback. The server now requires a real
+    // vendor prefix, so deriving an `RV-` code here would always fail
+    // checksum verification.
+    const bk = result?.booking as (BookingData & { ticketCode?: string }) | undefined;
+    const code = bk?.ticketCode ?? null;
     if (!code || confirming) return;
     setConfirming(true);
     try {
@@ -656,7 +662,11 @@ function ActualEntrySheet({
   const submit = async () => {
     setSaving(true);
     try {
-      const code = `RV-${String(b.id).padStart(6, "0")}`;
+      // Use the per-pub ticketCode from the lookup response. Falling back to
+      // the legacy `RV-{id}` form would fail the server's checksum check
+      // because every vendor now has a real ticketPrefix/ticketSalt (boot
+      // backfill in api-server/src/index.ts).
+      const code = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
       const actualEntry = isTicket ? { women: w, men: m, couple: c } : { guests: g };
       const res = await customFetch<{ booking?: BookingData }>("/api/partner/scan-ticket", {
         method: "POST",
@@ -845,13 +855,20 @@ function ScannerBookingsPanel({ onCheckedOut }: { onCheckedOut: () => void }) {
     return () => clearInterval(id);
   }, []);
 
-  // Distinct vendors present in the current rows — drives the venue filter
-  // for managers/admins who scan across multiple pubs.
-  const vendorOptions = (() => {
-    const seen = new Map<number, string>();
-    for (const r of rows) seen.set(r.vendorId, r.vendorName);
-    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-  })();
+  // Authoritative vendor scope — fetched from the server, never derived from
+  // the current booking rows. A manager assigned to a pub with zero bookings
+  // today still appears in the dropdown.
+  const [vendorOptions, setVendorOptions] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    customFetch<{ vendors: { id: number; businessName: string }[] }>("/api/partner/scanner/allowed-vendors")
+      .then((r) => {
+        if (cancelled) return;
+        setVendorOptions(r.vendors.map((v) => ({ id: v.id, name: v.businessName })));
+      })
+      .catch(() => { if (!cancelled) setVendorOptions([]); });
+    return () => { cancelled = true; };
+  }, []);
 
   const toggleStatus = (s: ScannerLiveStatus) => {
     setStatuses((prev) => {

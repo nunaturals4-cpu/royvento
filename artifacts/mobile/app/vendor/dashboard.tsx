@@ -880,6 +880,11 @@ export default function VendorDashboardScreen() {
   const vendorQuery = useGetMyVendor();
   const vendor = vendorQuery.data?.vendor ?? null;
 
+  // Lock the dashboard down to Profile + My Listings until the partner is
+  // approved AND has at least one event/pub listed. Mirrors the web behaviour
+  // in artifacts/royvento/src/pages/vendor-dashboard.tsx.
+  const ALLOWED_LOCKED_TABS: ReadonlySet<DashTab> = new Set<DashTab>(["profile", "events"]);
+
   const BOOKING_PAGE_LIMIT = 20;
   const [bookingItems, setBookingItems] = useState<VendorBookingItem[]>([]);
   const [bookingPage, setBookingPage] = useState(1);
@@ -910,6 +915,16 @@ export default function VendorDashboardScreen() {
   const [eventItems, setEventItems] = useState<VendorEvent[]>([]);
   const [eventPage, setEventPage] = useState(1);
   const [eventTotal, setEventTotal] = useState(0);
+
+  const isApprovedAndListed = vendor?.status === "approved" && eventTotal > 0;
+  // If the dashboard becomes locked while the manager is on a hidden tab
+  // (e.g. their pub gets unlisted), bounce them back to Profile so they
+  // never see an empty / forbidden panel.
+  useEffect(() => {
+    if (!isApprovedAndListed && !ALLOWED_LOCKED_TABS.has(activeTab)) {
+      setActiveTab("profile");
+    }
+  }, [isApprovedAndListed, activeTab]);
   const [eventLoading, setEventLoading] = useState(false);
   const [eventFetching, setEventFetching] = useState(false);
 
@@ -3012,22 +3027,37 @@ export default function VendorDashboardScreen() {
         </View>
 
         {/* Tab bar */}
+        {!isApprovedAndListed && (
+          <View style={{ marginHorizontal: 16, marginTop: 12, padding: 14, borderRadius: 14, backgroundColor: "#f59e0b15", borderWidth: 1, borderColor: "#f59e0b40", flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
+            <Ionicons name="information-circle-outline" size={20} color="#f59e0b" style={{ marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#f59e0b", marginBottom: 4 }}>
+                {vendor?.status === "approved" ? "List your first event or pub" : "Profile awaiting approval"}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, lineHeight: 17 }}>
+                {vendor?.status === "approved"
+                  ? "Add at least one event or pub to unlock Bookings, Analytics, the Ticket Scanner and the rest of the studio tools."
+                  : "We're reviewing your partner profile. Once approved (and you've listed an event or pub), the rest of the dashboard tools will appear here."}
+              </Text>
+            </View>
+          </View>
+        )}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
-          {([
-            { key: "bookings",      icon: "ticket-outline",          label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
+          {(([
+            { key: "profile",       icon: "person-outline",           label: "Profile" },
             { key: "events",        icon: "calendar-outline",         label: "My Listings" },
+            { key: "bookings",      icon: "ticket-outline",          label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
             { key: "drinkplans",    icon: "wine-outline",             label: "Drink Plans" },
             { key: "ads",           icon: "megaphone-outline",        label: "Ads" },
             { key: "analytics",     icon: "bar-chart-outline",        label: "Analytics" },
             { key: "attendance",    icon: "checkmark-circle-outline", label: "Attendance" },
             { key: "announcements", icon: "flag-outline",             label: "Announcements" },
             { key: "leads",         icon: "people-outline",           label: "Leads" },
-            { key: "profile",       icon: "person-outline",           label: "Profile" },
             { key: "calendar",      icon: "calendar-clear-outline",   label: "Calendar" },
             { key: "managers",      icon: "person-add-outline",       label: "Managers" },
             { key: "banking",       icon: "card-outline",             label: "Banking" },
             { key: "reviews",       icon: "star-outline",             label: "Reviews" },
-          ] as const).map((t) => (
+          ] as const).filter((t) => isApprovedAndListed || ALLOWED_LOCKED_TABS.has(t.key))).map((t) => (
             <TouchableOpacity
               key={t.key}
               onPress={() => setActiveTab(t.key)}

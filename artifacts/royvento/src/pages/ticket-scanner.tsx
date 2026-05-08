@@ -23,6 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 interface BookingData {
   id: number;
+  ticketCode?: string;
   eventTitle: string;
   vendorName: string;
   eventImage: string | null;
@@ -662,13 +663,21 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
     query: { refetchInterval: 20000 },
   });
 
-  // Unique vendors that show up in the bookings page — used to populate the
-  // venue dropdown for managers/admins who scan across multiple pubs.
-  const vendorOptions = (() => {
-    const seen = new Map<number, string>();
-    for (const r of data?.rows ?? []) seen.set(r.vendorId, r.vendorName);
-    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-  })();
+  // Authoritative vendor scope — fetched from the server, not derived from
+  // booking results. A manager assigned to one pub with zero bookings today
+  // still sees their pub in the dropdown (and is forced to it when only one
+  // pub is allowed).
+  const [vendorOptions, setVendorOptions] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    apiGet<{ vendors: { id: number; businessName: string }[] }>("/api/partner/scanner/allowed-vendors")
+      .then((r) => {
+        if (cancelled) return;
+        setVendorOptions(r.vendors.map((v) => ({ id: v.id, name: v.businessName })));
+      })
+      .catch(() => { if (!cancelled) setVendorOptions([]); });
+    return () => { cancelled = true; };
+  }, []);
 
   const checkout = usePartnerCheckoutTicket({
     mutation: {
@@ -833,7 +842,7 @@ function BookingDetails({ booking: b }: { booking: BookingData }) {
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Ticket code</p>
-          <p className="font-mono text-primary">RV-{String(b.id).padStart(6, "0")}</p>
+          <p className="font-mono text-primary">{b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Booking type</p>
@@ -954,7 +963,11 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
   const submit = async () => {
     setSaving(true);
     try {
-      const code = `RV-${String(b.id).padStart(6, "0")}`;
+      // Always submit the authoritative per-pub ticketCode returned by the
+      // server. The legacy `RV-{id}` fallback is only used if the booking
+      // payload predates the per-pub code rollout (defensive only — the boot
+      // backfill ensures every vendor has a prefix/salt).
+      const code = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
       const actualEntry = isTicket
         ? { women: w, men: m, couple: c }
         : { guests: g };

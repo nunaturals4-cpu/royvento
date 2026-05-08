@@ -4,9 +4,51 @@ import { runCleanup } from "./jobs/cleanup";
 import { runBookingReminders } from "./jobs/bookingReminders";
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import cron from "node-cron";
-import { db, usersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { db, usersTable, vendorsTable } from "@workspace/db";
+import { eq, or, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { generateUniqueTicketPrefix, generateTicketSalt } from "./lib/ticketCode";
+
+/**
+ * Boot-time backfill: populate `ticketPrefix` / `ticketSalt` for any vendor
+ * row whose values are still empty. Required so `generateTicketCode` (which
+ * now throws on missing prefix/salt — no more silent `RV-` fallback) always
+ * has data to work with. New vendors created via POST /vendors/me already get
+ * these fields populated; this only affects legacy rows.
+ */
+async function backfillVendorTicketPrefixes() {
+  try {
+    const missing = await db
+      .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, ticketPrefix: vendorsTable.ticketPrefix, ticketSalt: vendorsTable.ticketSalt })
+      .from(vendorsTable)
+      .where(or(eq(vendorsTable.ticketPrefix, ""), eq(vendorsTable.ticketSalt, "")));
+    if (missing.length === 0) {
+      logger.info("Startup audit: all vendors have ticketPrefix/ticketSalt");
+      return;
+    }
+    // Pre-load all currently-used prefixes so collision checks include rows
+    // we're about to skip (already-set vendors).
+    const used = new Set(
+      (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable))
+        .map((r) => r.p)
+        .filter((p): p is string => Boolean(p)),
+    );
+    for (const v of missing) {
+      const prefix = v.ticketPrefix
+        ? v.ticketPrefix
+        : await generateUniqueTicketPrefix(v.businessName || "Vendor", Array.from(used));
+      const salt = v.ticketSalt || generateTicketSalt();
+      used.add(prefix);
+      await db
+        .update(vendorsTable)
+        .set({ ticketPrefix: prefix, ticketSalt: salt })
+        .where(eq(vendorsTable.id, v.id));
+    }
+    logger.info({ backfilled: missing.length }, "Startup audit: backfilled vendor ticketPrefix/ticketSalt");
+  } catch (err) {
+    logger.error({ err }, "Startup audit failed (vendor ticket prefix backfill)");
+  }
+}
 
 async function auditPasswordHashes() {
   try {
@@ -94,6 +136,7 @@ app.listen(port, (err) => {
 
   ensureAdminAccount()
     .then(() => auditPasswordHashes())
+    .then(() => backfillVendorTicketPrefixes())
     .catch((err) => logger.error({ err }, "Startup admin/audit chain failed"));
   runCleanup();
 

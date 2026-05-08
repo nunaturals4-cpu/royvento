@@ -5,7 +5,13 @@ export function generateTicketCode(
   vendor: { ticketPrefix: string; ticketSalt: string },
 ): string {
   if (!vendor.ticketPrefix || !vendor.ticketSalt) {
-    return `RV-${String(bookingId).padStart(6, "0")}`;
+    // Hard error: every vendor must have a per-pub prefix and salt. Boot
+    // backfill (`backfillVendorTicketPrefixes`) and the create-vendor path in
+    // routes/vendors.ts ensure this — if we hit this, something inserted a
+    // vendor row without populating ticketPrefix/ticketSalt.
+    throw new Error(
+      `generateTicketCode: vendor is missing ticketPrefix/ticketSalt (bookingId=${bookingId}). Run backfillVendorTicketPrefixes.`,
+    );
   }
   const checksum = crypto
     .createHmac("sha256", vendor.ticketSalt)

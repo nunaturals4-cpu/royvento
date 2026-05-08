@@ -187,6 +187,16 @@ export function VendorDashboard() {
   const events = eventsResp?.data ?? [];
   const hasPub = events.some((e: any) => e.type === "pub");
 
+  // Lock the dashboard down to Profile + Events&Pubs until the partner is
+  // approved AND has at least one listed event/pub. Hides the rest of the
+  // tabs and the scanner button so unapproved partners can't poke at empty
+  // panels (or scan tickets they shouldn't be able to).
+  const isApprovedAndListed = vendor?.status === "approved" && events.length > 0;
+  const ALLOWED_LOCKED_TABS = ["overview", "events"] as const;
+  const safeInitialTab = isApprovedAndListed
+    ? initialTab
+    : (ALLOWED_LOCKED_TABS as readonly string[]).includes(initialTab) ? initialTab : "overview";
+
   const [bookTablePage, setBookTablePage] = useState(1);
 
   return (
@@ -210,57 +220,78 @@ export function VendorDashboard() {
           <p className="text-muted-foreground">Your partner profile is being prepared. Please refresh in a moment or contact support if this persists.</p>
         </div>
       ) : (
-        <Tabs defaultValue={initialTab} className="space-y-6">
+        <Tabs defaultValue={safeInitialTab} className="space-y-6">
+          {!isApprovedAndListed && (
+            <div className="rounded-2xl glass-card border border-amber-500/30 bg-amber-500/5 p-5 flex items-start gap-3">
+              <Megaphone className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-serif text-lg text-amber-100">
+                  {vendor.status === "approved"
+                    ? "Add your first event or pub to unlock the full dashboard"
+                    : "Your partner profile is awaiting Royvento approval"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {vendor.status === "approved"
+                    ? "Once you list an event or pub, Bookings, Analytics, Scanner and the rest of the studio tools become available."
+                    : "We're reviewing your profile. As soon as it's approved (and you list at least one event or pub), Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto scrollbar-thin-x pb-2">
           <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
             <TabsTrigger value="overview">Profile</TabsTrigger>
             <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
-            <TabsTrigger value="bookings">Booking Report</TabsTrigger>
-            <TabsTrigger value="analytics">
-              <TrendingUp className="h-3.5 w-3.5 mr-1 text-primary" /> Analytics
-            </TabsTrigger>
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            <TabsTrigger value="ads">Ads</TabsTrigger>
-            <TabsTrigger value="announcements">
-              <Megaphone className="h-3.5 w-3.5 mr-1 text-primary" /> Announcements
-            </TabsTrigger>
-            <TabsTrigger value="leads">
-              <Crown className="h-3.5 w-3.5 mr-1 text-primary" /> Leads
-            </TabsTrigger>
-            <TabsTrigger value="drinkplans">
-              <GlassWater className="h-3.5 w-3.5 mr-1 text-primary" /> Drink Plans
-            </TabsTrigger>
-            <TabsTrigger value="attendance">
-              <UserCheck className="h-3.5 w-3.5 mr-1 text-primary" /> Attendance
-            </TabsTrigger>
-            <TabsTrigger value="managers">
-              <Users className="h-3.5 w-3.5 mr-1 text-primary" /> Managers
-            </TabsTrigger>
-            <TabsTrigger value="banking">
-              <Banknote className="h-3.5 w-3.5 mr-1 text-primary" /> Banking &amp; Settlement
-            </TabsTrigger>
-            <TabsTrigger value="reviews">Reviews</TabsTrigger>
-            <Link href="/dashboard/vendor/scanner">
-              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors">
-                <ScanLine className="h-3.5 w-3.5" /> Ticket scanner
-              </button>
-            </Link>
+            {isApprovedAndListed && <>
+              <TabsTrigger value="bookings">Booking Report</TabsTrigger>
+              <TabsTrigger value="analytics">
+                <TrendingUp className="h-3.5 w-3.5 mr-1 text-primary" /> Analytics
+              </TabsTrigger>
+              <TabsTrigger value="calendar">Calendar</TabsTrigger>
+              <TabsTrigger value="ads">Ads</TabsTrigger>
+              <TabsTrigger value="announcements">
+                <Megaphone className="h-3.5 w-3.5 mr-1 text-primary" /> Announcements
+              </TabsTrigger>
+              <TabsTrigger value="leads">
+                <Crown className="h-3.5 w-3.5 mr-1 text-primary" /> Leads
+              </TabsTrigger>
+              <TabsTrigger value="drinkplans">
+                <GlassWater className="h-3.5 w-3.5 mr-1 text-primary" /> Drink Plans
+              </TabsTrigger>
+              <TabsTrigger value="attendance">
+                <UserCheck className="h-3.5 w-3.5 mr-1 text-primary" /> Attendance
+              </TabsTrigger>
+              <TabsTrigger value="managers">
+                <Users className="h-3.5 w-3.5 mr-1 text-primary" /> Managers
+              </TabsTrigger>
+              <TabsTrigger value="banking">
+                <Banknote className="h-3.5 w-3.5 mr-1 text-primary" /> Banking &amp; Settlement
+              </TabsTrigger>
+              <TabsTrigger value="reviews">Reviews</TabsTrigger>
+              <Link href="/dashboard/vendor/scanner">
+                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors">
+                  <ScanLine className="h-3.5 w-3.5" /> Ticket scanner
+                </button>
+              </Link>
+            </>}
           </TabsList>
           </div>
 
           <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>
-          <TabsContent value="bookings"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
-          <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
-          <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
-          <TabsContent value="ads"><AdsPanel /></TabsContent>
-          <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
-          <TabsContent value="leads"><LeadsPanel /></TabsContent>
-          <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
-          <TabsContent value="attendance"><AttendancePanel /></TabsContent>
-          <TabsContent value="managers"><ManagersPanel /></TabsContent>
-          <TabsContent value="banking"><BankingPanel /></TabsContent>
-          <TabsContent value="reviews"><PartnerReviewsPanel /></TabsContent>
+          {isApprovedAndListed && <>
+            <TabsContent value="bookings"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
+            <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
+            <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
+            <TabsContent value="ads"><AdsPanel /></TabsContent>
+            <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
+            <TabsContent value="leads"><LeadsPanel /></TabsContent>
+            <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
+            <TabsContent value="attendance"><AttendancePanel /></TabsContent>
+            <TabsContent value="managers"><ManagersPanel /></TabsContent>
+            <TabsContent value="banking"><BankingPanel /></TabsContent>
+            <TabsContent value="reviews"><PartnerReviewsPanel /></TabsContent>
+          </>}
         </Tabs>
       )}
     </div>

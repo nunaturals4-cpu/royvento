@@ -685,7 +685,9 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
     const v = vMap.get(b.vendorId);
     const pay = payMap.get(b.id);
     const ticketCode = v
-      ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" })
+      ? (v.ticketPrefix && v.ticketSalt
+          ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
+          : `RV-${String(b.id).padStart(6, "0")}`)
       : `RV-${String(b.id).padStart(6, "0")}`;
     let paymentMethod: string;
     if (pay) {

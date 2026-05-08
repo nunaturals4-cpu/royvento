@@ -228,7 +228,9 @@ async function serializeBookings(rows: BookingRow[]) {
       partnerName: v?.businessName ?? "",
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
-      ticketCode: v ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" }) : `RV-${String(b.id).padStart(6, "0")}`,
+      ticketCode: v && v.ticketPrefix && v.ticketSalt
+        ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
+        : `RV-${String(b.id).padStart(6, "0")}`,
       // True when the event is far enough away that self-service cancellation is permitted.
       // Interpreted as midnight (local server time) of the booking date to align with how
       // the cancel handler enforces the same check.
@@ -2402,8 +2404,8 @@ router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) =
     .where(eq(vendorsTable.id, b.vendorId))
     .limit(1);
   const v = vRows[0];
-  const ticketCode = v
-    ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" })
+  const ticketCode = v && v.ticketPrefix && v.ticketSalt
+    ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
     : `RV-${String(b.id).padStart(6, "0")}`;
   res.json({ ticketCode });
 });
@@ -2788,8 +2790,8 @@ async function fetchScannerBookings(opts: {
         : "notArrived";
     return {
       id: b.id,
-      ticketCode: v
-        ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" })
+      ticketCode: v && v.ticketPrefix && v.ticketSalt
+        ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
         : `RV-${String(b.id).padStart(6, "0")}`,
       eventId: b.eventId,
       eventTitle: e?.title ?? "",
@@ -2971,6 +2973,30 @@ function parseStatusList(raw: unknown): ScannerLiveStatus[] {
   }
   return out;
 }
+
+/**
+ * Returns the list of vendors (pubs) the current user is allowed to scan
+ * tickets for. Sourced from `resolveScannerVendorIds` so the scanner UI
+ * never derives venue scope from booking results — a manager with one pub
+ * and zero bookings today still sees their pub here.
+ */
+router.get("/partner/scanner/allowed-vendors", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const allowed = await resolveScannerVendorIds(user.id, user.role);
+  if (allowed.size === 0) {
+    res.json({ vendors: [] });
+    return;
+  }
+  const rows = await db
+    .select({ id: vendorsTable.id, businessName: vendorsTable.businessName })
+    .from(vendorsTable)
+    .where(inArray(vendorsTable.id, Array.from(allowed)));
+  res.json({ vendors: rows });
+});
 
 router.get("/partner/scanner/occupancy", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
