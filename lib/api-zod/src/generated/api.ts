@@ -2849,13 +2849,25 @@ export const PartnerScanTicketBody = zod
   .strict();
 
 export const PartnerScanTicketResponse = zod.object({
-  code: zod.enum(["OK", "ALREADY_CHECKED_IN", "NOT_FOUND", "INVALID_STATUS"]),
+  code: zod.enum([
+    "OK",
+    "ALREADY_CHECKED_IN",
+    "ALREADY_CHECKED_OUT",
+    "NOT_FOUND",
+    "INVALID_STATUS",
+  ]),
   status: zod
-    .enum(["ready_to_check_in", "checked_in", "already_checked_in"])
+    .enum([
+      "ready_to_check_in",
+      "checked_in",
+      "already_checked_in",
+      "already_checked_out",
+    ])
     .optional()
     .describe(
-      "Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm\/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it).",
+      'Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm\/actualEntry request just burned the ticket. `already_checked_in` is returned for re-scans of an inside guest. `already_checked_out` is returned when the booking has already been checked out — the scanner UI surfaces this as a distinct \"Checked out\" state and offers re-check-in via a fresh confirm flow.',
     ),
+  checkedOutAt: zod.string().nullish(),
   lookupOnly: zod
     .boolean()
     .optional()
@@ -2946,6 +2958,413 @@ export const PartnerScanTicketResponse = zod.object({
         .describe("Per-couple ticket price for this event."),
     })
     .nullish(),
+});
+
+/**
+ * @summary Check out a previously checked-in ticket (partner). Decrements live occupancy.
+ */
+export const PartnerCheckoutTicketBody = zod
+  .object({
+    bookingId: zod
+      .number()
+      .optional()
+      .describe(
+        "Numeric booking id. Preferred when checking out from a known list (e.g. the partner scanner table) since it skips ticket-code parsing.",
+      ),
+    ticketCode: zod
+      .string()
+      .optional()
+      .describe(
+        "Full ticket code as printed on the QR (e.g. `ROY-000123-AB`). Used when the operator scans \/ types the code.",
+      ),
+    code: zod
+      .string()
+      .optional()
+      .describe("Alias for `ticketCode` (kept for backward compatibility)."),
+    confirm: zod
+      .boolean()
+      .optional()
+      .describe(
+        "When true, marks the booking as checked out. When false\/omitted, returns booking details + status without mutating (mirror of scan-ticket lookup).",
+      ),
+  })
+  .strict()
+  .describe(
+    "Identify the booking either by `bookingId` (preferred, used by the scanner table) or by a scanned ticket string (`ticketCode`, alias `code`). Exactly one of the three should be provided.",
+  );
+
+export const PartnerCheckoutTicketResponse = zod.object({
+  code: zod.enum([
+    "OK",
+    "ALREADY_CHECKED_OUT",
+    "NOT_CHECKED_IN",
+    "NOT_FOUND",
+    "INVALID_CODE",
+    "FORBIDDEN",
+    "WRONG_VENDOR",
+    "INVALID_STATUS",
+  ]),
+  status: zod
+    .enum([
+      "ready_to_check_out",
+      "checked_out",
+      "already_checked_out",
+      "not_checked_in",
+    ])
+    .optional(),
+  lookupOnly: zod.boolean().optional(),
+  justCheckedOut: zod.boolean().optional(),
+  message: zod.string().optional(),
+  checkedInAt: zod.string().nullish(),
+  checkedOutAt: zod.string().nullish(),
+  booking: zod
+    .object({
+      id: zod.number(),
+      eventTitle: zod.string(),
+      vendorName: zod.string(),
+      bookingDate: zod.string(),
+      personName: zod.string().nullish(),
+      userName: zod.string(),
+      pubMode: zod.string(),
+      ticketWomen: zod.number(),
+      ticketMen: zod.number(),
+      ticketCouple: zod.number(),
+      guests: zod.number(),
+      finalPrice: zod.number().optional(),
+      commissionRate: zod
+        .number()
+        .optional()
+        .describe(
+          "Flat fee in INR per unit (per person, per ticket, or per table booking)",
+        ),
+      commissionAmount: zod
+        .number()
+        .optional()
+        .describe("Platform fee deducted from gross"),
+      netAmount: zod
+        .number()
+        .optional()
+        .describe("Net amount the venue should collect"),
+      paymentMethod: zod.string().optional(),
+      finalPriceBooked: zod
+        .number()
+        .optional()
+        .describe("Original booked finalPrice (alias for finalPrice)"),
+      actualWomen: zod.number().nullish(),
+      actualMen: zod.number().nullish(),
+      actualCouple: zod.number().nullish(),
+      actualGuests: zod.number().nullish(),
+      actualAmountDue: zod
+        .number()
+        .nullish()
+        .describe(
+          "Server-computed amount the venue should collect at the door, based on per-type actuals. Null if no actuals recorded yet.",
+        ),
+      actualEntry: zod
+        .object({
+          women: zod.number().nullish(),
+          men: zod.number().nullish(),
+          couple: zod.number().nullish(),
+          guests: zod.number().nullish(),
+        })
+        .nullish()
+        .describe(
+          "Per-type actuals as a single object. Null if none recorded yet.",
+        ),
+      priceWomen: zod
+        .number()
+        .optional()
+        .describe(
+          "Per-woman ticket price for this event (used by client to compute live actual amount).",
+        ),
+      priceMen: zod
+        .number()
+        .optional()
+        .describe("Per-man ticket price for this event."),
+      priceCouple: zod
+        .number()
+        .optional()
+        .describe("Per-couple ticket price for this event."),
+    })
+    .nullish(),
+  occupancy: zod
+    .object({
+      vendorId: zod.number(),
+      businessName: zod.string(),
+      city: zod.string().nullish(),
+      capacity: zod.number(),
+      currentlyInside: zod.number(),
+      available: zod.number(),
+      occupancyPercent: zod.number(),
+      totalBookingsToday: zod.number(),
+      checkedInCount: zod.number(),
+      checkedOutCount: zod.number(),
+      notArrivedCount: zod.number(),
+      lastScanAt: zod
+        .string()
+        .nullish()
+        .describe(
+          "ISO timestamp of the most recent scan (check-in or check-out) at this venue today. Null when no scans yet.",
+        ),
+      today: zod.string(),
+    })
+    .nullish()
+    .describe(
+      "Live occupancy snapshot for the booking's vendor immediately after the check-out. Returned on successful confirm so the client can refresh capacity badges without a follow-up request.",
+    ),
+});
+
+/**
+ * @summary Filterable bookings list for the partner's ticket scanner (own + managed venues)
+ */
+export const GetPartnerScannerBookingsQueryParams = zod
+  .object({
+    vendorId: zod.coerce.number().optional(),
+    date: zod.coerce
+      .string()
+      .optional()
+      .describe(
+        "ISO date (YYYY-MM-DD). Defaults to today (server local). When `from`\/`to` are provided this is ignored.",
+      ),
+    from: zod.coerce
+      .string()
+      .optional()
+      .describe("Start of date range (inclusive, YYYY-MM-DD)."),
+    to: zod.coerce
+      .string()
+      .optional()
+      .describe("End of date range (inclusive, YYYY-MM-DD)."),
+    status: zod.coerce
+      .string()
+      .optional()
+      .describe(
+        "Comma-separated list of `liveStatus` values (`notArrived`, `inside`, `checkedOut`, `noShow`, `cancelled`)\nor `all` to disable the filter. Example: `inside,notArrived`.\n",
+      ),
+    q: zod.coerce
+      .string()
+      .optional()
+      .describe(
+        "Free-text search across guest name, phone, ticket code, and booking ID.",
+      ),
+    page: zod.coerce.number().optional(),
+    limit: zod.coerce.number().optional(),
+  })
+  .strict();
+
+export const GetPartnerScannerBookingsResponse = zod.object({
+  rows: zod.array(
+    zod.object({
+      id: zod.number(),
+      ticketCode: zod.string(),
+      eventId: zod.number(),
+      eventTitle: zod.string(),
+      vendorId: zod.number(),
+      vendorName: zod.string(),
+      bookingDate: zod.string(),
+      bookingTime: zod.string().nullish(),
+      personName: zod.string().nullish(),
+      userName: zod.string(),
+      userEmail: zod.string().nullish(),
+      phone: zod.string().nullish(),
+      pubMode: zod.string(),
+      guests: zod.number(),
+      ticketWomen: zod.number(),
+      ticketMen: zod.number(),
+      ticketCouple: zod.number(),
+      finalPrice: zod.number().optional(),
+      paymentMethod: zod.string().optional(),
+      status: zod.string(),
+      checkedIn: zod.boolean(),
+      checkedInAt: zod.string().nullish(),
+      checkedOut: zod.boolean(),
+      checkedOutAt: zod.string().nullish(),
+      actualGuests: zod.number().nullish(),
+      actualWomen: zod.number().nullish(),
+      actualMen: zod.number().nullish(),
+      actualCouple: zod.number().nullish(),
+      liveStatus: zod
+        .enum(["notArrived", "inside", "checkedOut", "noShow", "cancelled"])
+        .describe(
+          "Derived live status used by the scanner table & filter chips:\n- `notArrived`: confirmed booking, not yet checked in (today or future).\n- `inside`: checked in, not yet checked out.\n- `checkedOut`: checked out.\n- `noShow`: confirmed booking, never checked in, bookingDate is in the past.\n- `cancelled`: booking row with status=cancelled (kept visible for audit).\n",
+        ),
+    }),
+  ),
+  page: zod.number(),
+  totalPages: zod.number(),
+  total: zod.number(),
+  stats: zod.object({
+    total: zod.number(),
+    notArrived: zod.number(),
+    inside: zod.number(),
+    checkedOut: zod.number(),
+    noShow: zod.number(),
+    cancelled: zod.number(),
+    currentlyInside: zod.number(),
+  }),
+});
+
+/**
+ * @summary Live occupancy for venues the authenticated partner can scan for
+ */
+export const GetPartnerScannerOccupancyResponse = zod.object({
+  today: zod.string(),
+  rows: zod.array(
+    zod.object({
+      vendorId: zod.number(),
+      businessName: zod.string(),
+      city: zod.string().nullish(),
+      capacity: zod.number(),
+      currentlyInside: zod.number(),
+      available: zod.number(),
+      occupancyPercent: zod.number(),
+      totalBookingsToday: zod.number(),
+      checkedInCount: zod.number(),
+      checkedOutCount: zod.number(),
+      notArrivedCount: zod.number(),
+      lastScanAt: zod
+        .string()
+        .nullish()
+        .describe(
+          "ISO timestamp of the most recent scan (check-in or check-out) at this venue today. Null when no scans yet.",
+        ),
+      today: zod.string(),
+    }),
+  ),
+  totals: zod.object({
+    totalCapacity: zod.number(),
+    totalCurrentlyInside: zod.number(),
+    totalCheckedInToday: zod.number(),
+    totalCheckedOutToday: zod.number(),
+  }),
+});
+
+/**
+ * @summary Live occupancy across all partner venues (admin)
+ */
+export const GetAdminLiveOccupancyQueryParams = zod
+  .object({
+    city: zod.coerce
+      .string()
+      .optional()
+      .describe("Case-insensitive substring filter against vendor city."),
+    q: zod.coerce
+      .string()
+      .optional()
+      .describe("Free-text search across business name and city."),
+  })
+  .strict();
+
+export const GetAdminLiveOccupancyResponse = zod.object({
+  today: zod.string(),
+  rows: zod.array(
+    zod.object({
+      vendorId: zod.number(),
+      businessName: zod.string(),
+      city: zod.string().nullish(),
+      capacity: zod.number(),
+      currentlyInside: zod.number(),
+      available: zod.number(),
+      occupancyPercent: zod.number(),
+      totalBookingsToday: zod.number(),
+      checkedInCount: zod.number(),
+      checkedOutCount: zod.number(),
+      notArrivedCount: zod.number(),
+      lastScanAt: zod
+        .string()
+        .nullish()
+        .describe(
+          "ISO timestamp of the most recent scan (check-in or check-out) at this venue today. Null when no scans yet.",
+        ),
+      today: zod.string(),
+    }),
+  ),
+  totals: zod.object({
+    totalCapacity: zod.number(),
+    totalCurrentlyInside: zod.number(),
+    totalCheckedInToday: zod.number(),
+    totalCheckedOutToday: zod.number(),
+  }),
+});
+
+/**
+ * @summary Today's bookings for a specific pub (admin drill-down)
+ */
+export const GetAdminLiveOccupancyBookingsParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
+
+export const GetAdminLiveOccupancyBookingsQueryParams = zod
+  .object({
+    date: zod.coerce.string().optional(),
+    from: zod.coerce.string().optional(),
+    to: zod.coerce.string().optional(),
+    status: zod.coerce
+      .string()
+      .optional()
+      .describe(
+        "Comma-separated list of `liveStatus` values (`notArrived`, `inside`, `checkedOut`, `noShow`, `cancelled`)\nor `all` to disable the filter.\n",
+      ),
+    q: zod.coerce
+      .string()
+      .optional()
+      .describe(
+        "Free-text search across guest name, phone, ticket code, and booking ID.",
+      ),
+  })
+  .strict();
+
+export const GetAdminLiveOccupancyBookingsResponse = zod.object({
+  rows: zod.array(
+    zod.object({
+      id: zod.number(),
+      ticketCode: zod.string(),
+      eventId: zod.number(),
+      eventTitle: zod.string(),
+      vendorId: zod.number(),
+      vendorName: zod.string(),
+      bookingDate: zod.string(),
+      bookingTime: zod.string().nullish(),
+      personName: zod.string().nullish(),
+      userName: zod.string(),
+      userEmail: zod.string().nullish(),
+      phone: zod.string().nullish(),
+      pubMode: zod.string(),
+      guests: zod.number(),
+      ticketWomen: zod.number(),
+      ticketMen: zod.number(),
+      ticketCouple: zod.number(),
+      finalPrice: zod.number().optional(),
+      paymentMethod: zod.string().optional(),
+      status: zod.string(),
+      checkedIn: zod.boolean(),
+      checkedInAt: zod.string().nullish(),
+      checkedOut: zod.boolean(),
+      checkedOutAt: zod.string().nullish(),
+      actualGuests: zod.number().nullish(),
+      actualWomen: zod.number().nullish(),
+      actualMen: zod.number().nullish(),
+      actualCouple: zod.number().nullish(),
+      liveStatus: zod
+        .enum(["notArrived", "inside", "checkedOut", "noShow", "cancelled"])
+        .describe(
+          "Derived live status used by the scanner table & filter chips:\n- `notArrived`: confirmed booking, not yet checked in (today or future).\n- `inside`: checked in, not yet checked out.\n- `checkedOut`: checked out.\n- `noShow`: confirmed booking, never checked in, bookingDate is in the past.\n- `cancelled`: booking row with status=cancelled (kept visible for audit).\n",
+        ),
+    }),
+  ),
+  page: zod.number(),
+  totalPages: zod.number(),
+  total: zod.number(),
+  stats: zod.object({
+    total: zod.number(),
+    notArrived: zod.number(),
+    inside: zod.number(),
+    checkedOut: zod.number(),
+    noShow: zod.number(),
+    cancelled: zod.number(),
+    currentlyInside: zod.number(),
+  }),
 });
 
 /**

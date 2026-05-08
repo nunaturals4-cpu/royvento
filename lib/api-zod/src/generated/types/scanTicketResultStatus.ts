@@ -7,7 +7,7 @@
  */
 
 /**
- * Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it).
+ * Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned for re-scans of an inside guest. `already_checked_out` is returned when the booking has already been checked out — the scanner UI surfaces this as a distinct "Checked out" state and offers re-check-in via a fresh confirm flow.
  */
 export type ScanTicketResultStatus =
   (typeof ScanTicketResultStatus)[keyof typeof ScanTicketResultStatus];
@@ -16,4 +16,5 @@ export const ScanTicketResultStatus = {
   ready_to_check_in: "ready_to_check_in",
   checked_in: "checked_in",
   already_checked_in: "already_checked_in",
+  already_checked_out: "already_checked_out",
 } as const;

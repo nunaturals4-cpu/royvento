@@ -1461,12 +1461,13 @@ export type ScanTicketResultCode =
 export const ScanTicketResultCode = {
   OK: "OK",
   ALREADY_CHECKED_IN: "ALREADY_CHECKED_IN",
+  ALREADY_CHECKED_OUT: "ALREADY_CHECKED_OUT",
   NOT_FOUND: "NOT_FOUND",
   INVALID_STATUS: "INVALID_STATUS",
 } as const;
 
 /**
- * Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it).
+ * Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned for re-scans of an inside guest. `already_checked_out` is returned when the booking has already been checked out — the scanner UI surfaces this as a distinct "Checked out" state and offers re-check-in via a fresh confirm flow.
  */
 export type ScanTicketResultStatus =
   (typeof ScanTicketResultStatus)[keyof typeof ScanTicketResultStatus];
@@ -1475,12 +1476,14 @@ export const ScanTicketResultStatus = {
   ready_to_check_in: "ready_to_check_in",
   checked_in: "checked_in",
   already_checked_in: "already_checked_in",
+  already_checked_out: "already_checked_out",
 } as const;
 
 export interface ScanTicketResult {
   code: ScanTicketResultCode;
-  /** Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it). */
+  /** Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned for re-scans of an inside guest. `already_checked_out` is returned when the booking has already been checked out — the scanner UI surfaces this as a distinct "Checked out" state and offers re-check-in via a fresh confirm flow. */
   status?: ScanTicketResultStatus;
+  checkedOutAt?: string | null;
   /** True when the response came from a read-only lookup (no `confirm` and no `actualEntry`). The booking has NOT been marked checked in. The client should render a "Confirm entry" affordance that re-POSTs with `confirm: true`. */
   lookupOnly?: boolean;
   /** True only when this exact request transitioned the booking from not-checked-in to checked-in. False when the booking was already checked in (whether inside the grace window or not). */
@@ -1490,6 +1493,164 @@ export interface ScanTicketResult {
   message?: string;
   checkedInAt?: string | null;
   booking?: ScanTicketBooking | null;
+}
+
+/**
+ * Identify the booking either by `bookingId` (preferred, used by the scanner table) or by a scanned ticket string (`ticketCode`, alias `code`). Exactly one of the three should be provided.
+ */
+export interface CheckoutTicketBody {
+  /** Numeric booking id. Preferred when checking out from a known list (e.g. the partner scanner table) since it skips ticket-code parsing. */
+  bookingId?: number;
+  /** Full ticket code as printed on the QR (e.g. `ROY-000123-AB`). Used when the operator scans / types the code. */
+  ticketCode?: string;
+  /** Alias for `ticketCode` (kept for backward compatibility). */
+  code?: string;
+  /** When true, marks the booking as checked out. When false/omitted, returns booking details + status without mutating (mirror of scan-ticket lookup). */
+  confirm?: boolean;
+}
+
+export type CheckoutTicketResultCode =
+  (typeof CheckoutTicketResultCode)[keyof typeof CheckoutTicketResultCode];
+
+export const CheckoutTicketResultCode = {
+  OK: "OK",
+  ALREADY_CHECKED_OUT: "ALREADY_CHECKED_OUT",
+  NOT_CHECKED_IN: "NOT_CHECKED_IN",
+  NOT_FOUND: "NOT_FOUND",
+  INVALID_CODE: "INVALID_CODE",
+  FORBIDDEN: "FORBIDDEN",
+  WRONG_VENDOR: "WRONG_VENDOR",
+  INVALID_STATUS: "INVALID_STATUS",
+} as const;
+
+export type CheckoutTicketResultStatus =
+  (typeof CheckoutTicketResultStatus)[keyof typeof CheckoutTicketResultStatus];
+
+export const CheckoutTicketResultStatus = {
+  ready_to_check_out: "ready_to_check_out",
+  checked_out: "checked_out",
+  already_checked_out: "already_checked_out",
+  not_checked_in: "not_checked_in",
+} as const;
+
+export interface OccupancyRow {
+  vendorId: number;
+  businessName: string;
+  city?: string | null;
+  capacity: number;
+  currentlyInside: number;
+  available: number;
+  occupancyPercent: number;
+  totalBookingsToday: number;
+  checkedInCount: number;
+  checkedOutCount: number;
+  notArrivedCount: number;
+  /** ISO timestamp of the most recent scan (check-in or check-out) at this venue today. Null when no scans yet. */
+  lastScanAt?: string | null;
+  today: string;
+}
+
+export interface CheckoutTicketResult {
+  code: CheckoutTicketResultCode;
+  status?: CheckoutTicketResultStatus;
+  lookupOnly?: boolean;
+  justCheckedOut?: boolean;
+  message?: string;
+  checkedInAt?: string | null;
+  checkedOutAt?: string | null;
+  booking?: ScanTicketBooking | null;
+  /** Live occupancy snapshot for the booking's vendor immediately after the check-out. Returned on successful confirm so the client can refresh capacity badges without a follow-up request. */
+  occupancy?: OccupancyRow | null;
+}
+
+/**
+ * Derived live status used by the scanner table & filter chips:
+- `notArrived`: confirmed booking, not yet checked in (today or future).
+- `inside`: checked in, not yet checked out.
+- `checkedOut`: checked out.
+- `noShow`: confirmed booking, never checked in, bookingDate is in the past.
+- `cancelled`: booking row with status=cancelled (kept visible for audit).
+
+ */
+export type ScannerBookingRowLiveStatus =
+  (typeof ScannerBookingRowLiveStatus)[keyof typeof ScannerBookingRowLiveStatus];
+
+export const ScannerBookingRowLiveStatus = {
+  notArrived: "notArrived",
+  inside: "inside",
+  checkedOut: "checkedOut",
+  noShow: "noShow",
+  cancelled: "cancelled",
+} as const;
+
+export interface ScannerBookingRow {
+  id: number;
+  ticketCode: string;
+  eventId: number;
+  eventTitle: string;
+  vendorId: number;
+  vendorName: string;
+  bookingDate: string;
+  bookingTime?: string | null;
+  personName?: string | null;
+  userName: string;
+  userEmail?: string | null;
+  phone?: string | null;
+  pubMode: string;
+  guests: number;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  finalPrice?: number;
+  paymentMethod?: string;
+  status: string;
+  checkedIn: boolean;
+  checkedInAt?: string | null;
+  checkedOut: boolean;
+  checkedOutAt?: string | null;
+  actualGuests?: number | null;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  /** Derived live status used by the scanner table & filter chips:
+- `notArrived`: confirmed booking, not yet checked in (today or future).
+- `inside`: checked in, not yet checked out.
+- `checkedOut`: checked out.
+- `noShow`: confirmed booking, never checked in, bookingDate is in the past.
+- `cancelled`: booking row with status=cancelled (kept visible for audit).
+ */
+  liveStatus: ScannerBookingRowLiveStatus;
+}
+
+export type ScannerBookingsResponseStats = {
+  total: number;
+  notArrived: number;
+  inside: number;
+  checkedOut: number;
+  noShow: number;
+  cancelled: number;
+  currentlyInside: number;
+};
+
+export interface ScannerBookingsResponse {
+  rows: ScannerBookingRow[];
+  page: number;
+  totalPages: number;
+  total: number;
+  stats: ScannerBookingsResponseStats;
+}
+
+export type OccupancyResponseTotals = {
+  totalCapacity: number;
+  totalCurrentlyInside: number;
+  totalCheckedInToday: number;
+  totalCheckedOutToday: number;
+};
+
+export interface OccupancyResponse {
+  today: string;
+  rows: OccupancyRow[];
+  totals: OccupancyResponseTotals;
 }
 
 export interface VendorBankingDetails {
@@ -1726,6 +1887,61 @@ export const GetPartnerAnalyticsPreset = {
   "3m": "3m",
   "6m": "6m",
 } as const;
+
+export type GetPartnerScannerBookingsParams = {
+  vendorId?: number;
+  /**
+   * ISO date (YYYY-MM-DD). Defaults to today (server local). When `from`/`to` are provided this is ignored.
+   */
+  date?: string;
+  /**
+   * Start of date range (inclusive, YYYY-MM-DD).
+   */
+  from?: string;
+  /**
+   * End of date range (inclusive, YYYY-MM-DD).
+   */
+  to?: string;
+  /**
+ * Comma-separated list of `liveStatus` values (`notArrived`, `inside`, `checkedOut`, `noShow`, `cancelled`)
+or `all` to disable the filter. Example: `inside,notArrived`.
+
+ */
+  status?: string;
+  /**
+   * Free-text search across guest name, phone, ticket code, and booking ID.
+   */
+  q?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type GetAdminLiveOccupancyParams = {
+  /**
+   * Case-insensitive substring filter against vendor city.
+   */
+  city?: string;
+  /**
+   * Free-text search across business name and city.
+   */
+  q?: string;
+};
+
+export type GetAdminLiveOccupancyBookingsParams = {
+  date?: string;
+  from?: string;
+  to?: string;
+  /**
+ * Comma-separated list of `liveStatus` values (`notArrived`, `inside`, `checkedOut`, `noShow`, `cancelled`)
+or `all` to disable the filter.
+
+ */
+  status?: string;
+  /**
+   * Free-text search across guest name, phone, ticket code, and booking ID.
+   */
+  q?: string;
+};
 
 export type GetPartnerCheckinReportParams = {
   page?: number;

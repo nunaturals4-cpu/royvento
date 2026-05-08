@@ -33,6 +33,8 @@ import type {
   Availability,
   Booking,
   CategorySummary,
+  CheckoutTicketBody,
+  CheckoutTicketResult,
   CitySummary,
   CommissionReport,
   Coupon,
@@ -50,10 +52,13 @@ import type {
   GetAdminCheckinReportParams,
   GetAdminLeadsParams,
   GetAdminLeadsSummaryParams,
+  GetAdminLiveOccupancyBookingsParams,
+  GetAdminLiveOccupancyParams,
   GetBookingTicketCode200,
   GetCommissionReportParams,
   GetPartnerAnalyticsParams,
   GetPartnerCheckinReportParams,
+  GetPartnerScannerBookingsParams,
   GetPartnerSettlementBalance200,
   GetSeoPageParams,
   HealthStatus,
@@ -75,6 +80,7 @@ import type {
   MeResponse,
   MyVendorResponse,
   Notification,
+  OccupancyResponse,
   Ok,
   PaginatedReviews,
   PartnerAnalyticsResult,
@@ -91,6 +97,7 @@ import type {
   SaveBankingDetailsBody,
   ScanTicketBody,
   ScanTicketResult,
+  ScannerBookingsResponse,
   SeoPage,
   SetAvailabilityBody,
   SetPartnerCrowdLevel200,
@@ -4592,6 +4599,502 @@ export const usePartnerScanTicket = <
 > => {
   return useMutation(getPartnerScanTicketMutationOptions(options));
 };
+
+/**
+ * @summary Check out a previously checked-in ticket (partner). Decrements live occupancy.
+ */
+export const getPartnerCheckoutTicketUrl = () => {
+  return `/api/partner/checkout-ticket`;
+};
+
+export const partnerCheckoutTicket = async (
+  checkoutTicketBody: CheckoutTicketBody,
+  options?: RequestInit,
+): Promise<CheckoutTicketResult> => {
+  return customFetch<CheckoutTicketResult>(getPartnerCheckoutTicketUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(checkoutTicketBody),
+  });
+};
+
+export const getPartnerCheckoutTicketMutationOptions = <
+  TError = ErrorType<CheckoutTicketResult>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof partnerCheckoutTicket>>,
+    TError,
+    { data: BodyType<CheckoutTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof partnerCheckoutTicket>>,
+  TError,
+  { data: BodyType<CheckoutTicketBody> },
+  TContext
+> => {
+  const mutationKey = ["partnerCheckoutTicket"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof partnerCheckoutTicket>>,
+    { data: BodyType<CheckoutTicketBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return partnerCheckoutTicket(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PartnerCheckoutTicketMutationResult = NonNullable<
+  Awaited<ReturnType<typeof partnerCheckoutTicket>>
+>;
+export type PartnerCheckoutTicketMutationBody = BodyType<CheckoutTicketBody>;
+export type PartnerCheckoutTicketMutationError =
+  ErrorType<CheckoutTicketResult>;
+
+/**
+ * @summary Check out a previously checked-in ticket (partner). Decrements live occupancy.
+ */
+export const usePartnerCheckoutTicket = <
+  TError = ErrorType<CheckoutTicketResult>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof partnerCheckoutTicket>>,
+    TError,
+    { data: BodyType<CheckoutTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof partnerCheckoutTicket>>,
+  TError,
+  { data: BodyType<CheckoutTicketBody> },
+  TContext
+> => {
+  return useMutation(getPartnerCheckoutTicketMutationOptions(options));
+};
+
+/**
+ * @summary Filterable bookings list for the partner's ticket scanner (own + managed venues)
+ */
+export const getGetPartnerScannerBookingsUrl = (
+  params?: GetPartnerScannerBookingsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/partner/scanner/bookings?${stringifiedParams}`
+    : `/api/partner/scanner/bookings`;
+};
+
+export const getPartnerScannerBookings = async (
+  params?: GetPartnerScannerBookingsParams,
+  options?: RequestInit,
+): Promise<ScannerBookingsResponse> => {
+  return customFetch<ScannerBookingsResponse>(
+    getGetPartnerScannerBookingsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPartnerScannerBookingsQueryKey = (
+  params?: GetPartnerScannerBookingsParams,
+) => {
+  return [
+    `/api/partner/scanner/bookings`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetPartnerScannerBookingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerScannerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPartnerScannerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPartnerScannerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPartnerScannerBookingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPartnerScannerBookings>>
+  > = ({ signal }) =>
+    getPartnerScannerBookings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerScannerBookings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerScannerBookingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerScannerBookings>>
+>;
+export type GetPartnerScannerBookingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Filterable bookings list for the partner's ticket scanner (own + managed venues)
+ */
+
+export function useGetPartnerScannerBookings<
+  TData = Awaited<ReturnType<typeof getPartnerScannerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPartnerScannerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPartnerScannerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerScannerBookingsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Live occupancy for venues the authenticated partner can scan for
+ */
+export const getGetPartnerScannerOccupancyUrl = () => {
+  return `/api/partner/scanner/occupancy`;
+};
+
+export const getPartnerScannerOccupancy = async (
+  options?: RequestInit,
+): Promise<OccupancyResponse> => {
+  return customFetch<OccupancyResponse>(getGetPartnerScannerOccupancyUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPartnerScannerOccupancyQueryKey = () => {
+  return [`/api/partner/scanner/occupancy`] as const;
+};
+
+export const getGetPartnerScannerOccupancyQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPartnerScannerOccupancy>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerScannerOccupancy>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPartnerScannerOccupancyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPartnerScannerOccupancy>>
+  > = ({ signal }) => getPartnerScannerOccupancy({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerScannerOccupancy>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPartnerScannerOccupancyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPartnerScannerOccupancy>>
+>;
+export type GetPartnerScannerOccupancyQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Live occupancy for venues the authenticated partner can scan for
+ */
+
+export function useGetPartnerScannerOccupancy<
+  TData = Awaited<ReturnType<typeof getPartnerScannerOccupancy>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPartnerScannerOccupancy>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPartnerScannerOccupancyQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Live occupancy across all partner venues (admin)
+ */
+export const getGetAdminLiveOccupancyUrl = (
+  params?: GetAdminLiveOccupancyParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/live-occupancy?${stringifiedParams}`
+    : `/api/admin/live-occupancy`;
+};
+
+export const getAdminLiveOccupancy = async (
+  params?: GetAdminLiveOccupancyParams,
+  options?: RequestInit,
+): Promise<OccupancyResponse> => {
+  return customFetch<OccupancyResponse>(getGetAdminLiveOccupancyUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminLiveOccupancyQueryKey = (
+  params?: GetAdminLiveOccupancyParams,
+) => {
+  return [`/api/admin/live-occupancy`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAdminLiveOccupancyQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminLiveOccupancy>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminLiveOccupancyParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLiveOccupancy>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminLiveOccupancyQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminLiveOccupancy>>
+  > = ({ signal }) =>
+    getAdminLiveOccupancy(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminLiveOccupancy>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminLiveOccupancyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminLiveOccupancy>>
+>;
+export type GetAdminLiveOccupancyQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Live occupancy across all partner venues (admin)
+ */
+
+export function useGetAdminLiveOccupancy<
+  TData = Awaited<ReturnType<typeof getAdminLiveOccupancy>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAdminLiveOccupancyParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLiveOccupancy>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminLiveOccupancyQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Today's bookings for a specific pub (admin drill-down)
+ */
+export const getGetAdminLiveOccupancyBookingsUrl = (
+  vendorId: number,
+  params?: GetAdminLiveOccupancyBookingsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/live-occupancy/${vendorId}/bookings?${stringifiedParams}`
+    : `/api/admin/live-occupancy/${vendorId}/bookings`;
+};
+
+export const getAdminLiveOccupancyBookings = async (
+  vendorId: number,
+  params?: GetAdminLiveOccupancyBookingsParams,
+  options?: RequestInit,
+): Promise<ScannerBookingsResponse> => {
+  return customFetch<ScannerBookingsResponse>(
+    getGetAdminLiveOccupancyBookingsUrl(vendorId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAdminLiveOccupancyBookingsQueryKey = (
+  vendorId: number,
+  params?: GetAdminLiveOccupancyBookingsParams,
+) => {
+  return [
+    `/api/admin/live-occupancy/${vendorId}/bookings`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAdminLiveOccupancyBookingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminLiveOccupancyBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  vendorId: number,
+  params?: GetAdminLiveOccupancyBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLiveOccupancyBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetAdminLiveOccupancyBookingsQueryKey(vendorId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminLiveOccupancyBookings>>
+  > = ({ signal }) =>
+    getAdminLiveOccupancyBookings(vendorId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!vendorId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminLiveOccupancyBookings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminLiveOccupancyBookingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminLiveOccupancyBookings>>
+>;
+export type GetAdminLiveOccupancyBookingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Today's bookings for a specific pub (admin drill-down)
+ */
+
+export function useGetAdminLiveOccupancyBookings<
+  TData = Awaited<ReturnType<typeof getAdminLiveOccupancyBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  vendorId: number,
+  params?: GetAdminLiveOccupancyBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminLiveOccupancyBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminLiveOccupancyBookingsQueryOptions(
+    vendorId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Attendance / check-in report for the authenticated vendor

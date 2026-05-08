@@ -12,6 +12,7 @@ export type ScanTicketResultCode =
 export const ScanTicketResultCode = {
   OK: "OK",
   ALREADY_CHECKED_IN: "ALREADY_CHECKED_IN",
+  ALREADY_CHECKED_OUT: "ALREADY_CHECKED_OUT",
   NOT_FOUND: "NOT_FOUND",
   INVALID_STATUS: "INVALID_STATUS",
 } as const;

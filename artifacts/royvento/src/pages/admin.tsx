@@ -19,6 +19,14 @@ import {
   useDeleteReview,
 } from "@workspace/api-client-react";
 import type { ImportGooglePubResponse } from "@workspace/api-client-react";
+import {
+  useGetAdminLiveOccupancy,
+  useGetAdminLiveOccupancyBookings,
+} from "@workspace/api-client-react";
+import type {
+  OccupancyRow as ApiOccupancyRow,
+  GetAdminLiveOccupancyBookingsParams,
+} from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
@@ -53,7 +61,7 @@ import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR } from "@/lib/a
 const ADMIN_TABS = [
   "analytics", "commissions", "vendors", "requests", "event-approvals",
   "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
-  "booking-report", "attendance", "crm-leads", "import-pub",
+  "booking-report", "attendance", "live-occupancy", "crm-leads", "import-pub",
   "announcement-slider", "settlements", "reviews",
 ] as const;
 const DEFAULT_ADMIN_TAB = "analytics";
@@ -107,6 +115,7 @@ export function AdminPanel() {
           <TabsTrigger value="blogs">Blogs</TabsTrigger>
           <TabsTrigger value="booking-report">Booking Report</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="live-occupancy">Live Occupancy</TabsTrigger>
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
@@ -127,6 +136,7 @@ export function AdminPanel() {
         <TabsContent value="blogs"><BlogsAdmin /></TabsContent>
         <TabsContent value="booking-report"><BookingReport /></TabsContent>
         <TabsContent value="attendance"><AttendanceReport /></TabsContent>
+        <TabsContent value="live-occupancy"><LiveOccupancyAdmin /></TabsContent>
         <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
         <TabsContent value="import-pub"><ImportPubFromGoogle /></TabsContent>
         <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
@@ -4148,6 +4158,233 @@ function ReviewsAdmin() {
           <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}>Next</Button>
         </div>
       )}
+    </div>
+  );
+}
+
+interface OccRow {
+  vendorId: number; businessName: string; city: string | null;
+  capacity: number; currentlyInside: number; available: number;
+  occupancyPercent: number; totalBookingsToday: number;
+  checkedInCount: number; checkedOutCount: number; notArrivedCount: number; today: string;
+}
+interface OccResponse {
+  today: string; rows: OccRow[];
+  totals: { totalCapacity: number; totalCurrentlyInside: number; totalCheckedInToday: number; totalCheckedOutToday: number };
+}
+interface ScannerRow {
+  id: number; ticketCode: string; eventTitle: string; vendorName: string;
+  bookingDate: string; personName: string | null; userName: string;
+  phone: string | null; pubMode: string; guests: number; ticketWomen: number;
+  ticketMen: number; ticketCouple: number; finalPrice: number; status: string;
+  checkedIn: boolean; checkedInAt: string | null;
+  checkedOut: boolean; checkedOutAt: string | null;
+  liveStatus: "notArrived" | "inside" | "checkedOut";
+}
+
+function pctColor(p: number) {
+  if (p >= 90) return "text-red-400 border-red-500/40 bg-red-500/10";
+  if (p >= 70) return "text-amber-300 border-amber-500/40 bg-amber-500/10";
+  if (p >= 30) return "text-emerald-300 border-emerald-500/40 bg-emerald-500/10";
+  return "text-muted-foreground border-white/10 bg-black/30";
+}
+
+function LiveOccupancyAdmin() {
+  const [drillVendor, setDrillVendor] = useState<ApiOccupancyRow | null>(null);
+  const [city, setCity] = useState("");
+  const [q, setQ] = useState("");
+  const [sortBy, setSortBy] = useState<"occupancy" | "name" | "city">("occupancy");
+
+  const params = {
+    ...(city.trim() ? { city: city.trim() } : {}),
+    ...(q.trim() ? { q: q.trim() } : {}),
+  };
+  const { data, isLoading, error } = useGetAdminLiveOccupancy(params, {
+    query: { refetchInterval: 15000 },
+  });
+  const loading = isLoading;
+  const err = error ? (error instanceof Error ? error.message : "Failed to load") : null;
+
+  if (loading && !data) return <div className="text-muted-foreground">Loading occupancy…</div>;
+  if (err) return <div className="text-red-400">{err}</div>;
+  if (!data) return null;
+
+  const overallPct = data.totals.totalCapacity > 0
+    ? Math.round((data.totals.totalCurrentlyInside / data.totals.totalCapacity) * 1000) / 10
+    : 0;
+
+  const sortedRows = [...data.rows].sort((a, b) => {
+    if (sortBy === "name") return a.businessName.localeCompare(b.businessName);
+    if (sortBy === "city") return (a.city ?? "").localeCompare(b.city ?? "") || a.businessName.localeCompare(b.businessName);
+    return b.occupancyPercent - a.occupancyPercent || a.businessName.localeCompare(b.businessName);
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-xs uppercase text-muted-foreground">Search</label>
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pub or city" className="bg-black/40 border-white/10" />
+        </div>
+        <div className="w-48">
+          <label className="text-xs uppercase text-muted-foreground">City</label>
+          <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Bengaluru" className="bg-black/40 border-white/10" />
+        </div>
+        <div>
+          <label className="text-xs uppercase text-muted-foreground block">Sort</label>
+          <div className="flex gap-1 mt-1">
+            {(["occupancy", "name", "city"] as const).map((s) => (
+              <button key={s} onClick={() => setSortBy(s)}
+                className={`text-xs px-3 py-1.5 rounded-md border ${sortBy === s ? "bg-primary border-primary text-primary-foreground" : "border-white/10 text-muted-foreground"}`}>
+                {s === "occupancy" ? "% Full" : s === "name" ? "Name" : "City"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-2xl glass-card p-4"><p className="text-xs uppercase text-muted-foreground">Date (IST)</p><p className="text-lg font-semibold">{data.today}</p></div>
+        <div className="rounded-2xl glass-card p-4"><p className="text-xs uppercase text-muted-foreground">Currently inside</p><p className="text-lg font-semibold tabular-nums">{data.totals.totalCurrentlyInside} / {data.totals.totalCapacity}</p><p className="text-xs text-muted-foreground">{overallPct}% full</p></div>
+        <div className="rounded-2xl glass-card p-4"><p className="text-xs uppercase text-muted-foreground">Check-ins today</p><p className="text-lg font-semibold tabular-nums">{data.totals.totalCheckedInToday}</p></div>
+        <div className="rounded-2xl glass-card p-4"><p className="text-xs uppercase text-muted-foreground">Check-outs today</p><p className="text-lg font-semibold tabular-nums">{data.totals.totalCheckedOutToday}</p></div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-black/40 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">Pub</th>
+                <th className="text-left p-3">City</th>
+                <th className="text-right p-3">Capacity</th>
+                <th className="text-right p-3">Inside</th>
+                <th className="text-right p-3">% Full</th>
+                <th className="text-right p-3">In / Out / Pending</th>
+                <th className="text-right p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.length === 0 && (
+                <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No approved partners match your filters.</td></tr>
+              )}
+              {sortedRows.map((r) => (
+                <tr key={r.vendorId} className="border-t border-white/5 hover:bg-white/5">
+                  <td className="p-3 font-medium">{r.businessName}</td>
+                  <td className="p-3 text-muted-foreground">{r.city ?? "—"}</td>
+                  <td className="p-3 text-right tabular-nums">{r.capacity || "—"}</td>
+                  <td className="p-3 text-right tabular-nums font-semibold">{r.currentlyInside}</td>
+                  <td className="p-3 text-right">
+                    <span className={`inline-flex px-2 py-0.5 rounded-md border text-xs tabular-nums ${pctColor(r.occupancyPercent)}`}>
+                      {r.capacity > 0 ? `${r.occupancyPercent}%` : "—"}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right tabular-nums text-xs text-muted-foreground">
+                    <span className="text-emerald-300">{r.checkedInCount}</span> / <span className="text-amber-300">{r.checkedOutCount}</span> / <span>{r.notArrivedCount}</span>
+                  </td>
+                  <td className="p-3 text-right">
+                    <Button size="sm" variant="outline" onClick={() => setDrillVendor(r)}>View bookings</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {drillVendor && <LiveOccupancyDrill vendor={drillVendor} onClose={() => setDrillVendor(null)} />}
+    </div>
+  );
+}
+
+function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onClose: () => void }) {
+  const [statusF, setStatusF] = useState<"all" | "notArrived" | "inside" | "checkedOut">("all");
+  const [drillQ, setDrillQ] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  // Generated React Query hook keeps the params object aligned with the
+  // OpenAPI contract. Date range is optional; when blank the server defaults
+  // to today (IST) which is the desired behaviour for the live drill-in.
+  const params: GetAdminLiveOccupancyBookingsParams = {};
+  if (statusF !== "all") params.status = statusF;
+  if (drillQ.trim()) params.q = drillQ.trim();
+  if (from && to) { params.from = from; params.to = to; }
+
+  const { data, isLoading } = useGetAdminLiveOccupancyBookings(vendor.vendorId, params, {
+    query: { refetchInterval: 20000 },
+  });
+  const rows = data?.rows ?? [];
+  const loading = isLoading;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-white/10 rounded-3xl max-w-5xl w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 border-b border-white/10 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">Today's bookings</p>
+            <p className="font-serif text-2xl">{vendor.businessName}</p>
+            <p className="text-xs text-muted-foreground">Inside: {vendor.currentlyInside} / {vendor.capacity || "—"}</p>
+          </div>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+        </div>
+        <div className="p-3 border-b border-white/10 flex flex-wrap gap-2 items-center">
+          {(["all", "notArrived", "inside", "checkedOut"] as const).map((s) => (
+            <button key={s} onClick={() => setStatusF(s)}
+              className={`text-xs px-3 py-1.5 rounded-full border ${statusF === s ? "bg-primary border-primary text-primary-foreground" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>
+              {s === "all" ? "All" : s === "notArrived" ? "Not arrived" : s === "inside" ? "Inside" : "Checked out"}
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-2">
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-black/40 border-white/10 w-36" title="From" />
+            <span className="text-xs text-muted-foreground">→</span>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-black/40 border-white/10 w-36" title="To" />
+            <Input value={drillQ} onChange={(e) => setDrillQ(e.target.value)} placeholder="Search name / phone / ticket #" className="bg-black/40 border-white/10 w-64" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {loading ? (
+            <div className="p-6 text-center text-muted-foreground">Loading…</div>
+          ) : rows.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground">No bookings.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-black/40 text-xs uppercase text-muted-foreground sticky top-0">
+                <tr>
+                  <th className="text-left p-3">Ticket</th>
+                  <th className="text-left p-3">Guest</th>
+                  <th className="text-left p-3">Phone</th>
+                  <th className="text-right p-3">Pax</th>
+                  <th className="text-left p-3">Status</th>
+                  <th className="text-left p-3">In / Out</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const pax = r.pubMode === "ticket" ? r.ticketWomen + r.ticketMen + r.ticketCouple * 2 : r.guests;
+                  return (
+                    <tr key={r.id} className="border-t border-white/5">
+                      <td className="p-3 font-mono text-xs">{r.ticketCode}</td>
+                      <td className="p-3">{r.personName || r.userName}</td>
+                      <td className="p-3 text-muted-foreground">{r.phone || "—"}</td>
+                      <td className="p-3 text-right tabular-nums">{pax}</td>
+                      <td className="p-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-md border ${r.liveStatus === "inside" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : r.liveStatus === "checkedOut" ? "border-amber-500/40 text-amber-300 bg-amber-500/10" : "border-white/10 text-muted-foreground"}`}>
+                          {r.liveStatus === "inside" ? "Inside" : r.liveStatus === "checkedOut" ? "Checked out" : "Not arrived"}
+                        </span>
+                      </td>
+                      <td className="p-3 text-xs text-muted-foreground tabular-nums">
+                        {r.checkedInAt ? new Date(r.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                        {" / "}
+                        {r.checkedOutAt ? new Date(r.checkedOutAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

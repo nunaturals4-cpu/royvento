@@ -1214,6 +1214,163 @@ paths:
               schema:
                 $ref: "#/components/schemas/ScanTicketResult"
 
+  /partner/checkout-ticket:
+    post:
+      operationId: partnerCheckoutTicket
+      tags: [bookings]
+      summary: Check out a previously checked-in ticket (partner). Decrements live occupancy.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutTicketBody"
+      responses:
+        "200":
+          description: Checkout result (lookup or confirmed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutTicketResult"
+        "409":
+          description: Already checked out / not checked in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutTicketResult"
+
+  /partner/scanner/bookings:
+    get:
+      operationId: getPartnerScannerBookings
+      tags: [bookings]
+      summary: Filterable bookings list for the partner's ticket scanner (own + managed venues)
+      parameters:
+        - name: vendorId
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: date
+          in: query
+          required: false
+          description: ISO date (YYYY-MM-DD). Defaults to today (server local). When `from`/`to` are provided this is ignored.
+          schema: { type: string }
+        - name: from
+          in: query
+          required: false
+          description: Start of date range (inclusive, YYYY-MM-DD).
+          schema: { type: string }
+        - name: to
+          in: query
+          required: false
+          description: End of date range (inclusive, YYYY-MM-DD).
+          schema: { type: string }
+        - name: status
+          in: query
+          required: false
+          description: |
+            Comma-separated list of `liveStatus` values (`notArrived`, `inside`, `checkedOut`, `noShow`, `cancelled`)
+            or `all` to disable the filter. Example: `inside,notArrived`.
+          schema: { type: string }
+        - name: q
+          in: query
+          required: false
+          description: Free-text search across guest name, phone, ticket code, and booking ID.
+          schema: { type: string }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Scanner bookings page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerBookingsResponse"
+
+  /partner/scanner/occupancy:
+    get:
+      operationId: getPartnerScannerOccupancy
+      tags: [bookings]
+      summary: Live occupancy for venues the authenticated partner can scan for
+      responses:
+        "200":
+          description: Occupancy snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OccupancyResponse"
+
+  /admin/live-occupancy:
+    get:
+      operationId: getAdminLiveOccupancy
+      tags: [admin]
+      summary: Live occupancy across all partner venues (admin)
+      parameters:
+        - name: city
+          in: query
+          required: false
+          description: Case-insensitive substring filter against vendor city.
+          schema: { type: string }
+        - name: q
+          in: query
+          required: false
+          description: Free-text search across business name and city.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Cross-pub live occupancy snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OccupancyResponse"
+
+  /admin/live-occupancy/{vendorId}/bookings:
+    get:
+      operationId: getAdminLiveOccupancyBookings
+      tags: [admin]
+      summary: Today's bookings for a specific pub (admin drill-down)
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: date
+          in: query
+          required: false
+          schema: { type: string }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string }
+        - name: status
+          in: query
+          required: false
+          description: |
+            Comma-separated list of `liveStatus` values (`notArrived`, `inside`, `checkedOut`, `noShow`, `cancelled`)
+            or `all` to disable the filter.
+          schema: { type: string }
+        - name: q
+          in: query
+          required: false
+          description: Free-text search across guest name, phone, ticket code, and booking ID.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Scanner bookings page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerBookingsResponse"
+
   /partner/checkin-report:
     get:
       operationId: getPartnerCheckinReport
@@ -4455,11 +4612,14 @@ components:
       properties:
         code:
           type: string
-          enum: [OK, ALREADY_CHECKED_IN, NOT_FOUND, INVALID_STATUS]
+          enum: [OK, ALREADY_CHECKED_IN, ALREADY_CHECKED_OUT, NOT_FOUND, INVALID_STATUS]
         status:
           type: string
-          description: Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned both for lookup hits on used tickets and for re-confirm attempts (success inside the ~30s grace window with `justCheckedIn=false`, 409 outside it).
-          enum: [ready_to_check_in, checked_in, already_checked_in]
+          description: Higher-resolution outcome. `ready_to_check_in` is only returned for lookup-only requests on a non-checked-in booking. `checked_in` is returned when a confirm/actualEntry request just burned the ticket. `already_checked_in` is returned for re-scans of an inside guest. `already_checked_out` is returned when the booking has already been checked out — the scanner UI surfaces this as a distinct "Checked out" state and offers re-check-in via a fresh confirm flow.
+          enum: [ready_to_check_in, checked_in, already_checked_in, already_checked_out]
+        checkedOutAt:
+          type: string
+          nullable: true
         lookupOnly:
           type: boolean
           description: "True when the response came from a read-only lookup (no `confirm` and no `actualEntry`). The booking has NOT been marked checked in. The client should render a \"Confirm entry\" affordance that re-POSTs with `confirm: true`."
@@ -4478,6 +4638,156 @@ components:
           $ref: "#/components/schemas/ScanTicketBooking"
           nullable: true
       required: [code]
+
+    CheckoutTicketBody:
+      type: object
+      description: Identify the booking either by `bookingId` (preferred, used by the scanner table) or by a scanned ticket string (`ticketCode`, alias `code`). Exactly one of the three should be provided.
+      properties:
+        bookingId:
+          type: integer
+          description: Numeric booking id. Preferred when checking out from a known list (e.g. the partner scanner table) since it skips ticket-code parsing.
+        ticketCode:
+          type: string
+          description: Full ticket code as printed on the QR (e.g. `ROY-000123-AB`). Used when the operator scans / types the code.
+        code:
+          type: string
+          description: Alias for `ticketCode` (kept for backward compatibility).
+        confirm:
+          type: boolean
+          description: When true, marks the booking as checked out. When false/omitted, returns booking details + status without mutating (mirror of scan-ticket lookup).
+
+    CheckoutTicketResult:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [OK, ALREADY_CHECKED_OUT, NOT_CHECKED_IN, NOT_FOUND, INVALID_CODE, FORBIDDEN, WRONG_VENDOR, INVALID_STATUS]
+        status:
+          type: string
+          enum: [ready_to_check_out, checked_out, already_checked_out, not_checked_in]
+        lookupOnly:
+          type: boolean
+        justCheckedOut:
+          type: boolean
+        message:
+          type: string
+        checkedInAt:
+          type: string
+          nullable: true
+        checkedOutAt:
+          type: string
+          nullable: true
+        booking:
+          $ref: "#/components/schemas/ScanTicketBooking"
+          nullable: true
+        occupancy:
+          $ref: "#/components/schemas/OccupancyRow"
+          nullable: true
+          description: Live occupancy snapshot for the booking's vendor immediately after the check-out. Returned on successful confirm so the client can refresh capacity badges without a follow-up request.
+      required: [code]
+
+    ScannerBookingRow:
+      type: object
+      properties:
+        id: { type: integer }
+        ticketCode: { type: string }
+        eventId: { type: integer }
+        eventTitle: { type: string }
+        vendorId: { type: integer }
+        vendorName: { type: string }
+        bookingDate: { type: string }
+        bookingTime: { type: string, nullable: true }
+        personName: { type: string, nullable: true }
+        userName: { type: string }
+        userEmail: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        pubMode: { type: string }
+        guests: { type: integer }
+        ticketWomen: { type: integer }
+        ticketMen: { type: integer }
+        ticketCouple: { type: integer }
+        finalPrice: { type: number }
+        paymentMethod: { type: string }
+        status: { type: string }
+        checkedIn: { type: boolean }
+        checkedInAt: { type: string, nullable: true }
+        checkedOut: { type: boolean }
+        checkedOutAt: { type: string, nullable: true }
+        actualGuests: { type: integer, nullable: true }
+        actualWomen: { type: integer, nullable: true }
+        actualMen: { type: integer, nullable: true }
+        actualCouple: { type: integer, nullable: true }
+        liveStatus:
+          type: string
+          description: |
+            Derived live status used by the scanner table & filter chips:
+            - `notArrived`: confirmed booking, not yet checked in (today or future).
+            - `inside`: checked in, not yet checked out.
+            - `checkedOut`: checked out.
+            - `noShow`: confirmed booking, never checked in, bookingDate is in the past.
+            - `cancelled`: booking row with status=cancelled (kept visible for audit).
+          enum: [notArrived, inside, checkedOut, noShow, cancelled]
+      required: [id, ticketCode, eventId, eventTitle, vendorId, vendorName, bookingDate, userName, pubMode, guests, ticketWomen, ticketMen, ticketCouple, status, checkedIn, checkedOut, liveStatus]
+
+    ScannerBookingsResponse:
+      type: object
+      properties:
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/ScannerBookingRow" }
+        page: { type: integer }
+        totalPages: { type: integer }
+        total: { type: integer }
+        stats:
+          type: object
+          properties:
+            total: { type: integer }
+            notArrived: { type: integer }
+            inside: { type: integer }
+            checkedOut: { type: integer }
+            noShow: { type: integer }
+            cancelled: { type: integer }
+            currentlyInside: { type: integer }
+          required: [total, notArrived, inside, checkedOut, noShow, cancelled, currentlyInside]
+      required: [rows, page, totalPages, total, stats]
+
+    OccupancyRow:
+      type: object
+      properties:
+        vendorId: { type: integer }
+        businessName: { type: string }
+        city: { type: string, nullable: true }
+        capacity: { type: integer }
+        currentlyInside: { type: integer }
+        available: { type: integer }
+        occupancyPercent: { type: number }
+        totalBookingsToday: { type: integer }
+        checkedInCount: { type: integer }
+        checkedOutCount: { type: integer }
+        notArrivedCount: { type: integer }
+        lastScanAt:
+          type: string
+          nullable: true
+          description: ISO timestamp of the most recent scan (check-in or check-out) at this venue today. Null when no scans yet.
+        today: { type: string }
+      required: [vendorId, businessName, capacity, currentlyInside, available, occupancyPercent, totalBookingsToday, checkedInCount, checkedOutCount, notArrivedCount, today]
+
+    OccupancyResponse:
+      type: object
+      properties:
+        today: { type: string }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/OccupancyRow" }
+        totals:
+          type: object
+          properties:
+            totalCapacity: { type: integer }
+            totalCurrentlyInside: { type: integer }
+            totalCheckedInToday: { type: integer }
+            totalCheckedOutToday: { type: integer }
+          required: [totalCapacity, totalCurrentlyInside, totalCheckedInToday, totalCheckedOutToday]
+      required: [today, rows, totals]
 
     VendorBankingDetails:
       type: object

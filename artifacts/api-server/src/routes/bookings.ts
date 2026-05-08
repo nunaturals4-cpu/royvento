@@ -25,7 +25,16 @@ import { createUserNotification } from "../lib/notify";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
-import { UpdateBookingStatusBody, RetryBookingPaymentBody, RetryBookingPaymentParams } from "@workspace/api-zod";
+import {
+  UpdateBookingStatusBody,
+  RetryBookingPaymentBody,
+  RetryBookingPaymentParams,
+  PartnerCheckoutTicketBody,
+  GetPartnerScannerBookingsQueryParams,
+  GetAdminLiveOccupancyQueryParams,
+  GetAdminLiveOccupancyBookingsParams,
+  GetAdminLiveOccupancyBookingsQueryParams,
+} from "@workspace/api-zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
 import {
   sendBookingCreatedEmails,
@@ -2058,12 +2067,27 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       b.checkedIn && b.checkedInAt
         ? Date.now() - b.checkedInAt.getTime() <= GRACE_WINDOW_MS
         : false;
+    // Surface the checked-out state distinctly from the orange "already
+    // checked in" path so clients can present the correct UX (e.g. "Guest
+    // already left at 22:14"). The lookup remains read-only.
+    const checkedOutAtIso = b.checkedOutAt ? b.checkedOutAt.toISOString() : null;
+    const codeOut = b.checkedOut
+      ? "ALREADY_CHECKED_OUT"
+      : b.checkedIn
+        ? "ALREADY_CHECKED_IN"
+        : "OK";
+    const statusOut = b.checkedOut
+      ? "already_checked_out"
+      : b.checkedIn
+        ? "already_checked_in"
+        : "ready_to_check_in";
     res.json({
-      code: b.checkedIn ? "ALREADY_CHECKED_IN" : "OK",
-      status: b.checkedIn ? "already_checked_in" : "ready_to_check_in",
+      code: codeOut,
+      status: statusOut,
       lookupOnly: true,
       recentlyCheckedIn,
       checkedInAt: checkedInAtIso,
+      checkedOutAt: checkedOutAtIso,
       booking: out
         ? { ...out, ...scanCommInfo, ...scanPriceInfo, actualAmountDue: lookupActualAmountDue, actualEntry: buildActualEntry(b) }
         : null,
@@ -2390,6 +2414,619 @@ router.get("/admin/bookings", requireAuth(["admin"]), async (_req, res) => {
     .from(bookingsTable)
     .orderBy(desc(bookingsTable.createdAt));
   res.json(await serializeBookings(rows));
+});
+
+// ── Scanner check-out & live occupancy (Task #581) ──────────────────────────
+
+/**
+ * Returns "today" as YYYY-MM-DD in IST. Pubs in India operate late at night;
+ * a single calendar date in Asia/Kolkata is the natural business-day window
+ * for occupancy / scanner filtering.
+ */
+function todayIstDate(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * Resolves all vendor IDs the user is allowed to scan/manage tickets for:
+ *   - their own vendor profile (vendor or admin role)
+ *   - venues where they have an `accepted` manager relationship
+ * Same eligibility surface as POST /partner/scan-ticket.
+ */
+export async function resolveScannerVendorIds(
+  userId: number,
+  role: string,
+): Promise<Set<number>> {
+  const ids = new Set<number>();
+  if (role === "vendor" || role === "admin") {
+    const vRows = await db
+      .select({ id: vendorsTable.id })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.userId, userId))
+      .limit(1);
+    if (vRows[0]) ids.add(vRows[0].id);
+  }
+  const mgRows = await db
+    .select({ vendorId: vendorManagersTable.vendorId })
+    .from(vendorManagersTable)
+    .where(and(eq(vendorManagersTable.managerId, userId), eq(vendorManagersTable.status, "accepted")));
+  for (const r of mgRows) ids.add(r.vendorId);
+  return ids;
+}
+
+/**
+ * Decodes a ticket code (PREFIX-NNNNNN-XX or legacy RV-NNNNNN / numeric) to a
+ * booking ID, returning the parsed ID and whether checksum verification is
+ * needed for the format. Mirrors the parser in /partner/scan-ticket.
+ */
+function parseTicketCode(raw: string): { bookingId: number; needsChecksum: boolean } | null {
+  const code = raw.trim().toUpperCase();
+  const m1 = code.match(/^([A-Z][A-Z0-9]{1,7})-(\d{1,10})-([0-9A-F]{2})$/);
+  const m2 = code.match(/^(?:RV-?)?(\d+)$/);
+  if (m1 && m1[2] && m1[1] !== "RV") {
+    const id = parseInt(m1[2], 10);
+    return Number.isFinite(id) && id > 0 ? { bookingId: id, needsChecksum: true } : null;
+  }
+  if (m2 && m2[1]) {
+    const id = parseInt(m2[1], 10);
+    return Number.isFinite(id) && id > 0 ? { bookingId: id, needsChecksum: false } : null;
+  }
+  return null;
+}
+
+router.post("/partner/checkout-ticket", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ code: "FORBIDDEN", message: "Unauthorized" });
+    return;
+  }
+
+  // Validate request body against the generated zod schema. Keeps the
+  // contract enforced server-side and rejects unknown fields.
+  const parsedBody = PartnerCheckoutTicketBody.safeParse(req.body ?? {});
+  if (!parsedBody.success) {
+    res.status(400).json({ code: "INVALID_CODE", message: "Invalid request body.", issues: parsedBody.error.issues });
+    return;
+  }
+  const body = parsedBody.data;
+  // Accept any of: { bookingId } (preferred from scanner table), { ticketCode },
+  // or legacy { code }. ticketCode takes precedence over code if both are sent.
+  const bookingIdRaw = body.bookingId;
+  const ticketCodeRaw = typeof body.ticketCode === "string" ? body.ticketCode : body.code;
+  const confirmRequested = body.confirm === true;
+
+  let parsed: { bookingId: number; needsChecksum: boolean } | null = null;
+  let parsedFromCode: string | null = null;
+  if (typeof bookingIdRaw === "number" && Number.isFinite(bookingIdRaw) && bookingIdRaw > 0) {
+    parsed = { bookingId: Math.floor(bookingIdRaw), needsChecksum: false };
+  } else if (typeof ticketCodeRaw === "string" && ticketCodeRaw.trim()) {
+    parsed = parseTicketCode(ticketCodeRaw);
+    parsedFromCode = ticketCodeRaw.trim().toUpperCase();
+    if (!parsed) {
+      res.status(400).json({ code: "INVALID_CODE", message: "Invalid ticket code format." });
+      return;
+    }
+  } else {
+    res.status(400).json({ code: "INVALID_CODE", message: "Provide bookingId or ticketCode." });
+    return;
+  }
+
+  const allowed = await resolveScannerVendorIds(user.id, user.role);
+  if (allowed.size === 0) {
+    res.status(403).json({ code: "FORBIDDEN", message: "No partner profile found." });
+    return;
+  }
+
+  const bRows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, parsed.bookingId)).limit(1);
+  const b = bRows[0];
+  if (!b) {
+    res.status(404).json({ code: "NOT_FOUND", message: "Ticket not found." });
+    return;
+  }
+  if (!allowed.has(b.vendorId)) {
+    res.status(403).json({ code: "WRONG_VENDOR", message: "This ticket belongs to a different partner's venue." });
+    return;
+  }
+
+  if (parsed.needsChecksum && parsedFromCode) {
+    const v = await db
+      .select({ ticketPrefix: vendorsTable.ticketPrefix, ticketSalt: vendorsTable.ticketSalt })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, b.vendorId))
+      .limit(1);
+    const vendor = v[0];
+    if (!vendor?.ticketPrefix || !vendor?.ticketSalt) {
+      res.status(400).json({ code: "INVALID_CODE", message: "Cannot verify ticket — vendor not configured." });
+      return;
+    }
+    if (!verifyTicketCode(parsedFromCode, parsed.bookingId, { ticketPrefix: vendor.ticketPrefix, ticketSalt: vendor.ticketSalt })) {
+      res.status(400).json({ code: "INVALID_CODE", message: "Ticket code is invalid or has been tampered with." });
+      return;
+    }
+  }
+
+  if (b.status !== "confirmed" && b.status !== "completed") {
+    res.status(422).json({ code: "INVALID_STATUS", message: `Booking is in status "${b.status}" and cannot be checked out.` });
+    return;
+  }
+
+  const [out] = await serializeBookings([b]);
+  const bookingPayload = out
+    ? { ...out, checkedOut: b.checkedOut, checkedOutAt: b.checkedOutAt ? b.checkedOutAt.toISOString() : null }
+    : null;
+
+  // Lookup-only: report current state without mutating.
+  if (!confirmRequested) {
+    if (!b.checkedIn) {
+      res.json({
+        code: "NOT_CHECKED_IN",
+        status: "not_checked_in",
+        lookupOnly: true,
+        message: "This guest has not been checked in yet.",
+        booking: bookingPayload,
+      });
+      return;
+    }
+    if (b.checkedOut) {
+      res.json({
+        code: "ALREADY_CHECKED_OUT",
+        status: "already_checked_out",
+        lookupOnly: true,
+        checkedInAt: b.checkedInAt?.toISOString() ?? null,
+        checkedOutAt: b.checkedOutAt?.toISOString() ?? null,
+        message: "This ticket has already been checked out.",
+        booking: bookingPayload,
+      });
+      return;
+    }
+    res.json({
+      code: "OK",
+      status: "ready_to_check_out",
+      lookupOnly: true,
+      checkedInAt: b.checkedInAt?.toISOString() ?? null,
+      booking: bookingPayload,
+    });
+    return;
+  }
+
+  // Confirm path.
+  if (!b.checkedIn) {
+    res.status(409).json({
+      code: "NOT_CHECKED_IN",
+      status: "not_checked_in",
+      message: "Cannot check out a guest who hasn't been checked in.",
+      booking: bookingPayload,
+    });
+    return;
+  }
+  if (b.checkedOut) {
+    res.status(409).json({
+      code: "ALREADY_CHECKED_OUT",
+      status: "already_checked_out",
+      checkedInAt: b.checkedInAt?.toISOString() ?? null,
+      checkedOutAt: b.checkedOutAt?.toISOString() ?? null,
+      message: "This ticket has already been checked out.",
+      booking: bookingPayload,
+    });
+    return;
+  }
+
+  // Atomic check-out: only update if checkedOut is still false.
+  const now = new Date();
+  const [updated] = await db
+    .update(bookingsTable)
+    .set({ checkedOut: true, checkedOutAt: now })
+    .where(and(eq(bookingsTable.id, b.id), eq(bookingsTable.checkedOut, false), eq(bookingsTable.checkedIn, true)))
+    .returning();
+  if (!updated) {
+    const [cur] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, b.id)).limit(1);
+    const [outCur] = await serializeBookings(cur ? [cur] : []);
+    res.status(409).json({
+      code: "ALREADY_CHECKED_OUT",
+      status: "already_checked_out",
+      checkedInAt: cur?.checkedInAt?.toISOString() ?? null,
+      checkedOutAt: cur?.checkedOutAt?.toISOString() ?? null,
+      message: "This ticket has already been checked out.",
+      booking: outCur ? { ...outCur, checkedOut: true, checkedOutAt: cur?.checkedOutAt?.toISOString() ?? null } : null,
+    });
+    return;
+  }
+
+  req.log.info({ bookingId: updated.id, vendorId: updated.vendorId, by: user.id }, "Booking checked out");
+
+  const [outFresh] = await serializeBookings([updated]);
+  // Compute fresh occupancy snapshot for this vendor so the client can
+  // refresh capacity badges without a follow-up request.
+  const occSnap = await fetchOccupancyForVendors([updated.vendorId]);
+  res.json({
+    code: "OK",
+    status: "checked_out",
+    justCheckedOut: true,
+    checkedInAt: updated.checkedInAt?.toISOString() ?? null,
+    checkedOutAt: now.toISOString(),
+    booking: outFresh ? { ...outFresh, checkedOut: true, checkedOutAt: now.toISOString() } : null,
+    occupancy: occSnap.rows[0] ?? null,
+  });
+});
+
+/**
+ * Build the rich rows + stats payload used by both the partner scanner list
+ * and the admin live-occupancy drill-down. Filters are applied in SQL so
+ * pagination math stays correct.
+ */
+type ScannerLiveStatus = "notArrived" | "inside" | "checkedOut" | "noShow" | "cancelled";
+
+async function fetchScannerBookings(opts: {
+  vendorIds: number[];
+  date?: string;
+  from?: string;
+  to?: string;
+  statuses: ScannerLiveStatus[]; // empty = all
+  q: string;
+  page: number;
+  limit: number;
+}) {
+  const today = todayIstDate();
+  const dateConditions = opts.from && opts.to
+    ? [sql`${bookingsTable.bookingDate} >= ${opts.from}`, sql`${bookingsTable.bookingDate} <= ${opts.to}`]
+    : [eq(bookingsTable.bookingDate, opts.date ?? today)];
+
+  // Surface the full status spectrum required by Task #581 (Booked /
+  // Checked-in / Checked-out / No-show / Cancelled). We do NOT hard-filter
+  // to confirmed/completed anymore — cancelled rows must remain visible for
+  // audit, and "no-show" is derived from confirmed-but-past-without-checkin.
+  const conditions = [
+    inArray(bookingsTable.vendorId, opts.vendorIds),
+    ...dateConditions,
+    inArray(bookingsTable.status, ["confirmed", "completed", "cancelled"]),
+  ];
+  const rowConditions = [...conditions];
+
+  const liveStatusClause = (s: ScannerLiveStatus) => {
+    switch (s) {
+      case "cancelled":
+        return sql`(${bookingsTable.status} = 'cancelled')`;
+      case "checkedOut":
+        return sql`(${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedOut} = true)`;
+      case "inside":
+        return sql`(${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedIn} = true and ${bookingsTable.checkedOut} = false)`;
+      case "noShow":
+        return sql`(${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedIn} = false and ${bookingsTable.bookingDate} < ${today})`;
+      case "notArrived":
+      default:
+        return sql`(${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedIn} = false and ${bookingsTable.bookingDate} >= ${today})`;
+    }
+  };
+
+  // Multi-status filter via OR. Empty array = no filter (= all).
+  if (opts.statuses.length > 0) {
+    const statusClauses = opts.statuses.map(liveStatusClause);
+    rowConditions.push(sql`(${sql.join(statusClauses, sql` OR `)})`);
+  }
+
+  if (opts.q.trim()) {
+    const raw = opts.q.trim();
+    const q = `%${raw.toLowerCase()}%`;
+    // Try to extract a numeric booking id from the search (handles plain "42",
+    // "RV-000042", or any prefixed code containing digits).
+    const numMatch = raw.match(/\d+/);
+    const bookingId = numMatch ? Number(numMatch[0]) : null;
+    const idClause = bookingId && Number.isFinite(bookingId)
+      ? sql`or ${bookingsTable.id} = ${bookingId}`
+      : sql``;
+    // Ticket codes are derived from booking id + vendor prefix/salt, so we
+    // match the embedded numeric portion against bookings.id rather than
+    // hitting a non-existent ticket_code column.
+    rowConditions.push(sql`(
+      lower(${bookingsTable.personName}) like ${q}
+      or lower(${bookingsTable.phone}) like ${q}
+      ${idClause}
+    )`);
+  }
+
+  const baseWhere = and(...conditions);
+  const rowsWhere = and(...rowConditions);
+
+  const offset = (opts.page - 1) * opts.limit;
+  const [statsRows, countRow, rows] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        notArrived: sql<number>`coalesce(sum(case when ${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedIn} = false and ${bookingsTable.bookingDate} >= ${today} then 1 else 0 end),0)::int`,
+        inside: sql<number>`coalesce(sum(case when ${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedIn} = true and ${bookingsTable.checkedOut} = false then 1 else 0 end),0)::int`,
+        checkedOut: sql<number>`coalesce(sum(case when ${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedOut} = true then 1 else 0 end),0)::int`,
+        noShow: sql<number>`coalesce(sum(case when ${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedIn} = false and ${bookingsTable.bookingDate} < ${today} then 1 else 0 end),0)::int`,
+        cancelled: sql<number>`coalesce(sum(case when ${bookingsTable.status} = 'cancelled' then 1 else 0 end),0)::int`,
+        currentlyInside: sql<number>`coalesce(sum(case when ${bookingsTable.status} <> 'cancelled' and ${bookingsTable.checkedIn} = true and ${bookingsTable.checkedOut} = false then ${bookingsTable.guests} + ${bookingsTable.ticketWomen} + ${bookingsTable.ticketMen} + ${bookingsTable.ticketCouple} * 2 else 0 end),0)::int`,
+      })
+      .from(bookingsTable)
+      .where(baseWhere),
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(rowsWhere),
+    db
+      .select()
+      .from(bookingsTable)
+      .where(rowsWhere)
+      .orderBy(desc(bookingsTable.checkedInAt), desc(bookingsTable.id))
+      .limit(opts.limit)
+      .offset(offset),
+  ]);
+
+  const total = countRow[0]?.c ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / opts.limit));
+
+  // Enrich rows with names + ticketCode.
+  const eventIds = [...new Set(rows.map((r) => r.eventId))];
+  const userIds = [...new Set(rows.map((r) => r.userId))];
+  const vendorIds = [...new Set(rows.map((r) => r.vendorId))];
+  const [events, users, vendors] = await Promise.all([
+    eventIds.length > 0 ? db.select({ id: eventsTable.id, title: eventsTable.title }).from(eventsTable).where(inArray(eventsTable.id, eventIds)) : Promise.resolve([] as { id: number; title: string }[]),
+    userIds.length > 0 ? db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, phone: sql<string>`coalesce(phone,'')` }).from(usersTable).where(inArray(usersTable.id, userIds)) : Promise.resolve([] as { id: number; name: string; email: string; phone: string }[]),
+    vendorIds.length > 0 ? db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName, ticketPrefix: vendorsTable.ticketPrefix, ticketSalt: vendorsTable.ticketSalt }).from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)) : Promise.resolve([] as { id: number; businessName: string; ticketPrefix: string | null; ticketSalt: string | null }[]),
+  ]);
+  const eMap = new Map(events.map((e) => [e.id, e]));
+  const uMap = new Map(users.map((u) => [u.id, u]));
+  const vMap = new Map(vendors.map((v) => [v.id, v]));
+
+  const out = rows.map((b) => {
+    const u = uMap.get(b.userId);
+    const v = vMap.get(b.vendorId);
+    const e = eMap.get(b.eventId);
+    const liveStatus: ScannerLiveStatus =
+      b.status === "cancelled"
+        ? "cancelled"
+        : b.checkedOut
+        ? "checkedOut"
+        : b.checkedIn
+        ? "inside"
+        : b.bookingDate < today
+        ? "noShow"
+        : "notArrived";
+    return {
+      id: b.id,
+      ticketCode: v
+        ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix ?? "", ticketSalt: v.ticketSalt ?? "" })
+        : `RV-${String(b.id).padStart(6, "0")}`,
+      eventId: b.eventId,
+      eventTitle: e?.title ?? "",
+      vendorId: b.vendorId,
+      vendorName: v?.businessName ?? "",
+      bookingDate: b.bookingDate,
+      bookingTime: b.arrivalTime ?? null,
+      personName: b.personName || u?.name || null,
+      userName: u?.name ?? "",
+      userEmail: u?.email ?? null,
+      phone: (b.phone || u?.phone) ?? null,
+      pubMode: b.pubMode ?? "",
+      guests: b.guests,
+      ticketWomen: b.ticketWomen,
+      ticketMen: b.ticketMen,
+      ticketCouple: b.ticketCouple,
+      finalPrice: Number(b.finalPrice),
+      paymentMethod: b.paymentMethod,
+      status: b.status,
+      checkedIn: b.checkedIn,
+      checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
+      checkedOut: b.checkedOut,
+      checkedOutAt: b.checkedOutAt ? b.checkedOutAt.toISOString() : null,
+      actualGuests: b.actualGuests ?? null,
+      actualWomen: b.actualWomen ?? null,
+      actualMen: b.actualMen ?? null,
+      actualCouple: b.actualCouple ?? null,
+      liveStatus,
+    };
+  });
+
+  const stats = statsRows[0] ?? { total: 0, notArrived: 0, inside: 0, checkedOut: 0, noShow: 0, cancelled: 0, currentlyInside: 0 };
+  return { rows: out, page: opts.page, totalPages, total, stats };
+}
+
+/**
+ * Per-vendor occupancy snapshot for "today" (IST). Capacity is derived from
+ * MAX(events.capacity) across each vendor's events — events store the venue
+ * capacity, vendors do not (Task #581).
+ */
+async function fetchOccupancyForVendors(vendorIds: number[]) {
+  const today = todayIstDate();
+  if (vendorIds.length === 0) {
+    return { today, rows: [], totals: { totalCapacity: 0, totalCurrentlyInside: 0, totalCheckedInToday: 0, totalCheckedOutToday: 0 } };
+  }
+  const [vendors, capRows, statRows] = await Promise.all([
+    db
+      .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city })
+      .from(vendorsTable)
+      .where(inArray(vendorsTable.id, vendorIds)),
+    db
+      .select({ vendorId: eventsTable.vendorId, capacity: sql<number>`coalesce(max(${eventsTable.capacity}),0)::int` })
+      .from(eventsTable)
+      .where(inArray(eventsTable.vendorId, vendorIds))
+      .groupBy(eventsTable.vendorId),
+    db
+      .select({
+        vendorId: bookingsTable.vendorId,
+        totalBookingsToday: sql<number>`count(*)::int`,
+        checkedInCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} = true then 1 else 0 end),0)::int`,
+        checkedOutCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedOut} = true then 1 else 0 end),0)::int`,
+        notArrivedCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} = false then 1 else 0 end),0)::int`,
+        currentlyInsideHeads: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} = true and ${bookingsTable.checkedOut} = false then ${bookingsTable.guests} + ${bookingsTable.ticketWomen} + ${bookingsTable.ticketMen} + ${bookingsTable.ticketCouple} * 2 else 0 end),0)::int`,
+        // Most recent scan (check-in OR check-out) recorded for this vendor today.
+        lastScanAt: sql<Date | null>`max(greatest(${bookingsTable.checkedInAt}, ${bookingsTable.checkedOutAt}))`,
+      })
+      .from(bookingsTable)
+      .where(and(
+        inArray(bookingsTable.vendorId, vendorIds),
+        eq(bookingsTable.bookingDate, today),
+        inArray(bookingsTable.status, ["confirmed", "completed"]),
+      ))
+      .groupBy(bookingsTable.vendorId),
+  ]);
+
+  const capMap = new Map(capRows.map((r) => [r.vendorId, r.capacity]));
+  const statMap = new Map(statRows.map((r) => [r.vendorId, r]));
+
+  const rows = vendors
+    .map((v) => {
+      const capacity = capMap.get(v.id) ?? 0;
+      const s = statMap.get(v.id);
+      const currentlyInside = s?.currentlyInsideHeads ?? 0;
+      const available = Math.max(0, capacity - currentlyInside);
+      const occupancyPercent = capacity > 0 ? Math.round((currentlyInside / capacity) * 1000) / 10 : 0;
+      const rawLastScan = s?.lastScanAt ?? null;
+      const lastScanAt = rawLastScan ? (rawLastScan instanceof Date ? rawLastScan.toISOString() : String(rawLastScan)) : null;
+      return {
+        vendorId: v.id,
+        businessName: v.businessName,
+        city: v.city ?? null,
+        capacity,
+        currentlyInside,
+        available,
+        occupancyPercent,
+        totalBookingsToday: s?.totalBookingsToday ?? 0,
+        checkedInCount: s?.checkedInCount ?? 0,
+        checkedOutCount: s?.checkedOutCount ?? 0,
+        notArrivedCount: s?.notArrivedCount ?? 0,
+        lastScanAt,
+        today,
+      };
+    })
+    .sort((a, b) => b.occupancyPercent - a.occupancyPercent || a.businessName.localeCompare(b.businessName));
+
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.totalCapacity += r.capacity;
+      acc.totalCurrentlyInside += r.currentlyInside;
+      acc.totalCheckedInToday += r.checkedInCount;
+      acc.totalCheckedOutToday += r.checkedOutCount;
+      return acc;
+    },
+    { totalCapacity: 0, totalCurrentlyInside: 0, totalCheckedInToday: 0, totalCheckedOutToday: 0 },
+  );
+
+  return { today, rows, totals };
+}
+
+router.get("/partner/scanner/bookings", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const allowed = await resolveScannerVendorIds(user.id, user.role);
+  if (allowed.size === 0) {
+    res.json({ rows: [], page: 1, totalPages: 1, total: 0, stats: { total: 0, notArrived: 0, inside: 0, checkedOut: 0, noShow: 0, cancelled: 0, currentlyInside: 0 } });
+    return;
+  }
+  // Validate query params with the generated zod schema.
+  const parsedQuery = GetPartnerScannerBookingsQueryParams.safeParse(req.query);
+  if (!parsedQuery.success) {
+    res.status(400).json({ error: "Invalid query", issues: parsedQuery.error.issues });
+    return;
+  }
+  const qp = parsedQuery.data;
+
+  let scope = Array.from(allowed);
+  if (qp.vendorId != null) {
+    if (!allowed.has(qp.vendorId)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    scope = [qp.vendorId];
+  }
+  const isIso = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const fromParam = isIso(qp.from) ? qp.from : undefined;
+  const toParam = isIso(qp.to) ? qp.to : undefined;
+  const dateParam = isIso(qp.date) ? qp.date : todayIstDate();
+  const statuses = parseStatusList(qp.status);
+  const q = typeof qp.q === "string" ? qp.q : "";
+  const page = Math.max(1, qp.page ?? 1);
+  const rawLimit = qp.limit ?? 50;
+  const limit = Math.min(200, Math.max(1, rawLimit));
+
+  const result = await fetchScannerBookings({
+    vendorIds: scope,
+    ...(fromParam && toParam ? { from: fromParam, to: toParam } : { date: dateParam }),
+    statuses, q, page, limit,
+  });
+  res.json(result);
+});
+
+function parseStatusList(raw: unknown): ScannerLiveStatus[] {
+  if (typeof raw !== "string" || !raw.trim() || raw === "all") return [];
+  const valid: ReadonlySet<ScannerLiveStatus> = new Set([
+    "notArrived",
+    "inside",
+    "checkedOut",
+    "noShow",
+    "cancelled",
+  ]);
+  const out: ScannerLiveStatus[] = [];
+  for (const part of raw.split(",").map((s) => s.trim())) {
+    if (valid.has(part as ScannerLiveStatus) && !out.includes(part as ScannerLiveStatus)) {
+      out.push(part as ScannerLiveStatus);
+    }
+  }
+  return out;
+}
+
+router.get("/partner/scanner/occupancy", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const allowed = await resolveScannerVendorIds(user.id, user.role);
+  const result = await fetchOccupancyForVendors(Array.from(allowed));
+  res.json(result);
+});
+
+router.get("/admin/live-occupancy", requireAuth(["admin"]), async (req, res) => {
+  const parsedQuery = GetAdminLiveOccupancyQueryParams.safeParse(req.query);
+  if (!parsedQuery.success) {
+    res.status(400).json({ error: "Invalid query", issues: parsedQuery.error.issues });
+    return;
+  }
+  const cityRaw = parsedQuery.data.city ? parsedQuery.data.city.trim().toLowerCase() : "";
+  const qRaw = parsedQuery.data.q ? parsedQuery.data.q.trim().toLowerCase() : "";
+  const where = [eq(vendorsTable.status, "approved")];
+  if (cityRaw) where.push(sql`lower(coalesce(${vendorsTable.city}, '')) like ${`%${cityRaw}%`}`);
+  if (qRaw) {
+    const like = `%${qRaw}%`;
+    where.push(sql`(lower(${vendorsTable.businessName}) like ${like} or lower(coalesce(${vendorsTable.city}, '')) like ${like})`);
+  }
+  const allVendors = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(and(...where));
+  const result = await fetchOccupancyForVendors(allVendors.map((v) => v.id));
+  res.json(result);
+});
+
+router.get("/admin/live-occupancy/:vendorId/bookings", requireAuth(["admin"]), async (req, res) => {
+  const parsedParams = GetAdminLiveOccupancyBookingsParams.safeParse(req.params);
+  if (!parsedParams.success || !Number.isFinite(parsedParams.data.vendorId) || parsedParams.data.vendorId <= 0) {
+    res.status(400).json({ error: "Invalid vendorId" });
+    return;
+  }
+  const parsedQuery = GetAdminLiveOccupancyBookingsQueryParams.safeParse(req.query);
+  if (!parsedQuery.success) {
+    res.status(400).json({ error: "Invalid query", issues: parsedQuery.error.issues });
+    return;
+  }
+  const vendorId = parsedParams.data.vendorId;
+  const qp = parsedQuery.data;
+  const isIso = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const fromParam = isIso(qp.from) ? qp.from : undefined;
+  const toParam = isIso(qp.to) ? qp.to : undefined;
+  const dateParam = isIso(qp.date) ? qp.date : todayIstDate();
+  const statuses = parseStatusList(qp.status);
+  const q = typeof qp.q === "string" ? qp.q : "";
+  const result = await fetchScannerBookings({
+    vendorIds: [vendorId],
+    ...(fromParam && toParam ? { from: fromParam, to: toParam } : { date: dateParam }),
+    statuses, q, page: 1, limit: 200,
+  });
+  res.json(result);
 });
 
 export default router;

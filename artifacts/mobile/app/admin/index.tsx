@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
   customFetch,
+  getAdminLiveOccupancy,
   getGetAdminAnalyticsQueryKey,
   getGetAdminBookingsReportQueryKey,
   getGetAdminLeadsSummaryQueryKey,
@@ -28,7 +29,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions" | "settlements";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy";
 
 interface ContactMessage {
   id: number;
@@ -2736,6 +2737,7 @@ export default function AdminPanelScreen() {
     { key: "crm-leads" as AdminTab, icon: "person-add-outline" as const, label: "CRM" },
     { key: "import-pub" as AdminTab, icon: "cloud-download-outline" as const, label: "Import" },
     { key: "settlements" as AdminTab, icon: "card-outline" as const, label: "Settlements" },
+    { key: "live-occupancy" as AdminTab, icon: "pulse-outline" as const, label: "Live Occ" },
   ];
 
   if (!user || user.role !== "admin") {
@@ -2803,7 +2805,110 @@ export default function AdminPanelScreen() {
       {activeTab === "import-pub" && renderImportPub()}
       {activeTab === "commissions" && <AdminCommissionsTab colors={colors} />}
       {activeTab === "settlements" && <AdminSettlementsTab colors={colors} />}
+      {activeTab === "live-occupancy" && <AdminLiveOccupancyTab colors={colors} />}
     </View>
+  );
+}
+
+function AdminLiveOccupancyTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [data, setData] = useState<import("@workspace/api-client-react").OccupancyResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [city, setCity] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      // Generated client function — typed params object aligned with OpenAPI.
+      getAdminLiveOccupancy({
+        ...(q.trim() ? { q: q.trim() } : {}),
+        ...(city.trim() ? { city: city.trim() } : {}),
+      })
+        .then((r) => { if (!cancelled) { setData(r); setLoading(false); } })
+        .catch(() => { if (!cancelled) setLoading(false); });
+    };
+    load();
+    const id = setInterval(load, 15000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [q, city]);
+
+  if (loading && !data) {
+    return <View style={{ padding: 20 }}><ActivityIndicator color={colors.primary} /></View>;
+  }
+  if (!data) return null;
+
+  const overallPct = data.totals.totalCapacity > 0
+    ? Math.round((data.totals.totalCurrentlyInside / data.totals.totalCapacity) * 1000) / 10
+    : 0;
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <TextInput
+          value={q}
+          onChangeText={setQ}
+          placeholder="Search pub or city"
+          placeholderTextColor={colors.mutedForeground}
+          style={{ flex: 1, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular" }}
+        />
+        <TextInput
+          value={city}
+          onChangeText={setCity}
+          placeholder="City"
+          placeholderTextColor={colors.mutedForeground}
+          style={{ width: 110, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular" }}
+        />
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 12 }}>
+          <Text style={{ fontSize: 10, color: colors.mutedForeground, textTransform: "uppercase", fontFamily: "Inter_600SemiBold" }}>Inside / Capacity</Text>
+          <Text style={{ fontSize: 22, color: colors.foreground, fontFamily: "Inter_700Bold", marginTop: 4 }}>
+            {data.totals.totalCurrentlyInside} / {data.totals.totalCapacity}
+          </Text>
+          <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>{overallPct}% full · {data.today}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 140, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 12 }}>
+          <Text style={{ fontSize: 10, color: colors.mutedForeground, textTransform: "uppercase", fontFamily: "Inter_600SemiBold" }}>Today</Text>
+          <Text style={{ fontSize: 13, color: colors.foreground, fontFamily: "Inter_600SemiBold", marginTop: 4 }}>
+            {data.totals.totalCheckedInToday} in · {data.totals.totalCheckedOutToday} out
+          </Text>
+        </View>
+      </View>
+
+      {data.rows.length === 0 ? (
+        <Text style={{ color: colors.mutedForeground, padding: 20, textAlign: "center" }}>No approved partners.</Text>
+      ) : (
+        data.rows.map((r) => {
+          const pct = r.capacity > 0 ? r.occupancyPercent : 0;
+          const barColor = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : "#22c55e";
+          return (
+            <Pressable
+              key={r.vendorId}
+              onPress={() => router.push({ pathname: "/admin/live-occupancy", params: { vendorId: String(r.vendorId), businessName: r.businessName } } as never)}
+              style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: 14 }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 14, color: colors.foreground, fontFamily: "Inter_600SemiBold" }} numberOfLines={1}>{r.businessName}</Text>
+                  {r.city && <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>{r.city}</Text>}
+                </View>
+                <Text style={{ fontSize: 16, color: colors.foreground, fontFamily: "Inter_700Bold" }}>
+                  {r.currentlyInside}{r.capacity > 0 ? ` / ${r.capacity}` : ""}
+                </Text>
+              </View>
+              {r.capacity > 0 && (
+                <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.muted, overflow: "hidden", marginBottom: 6 }}>
+                  <View style={{ width: `${Math.min(100, pct)}%`, height: "100%", backgroundColor: barColor }} />
+                </View>
+              )}
+              <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
+                {r.checkedInCount} in · {r.checkedOutCount} out · {r.notArrivedCount} pending · tap for details
+              </Text>
+            </Pressable>
+          );
+        })
+      )}
+    </ScrollView>
   );
 }
 

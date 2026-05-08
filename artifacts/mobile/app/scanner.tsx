@@ -1,5 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { customFetch } from "@workspace/api-client-react";
+import {
+  customFetch,
+  getPartnerScannerBookings,
+  getPartnerScannerOccupancy,
+  partnerCheckoutTicket,
+} from "@workspace/api-client-react";
+import type {
+  ScannerBookingRow as ApiScannerBookingRow,
+  OccupancyResponse as ApiOccupancyResponse,
+} from "@workspace/api-client-react";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import React, { useState, useRef, useEffect } from "react";
@@ -78,7 +87,10 @@ interface ScanResult {
   // returned for the read-only lookup phase (POST {code}); the manager must
   // tap "Confirm entry" to move the booking to `checked_in`. `already_checked_in`
   // covers both lookup hits on used tickets and grace-window re-confirms.
-  status?: "ready_to_check_in" | "checked_in" | "already_checked_in";
+  // `checked_out` is set after a successful POST /partner/checkout-ticket.
+  status?: "ready_to_check_in" | "checked_in" | "already_checked_in" | "checked_out" | "ready_to_check_out" | "already_checked_out" | "not_checked_in";
+  checkedOutAt?: string | null;
+  justCheckedOut?: boolean;
   // True when the response came from a read-only lookup. The booking has NOT
   // been marked checked in — show a Confirm button instead of a green banner.
   lookupOnly?: boolean;
@@ -182,6 +194,32 @@ export default function ScannerScreen() {
     scanLock.current = false;
   };
 
+  // Check-out flow (Task #581): re-POST to /partner/checkout-ticket with
+  // confirm:true to flip checkedOut → true and decrement live occupancy.
+  const [checkingOut, setCheckingOut] = useState(false);
+  const checkout = async () => {
+    const bookingId = result?.booking?.id ?? null;
+    if (!bookingId || checkingOut) return;
+    setCheckingOut(true);
+    try {
+      // Use the generated client (no hand-rolled fetch). Pass bookingId since
+      // we already have the booking from a successful scan — skips ticket-code
+      // parsing on the server.
+      const res = (await partnerCheckoutTicket({ bookingId, confirm: true })) as ScanResult;
+      setResult(res);
+    } catch (e: unknown) {
+      const err = e as { message?: string; code?: string; checkedOutAt?: string; booking?: BookingData };
+      setResult({
+        code: err.code ?? "ERROR",
+        message: err.message ?? "Check-out failed.",
+        checkedOutAt: err.checkedOutAt ?? null,
+        booking: err.booking,
+      });
+    } finally {
+      setCheckingOut(false);
+    }
+  };
+
   useEffect(() => {
     if (result && result.code !== "OK" && result.code !== "ALREADY_CHECKED_IN") {
       const t = setTimeout(() => manualInputRef.current?.focus(), 100);
@@ -196,6 +234,9 @@ export default function ScannerScreen() {
   //   anything else (not found, invalid status, network) → red
   const resultColor = result == null ? "#ef4444"
     : result.status === "ready_to_check_in" ? "#3b82f6"
+    : result.status === "ready_to_check_out" ? "#a855f7"
+    : result.status === "checked_out" || result.justCheckedOut ? "#22c55e"
+    : result.status === "already_checked_out" ? "#f97316"
     : result.code === "OK" ? "#22c55e"
     : result.code === "ALREADY_CHECKED_IN" && result.recentlyCheckedIn ? "#22c55e"
     : result.code === "ALREADY_CHECKED_IN" ? "#f97316"
@@ -356,6 +397,32 @@ export default function ScannerScreen() {
               </View>
             </View>
 
+            {/* Check-out button — appears when scan returns ALREADY_CHECKED_IN
+                outside the grace window. Re-POSTs to /partner/checkout-ticket. */}
+            {result.code === "ALREADY_CHECKED_IN" && !result.recentlyCheckedIn && result.booking && result.status !== "checked_out" && (
+              <TouchableOpacity
+                onPress={checkout}
+                disabled={checkingOut}
+                style={{ marginHorizontal: 14, marginBottom: 14, backgroundColor: "#a855f7", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8, opacity: checkingOut ? 0.6 : 1 }}
+              >
+                {checkingOut
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="log-out-outline" size={20} color="#fff" />}
+                <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" }}>
+                  {checkingOut ? "Checking out…" : "Check out guest"}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {result.status === "checked_out" && (
+              <View style={{ marginHorizontal: 14, marginBottom: 14, backgroundColor: "#22c55e20", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#22c55e" }}>
+                  Guest checked out{result.checkedOutAt ? ` at ${new Date(result.checkedOutAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}
+                </Text>
+              </View>
+            )}
+
             {/* Confirm entry button — only for read-only lookups on a non-checked-in
                 booking. Sends {code, confirm:true} to actually burn the ticket. */}
             {result.lookupOnly && result.status === "ready_to_check_in" && result.booking && (
@@ -487,6 +554,8 @@ export default function ScannerScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        <ScannerPanels />
 
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
@@ -671,6 +740,234 @@ function ActualEntrySheet({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+// ─── Occupancy + bookings panels (Task #581) ───────────────────────────────
+type ScannerLiveStatus = "notArrived" | "inside" | "checkedOut";
+
+function ScannerPanels() {
+  // Lift a "mutation tick" so a successful checkout in the bookings panel
+  // forces an immediate refresh in the occupancy panel above instead of
+  // waiting for the next 15s poll.
+  const [tick, setTick] = useState(0);
+  return (
+    <>
+      <ScannerOccupancyPanel refetchKey={tick} />
+      <ScannerBookingsPanel onCheckedOut={() => setTick((t) => t + 1)} />
+    </>
+  );
+}
+
+function ScannerOccupancyPanel({ refetchKey = 0 }: { refetchKey?: number }) {
+  const colors = useColors();
+  const [data, setData] = useState<ApiOccupancyResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      // Generated client function — keeps the URL + response shape in sync
+      // with the OpenAPI contract instead of hand-rolled customFetch calls.
+      getPartnerScannerOccupancy()
+        .then((r) => { if (!cancelled) setData(r); })
+        .catch(() => {});
+    };
+    load();
+    const id = setInterval(load, 15000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [refetchKey]);
+
+  if (!data || data.rows.length === 0) return null;
+
+  return (
+    <View style={{ marginHorizontal: 16, marginTop: 24, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, gap: 10 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>Live occupancy</Text>
+        <Text style={{ fontSize: 11, color: colors.mutedForeground }}>{data.today}</Text>
+      </View>
+      {data.rows.map((r) => {
+        const pct = r.capacity > 0 ? r.occupancyPercent : 0;
+        const barColor = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : "#22c55e";
+        return (
+          <View key={r.vendorId} style={{ gap: 4 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{r.businessName}</Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground }}>{r.currentlyInside}{r.capacity > 0 ? ` / ${r.capacity}` : ""}</Text>
+            </View>
+            {r.capacity > 0 && (
+              <View style={{ height: 5, borderRadius: 3, backgroundColor: colors.muted, overflow: "hidden" }}>
+                <View style={{ width: `${Math.min(100, pct)}%`, height: "100%", backgroundColor: barColor }} />
+              </View>
+            )}
+            <Text style={{ fontSize: 10, color: colors.mutedForeground }}>
+              {r.checkedInCount} in · {r.checkedOutCount} out · {r.notArrivedCount} pending
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function ScannerBookingsPanel({ onCheckedOut }: { onCheckedOut: () => void }) {
+  const colors = useColors();
+  const [rows, setRows] = useState<ApiScannerBookingRow[]>([]);
+  const [statuses, setStatuses] = useState<Set<ScannerLiveStatus>>(() => new Set());
+  const [q, setQ] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [vendorFilter, setVendorFilter] = useState<number | "all">("all");
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const statusKey = Array.from(statuses).sort().join(",");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    // Generated client function — typed params object stays aligned with the
+    // OpenAPI contract (status csv, q, from/to range, optional vendorId).
+    getPartnerScannerBookings({
+      ...(statuses.size > 0 ? { status: Array.from(statuses).join(",") } : {}),
+      ...(q.trim() ? { q: q.trim() } : {}),
+      ...(from && to ? { from, to } : {}),
+      ...(typeof vendorFilter === "number" ? { vendorId: vendorFilter } : {}),
+    })
+      .then((r) => { if (!cancelled) setRows(r.rows); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [statusKey, statuses, q, from, to, vendorFilter, tick]);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 20000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Distinct vendors present in the current rows — drives the venue filter
+  // for managers/admins who scan across multiple pubs.
+  const vendorOptions = (() => {
+    const seen = new Map<number, string>();
+    for (const r of rows) seen.set(r.vendorId, r.vendorName);
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  })();
+
+  const toggleStatus = (s: ScannerLiveStatus) => {
+    setStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s); else next.add(s);
+      return next;
+    });
+  };
+
+  const checkout = async (row: ApiScannerBookingRow) => {
+    setBusyId(row.id);
+    try {
+      // Prefer bookingId path now that the server accepts it — avoids any
+      // ticket-code parsing edge cases for an already-known row.
+      await partnerCheckoutTicket({ bookingId: row.id, confirm: true });
+      setTick((t) => t + 1);
+      onCheckedOut();
+    } catch {
+      // Surface via row UI on next refresh; keep panel resilient
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <View style={{ marginHorizontal: 16, marginTop: 16, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, gap: 10 }}>
+      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>Today's bookings</Text>
+      <TextInput
+        value={q}
+        onChangeText={setQ}
+        placeholder="Search name / phone / ticket #"
+        placeholderTextColor={colors.mutedForeground}
+        style={{ backgroundColor: colors.muted, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: colors.foreground, fontSize: 13, fontFamily: "Inter_400Regular" }}
+      />
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <TextInput
+          value={from}
+          onChangeText={setFrom}
+          placeholder="From YYYY-MM-DD"
+          placeholderTextColor={colors.mutedForeground}
+          style={{ flex: 1, backgroundColor: colors.muted, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, color: colors.foreground, fontSize: 12, fontFamily: "Inter_400Regular" }}
+        />
+        <TextInput
+          value={to}
+          onChangeText={setTo}
+          placeholder="To YYYY-MM-DD"
+          placeholderTextColor={colors.mutedForeground}
+          style={{ flex: 1, backgroundColor: colors.muted, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, color: colors.foreground, fontSize: 12, fontFamily: "Inter_400Regular" }}
+        />
+      </View>
+      {vendorOptions.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} style={{ flexGrow: 0 }}>
+          <TouchableOpacity onPress={() => setVendorFilter("all")}
+            style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1, backgroundColor: vendorFilter === "all" ? colors.primary : colors.muted, borderColor: vendorFilter === "all" ? colors.primary : colors.border }}>
+            <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: vendorFilter === "all" ? colors.primaryForeground : colors.mutedForeground }}>All venues</Text>
+          </TouchableOpacity>
+          {vendorOptions.map((v) => (
+            <TouchableOpacity key={v.id} onPress={() => setVendorFilter(v.id)}
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1, backgroundColor: vendorFilter === v.id ? colors.primary : colors.muted, borderColor: vendorFilter === v.id ? colors.primary : colors.border }}>
+              <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: vendorFilter === v.id ? colors.primaryForeground : colors.mutedForeground }} numberOfLines={1}>{v.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
+        <TouchableOpacity onPress={() => setStatuses(new Set())}
+          style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, backgroundColor: statuses.size === 0 ? colors.primary : colors.muted, borderColor: statuses.size === 0 ? colors.primary : colors.border }}>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: statuses.size === 0 ? colors.primaryForeground : colors.mutedForeground }}>All</Text>
+        </TouchableOpacity>
+        {(["notArrived", "inside", "checkedOut"] as const).map((s) => (
+          <TouchableOpacity key={s} onPress={() => toggleStatus(s)}
+            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, backgroundColor: statuses.has(s) ? colors.primary : colors.muted, borderColor: statuses.has(s) ? colors.primary : colors.border }}>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: statuses.has(s) ? colors.primaryForeground : colors.mutedForeground }}>
+              {s === "notArrived" ? "Not arrived" : s === "inside" ? "Inside" : "Checked out"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      {loading && rows.length === 0 ? (
+        <ActivityIndicator color={colors.primary} />
+      ) : rows.length === 0 ? (
+        <Text style={{ fontSize: 12, color: colors.mutedForeground, textAlign: "center", paddingVertical: 12 }}>No bookings.</Text>
+      ) : (
+        rows.map((r) => {
+          const pax = r.pubMode === "ticket" ? r.ticketWomen + r.ticketMen + r.ticketCouple * 2 : r.guests;
+          const statusColor = r.liveStatus === "inside" ? "#22c55e" : r.liveStatus === "checkedOut" ? "#f59e0b" : colors.mutedForeground;
+          return (
+            <View key={r.id} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8, gap: 4 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{r.personName || r.userName}</Text>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, backgroundColor: statusColor + "20" }}>
+                  <Text style={{ fontSize: 10, color: statusColor, fontFamily: "Inter_600SemiBold" }}>
+                    {r.liveStatus === "inside" ? "INSIDE" : r.liveStatus === "checkedOut" ? "OUT" : "PENDING"}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
+                {r.ticketCode} · {pax} pax{r.phone ? ` · ${r.phone}` : ""}
+              </Text>
+              {r.liveStatus === "inside" && (
+                <TouchableOpacity
+                  onPress={() => checkout(r)}
+                  disabled={busyId === r.id}
+                  style={{ marginTop: 4, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: "#a855f720", borderWidth: 1, borderColor: "#a855f7", flexDirection: "row", alignItems: "center", gap: 6, opacity: busyId === r.id ? 0.6 : 1 }}
+                >
+                  {busyId === r.id
+                    ? <ActivityIndicator size="small" color="#a855f7" />
+                    : <Ionicons name="log-out-outline" size={14} color="#a855f7" />}
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#a855f7" }}>Check out</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })
+      )}
+    </View>
   );
 }
 

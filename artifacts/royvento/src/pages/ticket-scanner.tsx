@@ -5,9 +5,21 @@ import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff, Plus, Minus, IndianRupee, Banknote } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff, Plus, Minus, IndianRupee, Banknote, LogOut, Search } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
-import { useGetMe } from "@workspace/api-client-react";
+import {
+  useGetMe,
+  useGetPartnerScannerBookings,
+  useGetPartnerScannerOccupancy,
+  usePartnerCheckoutTicket,
+  getGetPartnerScannerBookingsQueryKey,
+  getGetPartnerScannerOccupancyQueryKey,
+} from "@workspace/api-client-react";
+import type {
+  ScannerBookingRow as ApiScannerBookingRow,
+  GetPartnerScannerBookingsParams,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface BookingData {
   id: number;
@@ -559,7 +571,241 @@ export function TicketScanner() {
           </Button>
         </div>
       )}
+
+      <ScannerPanels />
     </div>
+  );
+}
+
+type ScannerLiveStatus = "notArrived" | "inside" | "checkedOut";
+
+function ScannerPanels() {
+  // Lift a small "mutation tick" so a successful checkout in the bookings
+  // panel forces an immediate refetch in the occupancy panel above (in
+  // addition to the per-key invalidation done inside the mutation).
+  const [tick, setTick] = useState(0);
+  return (
+    <>
+      <ScannerOccupancyPanel refetchKey={tick} />
+      <ScannerBookingsPanel onMutated={() => setTick((t) => t + 1)} />
+    </>
+  );
+}
+
+function ScannerOccupancyPanel({ refetchKey }: { refetchKey?: number }) {
+  const { data, refetch } = useGetPartnerScannerOccupancy({
+    query: { refetchInterval: 15000 },
+  });
+
+  // External tick (e.g. after a successful check-out) forces an immediate
+  // refetch so the cards reflect the new "currently inside" count without
+  // waiting for the next 15s poll.
+  useEffect(() => { void refetch(); }, [refetchKey, refetch]);
+
+  if (!data || data.rows.length === 0) return null;
+
+  return (
+    <section className="mt-12 rounded-3xl glass-card-strong p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-serif text-2xl flex items-center gap-2"><Users className="h-5 w-5 text-primary" />Live occupancy</h2>
+        <span className="text-xs text-muted-foreground">{data.today} (IST) · auto-refreshes</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {data.rows.map((r) => {
+          const pct = r.capacity > 0 ? r.occupancyPercent : 0;
+          const barColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-400" : "bg-emerald-500";
+          return (
+            <div key={r.vendorId} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <p className="font-medium truncate">{r.businessName}</p>
+                <span className="text-sm tabular-nums font-semibold">{r.currentlyInside}{r.capacity > 0 ? ` / ${r.capacity}` : ""}</span>
+              </div>
+              {r.capacity > 0 && (
+                <div className="h-2 rounded-full bg-white/10 overflow-hidden mb-2">
+                  <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {r.checkedInCount} in · {r.checkedOutCount} out · {r.notArrivedCount} pending
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [statuses, setStatuses] = useState<Set<ScannerLiveStatus>>(() => new Set());
+  const [q, setQ] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  // Build typed params object for the generated React Query hook so the
+  // request stays in sync with the OpenAPI contract instead of hand-built
+  // query strings.
+  const params: GetPartnerScannerBookingsParams = {};
+  if (statuses.size > 0) params.status = Array.from(statuses).join(",");
+  if (q.trim()) params.q = q.trim();
+  if (from && to) { params.from = from; params.to = to; }
+  if (vendorFilter !== "all") {
+    const vid = Number(vendorFilter);
+    if (Number.isFinite(vid) && vid > 0) params.vendorId = vid;
+  }
+
+  const { data, isLoading, refetch } = useGetPartnerScannerBookings(params, {
+    query: { refetchInterval: 20000 },
+  });
+
+  // Unique vendors that show up in the bookings page — used to populate the
+  // venue dropdown for managers/admins who scan across multiple pubs.
+  const vendorOptions = (() => {
+    const seen = new Map<number, string>();
+    for (const r of data?.rows ?? []) seen.set(r.vendorId, r.vendorName);
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  })();
+
+  const checkout = usePartnerCheckoutTicket({
+    mutation: {
+      onSuccess: (_resp, vars) => {
+        toast({ title: "Checked out", description: "Live occupancy updated." });
+        // Invalidate both the bookings list and the occupancy panel so they
+        // refresh immediately instead of waiting for the next poll.
+        void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerBookingsQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerOccupancyQueryKey() });
+        void refetch();
+        onMutated();
+        void vars;
+      },
+      onError: (err: unknown) => {
+        const msg = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : "Network error.";
+        toast({ title: "Check-out failed", description: msg, variant: "destructive" });
+      },
+      onSettled: () => setBusyId(null),
+    },
+  });
+
+  const handleCheckout = (row: ApiScannerBookingRow) => {
+    if (!confirm(`Check out ${row.personName || row.userName}? This decrements live occupancy.`)) return;
+    setBusyId(row.id);
+    checkout.mutate({ data: { bookingId: row.id, confirm: true } });
+  };
+
+  const toggleStatus = (s: ScannerLiveStatus) => {
+    setStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s); else next.add(s);
+      return next;
+    });
+  };
+
+  const rows = data?.rows ?? [];
+
+  return (
+    <section className="mt-8 rounded-3xl glass-card-strong p-6">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <h2 className="font-serif text-2xl flex items-center gap-2"><TicketIcon className="h-5 w-5 text-primary" />Bookings</h2>
+        <div className="relative">
+          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / phone / ticket #" className="pl-9 bg-black/40 border-white/10 w-64" />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div>
+          <label className="text-[10px] uppercase text-muted-foreground block mb-1">From</label>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-black/40 border-white/10 w-40" />
+        </div>
+        <div>
+          <label className="text-[10px] uppercase text-muted-foreground block mb-1">To</label>
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-black/40 border-white/10 w-40" />
+        </div>
+        {vendorOptions.length > 1 && (
+          <div>
+            <label className="text-[10px] uppercase text-muted-foreground block mb-1">Venue</label>
+            <select value={vendorFilter} onChange={(e) => setVendorFilter(e.target.value)}
+              className="bg-black/40 border border-white/10 rounded-md px-3 py-2 text-sm">
+              <option value="all">All venues</option>
+              {vendorOptions.map((v) => <option key={v.id} value={String(v.id)}>{v.name}</option>)}
+            </select>
+          </div>
+        )}
+        {(from || to || vendorFilter !== "all" || statuses.size > 0 || q) && (
+          <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); setVendorFilter("all"); setStatuses(new Set()); setQ(""); }}>
+            Clear
+          </Button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button onClick={() => setStatuses(new Set())}
+          className={`text-xs px-3 py-1.5 rounded-full border ${statuses.size === 0 ? "bg-primary border-primary text-primary-foreground" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>
+          All
+        </button>
+        {(["notArrived", "inside", "checkedOut"] as const).map((s) => (
+          <button key={s} onClick={() => toggleStatus(s)}
+            className={`text-xs px-3 py-1.5 rounded-full border ${statuses.has(s) ? "bg-primary border-primary text-primary-foreground" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>
+            {s === "notArrived" ? "Not arrived" : s === "inside" ? "Inside" : "Checked out"}
+          </button>
+        ))}
+        <span className="text-[11px] text-muted-foreground self-center ml-auto">Tap chips to combine statuses.</span>
+      </div>
+      <div className="rounded-2xl border border-white/10 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-black/40 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">Ticket</th>
+                <th className="text-left p-3">Guest</th>
+                <th className="text-right p-3">Pax</th>
+                <th className="text-left p-3">Status</th>
+                <th className="text-left p-3">In / Out</th>
+                <th className="text-right p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading…</td></tr>)}
+              {!isLoading && rows.length === 0 && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No bookings match these filters.</td></tr>)}
+              {!isLoading && rows.map((r) => {
+                const pax = r.pubMode === "ticket" ? r.ticketWomen + r.ticketMen + r.ticketCouple * 2 : r.guests;
+                return (
+                  <tr key={r.id} className="border-t border-white/5">
+                    <td className="p-3 font-mono text-xs">{r.ticketCode}</td>
+                    <td className="p-3">
+                      <p className="font-medium">{r.personName || r.userName}</p>
+                      <p className="text-[11px] text-muted-foreground">{r.vendorName}{r.phone ? ` · ${r.phone}` : ""}</p>
+                    </td>
+                    <td className="p-3 text-right tabular-nums">{pax}</td>
+                    <td className="p-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-md border ${r.liveStatus === "inside" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : r.liveStatus === "checkedOut" ? "border-amber-500/40 text-amber-300 bg-amber-500/10" : "border-white/10 text-muted-foreground"}`}>
+                        {r.liveStatus === "inside" ? "Inside" : r.liveStatus === "checkedOut" ? "Checked out" : "Not arrived"}
+                      </span>
+                    </td>
+                    <td className="p-3 text-xs text-muted-foreground tabular-nums">
+                      {r.checkedInAt ? new Date(r.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                      {" / "}
+                      {r.checkedOutAt ? new Date(r.checkedOutAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                    </td>
+                    <td className="p-3 text-right">
+                      {r.liveStatus === "inside" ? (
+                        <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => handleCheckout(r)} className="gap-1">
+                          <LogOut className="h-3.5 w-3.5" /> {busyId === r.id ? "…" : "Check out"}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/60">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
 
