@@ -153,12 +153,26 @@ router.get("/partners/popular", async (_req, res) => {
   return res.json(filtered);
 });
 
-// Track profile view (optional auth — captures viewer if logged in)
+// Track profile view (optional auth — captures viewer if logged in).
+// Self-views (the partner viewing their own pub) are dropped server-side so
+// the leads list is never polluted by the owner's own page loads. Doing the
+// check here — rather than only on the client — eliminates auth-load races
+// where the client doesn't yet know who `me` is when the page first mounts.
 router.post("/partners/:vendorId/view", async (req, res) => {
   const id = Number(req.params["vendorId"]);
   if (!Number.isFinite(id))
     return res.status(400).json({ error: "Invalid id" });
   const user = await loadUserFromRequest(req);
+  if (user) {
+    const vendorRow = await db
+      .select({ userId: vendorsTable.userId })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, id))
+      .limit(1);
+    if (vendorRow[0]?.userId === user.id) {
+      return res.json({ ok: true, skipped: "self" });
+    }
+  }
   await db.insert(profileViewsTable).values({
     vendorId: id,
     viewerUserId: user?.id ?? null,
@@ -210,19 +224,21 @@ router.get(
       });
     }
 
+    // Pull all views for THIS vendor only — scoping is enforced by the
+     // vendorId equality filter, never widen.
     const rows = await db
       .select()
       .from(profileViewsTable)
       .where(eq(profileViewsTable.vendorId, vendor.id))
       .orderBy(desc(profileViewsTable.viewedAt))
-      .limit(200);
+      .limit(2000);
 
     // Collect known viewer user IDs
     const ids = Array.from(
       new Set(rows.map((r) => r.viewerUserId).filter((x): x is number => !!x)),
     );
 
-    // Fetch user details for enrichment
+    // Fetch user details for enrichment (name, email, phone)
     const users = ids.length
       ? await db.select().from(usersTable).where(inArray(usersTable.id, ids))
       : [];
@@ -245,7 +261,9 @@ router.get(
       existingCoupons.forEach((c) => existingCouponMap.set(c.userId, c.code));
     }
 
-    // Determine which known viewers have already booked one of this vendor's events
+    // Determine which known viewers have already booked one of THIS vendor's
+    // events. We only join on this vendor's eventIds, so bookings at other
+    // partners never leak into the count.
     const bookedUserIds = new Set<number>();
     if (ids.length) {
       const vendorEvents = await db
@@ -267,21 +285,86 @@ router.get(
       }
     }
 
+    // Aggregate views per visitor:
+    //   - Each known viewer (viewerUserId !== null) collapses to ONE row,
+    //     carrying visitCount + lastViewedAt.
+    //   - Anonymous views collapse to a single synthetic row with the total
+    //     anon visit count.
+    type Aggregated = {
+      id: number;                 // latest profileViewId — used by send-discount
+      viewerUserId: number | null;
+      viewerName: string;
+      viewerEmail: string;
+      phone: string;
+      visitCount: number;
+      lastViewedAt: Date;
+      viewedAt: Date;             // alias of lastViewedAt for back-compat
+      hasBooked: boolean;
+      existingCode: string | null;
+    };
+    const knownMap = new Map<number, Aggregated>();
+    let anonCount = 0;
+    let anonLatestRow: typeof rows[number] | null = null;
+
+    for (const r of rows) {
+      if (r.viewerUserId) {
+        const existing = knownMap.get(r.viewerUserId);
+        if (existing) {
+          existing.visitCount += 1;
+          // rows are already DESC by viewedAt, so we keep the first id we saw
+          continue;
+        }
+        const u = uMap.get(r.viewerUserId);
+        knownMap.set(r.viewerUserId, {
+          id: r.id,
+          viewerUserId: r.viewerUserId,
+          viewerName: u?.name ?? r.viewerName ?? "Anonymous",
+          viewerEmail: u?.email ?? r.viewerEmail ?? "",
+          phone: u?.phone ?? "",
+          visitCount: 1,
+          lastViewedAt: r.viewedAt,
+          viewedAt: r.viewedAt,
+          hasBooked: bookedUserIds.has(r.viewerUserId),
+          existingCode: existingCouponMap.get(r.viewerUserId) ?? null,
+        });
+      } else {
+        anonCount += 1;
+        if (!anonLatestRow) anonLatestRow = r;
+      }
+    }
+
+    const knownViews = Array.from(knownMap.values()).sort(
+      (a, b) => b.lastViewedAt.getTime() - a.lastViewedAt.getTime(),
+    );
+    const anonView: Aggregated[] =
+      anonCount > 0 && anonLatestRow
+        ? [
+            {
+              id: anonLatestRow.id,
+              viewerUserId: null,
+              viewerName: "Anonymous",
+              viewerEmail: "",
+              phone: "",
+              visitCount: anonCount,
+              lastViewedAt: anonLatestRow.viewedAt,
+              viewedAt: anonLatestRow.viewedAt,
+              hasBooked: false,
+              existingCode: null,
+            },
+          ]
+        : [];
+
+    const views = [...knownViews, ...anonView];
+
     return res.json({
       premium: vendor.isPremium,
       crmAccessGranted: true,
       crmTrialActive,
       crmTrialDaysRemaining,
-      views: rows.map((r) => {
-        const u = r.viewerUserId ? uMap.get(r.viewerUserId) : null;
-        return {
-          ...r,
-          viewerName: u?.name ?? r.viewerName ?? "Anonymous",
-          viewerEmail: u?.email ?? r.viewerEmail ?? "",
-          hasBooked: r.viewerUserId ? bookedUserIds.has(r.viewerUserId) : false,
-          existingCode: r.viewerUserId ? (existingCouponMap.get(r.viewerUserId) ?? null) : null,
-        };
-      }),
+      // Total profile views (sum of visit counts across all aggregated rows).
+      totalViews: views.reduce((sum, v) => sum + v.visitCount, 0),
+      bookedCount: views.filter((v) => v.hasBooked).length,
+      views,
     });
   },
 );

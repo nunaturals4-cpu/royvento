@@ -2772,14 +2772,26 @@ export default function VendorDashboardScreen() {
 
   // ─── LEADS TAB ────────────────────────────────────────────────────────────────
   interface LeadEntry {
-    viewerUserId?: number;
+    id?: number;
+    viewerUserId?: number | null;
     viewerName?: string;
     viewerEmail?: string;
+    phone?: string;
+    visitCount?: number;
+    lastViewedAt?: string;
     viewedAt?: string;
+    hasBooked?: boolean;
+    /** Legacy field kept for back-compat with older API responses. */
     converted?: boolean;
   }
   type LeadsResult = {
-    premium: boolean; crmAccessGranted: boolean; crmTrialActive: boolean; crmTrialDaysRemaining: number; views: LeadEntry[];
+    premium: boolean;
+    crmAccessGranted: boolean;
+    crmTrialActive: boolean;
+    crmTrialDaysRemaining: number;
+    totalViews?: number;
+    bookedCount?: number;
+    views: LeadEntry[];
   };
   const [leadsData, setLeadsData] = useState<LeadsResult | null>(null);
   const [leadsLoading, setLeadsLoading] = useState(false);
@@ -2840,6 +2852,10 @@ export default function VendorDashboardScreen() {
     }
 
     const views = leadsData?.views ?? [];
+    const totalViews =
+      leadsData?.totalViews ?? views.reduce((s, v) => s + (v.visitCount ?? 1), 0);
+    const bookedCount =
+      leadsData?.bookedCount ?? views.filter((v) => v.hasBooked ?? v.converted).length;
     return (
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: 120 }]}>
         {leadsData?.crmTrialActive && (
@@ -2850,7 +2866,20 @@ export default function VendorDashboardScreen() {
             </Text>
           </View>
         )}
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>RECENT LEADS ({views.length})</Text>
+        {/* Stat cards: Profile Views + Already Booked only (web parity). */}
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+          <View style={{ flex: 1, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 4 }}>
+            <Ionicons name="eye-outline" size={18} color={colors.primary} />
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 22 }}>{totalViews}</Text>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Profile views</Text>
+          </View>
+          <View style={{ flex: 1, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 4 }}>
+            <Ionicons name="trending-up-outline" size={18} color="#22c55e" />
+            <Text style={{ color: "#22c55e", fontFamily: "Inter_700Bold", fontSize: 22 }}>{bookedCount}</Text>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Already booked</Text>
+          </View>
+        </View>
+        <Text style={[styles.sectionHeader, { color: colors.mutedForeground }]}>RECENT VISITORS ({views.length})</Text>
         {views.length === 0 ? (
           <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
             <Ionicons name="person-add-outline" size={40} color={colors.mutedForeground} />
@@ -2862,20 +2891,37 @@ export default function VendorDashboardScreen() {
           views.map((lead, i) => {
             const name = lead.viewerName ?? "Anonymous";
             const email = lead.viewerEmail ?? "";
+            const phone = lead.phone ?? "";
             const initial = name.length > 0 ? name.charAt(0).toUpperCase() : "?";
-            const converted = lead.converted ?? false;
+            const visitCount = lead.visitCount ?? 1;
+            const hasBooked = lead.hasBooked ?? lead.converted ?? false;
+            const lastVisit = lead.lastViewedAt ?? lead.viewedAt;
             return (
-              <View key={i} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-                <View style={[{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" }, { backgroundColor: colors.primary + "20" }]}>
+              <View key={i} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "row", alignItems: "flex-start", gap: 10 }]}>
+                <View style={[{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginTop: 2 }, { backgroundColor: colors.primary + "20" }]}>
                   <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 13 }}>{initial}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, gap: 1 }}>
                   <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>{name}</Text>
                   {email ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{email}</Text> : null}
-                  {lead.viewedAt ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 1 }}>{new Date(lead.viewedAt).toLocaleDateString("en-IN")}</Text> : null}
+                  {phone ? <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>{phone}</Text> : null}
+                  {lastVisit ? (
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 1 }}>
+                      Last visit {new Date(lastVisit).toLocaleDateString("en-IN")}
+                    </Text>
+                  ) : null}
                 </View>
-                <View style={[{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 }, converted ? { backgroundColor: "#22c55e18", borderColor: "#22c55e40" } : { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                  <Text style={{ color: converted ? "#22c55e" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>{converted ? "Converted" : "View"}</Text>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <View style={[{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Text style={{ color: colors.foreground, fontSize: 11, fontFamily: "Inter_700Bold" }}>
+                      {visitCount} visit{visitCount === 1 ? "" : "s"}
+                    </Text>
+                  </View>
+                  <View style={[{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 }, hasBooked ? { backgroundColor: "#22c55e18", borderColor: "#22c55e40" } : { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Text style={{ color: hasBooked ? "#22c55e" : colors.mutedForeground, fontSize: 10, fontFamily: "Inter_600SemiBold" }}>
+                      {hasBooked ? "Booked" : "Not booked"}
+                    </Text>
+                  </View>
                 </View>
               </View>
             );

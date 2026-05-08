@@ -170,12 +170,26 @@ interface BlockedDate {
 interface Ad {
   id: number; status: string; message: string; createdAt: string;
 }
+interface LeadView {
+  id: number;
+  viewerUserId: number | null;
+  viewerName: string;
+  viewerEmail: string;
+  phone: string;
+  visitCount: number;
+  lastViewedAt: string;
+  viewedAt: string;
+  hasBooked: boolean;
+  existingCode: string | null;
+}
 interface Lead {
   premium: boolean;
   crmAccessGranted?: boolean;
   crmTrialActive?: boolean;
   crmTrialDaysRemaining?: number;
-  views: any[];
+  totalViews?: number;
+  bookedCount?: number;
+  views: LeadView[];
   message?: string;
 }
 
@@ -4123,10 +4137,8 @@ function LeadsPanel() {
     );
   }
 
-  const totalViews = data.views.length;
-  const known = data.views.filter((v: any) => v.viewerUserId).length;
-  const booked = data.views.filter((v: any) => v.hasBooked).length;
-  const conv = known ? Math.round((booked / known) * 100) : 0;
+  const totalViews = data.totalViews ?? data.views.reduce((s, v) => s + (v.visitCount ?? 1), 0);
+  const booked = data.bookedCount ?? data.views.filter((v) => v.hasBooked).length;
 
   return (
     <div className="space-y-6">
@@ -4139,26 +4151,16 @@ function LeadsPanel() {
           </p>
         </div>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="rounded-2xl glass-card p-5">
           <Eye className="h-5 w-5 text-primary mb-2" />
           <p className="stat-number text-3xl">{totalViews}</p>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Profile views</p>
         </div>
         <div className="rounded-2xl glass-card p-5">
-          <Users className="h-5 w-5 text-primary mb-2" />
-          <p className="stat-number text-3xl">{known}</p>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Known leads</p>
-        </div>
-        <div className="rounded-2xl glass-card p-5">
           <TrendingUp className="h-5 w-5 text-green-400 mb-2" />
           <p className="stat-number text-3xl text-green-400">{booked}</p>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Already booked</p>
-        </div>
-        <div className="rounded-2xl glass-card p-5">
-          <Crown className="h-5 w-5 text-primary mb-2" />
-          <p className="stat-number text-3xl">{conv}%</p>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Lead→booking rate</p>
         </div>
       </div>
       <div className="rounded-3xl glass-card-strong p-6">
@@ -4171,14 +4173,17 @@ function LeadsPanel() {
               <tr>
                 <th className="text-left py-2">Name</th>
                 <th className="text-left hidden sm:table-cell">Email</th>
-                <th className="text-right hidden md:table-cell">When</th>
+                <th className="text-left hidden md:table-cell">Phone</th>
+                <th className="text-right">Visits</th>
+                <th className="text-right hidden lg:table-cell">Last visit</th>
                 <th className="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              {data.views.slice(0, 50).map((v: any, i: number) => {
+              {data.views.slice(0, 100).map((v, i) => {
                 const sentCode = sentCodes[v.id];
                 const isAnon = !v.viewerUserId;
+                const lastVisit = v.lastViewedAt ?? v.viewedAt;
                 return (
                   <tr key={i} className="border-t border-white/5">
                     <td className="py-2 pr-2">
@@ -4190,7 +4195,11 @@ function LeadsPanel() {
                       )}
                     </td>
                     <td className="text-muted-foreground hidden sm:table-cell pr-2">{v.viewerEmail || "—"}</td>
-                    <td className="text-right text-muted-foreground hidden md:table-cell pr-2">{new Date(v.viewedAt).toLocaleString()}</td>
+                    <td className="text-muted-foreground hidden md:table-cell pr-2">{v.phone || "—"}</td>
+                    <td className="text-right tabular-nums font-medium">{v.visitCount ?? 1}</td>
+                    <td className="text-right text-muted-foreground hidden lg:table-cell pr-2">
+                      {lastVisit ? new Date(lastVisit).toLocaleString() : "—"}
+                    </td>
                     <td className="text-right">
                       {isAnon ? (
                         <span className="text-xs text-muted-foreground/50">Anonymous</span>
@@ -4273,8 +4282,14 @@ function LineItemsEditor({
               <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input
                 type="number" min="0" placeholder="Price"
-                value={item.discountedPrice}
-                onChange={(e) => { const next = [...items]; next[idx] = { ...item, discountedPrice: Math.max(0, parseInt(e.target.value) || 0) }; onChange(next); }}
+                value={item.discountedPrice ? item.discountedPrice : ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const parsed = raw === "" ? 0 : Math.max(0, parseInt(raw) || 0);
+                  const next = [...items];
+                  next[idx] = { ...item, discountedPrice: parsed };
+                  onChange(next);
+                }}
                 className="bg-black/40 border-white/10 pl-7"
               />
             </div>

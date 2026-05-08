@@ -256,6 +256,19 @@ export default function PartnerDetailScreen() {
   const REVIEWS_PAGE_SIZE = 5;
   const [reviewsPage, setReviewsPage] = useState(1);
   useEffect(() => { setReviewsPage(1); }, [vendorId]);
+
+  // Track this partner page view for the partner's leads/CRM. We skip the
+  // call when the viewer is the partner who owns this pub. The view is
+  // fired at most once per session per vendorId so quick remounts don't
+  // inflate the count.
+  const viewedRef = React.useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!vendorId || !vendor) return;
+    if (user && (vendor as any).userId === user.id) return;
+    if (viewedRef.current.has(vendorId)) return;
+    viewedRef.current.add(vendorId);
+    customFetch(`/api/partners/${vendorId}/view`, { method: "POST", body: JSON.stringify({}) }).catch(() => {});
+  }, [vendorId, vendor, user?.id]);
   const reviewsQc = useQC();
   const { data: reviewsData, refetch: refetchReviews } = useListVendorReviews(vendorId, { page: reviewsPage, pageSize: REVIEWS_PAGE_SIZE });
   const reviews = reviewsData?.items;

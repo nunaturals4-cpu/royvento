@@ -87,6 +87,22 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
       .catch(() => {});
   }, [id]);
 
+  // Track this profile view for the partner's leads/CRM. We skip the call
+  // when the visitor IS the partner who owns this pub (no point logging
+  // self-views in their own leads list). Guarded by sessionStorage so a
+  // single tab session only counts once per pub even with React StrictMode
+  // double-mounts or quick remounts.
+  useEffect(() => {
+    if (!id || !vendor) return;
+    if (me?.user && (vendor as any).userId === me.user.id) return;
+    const storageKey = `royvento:viewed:${id}`;
+    try {
+      if (sessionStorage.getItem(storageKey)) return;
+      sessionStorage.setItem(storageKey, "1");
+    } catch { /* private mode etc — fall through and still POST */ }
+    apiPost(`/api/partners/${id}/view`, {}).catch(() => {});
+  }, [id, vendor, me?.user?.id]);
+
   const { data: wishlistItems = [] } = useQuery<{ id: number }[]>({
     queryKey: ["wishlist"],
     queryFn: () => apiGet<{ id: number }[]>("/api/wishlist"),
