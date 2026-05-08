@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
@@ -189,10 +189,15 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   // When arriving with #book in the URL (e.g. from a pub's "Book a Table"
   // CTA), scroll the booking form into view once the event has loaded so
   // the user lands directly on the form instead of the cover/intro.
+  // Runs only once per arrival so background refetches don't yank the
+  // user back to the form mid-interaction.
+  const bookScrollDone = useRef(false);
   useEffect(() => {
+    if (bookScrollDone.current) return;
     if (isLoading || !event) return;
     if (typeof window === "undefined") return;
     if (window.location.hash !== "#book") return;
+    bookScrollDone.current = true;
     const raf = requestAnimationFrame(() => {
       const el = document.getElementById("book");
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
