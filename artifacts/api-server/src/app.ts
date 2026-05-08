@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
 import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
+import legacyRedirectsRouter from "./routes/legacyRedirects";
 import { logger } from "./lib/logger";
 import { SESSION_SECRET } from "./lib/auth";
 
@@ -102,5 +103,13 @@ app.use("/api", globalApiLimiter, router);
 // only forwards these paths to api-server because they are listed in
 // .replit-artifact/artifact.toml's services.paths.
 app.use(sitemapRouter);
+
+// HTTP 301 redirects for legacy vendor/partner URLs to the canonical
+// /pubs/{city}/{slug}-{id} URL. The shared proxy forwards /vendors/* and
+// /partners/* to api-server because they're listed in artifact.toml's
+// services.paths. /events/{id} is handled SPA-side because the SPA also
+// owns /events/{city}/{slug} which would conflict with a /events prefix
+// claim here.
+app.use(legacyRedirectsRouter);
 
 export default app;

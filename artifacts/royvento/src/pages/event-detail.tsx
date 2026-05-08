@@ -509,7 +509,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       <SEO
         title={seoTitle}
         description={seoDesc}
-        canonical={eventDetailSlug({ id: event.id, title: event.title, city: (event as any).city ?? (event as any).vendor?.city, date: (event as any).eventDate })}
+        canonical={eventDetailSlug({ id: event.id, title: event.title, city: event.vendor?.city })}
         ogImage={event.imageUrl || ev.vendor?.coverImageUrl}
         ogType="event"
         jsonLd={eventJsonLd}

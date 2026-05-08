@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, Redirect } from "wouter";
 import { SEO, buildBreadcrumbList, buildFAQPage } from "@/components/SEO";
 import { EventCard } from "@/components/EventCard";
 import { CrossLinkRail } from "@/components/CrossLinkRail";
-import { apiGet } from "@/lib/api";
-import { useGetSeoPage, getGetSeoPageQueryKey } from "@workspace/api-client-react";
+import {
+  useGetSeoPage,
+  getGetSeoPageQueryKey,
+  useGetLocalitySummary,
+  getGetLocalitySummaryQueryKey,
+  useGetCategorySummary,
+  getGetCategorySummaryQueryKey,
+  type VendorSummary,
+} from "@workspace/api-client-react";
 import {
   PUB_CATEGORY_SLUGS,
   canonicalCitySlug,
@@ -14,39 +20,24 @@ import {
   pubDetailSlug,
   slugify,
   titleCase,
-  vendorMatchesLocality,
 } from "@/lib/seo-slug";
 import NotFound from "@/pages/not-found";
 import { Spinner } from "@/components/ui/spinner";
 import { MapPin } from "lucide-react";
 
-interface VendorRow {
-  id: number;
-  businessName: string;
-  category: string;
-  city?: string;
-  state?: string;
-  location?: string;
-  address?: string | null;
-  rating: number;
-  reviewCount: number;
-  bannerImage?: string;
-  coverImageUrl?: string;
-}
-
 const THIN_THRESHOLD = 4;
 
-function vendorToCardEvent(v: VendorRow) {
+function vendorToCardEvent(v: VendorSummary) {
   return {
     id: v.id,
     title: v.businessName,
     category: v.category,
     type: "pub",
-    location: v.location ?? `${v.city ?? ""}${v.state ? ", " + v.state : ""}`,
-    city: v.city,
-    state: v.state,
+    location: `${v.city ?? ""}${v.state ? ", " + v.state : ""}`.trim() || (v.city ?? ""),
+    city: v.city ?? undefined,
+    state: v.state ?? undefined,
     price: 0,
-    imageUrl: v.coverImageUrl || v.bannerImage || "",
+    imageUrl: v.bannerImage || "",
     rating: v.rating,
     reviewCount: v.reviewCount,
     partnerName: v.businessName,
@@ -98,22 +89,30 @@ export function CitySecondary() {
   const localitySlug = !isCategory ? slugify(second) : "";
   const localityName = localitySlug ? titleCase(localitySlug) : "";
 
-  const [vendors, setVendors] = useState<VendorRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!citySlug || !second) return;
-    setLoading(true);
-    const params = new URLSearchParams({ city: cityName });
-    apiGet<VendorRow[]>(`/api/vendors?${params.toString()}`)
-      .then((rows) => {
-        setVendors(rows);
-        setError(false);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [citySlug, cityName, second]);
+  type CategorySlugParam = Parameters<typeof useGetCategorySummary>[1];
+  const categorySlug = (isCategory && category ? category.slug : "pubs") as CategorySlugParam;
+  const {
+    data: catSummary,
+    isLoading: catLoading,
+    isError: catError,
+  } = useGetCategorySummary(citySlug, categorySlug, {
+    query: {
+      queryKey: getGetCategorySummaryQueryKey(citySlug, categorySlug),
+      enabled: !!citySlug && isCategory,
+      staleTime: 5 * 60 * 1000,
+    },
+  });
+  const {
+    data: locSummary,
+    isLoading: locLoading,
+    isError: locError,
+  } = useGetLocalitySummary(citySlug, localitySlug, {
+    query: {
+      queryKey: getGetLocalitySummaryQueryKey(citySlug, localitySlug),
+      enabled: !!citySlug && !isCategory && !!localitySlug,
+      staleTime: 5 * 60 * 1000,
+    },
+  });
 
   if (rawCity && isAliasedCity(rawCity) && rawCity !== citySlug) {
     return <Redirect to={`/${citySlug}/${slugify(second)}`} replace />;
@@ -121,32 +120,21 @@ export function CitySecondary() {
 
   if (!citySlug || !second) return <NotFound />;
 
-  const filteredVendors = useMemo(() => {
-    if (isCategory && category) {
-      const q = category.query.toLowerCase();
-      return vendors.filter((v) => {
-        const blob = `${v.businessName} ${v.category} ${v.address ?? ""} ${v.location ?? ""}`.toLowerCase();
-        return blob.includes(q);
-      });
-    }
-    if (localitySlug) {
-      return vendors.filter((v) => vendorMatchesLocality(v, localitySlug));
-    }
-    return [];
-  }, [vendors, isCategory, category, localitySlug]);
-
-  const topPubs = filteredVendors.slice(0, 12);
-  const count = filteredVendors.length;
+  const isLoading = isCategory ? catLoading : locLoading;
+  const isErr = isCategory ? catError : locError;
+  const summary = isCategory ? catSummary : locSummary;
+  const topPubs: VendorSummary[] = summary?.topVendors ?? [];
+  const count = summary?.vendorCount ?? 0;
   const isThin = count < THIN_THRESHOLD;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-32">
         <Spinner />
       </div>
     );
   }
-  if (error) return <NotFound />;
+  if (isErr || !summary) return <NotFound />;
 
   const subjectLabel = isCategory ? category!.label : "Pubs";
   const subjectName = isCategory ? category!.label : `${localityName}`;
@@ -178,7 +166,7 @@ export function CitySecondary() {
       item: {
         "@type": "BarOrPub",
         name: v.businessName,
-        address: v.address ?? v.location ?? cityName,
+        address: v.address ?? cityName,
         aggregateRating:
           v.reviewCount > 0
             ? {
@@ -193,12 +181,12 @@ export function CitySecondary() {
                 pubDetailSlug({
                   id: v.id,
                   name: v.businessName,
-                  city: v.city,
+                  city: v.city ?? undefined,
                   locality: !isCategory ? localitySlug : undefined,
                 }),
                 window.location.origin,
               ).toString()
-            : pubDetailSlug({ id: v.id, name: v.businessName, city: v.city }),
+            : pubDetailSlug({ id: v.id, name: v.businessName, city: v.city ?? undefined }),
       },
     })),
   };

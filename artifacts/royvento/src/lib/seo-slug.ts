@@ -9,11 +9,16 @@ export function slugify(input: string | null | undefined): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// Keep in sync with backend `CITY_ALIAS_GROUPS` in
+// artifacts/api-server/src/routes/legacyRedirects.ts and
+// artifacts/api-server/src/routes/seo.ts.
 const CITY_ALIASES: Record<string, string> = {
   bengaluru: "bangalore",
   bombay: "mumbai",
   gurugram: "gurgaon",
   calcutta: "kolkata",
+  madras: "chennai",
+  poona: "pune",
 };
 
 export function canonicalCitySlug(slug: string): string {

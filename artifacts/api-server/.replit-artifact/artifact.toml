@@ -16,6 +16,8 @@ paths = [
   "/sitemap-events.xml",
   "/sitemap-offers.xml",
   "/sitemap-blogs.xml",
+  "/vendors",
+  "/partners",
 ]
 
 [services.development]

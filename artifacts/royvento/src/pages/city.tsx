@@ -1,35 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, Redirect } from "wouter";
 import { SEO, buildBreadcrumbList, buildFAQPage } from "@/components/SEO";
 import { EventCard } from "@/components/EventCard";
 import { CrossLinkRail } from "@/components/CrossLinkRail";
-import { apiGet } from "@/lib/api";
-import { useGetSeoPage, getGetSeoPageQueryKey } from "@workspace/api-client-react";
+import {
+  useGetSeoPage,
+  getGetSeoPageQueryKey,
+  useGetCitySummary,
+  getGetCitySummaryQueryKey,
+  type VendorSummary,
+} from "@workspace/api-client-react";
 import {
   PUB_CATEGORY_SLUGS,
   canonicalCitySlug,
+  findCategoryBySlug,
   isAliasedCity,
   pubDetailSlug,
-  slugify,
   titleCase,
 } from "@/lib/seo-slug";
 import NotFound from "@/pages/not-found";
 import { Spinner } from "@/components/ui/spinner";
 import { MapPin } from "lucide-react";
-
-interface VendorRow {
-  id: number;
-  businessName: string;
-  category: string;
-  city?: string;
-  state?: string;
-  location?: string;
-  address?: string | null;
-  rating: number;
-  reviewCount: number;
-  bannerImage?: string;
-  coverImageUrl?: string;
-}
 
 const THIN_THRESHOLD = 4;
 
@@ -54,17 +44,17 @@ function buildCityFAQs(cityName: string): { question: string; answer: string }[]
   ];
 }
 
-function vendorToCardEvent(v: VendorRow) {
+function vendorToCardEvent(v: VendorSummary) {
   return {
     id: v.id,
     title: v.businessName,
     category: v.category,
     type: "pub",
-    location: v.location ?? `${v.city ?? ""}${v.state ? ", " + v.state : ""}`,
-    city: v.city,
-    state: v.state,
+    location: `${v.city ?? ""}${v.state ? ", " + v.state : ""}`.trim() || (v.city ?? ""),
+    city: v.city ?? undefined,
+    state: v.state ?? undefined,
     price: 0,
-    imageUrl: v.coverImageUrl || v.bannerImage || "",
+    imageUrl: v.bannerImage || "",
     rating: v.rating,
     reviewCount: v.reviewCount,
     partnerName: v.businessName,
@@ -76,21 +66,14 @@ export function City() {
   const rawCity = params["city"] ?? "";
   const citySlug = canonicalCitySlug(rawCity);
   const cityName = titleCase(citySlug);
-  const [vendors, setVendors] = useState<VendorRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    if (!citySlug) return;
-    setLoading(true);
-    apiGet<VendorRow[]>(`/api/vendors?city=${encodeURIComponent(cityName)}`)
-      .then((rows) => {
-        setVendors(rows);
-        setError(false);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [citySlug, cityName]);
+  const { data: summary, isLoading, isError } = useGetCitySummary(citySlug, {
+    query: {
+      queryKey: getGetCitySummaryQueryKey(citySlug),
+      enabled: !!citySlug,
+      staleTime: 5 * 60 * 1000,
+    },
+  });
 
   // Aliased cities (e.g. /bengaluru) redirect to canonical (/bangalore).
   if (rawCity && isAliasedCity(rawCity) && rawCity !== citySlug) {
@@ -99,35 +82,7 @@ export function City() {
 
   if (!citySlug) return <NotFound />;
 
-  const localities = useMemo(() => {
-    const counts = new Map<string, number>();
-    vendors.forEach((v) => {
-      const addr = v.address ?? "";
-      // Pick the first comma-segment that isn't the city/state
-      const parts = addr
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      for (const p of parts) {
-        const s = slugify(p);
-        if (!s) continue;
-        if (s === citySlug) continue;
-        if (s === slugify(v.state ?? "")) continue;
-        if (s.length < 3 || /^\d/.test(s)) continue;
-        counts.set(s, (counts.get(s) ?? 0) + 1);
-        break;
-      }
-    });
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 12)
-      .map(([slug]) => ({ slug, label: titleCase(slug) }));
-  }, [vendors, citySlug]);
-
-  const topPubs = vendors.slice(0, 10);
-  const isThin = vendors.length < THIN_THRESHOLD;
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-32">
         <Spinner />
@@ -135,13 +90,18 @@ export function City() {
     );
   }
 
-  if (error) {
-    return <NotFound />;
-  }
+  if (isError || !summary) return <NotFound />;
+
+  const topPubs = summary.topVendors.slice(0, 10);
+  const localities = summary.localityCounts.slice(0, 12).map((l) => ({
+    slug: l.slug,
+    label: titleCase(l.slug),
+  }));
+  const isThin = summary.vendorCount < THIN_THRESHOLD;
 
   // Render an empty/thin state page (still indexable structure but noindex)
   const title = `Best Pubs in ${cityName} — Book a Table | Royvento`;
-  const description = `${vendors.length}+ pubs and party venues in ${cityName} — rooftop bars, microbreweries, live music, couple-friendly. Today's offers, ladies nights, NYE parties — instant booking on Royvento.`;
+  const description = `${summary.vendorCount}+ pubs and party venues in ${cityName} — rooftop bars, microbreweries, live music, couple-friendly. Today's offers, ladies nights, NYE parties — instant booking on Royvento.`;
   const canonical = `/${citySlug}`;
   const breadcrumbs = buildBreadcrumbList([
     { name: "Home", url: "/" },
@@ -157,7 +117,7 @@ export function City() {
       item: {
         "@type": "BarOrPub",
         name: v.businessName,
-        address: v.address ?? v.location ?? cityName,
+        address: v.address ?? cityName,
         aggregateRating:
           v.reviewCount > 0
             ? {
@@ -169,10 +129,10 @@ export function City() {
         url:
           typeof window !== "undefined"
             ? new URL(
-                pubDetailSlug({ id: v.id, name: v.businessName, city: v.city }),
+                pubDetailSlug({ id: v.id, name: v.businessName, city: v.city ?? undefined }),
                 window.location.origin,
               ).toString()
-            : pubDetailSlug({ id: v.id, name: v.businessName, city: v.city }),
+            : pubDetailSlug({ id: v.id, name: v.businessName, city: v.city ?? undefined }),
       },
     })),
   };
@@ -221,7 +181,7 @@ export function City() {
         <p className="mt-4 text-white/60 leading-relaxed whitespace-pre-line">
           {introCopy ?? (
             <>
-              Discover {vendors.length || "the best"} verified pubs and party venues in {cityName} on Royvento.
+              Discover {summary.vendorCount || "the best"} verified pubs and party venues in {cityName} on Royvento.
               Filter by rooftop bars, microbreweries, live music or couple-friendly lounges.
               Book a table instantly with today's offers, ladies nights and weekend deals.
             </>
