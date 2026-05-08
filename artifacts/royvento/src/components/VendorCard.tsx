@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Star, MapPin, Music2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { pubDetailSlug } from "@/lib/seo-slug";
 
 interface FreeEntryRules {
   enabled: boolean;
@@ -27,6 +28,7 @@ interface Props {
     businessName: string;
     category: string;
     location: string;
+    city?: string | null;
     bannerImage: string;
     rating: number;
     reviewCount: number;
@@ -41,7 +43,7 @@ export function VendorCard({ vendor }: Props) {
   const danceFloorLabel = vendor.danceFloor ? DANCE_FLOOR_LABELS[vendor.danceFloor] : null;
   const crowd = vendor.crowdLevel ? CROWD_LABEL[vendor.crowdLevel] : null;
   return (
-    <Link href={`/vendors/${vendor.id}`}>
+    <Link href={pubDetailSlug({ id: vendor.id, name: vendor.businessName, city: vendor.city ?? undefined })}>
       <div className="group cursor-pointer overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-1 hover:shadow-xl">
         <div className="aspect-[16/10] overflow-hidden bg-muted relative">
           {vendor.bannerImage ? (

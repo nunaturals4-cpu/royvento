@@ -8,8 +8,11 @@ import {
   useListEvents,
   useGetMe,
   useCreateReview,
+  useUpdateReview,
+  useDeleteReview,
+  useGetReviewEligibility,
 } from "@workspace/api-client-react";
-import type { Vendor } from "@workspace/api-client-react";
+import type { Review, Vendor } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { EventCard } from "@/components/EventCard";
 import { Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell, Heart, ChevronLeft, ChevronRight, X, ImagePlus } from "lucide-react";
@@ -48,12 +51,16 @@ const PLAN_TYPE_LABELS: Record<string, string> = {
 
 export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const params = useParams();
-  const id = vendorIdProp ?? Number(params["id"]);
+  const rawIdParam = vendorIdProp ?? Number(params["id"]);
+  const idValid = Number.isFinite(rawIdParam) && rawIdParam > 0;
+  const id = idValid ? rawIdParam : 0;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: me } = useGetMe();
-  const { data: vendor, isLoading } = useGetVendor(id);
+  const { data: vendor, isLoading, isFetching, isError } = useGetVendor(id, {
+    query: { enabled: idValid },
+  } as any);
   const REVIEWS_PAGE_SIZE = 5;
   const [reviewsPage, setReviewsPage] = useState(1);
   useEffect(() => { setReviewsPage(1); }, [id]);
@@ -62,10 +69,59 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const reviewsTotal = reviewsData?.total ?? 0;
   const reviewsTotalPages = Math.max(1, Math.ceil(reviewsTotal / REVIEWS_PAGE_SIZE));
   const createReview = useCreateReview();
+  const updateReview = useUpdateReview();
+  const deleteReview = useDeleteReview();
+  const { data: eligibility, refetch: refetchEligibility } = useGetReviewEligibility(id, {
+    query: { enabled: idValid && !!me?.user },
+  } as any);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [reviewUploading, setReviewUploading] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
+  const [editRating, setEditRating] = useState(5);
+  const [editComment, setEditComment] = useState("");
+  const startEditReview = (r: Review) => {
+    setEditingReviewId(r.id);
+    setEditRating(r.rating);
+    setEditComment(r.comment || "");
+  };
+  const cancelEditReview = () => setEditingReviewId(null);
+  const saveEditReview = (r: Review) => {
+    updateReview.mutate(
+      { reviewId: r.id, data: { rating: editRating, comment: editComment } },
+      {
+        onSuccess: () => {
+          toast({ title: "Review updated" });
+          setEditingReviewId(null);
+          refetchReviews();
+        },
+        onError: (e: unknown) => toast({
+          title: "Could not update review",
+          description: e instanceof Error ? e.message : undefined,
+          variant: "destructive",
+        }),
+      },
+    );
+  };
+  const handleDeleteReview = (r: Review) => {
+    if (!window.confirm("Delete your review? This cannot be undone.")) return;
+    deleteReview.mutate(
+      { reviewId: r.id },
+      {
+        onSuccess: () => {
+          toast({ title: "Review deleted" });
+          refetchReviews();
+          refetchEligibility();
+        },
+        onError: (e: unknown) => toast({
+          title: "Could not delete review",
+          description: e instanceof Error ? e.message : undefined,
+          variant: "destructive",
+        }),
+      },
+    );
+  };
   const [lightbox, setLightbox] = useState<string | null>(null);
   const { data: allEvents = [] } = useListEvents();
   const [drinkPlans, setDrinkPlans] = useState<DrinkPlan[]>([]);
@@ -87,8 +143,12 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
     enabled: !!me?.user,
   });
 
-  if (isLoading) return <div className="container mx-auto px-4 py-20">Loading…</div>;
-  if (!vendor) return <div className="container mx-auto px-4 py-20">Partner not found.</div>;
+  if (!idValid) return <div className="container mx-auto px-4 py-20">Invalid pub link.</div>;
+  if (isLoading || (isFetching && !vendor && !isError)) return <div className="container mx-auto px-4 py-20">Loading…</div>;
+  if (!vendor) {
+    if (isError) return <div className="container mx-auto px-4 py-20">Couldn't load this pub. Please try again.</div>;
+    return <div className="container mx-auto px-4 py-20">Pub not found.</div>;
+  }
 
   const events = allEvents.filter((e) => e.vendorId === vendor.id);
   const pubEvent = events.find((e) => e.type === "pub");
@@ -678,36 +738,69 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
           ) : (
             <>
               <div className="grid md:grid-cols-2 gap-4">
-                {reviews.map((r) => (
-                  <div key={r.id} className="rounded-xl border bg-card p-5">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">{r.userName}</p>
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} className={`h-4 w-4 ${i < r.rating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
-                        ))}
+                {reviews.map((r) => {
+                  const isMine = !!me?.user && r.userId === me.user.id;
+                  const isEditing = editingReviewId === r.id;
+                  return (
+                    <div key={r.id} className="rounded-xl border bg-card p-5">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">{r.userName}{isMine ? " (you)" : ""}</p>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} className={`h-4 w-4 ${i < (isEditing ? editRating : r.rating) ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                          ))}
+                        </div>
                       </div>
+                      {isEditing ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <button key={n} type="button" onClick={() => setEditRating(n)}>
+                                <Star className={`h-5 w-5 ${n <= editRating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                              </button>
+                            ))}
+                          </div>
+                          <Textarea
+                            value={editComment}
+                            onChange={(e) => setEditComment(e.target.value)}
+                            placeholder="Update your review…"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" onClick={() => saveEditReview(r)} disabled={updateReview.isPending}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={cancelEditReview}>Cancel</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {r.comment && (
+                            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{r.comment}</p>
+                          )}
+                          {Array.isArray(r.imageUrls) && r.imageUrls.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {r.imageUrls.map((url: string, i: number) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => setLightbox(url)}
+                                  className="rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
+                                  aria-label="Open review image"
+                                >
+                                  <img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {isMine && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <Button size="sm" variant="outline" onClick={() => startEditReview(r)}>Edit</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleDeleteReview(r)} disabled={deleteReview.isPending}>Delete</Button>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
-                    {r.comment && (
-                      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{r.comment}</p>
-                    )}
-                    {Array.isArray(r.imageUrls) && r.imageUrls.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {r.imageUrls.map((url: string, i: number) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => setLightbox(url)}
-                            className="rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
-                            aria-label="Open review image"
-                          >
-                            <img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {reviewsTotalPages > 1 && (
@@ -736,7 +829,17 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
             </>
           )}
 
-          {me?.user && (
+          {me?.user && eligibility && !eligibility.eligible && (
+            <div className="mt-8 rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+              {eligibility.reason === "no_checkin" && (
+                <p>Only verified guests can review — book and check in first.</p>
+              )}
+              {eligibility.reason === "already_reviewed" && (
+                <p>You've already reviewed this pub. Scroll up to edit or delete your review.</p>
+              )}
+            </div>
+          )}
+          {me?.user && eligibility?.eligible && (
             <div className="mt-8 rounded-xl border bg-card p-6 space-y-3">
               <p className="font-serif text-xl">Leave a review</p>
               <div className="flex items-center gap-1">
@@ -821,8 +924,23 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                         setReviewImages([]);
                         setReviewsPage(1);
                         refetchReviews();
+                        refetchEligibility();
                       },
-                      onError: (e: unknown) => toast({ title: "Could not post review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+                      onError: (e: unknown) => {
+                        const msg = e instanceof Error ? e.message : "Please try again.";
+                        const isDup = /already_reviewed|already reviewed/i.test(msg);
+                        const isNotEligible = /not_eligible|verified guests/i.test(msg);
+                        toast({
+                          title: isDup
+                            ? "You've already reviewed this pub"
+                            : isNotEligible
+                              ? "Only verified guests can review"
+                              : "Could not post review",
+                          description: msg,
+                          variant: "destructive",
+                        });
+                        refetchEligibility();
+                      },
                     },
                   );
                 }}

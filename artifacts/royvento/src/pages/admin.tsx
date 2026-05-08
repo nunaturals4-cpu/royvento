@@ -14,6 +14,9 @@ import {
   useGetAdminCheckinReport,
   useListVendors,
   importGooglePub,
+  useListReviewsAdmin,
+  useUpdateReview,
+  useDeleteReview,
 } from "@workspace/api-client-react";
 import type { ImportGooglePubResponse } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -50,7 +53,7 @@ const ADMIN_TABS = [
   "analytics", "commissions", "vendors", "requests", "event-approvals",
   "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
   "booking-report", "attendance", "crm-leads", "import-pub",
-  "announcement-slider", "settlements",
+  "announcement-slider", "settlements", "reviews",
 ] as const;
 const DEFAULT_ADMIN_TAB = "analytics";
 const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
@@ -107,6 +110,7 @@ export function AdminPanel() {
           <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
           <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
         </div>
         <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
@@ -127,6 +131,7 @@ export function AdminPanel() {
         <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
         <TabsContent value="commissions"><CommissionsAdmin /></TabsContent>
         <TabsContent value="settlements"><SettlementsAdmin /></TabsContent>
+        <TabsContent value="reviews"><ReviewsAdmin /></TabsContent>
       </Tabs>
     </div>
   );
@@ -2873,7 +2878,7 @@ function CrmLeads() {
                         <td className="py-3 px-3 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <Link
-                              href={`/partners/${lead.vendorId}`}
+                              href={`/vendors/${lead.vendorId}`}
                               className="text-xs text-primary underline-offset-2 hover:underline whitespace-nowrap"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -4015,6 +4020,122 @@ function SettlementsAdmin() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ReviewsAdmin() {
+  const { data: allVendors } = useListVendors({ limit: 500 } as Parameters<typeof useListVendors>[0]);
+  const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [ratingFilter, setRatingFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const params: Record<string, number> = { page, pageSize: 20 };
+  if (vendorFilter !== "all") params["vendorId"] = Number(vendorFilter);
+  if (ratingFilter !== "all") params["rating"] = Number(ratingFilter);
+  const { data, refetch, isLoading } = useListReviewsAdmin(params);
+  const updateReview = useUpdateReview();
+  const deleteReview = useDeleteReview();
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / 20));
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editRating, setEditRating] = useState(5);
+  const [editComment, setEditComment] = useState("");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="font-serif text-2xl">Reviews moderation</h2>
+        <Badge variant="secondary">{total}</Badge>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <select
+            value={vendorFilter}
+            onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }}
+            className="px-3 py-1.5 text-sm rounded-md border bg-background"
+          >
+            <option value="all">All pubs</option>
+            {(allVendors ?? []).map((v: { id: number; businessName: string }) => (
+              <option key={v.id} value={v.id}>{v.businessName}</option>
+            ))}
+          </select>
+          <select
+            value={ratingFilter}
+            onChange={(e) => { setRatingFilter(e.target.value); setPage(1); }}
+            className="px-3 py-1.5 text-sm rounded-md border bg-background"
+          >
+            <option value="all">All ratings</option>
+            {[5, 4, 3, 2, 1].map((r) => (
+              <option key={r} value={r}>{r} star{r > 1 ? "s" : ""}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground text-sm">Loading reviews…</p>
+      ) : items.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No reviews match these filters.</p>
+      ) : (
+        <div className="space-y-3">
+          {items.map((r) => {
+            const isEditing = editingId === r.id;
+            return (
+              <div key={r.id} className="rounded-xl border bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-sm">{r.userName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      on <span className="text-foreground">{r.vendorName}</span> · {new Date(r.createdAt).toLocaleString()}
+                      {r.verifiedBooking ? " · ✓ verified" : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <span key={i} className={`text-xs ${i < (isEditing ? editRating : r.rating) ? "text-amber-400" : "text-muted-foreground"}`}>★</span>
+                    ))}
+                  </div>
+                </div>
+                {isEditing ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-1">
+                      {[1,2,3,4,5].map((n) => (
+                        <button key={n} type="button" onClick={() => setEditRating(n)} className={`text-xl ${n <= editRating ? "text-amber-400" : "text-muted-foreground"}`}>★</button>
+                      ))}
+                    </div>
+                    <Textarea value={editComment} onChange={(e) => setEditComment(e.target.value)} />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => updateReview.mutate(
+                        { reviewId: r.id, data: { rating: editRating, comment: editComment } },
+                        { onSuccess: () => { setEditingId(null); refetch(); } },
+                      )} disabled={updateReview.isPending}>Save</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {r.comment && <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{r.comment}</p>}
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => { setEditingId(r.id); setEditRating(r.rating); setEditComment(r.comment || ""); }}>Edit</Button>
+                      <Button size="sm" variant="outline" onClick={() => {
+                        if (!window.confirm("Delete this review? This cannot be undone.")) return;
+                        deleteReview.mutate({ reviewId: r.id }, { onSuccess: () => refetch() });
+                      }} disabled={deleteReview.isPending}>Delete</Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {pages > 1 && (
+        <div className="flex items-center justify-between gap-2">
+          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
+          <span className="text-sm text-muted-foreground">Page {page} of {pages}</span>
+          <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}>Next</Button>
+        </div>
+      )}
     </div>
   );
 }

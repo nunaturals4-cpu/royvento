@@ -672,6 +672,36 @@ export interface Review {
   createdAt: string;
   userName: string;
   imageUrls?: string[];
+  userImage?: string;
+  verifiedBooking?: boolean;
+  vendorName?: string;
+}
+
+export type ReviewEligibilityReason =
+  (typeof ReviewEligibilityReason)[keyof typeof ReviewEligibilityReason];
+
+export const ReviewEligibilityReason = {
+  ok: "ok",
+  not_authenticated: "not_authenticated",
+  no_checkin: "no_checkin",
+  already_reviewed: "already_reviewed",
+} as const;
+
+export interface ReviewEligibility {
+  eligible: boolean;
+  reason: ReviewEligibilityReason;
+  existingReviewId?: number;
+}
+
+export interface UpdateReviewBody {
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  rating?: number;
+  comment?: string;
+  /** @maxItems 5 */
+  imageUrls?: string[];
 }
 
 export interface PaginatedReviews {
@@ -1621,6 +1651,36 @@ export type ListVendorBookings200 = {
 
 export type GetBookingTicketCode200 = {
   ticketCode: string;
+};
+
+export type ListReviewsAdminParams = {
+  vendorId?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  rating?: number;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
+};
+
+export type ListReviewsPartnerParams = {
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
 };
 
 export type ListEventReviewsParams = {

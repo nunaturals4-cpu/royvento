@@ -16,4 +16,7 @@ export interface Review {
   createdAt: string;
   userName: string;
   imageUrls?: string[];
+  userImage?: string;
+  verifiedBooking?: boolean;
+  vendorName?: string;
 }

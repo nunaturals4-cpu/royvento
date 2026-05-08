@@ -867,6 +867,152 @@ paths:
               schema:
                 $ref: "#/components/schemas/Review"
 
+  /reviews/eligibility/vendor/{vendorId}:
+    get:
+      operationId: getReviewEligibility
+      tags: [reviews]
+      summary: Check if the current user is eligible to leave a review for this vendor
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Eligibility result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewEligibility"
+
+  /reviews/mine:
+    get:
+      operationId: listMyReviews
+      tags: [reviews]
+      summary: List the authenticated user's reviews
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+  /reviews/admin:
+    get:
+      operationId: listReviewsAdmin
+      tags: [reviews]
+      summary: List all reviews for admin moderation
+      parameters:
+        - name: vendorId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: rating
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedReviews"
+
+  /reviews/partner:
+    get:
+      operationId: listReviewsPartner
+      tags: [reviews]
+      summary: List reviews on the authenticated partner's vendors
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedReviews"
+
+  /reviews/{reviewId}:
+    patch:
+      operationId: updateReview
+      tags: [reviews]
+      summary: Edit a review (owner or admin)
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReviewBody"
+      responses:
+        "200":
+          description: Updated review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+    delete:
+      operationId: deleteReview
+      tags: [reviews]
+      summary: Delete a review (owner, partner-of-vendor, or admin)
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
   /reviews/event/{eventId}:
     get:
       operationId: listEventReviews
@@ -3031,7 +3177,40 @@ components:
           type: array
           items:
             type: string
+        userImage:
+          type: string
+        verifiedBooking:
+          type: boolean
+        vendorName:
+          type: string
       required: [id, userId, vendorId, rating, comment, createdAt, userName]
+
+    ReviewEligibility:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        reason:
+          type: string
+          enum: [ok, not_authenticated, no_checkin, already_reviewed]
+        existingReviewId:
+          type: integer
+      required: [eligible, reason]
+
+    UpdateReviewBody:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+          maxItems: 5
 
     PaginatedReviews:
       type: object

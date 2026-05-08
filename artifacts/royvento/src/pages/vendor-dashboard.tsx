@@ -11,6 +11,8 @@ import {
   useDeleteEvent,
   useListVendorBookings,
   useGetPartnerCheckinReport,
+  useListReviewsPartner,
+  useDeleteReview,
 } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -237,6 +239,7 @@ export function VendorDashboard() {
             <TabsTrigger value="banking">
               <Banknote className="h-3.5 w-3.5 mr-1 text-primary" /> Banking &amp; Settlement
             </TabsTrigger>
+            <TabsTrigger value="reviews">Reviews</TabsTrigger>
             <Link href="/dashboard/vendor/scanner">
               <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors">
                 <ScanLine className="h-3.5 w-3.5" /> Ticket scanner
@@ -257,6 +260,7 @@ export function VendorDashboard() {
           <TabsContent value="attendance"><AttendancePanel /></TabsContent>
           <TabsContent value="managers"><ManagersPanel /></TabsContent>
           <TabsContent value="banking"><BankingPanel /></TabsContent>
+          <TabsContent value="reviews"><PartnerReviewsPanel /></TabsContent>
         </Tabs>
       )}
     </div>
@@ -4551,6 +4555,66 @@ function BankingPanel() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PartnerReviewsPanel() {
+  const [page, setPage] = useState(1);
+  const { data, refetch, isLoading } = useListReviewsPartner({ page, pageSize: 20 });
+  const deleteReview = useDeleteReview();
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / 20));
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="font-serif text-2xl">Reviews on your pubs</h2>
+        <Badge variant="secondary">{total}</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        You can remove inappropriate or off-topic reviews. Removed reviews are logged for audit.
+      </p>
+      {isLoading ? (
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      ) : items.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No reviews yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {items.map((r) => (
+            <div key={r.id} className="rounded-xl border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-sm">{r.userName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    on <span className="text-foreground">{r.vendorName}</span> · {new Date(r.createdAt).toLocaleString()}
+                    {r.verifiedBooking ? " · ✓ verified" : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <span key={i} className={`text-xs ${i < r.rating ? "text-amber-400" : "text-muted-foreground"}`}>★</span>
+                  ))}
+                </div>
+              </div>
+              {r.comment && <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{r.comment}</p>}
+              <div className="mt-3">
+                <Button size="sm" variant="outline" onClick={() => {
+                  if (!window.confirm("Remove this review from your pub? This cannot be undone.")) return;
+                  deleteReview.mutate({ reviewId: r.id }, { onSuccess: () => refetch() });
+                }} disabled={deleteReview.isPending}>Remove review</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {pages > 1 && (
+        <div className="flex items-center justify-between gap-2">
+          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
+          <span className="text-sm text-muted-foreground">Page {page} of {pages}</span>
+          <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}>Next</Button>
         </div>
       )}
     </div>

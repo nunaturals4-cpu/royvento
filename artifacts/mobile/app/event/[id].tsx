@@ -2,9 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   customFetch,
+  getGetReviewEligibilityQueryKey,
   getGetWishlistQueryKey,
+  getListEventReviewsQueryKey,
   getListMyBookingsQueryKey,
   getListVendorDrinkPlansQueryKey,
+  getListVendorReviewsQueryKey,
   useAddToWishlist,
   useCreateBooking,
   useGetEvent,
@@ -15,6 +18,7 @@ import {
   useRemoveFromWishlist,
 } from "@workspace/api-client-react";
 import { ReviewForm } from "@/components/ReviewForm";
+import { ReviewItem } from "@/components/ReviewItem";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -137,7 +141,7 @@ export default function EventDetailScreen() {
   const REVIEWS_PAGE_SIZE = 5;
   const [reviewsPage, setReviewsPage] = useState(1);
   useEffect(() => { setReviewsPage(1); }, [eventId]);
-  const { data: reviewsData } = useListEventReviews(eventId, { page: reviewsPage, pageSize: REVIEWS_PAGE_SIZE });
+  const { data: reviewsData, refetch: refetchReviews } = useListEventReviews(eventId, { page: reviewsPage, pageSize: REVIEWS_PAGE_SIZE });
   const reviews = reviewsData?.items;
   const reviewsTotal = reviewsData?.total ?? 0;
   const reviewsTotalPages = Math.max(1, Math.ceil(reviewsTotal / REVIEWS_PAGE_SIZE));
@@ -913,37 +917,20 @@ export default function EventDetailScreen() {
             <View style={{ gap: 10 }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
               {(reviews ?? []).map((r) => (
-                <View key={r.id} style={[styles.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={styles.reviewHeader}>
-                    <View style={[styles.reviewAvatar, { backgroundColor: colors.muted }]}>
-                      <Ionicons name="person" size={14} color={colors.mutedForeground} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.reviewerName, { color: colors.foreground }]}>{r.userName || "Customer"}</Text>
-                      <View style={{ flexDirection: "row", gap: 2 }}>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Ionicons key={i} name={i < r.rating ? "star" : "star-outline"} size={11} color={colors.primary} />
-                        ))}
-                      </View>
-                    </View>
-                  </View>
-                  {r.comment ? (
-                    <Text style={[styles.reviewComment, { color: colors.mutedForeground }]}>{r.comment}</Text>
-                  ) : null}
-                  {r.imageUrls && r.imageUrls.length > 0 ? (
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                      {r.imageUrls.map((url, i) => (
-                        <Pressable
-                          key={i}
-                          onPress={() => setLightboxImage(url)}
-                          style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
-                        >
-                          <Image source={{ uri: url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
+                <ReviewItem
+                  key={r.id}
+                  review={r}
+                  isOwner={!!user && r.userId === user.id}
+                  onChanged={() => {
+                    refetchReviews();
+                    if (vendorId) {
+                      qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
+                      qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
+                    }
+                    qc.invalidateQueries({ queryKey: getListEventReviewsQueryKey(eventId) });
+                  }}
+                  onImagePress={(url) => setLightboxImage(url)}
+                />
               ))}
               {reviewsTotalPages > 1 ? (
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
@@ -982,13 +969,16 @@ export default function EventDetailScreen() {
           ) : null}
 
           {/* Review submission form — shown only to logged-in users with a booking */}
-          {vendor?.id ? (
+          {vendorId ? (
             <ReviewForm
               user={user}
-              reviews={reviews}
               eventId={eventId}
-              vendorId={vendor.id}
-              isEligible={hasEventBooking}
+              vendorId={vendorId}
+              onPosted={() => {
+                refetchReviews();
+                qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
+                qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
+              }}
             />
           ) : null}
         </View>

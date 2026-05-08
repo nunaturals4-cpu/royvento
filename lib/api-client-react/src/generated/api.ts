@@ -64,6 +64,8 @@ import type {
   ListEventsParams,
   ListMyVendorEvents200,
   ListMyVendorEventsParams,
+  ListReviewsAdminParams,
+  ListReviewsPartnerParams,
   ListVendorBookings200,
   ListVendorBookingsParams,
   ListVendorReviewsParams,
@@ -85,6 +87,7 @@ import type {
   RetryPaymentBody,
   RetryPaymentResult,
   Review,
+  ReviewEligibility,
   SaveBankingDetailsBody,
   ScanTicketBody,
   ScanTicketResult,
@@ -97,6 +100,7 @@ import type {
   UpdateBookingStatusBody,
   UpdateEventBody,
   UpdateMeBody,
+  UpdateReviewBody,
   UpdateRoleBody,
   UpdateVendorBody,
   UploadUrlRequest,
@@ -3295,6 +3299,535 @@ export const useCreateReview = <
   TContext
 > => {
   return useMutation(getCreateReviewMutationOptions(options));
+};
+
+/**
+ * @summary Check if the current user is eligible to leave a review for this vendor
+ */
+export const getGetReviewEligibilityUrl = (vendorId: number) => {
+  return `/api/reviews/eligibility/vendor/${vendorId}`;
+};
+
+export const getReviewEligibility = async (
+  vendorId: number,
+  options?: RequestInit,
+): Promise<ReviewEligibility> => {
+  return customFetch<ReviewEligibility>(getGetReviewEligibilityUrl(vendorId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetReviewEligibilityQueryKey = (vendorId: number) => {
+  return [`/api/reviews/eligibility/vendor/${vendorId}`] as const;
+};
+
+export const getGetReviewEligibilityQueryOptions = <
+  TData = Awaited<ReturnType<typeof getReviewEligibility>>,
+  TError = ErrorType<unknown>,
+>(
+  vendorId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReviewEligibility>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetReviewEligibilityQueryKey(vendorId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getReviewEligibility>>
+  > = ({ signal }) =>
+    getReviewEligibility(vendorId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!vendorId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getReviewEligibility>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetReviewEligibilityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getReviewEligibility>>
+>;
+export type GetReviewEligibilityQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Check if the current user is eligible to leave a review for this vendor
+ */
+
+export function useGetReviewEligibility<
+  TData = Awaited<ReturnType<typeof getReviewEligibility>>,
+  TError = ErrorType<unknown>,
+>(
+  vendorId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReviewEligibility>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetReviewEligibilityQueryOptions(vendorId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List the authenticated user's reviews
+ */
+export const getListMyReviewsUrl = () => {
+  return `/api/reviews/mine`;
+};
+
+export const listMyReviews = async (
+  options?: RequestInit,
+): Promise<Review[]> => {
+  return customFetch<Review[]>(getListMyReviewsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMyReviewsQueryKey = () => {
+  return [`/api/reviews/mine`] as const;
+};
+
+export const getListMyReviewsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMyReviews>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMyReviews>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListMyReviewsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyReviews>>> = ({
+    signal,
+  }) => listMyReviews({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMyReviews>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMyReviewsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMyReviews>>
+>;
+export type ListMyReviewsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List the authenticated user's reviews
+ */
+
+export function useListMyReviews<
+  TData = Awaited<ReturnType<typeof listMyReviews>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMyReviews>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMyReviewsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all reviews for admin moderation
+ */
+export const getListReviewsAdminUrl = (params?: ListReviewsAdminParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reviews/admin?${stringifiedParams}`
+    : `/api/reviews/admin`;
+};
+
+export const listReviewsAdmin = async (
+  params?: ListReviewsAdminParams,
+  options?: RequestInit,
+): Promise<PaginatedReviews> => {
+  return customFetch<PaginatedReviews>(getListReviewsAdminUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListReviewsAdminQueryKey = (
+  params?: ListReviewsAdminParams,
+) => {
+  return [`/api/reviews/admin`, ...(params ? [params] : [])] as const;
+};
+
+export const getListReviewsAdminQueryOptions = <
+  TData = Awaited<ReturnType<typeof listReviewsAdmin>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListReviewsAdminParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReviewsAdmin>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListReviewsAdminQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listReviewsAdmin>>
+  > = ({ signal }) => listReviewsAdmin(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listReviewsAdmin>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListReviewsAdminQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listReviewsAdmin>>
+>;
+export type ListReviewsAdminQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all reviews for admin moderation
+ */
+
+export function useListReviewsAdmin<
+  TData = Awaited<ReturnType<typeof listReviewsAdmin>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListReviewsAdminParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReviewsAdmin>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListReviewsAdminQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List reviews on the authenticated partner's vendors
+ */
+export const getListReviewsPartnerUrl = (params?: ListReviewsPartnerParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reviews/partner?${stringifiedParams}`
+    : `/api/reviews/partner`;
+};
+
+export const listReviewsPartner = async (
+  params?: ListReviewsPartnerParams,
+  options?: RequestInit,
+): Promise<PaginatedReviews> => {
+  return customFetch<PaginatedReviews>(getListReviewsPartnerUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListReviewsPartnerQueryKey = (
+  params?: ListReviewsPartnerParams,
+) => {
+  return [`/api/reviews/partner`, ...(params ? [params] : [])] as const;
+};
+
+export const getListReviewsPartnerQueryOptions = <
+  TData = Awaited<ReturnType<typeof listReviewsPartner>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListReviewsPartnerParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReviewsPartner>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListReviewsPartnerQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listReviewsPartner>>
+  > = ({ signal }) => listReviewsPartner(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listReviewsPartner>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListReviewsPartnerQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listReviewsPartner>>
+>;
+export type ListReviewsPartnerQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List reviews on the authenticated partner's vendors
+ */
+
+export function useListReviewsPartner<
+  TData = Awaited<ReturnType<typeof listReviewsPartner>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListReviewsPartnerParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReviewsPartner>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListReviewsPartnerQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Edit a review (owner or admin)
+ */
+export const getUpdateReviewUrl = (reviewId: number) => {
+  return `/api/reviews/${reviewId}`;
+};
+
+export const updateReview = async (
+  reviewId: number,
+  updateReviewBody: UpdateReviewBody,
+  options?: RequestInit,
+): Promise<Review> => {
+  return customFetch<Review>(getUpdateReviewUrl(reviewId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateReviewBody),
+  });
+};
+
+export const getUpdateReviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReview>>,
+    TError,
+    { reviewId: number; data: BodyType<UpdateReviewBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateReview>>,
+  TError,
+  { reviewId: number; data: BodyType<UpdateReviewBody> },
+  TContext
+> => {
+  const mutationKey = ["updateReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateReview>>,
+    { reviewId: number; data: BodyType<UpdateReviewBody> }
+  > = (props) => {
+    const { reviewId, data } = props ?? {};
+
+    return updateReview(reviewId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateReview>>
+>;
+export type UpdateReviewMutationBody = BodyType<UpdateReviewBody>;
+export type UpdateReviewMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Edit a review (owner or admin)
+ */
+export const useUpdateReview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReview>>,
+    TError,
+    { reviewId: number; data: BodyType<UpdateReviewBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateReview>>,
+  TError,
+  { reviewId: number; data: BodyType<UpdateReviewBody> },
+  TContext
+> => {
+  return useMutation(getUpdateReviewMutationOptions(options));
+};
+
+/**
+ * @summary Delete a review (owner, partner-of-vendor, or admin)
+ */
+export const getDeleteReviewUrl = (reviewId: number) => {
+  return `/api/reviews/${reviewId}`;
+};
+
+export const deleteReview = async (
+  reviewId: number,
+  options?: RequestInit,
+): Promise<Ok> => {
+  return customFetch<Ok>(getDeleteReviewUrl(reviewId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteReviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteReview>>,
+    TError,
+    { reviewId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteReview>>,
+  TError,
+  { reviewId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteReview>>,
+    { reviewId: number }
+  > = (props) => {
+    const { reviewId } = props ?? {};
+
+    return deleteReview(reviewId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteReview>>
+>;
+
+export type DeleteReviewMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a review (owner, partner-of-vendor, or admin)
+ */
+export const useDeleteReview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteReview>>,
+    TError,
+    { reviewId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteReview>>,
+  TError,
+  { reviewId: number },
+  TContext
+> => {
+  return useMutation(getDeleteReviewMutationOptions(options));
 };
 
 /**

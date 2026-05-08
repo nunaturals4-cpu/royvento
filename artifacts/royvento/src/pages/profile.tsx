@@ -386,7 +386,7 @@ export function Profile() {
                     <div className="min-w-0">
                       <span className="font-mono text-xs text-red-200 block">{c.code}</span>
                       {c.vendorName && c.vendorId && (
-                        <Link href={`/vendors/${c.vendorId}`}>
+                        <Link href={`/vendors/${c.vendorId}`} /* legacy redirect handles slug */>
                           <span className="text-[10px] text-primary/80 hover:text-primary mt-0.5 block underline underline-offset-2 cursor-pointer">
                             Exclusive to {c.vendorName} ↗
                           </span>

@@ -2377,6 +2377,193 @@ export const CreateReviewResponse = zod.object({
   createdAt: zod.string(),
   userName: zod.string(),
   imageUrls: zod.array(zod.string()).optional(),
+  userImage: zod.string().optional(),
+  verifiedBooking: zod.boolean().optional(),
+  vendorName: zod.string().optional(),
+});
+
+/**
+ * @summary Check if the current user is eligible to leave a review for this vendor
+ */
+export const GetReviewEligibilityParams = zod
+  .object({
+    vendorId: zod.coerce.number(),
+  })
+  .strict();
+
+export const GetReviewEligibilityResponse = zod.object({
+  eligible: zod.boolean(),
+  reason: zod.enum([
+    "ok",
+    "not_authenticated",
+    "no_checkin",
+    "already_reviewed",
+  ]),
+  existingReviewId: zod.number().optional(),
+});
+
+/**
+ * @summary List the authenticated user's reviews
+ */
+export const ListMyReviewsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  eventId: zod.number().optional(),
+  vendorId: zod.number(),
+  rating: zod.number(),
+  comment: zod.string(),
+  createdAt: zod.string(),
+  userName: zod.string(),
+  imageUrls: zod.array(zod.string()).optional(),
+  userImage: zod.string().optional(),
+  verifiedBooking: zod.boolean().optional(),
+  vendorName: zod.string().optional(),
+});
+export const ListMyReviewsResponse = zod.array(ListMyReviewsResponseItem);
+
+/**
+ * @summary List all reviews for admin moderation
+ */
+export const listReviewsAdminQueryRatingMax = 5;
+
+export const listReviewsAdminQueryPageDefault = 1;
+
+export const listReviewsAdminQueryPageSizeDefault = 20;
+export const listReviewsAdminQueryPageSizeMax = 100;
+
+export const ListReviewsAdminQueryParams = zod
+  .object({
+    vendorId: zod.coerce.number().optional(),
+    rating: zod.coerce
+      .number()
+      .min(1)
+      .max(listReviewsAdminQueryRatingMax)
+      .optional(),
+    page: zod.coerce.number().min(1).default(listReviewsAdminQueryPageDefault),
+    pageSize: zod.coerce
+      .number()
+      .min(1)
+      .max(listReviewsAdminQueryPageSizeMax)
+      .default(listReviewsAdminQueryPageSizeDefault),
+  })
+  .strict();
+
+export const ListReviewsAdminResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      eventId: zod.number().optional(),
+      vendorId: zod.number(),
+      rating: zod.number(),
+      comment: zod.string(),
+      createdAt: zod.string(),
+      userName: zod.string(),
+      imageUrls: zod.array(zod.string()).optional(),
+      userImage: zod.string().optional(),
+      verifiedBooking: zod.boolean().optional(),
+      vendorName: zod.string().optional(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  pageSize: zod.number(),
+});
+
+/**
+ * @summary List reviews on the authenticated partner's vendors
+ */
+export const listReviewsPartnerQueryPageDefault = 1;
+
+export const listReviewsPartnerQueryPageSizeDefault = 20;
+export const listReviewsPartnerQueryPageSizeMax = 100;
+
+export const ListReviewsPartnerQueryParams = zod
+  .object({
+    page: zod.coerce
+      .number()
+      .min(1)
+      .default(listReviewsPartnerQueryPageDefault),
+    pageSize: zod.coerce
+      .number()
+      .min(1)
+      .max(listReviewsPartnerQueryPageSizeMax)
+      .default(listReviewsPartnerQueryPageSizeDefault),
+  })
+  .strict();
+
+export const ListReviewsPartnerResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      eventId: zod.number().optional(),
+      vendorId: zod.number(),
+      rating: zod.number(),
+      comment: zod.string(),
+      createdAt: zod.string(),
+      userName: zod.string(),
+      imageUrls: zod.array(zod.string()).optional(),
+      userImage: zod.string().optional(),
+      verifiedBooking: zod.boolean().optional(),
+      vendorName: zod.string().optional(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  pageSize: zod.number(),
+});
+
+/**
+ * @summary Edit a review (owner or admin)
+ */
+export const UpdateReviewParams = zod
+  .object({
+    reviewId: zod.coerce.number(),
+  })
+  .strict();
+
+export const updateReviewBodyRatingMax = 5;
+
+export const updateReviewBodyImageUrlsMax = 5;
+
+export const UpdateReviewBody = zod
+  .object({
+    rating: zod.number().min(1).max(updateReviewBodyRatingMax).optional(),
+    comment: zod.string().optional(),
+    imageUrls: zod
+      .array(zod.string())
+      .max(updateReviewBodyImageUrlsMax)
+      .optional(),
+  })
+  .strict();
+
+export const UpdateReviewResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  eventId: zod.number().optional(),
+  vendorId: zod.number(),
+  rating: zod.number(),
+  comment: zod.string(),
+  createdAt: zod.string(),
+  userName: zod.string(),
+  imageUrls: zod.array(zod.string()).optional(),
+  userImage: zod.string().optional(),
+  verifiedBooking: zod.boolean().optional(),
+  vendorName: zod.string().optional(),
+});
+
+/**
+ * @summary Delete a review (owner, partner-of-vendor, or admin)
+ */
+export const DeleteReviewParams = zod
+  .object({
+    reviewId: zod.coerce.number(),
+  })
+  .strict();
+
+export const DeleteReviewResponse = zod.object({
+  ok: zod.boolean(),
 });
 
 /**
@@ -2416,6 +2603,9 @@ export const ListEventReviewsResponse = zod.object({
       createdAt: zod.string(),
       userName: zod.string(),
       imageUrls: zod.array(zod.string()).optional(),
+      userImage: zod.string().optional(),
+      verifiedBooking: zod.boolean().optional(),
+      vendorName: zod.string().optional(),
     }),
   ),
   total: zod.number(),
@@ -2460,6 +2650,9 @@ export const ListVendorReviewsResponse = zod.object({
       createdAt: zod.string(),
       userName: zod.string(),
       imageUrls: zod.array(zod.string()).optional(),
+      userImage: zod.string().optional(),
+      verifiedBooking: zod.boolean().optional(),
+      vendorName: zod.string().optional(),
     }),
   ),
   total: zod.number(),

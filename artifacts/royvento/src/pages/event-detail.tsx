@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, Link, useLocation } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
-import { eventDetailSlug } from "@/lib/seo-slug";
+import { eventDetailSlug, pubDetailSlug } from "@/lib/seo-slug";
 import {
   useGetEvent,
   useListEventReviews,
   useListVendorAvailability,
   useCreateReview,
+  useUpdateReview,
+  useDeleteReview,
+  useGetReviewEligibility,
   useGetMe,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -113,7 +116,38 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [confirmedAge, setConfirmedAge] = useState(false);
 
   const createReview = useCreateReview();
+  const updateReview = useUpdateReview();
+  const deleteReview = useDeleteReview();
   const qc = useQueryClient();
+  const eventVendorId = (event as any)?.vendor?.id ?? (event as any)?.vendorId ?? 0;
+  const { data: eligibility, refetch: refetchEligibility } = useGetReviewEligibility(eventVendorId, {
+    query: { enabled: !!me?.user && eventVendorId > 0 },
+  } as any);
+  const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
+  const [editRating, setEditRating] = useState(5);
+  const [editComment, setEditComment] = useState("");
+  const handleEditReview = (r: { id: number; rating: number; comment?: string | null }) => {
+    setEditingReviewId(r.id); setEditRating(r.rating); setEditComment(r.comment ?? "");
+  };
+  const saveEditReview = (rid: number) => {
+    updateReview.mutate(
+      { reviewId: rid, data: { rating: editRating, comment: editComment } },
+      {
+        onSuccess: () => { setEditingReviewId(null); refetchReviews(); toast({ title: "Review updated" }); },
+        onError: (e: unknown) => toast({ title: "Could not update review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+      },
+    );
+  };
+  const handleDeleteReview = (rid: number) => {
+    if (!window.confirm("Delete your review? This cannot be undone.")) return;
+    deleteReview.mutate(
+      { reviewId: rid },
+      {
+        onSuccess: () => { refetchReviews(); refetchEligibility(); toast({ title: "Review deleted" }); },
+        onError: (e: unknown) => toast({ title: "Could not delete review", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+      },
+    );
+  };
 
   const { data: wishlistItems = [] } = useQuery<{ id: number }[]>({
     queryKey: ["wishlist"],
@@ -420,8 +454,23 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           setReviewImages([]);
           setReviewsPage(1);
           refetchReviews();
+          refetchEligibility();
         },
-        onError: (e: unknown) => toast({ title: t("events.review_failed"), description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+        onError: (e: unknown) => {
+          const msg = e instanceof Error ? e.message : "Please try again.";
+          const isDup = /already_reviewed|already reviewed/i.test(msg);
+          const isNotEligible = /not_eligible|verified guests/i.test(msg);
+          toast({
+            title: isDup
+              ? "You've already reviewed this pub"
+              : isNotEligible
+                ? "Only verified guests can review"
+                : t("events.review_failed"),
+            description: msg,
+            variant: "destructive",
+          });
+          refetchEligibility();
+        },
       },
     );
   };
@@ -568,7 +617,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl tracking-tight max-w-4xl leading-tight text-white">{event.title}</h1>
           <p className="mt-3 text-white/60">
             by{" "}
-            <Link href={`/partners/${event.vendor?.id ?? ""}`} className="text-white/85 hover:text-white underline underline-offset-4 transition-colors">
+            <Link href={event.vendor ? pubDetailSlug({ id: event.vendor.id, name: event.vendorName, city: event.vendor.city }) : "#"} className="text-white/85 hover:text-white underline underline-offset-4 transition-colors">
               {event.vendorName}
             </Link>
           </p>
@@ -984,23 +1033,48 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           ))}
                         </div>
                       </div>
-                      {r.comment && (
-                        <p className="text-sm text-white/65 leading-relaxed">{r.comment}</p>
-                      )}
-                      {Array.isArray(r.imageUrls) && r.imageUrls.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {r.imageUrls.map((url: string, i: number) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => setLightbox(url)}
-                              className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
-                              aria-label="Open review image"
-                            >
-                              <img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" />
-                            </button>
-                          ))}
+                      {editingReviewId === r.id ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1">
+                            {[1,2,3,4,5].map((n) => (
+                              <button key={n} type="button" onClick={() => setEditRating(n)}>
+                                <Star className={`h-5 w-5 ${n <= editRating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                              </button>
+                            ))}
+                          </div>
+                          <Textarea value={editComment} onChange={(e) => setEditComment(e.target.value)} className="bg-black/40 border-white/10" />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => saveEditReview(r.id)} disabled={updateReview.isPending}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingReviewId(null)}>Cancel</Button>
+                          </div>
                         </div>
+                      ) : (
+                        <>
+                          {r.comment && (
+                            <p className="text-sm text-white/65 leading-relaxed">{r.comment}</p>
+                          )}
+                          {Array.isArray(r.imageUrls) && r.imageUrls.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {r.imageUrls.map((url: string, i: number) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => setLightbox(url)}
+                                  className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
+                                  aria-label="Open review image"
+                                >
+                                  <img src={url} alt="" loading="lazy" className="w-20 h-20 object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {!!me?.user && r.userId === me.user.id && (
+                            <div className="flex items-center gap-2 pt-1">
+                              <Button size="sm" variant="outline" onClick={() => handleEditReview(r)}>Edit</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleDeleteReview(r.id)} disabled={deleteReview.isPending}>Delete</Button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ))}
@@ -1034,7 +1108,17 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               </>
             )}
 
-            {me?.user && (
+            {me?.user && eligibility && !eligibility.eligible && (
+              <div className="mt-8 rounded-2xl glass-card-strong p-5 text-sm text-white/65">
+                {eligibility.reason === "no_checkin" && (
+                  <p>Only verified guests can review — book and check in first.</p>
+                )}
+                {eligibility.reason === "already_reviewed" && (
+                  <p>You've already reviewed this pub. Scroll up to edit or delete your review.</p>
+                )}
+              </div>
+            )}
+            {me?.user && eligibility?.eligible && (
               <div className="mt-8 rounded-2xl glass-card-strong p-6 space-y-3">
                 <p className="font-serif text-xl">{t("events.leave_review")}</p>
                 <div className="flex items-center gap-1">

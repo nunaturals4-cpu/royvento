@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
+  getGetReviewEligibilityQueryKey,
   getListEventReviewsQueryKey,
   getListVendorReviewsQueryKey,
   useCreateReview,
+  useGetReviewEligibility,
 } from "@workspace/api-client-react";
-import type { Review } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
@@ -23,25 +24,25 @@ import { uploadImageToStorage } from "@/lib/uploadImage";
 
 interface ReviewFormProps {
   user: AuthUser | null;
-  reviews: Review[] | undefined;
   eventId?: number;
   vendorId: number;
-  isEligible: boolean;
+  onPosted?: () => void;
 }
 
-export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: ReviewFormProps) {
+export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProps) {
   const colors = useColors();
   const qc = useQueryClient();
   const createReview = useCreateReview();
+  const { data: eligibility } = useGetReviewEligibility(vendorId, {
+    query: { enabled: !!user && vendorId > 0 },
+  } as any);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   if (!user) return null;
-
-  const hasDuplicate = submitted || (reviews ?? []).some((r) => r.userId === user.id);
+  if (!eligibility) return null;
 
   const pickImages = async () => {
     if (uploading || images.length >= 5) return;
@@ -72,12 +73,11 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
   };
 
   const handleSubmit = () => {
-    if (createReview.isPending || submitted) return;
+    if (createReview.isPending) return;
     createReview.mutate(
       { data: { eventId, vendorId, rating, comment, imageUrls: images } },
       {
         onSuccess: () => {
-          setSubmitted(true);
           setComment("");
           setRating(5);
           setImages([]);
@@ -85,15 +85,30 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
             qc.invalidateQueries({ queryKey: getListEventReviewsQueryKey(eventId) });
           }
           qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
+          qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
+          onPosted?.();
           Alert.alert("Review submitted", "Thanks for your feedback!");
         },
         onError: (e: unknown) => {
           const msg = e instanceof Error ? e.message : "Please try again.";
-          Alert.alert("Could not submit", msg);
+          const isDup = /already_reviewed|already reviewed/i.test(msg);
+          const isNotEligible = /not_eligible|verified guests/i.test(msg);
+          Alert.alert(
+            isDup ? "Already reviewed" : isNotEligible ? "Not eligible" : "Could not submit",
+            msg,
+          );
+          qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
         },
       },
     );
   };
+
+  const reasonMessage =
+    eligibility.reason === "no_checkin"
+      ? "Only verified guests can review — book and check in first."
+      : eligibility.reason === "already_reviewed"
+        ? "You've already reviewed this pub. Edit or delete your review above."
+        : "You can't review this pub right now.";
 
   return (
     <View
@@ -113,7 +128,7 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
         </Text>
       </View>
 
-      {!isEligible ? (
+      {!eligibility.eligible ? (
         <View
           style={{
             flexDirection: "row",
@@ -136,32 +151,7 @@ export function ReviewForm({ user, reviews, eventId, vendorId, isEligible }: Rev
               lineHeight: 18,
             }}
           >
-            You need to book this to leave a review.
-          </Text>
-        </View>
-      ) : hasDuplicate ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            padding: 12,
-            borderRadius: 10,
-            backgroundColor: colors.primary + "15",
-            borderWidth: 1,
-            borderColor: colors.primary + "30",
-          }}
-        >
-          <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-          <Text
-            style={{
-              fontSize: 13,
-              fontFamily: "Inter_500Medium",
-              color: colors.primary,
-              flex: 1,
-            }}
-          >
-            You've already submitted a review. Thank you!
+            {reasonMessage}
           </Text>
         </View>
       ) : (

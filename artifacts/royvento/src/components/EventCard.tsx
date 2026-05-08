@@ -7,6 +7,7 @@ import { pubDetailSlug, eventDetailSlug } from "@/lib/seo-slug";
 interface Props {
   event: {
     id: number;
+    vendorId?: number;
     title: string;
     category: string;
     type?: string;
@@ -55,9 +56,15 @@ export function EventCard({ event, hidePubBadge }: Props) {
   // Route to the canonical slugged URL so internal links match what the
   // sitemap and rel=canonical advertise. For pub-type cards this means
   // /pubs/{city}/{slug}-{id}; for event-type cards /events/{city}/{slug}-{id}.
+  // For pub-type cards we link to the pub (vendor) profile. When this card is
+  // rendered from a real Event row, `event.id` is the event id — we must use
+  // `event.vendorId` instead. When rendered from a vendor (via
+  // vendorToCardEvent), `id` already equals the vendor id and `vendorId` is
+  // undefined, so the fallback works.
+  const pubLinkId = event.vendorId ?? event.id;
   const href =
     event.type === "pub"
-      ? pubDetailSlug({ id: event.id, name: event.title, city: event.city })
+      ? pubDetailSlug({ id: pubLinkId, name: event.title, city: event.city })
       : eventDetailSlug({ id: event.id, title: event.title, city: event.city });
 
   return (
