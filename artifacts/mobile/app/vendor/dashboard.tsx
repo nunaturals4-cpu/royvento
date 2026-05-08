@@ -308,17 +308,22 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
     // For ticket plans, drop empty-name rows then coerce editor "" → 0 on
     // discountedPrice. Mirrors the web LineItemsEditor flow.
     const isTicket = form.type === "ticket";
+    // Mirror web LineItemsEditor validation: every row that the user has
+    // started filling out must have a name, AND a ticket plan must end
+    // up with at least one named row before it can be saved.
     if (isTicket && form.lineItems.some((i) => !i.name.trim())) {
-      const allBlank = form.lineItems.every((i) => !i.name.trim());
-      if (!allBlank) {
-        Alert.alert("Each ticket item must have a name");
-        setSaving(false);
-        return;
-      }
+      Alert.alert("Each ticket item must have a name");
+      setSaving(false);
+      return;
     }
     const ticketLineItems = isTicket
       ? form.lineItems.filter((i) => i.name.trim()).map(lineItemForWire)
       : undefined;
+    if (isTicket && (!ticketLineItems || ticketLineItems.length === 0)) {
+      Alert.alert("Add at least one ticket item");
+      setSaving(false);
+      return;
+    }
     try {
       const commonBody = {
         productName: form.productName.trim(),
