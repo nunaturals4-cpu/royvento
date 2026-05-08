@@ -3811,6 +3811,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   // Add form — Included with Ticket section
   const [ticketChecked, setTicketChecked] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const [ticketItems, setTicketItems] = useState<DrinkPlanLineItem[]>([emptyItem()]);
   const [ticketDrinksOffer, setTicketDrinksOffer] = useState("");
   const [ticketFoodDiscount, setTicketFoodDiscount] = useState("");
@@ -3862,6 +3863,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
   const resetForm = () => {
+    setAddError(null);
     setFreeEntryChecked(false); setFeDrinkTypes(["welcome"]); setFeGender("all");
     setFeDrinksOffer(""); setFeFoodDiscount(""); setFeValidUntil(""); setFeValidFrom("");
     setFeDays([]); setFeTimeFrom(""); setFeTimeTo(""); setFeDescription("");
@@ -3890,6 +3892,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAddError(null);
     if (!freeEntryChecked && !ticketChecked) {
       toast({ title: "Select at least one plan type", variant: "destructive" }); return;
     }
@@ -3932,7 +3935,9 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       resetForm();
       await fetchPlans();
     } catch (err: unknown) {
-      toast({ title: "Failed to add plan", description: errMsg(err), variant: "destructive" });
+      const msg = errMsg(err);
+      setAddError(msg);
+      toast({ title: "Failed to add plan", description: msg, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -4160,6 +4165,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
             )}
           </div>
 
+          {addError && (
+            <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {addError}
+            </div>
+          )}
           <Button type="submit" disabled={saving || (!freeEntryChecked && !ticketChecked)} className="gap-2">
             <Plus className="h-4 w-4" />
             {saving ? "Adding…" : "Add plan(s)"}

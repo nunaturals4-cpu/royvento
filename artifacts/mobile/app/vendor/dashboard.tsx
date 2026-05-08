@@ -265,6 +265,11 @@ const BLANK_PLAN: DrinkPlanFormState = {
   validUntil: "",
 };
 
+// NOTE: Task #571 — bugs (2) "Included with Ticket" line-item input focus, (3) Free Entry expander
+// overlay, and (4) vary-prices-by-day equal-width inputs are web-only. The mobile DrinkPlansTab
+// has no per-line-item editor (single price field, no lineItems array), the mobile EventFormFields
+// Free Entry section uses a flat conditional render (no nested expander/overlay), and the mobile
+// pricing form has no vary-by-day grid — so no equivalent fixes are required here.
 function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: ReturnType<typeof useColors> }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
