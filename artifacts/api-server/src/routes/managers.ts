@@ -242,11 +242,56 @@ router.get("/manager/my-vendors", requireAuth(), async (req, res) => {
   const vendorIds = rows.map((r) => r.vendorId);
   if (vendorIds.length === 0) { res.json([]); return; }
 
+  // Exclude the user's own vendor profile — that's covered by the "Your
+  // managers" panel and shouldn't appear in "Pubs I manage for others".
+  const ownVendor = await db.select({ id: vendorsTable.id })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.userId, user.id))
+    .limit(1);
+  const ownVendorId = ownVendor[0]?.id;
+
   const vendors = await db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName })
     .from(vendorsTable)
     .where(inArray(vendorsTable.id, vendorIds));
 
-  res.json(vendors.map((v) => ({ id: v.id, businessName: v.businessName })));
+  res.json(
+    vendors
+      .filter((v) => v.id !== ownVendorId)
+      .map((v) => ({ id: v.id, businessName: v.businessName })),
+  );
+});
+
+// ─── Manager-side: leave a pub you've been added to as a manager ────────────
+// Removes the current user's own `accepted` vendor_managers row for the given
+// vendorId. This is how a partner who was previously invited to scan tickets
+// at another partner's pub disconnects themselves so the pub stops showing
+// up in their scanner panels. Authorization: only deletes rows where
+// `manager_id = current user`, so callers can never detach someone else.
+
+router.delete("/manager/my-vendors/:vendorId", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const vendorId = parseInt(String(req.params["vendorId"] ?? ""), 10);
+  if (!Number.isFinite(vendorId) || vendorId <= 0) {
+    res.status(400).json({ error: "Invalid vendor ID" });
+    return;
+  }
+
+  const rows = await db.select().from(vendorManagersTable)
+    .where(and(
+      eq(vendorManagersTable.managerId, user.id),
+      eq(vendorManagersTable.vendorId, vendorId),
+    ))
+    .limit(1);
+  const row = rows[0];
+  if (!row) {
+    res.status(404).json({ error: "You are not a manager of this venue." });
+    return;
+  }
+
+  await db.delete(vendorManagersTable).where(eq(vendorManagersTable.id, row.id));
+  res.json({ message: "You've left this venue. It will no longer appear in your scanner." });
 });
 
 export default router;

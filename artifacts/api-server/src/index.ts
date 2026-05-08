@@ -50,6 +50,47 @@ async function backfillVendorTicketPrefixes() {
   }
 }
 
+/**
+ * Detect users who own a vendor profile AND are also `accepted` managers of a
+ * different vendor. This is legal (a partner can manage another partner's
+ * pub), but it's the exact condition that causes another pub's data to show
+ * up in their scanner panels — see Task #598. Logging it on boot makes future
+ * leaks immediately visible without needing a manual SQL audit. Each user
+ * can use the "Pubs I manage for others" → Leave button on the Vendor
+ * dashboard to detach themselves.
+ */
+async function auditVendorManagerOverlap() {
+  try {
+    const rows = await db.execute<{
+      manager_id: number;
+      email: string | null;
+      own_vendor_id: number;
+      managed_vendor_ids: number[];
+    }>(sql`
+      SELECT
+        vm.manager_id,
+        u.email,
+        v_own.id AS own_vendor_id,
+        array_agg(vm.vendor_id) AS managed_vendor_ids
+      FROM vendor_managers vm
+      JOIN vendors v_own ON v_own.user_id = vm.manager_id
+      LEFT JOIN users u ON u.id = vm.manager_id
+      WHERE vm.status = 'accepted' AND vm.vendor_id <> v_own.id
+      GROUP BY vm.manager_id, u.email, v_own.id
+    `);
+    const list = (rows as unknown as { rows?: Array<{ manager_id: number; email: string | null; own_vendor_id: number; managed_vendor_ids: number[] }> }).rows
+      ?? (rows as unknown as Array<{ manager_id: number; email: string | null; own_vendor_id: number; managed_vendor_ids: number[] }>);
+    if (Array.isArray(list) && list.length > 0) {
+      logger.warn(
+        { overlap: list },
+        `Startup audit: ${list.length} vendor owner(s) are also accepted managers of another pub — they will see those pubs in their scanner panels until they tap Leave.`,
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, "Startup audit failed (vendor/manager overlap check)");
+  }
+}
+
 async function auditPasswordHashes() {
   try {
     const rows = await db
@@ -137,6 +178,7 @@ app.listen(port, (err) => {
   ensureAdminAccount()
     .then(() => auditPasswordHashes())
     .then(() => backfillVendorTicketPrefixes())
+    .then(() => auditVendorManagerOverlap())
     .catch((err) => logger.error({ err }, "Startup admin/audit chain failed"));
   runCleanup();
 

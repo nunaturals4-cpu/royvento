@@ -3588,6 +3588,9 @@ interface ManagerRow {
 function ManagersPanel() {
   const { toast } = useToast();
   const [managers, setManagers] = useState<ManagerRow[]>([]);
+  const [myVendors, setMyVendors] = useState<{ id: number; businessName: string }[]>([]);
+  const [leavingId, setLeavingId] = useState<number | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState<{ id: number; name: string } | null>(null);
   const [email, setEmail] = useState("");
   const inviteFormErrors = useFormErrors();
   const [loading, setLoading] = useState(false);
@@ -3601,7 +3604,34 @@ function ManagersPanel() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchManagers(); }, []);
+  // Pubs the signed-in partner manages for OTHER partners (i.e. accepted
+  // manager invites). Tapping Leave detaches them so those pubs no longer
+  // appear in their scanner Live Occupancy / Bookings panels.
+  const fetchMyManagedVendors = () => {
+    apiGet<{ id: number; businessName: string }[]>("/api/manager/my-vendors")
+      .then(setMyVendors)
+      .catch(() => { /* non-fatal — section just renders empty */ });
+  };
+
+  useEffect(() => { fetchManagers(); fetchMyManagedVendors(); }, []);
+
+  const leaveVendor = async (vendorId: number) => {
+    setLeavingId(vendorId);
+    try {
+      await apiDelete(`/api/manager/my-vendors/${vendorId}`);
+      setMyVendors((prev) => prev.filter((v) => v.id !== vendorId));
+      toast({ title: "Left venue", description: "It will no longer appear in your scanner." });
+      setConfirmLeave(null);
+    } catch (err: any) {
+      toast({
+        title: "Failed to leave",
+        description: err?.data?.error ?? (err instanceof Error ? err.message : undefined),
+        variant: "destructive",
+      });
+    } finally {
+      setLeavingId(null);
+    }
+  };
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3662,6 +3692,64 @@ function ManagersPanel() {
           {inviteFormErrors.fieldError("email") && <p className="text-xs text-destructive mt-1">{inviteFormErrors.fieldError("email")}</p>}
         </form>
       </div>
+
+      {myVendors.length > 0 && (
+        <div className="rounded-3xl glass-card p-6 md:p-8">
+          <h2 className="font-serif text-2xl mb-1">Pubs I manage for others</h2>
+          <p className="text-sm text-muted-foreground mb-5">
+            Other partners have added you as a scanner manager at these venues. Their bookings appear in your Ticket Scanner. Tap Leave to remove yourself — only your own pub will remain.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pb-3">Venue</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {myVendors.map((v) => (
+                  <tr key={v.id} className="border-t border-white/5">
+                    <td className="py-3">{v.businessName}</td>
+                    <td className="py-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmLeave({ id: v.id, name: v.businessName })}
+                        disabled={leavingId === v.id}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      >
+                        {leavingId === v.id ? "Leaving…" : "Leave"}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {confirmLeave && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => leavingId == null && setConfirmLeave(null)}>
+          <div className="w-full max-w-md rounded-2xl glass-card-strong p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-xl">Leave {confirmLeave.name}?</h3>
+            <p className="text-sm text-muted-foreground">
+              You'll lose scanner access for this venue immediately. Their bookings and live occupancy will stop appearing in your Ticket Scanner. The pub owner can re-invite you anytime.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" disabled={leavingId != null} onClick={() => setConfirmLeave(null)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                disabled={leavingId != null}
+                onClick={() => leaveVendor(confirmLeave.id)}
+              >
+                {leavingId === confirmLeave.id ? "Leaving…" : "Leave venue"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-3xl glass-card p-6 md:p-8">
         <h2 className="font-serif text-2xl mb-4">Your managers</h2>
