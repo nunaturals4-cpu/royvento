@@ -257,17 +257,10 @@ export default function PartnerDetailScreen() {
   const [reviewsPage, setReviewsPage] = useState(1);
   useEffect(() => { setReviewsPage(1); }, [vendorId]);
 
-  // Track this partner page view for the partner's leads/CRM. Skipped
-  // when the viewer is the partner who owns this pub (server also drops
-  // self-views as defence in depth). The ref tracks the last vendorId we
-  // already POSTed for in this component instance: blocks React
-  // StrictMode's double-invocation (same component => same ref => same
-  // id) while still firing once when the user navigates to a different
-  // partner page (vendorId change resets the guard).
+  // Track profile view; skip self-views and StrictMode double-invokes.
   const lastTrackedVendorIdRef = React.useRef<number | null>(null);
   useEffect(() => {
     if (!vendorId || !vendor) return;
-    // `vendor` is the generated Vendor schema and includes `userId`.
     if (user && vendor.userId === user.id) return;
     if (lastTrackedVendorIdRef.current === vendorId) return;
     lastTrackedVendorIdRef.current = vendorId;

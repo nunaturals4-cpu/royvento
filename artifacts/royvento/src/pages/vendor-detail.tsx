@@ -87,17 +87,10 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
       .catch(() => {});
   }, [id]);
 
-  // Track this profile view for the partner's leads/CRM. Skipped when the
-  // visitor IS the partner who owns this pub (defence-in-depth — server
-  // also drops self-views). The ref tracks the last vendorId we already
-  // POSTed for in this component instance: it blocks React StrictMode's
-  // intentional double-invocation in dev (same component => same ref =>
-  // same id) but legitimate navigations to a different partner reset the
-  // guard so the new vendor's profile view is recorded exactly once.
+  // Track profile view; skip self-views and StrictMode double-invokes.
   const lastTrackedVendorIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (!id || !vendor) return;
-    // `vendor` is the generated Vendor schema (already includes `userId`).
     if (me?.user && vendor.userId === me.user.id) return;
     if (lastTrackedVendorIdRef.current === id) return;
     lastTrackedVendorIdRef.current = id;

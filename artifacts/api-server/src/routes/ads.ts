@@ -9,7 +9,7 @@ import {
   bookingsTable,
   eventsTable,
 } from "@workspace/db";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
@@ -224,19 +224,46 @@ router.get(
       });
     }
 
-    // Pull all views for THIS vendor only — scoping is enforced by the
-     // vendorId equality filter, never widen.
-    const rows = await db
-      .select()
+    // Aggregate at the DB so totals stay accurate as history grows.
+    // Known viewers: one row per viewerUserId with visitCount + lastViewedAt.
+    const knownAgg = await db
+      .select({
+        viewerUserId: profileViewsTable.viewerUserId,
+        visitCount: sql<number>`count(*)::int`.as("visit_count"),
+        lastViewedAt: sql<Date>`max(${profileViewsTable.viewedAt})`.as("last_viewed_at"),
+        latestId: sql<number>`max(${profileViewsTable.id})`.as("latest_id"),
+      })
       .from(profileViewsTable)
-      .where(eq(profileViewsTable.vendorId, vendor.id))
-      .orderBy(desc(profileViewsTable.viewedAt))
-      .limit(2000);
+      .where(
+        and(
+          eq(profileViewsTable.vendorId, vendor.id),
+          sql`${profileViewsTable.viewerUserId} is not null`,
+        ),
+      )
+      .groupBy(profileViewsTable.viewerUserId);
 
-    // Collect known viewer user IDs
-    const ids = Array.from(
-      new Set(rows.map((r) => r.viewerUserId).filter((x): x is number => !!x)),
-    );
+    // Anonymous bucket: a single synthetic row carrying the total anon count.
+    const [anonAgg] = await db
+      .select({
+        visitCount: sql<number>`count(*)::int`.as("visit_count"),
+        lastViewedAt: sql<Date>`max(${profileViewsTable.viewedAt})`.as("last_viewed_at"),
+        latestId: sql<number>`max(${profileViewsTable.id})`.as("latest_id"),
+      })
+      .from(profileViewsTable)
+      .where(
+        and(
+          eq(profileViewsTable.vendorId, vendor.id),
+          isNull(profileViewsTable.viewerUserId),
+        ),
+      );
+    const anonCount = anonAgg?.visitCount ?? 0;
+    const anonLatest = anonAgg && anonCount > 0
+      ? { id: anonAgg.latestId, viewedAt: anonAgg.lastViewedAt }
+      : null;
+
+    const ids = knownAgg
+      .map((r) => r.viewerUserId)
+      .filter((x): x is number => !!x);
 
     // Fetch user details for enrichment (name, email, phone)
     const users = ids.length
@@ -285,74 +312,52 @@ router.get(
       }
     }
 
-    // Aggregate views per visitor:
-    //   - Each known viewer (viewerUserId !== null) collapses to ONE row,
-    //     carrying visitCount + lastViewedAt.
-    //   - Anonymous views collapse to a single synthetic row with the total
-    //     anon visit count.
     type Aggregated = {
-      id: number;                 // latest profileViewId — used by send-discount
+      id: number;
       viewerUserId: number | null;
       viewerName: string;
       viewerEmail: string;
       phone: string;
       visitCount: number;
       lastViewedAt: Date;
-      viewedAt: Date;             // alias of lastViewedAt for back-compat
+      viewedAt: Date;
       hasBooked: boolean;
       existingCode: string | null;
     };
-    const knownMap = new Map<number, Aggregated>();
-    let anonCount = 0;
-    let anonLatestRow: typeof rows[number] | null = null;
 
-    for (const r of rows) {
-      if (r.viewerUserId) {
-        const existing = knownMap.get(r.viewerUserId);
-        if (existing) {
-          existing.visitCount += 1;
-          // rows are already DESC by viewedAt, so we keep the first id we saw
-          continue;
-        }
-        const u = uMap.get(r.viewerUserId);
-        knownMap.set(r.viewerUserId, {
-          id: r.id,
-          viewerUserId: r.viewerUserId,
-          viewerName: u?.name ?? r.viewerName ?? "Anonymous",
-          viewerEmail: u?.email ?? r.viewerEmail ?? "",
+    const knownViews: Aggregated[] = knownAgg
+      .map((r) => {
+        const uid = r.viewerUserId as number;
+        const u = uMap.get(uid);
+        return {
+          id: r.latestId,
+          viewerUserId: uid,
+          viewerName: u?.name ?? "Anonymous",
+          viewerEmail: u?.email ?? "",
           phone: u?.phone ?? "",
-          visitCount: 1,
-          lastViewedAt: r.viewedAt,
-          viewedAt: r.viewedAt,
-          hasBooked: bookedUserIds.has(r.viewerUserId),
-          existingCode: existingCouponMap.get(r.viewerUserId) ?? null,
-        });
-      } else {
-        anonCount += 1;
-        if (!anonLatestRow) anonLatestRow = r;
-      }
-    }
+          visitCount: r.visitCount,
+          lastViewedAt: r.lastViewedAt,
+          viewedAt: r.lastViewedAt,
+          hasBooked: bookedUserIds.has(uid),
+          existingCode: existingCouponMap.get(uid) ?? null,
+        };
+      })
+      .sort((a, b) => b.lastViewedAt.getTime() - a.lastViewedAt.getTime());
 
-    const knownViews = Array.from(knownMap.values()).sort(
-      (a, b) => b.lastViewedAt.getTime() - a.lastViewedAt.getTime(),
-    );
-    const anonView: Aggregated[] =
-      anonCount > 0 && anonLatestRow
-        ? [
-            {
-              id: anonLatestRow.id,
-              viewerUserId: null,
-              viewerName: "Anonymous",
-              viewerEmail: "",
-              phone: "",
-              visitCount: anonCount,
-              lastViewedAt: anonLatestRow.viewedAt,
-              viewedAt: anonLatestRow.viewedAt,
-              hasBooked: false,
-              existingCode: null,
-            },
-          ]
-        : [];
+    const anonView: Aggregated[] = anonLatest
+      ? [{
+          id: anonLatest.id,
+          viewerUserId: null,
+          viewerName: "Anonymous",
+          viewerEmail: "",
+          phone: "",
+          visitCount: anonCount,
+          lastViewedAt: anonLatest.viewedAt,
+          viewedAt: anonLatest.viewedAt,
+          hasBooked: false,
+          existingCode: null,
+        }]
+      : [];
 
     const views = [...knownViews, ...anonView];
 
@@ -361,7 +366,6 @@ router.get(
       crmAccessGranted: true,
       crmTrialActive,
       crmTrialDaysRemaining,
-      // Total profile views (sum of visit counts across all aggregated rows).
       totalViews: views.reduce((sum, v) => sum + v.visitCount, 0),
       bookedCount: views.filter((v) => v.hasBooked).length,
       views,

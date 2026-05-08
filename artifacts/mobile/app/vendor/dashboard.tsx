@@ -305,12 +305,7 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
     setSaving(true);
     const isFreeEntryAdd = !editId && (freeEntryTypes.includes("welcome") || freeEntryTypes.includes("unlimited"))
       && (form.type === "welcome" || form.type === "unlimited");
-    // For ticket plans, drop empty-name rows then coerce editor "" → 0 on
-    // discountedPrice. Mirrors the web LineItemsEditor flow.
     const isTicket = form.type === "ticket";
-    // Mirror web LineItemsEditor validation: every row that the user has
-    // started filling out must have a name, AND a ticket plan must end
-    // up with at least one named row before it can be saved.
     if (isTicket && form.lineItems.some((i) => !i.name.trim())) {
       Alert.alert("Each ticket item must have a name");
       setSaving(false);
@@ -465,9 +460,6 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   foodDiscountLabel: plan.foodDiscountLabel ?? "",
                   validFrom: plan.validFrom ?? "",
                   validUntil: plan.validUntil ?? "",
-                  // Hydrate ticket plans' line items into the editor shape
-                  // (`number | ""`). Wire shape comes back numeric so it's
-                  // a safe widening — lineItemForWire handles the inverse.
                   lineItems: (plan.lineItems && plan.lineItems.length > 0)
                     ? plan.lineItems.map((i) => ({ name: i.name, qty: i.qty, discountedPrice: i.discountedPrice }))
                     : [emptyLineItem()],
@@ -621,7 +613,6 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   ))}
                 </View>
               </View>
-              {/* Price — hidden for ticket plans, which use per-line-item pricing instead */}
               {form.type !== "ticket" && (
                 <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
                   <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PRICE (₹)</Text>
@@ -635,10 +626,6 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                   />
                 </View>
               )}
-              {/* Ticket line items — mirrors web LineItemsEditor. Each row's
-                  `discountedPrice` is held as `number | ""` so a freshly
-                  added row's price field renders an empty placeholder
-                  instead of "0"; lineItemForWire() coerces "" → 0 at save. */}
               {form.type === "ticket" && (
                 <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 10 }}>
                   <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>TICKET LINE ITEMS</Text>
@@ -671,8 +658,6 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
                         value={item.discountedPrice === "" ? "" : String(item.discountedPrice)}
                         onChangeText={(v) => setForm((p) => {
                           const next = [...p.lineItems];
-                          // Keep "" while the field is empty so the
-                          // placeholder stays visible; save coerces to 0.
                           next[idx] = { ...next[idx], discountedPrice: v === "" ? "" : Math.max(0, parseInt(v) || 0) };
                           return { ...p, lineItems: next };
                         })}
