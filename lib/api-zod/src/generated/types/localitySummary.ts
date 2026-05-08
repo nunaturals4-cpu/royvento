@@ -5,15 +5,13 @@
  * Royvento event management platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { CategoryCount } from "./categoryCount";
-import type { LocalityCount } from "./localityCount";
 import type { VendorSummary } from "./vendorSummary";
 
-export interface CitySummary {
+export interface LocalitySummary {
   citySlug: string;
   canonicalCity: string;
+  localitySlug: string;
+  localityName: string;
   vendorCount: number;
-  localityCounts: LocalityCount[];
-  categoryCounts: CategoryCount[];
   topVendors: VendorSummary[];
 }

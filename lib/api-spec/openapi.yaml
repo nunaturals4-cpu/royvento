@@ -1950,6 +1950,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/CitySummary"
 
+  /cities/{citySlug}/localities/{localitySlug}:
+    get:
+      operationId: getLocalitySummary
+      tags: [seo]
+      summary: Aggregated pubs for a city/locality landing page
+      parameters:
+        - name: citySlug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: localitySlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Locality aggregation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalitySummary"
+
+  /cities/{citySlug}/categories/{categorySlug}:
+    get:
+      operationId: getCategorySummary
+      tags: [seo]
+      summary: Aggregated pubs for a city/category landing page
+      parameters:
+        - name: citySlug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: categorySlug
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [rooftop, microbrewery, sports-bar, live-music, couple-friendly, lounge, club, pubs]
+      responses:
+        "200":
+          description: Category aggregation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategorySummary"
+
 components:
   schemas:
     FreeEntryRules:
@@ -2062,8 +2111,73 @@ components:
         topVendors:
           type: array
           items:
-            $ref: "#/components/schemas/Vendor"
+            $ref: "#/components/schemas/VendorSummary"
       required: [citySlug, canonicalCity, vendorCount, localityCounts, categoryCounts, topVendors]
+
+    LocalitySummary:
+      type: object
+      additionalProperties: false
+      properties:
+        citySlug:
+          type: string
+        canonicalCity:
+          type: string
+        localitySlug:
+          type: string
+        localityName:
+          type: string
+        vendorCount:
+          type: integer
+        topVendors:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorSummary"
+      required: [citySlug, canonicalCity, localitySlug, localityName, vendorCount, topVendors]
+
+    CategorySummary:
+      type: object
+      additionalProperties: false
+      properties:
+        citySlug:
+          type: string
+        canonicalCity:
+          type: string
+        categorySlug:
+          type: string
+        vendorCount:
+          type: integer
+        topVendors:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorSummary"
+      required: [citySlug, canonicalCity, categorySlug, vendorCount, topVendors]
+
+    VendorSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        businessName:
+          type: string
+        category:
+          type: string
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        bannerImage:
+          type: string
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+      required: [id, businessName, category, bannerImage, rating, reviewCount]
 
     LocalityCount:
       type: object

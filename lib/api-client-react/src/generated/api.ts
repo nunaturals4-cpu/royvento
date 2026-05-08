@@ -32,6 +32,7 @@ import type {
   AuthResponse,
   Availability,
   Booking,
+  CategorySummary,
   CitySummary,
   CommissionReport,
   Coupon,
@@ -67,6 +68,7 @@ import type {
   ListVendorBookingsParams,
   ListVendorReviewsParams,
   ListVendorsParams,
+  LocalitySummary,
   LoginBody,
   MeResponse,
   MyVendorResponse,
@@ -6988,6 +6990,258 @@ export function useGetCitySummary<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetCitySummaryQueryOptions(citySlug, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Aggregated pubs for a city/locality landing page
+ */
+export const getGetLocalitySummaryUrl = (
+  citySlug: string,
+  localitySlug: string,
+) => {
+  return `/api/cities/${citySlug}/localities/${localitySlug}`;
+};
+
+export const getLocalitySummary = async (
+  citySlug: string,
+  localitySlug: string,
+  options?: RequestInit,
+): Promise<LocalitySummary> => {
+  return customFetch<LocalitySummary>(
+    getGetLocalitySummaryUrl(citySlug, localitySlug),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetLocalitySummaryQueryKey = (
+  citySlug: string,
+  localitySlug: string,
+) => {
+  return [`/api/cities/${citySlug}/localities/${localitySlug}`] as const;
+};
+
+export const getGetLocalitySummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLocalitySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  citySlug: string,
+  localitySlug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLocalitySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetLocalitySummaryQueryKey(citySlug, localitySlug);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLocalitySummary>>
+  > = ({ signal }) =>
+    getLocalitySummary(citySlug, localitySlug, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(citySlug && localitySlug),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLocalitySummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLocalitySummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLocalitySummary>>
+>;
+export type GetLocalitySummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Aggregated pubs for a city/locality landing page
+ */
+
+export function useGetLocalitySummary<
+  TData = Awaited<ReturnType<typeof getLocalitySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  citySlug: string,
+  localitySlug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLocalitySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLocalitySummaryQueryOptions(
+    citySlug,
+    localitySlug,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Aggregated pubs for a city/category landing page
+ */
+export const getGetCategorySummaryUrl = (
+  citySlug: string,
+  categorySlug:
+    | "rooftop"
+    | "microbrewery"
+    | "sports-bar"
+    | "live-music"
+    | "couple-friendly"
+    | "lounge"
+    | "club"
+    | "pubs",
+) => {
+  return `/api/cities/${citySlug}/categories/${categorySlug}`;
+};
+
+export const getCategorySummary = async (
+  citySlug: string,
+  categorySlug:
+    | "rooftop"
+    | "microbrewery"
+    | "sports-bar"
+    | "live-music"
+    | "couple-friendly"
+    | "lounge"
+    | "club"
+    | "pubs",
+  options?: RequestInit,
+): Promise<CategorySummary> => {
+  return customFetch<CategorySummary>(
+    getGetCategorySummaryUrl(citySlug, categorySlug),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetCategorySummaryQueryKey = (
+  citySlug: string,
+  categorySlug:
+    | "rooftop"
+    | "microbrewery"
+    | "sports-bar"
+    | "live-music"
+    | "couple-friendly"
+    | "lounge"
+    | "club"
+    | "pubs",
+) => {
+  return [`/api/cities/${citySlug}/categories/${categorySlug}`] as const;
+};
+
+export const getGetCategorySummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCategorySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  citySlug: string,
+  categorySlug:
+    | "rooftop"
+    | "microbrewery"
+    | "sports-bar"
+    | "live-music"
+    | "couple-friendly"
+    | "lounge"
+    | "club"
+    | "pubs",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCategorySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetCategorySummaryQueryKey(citySlug, categorySlug);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCategorySummary>>
+  > = ({ signal }) =>
+    getCategorySummary(citySlug, categorySlug, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(citySlug && categorySlug),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCategorySummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCategorySummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCategorySummary>>
+>;
+export type GetCategorySummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Aggregated pubs for a city/category landing page
+ */
+
+export function useGetCategorySummary<
+  TData = Awaited<ReturnType<typeof getCategorySummary>>,
+  TError = ErrorType<unknown>,
+>(
+  citySlug: string,
+  categorySlug:
+    | "rooftop"
+    | "microbrewery"
+    | "sports-bar"
+    | "live-music"
+    | "couple-friendly"
+    | "lounge"
+    | "club"
+    | "pubs",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCategorySummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCategorySummaryQueryOptions(
+    citySlug,
+    categorySlug,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

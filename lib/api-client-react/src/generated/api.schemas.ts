@@ -96,61 +96,16 @@ export interface CategoryCount {
   count: number;
 }
 
-export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
-
-export const VendorStatus = {
-  pending: "pending",
-  approved: "approved",
-  rejected: "rejected",
-} as const;
-
-export type VendorDanceFloor =
-  | (typeof VendorDanceFloor)[keyof typeof VendorDanceFloor]
-  | null;
-
-export const VendorDanceFloor = {
-  dedicated: "dedicated",
-  general: "general",
-  none: "none",
-} as const;
-
-export type VendorCrowdLevel =
-  | (typeof VendorCrowdLevel)[keyof typeof VendorCrowdLevel]
-  | null;
-
-export const VendorCrowdLevel = {
-  low: "low",
-  moderate: "moderate",
-  party: "party",
-} as const;
-
-export type VendorDayHours = { [key: string]: unknown } | null;
-
-export interface Vendor {
+export interface VendorSummary {
   id: number;
-  userId: number;
   businessName: string;
   category: string;
-  description: string;
-  location: string;
+  city?: string | null;
+  state?: string | null;
+  address?: string | null;
   bannerImage: string;
-  coverImageUrl: string;
-  portfolioImages: string[];
-  status: VendorStatus;
   rating: number;
   reviewCount: number;
-  createdAt: string;
-  openDays: string[];
-  address?: string | null;
-  dayHours?: VendorDayHours;
-  city: string;
-  state: string;
-  country: string;
-  freeEntryRules?: FreeEntryRules | null;
-  danceFloor?: VendorDanceFloor;
-  danceFloorPhotos?: string[] | null;
-  menuUrl?: string;
-  crowdLevel?: VendorCrowdLevel;
 }
 
 export interface CitySummary {
@@ -159,7 +114,24 @@ export interface CitySummary {
   vendorCount: number;
   localityCounts: LocalityCount[];
   categoryCounts: CategoryCount[];
-  topVendors: Vendor[];
+  topVendors: VendorSummary[];
+}
+
+export interface LocalitySummary {
+  citySlug: string;
+  canonicalCity: string;
+  localitySlug: string;
+  localityName: string;
+  vendorCount: number;
+  topVendors: VendorSummary[];
+}
+
+export interface CategorySummary {
+  citySlug: string;
+  canonicalCity: string;
+  categorySlug: string;
+  vendorCount: number;
+  topVendors: VendorSummary[];
 }
 
 export interface HealthStatus {
@@ -230,6 +202,63 @@ export interface UpdateMeBody {
   about?: string;
   /** @maxLength 2048 */
   profileImage?: string;
+}
+
+export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
+
+export const VendorStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export type VendorDayHours = { [key: string]: unknown } | null;
+
+export type VendorDanceFloor =
+  | (typeof VendorDanceFloor)[keyof typeof VendorDanceFloor]
+  | null;
+
+export const VendorDanceFloor = {
+  dedicated: "dedicated",
+  general: "general",
+  none: "none",
+} as const;
+
+export type VendorCrowdLevel =
+  | (typeof VendorCrowdLevel)[keyof typeof VendorCrowdLevel]
+  | null;
+
+export const VendorCrowdLevel = {
+  low: "low",
+  moderate: "moderate",
+  party: "party",
+} as const;
+
+export interface Vendor {
+  id: number;
+  userId: number;
+  businessName: string;
+  category: string;
+  description: string;
+  location: string;
+  bannerImage: string;
+  coverImageUrl: string;
+  portfolioImages: string[];
+  status: VendorStatus;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+  openDays: string[];
+  address?: string | null;
+  dayHours?: VendorDayHours;
+  city: string;
+  state: string;
+  country: string;
+  freeEntryRules?: FreeEntryRules | null;
+  danceFloor?: VendorDanceFloor;
+  danceFloorPhotos?: string[] | null;
+  menuUrl?: string;
+  crowdLevel?: VendorCrowdLevel;
 }
 
 export interface MyVendorResponse {

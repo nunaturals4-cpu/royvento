@@ -4010,9 +4010,6 @@ export const GetCitySummaryParams = zod
   })
   .strict();
 
-export const getCitySummaryResponseTopVendorsItemFreeEntryRulesOneBeforeTimeRegExp =
-  new RegExp("^([01][0-9]|2[0-3]):([0-5][0-9])$");
-
 export const GetCitySummaryResponse = zod.object({
   citySlug: zod.string(),
   canonicalCity: zod.string(),
@@ -4033,51 +4030,84 @@ export const GetCitySummaryResponse = zod.object({
   topVendors: zod.array(
     zod.object({
       id: zod.number(),
-      userId: zod.number(),
       businessName: zod.string(),
       category: zod.string(),
-      description: zod.string(),
-      location: zod.string(),
+      city: zod.string().nullish(),
+      state: zod.string().nullish(),
+      address: zod.string().nullish(),
       bannerImage: zod.string(),
-      coverImageUrl: zod.string(),
-      portfolioImages: zod.array(zod.string()),
-      status: zod.enum(["pending", "approved", "rejected"]),
       rating: zod.number(),
       reviewCount: zod.number(),
-      createdAt: zod.string(),
-      openDays: zod.array(zod.string()),
+    }),
+  ),
+});
+
+/**
+ * @summary Aggregated pubs for a city/locality landing page
+ */
+export const GetLocalitySummaryParams = zod
+  .object({
+    citySlug: zod.coerce.string(),
+    localitySlug: zod.coerce.string(),
+  })
+  .strict();
+
+export const GetLocalitySummaryResponse = zod.object({
+  citySlug: zod.string(),
+  canonicalCity: zod.string(),
+  localitySlug: zod.string(),
+  localityName: zod.string(),
+  vendorCount: zod.number(),
+  topVendors: zod.array(
+    zod.object({
+      id: zod.number(),
+      businessName: zod.string(),
+      category: zod.string(),
+      city: zod.string().nullish(),
+      state: zod.string().nullish(),
       address: zod.string().nullish(),
-      dayHours: zod.object({}).passthrough().nullish(),
-      city: zod.string(),
-      state: zod.string(),
-      country: zod.string(),
-      freeEntryRules: zod
-        .union([
-          zod.object({
-            enabled: zod.boolean(),
-            genders: zod.array(
-              zod.enum(["Everyone", "Ladies", "Men", "Couples"]),
-            ),
-            days: zod.array(
-              zod.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-            ),
-            beforeTime: zod
-              .string()
-              .regex(
-                getCitySummaryResponseTopVendorsItemFreeEntryRulesOneBeforeTimeRegExp,
-              )
-              .optional()
-              .describe(
-                "Entry cutoff time in 24-hour HH:mm format, e.g. 22:00",
-              ),
-          }),
-          zod.null(),
-        ])
-        .optional(),
-      danceFloor: zod.enum(["dedicated", "general", "none"]).nullish(),
-      danceFloorPhotos: zod.array(zod.string()).nullish(),
-      menuUrl: zod.string().optional(),
-      crowdLevel: zod.enum(["low", "moderate", "party"]).nullish(),
+      bannerImage: zod.string(),
+      rating: zod.number(),
+      reviewCount: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Aggregated pubs for a city/category landing page
+ */
+export const GetCategorySummaryParams = zod
+  .object({
+    citySlug: zod.coerce.string(),
+    categorySlug: zod.enum([
+      "rooftop",
+      "microbrewery",
+      "sports-bar",
+      "live-music",
+      "couple-friendly",
+      "lounge",
+      "club",
+      "pubs",
+    ]),
+  })
+  .strict();
+
+export const GetCategorySummaryResponse = zod.object({
+  citySlug: zod.string(),
+  canonicalCity: zod.string(),
+  categorySlug: zod.string(),
+  vendorCount: zod.number(),
+  topVendors: zod.array(
+    zod.object({
+      id: zod.number(),
+      businessName: zod.string(),
+      category: zod.string(),
+      city: zod.string().nullish(),
+      state: zod.string().nullish(),
+      address: zod.string().nullish(),
+      bannerImage: zod.string(),
+      rating: zod.number(),
+      reviewCount: zod.number(),
     }),
   ),
 });

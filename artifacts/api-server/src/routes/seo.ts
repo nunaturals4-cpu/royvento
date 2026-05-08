@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
 import { db, vendorsTable, seoPagesTable } from "@workspace/db";
-import { and, eq, ilike, or, sql, isNull, desc } from "drizzle-orm";
+import { and, eq, ilike, or, isNull, desc, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { UpsertSeoPageBody } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
+import { getVendorRatings } from "../lib/aggregates";
 
 const router: IRouter = Router();
 
@@ -50,7 +51,6 @@ function slugify(input: string | null | undefined): string {
 function localityFromAddress(address: string | null | undefined): string | null {
   if (!address) return null;
   const parts = address.split(",").map((s) => s.trim()).filter(Boolean);
-  // Heuristic: first non-numeric, non-pin-code segment after the street name.
   for (const p of parts.slice(0, 3)) {
     if (/^\d+$/.test(p)) continue;
     if (/^\d{5,7}$/.test(p)) continue;
@@ -58,6 +58,35 @@ function localityFromAddress(address: string | null | undefined): string | null 
     return p;
   }
   return parts[0] ?? null;
+}
+
+type VendorRow = typeof vendorsTable.$inferSelect;
+
+async function vendorRowsToSummaries(rows: VendorRow[]) {
+  if (rows.length === 0) return [];
+  const ratings = await getVendorRatings(rows.map((r) => r.id));
+  return rows.map((v) => {
+    const r = ratings.get(v.id) ?? { rating: 0, reviewCount: 0 };
+    return {
+      id: v.id,
+      businessName: v.businessName,
+      category: v.category,
+      city: v.city ?? null,
+      state: v.state ?? null,
+      address: v.address ?? null,
+      bannerImage: v.bannerImage ?? "",
+      rating: r.rating,
+      reviewCount: r.reviewCount,
+    };
+  });
+}
+
+function cityWhereClause(citySlug: string): SQL | undefined {
+  const variants = expandCityAliases(citySlug);
+  const conds = variants.map((v) => ilike(vendorsTable.city, `%${v}%`));
+  if (conds.length === 0) return undefined;
+  if (conds.length === 1) return conds[0]!;
+  return or(...conds);
 }
 
 // ─── /seo-pages (editorial overrides) ───────────────────────────────────────
@@ -110,8 +139,6 @@ router.put("/seo-pages", requireAuth(["admin"]), async (req, res) => {
   }
   const body = parsed.data;
   const second = body.secondSlug ?? null;
-  // Manual upsert (NULL second_slug doesn't play nicely with onConflict on
-  // older Postgres). Try update, fall back to insert.
   const updated = await db
     .update(seoPagesTable)
     .set({
@@ -162,18 +189,27 @@ router.put("/seo-pages", requireAuth(["admin"]), async (req, res) => {
   });
 });
 
-// ─── /cities/:citySlug/summary (aggregation) ────────────────────────────────
+// ─── Category keyword matching (keep server in sync with frontend) ──────────
 
-const KNOWN_CATEGORIES = [
-  "rooftop",
-  "microbrewery",
-  "sports-bar",
-  "live-music",
-  "couple-friendly",
-  "lounge",
-  "club",
-  "pubs",
-];
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  rooftop: ["rooftop"],
+  microbrewery: ["microbrewery", "brewery"],
+  "sports-bar": ["sports bar", "sports-bar", "sports"],
+  "live-music": ["live music", "live-music", "gig"],
+  "couple-friendly": ["couple", "date", "romantic"],
+  lounge: ["lounge"],
+  club: ["nightclub", "club"],
+  pubs: ["pub", "bar"],
+};
+
+function vendorMatchesCategory(v: VendorRow, categorySlug: string): boolean {
+  const keywords = CATEGORY_KEYWORDS[categorySlug];
+  if (!keywords) return false;
+  const haystack = `${v.category ?? ""} ${v.description ?? ""}`.toLowerCase();
+  return keywords.some((k) => haystack.includes(k));
+}
+
+// ─── /cities/:citySlug/summary (aggregation) ────────────────────────────────
 
 router.get("/cities/:citySlug/summary", async (req, res) => {
   const slug = String(req.params.citySlug ?? "").toLowerCase();
@@ -181,9 +217,11 @@ router.get("/cities/:citySlug/summary", async (req, res) => {
     res.status(400).json({ error: "Invalid city slug" });
     return;
   }
-  const variants = expandCityAliases(slug);
-  const cityConds = variants.map((v) => ilike(vendorsTable.city, `%${v}%`));
-  const cityWhere = cityConds.length === 1 ? cityConds[0]! : or(...cityConds)!;
+  const cityWhere = cityWhereClause(slug);
+  if (!cityWhere) {
+    res.status(400).json({ error: "Invalid city slug" });
+    return;
+  }
 
   const rows = await db
     .select()
@@ -204,37 +242,14 @@ router.get("/cities/:citySlug/summary", async (req, res) => {
         else localityMap.set(ls, { slug: ls, name: loc, count: 1 });
       }
     }
-    if (v.category) {
-      const haystack = `${v.category} ${v.description ?? ""}`.toLowerCase();
-      for (const cat of KNOWN_CATEGORIES) {
-        const needle = cat.replace(/-/g, " ");
-        if (haystack.includes(needle)) {
-          categoryMap.set(cat, (categoryMap.get(cat) ?? 0) + 1);
-        }
+    for (const cat of Object.keys(CATEGORY_KEYWORDS)) {
+      if (vendorMatchesCategory(v, cat)) {
+        categoryMap.set(cat, (categoryMap.get(cat) ?? 0) + 1);
       }
     }
   }
 
-  // Reuse the existing /vendors serialization shape minimally — return the
-  // top 12 raw rows; client can re-fetch full details if needed.
-  const topVendors = rows.slice(0, 12).map((v) => ({
-    id: v.id,
-    userId: v.userId,
-    businessName: v.businessName,
-    category: v.category,
-    description: v.description,
-    location: v.location,
-    country: v.country ?? null,
-    state: v.state ?? null,
-    city: v.city ?? null,
-    address: v.address ?? null,
-    bannerImage: v.bannerImage ?? "",
-    galleryImages: (v as any).galleryImages ?? [],
-    instagramUrl: (v as any).instagramUrl ?? "",
-    websiteUrl: (v as any).websiteUrl ?? "",
-    googlePlaceUrl: (v as any).googlePlaceUrl ?? "",
-    status: v.status,
-  }));
+  const topVendors = await vendorRowsToSummaries(rows.slice(0, 12));
 
   res.json({
     citySlug: slug,
@@ -246,6 +261,85 @@ router.get("/cities/:citySlug/summary", async (req, res) => {
     categoryCounts: [...categoryMap.entries()]
       .map(([s, count]) => ({ slug: s, count }))
       .sort((a, b) => b.count - a.count),
+    topVendors,
+  });
+});
+
+// ─── /cities/:citySlug/localities/:localitySlug ─────────────────────────────
+
+router.get("/cities/:citySlug/localities/:localitySlug", async (req, res) => {
+  const citySlug = String(req.params.citySlug ?? "").toLowerCase();
+  const localitySlug = String(req.params.localitySlug ?? "").toLowerCase();
+  if (!citySlug || !localitySlug) {
+    res.status(400).json({ error: "Invalid slug" });
+    return;
+  }
+  const cityWhere = cityWhereClause(citySlug);
+  if (!cityWhere) {
+    res.status(400).json({ error: "Invalid city slug" });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(vendorsTable)
+    .where(and(eq(vendorsTable.status, "approved"), cityWhere))
+    .orderBy(desc(vendorsTable.createdAt))
+    .limit(500);
+
+  let localityName = localitySlug.replace(/-/g, " ");
+  const filtered = rows.filter((v) => {
+    const loc = localityFromAddress(v.address);
+    if (!loc) return false;
+    if (slugify(loc) !== localitySlug) return false;
+    localityName = loc;
+    return true;
+  });
+
+  const topVendors = await vendorRowsToSummaries(filtered.slice(0, 24));
+
+  res.json({
+    citySlug,
+    canonicalCity: canonicalCity(citySlug),
+    localitySlug,
+    localityName,
+    vendorCount: filtered.length,
+    topVendors,
+  });
+});
+
+// ─── /cities/:citySlug/categories/:categorySlug ─────────────────────────────
+
+router.get("/cities/:citySlug/categories/:categorySlug", async (req, res) => {
+  const citySlug = String(req.params.citySlug ?? "").toLowerCase();
+  const categorySlug = String(req.params.categorySlug ?? "").toLowerCase();
+  if (!citySlug || !categorySlug) {
+    res.status(400).json({ error: "Invalid slug" });
+    return;
+  }
+  if (!CATEGORY_KEYWORDS[categorySlug]) {
+    res.status(400).json({ error: "Unknown category" });
+    return;
+  }
+  const cityWhere = cityWhereClause(citySlug);
+  if (!cityWhere) {
+    res.status(400).json({ error: "Invalid city slug" });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(vendorsTable)
+    .where(and(eq(vendorsTable.status, "approved"), cityWhere))
+    .orderBy(desc(vendorsTable.createdAt))
+    .limit(500);
+
+  const filtered = rows.filter((v) => vendorMatchesCategory(v, categorySlug));
+  const topVendors = await vendorRowsToSummaries(filtered.slice(0, 24));
+
+  res.json({
+    citySlug,
+    canonicalCity: canonicalCity(citySlug),
+    categorySlug,
+    vendorCount: filtered.length,
     topVendors,
   });
 });

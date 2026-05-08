@@ -4,7 +4,7 @@ import { SEO, buildBreadcrumbList, buildFAQPage } from "@/components/SEO";
 import { EventCard } from "@/components/EventCard";
 import { CrossLinkRail } from "@/components/CrossLinkRail";
 import { apiGet } from "@/lib/api";
-import { useGetSeoPage } from "@workspace/api-client-react";
+import { useGetSeoPage, getGetSeoPageQueryKey } from "@workspace/api-client-react";
 import {
   PUB_CATEGORY_SLUGS,
   canonicalCitySlug,
@@ -203,15 +203,19 @@ export function CitySecondary() {
     })),
   };
   // Editorial override from the admin-editable seo_pages table.
-  const { data: seoOverride } = useGetSeoPage(
-    {
-      template: isCategory ? "category" : "locality",
-      citySlug,
-      secondSlug: isCategory ? category!.slug : localitySlug,
+  const seoParams = {
+    template: (isCategory ? "category" : "locality") as "category" | "locality",
+    citySlug,
+    secondSlug: isCategory ? category!.slug : localitySlug,
+  };
+  const { data: seoOverride } = useGetSeoPage(seoParams, {
+    query: {
+      queryKey: getGetSeoPageQueryKey(seoParams),
+      retry: false,
+      staleTime: 5 * 60 * 1000,
     },
-    { query: { retry: false, staleTime: 5 * 60 * 1000 } as any },
-  );
-  const overrideFaqs = (seoOverride?.faqs ?? []).map((f: any) => ({
+  });
+  const overrideFaqs = (seoOverride?.faqs ?? []).map((f) => ({
     question: f.q,
     answer: f.a,
   }));

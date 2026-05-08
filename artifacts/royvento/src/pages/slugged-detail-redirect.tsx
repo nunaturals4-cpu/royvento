@@ -3,7 +3,12 @@ import { useParams, useLocation, Redirect } from "wouter";
 import { parseTrailingId, pubDetailSlug, eventDetailSlug } from "@/lib/seo-slug";
 import { VendorDetail } from "@/pages/vendor-detail";
 import { EventDetail } from "@/pages/event-detail";
-import { useGetVendor, useGetEvent } from "@workspace/api-client-react";
+import {
+  useGetVendor,
+  useGetEvent,
+  getGetVendorQueryKey,
+  getGetEventQueryKey,
+} from "@workspace/api-client-react";
 import NotFound from "@/pages/not-found";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -48,7 +53,10 @@ export function VendorLegacyRedirect() {
   const params = useParams();
   const id = Number(params["id"]);
   const { data: vendor, isLoading } = useGetVendor(id, {
-    query: { enabled: Number.isFinite(id) && id > 0 } as any,
+    query: {
+      queryKey: getGetVendorQueryKey(id),
+      enabled: Number.isFinite(id) && id > 0,
+    },
   });
   const [, setLocation] = useLocation();
   useEffect(() => {
@@ -73,7 +81,10 @@ export function EventLegacyRedirect() {
   const params = useParams();
   const id = Number(params["id"]);
   const { data: event, isLoading } = useGetEvent(id, {
-    query: { enabled: Number.isFinite(id) && id > 0 } as any,
+    query: {
+      queryKey: getGetEventQueryKey(id),
+      enabled: Number.isFinite(id) && id > 0,
+    },
   });
   const [, setLocation] = useLocation();
   useEffect(() => {
@@ -81,8 +92,7 @@ export function EventLegacyRedirect() {
     const target = eventDetailSlug({
       id: event.id,
       title: event.title,
-      city: (event as any).city ?? (event as any).vendor?.city,
-      date: (event as any).eventDate,
+      city: event.vendor?.city,
     });
     if (typeof window !== "undefined" && window.location.pathname !== target) {
       setLocation(target, { replace: true });

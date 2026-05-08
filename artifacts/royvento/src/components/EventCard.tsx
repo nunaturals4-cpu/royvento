@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Star, MapPin, GlassWater } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/lib/api";
+import { pubDetailSlug, eventDetailSlug } from "@/lib/seo-slug";
 
 interface Props {
   event: {
@@ -51,8 +52,16 @@ export function EventCard({ event, hidePubBadge }: Props) {
   const ratingLabel = event.rating > 0 ? event.rating.toFixed(1) : null;
   const crowd = event.vendorCrowdLevel ? CROWD_BADGE[event.vendorCrowdLevel] : null;
 
+  // Route to the canonical slugged URL so internal links match what the
+  // sitemap and rel=canonical advertise. For pub-type cards this means
+  // /pubs/{city}/{slug}-{id}; for event-type cards /events/{city}/{slug}-{id}.
+  const href =
+    event.type === "pub"
+      ? pubDetailSlug({ id: event.id, name: event.title, city: event.city })
+      : eventDetailSlug({ id: event.id, title: event.title, city: event.city });
+
   return (
-    <Link href={`/events/${event.id}`}>
+    <Link href={href}>
       <div className="group cursor-pointer relative overflow-hidden rounded-2xl lift-3d border border-white/8 bg-black/30">
         {/* Image — 16:9 aspect ratio with full overlay layout */}
         <div className="relative aspect-video overflow-hidden bg-black/40">
