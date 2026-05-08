@@ -268,6 +268,10 @@ export default function PartnerDetailScreen() {
   };
 
   const vendorEvents = (events ?? []).filter((e) => e.vendorId === vendorId);
+  // Pick the primary "Book a table" target: prefer pub-type events, else
+  // fall back to the first event (matches the web Book a Table CTA).
+  const primaryBookEvent =
+    vendorEvents.find((e) => e.type === "pub") ?? vendorEvents[0] ?? null;
   const avgRating = vendor && vendor.reviewCount > 0
     ? vendor.rating.toFixed(1)
     : null;
@@ -356,6 +360,42 @@ export default function PartnerDetailScreen() {
       </View>
 
       <View style={styles.content}>
+        {/* Primary Book a Table CTA — opens the booking form directly. */}
+        {primaryBookEvent ? (
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: "/event/[id]",
+                params: { id: String(primaryBookEvent.id), book: "1" },
+              })
+            }
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              backgroundColor: colors.primary,
+              borderRadius: 14,
+              paddingVertical: 14,
+              paddingHorizontal: 18,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Book a table"
+          >
+            <Ionicons name="calendar" size={18} color={colors.primaryForeground} />
+            <Text
+              style={{
+                color: colors.primaryForeground,
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 15,
+                letterSpacing: 0.2,
+              }}
+            >
+              Book a Table
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         {/* Location row */}
         <View style={{ gap: 4 }}>
           <View style={styles.row}>

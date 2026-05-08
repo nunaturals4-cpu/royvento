@@ -25,7 +25,7 @@ import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -130,10 +130,10 @@ function TickerCounter({
 
 export default function EventDetailScreen() {
   const { t } = useLanguage();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, book } = useLocalSearchParams<{ id: string; book?: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const qc = useQueryClient();
 
   const eventId = Number(id);
@@ -156,6 +156,24 @@ export default function EventDetailScreen() {
   const clearFieldError = (field: string) => setFieldErrors((p) => { if (!(field in p)) return p; const n = { ...p }; delete n[field]; return n; });
   const [showBooking, setShowBooking] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+
+  // When arriving with `?book=1` from a pub's "Book a table" CTA, open
+  // the booking form immediately so the user lands directly on it. Runs
+  // once per arrival so refetches and the user closing the form don't
+  // re-trigger this. Mirrors the web hash-based behavior in Task #574.
+  const bookOpenDone = useRef(false);
+  useEffect(() => {
+    if (bookOpenDone.current) return;
+    if (isLoading || !event) return;
+    if (book !== "1") return;
+    // Wait for auth hydration before deciding sign-in vs. open form,
+    // otherwise a logged-in user with persisted session can briefly
+    // appear as `user === null` and get pushed to the sign-in modal.
+    if (authLoading) return;
+    bookOpenDone.current = true;
+    if (!user) { setShowSignInModal(true); return; }
+    setShowBooking(true);
+  }, [isLoading, event, book, user, authLoading]);
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
   const [agreedTerms, setAgreedTerms] = useState(false);
