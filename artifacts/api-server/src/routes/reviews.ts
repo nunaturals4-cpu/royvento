@@ -162,6 +162,12 @@ router.get("/reviews/admin", requireAuth(["admin"]), async (req, res) => {
   if (Number.isFinite(vendorIdRaw) && vendorIdRaw > 0) filters.push(eq(reviewsTable.vendorId, vendorIdRaw));
   const ratingRaw = Number(req.query["rating"]);
   if (Number.isFinite(ratingRaw) && ratingRaw >= 1 && ratingRaw <= 5) filters.push(eq(reviewsTable.rating, ratingRaw));
+  const verifiedRaw = req.query["verified"];
+  if (verifiedRaw === "true" || verifiedRaw === "false") {
+    const wantVerified = verifiedRaw === "true";
+    const existsClause = sql`EXISTS (SELECT 1 FROM ${bookingsTable} b WHERE b.${sql.raw("user_id")} = ${reviewsTable.userId} AND b.${sql.raw("vendor_id")} = ${reviewsTable.vendorId} AND b.${sql.raw("checked_in")} = true)`;
+    filters.push(wantVerified ? existsClause : sql`NOT ${existsClause}`);
+  }
   const where = filters.length > 0 ? and(...filters) : undefined;
 
   const totalRows = where

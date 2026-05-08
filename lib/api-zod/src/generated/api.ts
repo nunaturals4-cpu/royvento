@@ -2439,6 +2439,12 @@ export const ListReviewsAdminQueryParams = zod
       .min(1)
       .max(listReviewsAdminQueryRatingMax)
       .optional(),
+    verified: zod.coerce
+      .boolean()
+      .optional()
+      .describe(
+        "Filter by whether the reviewer has a checked-in booking at the vendor",
+      ),
     page: zod.coerce.number().min(1).default(listReviewsAdminQueryPageDefault),
     pageSize: zod.coerce
       .number()

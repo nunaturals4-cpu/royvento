@@ -1661,6 +1661,10 @@ export type ListReviewsAdminParams = {
    */
   rating?: number;
   /**
+   * Filter by whether the reviewer has a checked-in booking at the vendor
+   */
+  verified?: boolean;
+  /**
    * @minimum 1
    */
   page?: number;

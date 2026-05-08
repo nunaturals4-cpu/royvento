@@ -3,14 +3,14 @@ import { useParams, Link, useLocation } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import { pubDetailSlug } from "@/lib/seo-slug";
 import {
-  useGetVendor,
+  getGetVendorQueryOptions,
+  getGetReviewEligibilityQueryOptions,
   useListVendorReviews,
   useListEvents,
   useGetMe,
   useCreateReview,
   useUpdateReview,
   useDeleteReview,
-  useGetReviewEligibility,
 } from "@workspace/api-client-react";
 import type { Review, Vendor } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,9 +58,11 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: me } = useGetMe();
-  const { data: vendor, isLoading, isFetching, isError } = useGetVendor(id, {
-    query: { enabled: idValid },
-  } as any);
+  const vendorQueryOptions = getGetVendorQueryOptions(id);
+  const { data: vendor, isLoading, isFetching, isError } = useQuery({
+    ...vendorQueryOptions,
+    enabled: idValid,
+  });
   const REVIEWS_PAGE_SIZE = 5;
   const [reviewsPage, setReviewsPage] = useState(1);
   useEffect(() => { setReviewsPage(1); }, [id]);
@@ -71,9 +73,11 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const createReview = useCreateReview();
   const updateReview = useUpdateReview();
   const deleteReview = useDeleteReview();
-  const { data: eligibility, refetch: refetchEligibility } = useGetReviewEligibility(id, {
-    query: { enabled: idValid && !!me?.user },
-  } as any);
+  const eligibilityQueryOptions = getGetReviewEligibilityQueryOptions(id);
+  const { data: eligibility, refetch: refetchEligibility } = useQuery({
+    ...eligibilityQueryOptions,
+    enabled: idValid && !!me?.user,
+  });
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewImages, setReviewImages] = useState<string[]>([]);

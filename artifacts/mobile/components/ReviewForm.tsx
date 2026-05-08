@@ -4,9 +4,9 @@ import {
   getListEventReviewsQueryKey,
   getListVendorReviewsQueryKey,
   useCreateReview,
-  useGetReviewEligibility,
+  getGetReviewEligibilityQueryOptions,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
@@ -33,9 +33,11 @@ export function ReviewForm({ user, eventId, vendorId, onPosted }: ReviewFormProp
   const colors = useColors();
   const qc = useQueryClient();
   const createReview = useCreateReview();
-  const { data: eligibility } = useGetReviewEligibility(vendorId, {
-    query: { enabled: !!user && vendorId > 0 },
-  } as any);
+  const eligibilityQueryOptions = getGetReviewEligibilityQueryOptions(vendorId);
+  const { data: eligibility } = useQuery({
+    ...eligibilityQueryOptions,
+    enabled: !!user && vendorId > 0,
+  });
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [images, setImages] = useState<string[]>([]);

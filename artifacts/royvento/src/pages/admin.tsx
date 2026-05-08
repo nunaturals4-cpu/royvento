@@ -4028,10 +4028,12 @@ function ReviewsAdmin() {
   const { data: allVendors } = useListVendors({ limit: 500 } as Parameters<typeof useListVendors>[0]);
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
+  const [verifiedFilter, setVerifiedFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
-  const params: Record<string, number> = { page, pageSize: 20 };
+  const params: Record<string, number | boolean> = { page, pageSize: 20 };
   if (vendorFilter !== "all") params["vendorId"] = Number(vendorFilter);
   if (ratingFilter !== "all") params["rating"] = Number(ratingFilter);
+  if (verifiedFilter !== "all") params["verified"] = verifiedFilter === "true";
   const { data, refetch, isLoading } = useListReviewsAdmin(params);
   const updateReview = useUpdateReview();
   const deleteReview = useDeleteReview();
@@ -4067,6 +4069,15 @@ function ReviewsAdmin() {
             {[5, 4, 3, 2, 1].map((r) => (
               <option key={r} value={r}>{r} star{r > 1 ? "s" : ""}</option>
             ))}
+          </select>
+          <select
+            value={verifiedFilter}
+            onChange={(e) => { setVerifiedFilter(e.target.value); setPage(1); }}
+            className="px-3 py-1.5 text-sm rounded-md border bg-background"
+          >
+            <option value="all">All reviewers</option>
+            <option value="true">Verified only</option>
+            <option value="false">Unverified only</option>
           </select>
         </div>
       </div>

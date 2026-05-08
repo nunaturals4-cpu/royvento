@@ -10,7 +10,7 @@ import {
   useCreateReview,
   useUpdateReview,
   useDeleteReview,
-  useGetReviewEligibility,
+  getGetReviewEligibilityQueryOptions,
   useGetMe,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -120,9 +120,11 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const deleteReview = useDeleteReview();
   const qc = useQueryClient();
   const eventVendorId = (event as any)?.vendor?.id ?? (event as any)?.vendorId ?? 0;
-  const { data: eligibility, refetch: refetchEligibility } = useGetReviewEligibility(eventVendorId, {
-    query: { enabled: !!me?.user && eventVendorId > 0 },
-  } as any);
+  const eligibilityQueryOptions = getGetReviewEligibilityQueryOptions(eventVendorId);
+  const { data: eligibility, refetch: refetchEligibility } = useQuery({
+    ...eligibilityQueryOptions,
+    enabled: !!me?.user && eventVendorId > 0,
+  });
   const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
   const [editRating, setEditRating] = useState(5);
   const [editComment, setEditComment] = useState("");
