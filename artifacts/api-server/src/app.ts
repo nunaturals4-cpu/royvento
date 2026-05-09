@@ -42,6 +42,14 @@ function buildAllowedOrigins(): Set<string> {
   if (dev) allowed.add(`https://${dev}`);
   const expo = process.env["REPLIT_EXPO_DEV_DOMAIN"];
   if (expo) allowed.add(`https://${expo}`);
+  // Support additional origins for Railway / other deployments (comma-separated)
+  const extra = process.env["CORS_ORIGINS"];
+  if (extra) {
+    for (const o of extra.split(",")) {
+      const trimmed = o.trim();
+      if (trimmed) allowed.add(trimmed);
+    }
+  }
   return allowed;
 }
 
