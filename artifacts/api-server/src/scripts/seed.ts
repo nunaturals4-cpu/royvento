@@ -17,7 +17,11 @@ async function ensureAdmin() {
   if (existing[0]) {
     await db
       .update(usersTable)
-      .set({ role: "admin", passwordHash: await bcrypt.hash("admin123@", 10) })
+      .set({
+        role: "admin",
+        passwordHash: await bcrypt.hash("admin123@", 10),
+        referralCode: existing[0].referralCode || "ADMIN0001",
+      })
       .where(eq(usersTable.id, existing[0].id));
     logger.info("Admin user updated.");
     return existing[0];
@@ -30,6 +34,7 @@ async function ensureAdmin() {
       name: "Royvento Admin",
       role: "admin",
       phone: "+91 9000000000",
+      referralCode: "ADMIN0001",
     })
     .returning();
   logger.info("Admin user created.");
@@ -50,6 +55,7 @@ async function ensureDemoPartner() {
         name: "Royvento Showcase",
         role: "vendor",
         phone: "+91 9111111111",
+        referralCode: "SHOWCASE01",
       })
       .returning();
   }
