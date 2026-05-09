@@ -8,6 +8,8 @@ import sitemapRouter from "./routes/sitemap";
 import legacyRedirectsRouter from "./routes/legacyRedirects";
 import { logger } from "./lib/logger";
 import { SESSION_SECRET } from "./lib/auth";
+import path from "path";
+import { existsSync } from "fs";
 
 if (
   process.env["NODE_ENV"] === "production" &&
@@ -119,5 +121,14 @@ app.use(sitemapRouter);
 // owns /events/{city}/{slug} which would conflict with a /events prefix
 // claim here.
 app.use(legacyRedirectsRouter);
+
+// Serve the built frontend in production (same origin = no CORS needed)
+const frontendDist = path.resolve(process.cwd(), "artifacts/royvento/dist/public");
+if (existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 export default app;
