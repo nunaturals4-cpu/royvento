@@ -52,6 +52,9 @@ function buildAllowedOrigins(): Set<string> {
       if (trimmed) allowed.add(trimmed);
     }
   }
+  // Auto-allow the Railway public domain so same-server frontend requests work
+  const railwayDomain = process.env["RAILWAY_PUBLIC_DOMAIN"];
+  if (railwayDomain) allowed.add(`https://${railwayDomain}`);
   return allowed;
 }
 
