@@ -15,7 +15,9 @@ export function RequireAuth({ role, children }: Props) {
   useEffect(() => {
     if (isLoading) return;
     if (isError || !data?.user) {
-      setLocation("/login");
+      const here = window.location.pathname + window.location.search;
+      const next = here && here !== "/login" ? `?next=${encodeURIComponent(here)}` : "";
+      setLocation(`/login${next}`);
       return;
     }
     if (role && data.user.role !== role && data.user.role !== "admin") {

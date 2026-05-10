@@ -13,6 +13,16 @@ import { useTranslation } from "react-i18next";
 import { getEmailError } from "@workspace/validators";
 import { useFormErrors, fieldClass } from "@/lib/formErrors";
 
+// Reject anything that isn't a same-origin path (must start with single "/").
+// Blocks "//evil.com", "https://...", "javascript:..." used to bounce off the
+// login page to a third party.
+function safeNext(value: string | null | undefined): string {
+  if (!value) return "/";
+  if (!value.startsWith("/")) return "/";
+  if (value.startsWith("//") || value.startsWith("/\\")) return "/";
+  return value;
+}
+
 export function Login() {
   const { t } = useTranslation();
   const [email, setEmail] = useState(() => {
@@ -22,6 +32,13 @@ export function Login() {
       return "";
     }
   });
+  const nextPath = (() => {
+    try {
+      return safeNext(new URLSearchParams(window.location.search).get("next"));
+    } catch {
+      return "/";
+    }
+  })();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
@@ -70,7 +87,7 @@ export function Login() {
         onSuccess: (data) => {
           qc.invalidateQueries();
           toast({ title: `${t("auth.welcome_back")}, ${data.user.name.split(" ")[0]}` });
-          setLocation("/");
+          setLocation(nextPath);
         },
         onError: (err: any) => {
           const code = err?.data?.code ?? err?.code;
@@ -104,7 +121,8 @@ export function Login() {
       });
       return;
     }
-    window.location.href = "/api/auth/google/start";
+    const qs = nextPath !== "/" ? `?next=${encodeURIComponent(nextPath)}` : "";
+    window.location.href = `/api/auth/google/start${qs}`;
   };
 
   const emailError = formErrors.fieldError("email");

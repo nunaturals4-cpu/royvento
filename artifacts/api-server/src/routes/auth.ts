@@ -341,6 +341,16 @@ router.get("/auth/google/status", async (_req, res) => {
   });
 });
 
+// Reject anything that isn't a same-origin path (must start with single "/").
+// Blocks "//evil.com", "https://...", "javascript:..." used to bounce off the
+// auth flow to a third party.
+function safeNextPath(value: unknown): string {
+  if (typeof value !== "string" || !value) return "/";
+  if (!value.startsWith("/")) return "/";
+  if (value.startsWith("//") || value.startsWith("/\\")) return "/";
+  return value;
+}
+
 router.get("/auth/google/start", (req, res) => {
   const clientId = process.env["GOOGLE_CLIENT_ID"];
   if (!clientId) {
@@ -356,6 +366,17 @@ router.get("/auth/google/start", (req, res) => {
     maxAge: 10 * 60 * 1000,
     signed: true,
   });
+
+  const next = safeNextPath((req.query as Record<string, unknown>)["next"]);
+  if (next !== "/") {
+    res.cookie("google_oauth_next", next, {
+      httpOnly: true,
+      secure: process.env["NODE_ENV"] === "production",
+      sameSite: "lax",
+      maxAge: 10 * 60 * 1000,
+      signed: true,
+    });
+  }
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -386,6 +407,9 @@ router.get("/auth/google/callback", async (req, res) => {
   }
 
   res.clearCookie("google_oauth_state");
+
+  const nextPath = safeNextPath(signedCookies?.["google_oauth_next"]);
+  res.clearCookie("google_oauth_next");
 
   const clientId = process.env["GOOGLE_CLIENT_ID"];
   const clientSecret = process.env["GOOGLE_CLIENT_SECRET"];
@@ -490,7 +514,7 @@ router.get("/auth/google/callback", async (req, res) => {
 
     const token = signToken({ userId: user.id, role: user.role as Role });
     setAuthCookie(res, token);
-    res.redirect("/");
+    res.redirect(nextPath);
   } catch (err) {
     req.log.error({ err }, "Google OAuth callback error");
     res.redirect("/?error=google_auth_failed");

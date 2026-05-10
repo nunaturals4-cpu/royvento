@@ -495,7 +495,7 @@ export async function sendBookingCreatedEmails(b: BookingNotification): Promise<
     ${card(userRows)}
     ${userNoteHtml}
     ${para("Sign in to your Royvento account to view your ticket and QR code.")}
-    ${btn("View My Booking", getAppUrl())}
+    ${btn("View My Booking", `${getAppUrl()}/dashboard/bookings`)}
     ${signature()}
   `);
 
