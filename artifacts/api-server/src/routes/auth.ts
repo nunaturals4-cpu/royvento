@@ -298,8 +298,25 @@ router.post("/auth/resend-verification", resendVerificationLimiter, async (req, 
 
 // ─── Google OAuth ──────────────────────────────────────────────────────────────
 
+const PRODUCTION_CALLBACK_URL = "https://royvento.com/api/auth/google/callback";
+
 function getGoogleCallbackUrl(): string {
+  // 1. Explicit override wins.
   if (process.env["GOOGLE_CALLBACK_URL"]) return process.env["GOOGLE_CALLBACK_URL"];
+
+  // 2. Generic APP_URL (already used for PhonePe callbacks). Strip trailing slash.
+  const appUrl = process.env["APP_URL"];
+  if (appUrl) return `${appUrl.replace(/\/+$/, "")}/api/auth/google/callback`;
+
+  // 3. Production = royvento.com. Anything else (preview deploys, staging) must
+  // set APP_URL or GOOGLE_CALLBACK_URL explicitly.
+  if (process.env["NODE_ENV"] === "production") return PRODUCTION_CALLBACK_URL;
+
+  // 4. Railway preview / non-prod public domain.
+  const railwayDomain = process.env["RAILWAY_PUBLIC_DOMAIN"];
+  if (railwayDomain) return `https://${railwayDomain}/api/auth/google/callback`;
+
+  // 5. Replit dev domains.
   const productionDomains = process.env["REPLIT_DOMAINS"];
   if (productionDomains) {
     const domain = productionDomains.split(",")[0]?.trim();
@@ -307,6 +324,9 @@ function getGoogleCallbackUrl(): string {
   }
   const devDomain = process.env["REPLIT_DEV_DOMAIN"];
   if (devDomain) return `https://${devDomain}/api/auth/google/callback`;
+
+  // 6. Local dev fallback — Vite proxies /api to the api-server, so the frontend
+  // port is the externally-visible one Google should redirect to.
   return "http://localhost:3000/api/auth/google/callback";
 }
 

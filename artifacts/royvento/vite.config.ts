@@ -66,10 +66,23 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    hmr: {
-      clientPort: 443,
-      protocol: "wss",
-      timeout: 120_000,
+    // HMR via wss:443 only when running behind the Replit/Railway proxy.
+    // Locally, fall back to default same-origin ws so the browser can connect.
+    hmr:
+      process.env.REPL_ID !== undefined ||
+      process.env.RAILWAY_PUBLIC_DOMAIN !== undefined
+        ? { clientPort: 443, protocol: "wss", timeout: 120_000 }
+        : { timeout: 120_000 },
+    // Proxy API calls to the local api-server so they don't fall through to
+    // the SPA fallback (which would return index.html for /api/* and the
+    // client would happily parse the HTML body, then crash on `.map`).
+    // Override the upstream with VITE_API_PROXY when running on a different port.
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_PROXY ?? "http://localhost:5000",
+        changeOrigin: true,
+        ws: true,
+      },
     },
     fs: {
       strict: true,
