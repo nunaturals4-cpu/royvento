@@ -1,4 +1,4 @@
-import { customFetch } from "@workspace/api-client-react";
+import { customFetch, getBaseUrl } from "@workspace/api-client-react";
 
 export const ALLOWED_IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif"];
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -56,6 +56,7 @@ export async function uploadImageToStorage(localUri: string, mimeHint?: string):
   });
 
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
-  const domain = process.env["EXPO_PUBLIC_DOMAIN"];
-  return `https://${domain}/api/storage/objects/${pathAfterObjects}`;
+  const base = getBaseUrl();
+  if (!base) throw new Error("API base URL is not configured; cannot build storage URL.");
+  return `${base}/api/storage/objects/${pathAfterObjects}`;
 }

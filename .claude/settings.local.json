@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm -v)"
+      "Bash(pnpm -v)",
+      "PowerShell(psql --version 2>&1)"
     ]
   }
 }

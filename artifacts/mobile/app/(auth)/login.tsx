@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { customFetch, useLogin } from "@workspace/api-client-react";
-import * as AuthSession from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -30,6 +29,40 @@ import type { AuthUser } from "@/context/AuthContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
+// ─── GIS helpers (web only) ────────────────────────────────────────────────
+
+function loadGISScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).google?.accounts?.id) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Google Sign-In"));
+    document.head.appendChild(s);
+  });
+}
+
+function getGoogleIdTokenWeb(clientId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const g = (window as any).google;
+    if (!g?.accounts?.id) { reject(new Error("Google Sign-In not loaded")); return; }
+    g.accounts.id.initialize({
+      client_id: clientId,
+      callback: (resp: { credential?: string }) => {
+        if (resp.credential) resolve(resp.credential);
+        else reject(new Error("No credential returned"));
+      },
+      cancel_on_tap_outside: false,
+    });
+    g.accounts.id.prompt((n: any) => {
+      if (n.isNotDisplayed()) {
+        reject(new Error("Google Sign-In was blocked by your browser. Please allow popups and try again."));
+      }
+    });
+  });
+}
+
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -50,44 +83,65 @@ export default function LoginScreen() {
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest(
     googleClientId
-      ? {
-          webClientId: googleClientId,
-          redirectUri: AuthSession.makeRedirectUri(),
-        }
+      ? { clientId: googleClientId, webClientId: googleClientId }
       : ({} as Parameters<typeof Google.useIdTokenAuthRequest>[0])
   );
 
+  // Preload GIS script on web so it's ready when the button is pressed
   useEffect(() => {
+    if (Platform.OS !== "web" || !googleClientId) return;
+    loadGISScript().catch(() => {});
+  }, [googleClientId]);
+
+  // Handle native Google auth response
+  useEffect(() => {
+    if (Platform.OS === "web") return;
     if (response?.type === "success") {
       const idToken = (response.params as Record<string, string>)["id_token"];
       if (!idToken) return;
-      setGoogleLoading(true);
-      customFetch<{ token: string; user: AuthUser }>("/api/auth/google/mobile", {
-        method: "POST",
-        body: JSON.stringify({ idToken }),
-        headers: { "Content-Type": "application/json" },
-      })
-        .then(async (data) => {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          await login(data.token, data.user);
-          router.replace(returnTo ? (returnTo as never) : "/(tabs)");
-        })
-        .catch((err: any) => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          if (err?.data?.code === "USE_PASSWORD_SIGNIN") {
-            Alert.alert(
-              t("auth.use_password_signin_title"),
-              t("auth.use_password_signin"),
-            );
-            return;
-          }
-          Alert.alert(t("auth.google_signin_failed"), err?.message ?? "");
-        })
-        .finally(() => setGoogleLoading(false));
+      handleGoogleIdToken(idToken);
     } else if (response?.type === "error") {
       Alert.alert(t("auth.google_signin_failed"), t("auth.google_signin_failed_desc"));
     }
   }, [response]);
+
+  const handleGoogleIdToken = (idToken: string) => {
+    setGoogleLoading(true);
+    customFetch<{ token: string; user: AuthUser }>("/api/auth/google/mobile", {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
+      headers: { "Content-Type": "application/json" },
+    })
+      .then(async (data) => {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await login(data.token, data.user);
+        router.replace(returnTo ? (returnTo as never) : "/(tabs)");
+      })
+      .catch((err: any) => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (err?.data?.code === "USE_PASSWORD_SIGNIN") {
+          Alert.alert(t("auth.use_password_signin_title"), t("auth.use_password_signin"));
+          return;
+        }
+        Alert.alert(t("auth.google_signin_failed"), err?.message ?? "");
+      })
+      .finally(() => setGoogleLoading(false));
+  };
+
+  const handleGooglePress = async () => {
+    if (Platform.OS !== "web") {
+      promptAsync();
+      return;
+    }
+    if (!googleClientId) return;
+    try {
+      await loadGISScript();
+      const idToken = await getGoogleIdTokenWeb(googleClientId);
+      handleGoogleIdToken(idToken);
+    } catch (err: any) {
+      Alert.alert(t("auth.google_signin_failed"), err?.message ?? "");
+    }
+  };
 
   const loginMutation = useLogin({
     mutation: {
@@ -180,8 +234,8 @@ export default function LoginScreen() {
           {!!googleClientId && (
             <TouchableOpacity
               style={[styles.googleBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
-              onPress={() => promptAsync()}
-              disabled={!request || googleLoading || loginMutation.isPending}
+              onPress={handleGooglePress}
+              disabled={(Platform.OS !== "web" && !request) || googleLoading || loginMutation.isPending}
             >
               {googleLoading ? (
                 <ActivityIndicator color={colors.foreground} size="small" />

@@ -26,8 +26,11 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
 
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
-if (domain) {
+if (apiUrl) {
+  setBaseUrl(apiUrl);
+} else if (domain) {
   setBaseUrl(`https://${domain}`);
 }
 

@@ -666,29 +666,9 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {/* Become Vendor CTA */}
-      {user.role === "user" && (
-        <TouchableOpacity
-          style={[styles.becomeVendorCard, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}
-          onPress={() => router.push("/become-vendor")}
-        >
-          <View style={[styles.becomeVendorIcon, { backgroundColor: colors.primary + "20" }]}>
-            <Ionicons name="business-outline" size={24} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.becomeVendorTitle, { color: colors.foreground }]}>{t("profile.list_venue")}</Text>
-            <Text style={[styles.becomeVendorSub, { color: colors.mutedForeground }]}>{t("profile.apply_partner")}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-        </TouchableOpacity>
-      )}
-
       {/* Menu */}
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
-          ...(user.role === "user"
-            ? [{ icon: "business-outline" as const, label: t("profile.become_partner"), onPress: () => router.push("/become-vendor"), badge: 0 }]
-            : []),
           { icon: "notifications-outline" as const, label: "Notifications", onPress: () => router.push("/notifications"), badge: unreadCount },
           { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings"), badge: 0 },
           { icon: "heart-outline" as const, label: t("profile.wishlist"), onPress: () => router.push("/(tabs)/wishlist"), badge: 0 },

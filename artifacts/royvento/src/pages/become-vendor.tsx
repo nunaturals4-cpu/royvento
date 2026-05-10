@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/SEO";
 import { Input } from "@/components/ui/input";
@@ -7,20 +7,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { LocationSelect } from "@/components/LocationSelect";
 import { useToast } from "@/hooks/use-toast";
-import { apiPost } from "@/lib/api";
-import { Sparkles, MapPin, CheckCircle2 } from "lucide-react";
+import { apiGet, apiPost } from "@/lib/api";
+import { Sparkles, MapPin, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
+
+interface VendorRequest {
+  id: number;
+  businessName: string;
+  category: string;
+  status: string;
+  createdAt: string;
+}
 
 const VENUE_CATEGORIES = [
   "Pub",
-  "Bar",
-  "Club",
-  "Lounge",
-  "Rooftop",
-  "Restaurant",
-  "Live Music Venue",
-  "Comedy Club",
-  "Other",
 ] as const;
 
 export function BecomeVendor() {
@@ -33,6 +33,13 @@ export function BecomeVendor() {
   const [city, setCity] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [existingRequest, setExistingRequest] = useState<VendorRequest | null | undefined>(undefined);
+
+  useEffect(() => {
+    apiGet<{ request: VendorRequest | null }>("/api/vendor-requests/me")
+      .then((r) => setExistingRequest(r.request))
+      .catch(() => setExistingRequest(null));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +86,53 @@ export function BecomeVendor() {
     );
   }
 
+  if (existingRequest === undefined) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl flex items-center justify-center min-h-[40vh]">
+        <p className="text-muted-foreground text-sm animate-pulse">Checking your application…</p>
+      </div>
+    );
+  }
+
+  if (existingRequest?.status === "pending") {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl flex flex-col items-center text-center">
+        <SEO title="Application Under Review" canonical="/dashboard/become-vendor" noindex />
+        <div className="w-20 h-20 rounded-full bg-amber-500/10 flex items-center justify-center mb-6">
+          <Clock className="h-10 w-10 text-amber-500" />
+        </div>
+        <h1 className="font-serif text-4xl tracking-tight mb-3">Application under review</h1>
+        <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
+          Your application for <strong className="text-foreground">{existingRequest.businessName}</strong> is being reviewed by our team. We'll notify you once a decision has been made.
+        </p>
+        <p className="text-sm text-muted-foreground mt-4">
+          You can re-apply only if your application is declined.
+        </p>
+        <Link href="/dashboard/profile" className="mt-8">
+          <Button variant="outline">Back to profile</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (existingRequest?.status === "approved") {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl flex flex-col items-center text-center">
+        <SEO title="Already a Partner" canonical="/dashboard/become-vendor" noindex />
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+          <CheckCircle2 className="h-10 w-10 text-primary" />
+        </div>
+        <h1 className="font-serif text-4xl tracking-tight mb-3">You're already a partner!</h1>
+        <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
+          Your application was approved. Head to your vendor dashboard to manage your listing.
+        </p>
+        <Link href="/vendor/dashboard" className="mt-8">
+          <Button className="bg-primary text-primary-foreground">Go to dashboard</Button>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-14 max-w-2xl">
       <SEO title="Become a Royvento Partner" canonical="/dashboard/become-vendor" noindex />
@@ -90,7 +144,17 @@ export function BecomeVendor() {
       <p className="mt-2 text-muted-foreground">
         Tell us about your pub. Once an admin approves your request, you'll be able to publish your listing and accept bookings.
       </p>
-      <form onSubmit={submit} className="mt-10 rounded-3xl border bg-card p-8 space-y-5">
+
+      {existingRequest?.status === "rejected" && (
+        <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            Your previous application was declined. You're welcome to submit a new one.
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={submit} className="mt-8 rounded-3xl border bg-card p-8 space-y-5">
         <div>
           <Label htmlFor="bname">Business name</Label>
           <Input id="bname" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. The Royal Arms Pub" />

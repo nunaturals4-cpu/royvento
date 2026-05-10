@@ -313,7 +313,7 @@ export default function EventDetailScreen() {
     enabled: !!eventId,
   });
 
-  const vendorId = (event as unknown as EventWithVendor).vendorId ?? (event as unknown as EventWithVendor).vendor?.id;
+  const vendorId = (event as unknown as EventWithVendor)?.vendorId ?? (event as unknown as EventWithVendor)?.vendor?.id;
   const { data: drinkPlans = [] } = useListVendorDrinkPlans(vendorId ?? 0, {
     query: { queryKey: getListVendorDrinkPlansQueryKey(vendorId ?? 0), enabled: isPub && !!vendorId },
   });
