@@ -484,10 +484,10 @@ router.get("/auth/google/callback", async (req, res) => {
         .limit(1);
       if (emailRows[0]) {
         // Strict separation: this email is already registered with a
-        // password. Don't merge — bounce to /login so they can sign in
-        // with their existing method.
-        const emailParam = encodeURIComponent(profile.email);
-        res.redirect(`/login?error=email_signed_up_with_password&email=${emailParam}`);
+        // password. Don't merge — bounce to /login. Don't echo the email
+        // back in the URL: keeps it out of browser history / referrers
+        // and avoids signaling "this email exists" via a pre-filled form.
+        res.redirect(`/login?error=email_signed_up_with_password`);
         return;
       }
     }

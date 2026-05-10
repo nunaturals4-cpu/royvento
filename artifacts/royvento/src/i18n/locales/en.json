@@ -82,7 +82,7 @@
     "use_google_signin_title": "Continue with Google",
     "use_google_signin": "This email is registered with Google. Please continue with Google to sign in.",
     "use_password_signin_title": "Sign in with your password",
-    "use_password_signin": "This email already has a Royvento account with a password. Sign in with your password below."
+    "use_password_signin": "This email already has a Royvento account with a password."
   },
   "home": {
     "hero_eyebrow": "India's premier pub booking platform",
