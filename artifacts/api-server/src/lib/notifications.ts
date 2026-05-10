@@ -24,8 +24,19 @@ function getFromAddress(): string {
   return process.env["RESEND_FROM_EMAIL"] ?? "Royvento <onboarding@resend.dev>";
 }
 
+const PRODUCTION_APP_URL = "https://royvento.com";
+
 function getAppUrl(): string {
-  if (process.env["APP_URL"]) return process.env["APP_URL"];
+  // Explicit override wins (preview deploys, staging).
+  if (process.env["APP_URL"]) return process.env["APP_URL"].replace(/\/+$/, "");
+
+  // Production = royvento.com — must come before Railway/Replit envs so the
+  // user-facing URL in emails is the canonical domain, not the platform host.
+  if (process.env["NODE_ENV"] === "production") return PRODUCTION_APP_URL;
+
+  const railwayDomain = process.env["RAILWAY_PUBLIC_DOMAIN"];
+  if (railwayDomain) return `https://${railwayDomain}`;
+
   const productionDomains = process.env["REPLIT_DOMAINS"];
   if (productionDomains) {
     const domain = productionDomains.split(",")[0]?.trim();
@@ -33,6 +44,7 @@ function getAppUrl(): string {
   }
   const devDomain = process.env["REPLIT_DEV_DOMAIN"];
   if (devDomain) return `https://${devDomain}`;
+
   return "http://localhost:3000";
 }
 

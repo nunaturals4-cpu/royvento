@@ -241,7 +241,15 @@ export function isPhonePeConfigured(): boolean {
 }
 
 export function getAppUrl(): string {
-  if (process.env["APP_URL"]) return process.env["APP_URL"];
+  if (process.env["APP_URL"]) return process.env["APP_URL"].replace(/\/+$/, "");
+
+  // Production = royvento.com — PhonePe redirect/callback URLs must hit the
+  // canonical domain, not the platform host.
+  if (process.env["NODE_ENV"] === "production") return "https://royvento.com";
+
+  const railwayDomain = process.env["RAILWAY_PUBLIC_DOMAIN"];
+  if (railwayDomain) return `https://${railwayDomain}`;
+
   const productionDomains = process.env["REPLIT_DOMAINS"];
   if (productionDomains) {
     const domain = productionDomains.split(",")[0]?.trim();
@@ -249,5 +257,6 @@ export function getAppUrl(): string {
   }
   const devDomain = process.env["REPLIT_DEV_DOMAIN"];
   if (devDomain) return `https://${devDomain}`;
+
   return "http://localhost:3000";
 }
