@@ -27,6 +27,7 @@ import { CityPickerSheet } from "@/components/CityPickerSheet";
 import { EventCard } from "@/components/EventCard";
 import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
+import { useAuth } from "@/context/AuthContext";
 import { useSelectedCity } from "@/context/CityContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
@@ -96,6 +97,8 @@ export default function HomeScreen() {
   const { t } = useLanguage();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const isLoggedIn = !!user;
   const { selectedCity, setSelectedCity } = useSelectedCity();
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
@@ -188,6 +191,53 @@ export default function HomeScreen() {
         selectedCity={selectedCity}
         onSelect={setSelectedCity}
       />
+
+      {/* Hero CTAs + stats */}
+      <View style={styles.heroCtaWrap}>
+        <View style={styles.heroCtaRow}>
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/pubs")}
+            style={[styles.heroCtaPrimary, { backgroundColor: colors.primary }]}
+          >
+            <Text style={[styles.heroCtaPrimaryText, { color: colors.primaryForeground }]}>
+              {t("home.browse_pubs")}
+            </Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.primaryForeground} />
+          </TouchableOpacity>
+          {!isLoggedIn ? (
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/register")}
+              style={[styles.heroCtaSecondary, { borderColor: colors.border, backgroundColor: colors.muted }]}
+            >
+              <Text style={[styles.heroCtaSecondaryText, { color: colors.foreground }]}>
+                {t("home.join_free")}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={[styles.statsRow, { borderColor: colors.border }]}>
+          <View style={styles.statCol}>
+            <Text style={[styles.statNum, { color: colors.foreground }]}>200+</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+              {t("home.verified_pubs")}
+            </Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statCol}>
+            <Text style={[styles.statNum, { color: colors.foreground }]}>15K</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+              {t("home.tickets_booked")}
+            </Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statCol}>
+            <Text style={[styles.statNum, { color: colors.foreground }]}>4.9★</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+              {t("home.avg_rating")}
+            </Text>
+          </View>
+        </View>
+      </View>
 
       {/* Popular Pubs */}
       {(popular.data?.length ?? 0) > 0 && (
@@ -430,6 +480,51 @@ export default function HomeScreen() {
           />
         </Section>
       )}
+
+      {/* Why Royvento — feature value props */}
+      <View style={styles.featureSection}>
+        {[
+          { icon: "shield-checkmark-outline" as const, title: t("home.feature1_title"), body: t("home.feature1_body") },
+          { icon: "sparkles-outline" as const, title: t("home.feature2_title"), body: t("home.feature2_body") },
+          { icon: "star-outline" as const, title: t("home.feature3_title"), body: t("home.feature3_body") },
+        ].map((f) => (
+          <View
+            key={f.title}
+            style={[styles.featureCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <View style={[styles.featureIcon, { backgroundColor: colors.primary + "1A" }]}>
+              <Ionicons name={f.icon} size={20} color={colors.primary} />
+            </View>
+            <Text style={[styles.featureTitle, { color: colors.foreground }]}>{f.title}</Text>
+            <Text style={[styles.featureBody, { color: colors.mutedForeground }]}>{f.body}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Premium CTA */}
+      <Pressable
+        onPress={() => router.push("/subscription")}
+        style={[styles.premiumCta, { borderColor: colors.primary + "40" }]}
+      >
+        <LinearGradient
+          colors={[colors.primary + "1A", colors.primary + "0A"]}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[styles.premiumBadge, { backgroundColor: colors.primary + "26", borderColor: colors.primary + "66" }]}>
+          <Ionicons name="ribbon-outline" size={11} color={colors.primary} />
+          <Text style={[styles.premiumBadgeText, { color: colors.primary }]}>Royvento Premium</Text>
+        </View>
+        <Text style={[styles.premiumHeading, { color: colors.foreground }]}>
+          Host an event people remember.
+        </Text>
+        <Text style={[styles.premiumSub, { color: colors.mutedForeground }]}>
+          Subscribe for early-access drops, members-only pubs, complimentary upgrades and a partner concierge.
+        </Text>
+        <View style={[styles.premiumGo, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.premiumGoText, { color: colors.primaryForeground }]}>Learn more</Text>
+          <Ionicons name="arrow-forward" size={14} color={colors.primaryForeground} />
+        </View>
+      </Pressable>
 
       <MobileFooter />
       <View style={{ height: BOTTOM_NAV_HEIGHT + insets.bottom + 16 }} />
@@ -687,6 +782,147 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   drinkCtaText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  heroCtaWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+    gap: 16,
+  },
+  heroCtaRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  heroCtaPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 999,
+  },
+  heroCtaPrimaryText: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.2,
+  },
+  heroCtaSecondary: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  heroCtaSecondaryText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 8,
+    borderTopWidth: 1,
+  },
+  statCol: {
+    flex: 1,
+    alignItems: "flex-start",
+    gap: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 36,
+    marginHorizontal: 4,
+  },
+  statNum: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.4,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  featureSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  featureCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+    gap: 8,
+  },
+  featureIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  featureTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
+  },
+  featureBody: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 19,
+  },
+  premiumCta: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 24,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 22,
+    gap: 10,
+    overflow: "hidden",
+  },
+  premiumBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  premiumBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 1.4,
+  },
+  premiumHeading: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.4,
+    lineHeight: 28,
+  },
+  premiumSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 19,
+  },
+  premiumGo: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  premiumGoText: {
     fontSize: 13,
     fontFamily: "Inter_700Bold",
   },

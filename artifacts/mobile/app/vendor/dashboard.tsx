@@ -1919,21 +1919,25 @@ export default function VendorDashboardScreen() {
               <>
                 <Text style={[styles.freeEntrySubLabel, { color: colors.mutedForeground }]}>Free for which genders?</Text>
                 <View style={styles.chipRow}>
-                  {(["Everyone", "Ladies", "Men", "Couples"] as const).map((g) => (
+                  {([
+                    { canon: "women" as const, label: "Ladies" },
+                    { canon: "men" as const, label: "Men" },
+                    { canon: "couple" as const, label: "Couples" },
+                  ]).map(({ canon, label }) => (
                     <TouchableOpacity
-                      key={g}
+                      key={canon}
                       style={[styles.chip, {
-                        borderColor: form.freeEntryGenders.includes(g) ? "#22c55e" : colors.border,
-                        backgroundColor: form.freeEntryGenders.includes(g) ? "#22c55e20" : colors.card,
+                        borderColor: form.freeEntryGenders.includes(canon) ? "#22c55e" : colors.border,
+                        backgroundColor: form.freeEntryGenders.includes(canon) ? "#22c55e20" : colors.card,
                       }]}
                       onPress={() => setForm((p) => ({
                         ...p,
-                        freeEntryGenders: p.freeEntryGenders.includes(g)
-                          ? p.freeEntryGenders.filter((x) => x !== g)
-                          : [...p.freeEntryGenders, g],
+                        freeEntryGenders: p.freeEntryGenders.includes(canon)
+                          ? p.freeEntryGenders.filter((x) => x !== canon)
+                          : [...p.freeEntryGenders, canon],
                       }))}
                     >
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: form.freeEntryGenders.includes(g) ? "#22c55e" : colors.mutedForeground }}>{g}</Text>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: form.freeEntryGenders.includes(canon) ? "#22c55e" : colors.mutedForeground }}>{label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

@@ -44,6 +44,7 @@ export default function PubsScreen() {
   const [freeEntry, setFreeEntry] = useState(false);
   const [drinkDeal, setDrinkDeal] = useState(false);
   const [drinkPlanType, setDrinkPlanType] = useState<DrinkPlanType>("");
+  const [crowdLevel, setCrowdLevel] = useState<"" | "low" | "moderate" | "party">("");
 
   const priceRange = PRICE_RANGES[priceRangeIdx];
 
@@ -69,7 +70,10 @@ export default function PubsScreen() {
       !freeEntry ||
       (e.freeEntryRules?.enabled === true && (e.freeEntryRules?.days?.length ?? 0) > 0);
     const matchDrinkDeal = !drinkDeal || !!drinkPlanType || e.hasDrinkPlans === true;
-    return matchSearch && matchFreeEntry && matchDrinkDeal;
+    const matchCrowd =
+      !crowdLevel ||
+      (e as { vendorCrowdLevel?: string | null }).vendorCrowdLevel === crowdLevel;
+    return matchSearch && matchFreeEntry && matchDrinkDeal && matchCrowd;
   });
 
   return (
@@ -182,6 +186,44 @@ export default function PubsScreen() {
           />
         )}
 
+        {/* Crowd level chips */}
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={[
+            { value: "" as const, label: "Any crowd", icon: "people-outline" as const, color: colors.mutedForeground },
+            { value: "low" as const, label: "Low", icon: "leaf-outline" as const, color: "#16a34a" },
+            { value: "moderate" as const, label: "Moderate", icon: "flame-outline" as const, color: "#d97706" },
+            { value: "party" as const, label: "🔥 High", icon: "flame" as const, color: "#dc2626" },
+          ]}
+          keyExtractor={(o) => o.value || "any"}
+          contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+          renderItem={({ item }) => {
+            const active = crowdLevel === item.value;
+            return (
+              <Pressable
+                onPress={() => setCrowdLevel(item.value)}
+                style={[
+                  styles.pill,
+                  {
+                    backgroundColor: active ? item.color : colors.muted,
+                    borderColor: active ? item.color : colors.border,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={item.icon}
+                  size={12}
+                  color={active ? "#fff" : colors.mutedForeground}
+                />
+                <Text style={[styles.pillText, { color: active ? "#fff" : colors.mutedForeground }]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          }}
+        />
+
         {/* Price Range Filter */}
         <FlatList
           horizontal
@@ -255,7 +297,7 @@ export default function PubsScreen() {
             <Ionicons name="beer-outline" size={48} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Pubs Found</Text>
             <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-              {search || city !== "All Cities" || freeEntry || drinkDeal
+              {search || city !== "All Cities" || freeEntry || drinkDeal || crowdLevel
                 ? "Try different filters"
                 : "Check back soon for new venues"}
             </Text>

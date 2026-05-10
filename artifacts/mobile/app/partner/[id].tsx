@@ -3,10 +3,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import {
   customFetch,
   getGetReviewEligibilityQueryKey,
+  getGetWishlistQueryKey,
   getListVendorReviewsQueryKey,
+  useAddToWishlist,
   useGetVendor,
+  useGetWishlist,
   useListEvents,
   useListVendorReviews,
+  useRemoveFromWishlist,
 } from "@workspace/api-client-react";
 import type { Vendor } from "@workspace/api-client-react";
 import { useQueryClient as useQC } from "@tanstack/react-query";
@@ -284,6 +288,44 @@ export default function PartnerDetailScreen() {
   // fall back to the first event (matches the web Book a Table CTA).
   const primaryBookEvent =
     vendorEvents.find((e) => e.type === "pub") ?? vendorEvents[0] ?? null;
+  const pubEvent = vendorEvents.find((e) => e.type === "pub") ?? null;
+  const pubEventTypes: string[] = (pubEvent as { pubEventTypes?: string[] } | null)?.pubEventTypes ?? [];
+  const upcomingEventCount = vendorEvents.filter((e) => e.type !== "pub").length;
+
+  // Wishlist (operates on the pub event id, matching web behaviour)
+  const { data: wishlistItems } = useGetWishlist({
+    query: { queryKey: getGetWishlistQueryKey(), enabled: !!user },
+  });
+  const inWishlist = pubEvent ? (wishlistItems ?? []).some((w) => w.id === pubEvent.id) : false;
+  const addToWishlist = useAddToWishlist({
+    mutation: {
+      onSuccess: () => reviewsQc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }),
+    },
+  });
+  const removeFromWishlist = useRemoveFromWishlist({
+    mutation: {
+      onSuccess: () => reviewsQc.invalidateQueries({ queryKey: getGetWishlistQueryKey() }),
+    },
+  });
+  const onToggleWishlist = () => {
+    if (!user) {
+      router.push("/(auth)/login");
+      return;
+    }
+    if (!pubEvent) return;
+    if (inWishlist) {
+      removeFromWishlist.mutate({ eventId: pubEvent.id });
+    } else {
+      addToWishlist.mutate({ data: { eventId: pubEvent.id } });
+    }
+  };
+
+  // Crowd level (matches web hero crowd badge)
+  const crowdLevel = (vendor as (Vendor & { crowdLevel?: string | null }) | undefined)?.crowdLevel ?? null;
+
+  // Refs for scroll-to-events when "See upcoming events" pressed
+  const scrollRef = React.useRef<ScrollView | null>(null);
+  const eventsAnchorY = React.useRef(0);
   const avgRating = vendor && vendor.reviewCount > 0
     ? vendor.rating.toFixed(1)
     : null;
@@ -306,6 +348,7 @@ export default function PartnerDetailScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={{ flex: 1, backgroundColor: colors.background }}
       showsVerticalScrollIndicator={false}
     >
@@ -334,13 +377,27 @@ export default function PartnerDetailScreen() {
           style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 240 }}
           pointerEvents="none"
         />
-        <View style={[styles.backOverlay, { paddingTop: topPadding + 8 }]}>
+        <View style={[styles.backOverlay, { paddingTop: topPadding + 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
           <Pressable
             onPress={() => router.back()}
             style={[styles.backBtn, { backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }]}
           >
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </Pressable>
+          {pubEvent ? (
+            <Pressable
+              onPress={onToggleWishlist}
+              accessibilityRole="button"
+              accessibilityLabel={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+              style={[styles.backBtn, { backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }]}
+            >
+              <Ionicons
+                name={inWishlist ? "heart" : "heart-outline"}
+                size={20}
+                color={inWishlist ? colors.primary : "#fff"}
+              />
+            </Pressable>
+          ) : null}
         </View>
         {/* Badges + title overlaid on hero bottom */}
         <View style={{ position: "absolute", bottom: 18, left: 20, right: 20, gap: 8 }}>
@@ -363,6 +420,21 @@ export default function PartnerDetailScreen() {
                 <Text style={[styles.ratingCount, { color: "rgba(255,255,255,0.6)", fontSize: 11 }]}>({vendor!.reviewCount})</Text>
               </View>
             ) : null}
+            {(() => {
+              if (!crowdLevel) return null;
+              const cfg: Record<string, { label: string; bg: string }> = {
+                low: { label: "Low Crowd", bg: "rgba(22,163,74,0.85)" },
+                moderate: { label: "Moderate Crowd", bg: "rgba(217,119,6,0.85)" },
+                party: { label: "🔥 High Crowd", bg: "rgba(220,38,38,0.85)" },
+              };
+              const c = cfg[crowdLevel];
+              if (!c) return null;
+              return (
+                <View style={[styles.badge, { backgroundColor: c.bg, borderWidth: 1, borderColor: "rgba(255,255,255,0.22)" }]}>
+                  <Text style={[styles.badgeText, { color: "#fff" }]}>{c.label}</Text>
+                </View>
+              );
+            })()}
           </View>
           <Text style={[styles.vendorName, { color: "#fff", textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }]}>{vendor.businessName}</Text>
           <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_400Regular" }}>
@@ -374,38 +446,66 @@ export default function PartnerDetailScreen() {
       <View style={styles.content}>
         {/* Primary Book a Table CTA — opens the booking form directly. */}
         {primaryBookEvent ? (
-          <TouchableOpacity
-            onPress={() =>
-              router.push({
-                pathname: "/event/[id]",
-                params: { id: String(primaryBookEvent.id), book: "1" },
-              })
-            }
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              backgroundColor: colors.primary,
-              borderRadius: 14,
-              paddingVertical: 14,
-              paddingHorizontal: 18,
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t("events.book_table")}
-          >
-            <Ionicons name="calendar" size={18} color={colors.primaryForeground} />
-            <Text
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/event/[id]",
+                  params: { id: String(primaryBookEvent.id), book: "1" },
+                })
+              }
               style={{
-                color: colors.primaryForeground,
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 15,
-                letterSpacing: 0.2,
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                backgroundColor: colors.primary,
+                borderRadius: 14,
+                paddingVertical: 14,
+                paddingHorizontal: 18,
+                minWidth: 160,
               }}
+              accessibilityRole="button"
+              accessibilityLabel={t("events.book_table")}
             >
-              {t("events.book_table")}
-            </Text>
-          </TouchableOpacity>
+              <Ionicons name="calendar" size={18} color={colors.primaryForeground} />
+              <Text
+                style={{
+                  color: colors.primaryForeground,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 15,
+                  letterSpacing: 0.2,
+                }}
+              >
+                {t("events.book_table")}
+              </Text>
+            </TouchableOpacity>
+            {upcomingEventCount > 0 ? (
+              <TouchableOpacity
+                onPress={() => scrollRef.current?.scrollTo({ y: eventsAnchorY.current - 16, animated: true })}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  backgroundColor: colors.muted,
+                  borderRadius: 14,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="See upcoming events"
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.foreground} />
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  See upcoming events
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
 
         {/* Location row */}
@@ -502,6 +602,18 @@ export default function PartnerDetailScreen() {
                   </Text>
                 </View>
               </View>
+              {todayTimes ? (
+                <View style={[styles.todayCard, { borderColor: colors.primary + "40", backgroundColor: colors.primary + "10" }]}>
+                  <Ionicons name="time-outline" size={14} color={colors.primary} />
+                  <Text style={[styles.todayCardLabel, { color: colors.mutedForeground }]}>
+                    Today ({DAY_FULL[todayKey]}):
+                  </Text>
+                  <Text style={[styles.todayCardTime, { color: colors.primary }]}>
+                    {fmt(todayTimes.open)} – {fmt(todayTimes.close)}
+                    {toMin(todayTimes.close) < toMin(todayTimes.open) ? " (next day)" : ""}
+                  </Text>
+                </View>
+              ) : null}
               <View style={[styles.hoursCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {DAY_ORDER.map((day, i) => {
                   const times = hours[day] ?? null;
@@ -548,25 +660,103 @@ export default function PartnerDetailScreen() {
           </View>
         ) : null}
 
-        {/* Dance Floor Photos */}
-        {vendor.danceFloor === "dedicated" && (vendor.danceFloorPhotos ?? []).length > 0 ? (
+        {/* Find us — Google Maps deep link */}
+        {vendor.address ? (
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Find us</Text>
+            </View>
+            <Pressable
+              onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(vendor.address!)}`)}
+              style={{
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.card,
+                padding: 14,
+                gap: 8,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="location-sharp" size={16} color={colors.primary} />
+                <Text style={{ flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", color: colors.foreground, lineHeight: 20 }}>
+                  {vendor.address}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="open-outline" size={13} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
+                  Open in Google Maps
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* What we host — pub event types */}
+        {pubEventTypes.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>What we host</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {pubEventTypes.map((eventType) => (
+                <View
+                  key={eventType}
+                  style={{
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: colors.primary + "55",
+                    backgroundColor: colors.primary + "1A",
+                    paddingHorizontal: 14,
+                    paddingVertical: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primary }}>{eventType}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Dance Floor — all three states (dedicated / general / none), with photos when dedicated */}
+        {vendor.danceFloor ? (
           <View style={{ gap: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Ionicons name="musical-notes-outline" size={16} color={colors.primary} />
-              <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: colors.foreground }}>Dance Floor</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Dance floor</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
-              <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 10 }}>
-                {(vendor.danceFloorPhotos ?? []).map((img, i) => (
-                  <Image
-                    key={i}
-                    source={{ uri: img }}
-                    style={{ width: 140, height: 100, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
-                    contentFit="cover"
-                  />
-                ))}
-              </View>
-            </ScrollView>
+            <View style={{ flexDirection: "row" }}>
+              {vendor.danceFloor === "dedicated" ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.primary + "55", backgroundColor: colors.primary + "1A", paddingHorizontal: 14, paddingVertical: 8 }}>
+                  <Ionicons name="musical-notes" size={14} color={colors.primary} />
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primary }}>Dedicated dance floor</Text>
+                </View>
+              ) : vendor.danceFloor === "general" ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.muted, paddingHorizontal: 14, paddingVertical: 8 }}>
+                  <Ionicons name="musical-notes-outline" size={14} color={colors.mutedForeground} />
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Dancing in main area</Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(0,0,0,0.18)", paddingHorizontal: 14, paddingVertical: 8 }}>
+                  <Ionicons name="remove-circle-outline" size={14} color={colors.mutedForeground} />
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>No dancing / seated only</Text>
+                </View>
+              )}
+            </View>
+            {vendor.danceFloor === "dedicated" && (vendor.danceFloorPhotos ?? []).length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
+                <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 10 }}>
+                  {(vendor.danceFloorPhotos ?? []).map((img, i) => (
+                    <Image
+                      key={i}
+                      source={{ uri: img }}
+                      style={{ width: 140, height: 100, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+                      contentFit="cover"
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            ) : null}
           </View>
         ) : null}
 
@@ -591,7 +781,10 @@ export default function PartnerDetailScreen() {
 
         {/* Events */}
         {vendorEvents.length > 0 ? (
-          <View style={{ gap: 10 }}>
+          <View
+            style={{ gap: 10 }}
+            onLayout={(e) => { eventsAnchorY.current = e.nativeEvent.layout.y; }}
+          >
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Events & Listings</Text>
             <FlatList
               horizontal
@@ -733,4 +926,16 @@ const styles = StyleSheet.create({
   openDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22c55e" },
   todayPill: { borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   todayPillText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.3 },
+  todayCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexWrap: "wrap",
+  },
+  todayCardLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  todayCardTime: { fontSize: 13, fontFamily: "Inter_700Bold" },
 });

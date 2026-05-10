@@ -29,6 +29,7 @@ interface Blog {
   content: string;
   imageUrl: string | null;
   category: string | null;
+  tags?: string[] | null;
   author: string | null;
   publishedAt: string | null;
   createdAt: string;
@@ -221,6 +222,19 @@ export default function BlogDetailScreen() {
           </View>
         </View>
 
+        {(blog.tags ?? []).length > 0 ? (
+          <View style={styles.tagRow}>
+            {(blog.tags ?? []).map((tag) => (
+              <View
+                key={tag}
+                style={[styles.tagChip, { backgroundColor: colors.muted, borderColor: colors.border }]}
+              >
+                <Text style={[styles.tagText, { color: colors.mutedForeground }]}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {blog.excerpt && (
           <Text style={[styles.excerpt, { color: colors.mutedForeground }]}>{blog.excerpt}</Text>
         )}
@@ -265,6 +279,9 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", gap: 16, flexWrap: "wrap" },
   metaItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   metaText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
+  tagChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
+  tagText: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.3 },
   excerpt: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 23, fontStyle: "italic" },
   headerDivider: { borderBottomWidth: 1, marginHorizontal: 24, marginBottom: 20 },
   content: { paddingHorizontal: 24 },

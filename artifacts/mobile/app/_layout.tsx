@@ -228,6 +228,8 @@ export default function RootLayout() {
                   <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
                   <Stack.Screen name="partner/[id]" options={{ headerShown: false }} />
                   <Stack.Screen name="vendor/dashboard" options={{ headerShown: false }} />
+                  <Stack.Screen name="city/[city]/index" options={{ headerShown: false }} />
+                  <Stack.Screen name="city/[city]/[locality]" options={{ headerShown: false }} />
                   <Stack.Screen name="+not-found" />
                 </Stack>
               </ErrorBoundary>
