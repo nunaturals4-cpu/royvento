@@ -44,6 +44,14 @@ export function Login() {
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
   const [noAccount, setNoAccount] = useState(false);
+  const [useGoogleHint, setUseGoogleHint] = useState(false);
+  const [usePasswordHint, setUsePasswordHint] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("error") === "email_signed_up_with_password";
+    } catch {
+      return false;
+    }
+  });
   const formErrors = useFormErrors();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -75,6 +83,8 @@ export function Login() {
     e.preventDefault();
     setUnverifiedEmail("");
     setNoAccount(false);
+    setUseGoogleHint(false);
+    setUsePasswordHint(false);
     formErrors.reset();
     const emailErr = getEmailError(email);
     if (emailErr) formErrors.setFieldError("email", emailErr);
@@ -100,6 +110,8 @@ export function Login() {
             else passwordRef.current?.focus();
           } else if (code === "EMAIL_NOT_VERIFIED" || /EMAIL_NOT_VERIFIED|verify your email/i.test(serverMsg)) {
             setUnverifiedEmail(email);
+          } else if (code === "USE_GOOGLE_SIGNIN") {
+            setUseGoogleHint(true);
           } else if (code === "NO_ACCOUNT" || err?.status === 404) {
             setNoAccount(true);
             formErrors.setFieldError("email", "No account found for that email.");
@@ -152,6 +164,40 @@ export function Login() {
                 >
                   {resendBusy ? t("auth.resend_sending") : t("auth.resend_verification")}
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* This email signed up with Google — offer the right path inline. */}
+        {useGoogleHint && (
+          <div className="mb-6 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+            <div className="flex gap-3 items-start">
+              <GoogleIcon />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-blue-300 mb-1">{t("auth.use_google_signin_title")}</p>
+                <p className="text-xs text-blue-200/80 mb-3">{t("auth.use_google_signin")}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-500/40 text-blue-300 hover:bg-blue-500/10 h-8 text-xs gap-2"
+                  onClick={handleGoogle}
+                >
+                  <GoogleIcon /> {t("auth.continue_google")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Landed here from Google callback because email already has a password account. */}
+        {usePasswordHint && (
+          <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+            <div className="flex gap-3 items-start">
+              <MailWarning className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-emerald-300 mb-1">{t("auth.use_password_signin_title")}</p>
+                <p className="text-xs text-emerald-200/80">{t("auth.use_password_signin")}</p>
               </div>
             </div>
           </div>

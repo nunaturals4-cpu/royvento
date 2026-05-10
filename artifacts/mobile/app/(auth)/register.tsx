@@ -51,6 +51,7 @@ export default function RegisterScreen() {
       onError: (err: any) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         const status = err?.status;
+        const code = err?.data?.code ?? err?.code;
         const serverMsg = err?.data?.error ?? err?.message ?? "";
         const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
         if (Object.keys(fe).length > 0) {
@@ -58,6 +59,13 @@ export default function RegisterScreen() {
           if (fe.name) nameRef.current?.focus();
           else if (fe.email) emailRef.current?.focus();
           else if (fe.password) passwordRef.current?.focus();
+          return;
+        }
+        if (code === "USE_GOOGLE_SIGNIN") {
+          Alert.alert(
+            t("auth.use_google_signin_title"),
+            t("auth.use_google_signin"),
+          );
           return;
         }
         const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);

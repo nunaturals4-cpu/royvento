@@ -72,9 +72,16 @@ export default function LoginScreen() {
           await login(data.token, data.user);
           router.replace(returnTo ? (returnTo as never) : "/(tabs)");
         })
-        .catch((err: Error) => {
+        .catch((err: any) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert(t("auth.google_signin_failed"), err.message);
+          if (err?.data?.code === "USE_PASSWORD_SIGNIN") {
+            Alert.alert(
+              t("auth.use_password_signin_title"),
+              t("auth.use_password_signin"),
+            );
+            return;
+          }
+          Alert.alert(t("auth.google_signin_failed"), err?.message ?? "");
         })
         .finally(() => setGoogleLoading(false));
     } else if (response?.type === "error") {
@@ -105,6 +112,11 @@ export default function LoginScreen() {
           Alert.alert(
             t("auth.email_not_verified"),
             t("auth.email_not_verified_desc"),
+          );
+        } else if (code === "USE_GOOGLE_SIGNIN") {
+          Alert.alert(
+            t("auth.use_google_signin_title"),
+            t("auth.use_google_signin"),
           );
         } else if (code === "NO_ACCOUNT" || status === 404) {
           setErrors((p) => ({

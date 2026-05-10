@@ -101,6 +101,13 @@ router.post("/auth/register", registerLimiter, async (req, res) => {
     .where(eq(usersTable.email, email))
     .limit(1);
   if (existing[0]) {
+    if (existing[0].googleId && existing[0].passwordHash === "") {
+      res.status(409).json({
+        error: "This email signed up with Google. Please continue with Google.",
+        code: "USE_GOOGLE_SIGNIN",
+      });
+      return;
+    }
     res.status(409).json({ error: "Email already in use" });
     return;
   }
@@ -197,6 +204,13 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
   const u = rows[0];
   if (!u) {
     res.status(404).json({ error: "No account found for that email.", code: "NO_ACCOUNT" });
+    return;
+  }
+  if (u.googleId && u.passwordHash === "") {
+    res.status(403).json({
+      error: "This email signed up with Google. Please continue with Google.",
+      code: "USE_GOOGLE_SIGNIN",
+    });
     return;
   }
   const ok = await comparePassword(password, u.passwordHash);
@@ -469,11 +483,12 @@ router.get("/auth/google/callback", async (req, res) => {
         .where(eq(usersTable.email, profile.email))
         .limit(1);
       if (emailRows[0]) {
-        await db
-          .update(usersTable)
-          .set({ googleId: profile.sub, emailVerified: true })
-          .where(eq(usersTable.id, emailRows[0].id));
-        user = { ...emailRows[0], googleId: profile.sub, emailVerified: true };
+        // Strict separation: this email is already registered with a
+        // password. Don't merge — bounce to /login so they can sign in
+        // with their existing method.
+        const emailParam = encodeURIComponent(profile.email);
+        res.redirect(`/login?error=email_signed_up_with_password&email=${emailParam}`);
+        return;
       }
     }
 
@@ -535,6 +550,13 @@ router.post("/auth/forgot-password", forgotPasswordLimiter, async (req, res) => 
     .where(eq(usersTable.email, parsed.data.email))
     .limit(1);
   if (!rows[0]) {
+    res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
+    return;
+  }
+  // Google-only users have no password to reset. Silently succeed (parity with
+  // the no-account branch above) so we don't leak whether the email is a
+  // Google account, and so the bypass-via-reset path is closed.
+  if (rows[0].googleId && rows[0].passwordHash === "") {
     res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
     return;
   }
@@ -644,11 +666,13 @@ router.post("/auth/google/mobile", async (req, res) => {
         .where(eq(usersTable.email, info.email))
         .limit(1);
       if (emailRows[0]) {
-        await db
-          .update(usersTable)
-          .set({ googleId: info.sub, emailVerified: true })
-          .where(eq(usersTable.id, emailRows[0].id));
-        user = { ...emailRows[0], googleId: info.sub, emailVerified: true };
+        // Strict separation: this email already has a password account.
+        // Tell the mobile client to redirect the user to email/password login.
+        res.status(409).json({
+          error: "This email already has a Royvento account with a password. Please log in with email and password instead.",
+          code: "USE_PASSWORD_SIGNIN",
+        });
+        return;
       }
     }
 

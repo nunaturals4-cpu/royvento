@@ -35,6 +35,7 @@ export function Register() {
   const [busy, setBusy] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
+  const [useGoogleHint, setUseGoogleHint] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [googleEnabled, setGoogleEnabled] = useState(false);
@@ -57,6 +58,7 @@ export function Register() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUseGoogleHint(false);
     formErrors.reset();
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Name is required.";
@@ -86,6 +88,7 @@ export function Register() {
       setPendingEmail(email);
     } catch (err: any) {
       const status = err?.status;
+      const code = err?.data?.code ?? err?.code;
       const serverMsg = err?.data?.error ?? err?.message ?? "";
       const fe: Record<string, string> = err?.data?.fieldErrors ?? err?.fieldErrors ?? {};
       const isDuplicate = status === 409 || /already in use|already exists/i.test(serverMsg);
@@ -95,6 +98,8 @@ export function Register() {
         else if (fe.email) emailRef.current?.focus();
         else if (fe.phone) phoneRef.current?.focus();
         else if (fe.password) passwordRef.current?.focus();
+      } else if (code === "USE_GOOGLE_SIGNIN") {
+        setUseGoogleHint(true);
       } else if (isDuplicate) {
         formErrors.setFieldError("email", "An account with this email already exists.");
         emailRef.current?.focus();
@@ -174,6 +179,31 @@ export function Register() {
       <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring">
         <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">{t("auth.get_started")}</p>
         <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">{t("auth.create_your_account")}</h1>
+
+        {useGoogleHint && (
+          <div className="mb-6 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+            <div className="flex gap-3 items-start">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 mt-0.5">
+                <path fill="#EA4335" d="M12 5.04c2.16 0 4.1.74 5.62 2.18l4.18-4.18C19.16.96 15.84-.5 12-.5 7.27-.5 3.2 2.2 1.18 6.16l4.86 3.78C7.04 6.94 9.3 5.04 12 5.04z" />
+                <path fill="#4285F4" d="M23.5 12.27c0-.83-.07-1.64-.21-2.41H12v4.56h6.46c-.28 1.5-1.13 2.78-2.42 3.64l3.92 3.04c2.29-2.12 3.6-5.24 3.6-8.83z" />
+                <path fill="#FBBC05" d="M6.04 14.06A7.46 7.46 0 0 1 5.66 12c0-.71.13-1.4.36-2.04L1.16 6.16A12 12 0 0 0 0 12c0 1.94.46 3.78 1.28 5.42l4.76-3.36z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.9l-3.92-3.04c-1.08.72-2.46 1.16-4.02 1.16-3.08 0-5.7-2.07-6.64-4.86L1.4 17.72C3.4 21.46 7.4 24 12 24z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-blue-300 mb-1">{t("auth.use_google_signin_title")}</p>
+                <p className="text-xs text-blue-200/80 mb-3">{t("auth.use_google_signin")}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-500/40 text-blue-300 hover:bg-blue-500/10 h-8 text-xs"
+                  onClick={handleGoogle}
+                >
+                  {t("auth.continue_google")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Button
           type="button"
