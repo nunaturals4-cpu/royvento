@@ -648,6 +648,227 @@ router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
   res.json({ ok: true, vendor: { id: v.id, businessName: v.businessName, status: v.status } });
 });
 
+// ── Admin: look up a partner by email (diagnostic before create-pub) ────────
+
+router.get("/admin/lookup-partner", requireAuth(["admin"]), async (req, res) => {
+  const emailRaw = String(req.query["email"] ?? "").trim();
+  if (!emailRaw) {
+    res.status(400).json({ error: "email query param is required" });
+    return;
+  }
+  const normalized = emailRaw.toLowerCase();
+
+  // ilike covers case-insensitive exact match for both normal and Google accounts
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(sql`lower(${usersTable.email}) = ${normalized}`)
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({
+      error: `No account found for "${emailRaw}". Make sure the partner has signed up on Royvento (normal or Google Sign-In) and that the email address is spelled correctly.`,
+    });
+    return;
+  }
+
+  const [vendor] = await db
+    .select()
+    .from(vendorsTable)
+    .where(eq(vendorsTable.userId, user.id))
+    .limit(1);
+
+  const existingPub = vendor
+    ? await db
+        .select({ id: eventsTable.id, title: eventsTable.title })
+        .from(eventsTable)
+        .where(and(eq(eventsTable.vendorId, vendor.id), eq(eventsTable.type, "pub")))
+        .limit(1)
+    : [];
+
+  res.json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      signInMethod: user.googleId ? "Google" : "Email/Password",
+    },
+    vendor: vendor
+      ? {
+          id: vendor.id,
+          businessName: vendor.businessName,
+          status: vendor.status,
+          category: vendor.category,
+          city: vendor.city,
+          state: vendor.state,
+        }
+      : null,
+    existingPub: existingPub[0] ?? null,
+    canCreate:
+      user.role === "vendor" &&
+      vendor?.status === "approved" &&
+      !existingPub[0],
+    blockReason:
+      user.role !== "vendor"
+        ? `Account role is "${user.role}" — partner must complete the Become a Partner application first.`
+        : !vendor
+          ? "No vendor profile found for this account."
+          : vendor.status !== "approved"
+            ? `Vendor profile is "${vendor.status}" — admin must approve it before assigning a listing.`
+            : existingPub[0]
+              ? `Already has a ${vendor.category === "Club" ? "club" : "pub"} listing: "${existingPub[0].title}" (#${existingPub[0].id}).`
+              : null,
+  });
+});
+
+// ── Admin: create pub and assign to a partner by email ───────────────────────
+
+router.post("/admin/create-pub", requireAuth(["admin"]), async (req, res) => {
+  const {
+    email, title, description, location, city, state, country,
+    capacity, imageUrl, pubMode, priceWomen, priceMen, priceCouple,
+    galleryImages, galleryVideo,
+    pubEventTypes, dayPricing,
+    freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
+    danceFloor, danceFloorPhotos, menuUrl, menuUrls,
+  } = req.body as {
+    email: string;
+    title: string;
+    description?: string;
+    location?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    capacity?: number;
+    imageUrl?: string;
+    pubMode?: string;
+    priceWomen?: number;
+    priceMen?: number;
+    priceCouple?: number;
+    galleryImages?: string[];
+    galleryVideo?: string;
+    pubEventTypes?: string[];
+    dayPricing?: Record<string, { women: number; men: number; couple: number }>;
+    freeEntryEnabled?: boolean;
+    freeEntryGenders?: string[];
+    freeEntryDays?: string[];
+    freeEntryBeforeTime?: string;
+    danceFloor?: string;
+    danceFloorPhotos?: string[];
+    menuUrl?: string;
+    menuUrls?: string[];
+  };
+
+  if (!email || !title) {
+    res.status(400).json({ error: "email and title are required" });
+    return;
+  }
+
+  // Case-insensitive lookup: Google Sign-In stores email exactly as returned by
+  // Google (e.g. "User@Gmail.com"). Using lower() on both sides ensures we find
+  // the account regardless of how the email was entered or stored.
+  const normalizedEmail = email.trim().toLowerCase();
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(sql`lower(${usersTable.email}) = ${normalizedEmail}`)
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({ error: "No user found with that email. Check that the partner has registered on Royvento (normal sign-up or Google Sign-In)." });
+    return;
+  }
+  if (user.role !== "vendor") {
+    res.status(400).json({ error: `User found (${user.email}) but they are not a pub partner. Their role is '${user.role}'. They must complete the Become a Partner application first.` });
+    return;
+  }
+
+  const [vendor] = await db
+    .select()
+    .from(vendorsTable)
+    .where(eq(vendorsTable.userId, user.id))
+    .limit(1);
+
+  if (!vendor) {
+    res.status(400).json({ error: "Partner has no vendor profile" });
+    return;
+  }
+  if (vendor.status !== "approved") {
+    res.status(400).json({ error: "Partner's vendor profile is not yet approved" });
+    return;
+  }
+
+  const existingPub = await db
+    .select({ id: eventsTable.id })
+    .from(eventsTable)
+    .where(and(eq(eventsTable.vendorId, vendor.id), eq(eventsTable.type, "pub")))
+    .limit(1);
+
+  if (existingPub[0]) {
+    const kind = vendor.category === "Club" ? "Club" : "Pub";
+    res.status(409).json({ error: `${kind} already created for this partner` });
+    return;
+  }
+
+  const freeEntryRules =
+    freeEntryEnabled &&
+    (freeEntryGenders?.length ?? 0) > 0 &&
+    (freeEntryDays?.length ?? 0) > 0
+      ? {
+          enabled: true,
+          genders: freeEntryGenders!,
+          days: freeEntryDays!,
+          ...(freeEntryBeforeTime ? { beforeTime: freeEntryBeforeTime } : {}),
+        }
+      : null;
+
+  const [created] = await db
+    .insert(eventsTable)
+    .values({
+      vendorId: vendor.id,
+      title: title.trim(),
+      description: description ?? "",
+      category: vendor.category ?? "Pub",
+      type: "pub",
+      location: location ?? vendor.location ?? "",
+      state: state ?? vendor.state ?? "",
+      city: city ?? vendor.city ?? "",
+      country: country ?? vendor.country ?? "India",
+      price: "0",
+      capacity: capacity ?? 100,
+      imageUrl: imageUrl ?? vendor.bannerImage ?? "",
+      pubMode: pubMode ?? "both",
+      priceWomen: String(priceWomen ?? 0),
+      priceMen: String(priceMen ?? 0),
+      priceCouple: String(priceCouple ?? 0),
+      galleryImages: galleryImages ?? [],
+      galleryVideos: galleryVideo ? [galleryVideo] : [],
+      pubEventTypes: pubEventTypes ?? [],
+      dayPricing: dayPricing && Object.keys(dayPricing).length > 0 ? dayPricing : null,
+      freeEntryRules,
+      approvalStatus: "approved",
+    })
+    .returning();
+
+  // Update vendor profile with dance floor and menu data if provided
+  const menus = (menuUrls && menuUrls.length > 0) ? menuUrls : (menuUrl ? [menuUrl] : []);
+  if (danceFloor !== undefined || (danceFloorPhotos && danceFloorPhotos.length > 0) || menus.length > 0) {
+    const vendorUpdates: Record<string, unknown> = {};
+    if (danceFloor !== undefined) vendorUpdates["danceFloor"] = danceFloor || null;
+    if (danceFloorPhotos && danceFloorPhotos.length > 0) {
+      vendorUpdates["danceFloorPhotos"] = danceFloorPhotos;
+    }
+    if (menus.length > 0) {
+      vendorUpdates["menuUrl"] = menus[0];
+      vendorUpdates["menuUrls"] = menus;
+    }
+    await db.update(vendorsTable).set(vendorUpdates).where(eq(vendorsTable.id, vendor.id));
+  }
+
+  res.json({ ok: true, pubId: created.id, vendorId: vendor.id, partnerName: vendor.businessName });
+});
+
 router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) {

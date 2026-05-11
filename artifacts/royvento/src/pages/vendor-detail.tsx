@@ -114,6 +114,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
   const pubEvent = events.find((e) => e.type === "pub");
   const pubEventTypes: string[] = pubEvent?.pubEventTypes ?? [];
   const danceFloor = vendor.danceFloor;
+  const menuImages: string[] = ((vendor as unknown as { menuUrls?: string[] }).menuUrls ?? []).filter(Boolean);
 
   const inWishlist = pubEvent ? wishlistItems.some((w) => w.id === pubEvent.id) : false;
   const addToWishlist = () => {
@@ -300,9 +301,9 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                 {vendor.address}
               </a>
             )}
-            {vendor.menuUrl && (
+            {(vendor.menuUrl || menuImages.length > 0) && (
               <a
-                href={vendor.menuUrl}
+                href={menuImages[0] || vendor.menuUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary hover:bg-primary/20 transition-colors"
@@ -598,7 +599,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                 </span>
               )}
             </div>
-            {danceFloor === "dedicated" && (vendor.danceFloorPhotos ?? []).length > 0 && (
+            {(vendor.danceFloorPhotos ?? []).length > 0 && (
               <div className="flex gap-3 mt-4 flex-wrap">
                 {(vendor.danceFloorPhotos ?? []).map((url, i) => (
                   <div key={i} className="w-32 h-24 md:w-40 md:h-28 rounded-xl overflow-hidden border border-white/10">
@@ -607,6 +608,20 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                 ))}
               </div>
             )}
+          </section>
+        )}
+
+        {menuImages.length > 0 && (
+          <section>
+            <h2 className="font-serif text-2xl mb-4">Menu</h2>
+            <div className="flex gap-3 flex-wrap">
+              {menuImages.map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                  className="block w-32 h-40 md:w-40 md:h-52 rounded-xl overflow-hidden border border-white/10 hover:border-primary/40 transition-colors">
+                  <img src={url} alt={`Menu page ${i + 1}`} className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
           </section>
         )}
 

@@ -1,4 +1,4 @@
-import { SEO } from "@/components/SEO";
+﻿import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
   useListPendingVendors,
@@ -46,7 +46,7 @@ import {
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
-  Percent, Save,
+  Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -57,13 +57,15 @@ import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation, useSearch } from "wouter";
 import { pubDetailSlug } from "@/lib/seo-slug";
-import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR } from "@/lib/api";
+import { apiGet, apiPost, apiDelete, apiPatch, apiPut, formatINR, PUB_EVENT_TYPES } from "@/lib/api";
+import { uploadImage, validateImageFile } from "@/lib/uploadImage";
+import { cn } from "@/lib/utils";
 
 const ADMIN_TABS = [
   "analytics", "commissions", "vendors", "requests", "event-approvals",
   "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
-  "booking-report", "attendance", "live-occupancy", "crm-leads", "import-pub",
-  "announcement-slider", "settlements", "reviews",
+  "booking-report", "attendance", "live-occupancy", "crm-leads",
+  "create-pub", "announcement-slider", "settlements", "reviews",
 ] as const;
 const DEFAULT_ADMIN_TAB = "analytics";
 const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
@@ -118,7 +120,7 @@ export function AdminPanel() {
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="live-occupancy">Live Occupancy</TabsTrigger>
           <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
-          <TabsTrigger value="import-pub">Import Pub</TabsTrigger>
+          <TabsTrigger value="create-pub">Create Pub/Club</TabsTrigger>
           <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
           <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
@@ -139,7 +141,7 @@ export function AdminPanel() {
         <TabsContent value="attendance"><AttendanceReport /></TabsContent>
         <TabsContent value="live-occupancy"><LiveOccupancyAdmin /></TabsContent>
         <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
-        <TabsContent value="import-pub"><ImportPubFromGoogle /></TabsContent>
+        <TabsContent value="create-pub"><CreatePubAdmin /></TabsContent>
         <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
         <TabsContent value="commissions"><CommissionsAdmin /></TabsContent>
         <TabsContent value="settlements"><SettlementsAdmin /></TabsContent>
@@ -272,7 +274,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground">Loading…</p>
+        <p className="text-muted-foreground">Loading...</p>
       ) : !data ? null : (
       <>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
@@ -298,7 +300,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
           valueClassName="text-amber-300"
           subHint={
             (data as { pendingActualsCount?: number }).pendingActualsCount
-              ? `${data.actualCodRecordedCount ?? 0} recorded · ${(data as { pendingActualsCount?: number }).pendingActualsCount} pending`
+              ? `${data.actualCodRecordedCount ?? 0} recorded Â· ${(data as { pendingActualsCount?: number }).pendingActualsCount} pending`
               : `${data.actualCodRecordedCount ?? 0} bookings recorded`
           }
         />
@@ -316,7 +318,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
             <div className="grid grid-cols-3 gap-4">
               <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
                 <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
-                  <span className="text-pink-400 text-base">♀</span>
+                  <span className="text-pink-400 text-base">â™€</span>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
@@ -326,7 +328,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
               </div>
               <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-                  <span className="text-blue-400 text-base">♂</span>
+                  <span className="text-blue-400 text-base">â™‚</span>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
@@ -336,7 +338,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
               </div>
               <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
                 <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-                  <span className="text-purple-400 text-base">⚭</span>
+                  <span className="text-purple-400 text-base">âš­</span>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
@@ -361,7 +363,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
               <div className="grid grid-cols-3 gap-4">
                 <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
-                    <span className="text-pink-400 text-base">♀</span>
+                    <span className="text-pink-400 text-base">â™€</span>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
@@ -371,7 +373,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
                 </div>
                 <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-                    <span className="text-blue-400 text-base">♂</span>
+                    <span className="text-blue-400 text-base">â™‚</span>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
@@ -381,7 +383,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
                 </div>
                 <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-                    <span className="text-purple-400 text-base">⚭</span>
+                    <span className="text-purple-400 text-base">âš­</span>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
@@ -395,10 +397,10 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
         </div>
       )}
 
-      {/* Monthly revenue bar chart — always shown when data is loaded */}
+      {/* Monthly revenue bar chart -- always shown when data is loaded */}
       {(adminData.monthlyRevenue ?? []).length > 0 && (
         <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-5">Monthly revenue — {presetLabel[preset]}</h3>
+          <h3 className="font-serif text-xl mb-5">Monthly revenue -- {presetLabel[preset]}</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={adminData.monthlyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
@@ -413,7 +415,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v: number) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                tickFormatter={(v: number) => v === 0 ? "â‚¹0" : `â‚¹${(v / 1000).toFixed(0)}k`}
                 width={48}
                 domain={[0, Math.ceil(monthlyChartMax * 1.15)]}
               />
@@ -436,10 +438,10 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
         </div>
       )}
 
-      {/* Platform daily revenue — always last 30 days ending at range end */}
+      {/* Platform daily revenue -- always last 30 days ending at range end */}
       {hasDailyRevenue && (
         <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-5">Daily revenue — last 30 days</h3>
+          <h3 className="font-serif text-xl mb-5">Daily revenue -- last 30 days</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={adminData.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
@@ -454,7 +456,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v: number) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                tickFormatter={(v: number) => v === 0 ? "â‚¹0" : `â‚¹${(v / 1000).toFixed(0)}k`}
                 width={48}
                 domain={[0, Math.ceil(dailyChartMax * 1.15)]}
               />
@@ -505,7 +507,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
             ) : data.topVendors.map((v) => (
               <div key={v.vendorId} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
                 <span className="font-medium">{v.businessName}</span>
-                <span className="text-muted-foreground">{v.bookingCount} bookings · {formatINR(v.revenue)}</span>
+                <span className="text-muted-foreground">{v.bookingCount} bookings Â· {formatINR(v.revenue)}</span>
               </div>
             ))}
           </div>
@@ -539,9 +541,9 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
                     <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                       <td className="py-3 pr-4 font-medium">{row.vendorName}</td>
                       <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
-                      <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
-                      <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
-                      <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
+                      <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "--"}</td>
+                      <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "--"}</td>
+                      <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "--"}</td>
                       <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
                     </tr>
                   ))}
@@ -550,9 +552,9 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
             </div>
             {pv.totalPages > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-                <Button variant="outline" size="sm" disabled={pv.page <= 1} onClick={() => setPerVendorPage((p) => p - 1)}>← Prev</Button>
+                <Button variant="outline" size="sm" disabled={pv.page <= 1} onClick={() => setPerVendorPage((p) => p - 1)}>â† Prev</Button>
                 <span className="text-xs text-muted-foreground">Page {pv.page} of {pv.totalPages}</span>
-                <Button variant="outline" size="sm" disabled={pv.page >= pv.totalPages} onClick={() => setPerVendorPage((p) => p + 1)}>Next →</Button>
+                <Button variant="outline" size="sm" disabled={pv.page >= pv.totalPages} onClick={() => setPerVendorPage((p) => p + 1)}>Next â†’</Button>
               </div>
             )}
           </div>
@@ -568,7 +570,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
             <div key={b.id} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
               <div>
                 <span className="font-medium">{b.eventTitle}</span>
-                <span className="text-muted-foreground"> · {b.userName}</span>
+                <span className="text-muted-foreground"> Â· {b.userName}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Badge variant="secondary">{b.status}</Badge>
@@ -670,7 +672,7 @@ function AllVendorsAdmin() {
     }
   };
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
   if (vendors.length === 0 && serverTotal === 0) return <p className="text-muted-foreground">No partners found.</p>;
 
   return (
@@ -691,7 +693,7 @@ function AllVendorsAdmin() {
                   <Badge variant="outline" className="text-xs">{v.category}</Badge>
                 </div>
                 <p className="font-serif text-lg leading-tight">{v.businessName}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{v.userEmail}{v.city ? ` · ${v.city}` : ""}{v.state ? `, ${v.state}` : ""}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{v.userEmail}{v.city ? ` Â· ${v.city}` : ""}{v.state ? `, ${v.state}` : ""}</p>
                 <p className="text-xs text-muted-foreground mt-1">{v.eventCount} listing{v.eventCount !== 1 ? "s" : ""}</p>
               </div>
               <div className="flex gap-2 shrink-0 flex-wrap">
@@ -803,7 +805,7 @@ function AllVendorsAdmin() {
                   onClick={() => saveEdit(v.id)}
                   className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs"
                 >
-                  {saving ? "Saving…" : "Save changes"}
+                  {saving ? "Saving..." : "Save changes"}
                 </Button>
                 <Button size="sm" variant="outline" className="text-xs" onClick={() => setEditingId(null)}>
                   Cancel
@@ -815,9 +817,9 @@ function AllVendorsAdmin() {
       ))}
       {serverTotalPages > 1 && (
         <div className="flex items-center justify-between pt-4 border-t border-white/10">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => load(page - 1)}>← Prev</Button>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => load(page - 1)}>â† Prev</Button>
           <span className="text-xs text-muted-foreground">Page {page} of {serverTotalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= serverTotalPages} onClick={() => load(page + 1)}>Next →</Button>
+          <Button variant="outline" size="sm" disabled={page >= serverTotalPages} onClick={() => load(page + 1)}>Next â†’</Button>
         </div>
       )}
     </div>
@@ -878,7 +880,7 @@ function EventApprovalsAdmin() {
   const approve = async (id: number) => {
     try {
       await apiPatch(`/api/admin/events/${id}`, { approvalStatus: "approved" });
-      toast({ title: "Event approved — it is now live." });
+      toast({ title: "Event approved -- it is now live." });
       load();
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
@@ -904,7 +906,7 @@ function EventApprovalsAdmin() {
     }
   };
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
   if (items.length === 0) return (
     <div className="rounded-2xl glass-card p-8 text-center">
       <CheckCircle className="h-10 w-10 text-green-400 mx-auto mb-3" />
@@ -929,7 +931,7 @@ function EventApprovalsAdmin() {
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
                   <p className="font-serif text-lg">{e.title}</p>
-                  <p className="text-xs text-muted-foreground">{e.partnerName} · {e.city}{e.state ? `, ${e.state}` : ""}</p>
+                  <p className="text-xs text-muted-foreground">{e.partnerName} Â· {e.city}{e.state ? `, ${e.state}` : ""}</p>
                 </div>
                 <div className="flex gap-1 flex-wrap">
                   <Badge variant="outline">{e.type}</Badge>
@@ -961,7 +963,7 @@ function EventApprovalsAdmin() {
                 value={reason}
                 onChange={(ev) => { setReason(ev.target.value); eventFormErrors.clearField("rejectionReason"); }}
                 rows={2}
-                placeholder="E.g. Incomplete information, inappropriate content…"
+                placeholder="E.g. Incomplete information, inappropriate content..."
                 className={fieldClass("bg-black/40 border-white/10", eventFormErrors.fieldError("rejectionReason"))}
               />
               {eventFormErrors.fieldError("rejectionReason") && <p className="text-xs text-red-400">{eventFormErrors.fieldError("rejectionReason")}</p>}
@@ -990,7 +992,7 @@ function EventApprovalsAdmin() {
 }
 
 function popularDays(popularSince: string | null): string {
-  if (!popularSince) return "—";
+  if (!popularSince) return "--";
   const ms = Date.now() - new Date(popularSince).getTime();
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days === 0) return "Today";
@@ -1058,7 +1060,7 @@ function EventsAdmin() {
     return true;
   });
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   return (
     <div className="space-y-4">
@@ -1068,7 +1070,7 @@ function EventsAdmin() {
           <Input
             value={search}
             onChange={(ev) => setSearch(ev.target.value)}
-            placeholder="Search title or partner…"
+            placeholder="Search title or partner..."
             className="pl-8 h-8 text-sm bg-white/5 border-white/10"
           />
         </div>
@@ -1140,7 +1142,7 @@ function EventsAdmin() {
                       title={e.popular && e.popularSince ? `Popular since ${new Date(e.popularSince).toLocaleDateString()}` : "Mark as popular"}
                       className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.popular ? "bg-amber-600/30 text-amber-200" : "bg-white/5 text-white/40"}`}
                     >
-                      ★ {popularDays(e.popular ? e.popularSince : null)}
+                      â˜… {popularDays(e.popular ? e.popularSince : null)}
                     </button>
                   </td>
                   <td className="p-3 text-center">
@@ -1149,7 +1151,7 @@ function EventsAdmin() {
                       title={e.retainForever ? "Click to allow cleanup deletion" : "Click to protect from cleanup deletion"}
                       className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.retainForever ? "bg-blue-600/30 text-blue-200" : "bg-white/5 text-white/40"}`}
                     >
-                      {e.retainForever ? "🔒 Kept" : "–"}
+                      {e.retainForever ? "ðŸ”’ Kept" : "-"}
                     </button>
                   </td>
                   <td className="p-3 text-right">
@@ -1289,7 +1291,7 @@ function CouponsAdmin() {
                 <tr key={c.id} className="border-t border-white/5">
                   <td className="p-3 font-mono text-xs">{c.code}</td>
                   <td className="p-3">
-                    {c.userName ? (<><span>{c.userName}</span><span className="text-xs text-muted-foreground ml-2">{c.userEmail}</span></>) : <span className="text-muted-foreground">— public —</span>}
+                    {c.userName ? (<><span>{c.userName}</span><span className="text-xs text-muted-foreground ml-2">{c.userEmail}</span></>) : <span className="text-muted-foreground">-- public --</span>}
                   </td>
                   <td className="p-3 text-right">{c.discountPercent}%</td>
                   <td className="p-3 text-center">{c.isUsed ? "Yes" : "No"}</td>
@@ -1383,7 +1385,7 @@ function UsersPanel() {
             <tr key={u.id} className="border-t border-white/5">
               <td className="p-4 font-medium">{u.name}</td>
               <td className="p-4 text-muted-foreground">{u.email}</td>
-              <td className="p-4 text-muted-foreground">{u.phone ?? "—"}</td>
+              <td className="p-4 text-muted-foreground">{u.phone ?? "--"}</td>
               <td className="p-4">
                 <Select
                   value={u.role}
@@ -1447,7 +1449,7 @@ function VendorRequests() {
   };
   useEffect(() => { load(); }, []);
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
   if (items.length === 0) return <p className="text-muted-foreground">No partner requests yet.</p>;
 
   const act = async (id: number, action: "approve" | "reject") => {
@@ -1478,8 +1480,8 @@ function VendorRequests() {
               </div>
               <p className="font-serif text-xl">{r.businessName}</p>
               <p className="text-sm text-muted-foreground">
-                From {r.user.name} · {r.user.email}
-                {r.user.phone ? <> · {r.user.phone}</> : null}
+                From {r.user.name} Â· {r.user.email}
+                {r.user.phone ? <> Â· {r.user.phone}</> : null}
               </p>
               <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{r.message}</p>
               <p className="mt-2 text-xs text-muted-foreground">Submitted {new Date(r.createdAt).toLocaleString()}</p>
@@ -1533,7 +1535,7 @@ function Messages() {
     }
   };
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
   if (items.length === 0) {
     return (
       <div className="rounded-2xl glass-card p-10 text-center">
@@ -1554,8 +1556,8 @@ function Messages() {
                 <p className="font-serif text-lg">{m.subject || "(no subject)"}</p>
               </div>
               <p className="text-sm text-muted-foreground">
-                From <span className="font-medium text-foreground">{m.name}</span> · {m.email}
-                {m.phone ? <> · {m.phone}</> : null}
+                From <span className="font-medium text-foreground">{m.name}</span> Â· {m.email}
+                {m.phone ? <> Â· {m.phone}</> : null}
               </p>
               <p className="mt-3 whitespace-pre-wrap text-sm">{m.message}</p>
               <p className="mt-3 text-xs text-muted-foreground">{new Date(m.createdAt).toLocaleString()}</p>
@@ -1667,7 +1669,7 @@ function BlogsAdmin() {
         </div>
         <div>
           <Label>Content (HTML)</Label>
-          <Textarea rows={8} value={form.content} onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))} placeholder="<p>Article body…</p>" className="font-mono text-xs" />
+          <Textarea rows={8} value={form.content} onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))} placeholder="<p>Article body...</p>" className="font-mono text-xs" />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
@@ -1691,7 +1693,7 @@ function BlogsAdmin() {
         </div>
         <div className="flex gap-3">
           <Button type="submit" disabled={saving} className="bg-primary text-primary-foreground border-0">
-            {saving ? "Saving…" : editing != null ? "Update post" : "Create post"}
+            {saving ? "Saving..." : editing != null ? "Update post" : "Create post"}
           </Button>
           {editing != null && (
             <Button type="button" variant="outline" onClick={() => { setEditing(null); setForm({ title: "", slug: "", excerpt: "", content: "", imageUrl: "", authorName: "Royvento Editorial", tags: "", published: true }); }}>
@@ -1702,7 +1704,7 @@ function BlogsAdmin() {
       </form>
 
       {loading ? (
-        <p className="text-muted-foreground">Loading…</p>
+        <p className="text-muted-foreground">Loading...</p>
       ) : (
         <div className="space-y-3">
           {blogs.map((b) => (
@@ -1711,7 +1713,7 @@ function BlogsAdmin() {
                 {b.imageUrl && <img src={b.imageUrl} alt={b.title} className="w-16 h-12 rounded-lg object-cover shrink-0" />}
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{b.title}</p>
-                  <p className="text-xs text-muted-foreground">{b.slug} · {b.authorName}</p>
+                  <p className="text-xs text-muted-foreground">{b.slug} Â· {b.authorName}</p>
                   <div className="flex gap-1 mt-1">
                     {b.tags.slice(0, 3).map((t) => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{t}</span>)}
                     {!b.published && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Draft</span>}
@@ -1732,7 +1734,7 @@ function BlogsAdmin() {
   );
 }
 
-// ── Booking Report ────────────────────────────────────────────────────────────
+// -- Booking Report ------------------------------------------------------------
 
 const BOOKING_STATUSES = ["all", "confirmed", "pending", "payment_pending", "cancelled", "completed"];
 const BOOKING_TYPES = [
@@ -1807,7 +1809,7 @@ function BookingReport() {
     const code = couponCode.trim().toUpperCase();
     const discount = Number(couponDiscount);
     if (!code || !discount || discount < 1 || discount > 100) {
-      toast({ title: "Invalid input", description: "Enter a code and discount between 1–100.", variant: "destructive" });
+      toast({ title: "Invalid input", description: "Enter a code and discount between 1-100.", variant: "destructive" });
       return;
     }
     setCouponSending(true);
@@ -1900,7 +1902,7 @@ function BookingReport() {
           <div className="relative xl:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search customer name or email…"
+              placeholder="Search customer name or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-9 text-sm"
@@ -1981,7 +1983,7 @@ function BookingReport() {
             <span className="text-xs text-muted-foreground ml-auto">by tickets booked</span>
           </div>
           {insightsLoading ? (
-            <p className="text-xs text-muted-foreground py-4 text-center">Loading…</p>
+            <p className="text-xs text-muted-foreground py-4 text-center">Loading...</p>
           ) : topUsers.length === 0 ? (
             <p className="text-xs text-muted-foreground py-4 text-center">No confirmed bookings in range.</p>
           ) : (
@@ -2024,7 +2026,7 @@ function BookingReport() {
             <span className="text-xs text-muted-foreground ml-auto">by tickets sold</span>
           </div>
           {insightsLoading ? (
-            <p className="text-xs text-muted-foreground py-4 text-center">Loading…</p>
+            <p className="text-xs text-muted-foreground py-4 text-center">Loading...</p>
           ) : topPubs.length === 0 ? (
             <p className="text-xs text-muted-foreground py-4 text-center">No confirmed bookings in range.</p>
           ) : (
@@ -2113,7 +2115,7 @@ function BookingReport() {
               <Button variant="ghost" size="sm" disabled={couponSending}>Cancel</Button>
             </DialogClose>
             <Button size="sm" disabled={couponSending} onClick={handleSendCoupon}>
-              {couponSending ? "Sending…" : "Send Coupon"}
+              {couponSending ? "Sending..." : "Send Coupon"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2157,9 +2159,9 @@ function BookingReport() {
                         <p className="text-muted-foreground">Tickets</p>
                         <p className="font-semibold">
                           <span className="text-pink-400">{v.ticketWomen}W</span>
-                          {" · "}
+                          {" Â· "}
                           <span className="text-blue-400">{v.ticketMen}M</span>
-                          {" · "}
+                          {" Â· "}
                           <span className="text-purple-400">{v.ticketCouple}C</span>
                         </p>
                       </div>
@@ -2191,7 +2193,7 @@ function BookingReport() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">Loading…</div>
+        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">Loading...</div>
       ) : bookings.length === 0 ? (
         <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">
           No bookings match the selected filters.
@@ -2203,7 +2205,7 @@ function BookingReport() {
               <thead>
                 <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wider">
                   <th className="px-4 py-3 text-left">#</th>
-                  <th className="px-4 py-3 text-left">Partner · Event</th>
+                  <th className="px-4 py-3 text-left">Partner Â· Event</th>
                   <th className="px-4 py-3 text-left">Customer</th>
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Mode</th>
@@ -2238,7 +2240,7 @@ function BookingReport() {
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {b.bookingDate
                         ? new Date(b.bookingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                        : "—"}
+                        : "--"}
                       <p className="text-xs">{new Date(b.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</p>
                     </td>
                     <td className="px-4 py-3">
@@ -2278,7 +2280,7 @@ function BookingReport() {
                             : "Yes"}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-xs text-muted-foreground">--</span>
                       )}
                     </td>
                   </tr>
@@ -2297,7 +2299,7 @@ function BookingReport() {
                 onClick={() => setPage((p) => p - 1)}
                 className="text-xs"
               >
-                ← Previous
+                â† Previous
               </Button>
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
@@ -2320,7 +2322,7 @@ function BookingReport() {
                 onClick={() => setPage((p) => p + 1)}
                 className="text-xs"
               >
-                Next →
+                Next â†’
               </Button>
             </div>
           )}
@@ -2330,7 +2332,7 @@ function BookingReport() {
   );
 }
 
-// ── Attendance Report ─────────────────────────────────────────────────────────
+// -- Attendance Report ---------------------------------------------------------
 
 type AttendanceSortKey = "id" | "userName" | "vendorName" | "bookingDate" | "guests" | "checkedIn";
 
@@ -2377,7 +2379,7 @@ function AttendanceReport() {
   };
 
   const SortIcon = ({ k }: { k: AttendanceSortKey }) =>
-    sortKey === k ? <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span> : <span className="ml-1 opacity-20">↕</span>;
+    sortKey === k ? <span className="ml-1">{sortDir === "asc" ? "â†‘" : "â†“"}</span> : <span className="ml-1 opacity-20">â†•</span>;
 
   const resetFilters = () => { setVendorId("all"); setDate(""); setStatusFilter("all"); setPage(1); };
   const hasFilters = vendorId !== "all" || date || statusFilter !== "all";
@@ -2469,7 +2471,7 @@ function AttendanceReport() {
 
       {/* Table */}
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <p className="text-muted-foreground text-sm">Loading...</p>
       ) : rows.length === 0 ? (
         <div className="rounded-3xl glass-card p-10 text-center">
           <CheckCircle className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-30" />
@@ -2482,7 +2484,7 @@ function AttendanceReport() {
             {statusFilter === "checkedIn" ? "Checked-in guests" : statusFilter === "notArrived" ? "Not-arrived guests" : "All confirmed guests"}
           </h3>
 
-          {/* Booked vs attended totals — one row per event on the current page. */}
+          {/* Booked vs attended totals -- one row per event on the current page. */}
           {(() => {
             const byEvent = new Map<number, {
               eventId: number;
@@ -2537,12 +2539,12 @@ function AttendanceReport() {
                         <td className="py-2 px-3 text-right tabular-nums">
                           {t.hasActuals
                             ? <span className="text-foreground">{t.attW}/{t.attM}/{t.attC}/{t.attG}</span>
-                            : <span className="text-muted-foreground/50">—</span>}
+                            : <span className="text-muted-foreground/50">--</span>}
                         </td>
                         <td className="py-2 px-3 text-right tabular-nums">
                           {t.codDue > 0
-                            ? <span className="text-amber-300 font-semibold">₹{t.codDue.toLocaleString("en-IN")}</span>
-                            : <span className="text-muted-foreground/50">—</span>}
+                            ? <span className="text-amber-300 font-semibold">â‚¹{t.codDue.toLocaleString("en-IN")}</span>
+                            : <span className="text-muted-foreground/50">--</span>}
                         </td>
                       </tr>
                     ))}
@@ -2574,20 +2576,20 @@ function AttendanceReport() {
                 {rows.map((b) => (
                   <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-2.5 pr-3 text-muted-foreground tabular-nums">#{b.id}</td>
-                    <td className="py-2.5 pr-3 font-medium">{b.userName || "—"}</td>
-                    <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.userEmail || "—"}</td>
-                    <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.phone || "—"}</td>
-                    <td className="py-2.5 pr-3 text-muted-foreground">{b.vendorName || "—"}</td>
-                    <td className="py-2.5 pr-3 text-muted-foreground max-w-[140px] truncate">{b.eventTitle || "—"}</td>
+                    <td className="py-2.5 pr-3 font-medium">{b.userName || "--"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.userEmail || "--"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground text-xs">{b.phone || "--"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground">{b.vendorName || "--"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground max-w-[140px] truncate">{b.eventTitle || "--"}</td>
                     <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{b.bookingDate}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-muted-foreground">
-                      {b.guests || (b.ticketWomen + b.ticketMen + b.ticketCouple) || "—"}
+                      {b.guests || (b.ticketWomen + b.ticketMen + b.ticketCouple) || "--"}
                     </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
                       {(() => {
                         const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
                         const has = aw != null || am != null || ac != null || ag != null;
-                        if (!has) return <span className="text-muted-foreground/60">—</span>;
+                        if (!has) return <span className="text-muted-foreground/60">--</span>;
                         if (b.pubMode === "ticket") {
                           return (
                             <>
@@ -2603,10 +2605,10 @@ function AttendanceReport() {
                     </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
                       {b.paymentMethod !== "cod"
-                        ? <span className="text-muted-foreground/40">—</span>
+                        ? <span className="text-muted-foreground/40">--</span>
                         : b.actualAmountDue == null
-                          ? <span className="text-muted-foreground/60">—</span>
-                          : <span className="text-amber-300 font-semibold">₹{b.actualAmountDue.toLocaleString("en-IN")}</span>}
+                          ? <span className="text-muted-foreground/60">--</span>
+                          : <span className="text-amber-300 font-semibold">â‚¹{b.actualAmountDue.toLocaleString("en-IN")}</span>}
                     </td>
                     <td className="py-2.5 pr-3">
                       {b.checkedIn ? (
@@ -2621,7 +2623,7 @@ function AttendanceReport() {
                           {new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-xs text-muted-foreground">--</span>
                       )}
                     </td>
                   </tr>
@@ -2631,9 +2633,9 @@ function AttendanceReport() {
           </div>
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</Button>
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>â† Prev</Button>
               <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next â†’</Button>
             </div>
           )}
         </div>
@@ -2642,7 +2644,7 @@ function AttendanceReport() {
   );
 }
 
-// ── CRM & Leads ──────────────────────────────────────────────────────────────
+// -- CRM & Leads --------------------------------------------------------------
 
 type CrmPreset = "7d" | "30d" | "90d" | "custom";
 type LeadType = "all" | "known" | "anonymous";
@@ -2759,7 +2761,7 @@ function CrmLeads() {
 
       {/* KPI cards */}
       {summaryLoading ? (
-        <p className="text-muted-foreground">Loading summary…</p>
+        <p className="text-muted-foreground">Loading summary...</p>
       ) : summary && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="rounded-2xl glass-card p-5 lift-3d">
@@ -2807,7 +2809,7 @@ function CrmLeads() {
               </div>
             </div>
             <p className="stat-number text-3xl text-green-300">{summary.conversionRate}%</p>
-            <p className="text-xs text-muted-foreground mt-1">{summary.conversions} views → bookings</p>
+            <p className="text-xs text-muted-foreground mt-1">{summary.conversions} views â†’ bookings</p>
           </div>
         </div>
       )}
@@ -2838,13 +2840,13 @@ function CrmLeads() {
                     className={`border-t border-white/5 cursor-pointer transition-colors ${Number(vendorFilter) === v.vendorId ? "bg-primary/10" : "hover:bg-white/5"}`}
                   >
                     <td className="py-3 pr-4 font-medium">{v.vendorName}</td>
-                    <td className="py-3 pr-4 text-muted-foreground">{v.vendorCity || "—"}</td>
+                    <td className="py-3 pr-4 text-muted-foreground">{v.vendorCity || "--"}</td>
                     <td className="text-right px-2 tabular-nums">{v.totalViews}</td>
-                    <td className="text-right px-2 tabular-nums text-blue-300">{v.knownLeads || "—"}</td>
-                    <td className="text-right px-2 tabular-nums text-muted-foreground">{v.anonymousVisitors || "—"}</td>
-                    <td className="text-right px-2 tabular-nums text-green-300">{v.conversions || "—"}</td>
+                    <td className="text-right px-2 tabular-nums text-blue-300">{v.knownLeads || "--"}</td>
+                    <td className="text-right px-2 tabular-nums text-muted-foreground">{v.anonymousVisitors || "--"}</td>
+                    <td className="text-right px-2 tabular-nums text-green-300">{v.conversions || "--"}</td>
                     <td className="text-right pl-2 tabular-nums font-medium text-green-400">
-                      {v.totalViews > 0 ? `${v.conversionRate}%` : "—"}
+                      {v.totalViews > 0 ? `${v.conversionRate}%` : "--"}
                     </td>
                   </tr>
                 ))}
@@ -2863,7 +2865,7 @@ function CrmLeads() {
           )}
         </div>
         {leadsLoading ? (
-          <p className="text-muted-foreground p-6">Loading leads…</p>
+          <p className="text-muted-foreground p-6">Loading leads...</p>
         ) : leads.length === 0 ? (
           <div className="p-10 text-center">
             <Eye className="h-8 w-8 text-primary mx-auto mb-3" />
@@ -2893,7 +2895,7 @@ function CrmLeads() {
                             <span className="text-muted-foreground italic">Anonymous visitor</span>
                           ) : (
                             <div>
-                              <p className="font-medium">{lead.viewerName || "—"}</p>
+                              <p className="font-medium">{lead.viewerName || "--"}</p>
                               {lead.viewerEmail && (
                                 <p className="text-xs text-muted-foreground">{lead.viewerEmail}</p>
                               )}
@@ -2901,7 +2903,7 @@ function CrmLeads() {
                           )}
                         </td>
                         <td className="py-3 px-3 font-medium">{lead.vendorName}</td>
-                        <td className="py-3 px-3 text-muted-foreground">{lead.vendorCity || "—"}</td>
+                        <td className="py-3 px-3 text-muted-foreground">{lead.vendorCity || "--"}</td>
                         <td className="py-3 px-3 text-muted-foreground tabular-nums text-xs">
                           {new Date(lead.viewedAt).toLocaleString("en-IN", {
                             day: "2-digit", month: "short", year: "numeric",
@@ -2953,7 +2955,7 @@ function CrmLeads() {
                   onClick={() => setPage((p) => p - 1)}
                   className="text-xs"
                 >
-                  ← Previous
+                  â† Previous
                 </Button>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
@@ -2976,7 +2978,7 @@ function CrmLeads() {
                   onClick={() => setPage((p) => p + 1)}
                   className="text-xs"
                 >
-                  Next →
+                  Next â†’
                 </Button>
               </div>
             )}
@@ -3134,7 +3136,7 @@ function ImportPubFromGoogle() {
                     return (
                       <div key={day} className="flex gap-2">
                         <span className="text-muted-foreground w-8 shrink-0">{day}</span>
-                        <span>{h ? `${h.open} – ${h.close}` : "Closed"}</span>
+                        <span>{h ? `${h.open} - ${h.close}` : "Closed"}</span>
                       </div>
                     );
                   })}
@@ -3203,7 +3205,7 @@ function ImportPubFromGoogle() {
                     return (
                       <div key={day} className="flex gap-2">
                         <span className="text-muted-foreground w-8 shrink-0">{day}</span>
-                        <span>{h ? `${h.open} – ${h.close}` : "Closed"}</span>
+                        <span>{h ? `${h.open} - ${h.close}` : "Closed"}</span>
                       </div>
                     );
                   })}
@@ -3252,7 +3254,7 @@ function ImportPubFromGoogle() {
               Back
             </Button>
             <Button onClick={handleConfirm} disabled={step === "importing"} className="flex-1">
-              {step === "importing" ? "Importing…" : "Confirm & Import"}
+              {step === "importing" ? "Importing..." : "Confirm & Import"}
             </Button>
           </div>
         </div>
@@ -3301,7 +3303,7 @@ function ImportPubFromGoogle() {
             disabled={step === "previewing" || !googleUrl.trim() || !partnerEmail.trim()}
             className="w-full"
           >
-            {step === "previewing" ? "Fetching from Google…" : "Preview pub details"}
+            {step === "previewing" ? "Fetching from Google..." : "Preview pub details"}
           </Button>
         </form>
       )}
@@ -3376,7 +3378,7 @@ function AnnouncementSliderAdmin() {
         </div>
 
         {loading ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <p className="text-muted-foreground text-sm">Loading...</p>
         ) : items.length === 0 ? (
           <p className="text-muted-foreground text-sm">No announcements found.</p>
         ) : (
@@ -3414,7 +3416,7 @@ function AnnouncementSliderAdmin() {
   );
 }
 
-// ─── Commissions ─────────────────────────────────────────────────────────────
+// --- Commissions -------------------------------------------------------------
 
 interface CommissionRates {
   freeEntryRate: string;
@@ -3560,7 +3562,7 @@ function CommissionsAdmin() {
   return (
     <div className="space-y-8">
 
-      {/* ── Fee management ─────────────────────────────────────────────── */}
+      {/* -- Fee management ----------------------------------------------- */}
       <div className="rounded-2xl glass-card p-6">
         <div className="flex items-start gap-3 mb-6">
           <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 red-ring">
@@ -3568,12 +3570,12 @@ function CommissionsAdmin() {
           </div>
           <div>
             <h2 className="font-serif text-2xl">Commission fees per partner</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Set the flat platform fee (₹) per person/booking applied to each booking type for every approved vendor.</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Set the flat platform fee (â‚¹) per person/booking applied to each booking type for every approved vendor.</p>
           </div>
         </div>
 
         {ratesLoading ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <p className="text-muted-foreground text-sm">Loading...</p>
         ) : !ratesReport || ratesReport.rows.length === 0 ? (
           <p className="text-muted-foreground text-sm">No approved partners found.</p>
         ) : (
@@ -3582,9 +3584,9 @@ function CommissionsAdmin() {
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
                 <tr>
                   <th className="text-left py-2 pr-4">Partner</th>
-                  <th className="text-right py-2 px-3">Free Entry ₹/person</th>
-                  <th className="text-right py-2 px-3">Ticket ₹/ticket</th>
-                  <th className="text-right py-2 px-3">Table ₹/booking</th>
+                  <th className="text-right py-2 px-3">Free Entry â‚¹/person</th>
+                  <th className="text-right py-2 px-3">Ticket â‚¹/ticket</th>
+                  <th className="text-right py-2 px-3">Table â‚¹/booking</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
               </thead>
@@ -3642,7 +3644,7 @@ function CommissionsAdmin() {
                           className="text-xs h-8 px-3"
                         >
                           <Save className="h-3 w-3 mr-1" />
-                          {savingId === row.vendorId ? "Saving…" : "Save"}
+                          {savingId === row.vendorId ? "Saving..." : "Save"}
                         </Button>
                       </td>
                     </tr>
@@ -3654,7 +3656,7 @@ function CommissionsAdmin() {
         )}
       </div>
 
-      {/* ── Commission report ───────────────────────────────────────────── */}
+      {/* -- Commission report --------------------------------------------- */}
       <div className="rounded-2xl glass-card p-6">
         <div className="flex items-start gap-3 mb-6">
           <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
@@ -3682,7 +3684,7 @@ function CommissionsAdmin() {
         </div>
 
         {reportLoading ? (
-          <p className="text-muted-foreground text-sm">Loading report…</p>
+          <p className="text-muted-foreground text-sm">Loading report...</p>
         ) : !report ? null : (
           <div className="space-y-6">
             {/* Platform totals */}
@@ -3698,7 +3700,7 @@ function CommissionsAdmin() {
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Commission collected</p>
                 <p className="stat-number text-2xl text-primary">{formatINR(report.totals.collectedCommission)}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Same number as the Analytics “Total commission” tile.</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Same number as the Analytics "Total commission" tile.</p>
               </div>
             </div>
 
@@ -3717,9 +3719,9 @@ function CommissionsAdmin() {
                         className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> · {row.city}</span> : ""}</p>
+                          <p className="font-medium text-sm">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> Â· {row.city}</span> : ""}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Fees: FE ₹{row.appliedRates.freeEntryRate}/person · Ticket ₹{row.appliedRates.ticketRate}/ticket · Table ₹{row.appliedRates.tableBookingRate}/booking
+                            Fees: FE â‚¹{row.appliedRates.freeEntryRate}/person Â· Ticket â‚¹{row.appliedRates.ticketRate}/ticket Â· Table â‚¹{row.appliedRates.tableBookingRate}/booking
                           </p>
                         </div>
                         <div className="flex items-center gap-6 tabular-nums text-sm shrink-0">
@@ -3753,7 +3755,7 @@ function CommissionsAdmin() {
                                       <td className="py-1.5 pr-3">Free Entry</td>
                                       <td className="text-right px-2">{row.freeEntryCount}</td>
                                       <td className="text-right px-2">{formatINR(row.freeEntryRevenue)}</td>
-                                      <td className="text-right px-2">₹{row.appliedRates.freeEntryRate}/person</td>
+                                      <td className="text-right px-2">â‚¹{row.appliedRates.freeEntryRate}/person</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.freeEntryCommission)}</td>
                                     </tr>
                                   )}
@@ -3762,7 +3764,7 @@ function CommissionsAdmin() {
                                       <td className="py-1.5 pr-3">Ticket</td>
                                       <td className="text-right px-2">{row.ticketCount}</td>
                                       <td className="text-right px-2">{formatINR(row.ticketRevenue)}</td>
-                                      <td className="text-right px-2">₹{row.appliedRates.ticketRate}/ticket</td>
+                                      <td className="text-right px-2">â‚¹{row.appliedRates.ticketRate}/ticket</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.ticketCommission)}</td>
                                     </tr>
                                   )}
@@ -3771,7 +3773,7 @@ function CommissionsAdmin() {
                                       <td className="py-1.5 pr-3">Table Booking</td>
                                       <td className="text-right px-2">{row.tableCount}</td>
                                       <td className="text-right px-2">{formatINR(row.tableRevenue)}</td>
-                                      <td className="text-right px-2">₹{row.appliedRates.tableBookingRate}/booking</td>
+                                      <td className="text-right px-2">â‚¹{row.appliedRates.tableBookingRate}/booking</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.tableCommission)}</td>
                                     </tr>
                                   )}
@@ -3806,8 +3808,8 @@ function CommissionsAdmin() {
                                       <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
                                       <td className="text-right px-2">
                                         {b.commissionRate > 0
-                                          ? `₹${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)} × ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
-                                          : "—"}
+                                          ? `â‚¹${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)} Ã— ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
+                                          : "--"}
                                       </td>
                                       <td className="text-right pl-2 text-primary">{formatINR(b.commissionAmount)}</td>
                                     </tr>
@@ -3864,7 +3866,7 @@ function AnnouncementSliderRow({
           {item.vendorName}
           {item.announceDate && (
             <span className="ml-2">
-              · {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+              Â· {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
             </span>
           )}
         </p>
@@ -3977,7 +3979,7 @@ function SettlementsAdmin() {
           </Select>
         </div>
         {loading ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <p className="text-muted-foreground text-sm">Loading...</p>
         ) : requests.length === 0 ? (
           <p className="text-sm text-muted-foreground">No settlement requests found.</p>
         ) : (
@@ -4042,7 +4044,7 @@ function SettlementsAdmin() {
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => { setRejectingId(null); setRejectNote(""); }}>Cancel</Button>
                         <Button size="sm" variant="destructive" disabled={processing === r.id} onClick={() => reject(r.id)}>
-                          {processing === r.id ? "Rejecting…" : "Confirm Reject"}
+                          {processing === r.id ? "Rejecting..." : "Confirm Reject"}
                         </Button>
                       </div>
                     </div>
@@ -4052,7 +4054,7 @@ function SettlementsAdmin() {
                         <XCircle className="h-3.5 w-3.5" /> Reject
                       </Button>
                       <Button size="sm" className="gap-1.5" disabled={processing === r.id} onClick={() => approve(r.id)}>
-                        <CheckCircle className="h-3.5 w-3.5" /> {processing === r.id ? "Approving…" : "Approve"}
+                        <CheckCircle className="h-3.5 w-3.5" /> {processing === r.id ? "Approving..." : "Approve"}
                       </Button>
                     </div>
                   )
@@ -4125,7 +4127,7 @@ function ReviewsAdmin() {
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading reviews…</p>
+        <p className="text-muted-foreground text-sm">Loading reviews...</p>
       ) : items.length === 0 ? (
         <p className="text-muted-foreground text-sm">No reviews match these filters.</p>
       ) : (
@@ -4138,13 +4140,13 @@ function ReviewsAdmin() {
                   <div>
                     <p className="font-medium text-sm">{r.userName}</p>
                     <p className="text-xs text-muted-foreground">
-                      on <span className="text-foreground">{r.vendorName}</span> · {new Date(r.createdAt).toLocaleString()}
-                      {r.verifiedBooking ? " · ✓ verified" : ""}
+                      on <span className="text-foreground">{r.vendorName}</span> Â· {new Date(r.createdAt).toLocaleString()}
+                      {r.verifiedBooking ? " Â· âœ“ verified" : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <span key={i} className={`text-xs ${i < (isEditing ? editRating : r.rating) ? "text-amber-400" : "text-muted-foreground"}`}>★</span>
+                      <span key={i} className={`text-xs ${i < (isEditing ? editRating : r.rating) ? "text-amber-400" : "text-muted-foreground"}`}>â˜…</span>
                     ))}
                   </div>
                 </div>
@@ -4152,7 +4154,7 @@ function ReviewsAdmin() {
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center gap-1">
                       {[1,2,3,4,5].map((n) => (
-                        <button key={n} type="button" onClick={() => setEditRating(n)} className={`text-xl ${n <= editRating ? "text-amber-400" : "text-muted-foreground"}`}>★</button>
+                        <button key={n} type="button" onClick={() => setEditRating(n)} className={`text-xl ${n <= editRating ? "text-amber-400" : "text-muted-foreground"}`}>â˜…</button>
                       ))}
                     </div>
                     <Textarea value={editComment} onChange={(e) => setEditComment(e.target.value)} />
@@ -4236,7 +4238,7 @@ function LiveOccupancyAdmin() {
   const loading = isLoading;
   const err = error ? (error instanceof Error ? error.message : "Failed to load") : null;
 
-  if (loading && !data) return <div className="text-muted-foreground">Loading occupancy…</div>;
+  if (loading && !data) return <div className="text-muted-foreground">Loading occupancy...</div>;
   if (err) return <div className="text-red-400">{err}</div>;
   if (!data) return null;
 
@@ -4301,12 +4303,12 @@ function LiveOccupancyAdmin() {
               {sortedRows.map((r) => (
                 <tr key={r.vendorId} className="border-t border-white/5 hover:bg-white/5">
                   <td className="p-3 font-medium">{r.businessName}</td>
-                  <td className="p-3 text-muted-foreground">{r.city ?? "—"}</td>
-                  <td className="p-3 text-right tabular-nums">{r.capacity || "—"}</td>
+                  <td className="p-3 text-muted-foreground">{r.city ?? "--"}</td>
+                  <td className="p-3 text-right tabular-nums">{r.capacity || "--"}</td>
                   <td className="p-3 text-right tabular-nums font-semibold">{r.currentlyInside}</td>
                   <td className="p-3 text-right">
                     <span className={`inline-flex px-2 py-0.5 rounded-md border text-xs tabular-nums ${pctColor(r.occupancyPercent)}`}>
-                      {r.capacity > 0 ? `${r.occupancyPercent}%` : "—"}
+                      {r.capacity > 0 ? `${r.occupancyPercent}%` : "--"}
                     </span>
                   </td>
                   <td className="p-3 text-right tabular-nums text-xs text-muted-foreground">
@@ -4354,7 +4356,7 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
           <div>
             <p className="text-xs uppercase text-muted-foreground">Today's bookings</p>
             <p className="font-serif text-2xl">{vendor.businessName}</p>
-            <p className="text-xs text-muted-foreground">Inside: {vendor.currentlyInside} / {vendor.capacity || "—"}</p>
+            <p className="text-xs text-muted-foreground">Inside: {vendor.currentlyInside} / {vendor.capacity || "--"}</p>
           </div>
           <Button variant="ghost" onClick={onClose}>Close</Button>
         </div>
@@ -4367,14 +4369,14 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
           ))}
           <div className="ml-auto flex items-center gap-2">
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-black/40 border-white/10 w-36" title="From" />
-            <span className="text-xs text-muted-foreground">→</span>
+            <span className="text-xs text-muted-foreground">â†’</span>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-black/40 border-white/10 w-36" title="To" />
             <Input value={drillQ} onChange={(e) => setDrillQ(e.target.value)} placeholder="Search name / phone / ticket #" className="bg-black/40 border-white/10 w-64" />
           </div>
         </div>
         <div className="flex-1 overflow-auto">
           {loading ? (
-            <div className="p-6 text-center text-muted-foreground">Loading…</div>
+            <div className="p-6 text-center text-muted-foreground">Loading...</div>
           ) : rows.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground">No bookings.</div>
           ) : (
@@ -4396,7 +4398,7 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
                     <tr key={r.id} className="border-t border-white/5">
                       <td className="p-3 font-mono text-xs">{r.ticketCode}</td>
                       <td className="p-3">{r.personName || r.userName}</td>
-                      <td className="p-3 text-muted-foreground">{r.phone || "—"}</td>
+                      <td className="p-3 text-muted-foreground">{r.phone || "--"}</td>
                       <td className="p-3 text-right tabular-nums">{pax}</td>
                       <td className="p-3">
                         <span className={`text-xs px-2 py-0.5 rounded-md border ${r.liveStatus === "inside" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : r.liveStatus === "checkedOut" ? "border-amber-500/40 text-amber-300 bg-amber-500/10" : "border-white/10 text-muted-foreground"}`}>
@@ -4404,9 +4406,9 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
                         </span>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground tabular-nums">
-                        {r.checkedInAt ? new Date(r.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                        {r.checkedInAt ? new Date(r.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "--"}
                         {" / "}
-                        {r.checkedOutAt ? new Date(r.checkedOutAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                        {r.checkedOutAt ? new Date(r.checkedOutAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "--"}
                       </td>
                     </tr>
                   );
@@ -4416,6 +4418,705 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+const CP_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const CP_GENDERS = [
+  { canon: "women", label: "Ladies" },
+  { canon: "men", label: "Men" },
+  { canon: "couple", label: "Couple" },
+] as const;
+
+type LookupResult = {
+  user: { id: number; name: string; email: string; role: string; signInMethod: string };
+  vendor: { id: number; businessName: string; status: string; category: string; city: string; state: string } | null;
+  existingPub: { id: number; title: string } | null;
+  canCreate: boolean;
+  blockReason: string | null;
+};
+
+function CreatePubAdmin() {
+  const { toast } = useToast();
+
+  // -- Step 1: partner lookup ------------------------------------------------
+  const [emailInput, setEmailInput] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
+  const [lookupError, setLookupError] = useState("");
+
+  // -- Step 2: pub details ---------------------------------------------------
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [location, setLocation] = useState("");
+  const [country, setCountry] = useState("");
+  const [stateF, setStateF] = useState("");
+  const [city, setCity] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [pubMode, setPubMode] = useState<"ticket" | "event" | "both">("both");
+  const [priceWomen, setPriceWomen] = useState("");
+  const [priceMen, setPriceMen] = useState("");
+  const [priceCouple, setPriceCouple] = useState("");
+  const [varyByDay, setVaryByDay] = useState(false);
+  const [dayPricingOverrides, setDayPricingOverrides] = useState<
+    Record<string, { women: string; men: string; couple: string }>
+  >({});
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryUploading, setGalleryUploading] = useState(0);
+  const [galleryVideo, setGalleryVideo] = useState("");
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [pubEventTypes, setPubEventTypes] = useState<string[]>([]);
+  const [freeEntryEnabled, setFreeEntryEnabled] = useState(false);
+  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>([]);
+  const [freeEntryDays, setFreeEntryDays] = useState<string[]>([]);
+  const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState("");
+  const [danceFloor, setDanceFloor] = useState("");
+  const [danceFloorPhotos, setDanceFloorPhotos] = useState<string[]>([]);
+  const [danceFloorUploading, setDanceFloorUploading] = useState(0);
+  const [menuUrls, setMenuUrls] = useState<string[]>([]);
+  const [menuUploading, setMenuUploading] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ pubId: number; vendorId: number; partnerName: string } | null>(null);
+  const [submitError, setSubmitError] = useState("");
+
+  // -- Lookup handler --------------------------------------------------------
+
+  async function handleLookup(e: any) {
+    e.preventDefault();
+    const email = emailInput.trim();
+    if (!email) return;
+    setLooking(true);
+    setLookupResult(null);
+    setLookupError("");
+    setResult(null);
+    setSubmitError("");
+    try {
+      const data = await apiGet<LookupResult>(`/api/admin/lookup-partner?email=${encodeURIComponent(email)}`);
+      setLookupResult(data);
+      // Pre-fill location from vendor profile
+      if (data.vendor) {
+        setCity(data.vendor.city ?? "");
+        setStateF(data.vendor.state ?? "");
+        setCountry("India");
+      }
+    } catch (err: any) {
+      setLookupError(err?.message ?? "Lookup failed");
+    } finally {
+      setLooking(false);
+    }
+  }
+
+  function resetLookup() {
+    setLookupResult(null);
+    setLookupError("");
+    setTitle(""); setDescription(""); setImageUrl("");
+    setLocation(""); setCountry(""); setStateF(""); setCity("");
+    setCapacity(""); setPubMode("both");
+    setPriceWomen(""); setPriceMen(""); setPriceCouple("");
+    setVaryByDay(false); setDayPricingOverrides({});
+    setGalleryImages([]); setGalleryVideo("");
+    setPubEventTypes([]);
+    setFreeEntryEnabled(false); setFreeEntryGenders([]); setFreeEntryDays([]); setFreeEntryBeforeTime("");
+    setDanceFloor(""); setDanceFloorPhotos([]); setMenuUrls([]);
+    setSubmitError("");
+  }
+
+  // -- Upload handlers -------------------------------------------------------
+
+  async function handleCoverImage(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const v = validateImageFile(file);
+    if (v) { toast({ title: v, variant: "destructive" }); return; }
+    setImageUploading(true);
+    try { setImageUrl(await uploadImage(file)); }
+    catch { toast({ title: "Image upload failed", variant: "destructive" }); }
+    finally { setImageUploading(false); }
+  }
+
+  async function handleGalleryImages(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const toUpload = Array.from(files).slice(0, 6 - galleryImages.length);
+    if (toUpload.length === 0) { toast({ title: "Maximum 6 gallery photos allowed" }); return; }
+    setGalleryUploading(toUpload.length);
+    let remaining = toUpload.length;
+    const urls: string[] = [];
+    for (const file of toUpload) {
+      const v = validateImageFile(file);
+      if (v) { toast({ title: v, variant: "destructive" }); remaining--; setGalleryUploading(remaining); continue; }
+      try { urls.push(await uploadImage(file)); }
+      catch { toast({ title: "Gallery upload failed", variant: "destructive" }); }
+      finally { remaining--; setGalleryUploading(remaining); }
+    }
+    if (urls.length > 0) setGalleryImages((prev) => [...prev, ...urls]);
+  }
+
+  async function handleGalleryVideo(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (file.type !== "video/mp4") { toast({ title: "Only MP4 videos are allowed", variant: "destructive" }); return; }
+    if (file.size > 4 * 1024 * 1024) { toast({ title: "Video must be under 4 MB", variant: "destructive" }); return; }
+    setVideoUploading(true);
+    try { setGalleryVideo(await uploadImage(file)); }
+    catch { toast({ title: "Video upload failed", variant: "destructive" }); }
+    finally { setVideoUploading(false); }
+  }
+
+  async function handleMenuUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const cap = 6;
+    const toUpload = Array.from(files).slice(0, cap - menuUrls.length);
+    if (toUpload.length === 0) { toast({ title: `Maximum ${cap} menu images allowed` }); return; }
+    setMenuUploading(toUpload.length);
+    let remaining = toUpload.length;
+    const urls: string[] = [];
+    for (const file of toUpload) {
+      const v = validateImageFile(file);
+      if (v) { toast({ title: v, variant: "destructive" }); remaining--; setMenuUploading(remaining); continue; }
+      try { urls.push(await uploadImage(file)); }
+      catch { toast({ title: "Menu upload failed", variant: "destructive" }); }
+      finally { remaining--; setMenuUploading(remaining); }
+    }
+    if (urls.length > 0) setMenuUrls((prev) => [...prev, ...urls]);
+  }
+
+  async function handleDanceFloorUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const cap = 6;
+    const toUpload = Array.from(files).slice(0, cap - danceFloorPhotos.length);
+    if (toUpload.length === 0) { toast({ title: `Maximum ${cap} dance floor photos allowed` }); return; }
+    setDanceFloorUploading(toUpload.length);
+    let remaining = toUpload.length;
+    const urls: string[] = [];
+    for (const file of toUpload) {
+      const v = validateImageFile(file);
+      if (v) { toast({ title: v, variant: "destructive" }); remaining--; setDanceFloorUploading(remaining); continue; }
+      try { urls.push(await uploadImage(file)); }
+      catch { toast({ title: "Dance floor photo upload failed", variant: "destructive" }); }
+      finally { remaining--; setDanceFloorUploading(remaining); }
+    }
+    if (urls.length > 0) setDanceFloorPhotos((prev) => [...prev, ...urls]);
+  }
+
+  function setDayPrice(day: string, field: "women" | "men" | "couple", val: string) {
+    setDayPricingOverrides((prev) => ({
+      ...prev,
+      [day]: { ...(prev[day] ?? { women: "", men: "", couple: "" }), [field]: val },
+    }));
+  }
+
+  function togglePubEventType(t: string) {
+    setPubEventTypes((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
+  }
+  function toggleFreeEntryGender(g: string) {
+    setFreeEntryGenders((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
+  }
+  function toggleFreeEntryDay(d: string) {
+    setFreeEntryDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]);
+  }
+
+  async function handleSubmit(e: any) {
+    e.preventDefault();
+    if (!title.trim()) { setSubmitError("Pub name is required."); return; }
+    setSubmitError("");
+    setResult(null);
+    setSubmitting(true);
+
+    const dayPricing = varyByDay
+      ? Object.fromEntries(
+          Object.entries(dayPricingOverrides)
+            .filter(([, v]) => v.women !== "" || v.men !== "" || v.couple !== "")
+            .map(([day, v]) => [day, { women: Number(v.women) || 0, men: Number(v.men) || 0, couple: Number(v.couple) || 0 }]),
+        )
+      : undefined;
+
+    try {
+      const data = await apiPost<{ ok: boolean; pubId: number; vendorId: number; partnerName: string }>(
+        "/api/admin/create-pub",
+        {
+          email: emailInput.trim(),
+          title: title.trim(),
+          description: description.trim() || undefined,
+          imageUrl: imageUrl || undefined,
+          location: location.trim() || undefined,
+          country: country || undefined,
+          state: stateF || undefined,
+          city: city || undefined,
+          capacity: capacity ? Number(capacity) : undefined,
+          pubMode,
+          priceWomen: priceWomen ? Number(priceWomen) : undefined,
+          priceMen: priceMen ? Number(priceMen) : undefined,
+          priceCouple: priceCouple ? Number(priceCouple) : undefined,
+          galleryImages: galleryImages.length > 0 ? galleryImages : undefined,
+          galleryVideo: galleryVideo || undefined,
+          pubEventTypes: pubEventTypes.length > 0 ? pubEventTypes : undefined,
+          dayPricing: dayPricing && Object.keys(dayPricing).length > 0 ? dayPricing : undefined,
+          freeEntryEnabled,
+          freeEntryGenders,
+          freeEntryDays,
+          freeEntryBeforeTime: freeEntryBeforeTime || undefined,
+          danceFloor: danceFloor || undefined,
+          danceFloorPhotos: danceFloorPhotos.length > 0 ? danceFloorPhotos : undefined,
+          menuUrls: menuUrls.length > 0 ? menuUrls : undefined,
+        },
+      );
+      setResult(data);
+      toast({ title: "Pub created", description: `"${title}" assigned to ${data.partnerName}` });
+      setEmailInput("");
+      resetLookup();
+    } catch (err: any) {
+      setSubmitError(err?.message ?? "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold mb-1">Create Pub / Club for Partner</h2>
+        <p className="text-sm text-muted-foreground">
+          Assign a new listing to an approved Pub or Club partner by their registered email (normal or Google Sign-In). The form adapts to the partner's category.
+        </p>
+      </div>
+
+      {result && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300 space-y-1">
+          <p className="font-semibold flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Pub created successfully</p>
+          <p>Partner: <span className="font-medium text-white">{result.partnerName}</span></p>
+          <p>Pub ID: <span className="font-mono text-white">#{result.pubId}</span></p>
+        </div>
+      )}
+
+      {/* -- Step 1: Find partner --------------------------------------------- */}
+      <section className="rounded-xl border border-white/8 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Find Partner</p>
+        <form onSubmit={handleLookup} className="flex gap-2">
+          <Input
+            type="email"
+            placeholder="partner@example.com"
+            value={emailInput}
+            onChange={(e) => { setEmailInput(e.target.value); setLookupResult(null); setLookupError(""); }}
+            className="bg-black/40 border-white/10 flex-1"
+            required
+          />
+          <Button type="submit" variant="outline" disabled={looking || !emailInput.trim()} className="shrink-0">
+            {looking ? "Looking..." : "Find Partner"}
+          </Button>
+        </form>
+
+        {lookupError && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 flex items-start gap-2">
+            <XCircle className="h-4 w-4 shrink-0 mt-0.5" /> {lookupError}
+          </div>
+        )}
+
+        {lookupResult && (
+          <div className={cn(
+            "rounded-lg border p-3 text-sm space-y-2",
+            lookupResult.canCreate
+              ? "border-emerald-500/30 bg-emerald-500/8"
+              : "border-amber-500/30 bg-amber-500/8",
+          )}>
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-white">{lookupResult.user.name}</p>
+              <span className="text-xs text-muted-foreground">{lookupResult.user.signInMethod} Sign-In</span>
+            </div>
+            <p className="text-xs text-muted-foreground font-mono">{lookupResult.user.email}</p>
+            <div className="flex flex-wrap gap-2 pt-0.5">
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded-full border",
+                lookupResult.user.role === "vendor" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : "border-red-500/40 text-red-300 bg-red-500/10",
+              )}>
+                Role: {lookupResult.user.role}
+              </span>
+              {lookupResult.vendor && (
+                <span className={cn(
+                  "text-xs px-2 py-0.5 rounded-full border",
+                  lookupResult.vendor.status === "approved" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : "border-amber-500/40 text-amber-300 bg-amber-500/10",
+                )}>
+                  Vendor: {lookupResult.vendor.status}
+                </span>
+              )}
+              {lookupResult.existingPub && (
+                <span className="text-xs px-2 py-0.5 rounded-full border border-amber-500/40 text-amber-300 bg-amber-500/10">
+                  Has pub: {lookupResult.existingPub.title}
+                </span>
+              )}
+            </div>
+            {lookupResult.blockReason && (
+              <p className="text-xs text-amber-300 flex items-center gap-1.5 pt-0.5">
+                <XCircle className="h-3.5 w-3.5 shrink-0" /> {lookupResult.blockReason}
+              </p>
+            )}
+            {lookupResult.canCreate && (
+              <p className="text-xs text-emerald-300 flex items-center gap-1.5 pt-0.5">
+                <CheckCircle className="h-3.5 w-3.5" /> Ready -- fill in pub details below.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* -- Step 2: Pub details (only when partner is verified and eligible) -- */}
+      {lookupResult?.canCreate && (
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+          {submitError && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300 flex items-center gap-2">
+              <XCircle className="h-4 w-4 shrink-0" /> {submitError}
+            </div>
+          )}
+
+          {/* -- Pub Info ---------------------------------------------------- */}
+          <section className="rounded-xl border border-white/8 p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2 -- Pub Info</p>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-title">Pub Name <span className="text-red-400">*</span></Label>
+              <Input id="cp-title" placeholder="e.g. The Brew House"
+                value={title} onChange={(e) => setTitle(e.target.value)}
+                className="bg-black/40 border-white/10" required />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-desc">Description</Label>
+              <Textarea id="cp-desc" placeholder="Short description..."
+                value={description} onChange={(e) => setDescription(e.target.value)}
+                className="bg-black/40 border-white/10 min-h-[80px]" />
+            </div>
+
+            {/* Cover image */}
+            <div className="space-y-1.5">
+              <Label>Cover Image</Label>
+              {imageUrl ? (
+                <div className="relative w-32 h-20 rounded-lg overflow-hidden border border-white/10">
+                  <img src={imageUrl} alt="cover" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => setImageUrl("")}
+                    className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center text-white">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <label className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+                  imageUploading && "opacity-50 pointer-events-none",
+                )}>
+                  <Upload className="h-4 w-4" />
+                  {imageUploading ? "Uploading..." : "Upload cover photo"}
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={(e) => handleCoverImage(e.target.files)} />
+                </label>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cp-location">Address</Label>
+              <Input id="cp-location" placeholder="Street address"
+                value={location} onChange={(e) => setLocation(e.target.value)}
+                className="bg-black/40 border-white/10" />
+              {location.trim() && (
+                <div className="mt-2">
+                  <iframe key={location} title="Pub location"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent([location, city, stateF].filter(Boolean).join(", "))}&output=embed&hl=en`}
+                    className="w-full h-48 md:h-56 rounded-xl border border-white/10"
+                    loading="lazy" referrerPolicy="no-referrer-when-downgrade"
+                  />
+                  <a href={`https://maps.google.com/?q=${encodeURIComponent([location, city, stateF].filter(Boolean).join(", "))}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
+                    <Navigation className="h-3 w-3" />Open in Google Maps
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <LocationSelect country={country} state={stateF} city={city}
+              onChange={(next) => { setCountry(next.country); setStateF(next.state); setCity(next.city); }} />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="cp-capacity">Capacity</Label>
+                <Input id="cp-capacity" type="number" min={0} placeholder="e.g. 200"
+                  value={capacity} onChange={(e) => setCapacity(e.target.value)}
+                  className="bg-black/40 border-white/10" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Pub Mode</Label>
+                <Select value={pubMode} onValueChange={(v) => setPubMode(v as "ticket" | "event" | "both")}>
+                  <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="both">Ticket + Table</SelectItem>
+                    <SelectItem value="ticket">Ticket only</SelectItem>
+                    <SelectItem value="event">Table only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </section>
+
+          {/* -- Gallery Photos ----------------------------------------------- */}
+          <section className="rounded-xl border border-white/8 p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gallery Photos</p>
+            {galleryImages.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {galleryImages.map((src, i) => (
+                  <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-white/10">
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setGalleryImages((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/70 flex items-center justify-center text-white">
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {galleryImages.length < 6 && (
+              <label className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+                galleryUploading > 0 && "opacity-50 pointer-events-none",
+              )}>
+                <ImageIcon className="h-4 w-4" />
+                {galleryUploading > 0 ? `Uploading ${galleryUploading}...` : `Add photos (${galleryImages.length}/6)`}
+                <input type="file" accept="image/*" multiple className="hidden"
+                  onChange={(e) => handleGalleryImages(e.target.files)} />
+              </label>
+            )}
+          </section>
+
+          {/* -- Gallery Video ------------------------------------------------ */}
+          <section className="rounded-xl border border-white/8 p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gallery Video</p>
+            {galleryVideo ? (
+              <div className="flex items-center gap-3">
+                <video src={galleryVideo} className="w-24 h-16 rounded-lg object-cover border border-white/10" />
+                <button type="button" onClick={() => setGalleryVideo("")}
+                  className="text-xs text-red-400 hover:text-red-300">Remove</button>
+              </div>
+            ) : (
+              <label className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+                videoUploading && "opacity-50 pointer-events-none",
+              )}>
+                <Video className="h-4 w-4" />
+                {videoUploading ? "Uploading..." : "Upload MP4 video (max 4 MB)"}
+                <input type="file" accept="video/mp4" className="hidden"
+                  onChange={(e) => handleGalleryVideo(e.target.files)} />
+              </label>
+            )}
+          </section>
+
+          {/* -- Pricing ------------------------------------------------------ */}
+          <section className="rounded-xl border border-white/8 p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pricing</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(["Women", "Men", "Couple"] as const).map((label) => {
+                const val = label === "Women" ? priceWomen : label === "Men" ? priceMen : priceCouple;
+                const setter = label === "Women" ? setPriceWomen : label === "Men" ? setPriceMen : setPriceCouple;
+                return (
+                  <div key={label} className="space-y-1.5">
+                    <Label className="text-xs">{label} (â‚¹)</Label>
+                    <Input type="number" min={0} placeholder="0" value={val}
+                      onChange={(e) => setter(e.target.value)} className="bg-black/40 border-white/10" />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2.5 pt-1">
+              <Switch id="cp-varybyday" checked={varyByDay} onCheckedChange={setVaryByDay} />
+              <Label htmlFor="cp-varybyday" className="text-sm cursor-pointer select-none">Vary prices by day</Label>
+            </div>
+            {varyByDay && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-muted-foreground">
+                      <th className="text-left pb-1.5 font-normal">Day</th>
+                      <th className="pb-1.5 font-normal">Women (â‚¹)</th>
+                      <th className="pb-1.5 font-normal">Men (â‚¹)</th>
+                      <th className="pb-1.5 font-normal">Couple (â‚¹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {CP_DAYS.map((day) => (
+                      <tr key={day}>
+                        <td className="py-1 pr-2 font-medium w-10">{day}</td>
+                        {(["women", "men", "couple"] as const).map((field) => (
+                          <td key={field} className="py-1 px-1">
+                            <Input type="number" min={0}
+                              placeholder={field === "women" ? priceWomen || "--" : field === "men" ? priceMen || "--" : priceCouple || "--"}
+                              value={dayPricingOverrides[day]?.[field] ?? ""}
+                              onChange={(e) => setDayPrice(day, field, e.target.value)}
+                              className="bg-black/40 border-white/10 h-7 px-1.5 w-full" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          {/* -- Event Types -------------------------------------------------- */}
+          <section className="rounded-xl border border-white/8 p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event Types</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PUB_EVENT_TYPES.map((t) => (
+                <button key={t} type="button" onClick={() => togglePubEventType(t)}
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-full border transition-colors",
+                    pubEventTypes.includes(t) ? "bg-primary/20 border-primary/50 text-primary" : "border-white/10 text-white/60 hover:bg-white/5",
+                  )}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* -- Free Entry --------------------------------------------------- */}
+          <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+            <button type="button" onClick={() => setFreeEntryEnabled((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
+                <span className={cn(
+                  "inline-flex h-4 w-4 items-center justify-center rounded border",
+                  freeEntryEnabled ? "border-emerald-500 bg-emerald-500" : "border-emerald-500/40 bg-transparent",
+                )}>
+                  {freeEntryEnabled && <Check className="h-3 w-3 text-black" />}
+                </span>
+                Free Entry
+              </span>
+              <ChevronDown className={cn("h-4 w-4 text-emerald-400 transition-transform", freeEntryEnabled && "rotate-180")} />
+            </button>
+            {freeEntryEnabled && (
+              <div className="space-y-3 px-4 pb-4 pt-1">
+                <div>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Free for which genders? <span className="text-red-400">*</span></Label>
+                  <div className="flex flex-wrap gap-2">
+                    {CP_GENDERS.map(({ canon, label }) => (
+                      <button key={canon} type="button" onClick={() => toggleFreeEntryGender(canon)}
+                        className={cn(
+                          "text-xs px-3 py-1.5 rounded-full border",
+                          freeEntryGenders.includes(canon) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5",
+                        )}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days? <span className="text-red-400">*</span></Label>
+                  <div className="flex flex-wrap gap-2">
+                    {CP_DAYS.map((d) => (
+                      <button key={d} type="button" onClick={() => toggleFreeEntryDay(d)}
+                        className={cn(
+                          "text-xs px-3 py-1.5 rounded-full border",
+                          freeEntryDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5",
+                        )}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-white/60 block">Before time (optional, e.g. 22:00)</Label>
+                  <Input placeholder="HH:MM" value={freeEntryBeforeTime}
+                    onChange={(e) => setFreeEntryBeforeTime(e.target.value)}
+                    className="bg-black/40 border-white/10 w-32 text-sm" />
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* -- Venue Details ------------------------------------------------ */}
+          <section className="rounded-xl border border-white/8 p-4 space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Venue Details</p>
+
+            <div className="space-y-1.5">
+              <Label>Dance Floor</Label>
+              <Select value={danceFloor === "" ? "none-selected" : danceFloor}
+                onValueChange={(v) => setDanceFloor(v === "none-selected" ? "" : v)}>
+                <SelectTrigger className="w-52 bg-black/40 border-white/10"><SelectValue placeholder="Select..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none-selected">Not specified</SelectItem>
+                  <SelectItem value="dedicated">Dedicated dance floor</SelectItem>
+                  <SelectItem value="general">General area</SelectItem>
+                  <SelectItem value="none">No dance floor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Dance Floor Photos</Label>
+              {danceFloorPhotos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {danceFloorPhotos.map((src, i) => (
+                    <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-white/10">
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => setDanceFloorPhotos((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/70 flex items-center justify-center text-white">
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {danceFloorPhotos.length < 6 && (
+                <label className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+                  danceFloorUploading > 0 && "opacity-50 pointer-events-none",
+                )}>
+                  <ImageIcon className="h-4 w-4" />
+                  {danceFloorUploading > 0 ? `Uploading ${danceFloorUploading}...` : `Add dance floor photos (${danceFloorPhotos.length}/6)`}
+                  <input type="file" accept="image/*" multiple className="hidden"
+                    onChange={(e) => handleDanceFloorUpload(e.target.files)} />
+                </label>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Pub Menu (images)</Label>
+              {menuUrls.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {menuUrls.map((src, i) => (
+                    <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-white/10">
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => setMenuUrls((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/70 flex items-center justify-center text-white">
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {menuUrls.length < 6 && (
+                <label className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
+                  menuUploading > 0 && "opacity-50 pointer-events-none",
+                )}>
+                  <Upload className="h-4 w-4" />
+                  {menuUploading > 0 ? `Uploading ${menuUploading}...` : `Add menu images (${menuUrls.length}/6)`}
+                  <input type="file" accept="image/*" multiple className="hidden"
+                    onChange={(e) => handleMenuUpload(e.target.files)} />
+                </label>
+              )}
+            </div>
+          </section>
+
+          <div className="flex gap-3">
+            <Button type="submit" disabled={submitting} className="flex-1">
+              {submitting ? "Creating..." : `Create ${lookupResult.vendor?.category === "Club" ? "Club" : "Pub"} for ${lookupResult.user.name}`}
+            </Button>
+            <Button type="button" variant="outline" onClick={resetLookup}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

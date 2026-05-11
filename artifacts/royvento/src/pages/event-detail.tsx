@@ -1002,6 +1002,51 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             </section>
           )}
 
+          {isPub && (() => {
+            const danceFloorPhotos: string[] = ((ev.vendor as any)?.danceFloorPhotos ?? []).filter(Boolean);
+            if (danceFloorPhotos.length === 0) return null;
+            return (
+              <section>
+                <h2 className="font-serif text-3xl mb-4 accent-underline inline-block">Dance Floor</h2>
+                <div className="flex gap-3 flex-wrap">
+                  {danceFloorPhotos.map((url: string, i: number) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setLightbox(url)}
+                      className="block w-32 h-32 md:w-40 md:h-40 rounded-xl overflow-hidden border border-white/10 hover:border-primary/40 transition-colors cursor-zoom-in"
+                    >
+                      <img src={url} alt={`Dance floor ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
+
+          {isPub && (() => {
+            const menuImages: string[] = ((ev.vendor as any)?.menuUrls ?? []).filter(Boolean);
+            if (menuImages.length === 0) return null;
+            return (
+              <section>
+                <h2 className="font-serif text-3xl mb-4 accent-underline inline-block">Menu</h2>
+                <div className="flex gap-3 flex-wrap">
+                  {menuImages.map((url: string, i: number) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-32 h-40 md:w-40 md:h-52 rounded-xl overflow-hidden border border-white/10 hover:border-primary/40 transition-colors"
+                    >
+                      <img src={url} alt={`Menu page ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    </a>
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
+
           {isPub && announcements.length > 0 && (
             <section>
               <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">{t("events.announcements")}</h2>
@@ -1319,7 +1364,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       </label>
                       <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer ${pubMode === "event" ? "border-primary bg-primary/10" : "border-white/10"}`}>
                         <RadioGroupItem value="event" />
-                        <span className="text-sm">{t("events.table_booking")}</span>
+                        <span className="text-sm">{(event as any)?.vendorCategory === "Club" ? "VIP Table Booking" : t("events.table_booking")}</span>
                       </label>
                     </RadioGroup>
                   </div>

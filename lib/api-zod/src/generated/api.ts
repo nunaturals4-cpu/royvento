@@ -20,7 +20,7 @@ export const RequestUploadUrlBody = zod
   .strict();
 
 export const RequestUploadUrlResponse = zod.object({
-  uploadURL: zod.string().url(),
+  uploadURL: zod.string().min(1),
   objectPath: zod.string(),
   metadata: zod
     .object({

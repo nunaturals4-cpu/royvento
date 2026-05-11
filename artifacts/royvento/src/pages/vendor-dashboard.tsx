@@ -199,7 +199,17 @@ export function VendorDashboard() {
   const initialTab = rawTab === "listing" ? "events" : rawTab;
   const { data: vendorData, refetch: refetchVendor } = useGetMyVendor();
   const vendor = (vendorData?.vendor ?? null) as any;
-  const { data: eventsResp, refetch: refetchEvents } = useListMyVendorEvents(undefined, { query: { enabled: !!vendor } as any });
+
+  // Poll every 10 s while the partner is approved but has no approved listing
+  // yet — this makes dashboard tabs appear automatically when an admin assigns
+  // a pub without requiring the partner to manually refresh.
+  const [pollActive, setPollActive] = useState(true);
+  const { data: eventsResp, refetch: refetchEvents } = useListMyVendorEvents(undefined, {
+    query: {
+      enabled: !!vendor,
+      refetchInterval: vendor?.status === "approved" && pollActive ? 10_000 : false,
+    } as any,
+  });
   const events = eventsResp?.data ?? [];
   const hasPub = events.some((e: any) => e.type === "pub");
 
@@ -212,6 +222,12 @@ export function VendorDashboard() {
   const isApprovedAndListed = vendor?.status === "approved" && hasApprovedEvent;
   const hasPendingEvent = events.some((e: any) => e.approvalStatus === "pending");
   const allRejected = events.length > 0 && !hasApprovedEvent && !hasPendingEvent;
+
+  // Stop polling once the partner has an approved listing
+  useEffect(() => {
+    if (hasApprovedEvent) setPollActive(false);
+  }, [hasApprovedEvent]);
+
   const ALLOWED_LOCKED_TABS = ["overview", "events"] as const;
   const safeInitialTab = isApprovedAndListed
     ? initialTab
@@ -269,7 +285,7 @@ export function VendorDashboard() {
           <div className="overflow-x-auto scrollbar-thin-x pb-2">
           <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
             <TabsTrigger value="overview">Profile</TabsTrigger>
-            <TabsTrigger value="events">Events &amp; pubs</TabsTrigger>
+            <TabsTrigger value="events">Pubs &amp; Clubs</TabsTrigger>
             {isApprovedAndListed && <>
               <TabsTrigger value="bookings">Booking Report</TabsTrigger>
               <TabsTrigger value="analytics">
@@ -309,7 +325,7 @@ export function VendorDashboard() {
           <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>
           {isApprovedAndListed && <>
             <TabsContent value="bookings"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
-            <TabsContent value="analytics"><AnalyticsPanel /></TabsContent>
+            <TabsContent value="analytics"><AnalyticsPanel vendorCategory={vendor?.category ?? ""} /></TabsContent>
             <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
             <TabsContent value="ads"><AdsPanel /></TabsContent>
             <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
@@ -510,7 +526,7 @@ function EventsManager({ vendor, events, refetchEvents, onSaved }: { vendor: any
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
-        <h2 className="font-serif text-2xl">Your events &amp; pubs</h2>
+        <h2 className="font-serif text-2xl">Your Pubs &amp; Clubs</h2>
         {!hasPub && (
           <Button onClick={() => setShow((s) => !s)} className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
             {showForm ? "Close" : "+ New listing"}
@@ -1876,8 +1892,8 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Price (₹)</Label>
-            <Input type="number" min={0} value={price} onChange={(e) => { setPrice(Number(e.target.value)); formErrors.clearField("price"); }} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("price"))} />
-            {formErrors.fieldError("price") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("price")}</p>}
+            <Input type="number" min={0} value={price} readOnly disabled className="bg-black/20 border-white/10 opacity-60 cursor-not-allowed" />
+            <p className="mt-1 text-xs text-muted-foreground">Set by admin</p>
           </div>
           <div>
             <Label>Capacity</Label>
@@ -3240,7 +3256,7 @@ function toAnalyticsDateStr(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-function AnalyticsPanel() {
+function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [preset, setPreset] = useState<AnalyticsPreset>("30d");
@@ -3564,7 +3580,7 @@ function AnalyticsPanel() {
             const types: { key: keyof typeof cs; label: string }[] = [
               { key: "freeEntry", label: "Free Entry" },
               { key: "ticket", label: "Ticket" },
-              { key: "table", label: "Table Booking" },
+              { key: "table", label: vendorCategory === "Club" ? "VIP Table Booking" : "Table Booking" },
             ];
             const active = types.filter((t) => cs[t.key].count > 0);
             if (active.length === 0) return null;

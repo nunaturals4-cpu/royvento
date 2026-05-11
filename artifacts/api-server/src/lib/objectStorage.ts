@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir, unlink, access } from "fs/promises";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
 import path from "path";
+import os from "os";
 import { getObjectAclPolicy } from "./objectAcl";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
@@ -43,7 +44,14 @@ export class ObjectStorageService {
   constructor() {}
 
   private get localDir(): string | null {
-    return process.env.LOCAL_STORAGE_DIR || null;
+    if (process.env.LOCAL_STORAGE_DIR) return process.env.LOCAL_STORAGE_DIR;
+    // When neither LOCAL_STORAGE_DIR nor the Replit GCS env vars are configured,
+    // fall back to a system temp directory so uploads succeed without explicit setup.
+    // Files written here are ephemeral — set LOCAL_STORAGE_DIR to a persistent
+    // path (e.g. a Railway Volume at /data) for production durability.
+    const hasGCS = process.env.PRIVATE_OBJECT_DIR || process.env.PUBLIC_OBJECT_SEARCH_PATHS;
+    if (!hasGCS) return path.join(os.tmpdir(), "royvento-uploads");
+    return null;
   }
 
   getPublicObjectSearchPaths(): Array<string> {

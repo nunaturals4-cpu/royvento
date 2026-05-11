@@ -40,6 +40,7 @@ interface PublicEvent {
   hasDrinkPlans?: boolean;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
   vendorCrowdLevel?: string | null;
+  vendorCategory?: string;
 }
 
 const CROWD_OPTIONS = [
@@ -67,6 +68,7 @@ export function Pubs() {
   const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
   const [freeEntry, setFreeEntry] = useState(false);
   const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
+  const [venueTab, setVenueTab] = useState<"All" | "Pub" | "Club">("All");
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -103,14 +105,15 @@ export function Pubs() {
 
   const displayedPubs = useMemo(() => {
     let list = pubs;
+    if (venueTab !== "All") list = list.filter((p) => p.vendorCategory === venueTab);
     if (hasDrinkDeal && !drinkPlanType) list = list.filter((p) => p.hasDrinkPlans);
     if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true && (p.freeEntryRules?.days?.length ?? 0) > 0);
     if (crowdLevel) list = list.filter((p) => p.vendorCrowdLevel === crowdLevel);
     return list;
-  }, [pubs, hasDrinkDeal, drinkPlanType, freeEntry, crowdLevel]);
+  }, [pubs, venueTab, hasDrinkDeal, drinkPlanType, freeEntry, crowdLevel]);
 
   const hasFilters =
-    search || country || stateF || city || pricePreset !== null || drinkPlanType || hasDrinkDeal || freeEntry || crowdLevel;
+    search || country || stateF || city || pricePreset !== null || drinkPlanType || hasDrinkDeal || freeEntry || crowdLevel || venueTab !== "All";
 
   function clearAll() {
     setSearch("");
@@ -122,6 +125,7 @@ export function Pubs() {
     setHasDrinkDeal(false);
     setFreeEntry(false);
     setCrowdLevel("");
+    setVenueTab("All");
   }
 
   return (
@@ -140,6 +144,24 @@ export function Pubs() {
           {t("pubs.subtitle")}
         </p>
       </header>
+
+      {/* Venue type tabs */}
+      <div className="flex gap-2 mb-6">
+        {(["All", "Pub", "Club"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setVenueTab(tab)}
+            className={cn(
+              "px-5 py-2 rounded-full text-sm font-semibold border transition-colors",
+              venueTab === tab
+                ? "bg-primary border-primary text-primary-foreground"
+                : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20",
+            )}
+          >
+            {tab === "All" ? "All" : tab === "Pub" ? "Pubs" : "Clubs"}
+          </button>
+        ))}
+      </div>
 
       <div className="rounded-3xl glass-card p-5 md:p-6 mb-8 space-y-4">
         {/* Search */}

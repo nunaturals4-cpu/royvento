@@ -35,22 +35,11 @@ export function verifyUploadToken(
 }
 
 export function buildServerUploadUrl(
-  req: Request,
+  _req: Request,
   uuid: string,
   size: number,
   contentType: string,
 ): string {
-  const host =
-    req.get("x-forwarded-host") ??
-    req.get("host") ??
-    process.env.REPLIT_DEV_DOMAIN ??
-    "localhost";
-  // Honor reverse-proxy hint when present (production); otherwise fall back to
-  // the actual request scheme so local HTTP dev returns http:// not https://.
-  // Defaulting to "https" here caused the client to hit the HTTPS port on an
-  // HTTP-only local server and fail with TypeError "Failed to fetch", which
-  // then surfaced as a field error on imageUrl/galleryImages.
-  const proto = (req.get("x-forwarded-proto") ?? req.protocol ?? "http").split(",")[0].trim();
   const expiresAt = Date.now() + UPLOAD_TTL_MS;
   const token = signUploadToken(uuid, size, contentType, expiresAt);
   const qs = new URLSearchParams({
@@ -59,5 +48,8 @@ export function buildServerUploadUrl(
     size: String(size),
     type: contentType,
   });
-  return `${proto}://${host}/api/storage/uploads/file/${uuid}?${qs}`;
+  // Return a root-relative path so the client resolves it against the page
+  // origin. This eliminates cross-origin CORS issues in local dev (frontend
+  // on :3000 proxying to API on :5000) and removes host/protocol detection.
+  return `/api/storage/uploads/file/${uuid}?${qs}`;
 }

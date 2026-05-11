@@ -110,6 +110,7 @@ async function serializeEvents(rows: EventRow[]) {
       createdAt: e.createdAt.toISOString(),
       hasDrinkPlans: vendorIdsWithPlans.has(e.vendorId),
       vendorCrowdLevel: (v as unknown as { crowdLevel?: string | null })?.crowdLevel ?? null,
+      vendorCategory: v?.category ?? "",
     };
   });
 }
@@ -295,6 +296,10 @@ router.get("/events/:eventId", async (req, res) => {
           rating: rating.rating,
           reviewCount: rating.reviewCount,
           crowdLevel: (v as unknown as { crowdLevel?: string | null }).crowdLevel ?? null,
+          danceFloor: (v as unknown as { danceFloor?: string | null }).danceFloor ?? null,
+          danceFloorPhotos: (v as unknown as { danceFloorPhotos?: string[] | null }).danceFloorPhotos ?? [],
+          menuUrl: (v as unknown as { menuUrl?: string | null }).menuUrl ?? "",
+          menuUrls: (v as unknown as { menuUrls?: string[] | null }).menuUrls ?? [],
           createdAt: v.createdAt.toISOString(),
         }
       : null,
