@@ -21,6 +21,7 @@ import {
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -102,6 +103,8 @@ interface VendorEvent {
   imageUrl: string;
   approvalStatus: string;
   freeEntryRules?: FreeEntryRules | null;
+  galleryImages?: string[];
+  galleryVideos?: string[];
 }
 
 interface VendorBookingItem {
@@ -150,46 +153,73 @@ async function requestMenuPresignedUrl(name: string, size: number, contentType: 
   );
 }
 
-async function uploadMenuFileToStorage(localUri: string, filename: string, contentType: string): Promise<string> {
-  const fileRes = await fetch(localUri);
-  const blob = await fileRes.blob();
-  const size = blob.size || 1;
-  const { uploadURL, objectPath } = await requestMenuPresignedUrl(filename, size, contentType);
-  await fetch(uploadURL, {
-    method: "PUT",
+// React Native's `fetch(file://…)` -> `.blob()` is unreliable on Android and
+// crashes on some Expo runtimes ("Failed to fetch"). expo-file-system's
+// uploadAsync streams the file natively over HTTP without going through a JS
+// blob, which is the supported path for binary PUT to a presigned URL.
+async function putFileToPresignedUrl(uploadURL: string, localUri: string, contentType: string): Promise<void> {
+  const result = await FileSystem.uploadAsync(uploadURL, localUri, {
+    httpMethod: "PUT",
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
     headers: { "Content-Type": contentType },
-    body: blob,
   });
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(`Storage upload failed (${result.status}): ${result.body?.slice(0, 200) ?? ""}`);
+  }
+}
+
+async function getLocalFileSize(localUri: string): Promise<number> {
+  try {
+    const info = await FileSystem.getInfoAsync(localUri);
+    if (info.exists && typeof (info as { size?: number }).size === "number") {
+      return Math.max(1, (info as { size: number }).size);
+    }
+  } catch {
+    // fall through to fallback below
+  }
+  return 1;
+}
+
+async function uploadMenuFileToStorage(localUri: string, filename: string, contentType: string): Promise<string> {
+  const size = await getLocalFileSize(localUri);
+  const { uploadURL, objectPath } = await requestMenuPresignedUrl(filename, size, contentType);
+  await putFileToPresignedUrl(uploadURL, localUri, contentType);
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
   const base = getBaseUrl();
   if (!base) throw new Error("API base URL is not configured; cannot build storage URL.");
   return `${base}/api/storage/objects/${pathAfterObjects}`;
 }
 
-async function uploadImageToStorage(localUri: string): Promise<string> {
+async function uploadImageToStorage(localUri: string, mimeHint?: string): Promise<string> {
   const filename = localUri.split("/").pop() ?? "image.jpg";
   const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
   const mimeMap: Record<string, string> = {
-    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
   };
-  const contentType = mimeMap[ext] ?? "image/jpeg";
+  const contentType = mimeHint ?? mimeMap[ext] ?? "image/jpeg";
 
-  // Fetch the file as a blob
-  const fileRes = await fetch(localUri);
-  const blob = await fileRes.blob();
-  const size = blob.size || 1;
-
-  // Get presigned URL from our API
+  const size = await getLocalFileSize(localUri);
   const { uploadURL, objectPath } = await requestPresignedUrl(filename, size, contentType);
+  await putFileToPresignedUrl(uploadURL, localUri, contentType);
 
-  // PUT the file directly to storage
-  await fetch(uploadURL, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  });
+  const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
+  const base = getBaseUrl();
+  if (!base) throw new Error("API base URL is not configured; cannot build storage URL.");
+  return `${base}/api/storage/objects/${pathAfterObjects}`;
+}
 
-  // Construct the serving URL
+async function uploadVideoToStorage(localUri: string): Promise<string> {
+  const filename = localUri.split("/").pop() ?? "video.mp4";
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "mp4";
+  const mimeMap: Record<string, string> = {
+    mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", m4v: "video/x-m4v",
+  };
+  const contentType = mimeMap[ext] ?? "video/mp4";
+
+  const size = await getLocalFileSize(localUri);
+  const { uploadURL, objectPath } = await requestPresignedUrl(filename, size, contentType);
+  await putFileToPresignedUrl(uploadURL, localUri, contentType);
+
   const pathAfterObjects = objectPath.replace(/^\/objects\//, "");
   const base = getBaseUrl();
   if (!base) throw new Error("API base URL is not configured; cannot build storage URL.");
@@ -325,12 +355,15 @@ interface EventFormState {
   freeEntryGenders: FreeEntryRulesGendersItem[];
   freeEntryDays: FreeEntryRulesDaysItem[];
   freeEntryBeforeTime: string;
+  galleryImages: string[];
+  galleryVideos: string[];
 }
 
 const DEFAULT_EVENT_FORM: EventFormState = {
   title: "", description: "", category: EVENT_CATEGORIES[0]!,
   location: "", price: "", capacity: "", imageUrl: "", imageUri: "",
   freeEntryEnabled: false, freeEntryGenders: [], freeEntryDays: [], freeEntryBeforeTime: "",
+  galleryImages: [], galleryVideos: [],
 };
 
 // ─── Drink Plans Tab Component ────────────────────────────────────────────────
@@ -1246,10 +1279,11 @@ export default function VendorDashboardScreen() {
 
     setImageUploading(true);
     try {
-      const url = await uploadImageToStorage(asset.uri);
+      const url = await uploadImageToStorage(asset.uri, asset.mimeType ?? undefined);
       setter((prev) => ({ ...prev, imageUrl: url }));
-    } catch (e) {
-      Alert.alert("Upload failed", "Could not upload image. You can still create the listing without one.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not upload image. You can still create the listing without one.";
+      Alert.alert("Upload failed", msg);
       setter((prev) => ({ ...prev, imageUri: "", imageUrl: "" }));
     } finally {
       setImageUploading(false);
@@ -1305,6 +1339,8 @@ export default function VendorDashboardScreen() {
   const [showEditCatPicker, setShowEditCatPicker] = useState(false);
   const [editImageUploading, setEditImageUploading] = useState(false);
 
+  const [editGalleryUploading, setEditGalleryUploading] = useState(false);
+  const [editVideoUploading, setEditVideoUploading] = useState(false);
   const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
   const updateEventMut = useUpdateEvent({
     mutation: {
@@ -1333,6 +1369,8 @@ export default function VendorDashboardScreen() {
       freeEntryGenders: fer?.genders ?? [],
       freeEntryDays: fer?.days ?? [],
       freeEntryBeforeTime: fer?.beforeTime ?? "",
+      galleryImages: event.galleryImages ?? [],
+      galleryVideos: event.galleryVideos ?? [],
     });
     setShowEditCatPicker(false);
     setEditingEvent({ id: event.id, type: event.type });
@@ -1371,6 +1409,8 @@ export default function VendorDashboardScreen() {
         price,
         capacity,
         imageUrl: editForm.imageUrl || undefined,
+        galleryImages: editForm.galleryImages,
+        galleryVideos: editForm.galleryVideos,
         freeEntryRules: (editingEvent.type === "pub" || editForm.category === "Pubs") ? {
           enabled: editForm.freeEntryEnabled,
           genders: editForm.freeEntryGenders,
@@ -3910,10 +3950,11 @@ export default function VendorDashboardScreen() {
                             if (result.canceled) return;
                             setUploadingDfPhoto(true);
                             try {
-                              const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri)));
+                              const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri, a.mimeType ?? undefined)));
                               setProfDanceFloorPhotos((prev) => [...prev, ...urls]);
-                            } catch {
-                              Alert.alert("Upload failed", "Could not upload photo.");
+                            } catch (err) {
+                              const msg = err instanceof Error ? err.message : "Could not upload photo.";
+                              Alert.alert("Upload failed", msg);
                             } finally {
                               setUploadingDfPhoto(false);
                             }
@@ -4033,11 +4074,11 @@ export default function VendorDashboardScreen() {
               <Ionicons name="close" size={22} color={colors.foreground} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Listing</Text>
-            <TouchableOpacity onPress={submitEditEvent} disabled={updateEventMut.isPending || editImageUploading}>
+            <TouchableOpacity onPress={submitEditEvent} disabled={updateEventMut.isPending || editImageUploading || editGalleryUploading || editVideoUploading}>
               {updateEventMut.isPending
                 ? <ActivityIndicator color={colors.primary} size="small" />
-                : <Text style={{ color: editImageUploading ? colors.mutedForeground : colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
-                    {editImageUploading ? "Uploading…" : "Save"}
+                : <Text style={{ color: (editImageUploading || editGalleryUploading || editVideoUploading) ? colors.mutedForeground : colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                    {(editImageUploading || editGalleryUploading || editVideoUploading) ? "Uploading…" : "Save"}
                   </Text>
               }
             </TouchableOpacity>
@@ -4069,16 +4110,118 @@ export default function VendorDashboardScreen() {
                   setEditForm((p) => ({ ...p, imageUri: asset.uri, imageUrl: "" }));
                   setEditImageUploading(true);
                   try {
-                    const url = await uploadImageToStorage(asset.uri);
+                    const url = await uploadImageToStorage(asset.uri, asset.mimeType ?? undefined);
                     setEditForm((p) => ({ ...p, imageUrl: url }));
-                  } catch {
-                    Alert.alert("Upload failed", "Could not upload image.");
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : "Could not upload image.";
+                    Alert.alert("Upload failed", msg);
                     setEditForm((p) => ({ ...p, imageUri: "", imageUrl: "" }));
                   } finally {
                     setEditImageUploading(false);
                   }
                 }}
               />
+
+              {/* ── Gallery Photos ── */}
+              <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, gap: 10, marginTop: 4 }}>
+                <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>Gallery Photos</Text>
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Add up to 10 photos for this listing</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {editForm.galleryImages.map((url, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onLongPress={() => {
+                          Alert.alert("Remove photo?", undefined, [
+                            { text: "Cancel", style: "cancel" },
+                            { text: "Remove", style: "destructive", onPress: () => setEditForm((p) => ({ ...p, galleryImages: p.galleryImages.filter((_, j) => j !== i) })) },
+                          ]);
+                        }}
+                        style={{ width: 90, height: 90, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border }}
+                      >
+                        <Image source={{ uri: url }} style={{ width: 90, height: 90 }} resizeMode="cover" />
+                      </TouchableOpacity>
+                    ))}
+                    {editForm.galleryImages.length < 10 && (
+                      <TouchableOpacity
+                        disabled={editGalleryUploading}
+                        onPress={async () => {
+                          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                          if (status !== "granted") { Alert.alert("Permission required", "Allow photo library access to add gallery photos."); return; }
+                          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, quality: 0.85 });
+                          if (result.canceled) return;
+                          setEditGalleryUploading(true);
+                          try {
+                            const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri, a.mimeType ?? undefined)));
+                            setEditForm((p) => ({ ...p, galleryImages: [...p.galleryImages, ...urls].slice(0, 10) }));
+                          } catch (err) {
+                            const msg = err instanceof Error ? err.message : "Could not upload gallery photo.";
+                            Alert.alert("Upload failed", msg);
+                          } finally {
+                            setEditGalleryUploading(false);
+                          }
+                        }}
+                        style={{ width: 90, height: 90, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: editGalleryUploading ? colors.border : colors.primary + "60", backgroundColor: colors.card, alignItems: "center", justifyContent: "center", gap: 4 }}
+                      >
+                        {editGalleryUploading
+                          ? <ActivityIndicator size="small" color={colors.primary} />
+                          : <><Ionicons name="add" size={22} color={colors.primary} /><Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Add</Text></>
+                        }
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </ScrollView>
+                {editForm.galleryImages.length > 0 && (
+                  <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Long-press a photo to remove it</Text>
+                )}
+              </View>
+
+              {/* ── Gallery Video ── */}
+              <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, gap: 10, marginTop: 4 }}>
+                <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>Gallery Video</Text>
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Add one video to showcase this listing</Text>
+                {editForm.galleryVideos.length > 0 ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.muted + "40" }}>
+                    <Ionicons name="videocam-outline" size={20} color={colors.primary} />
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>
+                      {editForm.galleryVideos[0]!.split("/").pop()?.split("?")[0] ?? "Video"}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setEditForm((p) => ({ ...p, galleryVideos: [] }))}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="trash-outline" size={15} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    disabled={editVideoUploading}
+                    onPress={async () => {
+                      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                      if (status !== "granted") { Alert.alert("Permission required", "Allow photo library access to add a video."); return; }
+                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["videos"], allowsEditing: false, quality: 1 });
+                      if (result.canceled || !result.assets[0]) return;
+                      const asset = result.assets[0]!;
+                      setEditVideoUploading(true);
+                      try {
+                        const url = await uploadVideoToStorage(asset.uri);
+                        setEditForm((p) => ({ ...p, galleryVideos: [url] }));
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : "Could not upload video.";
+                        Alert.alert("Upload failed", msg);
+                      } finally {
+                        setEditVideoUploading(false);
+                      }
+                    }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: editVideoUploading ? colors.border : colors.primary + "60", paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.muted + "30", opacity: editVideoUploading ? 0.6 : 1 }}
+                  >
+                    {editVideoUploading ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />}
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: editVideoUploading ? colors.mutedForeground : colors.primary }}>
+                      {editVideoUploading ? "Uploading…" : "Add video"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
               {/* ── Venue Details ── */}
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16, gap: 12, marginTop: 4 }}>
@@ -4253,10 +4396,11 @@ export default function VendorDashboardScreen() {
                             if (result.canceled) return;
                             setUploadingDfPhoto(true);
                             try {
-                              const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri)));
+                              const urls = await Promise.all(result.assets.map((a) => uploadImageToStorage(a.uri, a.mimeType ?? undefined)));
                               setProfDanceFloorPhotos((prev) => [...prev, ...urls]);
-                            } catch {
-                              Alert.alert("Upload failed", "Could not upload photo.");
+                            } catch (err) {
+                              const msg = err instanceof Error ? err.message : "Could not upload photo.";
+                              Alert.alert("Upload failed", msg);
                             } finally {
                               setUploadingDfPhoto(false);
                             }

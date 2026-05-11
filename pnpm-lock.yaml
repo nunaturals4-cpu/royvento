@@ -195,6 +195,9 @@ importers:
       expo-document-picker:
         specifier: ^55.0.13
         version: 55.0.13(expo@54.0.34)
+      expo-file-system:
+        specifier: ~19.0.22
+        version: 19.0.22(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
       expo-localization:
         specifier: ^55.0.13
         version: 55.0.13(expo@54.0.34)(react@19.1.0)

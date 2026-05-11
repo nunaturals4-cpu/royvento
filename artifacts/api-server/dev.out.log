@@ -1,0 +1,19 @@
+[12:48:26.630] [32mINFO[39m (8540): [36mServer listening[39m
+    [35mport[39m: 5000
+[12:48:26.876] [32mINFO[39m (8540): [36mAdmin account refreshed (password + verified)[39m
+[12:48:26.876] [32mINFO[39m (8540): [36mCleanup: deleted old notifications[39m
+    [35mcount[39m: 0
+[12:48:26.878] [31mERROR[39m (8540): [36mStartup audit: users.password_hash failed bcrypt prefix check. See replit.md gotcha.[39m
+    [35mbadPasswordHashCount[39m: 2
+[12:48:26.883] [32mINFO[39m (8540): [36mStartup audit: backfilled vendor ticketPrefix/ticketSalt[39m
+    [35mbackfilled[39m: 2
+[12:48:35.241] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/api/health"
+    }
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 12

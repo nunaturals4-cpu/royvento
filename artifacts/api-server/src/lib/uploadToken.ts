@@ -45,7 +45,12 @@ export function buildServerUploadUrl(
     req.get("host") ??
     process.env.REPLIT_DEV_DOMAIN ??
     "localhost";
-  const proto = (req.get("x-forwarded-proto") ?? "https").split(",")[0].trim();
+  // Honor reverse-proxy hint when present (production); otherwise fall back to
+  // the actual request scheme so local HTTP dev returns http:// not https://.
+  // Defaulting to "https" here caused the client to hit the HTTPS port on an
+  // HTTP-only local server and fail with TypeError "Failed to fetch", which
+  // then surfaced as a field error on imageUrl/galleryImages.
+  const proto = (req.get("x-forwarded-proto") ?? req.protocol ?? "http").split(",")[0].trim();
   const expiresAt = Date.now() + UPLOAD_TTL_MS;
   const token = signUploadToken(uuid, size, contentType, expiresAt);
   const qs = new URLSearchParams({

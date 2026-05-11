@@ -949,122 +949,6 @@ export default function EventDetailScreen() {
               ))}
             </View>
           ) : null}
-
-          {isPub && similarPubs.length > 0 ? (
-            <View style={{ gap: 10 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.similar_pubs")}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
-                <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 12 }}>
-                  {similarPubs.map((pub: any) => (
-                    <Pressable
-                      key={pub.id}
-                      onPress={() => router.push(`/event/${pub.id}` as never)}
-                      style={[styles.similarPubCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    >
-                      {pub.imageUrl ? (
-                        <Image source={{ uri: pub.imageUrl }} style={styles.similarPubImage} contentFit="cover" />
-                      ) : (
-                        <View style={[styles.similarPubImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
-                          <Ionicons name="wine-outline" size={24} color={colors.mutedForeground} />
-                        </View>
-                      )}
-                      <View style={styles.similarPubInfo}>
-                        <Text style={[styles.similarPubName, { color: colors.foreground }]} numberOfLines={2}>{pub.title}</Text>
-                        {pub.city ? (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
-                            <Ionicons name="location-outline" size={10} color={colors.mutedForeground} />
-                            <Text style={[styles.similarPubCity, { color: colors.mutedForeground }]}>{pub.city}</Text>
-                          </View>
-                        ) : null}
-                        {pub.price != null && Number(pub.price) > 0 ? (
-                          <Text style={[styles.similarPubPrice, { color: colors.primary }]}>{formatINR(Number(pub.price))}</Text>
-                        ) : null}
-                      </View>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-              {eventCity ? (
-                <Pressable
-                  onPress={() => router.push(`/(tabs)/explore?city=${encodeURIComponent(eventCity)}&type=pub` as never)}
-                  style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4 }}
-                >
-                  <Text style={{ fontSize: 13, color: colors.primary }}>{t("events.see_all_in_city", { city: eventCity })}</Text>
-                  <Ionicons name="arrow-forward" size={13} color={colors.primary} />
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-
-          {/* Reviews */}
-          {reviewsTotal > 0 ? (
-            <View style={{ gap: 10 }}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
-              {(reviews ?? []).map((r) => (
-                <ReviewItem
-                  key={r.id}
-                  review={r}
-                  isOwner={!!user && r.userId === user.id}
-                  onChanged={() => {
-                    refetchReviews();
-                    if (vendorId) {
-                      qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
-                      qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
-                    }
-                    qc.invalidateQueries({ queryKey: getListEventReviewsQueryKey(eventId) });
-                  }}
-                  onImagePress={(url) => setLightboxImage(url)}
-                />
-              ))}
-              {reviewsTotalPages > 1 ? (
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-                  <Pressable
-                    onPress={() => setReviewsPage((p) => Math.max(1, p - 1))}
-                    disabled={reviewsPage <= 1}
-                    style={{
-                      flexDirection: "row", alignItems: "center", gap: 4,
-                      paddingVertical: 8, paddingHorizontal: 12,
-                      borderRadius: 8, borderWidth: 1, borderColor: colors.border,
-                      opacity: reviewsPage <= 1 ? 0.4 : 1,
-                    }}
-                  >
-                    <Ionicons name="chevron-back" size={14} color={colors.foreground} />
-                    <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Prev</Text>
-                  </Pressable>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
-                    Page {reviewsPage} of {reviewsTotalPages}
-                  </Text>
-                  <Pressable
-                    onPress={() => setReviewsPage((p) => Math.min(reviewsTotalPages, p + 1))}
-                    disabled={reviewsPage >= reviewsTotalPages}
-                    style={{
-                      flexDirection: "row", alignItems: "center", gap: 4,
-                      paddingVertical: 8, paddingHorizontal: 12,
-                      borderRadius: 8, borderWidth: 1, borderColor: colors.border,
-                      opacity: reviewsPage >= reviewsTotalPages ? 0.4 : 1,
-                    }}
-                  >
-                    <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Next</Text>
-                    <Ionicons name="chevron-forward" size={14} color={colors.foreground} />
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          {/* Review submission form — shown only to logged-in users with a booking */}
-          {vendorId ? (
-            <ReviewForm
-              user={user}
-              eventId={eventId}
-              vendorId={vendorId}
-              onPosted={() => {
-                refetchReviews();
-                qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
-                qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
-              }}
-            />
-          ) : null}
         </View>
 
         {/* ─── Booking form ─── */}
@@ -1491,6 +1375,120 @@ export default function EventDetailScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        ) : null}
+
+        {isPub && similarPubs.length > 0 ? (
+          <View style={{ gap: 10, paddingHorizontal: 20 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("events.similar_pubs")}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }}>
+              <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 12 }}>
+                {similarPubs.map((pub: any) => (
+                  <Pressable
+                    key={pub.id}
+                    onPress={() => router.push(`/event/${pub.id}` as never)}
+                    style={[styles.similarPubCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  >
+                    {pub.imageUrl ? (
+                      <Image source={{ uri: pub.imageUrl }} style={styles.similarPubImage} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.similarPubImage, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
+                        <Ionicons name="wine-outline" size={24} color={colors.mutedForeground} />
+                      </View>
+                    )}
+                    <View style={styles.similarPubInfo}>
+                      <Text style={[styles.similarPubName, { color: colors.foreground }]} numberOfLines={2}>{pub.title}</Text>
+                      {pub.city ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                          <Ionicons name="location-outline" size={10} color={colors.mutedForeground} />
+                          <Text style={[styles.similarPubCity, { color: colors.mutedForeground }]}>{pub.city}</Text>
+                        </View>
+                      ) : null}
+                      {pub.price != null && Number(pub.price) > 0 ? (
+                        <Text style={[styles.similarPubPrice, { color: colors.primary }]}>{formatINR(Number(pub.price))}</Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+            {eventCity ? (
+              <Pressable
+                onPress={() => router.push(`/(tabs)/explore?city=${encodeURIComponent(eventCity)}&type=pub` as never)}
+                style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4 }}
+              >
+                <Text style={{ fontSize: 13, color: colors.primary }}>{t("events.see_all_in_city", { city: eventCity })}</Text>
+                <Ionicons name="arrow-forward" size={13} color={colors.primary} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {reviewsTotal > 0 ? (
+          <View style={{ gap: 10, paddingHorizontal: 20 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
+            {(reviews ?? []).map((r) => (
+              <ReviewItem
+                key={r.id}
+                review={r}
+                isOwner={!!user && r.userId === user.id}
+                onChanged={() => {
+                  refetchReviews();
+                  if (vendorId) {
+                    qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
+                    qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
+                  }
+                  qc.invalidateQueries({ queryKey: getListEventReviewsQueryKey(eventId) });
+                }}
+                onImagePress={(url) => setLightboxImage(url)}
+              />
+            ))}
+            {reviewsTotalPages > 1 ? (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                <Pressable
+                  onPress={() => setReviewsPage((p) => Math.max(1, p - 1))}
+                  disabled={reviewsPage <= 1}
+                  style={{
+                    flexDirection: "row", alignItems: "center", gap: 4,
+                    paddingVertical: 8, paddingHorizontal: 12,
+                    borderRadius: 8, borderWidth: 1, borderColor: colors.border,
+                    opacity: reviewsPage <= 1 ? 0.4 : 1,
+                  }}
+                >
+                  <Ionicons name="chevron-back" size={14} color={colors.foreground} />
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Prev</Text>
+                </Pressable>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+                  Page {reviewsPage} of {reviewsTotalPages}
+                </Text>
+                <Pressable
+                  onPress={() => setReviewsPage((p) => Math.min(reviewsTotalPages, p + 1))}
+                  disabled={reviewsPage >= reviewsTotalPages}
+                  style={{
+                    flexDirection: "row", alignItems: "center", gap: 4,
+                    paddingVertical: 8, paddingHorizontal: 12,
+                    borderRadius: 8, borderWidth: 1, borderColor: colors.border,
+                    opacity: reviewsPage >= reviewsTotalPages ? 0.4 : 1,
+                  }}
+                >
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_500Medium" }}>Next</Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.foreground} />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {vendorId ? (
+          <ReviewForm
+            user={user}
+            eventId={eventId}
+            vendorId={vendorId}
+            onPosted={() => {
+              refetchReviews();
+              qc.invalidateQueries({ queryKey: getGetReviewEligibilityQueryKey(vendorId) });
+              qc.invalidateQueries({ queryKey: getListVendorReviewsQueryKey(vendorId) });
+            }}
+          />
         ) : null}
 
         <MobileFooter />

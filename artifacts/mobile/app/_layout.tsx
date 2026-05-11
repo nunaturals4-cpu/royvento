@@ -97,7 +97,9 @@ function AuthGate() {
   useEffect(() => {
     if (isLoading) return;
     const inAuth = segments[0] === "(auth)";
-    if (user && inAuth) {
+    if (!user && !inAuth) {
+      router.replace("/(auth)/login");
+    } else if (user && inAuth) {
       router.replace("/(tabs)");
     }
   }, [user, isLoading, segments]);
@@ -208,7 +210,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider onAfterLogout={() => { queryClient.clear(); router.replace("/(auth)/login"); }}>
+        <AuthProvider onAfterLogout={() => { queryClient.clear(); }}>
           <LanguageProvider>
           <CityProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>

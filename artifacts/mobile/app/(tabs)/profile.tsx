@@ -669,6 +669,7 @@ export default function ProfileScreen() {
       {/* Menu */}
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
+          { icon: "storefront-outline" as const, label: "Become a Partner", onPress: () => router.push("/become-vendor"), badge: 0 },
           { icon: "notifications-outline" as const, label: "Notifications", onPress: () => router.push("/notifications"), badge: unreadCount },
           { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings"), badge: 0 },
           { icon: "heart-outline" as const, label: t("profile.wishlist"), onPress: () => router.push("/(tabs)/wishlist"), badge: 0 },
