@@ -17,3 +17,1543 @@
       "statusCode": 404
     }
     [35mresponseTime[39m: 12
+[12:48:42.560] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2
+[12:49:24.102] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 38
+[12:49:24.129] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 9
+[12:49:24.483] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 5,
+      "method": "GET",
+      "url": "/api/vendors/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 55
+[12:49:24.507] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 6,
+      "method": "GET",
+      "url": "/api/events/vendor/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 12
+[12:49:24.771] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 7,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 2
+[12:49:24.805] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 8,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 5
+[12:49:25.113] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 9,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 2
+[12:49:25.149] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 10,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 5
+[12:49:25.465] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 11,
+      "method": "GET",
+      "url": "/api/vendors/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 14
+[12:49:25.503] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 12,
+      "method": "GET",
+      "url": "/api/events/vendor/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 6
+[12:49:34.185] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 13,
+      "method": "POST",
+      "url": "/api/storage/uploads/request-url"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 8
+[12:49:34.209] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 14,
+      "method": "OPTIONS",
+      "url": "/api/storage/uploads/file/a6eac18c-1235-4f41-a1cf-ba67f79a0854"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[12:49:34.533] [32mINFO[39m (8540): [36mImage uploaded and compressed[39m
+    [35mreq[39m: {
+      "id": 15,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/a6eac18c-1235-4f41-a1cf-ba67f79a0854"
+    }
+    [35muuid[39m: "a6eac18c-1235-4f41-a1cf-ba67f79a0854"
+    [35minputBytes[39m: 610132
+    [35moutputBytes[39m: 149334
+    [35mcompressed[39m: true
+[12:49:34.534] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 15,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/a6eac18c-1235-4f41-a1cf-ba67f79a0854"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 321
+[12:49:34.891] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 16,
+      "method": "GET",
+      "url": "/api/storage/objects/uploads/a6eac18c-1235-4f41-a1cf-ba67f79a0854"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 26
+[12:49:45.494] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 17,
+      "method": "POST",
+      "url": "/api/storage/uploads/request-url"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 36
+[12:49:45.497] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 18,
+      "method": "OPTIONS",
+      "url": "/api/storage/uploads/file/72e67623-ec7f-4d85-af96-c23797a24534"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[12:49:45.552] [32mINFO[39m (8540): [36mImage uploaded and compressed[39m
+    [35mreq[39m: {
+      "id": 19,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/72e67623-ec7f-4d85-af96-c23797a24534"
+    }
+    [35muuid[39m: "72e67623-ec7f-4d85-af96-c23797a24534"
+    [35minputBytes[39m: 111877
+    [35moutputBytes[39m: 58362
+    [35mcompressed[39m: true
+[12:49:45.552] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 19,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/72e67623-ec7f-4d85-af96-c23797a24534"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 54
+[12:49:45.867] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 20,
+      "method": "POST",
+      "url": "/api/storage/uploads/request-url"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[12:49:45.872] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 21,
+      "method": "OPTIONS",
+      "url": "/api/storage/uploads/file/118a0d5d-96e2-43b8-8208-613eae413acf"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[12:49:45.964] [32mINFO[39m (8540): [36mImage uploaded and compressed[39m
+    [35mreq[39m: {
+      "id": 22,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/118a0d5d-96e2-43b8-8208-613eae413acf"
+    }
+    [35muuid[39m: "118a0d5d-96e2-43b8-8208-613eae413acf"
+    [35minputBytes[39m: 162459
+    [35moutputBytes[39m: 84992
+    [35mcompressed[39m: true
+[12:49:45.964] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 22,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/118a0d5d-96e2-43b8-8208-613eae413acf"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 89
+[12:49:46.128] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 23,
+      "method": "POST",
+      "url": "/api/storage/uploads/request-url"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[12:49:46.132] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 24,
+      "method": "OPTIONS",
+      "url": "/api/storage/uploads/file/9471adf1-239d-4572-939a-c5a7c0c705c3"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[12:49:46.177] [32mINFO[39m (8540): [36mImage uploaded and compressed[39m
+    [35mreq[39m: {
+      "id": 25,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/9471adf1-239d-4572-939a-c5a7c0c705c3"
+    }
+    [35muuid[39m: "9471adf1-239d-4572-939a-c5a7c0c705c3"
+    [35minputBytes[39m: 53940
+    [35moutputBytes[39m: 32470
+    [35mcompressed[39m: true
+[12:49:46.178] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 25,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/9471adf1-239d-4572-939a-c5a7c0c705c3"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 43
+[12:49:46.280] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 26,
+      "method": "GET",
+      "url": "/api/storage/objects/uploads/72e67623-ec7f-4d85-af96-c23797a24534"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3
+[12:49:46.514] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 27,
+      "method": "GET",
+      "url": "/api/storage/objects/uploads/9471adf1-239d-4572-939a-c5a7c0c705c3"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[12:49:46.516] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 28,
+      "method": "GET",
+      "url": "/api/storage/objects/uploads/118a0d5d-96e2-43b8-8208-613eae413acf"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5
+[12:49:57.329] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 29,
+      "method": "POST",
+      "url": "/api/storage/uploads/request-url"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 32
+[12:49:57.338] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 30,
+      "method": "OPTIONS",
+      "url": "/api/storage/uploads/file/52adff45-497d-4767-a2b7-2117a0dba5a1"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[12:49:57.437] [32mINFO[39m (8540): [36mImage uploaded and compressed[39m
+    [35mreq[39m: {
+      "id": 31,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/52adff45-497d-4767-a2b7-2117a0dba5a1"
+    }
+    [35muuid[39m: "52adff45-497d-4767-a2b7-2117a0dba5a1"
+    [35minputBytes[39m: 132072
+    [35moutputBytes[39m: 107906
+    [35mcompressed[39m: true
+[12:49:57.438] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 31,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/52adff45-497d-4767-a2b7-2117a0dba5a1"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 99
+[12:49:57.794] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 32,
+      "method": "GET",
+      "url": "/api/storage/objects/uploads/52adff45-497d-4767-a2b7-2117a0dba5a1"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[12:50:15.251] [33mWARN[39m (8540): [36mGOOGLE_PLACES_API_KEY is not configured[39m
+    [35mreq[39m: {
+      "id": 33,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+[12:50:15.251] [32mINFO[39m (8540): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 33,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+    [35mres[39m: {
+      "statusCode": 503
+    }
+    [35mresponseTime[39m: 1
+    err: {
+      "type": "Error",
+      "message": "failed with status code 503",
+      "stack":
+          Error: failed with status code 503
+              at onResFinished (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:115:39)
+              at ServerResponse.onResponseComplete (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:178:14)
+              at ServerResponse.emit (node:events:521:24)
+              at onFinish (node:_http_outgoing:1026:10)
+              at callback (node:internal/streams/writable:764:21)
+              at afterWrite (node:internal/streams/writable:708:5)
+              at afterWriteTick (node:internal/streams/writable:694:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[12:50:16.715] [33mWARN[39m (8540): [36mGOOGLE_PLACES_API_KEY is not configured[39m
+    [35mreq[39m: {
+      "id": 34,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+[12:50:16.715] [32mINFO[39m (8540): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 34,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+    [35mres[39m: {
+      "statusCode": 503
+    }
+    [35mresponseTime[39m: 0
+    err: {
+      "type": "Error",
+      "message": "failed with status code 503",
+      "stack":
+          Error: failed with status code 503
+              at onResFinished (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:115:39)
+              at ServerResponse.onResponseComplete (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:178:14)
+              at ServerResponse.emit (node:events:521:24)
+              at onFinish (node:_http_outgoing:1026:10)
+              at callback (node:internal/streams/writable:764:21)
+              at afterWrite (node:internal/streams/writable:708:5)
+              at afterWriteTick (node:internal/streams/writable:694:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[12:50:18.843] [33mWARN[39m (8540): [36mGOOGLE_PLACES_API_KEY is not configured[39m
+    [35mreq[39m: {
+      "id": 35,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+[12:50:18.844] [32mINFO[39m (8540): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 35,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+    [35mres[39m: {
+      "statusCode": 503
+    }
+    [35mresponseTime[39m: 1
+    err: {
+      "type": "Error",
+      "message": "failed with status code 503",
+      "stack":
+          Error: failed with status code 503
+              at onResFinished (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:115:39)
+              at ServerResponse.onResponseComplete (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:178:14)
+              at ServerResponse.emit (node:events:521:24)
+              at onFinish (node:_http_outgoing:1026:10)
+              at callback (node:internal/streams/writable:764:21)
+              at afterWrite (node:internal/streams/writable:708:5)
+              at afterWriteTick (node:internal/streams/writable:694:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[12:50:19.752] [33mWARN[39m (8540): [36mGOOGLE_PLACES_API_KEY is not configured[39m
+    [35mreq[39m: {
+      "id": 36,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+[12:50:19.752] [32mINFO[39m (8540): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 36,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+    [35mres[39m: {
+      "statusCode": 503
+    }
+    [35mresponseTime[39m: 0
+    err: {
+      "type": "Error",
+      "message": "failed with status code 503",
+      "stack":
+          Error: failed with status code 503
+              at onResFinished (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:115:39)
+              at ServerResponse.onResponseComplete (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:178:14)
+              at ServerResponse.emit (node:events:521:24)
+              at onFinish (node:_http_outgoing:1026:10)
+              at callback (node:internal/streams/writable:764:21)
+              at afterWrite (node:internal/streams/writable:708:5)
+              at afterWriteTick (node:internal/streams/writable:694:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[12:50:23.334] [33mWARN[39m (8540): [36mGOOGLE_PLACES_API_KEY is not configured[39m
+    [35mreq[39m: {
+      "id": 37,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+[12:50:23.334] [32mINFO[39m (8540): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 37,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+    [35mres[39m: {
+      "statusCode": 503
+    }
+    [35mresponseTime[39m: 0
+    err: {
+      "type": "Error",
+      "message": "failed with status code 503",
+      "stack":
+          Error: failed with status code 503
+              at onResFinished (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:115:39)
+              at ServerResponse.onResponseComplete (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:178:14)
+              at ServerResponse.emit (node:events:521:24)
+              at onFinish (node:_http_outgoing:1026:10)
+              at callback (node:internal/streams/writable:764:21)
+              at afterWrite (node:internal/streams/writable:708:5)
+              at afterWriteTick (node:internal/streams/writable:694:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[12:50:25.302] [33mWARN[39m (8540): [36mGOOGLE_PLACES_API_KEY is not configured[39m
+    [35mreq[39m: {
+      "id": 38,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+[12:50:25.303] [32mINFO[39m (8540): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 38,
+      "method": "GET",
+      "url": "/api/places/autocomplete"
+    }
+    [35mres[39m: {
+      "statusCode": 503
+    }
+    [35mresponseTime[39m: 1
+    err: {
+      "type": "Error",
+      "message": "failed with status code 503",
+      "stack":
+          Error: failed with status code 503
+              at onResFinished (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:115:39)
+              at ServerResponse.onResponseComplete (D:\royvento\node_modules\.pnpm\pino-http@10.5.0\node_modules\pino-http\logger.js:178:14)
+              at ServerResponse.emit (node:events:521:24)
+              at onFinish (node:_http_outgoing:1026:10)
+              at callback (node:internal/streams/writable:764:21)
+              at afterWrite (node:internal/streams/writable:708:5)
+              at afterWriteTick (node:internal/streams/writable:694:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[12:50:35.013] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 39,
+      "method": "POST",
+      "url": "/api/partner/menu-upload"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 34
+[12:50:35.026] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 40,
+      "method": "OPTIONS",
+      "url": "/api/storage/uploads/file/ebd4ee27-8a44-4b71-87bf-2f545334ef56"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[12:50:35.057] [32mINFO[39m (8540): [36mImage uploaded and compressed[39m
+    [35mreq[39m: {
+      "id": 41,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/ebd4ee27-8a44-4b71-87bf-2f545334ef56"
+    }
+    [35muuid[39m: "ebd4ee27-8a44-4b71-87bf-2f545334ef56"
+    [35minputBytes[39m: 90930
+    [35moutputBytes[39m: 18016
+    [35mcompressed[39m: true
+[12:50:35.057] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 41,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/ebd4ee27-8a44-4b71-87bf-2f545334ef56"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 29
+[12:50:39.554] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 42,
+      "method": "POST",
+      "url": "/api/partner/menu-upload"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 10
+[12:50:39.561] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 43,
+      "method": "OPTIONS",
+      "url": "/api/storage/uploads/file/9b85aaae-adab-4667-a53c-ba0ddf727f9a"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[12:50:39.567] [32mINFO[39m (8540): [36mImage uploaded and compressed[39m
+    [35mreq[39m: {
+      "id": 44,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/9b85aaae-adab-4667-a53c-ba0ddf727f9a"
+    }
+    [35muuid[39m: "9b85aaae-adab-4667-a53c-ba0ddf727f9a"
+    [35minputBytes[39m: 28658
+    [35moutputBytes[39m: 28658
+    [35mcompressed[39m: false
+[12:50:39.568] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 44,
+      "method": "PUT",
+      "url": "/api/storage/uploads/file/9b85aaae-adab-4667-a53c-ba0ddf727f9a"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5
+[12:51:52.863] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 45,
+      "method": "PATCH",
+      "url": "/api/partner/profile"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 38
+[12:51:53.155] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 46,
+      "method": "GET",
+      "url": "/api/vendors/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 63
+[12:52:11.924] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 47,
+      "method": "PATCH",
+      "url": "/api/partner/profile"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 49
+[12:52:12.299] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 48,
+      "method": "GET",
+      "url": "/api/vendors/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 53
+[12:52:12.705] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 49,
+      "method": "POST",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 26
+[12:52:13.027] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 50,
+      "method": "GET",
+      "url": "/api/events/vendor/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 9
+[12:52:19.823] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 51,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 4
+[12:52:22.372] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 52,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 2
+[12:52:22.384] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 53,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 4
+[12:52:22.456] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 54,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 5
+[12:52:25.945] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 55,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3
+[12:52:27.437] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 56,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:52:27.946] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 57,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2
+[12:52:28.298] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 58,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:52:28.329] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 59,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2
+[12:52:28.391] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 60,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:52:28.424] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 61,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2
+[12:52:28.455] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 62,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3
+[12:52:28.486] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 63,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 4
+[12:52:28.646] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 64,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 4
+[12:52:31.310] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 65,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 1
+[12:52:31.443] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 66,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 10
+[12:52:31.458] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 67,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 6
+[12:52:34.278] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 68,
+      "method": "POST",
+      "url": "/api/auth/logout"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:52:34.315] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 69,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:52:34.338] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 70,
+      "method": "GET",
+      "url": "/api/events/featured"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 6
+[12:52:34.368] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 71,
+      "method": "GET",
+      "url": "/api/vendors/drink-offers"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 35
+[12:52:34.655] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 73,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 8
+[12:52:34.663] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 72,
+      "method": "GET",
+      "url": "/api/events/popular"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 18
+[12:52:34.700] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 74,
+      "method": "GET",
+      "url": "/api/announcements/recent"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 51
+[12:52:36.218] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 75,
+      "method": "GET",
+      "url": "/api/auth/google/status"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 2
+[12:52:37.379] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 76,
+      "method": "GET",
+      "url": "/api/auth/google/start"
+    }
+    [35mres[39m: {
+      "statusCode": 302
+    }
+    [35mresponseTime[39m: 3
+[12:52:41.279] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 77,
+      "method": "GET",
+      "url": "/api/auth/google/callback"
+    }
+    [35mres[39m: {
+      "statusCode": 302
+    }
+    [35mresponseTime[39m: 661
+[12:52:41.888] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 78,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:52:41.978] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 80,
+      "method": "GET",
+      "url": "/api/vendors/drink-offers"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 4
+[12:52:41.985] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 81,
+      "method": "GET",
+      "url": "/api/events/popular"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 11
+[12:52:41.989] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 79,
+      "method": "GET",
+      "url": "/api/events/featured"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 16
+[12:52:42.060] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 82,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 85
+[12:52:42.061] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 83,
+      "method": "GET",
+      "url": "/api/announcements/recent"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 85
+[12:52:42.336] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 84,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[12:52:50.308] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 85,
+      "method": "GET",
+      "url": "/api/admin/analytics"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 21
+[12:52:51.211] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 86,
+      "method": "GET",
+      "url": "/api/admin/vendor-requests"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 6
+[12:52:52.549] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 87,
+      "method": "GET",
+      "url": "/api/admin/events/pending"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 10
+[12:53:03.175] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 88,
+      "method": "PATCH",
+      "url": "/api/admin/events/6"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 34
+[12:53:03.495] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 89,
+      "method": "GET",
+      "url": "/api/admin/events/pending"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2
+[12:53:19.819] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 90,
+      "method": "POST",
+      "url": "/api/auth/logout"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0
+[12:53:20.157] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 91,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0
+[12:53:20.223] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 92,
+      "method": "GET",
+      "url": "/api/events/featured"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 51
+[12:53:20.224] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 93,
+      "method": "GET",
+      "url": "/api/vendors/drink-offers"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 51
+[12:53:20.230] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 94,
+      "method": "GET",
+      "url": "/api/events/popular"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 56
+[12:53:20.231] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 96,
+      "method": "GET",
+      "url": "/api/announcements/recent"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 54
+[12:53:20.238] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 95,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 62
+[12:53:21.507] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 97,
+      "method": "GET",
+      "url": "/api/auth/google/status"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 0
+[12:53:22.668] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 98,
+      "method": "GET",
+      "url": "/api/auth/google/start"
+    }
+    [35mres[39m: {
+      "statusCode": 302
+    }
+    [35mresponseTime[39m: 1
+[12:53:26.617] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 99,
+      "method": "GET",
+      "url": "/api/auth/google/callback"
+    }
+    [35mres[39m: {
+      "statusCode": 302
+    }
+    [35mresponseTime[39m: 516
+[12:53:27.193] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 100,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:53:27.267] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 101,
+      "method": "GET",
+      "url": "/api/events/featured"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 5
+[12:53:27.292] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 102,
+      "method": "GET",
+      "url": "/api/vendors/drink-offers"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 5
+[12:53:27.301] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 104,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 11
+[12:53:27.305] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 105,
+      "method": "GET",
+      "url": "/api/announcements/recent"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 14
+[12:53:27.310] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 103,
+      "method": "GET",
+      "url": "/api/events/popular"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 21
+[12:53:27.599] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 106,
+      "method": "GET",
+      "url": "/api/notifications"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 17
+[12:53:30.171] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 107,
+      "method": "GET",
+      "url": "/api/vendors/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 13
+[12:53:30.501] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 108,
+      "method": "GET",
+      "url": "/api/events/vendor/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 10
+[12:53:33.467] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 109,
+      "method": "GET",
+      "url": "/api/bookings/vendor/summary"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 11
+[12:53:33.780] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 110,
+      "method": "GET",
+      "url": "/api/bookings/vendor"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 15
+[12:53:35.625] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 111,
+      "method": "GET",
+      "url": "/api/partner/announcements"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 10
+[12:53:36.311] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 112,
+      "method": "GET",
+      "url": "/api/bookings/vendor"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[12:53:36.622] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 113,
+      "method": "GET",
+      "url": "/api/partner/leads/me"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 13
+[12:53:38.029] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 114,
+      "method": "GET",
+      "url": "/api/vendors/2/drink-plans"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[12:55:32.744] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 115,
+      "method": "POST",
+      "url": "/api/vendors/me/drink-plans"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 42
+[12:55:32.978] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 116,
+      "method": "POST",
+      "url": "/api/vendors/me/drink-plans"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 7
+[12:55:33.060] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 117,
+      "method": "GET",
+      "url": "/api/vendors/2/drink-plans"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:55:37.525] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 118,
+      "method": "GET",
+      "url": "/api/partner/checkin-report"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 45
+[12:55:39.211] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 119,
+      "method": "GET",
+      "url": "/api/manager/my-vendors"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 15
+[12:55:39.214] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 120,
+      "method": "GET",
+      "url": "/api/partner/managers"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 16
+[12:55:40.129] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 121,
+      "method": "GET",
+      "url": "/api/partner/banking-details"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5
+[12:55:40.450] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 122,
+      "method": "GET",
+      "url": "/api/partner/settlement/requests"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 10
+[12:55:40.705] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 123,
+      "method": "GET",
+      "url": "/api/partner/settlement/balance"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1
+[12:55:42.844] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 124,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 11
+[12:55:45.538] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 127,
+      "method": "GET",
+      "url": "/api/auth/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 6
+[12:55:45.540] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 126,
+      "method": "GET",
+      "url": "/api/reviews/event/6"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 8
+[12:55:45.544] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 125,
+      "method": "GET",
+      "url": "/api/events/6"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 13
+[12:55:45.593] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 130,
+      "method": "GET",
+      "url": "/api/coupons/me"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 57
+[12:55:45.594] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 129,
+      "method": "GET",
+      "url": "/api/wishlist"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 59
+[12:55:45.599] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 128,
+      "method": "GET",
+      "url": "/api/events/6/announcements"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 66
+[12:55:45.846] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 131,
+      "method": "GET",
+      "url": "/api/users/me/discounts"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 3
+[12:55:45.930] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 132,
+      "method": "GET",
+      "url": "/api/availability/vendor/2"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 7
+[12:55:45.930] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 135,
+      "method": "GET",
+      "url": "/api/vendors/2/drink-plans"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 3
+[12:55:45.931] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 134,
+      "method": "GET",
+      "url": "/api/partners/2/blocked-dates"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[12:55:45.941] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 133,
+      "method": "GET",
+      "url": "/api/reviews/eligibility/vendor/2"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 17
+[12:55:45.946] [32mINFO[39m (8540): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 136,
+      "method": "GET",
+      "url": "/api/events"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 18
