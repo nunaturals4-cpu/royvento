@@ -357,9 +357,6 @@ export function Navbar() {
                       <DropdownMenuItem asChild>
                         <Link href="/dashboard/partner" className="cursor-pointer w-full">{t("nav.partner_dashboard")}</Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href="/subscription" className="cursor-pointer w-full">{t("nav.partner_premium")}</Link>
-                      </DropdownMenuItem>
                     </>
                   )}
                   {user.role === "admin" && (

@@ -10,6 +10,7 @@ import {
   couponsTable,
   vendorCommissionsTable,
   commissionLedgerTable,
+  vendorRequestsTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
@@ -653,8 +654,27 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+  const [target] = await db
+    .select({ userId: vendorsTable.userId })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.id, id))
+    .limit(1);
+  if (!target) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
   await db.delete(eventsTable).where(eq(eventsTable.vendorId, id));
   await db.delete(vendorsTable).where(eq(vendorsTable.id, id));
+  // Revoke partner access and wipe prior applications so the user is locked
+  // out of the partner dashboard and the become-vendor form treats them as a
+  // fresh applicant.
+  await db
+    .update(usersTable)
+    .set({ role: "user" })
+    .where(and(eq(usersTable.id, target.userId), eq(usersTable.role, "vendor")));
+  await db
+    .delete(vendorRequestsTable)
+    .where(eq(vendorRequestsTable.userId, target.userId));
   res.json({ ok: true });
 });
 
