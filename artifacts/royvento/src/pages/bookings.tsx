@@ -147,7 +147,7 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
     completed: t("bookings.status_completed"),
     cancelled: t("bookings.status_cancelled"),
   };
-  const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free";
+  const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free" || b.pubMode === "event";
   const showTicket = isPubTicket && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
   // cancellationAllowed is computed server-side; fall back to true so old API responses stay functional
