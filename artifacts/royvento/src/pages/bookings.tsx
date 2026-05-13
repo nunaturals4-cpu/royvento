@@ -359,7 +359,10 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
-  const total = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+  const isEventMode = b.pubMode === "event";
+  const total = isEventMode
+    ? b.guests
+    : (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
   const hideAmountPaid = Number(b.finalPrice ?? b.totalPrice ?? 0) === 0;
   const isCod = (b.paymentMethod ?? "").toLowerCase() === "cod";
   const amountLabel = isCod ? t("bookings.amount_due") : t("bookings.amount_paid");
@@ -407,11 +410,16 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
       qrSvgHtml = `<div class="qr-frame"><p class="qr-venue">${esc(b.vendorName)}</p></div>`;
     }
 
-    const ticketBreakdown = [
-      b.ticketWomen ? `${b.ticketWomen}\u00d7 ${t("bookings.women")}` : "",
-      b.ticketMen ? `${b.ticketMen}\u00d7 ${t("bookings.men")}` : "",
-      b.ticketCouple ? `${b.ticketCouple}\u00d7 ${t("bookings.couple")}` : "",
-    ].filter(Boolean).map(esc).join(" &middot; ");
+    const ticketBreakdown = isEventMode
+      ? `${b.guests} ${esc(t("bookings.guests"))}`
+      : [
+          b.ticketWomen ? `${b.ticketWomen}\u00d7 ${t("bookings.women")}` : "",
+          b.ticketMen ? `${b.ticketMen}\u00d7 ${t("bookings.men")}` : "",
+          b.ticketCouple ? `${b.ticketCouple}\u00d7 ${t("bookings.couple")}` : "",
+        ].filter(Boolean).map(esc).join(" &middot; ");
+    const ticketsFieldHtml = isEventMode
+      ? `<div class="field-val">${ticketBreakdown}</div>`
+      : `<div class="field-val-sm">${ticketBreakdown || "&mdash;"}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} ${esc(t("bookings.guests"))}</span></div>`;
 
     w.document.write(`<!doctype html><html><head>
       <meta charset="utf-8">
@@ -489,7 +497,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
               <div class="fields">
                 <div><div class="field-lbl">${esc(t("bookings.guest"))}</div><div class="field-val">${esc(b.personName || b.userName)}</div></div>
                 <div><div class="field-lbl">${esc(t("bookings.date"))}</div><div class="field-val">${esc(b.bookingDate)}</div></div>
-                <div><div class="field-lbl">${esc(t("bookings.tickets"))}</div><div class="field-val-sm">${ticketBreakdown || "&mdash;"}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} ${esc(t("bookings.guests"))}</span></div></div>
+                <div><div class="field-lbl">${esc(t("bookings.tickets"))}</div>${ticketsFieldHtml}</div>
                 <div><div class="field-lbl">${esc(t("bookings.approved_by"))}</div><div class="field-val" style="text-transform:capitalize;">${esc(b.approvedBy || t("bookings.partner"))}</div></div>
               </div>
             </div>
