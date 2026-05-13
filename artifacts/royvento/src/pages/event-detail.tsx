@@ -410,6 +410,15 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     }
     if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime) {
       errs.arrivalTime = t("events.required_field");
+    } else if (isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && date) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (date === todayStr) {
+        const now = new Date();
+        const [h, m] = arrivalTime.split(":").map(Number);
+        if ((h ?? 0) * 60 + (m ?? 0) <= now.getHours() * 60 + now.getMinutes()) {
+          errs.arrivalTime = "Please select a future arrival time for today's booking";
+        }
+      }
     }
     if (isPub && !personName.trim()) errs.personName = t("events.required_field");
     if (isPub && !phone.trim()) errs.phone = t("events.required_field");
@@ -1424,7 +1433,16 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     {(pubMode === "ticket" || pubMode === "event") && (
                       <div>
                         <Label htmlFor="arrival-time2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.arrival_time")} <span className="text-red-400 text-xs ml-1">*</span></Label>
-                        <input id="arrival-time2" type="time" value={arrivalTime} onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }} required aria-invalid={!!fieldErrors.arrivalTime} className={`w-full rounded-xl border px-3 py-2.5 text-sm mt-2 text-foreground bg-black/40 h-11 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`} />
+                        <input
+                          id="arrival-time2"
+                          type="time"
+                          value={arrivalTime}
+                          min={(() => { const todayStr = new Date().toISOString().slice(0, 10); if (date !== todayStr) return undefined; const now = new Date(); return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`; })()}
+                          onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
+                          required
+                          aria-invalid={!!fieldErrors.arrivalTime}
+                          className={`w-full rounded-xl border px-3 py-2.5 text-sm mt-2 text-foreground bg-black/40 h-11 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
+                        />
                         {fieldErrors.arrivalTime && <p className="text-xs text-destructive mt-1">{fieldErrors.arrivalTime}</p>}
                       </div>
                     )}

@@ -2329,6 +2329,52 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   const [out] = await serializeBookings([updated]);
 
+  // Credit admin commission immediately on first check-in, based on booked counts.
+  // Uses the same idempotent ledger transaction as the actualEntry path so that
+  // if the manager later records actuals the delta is cleanly adjusted.
+  // Online-payment bookings already had commission deducted at payment time —
+  // only COD and free-entry bookings are credited here.
+  const confirmIsCod = updated.paymentMethod === "cod";
+  const confirmIsFreeEntry =
+    classifyBookingType({ pubMode: updated.pubMode, finalPrice: updated.finalPrice }) === "free_entry";
+  if (confirmIsCod || confirmIsFreeEntry) {
+    const confirmTrigger: "cod_checkin" | "free_checkin" = confirmIsFreeEntry ? "free_checkin" : "cod_checkin";
+    const confirmComm = calcScanCommission(updated);
+    try {
+      await db.transaction(async (tx) => {
+        const [existingLedger] = await tx
+          .select({ id: commissionLedgerTable.id, amount: commissionLedgerTable.amount })
+          .from(commissionLedgerTable)
+          .where(and(eq(commissionLedgerTable.bookingId, updated.id), eq(commissionLedgerTable.trigger, confirmTrigger)))
+          .limit(1);
+        const oldAmt = existingLedger ? Number(existingLedger.amount) : 0;
+        const delta = confirmComm.commissionAmount - oldAmt;
+        if (existingLedger) {
+          await tx
+            .update(commissionLedgerTable)
+            .set({ amount: String(confirmComm.commissionAmount), bookingType: classifyBookingType(updated) })
+            .where(eq(commissionLedgerTable.id, existingLedger.id));
+        } else {
+          await tx.insert(commissionLedgerTable).values({
+            vendorId: updated.vendorId,
+            bookingId: updated.id,
+            amount: String(confirmComm.commissionAmount),
+            bookingType: classifyBookingType(updated),
+            trigger: confirmTrigger,
+          });
+        }
+        if (delta !== 0) {
+          await tx
+            .update(vendorsTable)
+            .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
+            .where(eq(vendorsTable.id, updated.vendorId));
+        }
+      });
+    } catch (err) {
+      req.log.error({ err, bookingId: updated.id }, "Failed to credit commission on scan confirm");
+    }
+  }
+
   // Award 100 loyalty points to the booking owner for attending the event (atomic increment)
   try {
     const [scanEvt] = await db

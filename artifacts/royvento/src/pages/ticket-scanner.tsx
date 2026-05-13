@@ -200,15 +200,28 @@ function useAccessCheck() {
   return { accessStatus, managedVendors };
 }
 
-function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
+function CameraScanner({
+  onDetect,
+  disabled = false,
+}: {
+  onDetect: (code: string) => void;
+  disabled?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number>(0);
+  const disabledRef = useRef(disabled);
+  const lastCodeRef = useRef("");
+  const lastCodeTimeRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [detected, setDetected] = useState(false);
+
+  // Keep ref in sync without restarting the RAF loop
+  useEffect(() => { disabledRef.current = disabled; }, [disabled]);
 
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -220,20 +233,37 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
   }, []);
 
   const scanFrame = useCallback(() => {
+    // Pause scanning while an API call is in flight
+    if (disabledRef.current) {
+      rafRef.current = requestAnimationFrame(scanFrame);
+      return;
+    }
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
       rafRef.current = requestAnimationFrame(scanFrame);
       return;
     }
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
+    // Cap to 480px width for faster jsQR processing on mobile (biggest perf win)
+    const scale = Math.min(1, 480 / Math.max(video.videoWidth, 1));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) { rafRef.current = requestAnimationFrame(scanFrame); return; }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
     if (code?.data) {
+      const now = Date.now();
+      // Debounce: skip same code within 2 seconds to prevent double-fires
+      if (code.data === lastCodeRef.current && now - lastCodeTimeRef.current < 2000) {
+        rafRef.current = requestAnimationFrame(scanFrame);
+        return;
+      }
+      lastCodeRef.current = code.data;
+      lastCodeTimeRef.current = now;
+      setDetected(true);
+      setTimeout(() => setDetected(false), 600);
       onDetect(code.data);
       return;
     }
@@ -242,9 +272,12 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
 
   const startCamera = useCallback(async () => {
     setError(null);
+    lastCodeRef.current = "";
+    lastCodeTimeRef.current = 0;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        // 640×480 gives ~4× fewer pixels than 1280×720 — jsQR runs noticeably faster
+        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
       });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
@@ -289,58 +322,74 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
     );
   }
 
+  const frameColor = detected ? "#22c55e" : disabled ? "#6366f1" : "#e53e3e";
+  const frameLabel = detected ? "QR detected…" : disabled ? "Validating…" : scanning ? "Align QR code within the frame" : "Starting camera…";
+
   return (
     <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="w-full"
-        style={{ maxHeight: 320 }}
-      />
+      <video ref={videoRef} autoPlay playsInline muted className="w-full" style={{ maxHeight: 340 }} />
       <canvas ref={canvasRef} className="hidden" />
-      {/* Scanning overlay */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-52 h-52 relative">
-          {/* Corner markers */}
-          {["top-0 left-0", "top-0 right-0", "bottom-0 left-0", "bottom-0 right-0"].map((pos) => (
-            <div key={pos} className={`absolute w-8 h-8 ${pos} border-2 border-primary`}
+
+      {/* Premium scan overlay */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        {/* Dark vignette corners */}
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%)" }} />
+        <div className="relative w-56 h-56">
+          {/* Animated corner brackets */}
+          {([
+            { pos: "top-0 left-0", tr: "none", tl: undefined, br: "none", bl: undefined },
+            { pos: "top-0 right-0", tr: undefined, tl: "none", br: "none", bl: undefined },
+            { pos: "bottom-0 left-0", tr: "none", tl: undefined, br: undefined, bl: "none" },
+            { pos: "bottom-0 right-0", tr: undefined, tl: "none", br: undefined, bl: "none" },
+          ] as const).map(({ pos }) => (
+            <div
+              key={pos}
+              className={`absolute w-9 h-9 ${pos}`}
               style={{
-                borderRight: pos.includes("right") ? undefined : "none",
-                borderLeft: pos.includes("left") ? undefined : "none",
-                borderBottom: pos.includes("bottom") ? undefined : "none",
-                borderTop: pos.includes("top") ? undefined : "none",
-                borderRadius: 4,
+                borderTop: pos.includes("top") ? `3px solid ${frameColor}` : "none",
+                borderBottom: pos.includes("bottom") ? `3px solid ${frameColor}` : "none",
+                borderLeft: pos.includes("left") ? `3px solid ${frameColor}` : "none",
+                borderRight: pos.includes("right") ? `3px solid ${frameColor}` : "none",
+                borderRadius: pos.includes("top-0 left-0") ? "6px 0 0 0" : pos.includes("top-0 right-0") ? "0 6px 0 0" : pos.includes("bottom-0 left-0") ? "0 0 0 6px" : "0 0 6px 0",
+                transition: "border-color 0.25s ease",
               }}
             />
           ))}
           {/* Scan line */}
-          {scanning && (
+          {scanning && !disabled && !detected && (
             <div
-              className="absolute left-2 right-2 h-0.5 bg-primary opacity-80"
-              style={{ animation: "scanLine 2s ease-in-out infinite", top: "50%" }}
+              className="absolute left-3 right-3 h-px"
+              style={{ background: `linear-gradient(90deg, transparent, ${frameColor}, transparent)`, animation: "scanLine 1.8s ease-in-out infinite", top: "50%", opacity: 0.9 }}
             />
+          )}
+          {/* Detected flash */}
+          {detected && (
+            <div className="absolute inset-0 rounded-sm" style={{ background: "rgba(34,197,94,0.15)", border: "2px solid #22c55e", borderRadius: 4, transition: "all 0.2s" }} />
           )}
         </div>
       </div>
+
+      {/* Torch */}
       {torchSupported && (
         <button
           onClick={toggleTorch}
           aria-label={torchOn ? "Turn off torch" : "Turn on torch"}
-          className="absolute top-3 right-3 rounded-full p-2 bg-black/60 border border-white/20 text-white hover:bg-black/80 transition-colors z-10"
+          className="absolute top-3 right-3 rounded-full p-2.5 bg-black/60 border border-white/20 text-white hover:bg-black/80 transition-colors z-10"
         >
-          {torchOn ? <Zap className="h-4 w-4 text-yellow-300" /> : <ZapOff className="h-4 w-4 text-white/60" />}
+          {torchOn ? <Zap className="h-4 w-4 text-yellow-300" /> : <ZapOff className="h-4 w-4 text-white/50" />}
         </button>
       )}
-      <p className="absolute bottom-3 left-0 right-0 text-center text-xs text-white/60">
-        {scanning ? "Scanning for QR code…" : "Starting camera…"}
-      </p>
+
+      {/* Status label */}
+      <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm py-2 px-3 text-center">
+        <p className="text-xs font-medium" style={{ color: frameColor, transition: "color 0.25s" }}>{frameLabel}</p>
+      </div>
+
       <style>{`
         @keyframes scanLine {
-          0% { transform: translateY(-60px); }
-          50% { transform: translateY(60px); }
-          100% { transform: translateY(-60px); }
+          0%   { transform: translateY(-80px); opacity: 0.6; }
+          50%  { transform: translateY(80px);  opacity: 1; }
+          100% { transform: translateY(-80px); opacity: 0.6; }
         }
       `}</style>
     </div>
@@ -357,13 +406,12 @@ export function TicketScanner() {
   const queryClient = useQueryClient();
 
   const validateCode = async (code: string) => {
-    if (!code) return;
+    if (!code || loading) return;
     setLoading(true);
     setResult(null);
+    // Haptic feedback on scan start
+    if ("vibrate" in navigator) navigator.vibrate(40);
     try {
-      // Auto check-in: scanning a QR / submitting a manual code now checks
-      // the guest in immediately (single-step). The duplicate-scan guard on
-      // the server still returns ALREADY_CHECKED_IN for repeat scans.
       const res = await fetch("/api/partner/scan-ticket", {
         method: "POST",
         credentials: "include",
@@ -373,8 +421,7 @@ export function TicketScanner() {
       if (res.ok) {
         const json = (await res.json()) as ScanSuccess;
         setResult(json);
-        // Refresh occupancy + bookings panels immediately so the new
-        // "currently inside" count appears without waiting for the poll.
+        if ("vibrate" in navigator) navigator.vibrate([80, 40, 80]);
         void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerOccupancyQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerBookingsQueryKey() });
       } else {
@@ -389,15 +436,18 @@ export function TicketScanner() {
             booking: json.booking as BookingData,
           };
           setResult(scanResult);
+          if ("vibrate" in navigator) navigator.vibrate([200, 60, 200]);
         } else {
           const scanResult: ScanError = { code: errCode, message };
           setResult(scanResult);
+          if ("vibrate" in navigator) navigator.vibrate(300);
           toast({ title: "Scan failed", description: message, variant: "destructive" });
         }
       }
     } catch {
       const scanErr: ScanError = { code: "NETWORK_ERROR", message: "Network error. Check your connection." };
       setResult(scanErr);
+      if ("vibrate" in navigator) navigator.vibrate(300);
       toast({ title: "Scan failed", description: scanErr.message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -469,14 +519,14 @@ export function TicketScanner() {
       </div>
 
       {cameraMode ? (
-        <div className="rounded-3xl glass-card-strong p-6 space-y-4">
-          <p className="text-sm text-muted-foreground text-center">Point your camera at a QR code on the guest's ticket</p>
+        <div className="rounded-3xl glass-card-strong p-5 space-y-3">
           <CameraScanner
+            disabled={loading}
             onDetect={(code) => {
               const cleaned = code.trim().toUpperCase();
               setInput(cleaned);
-              setCameraMode(false);
-              validateCode(cleaned);
+              // Stay in camera mode — result appears below; scanner resumes after dismiss
+              void validateCode(cleaned);
             }}
           />
         </div>
@@ -506,26 +556,37 @@ export function TicketScanner() {
       )}
 
       {result && (
-        <div className={`mt-6 rounded-3xl overflow-hidden border ${
-          result.code === "OK"
-            ? "border-green-500/40 bg-green-900/10"
-            : result.code === "ALREADY_CHECKED_IN"
-            ? "border-red-500/60 bg-red-900/20"
-            : "border-red-500/40 bg-red-900/10"
-        }`}>
+        <div
+          className={`mt-5 rounded-3xl overflow-hidden border ${
+            result.code === "OK"
+              ? "border-green-500/50 bg-gradient-to-b from-green-950/60 to-green-950/30"
+              : result.code === "ALREADY_CHECKED_IN"
+              ? "border-amber-500/50 bg-gradient-to-b from-amber-950/60 to-amber-950/30"
+              : "border-red-500/40 bg-gradient-to-b from-red-950/60 to-red-950/30"
+          }`}
+          style={{ animation: "resultSlideIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both" }}
+        >
           {isScanSuccess(result) ? (
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-green-500/20 border border-green-500/40 p-2">
-                  <CheckCircle2 className="h-7 w-7 text-green-400" />
+            <div className="p-5 space-y-4">
+              {/* Success header */}
+              <div className="flex items-center gap-4">
+                <div className="rounded-2xl bg-green-500/20 border border-green-500/40 p-3 shrink-0">
+                  <CheckCircle2 className="h-8 w-8 text-green-400" />
                 </div>
-                <div>
-                  <p className="text-green-300 font-semibold text-lg">Entry granted</p>
-                  <p className="text-xs text-muted-foreground">
-                    Checked in at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                <div className="min-w-0">
+                  <p className="text-green-300 font-bold text-xl tracking-tight">Entry granted</p>
+                  <p className="text-xs text-green-300/60 mt-0.5">
+                    ✓ Checked in at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                   </p>
                 </div>
+                <button
+                  onClick={() => { setResult(null); setInput(""); }}
+                  className="ml-auto shrink-0 rounded-xl border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+                >
+                  Next →
+                </button>
               </div>
+              <div className="h-px bg-green-500/20" />
               <BookingDetails booking={result.booking} />
               <ActualEntryForm
                 key={`ok-${result.booking.id}`}
@@ -534,52 +595,65 @@ export function TicketScanner() {
               />
             </div>
           ) : isScanAlreadyUsed(result) ? (
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-red-500/20 border border-red-500/60 p-2">
-                  <XCircle className="h-7 w-7 text-red-400" />
+            <div className="p-5 space-y-4">
+              {/* Already used header */}
+              <div className="flex items-center gap-4">
+                <div className="rounded-2xl bg-amber-500/20 border border-amber-500/40 p-3 shrink-0">
+                  <XCircle className="h-8 w-8 text-amber-400" />
                 </div>
-                <div>
-                  <p className="text-red-300 font-semibold text-lg">Already used</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="min-w-0">
+                  <p className="text-amber-300 font-bold text-xl tracking-tight">Ticket already used</p>
+                  <p className="text-xs text-amber-300/70 mt-0.5">
                     {result.checkedInAt
-                      ? `Checked in at ${new Date(result.checkedInAt).toLocaleString("en-IN")}`
-                      : "This ticket was already checked in."}
+                      ? `First scan: ${new Date(result.checkedInAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}`
+                      : "This ticket has already been checked in."}
                   </p>
                 </div>
+                <button
+                  onClick={() => { setResult(null); setInput(""); }}
+                  className="ml-auto shrink-0 rounded-xl border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+                >
+                  Dismiss
+                </button>
               </div>
-              <BookingDetails booking={result.booking} />
-              <ActualEntryForm
-                key={`used-${result.booking.id}`}
-                booking={result.booking}
-                onSaved={(updated) => setResult({ ...result, booking: updated })}
-              />
+              <div className="h-px bg-amber-500/20" />
+              {result.booking && (
+                <>
+                  <BookingDetails booking={result.booking} />
+                  <ActualEntryForm
+                    key={`used-${result.booking.id}`}
+                    booking={result.booking}
+                    onSaved={(updated) => setResult({ ...result, booking: updated })}
+                  />
+                </>
+              )}
             </div>
           ) : (
-            <div className="p-6 flex items-center gap-3">
-              <div className="rounded-full bg-red-500/20 border border-red-500/40 p-2">
-                <XCircle className="h-7 w-7 text-red-400" />
+            <div className="p-5 flex items-start gap-4">
+              <div className="rounded-2xl bg-red-500/20 border border-red-500/40 p-3 shrink-0">
+                <XCircle className="h-8 w-8 text-red-400" />
               </div>
-              <div>
-                <p className="text-red-300 font-semibold">Invalid ticket</p>
-                <p className="text-sm text-muted-foreground mt-0.5">{result.message}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-red-300 font-bold text-lg">Invalid ticket</p>
+                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{result.message}</p>
               </div>
+              <button
+                onClick={() => { setResult(null); setInput(""); }}
+                className="shrink-0 rounded-xl border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+              >
+                Clear
+              </button>
             </div>
           )}
         </div>
       )}
 
-      {result && (
-        <div className="mt-4 text-center">
-          <Button
-            variant="ghost"
-            onClick={() => { setResult(null); setInput(""); }}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            Scan another ticket →
-          </Button>
-        </div>
-      )}
+      <style>{`
+        @keyframes resultSlideIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.98); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
 
       <ScannerPanels />
     </div>
@@ -833,66 +907,55 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
 
 function BookingDetails({ booking: b }: { booking: BookingData }) {
   const isPubTicket = b.pubMode === "ticket";
+  const guestName = b.personName ?? b.userName;
+  const ticketCode = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   return (
-    <div className="rounded-2xl bg-black/30 border border-white/10 p-4 space-y-2">
-      <div className="flex items-start gap-3">
+    <div className="rounded-2xl bg-black/40 border border-white/10 overflow-hidden">
+      {/* Event header */}
+      <div className="flex items-center gap-3 p-3 border-b border-white/10">
         {b.eventImage && (
-          <img src={b.eventImage} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />
+          <img src={b.eventImage} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
         )}
-        <div>
-          <p className="font-serif text-xl">{b.eventTitle}</p>
-          <p className="text-xs text-muted-foreground">{b.vendorName}</p>
+        <div className="min-w-0">
+          <p className="font-semibold text-sm truncate">{b.eventTitle}</p>
+          <p className="text-[11px] text-muted-foreground truncate">{b.vendorName} · {b.bookingDate}</p>
+        </div>
+        <div className="ml-auto shrink-0">
+          <span className="text-[10px] font-mono tracking-widest bg-primary/15 text-primary border border-primary/30 rounded-md px-2 py-0.5">
+            {ticketCode}
+          </span>
         </div>
       </div>
-      <div className="border-t border-white/10 pt-3 grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <p className="text-xs text-muted-foreground">Guest</p>
-          <p className="font-medium">{b.personName ?? b.userName}</p>
+      {/* Guest info row */}
+      <div className="flex items-center gap-3 p-3">
+        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
+          <span className="text-xs font-bold text-primary">{guestName.charAt(0).toUpperCase()}</span>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Date</p>
-          <p className="font-medium">{b.bookingDate}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Ticket code</p>
-          <p className="font-mono text-primary">{b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Booking type</p>
-          <p className="flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-sm truncate">{guestName}</p>
+          <p className="text-[11px] text-muted-foreground">
             {isPubTicket ? (
-              <><TicketIcon className="h-3.5 w-3.5 text-primary" /> Pub ticket</>
+              <span className="flex items-center gap-1"><TicketIcon className="h-3 w-3 text-primary inline" /> Pub ticket</span>
             ) : b.eventType_ === "pub" ? (
-              <><Wine className="h-3.5 w-3.5 text-red-400" /> Pub event</>
-            ) : (
-              "Event booking"
-            )}
+              <span className="flex items-center gap-1"><Wine className="h-3 w-3 text-red-400 inline" /> Pub event</span>
+            ) : "Event booking"}
           </p>
         </div>
-      </div>
-      {isPubTicket && (b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0) ? (
-        <div className="flex flex-wrap gap-2 pt-1">
-          {b.ticketWomen > 0 && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-200">
-              <Users className="h-3 w-3 inline mr-1" />{b.ticketWomen} Women
+        {/* Ticket breakdown chips */}
+        <div className="flex flex-wrap gap-1 justify-end">
+          {isPubTicket ? (
+            <>
+              {b.ticketWomen > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-200">{b.ticketWomen}W</span>}
+              {b.ticketMen > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-200">{b.ticketMen}M</span>}
+              {b.ticketCouple > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-200">{b.ticketCouple}C</span>}
+            </>
+          ) : b.guests > 0 ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 border border-white/10 text-muted-foreground">
+              <Users className="h-2.5 w-2.5 inline mr-0.5" />{b.guests}
             </span>
-          )}
-          {b.ticketMen > 0 && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-200">
-              <Users className="h-3 w-3 inline mr-1" />{b.ticketMen} Men
-            </span>
-          )}
-          {b.ticketCouple > 0 && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-200">
-              <Users className="h-3 w-3 inline mr-1" />{b.ticketCouple} Couple{b.ticketCouple > 1 ? "s" : ""}
-            </span>
-          )}
+          ) : null}
         </div>
-      ) : b.guests > 0 ? (
-        <p className="text-sm text-muted-foreground pt-1">
-          <Users className="h-3.5 w-3.5 inline mr-1" />{b.guests} guests
-        </p>
-      ) : null}
+      </div>
     </div>
   );
 }
