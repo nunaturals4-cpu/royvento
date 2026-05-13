@@ -147,7 +147,7 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
     completed: t("bookings.status_completed"),
     cancelled: t("bookings.status_cancelled"),
   };
-  const isPubTicket = (b.eventType_ === "pub" || b.pubMode === "ticket") && b.pubMode === "ticket";
+  const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free";
   const showTicket = isPubTicket && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
   // cancellationAllowed is computed server-side; fall back to true so old API responses stay functional
@@ -383,7 +383,9 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
     }
   };
 
-  const printTicket = async () => {
+  const printTicket = async (w: Window | null) => {
+    if (!w) return;
+
     const esc = (v: unknown): string =>
       String(v ?? "")
         .replace(/&/g, "&amp;")
@@ -391,9 +393,6 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
-
-    const w = window.open("", "_blank", "width=760,height=980");
-    if (!w) return;
 
     let qrSvgHtml = "";
     try {
@@ -539,10 +538,10 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
           <Button size="sm" variant="outline" onClick={shareTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
             <Share2 className="h-3.5 w-3.5" />Share
           </Button>
-          <Button size="sm" variant="outline" onClick={printTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
+          <Button size="sm" variant="outline" onClick={() => printTicket(window.open("about:blank", "_blank"))} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
             <Printer className="h-3.5 w-3.5" />{t("bookings.print")}
           </Button>
-          <Button size="sm" onClick={printTicket} className="gap-1.5 bg-gradient-to-br from-amber-600 to-amber-800 border-0 text-black font-semibold hover:from-amber-500 hover:to-amber-700">
+          <Button size="sm" onClick={() => printTicket(window.open("about:blank", "_blank"))} className="gap-1.5 bg-gradient-to-br from-amber-600 to-amber-800 border-0 text-black font-semibold hover:from-amber-500 hover:to-amber-700">
             <Download className="h-3.5 w-3.5" />{t("bookings.pdf")}
           </Button>
         </div>

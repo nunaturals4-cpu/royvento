@@ -46,7 +46,7 @@ import { computeEffectiveRevenues } from "../lib/effectiveRevenue";
 import { respondInvalid } from "../lib/validationError";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
-const CANCELLATION_CUTOFF_HOURS = Number(process.env["CANCELLATION_CUTOFF_HOURS"] ?? 24);
+const CANCELLATION_CUTOFF_HOURS = Number(process.env["CANCELLATION_CUTOFF_HOURS"] ?? 3);
 
 const EVENT_TYPES = [
   "wedding",

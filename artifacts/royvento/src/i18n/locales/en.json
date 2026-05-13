@@ -435,7 +435,7 @@
     "checked_in": "Checked in",
     "ticket_scanned": "Your ticket has already been scanned — this booking can no longer be cancelled.",
     "cancellation_closed": "Cancellation closed",
-    "cancellation_closed_msg": "Cancellations are not allowed within 24 hours of the event date.",
+    "cancellation_closed_msg": "Cancellations are not allowed within 3 hours of the event date.",
     "your_ticket": "Your ticket",
     "cancel_dialog_title": "Cancel booking",
     "cancel_dialog_desc": "Are you sure you want to cancel your booking for {{event}} on {{date}}? The partner will be notified. This cannot be undone.",
