@@ -9,6 +9,8 @@ import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
+import { createUserNotification } from "../lib/notify";
+import { sendPartnerRequestApprovedEmail } from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -150,7 +152,29 @@ router.post(
         status: "approved",
       });
     }
+    // Fetch approved user to send notifications (email + in-app)
+    const [approvedUser] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, r.userId))
+      .limit(1);
     res.json({ ok: true });
+    if (approvedUser) {
+      await Promise.allSettled([
+        sendPartnerRequestApprovedEmail({
+          to: approvedUser.email,
+          toName: approvedUser.name,
+          businessName: r.businessName,
+        }),
+        createUserNotification({
+          userId: approvedUser.id,
+          title: "Partner request approved!",
+          message: `Congratulations! Your application for ${r.businessName} has been approved. Access your partner dashboard to get started.`,
+          url: "/dashboard/vendor",
+          tag: `partner-approved-${r.id}`,
+        }),
+      ]);
+    }
   },
 );
 

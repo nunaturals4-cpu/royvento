@@ -753,6 +753,119 @@ export async function sendUpcomingDeletionWarningEmail(
   });
 }
 
+// ─── Partner Request Approved ──────────────────────────────────────────────────
+
+export async function sendPartnerRequestApprovedEmail(params: {
+  to: string;
+  toName: string;
+  businessName: string;
+}): Promise<void> {
+  const firstName = params.toName.split(" ")[0];
+  const dashboardUrl = `${getAppUrl()}/dashboard/vendor`;
+
+  const html = layout(`
+    ${greeting(firstName)}
+    <p style="margin:0 0 20px 0;">
+      <span style="display:inline-block;background:#22c55e20;color:#16a34a;font-size:12px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:4px;">APPROVED</span>
+    </p>
+    ${para("Great news — your application to become a Royvento partner has been approved!")}
+    ${card([
+      { label: "Business", value: params.businessName },
+      { label: "Status", value: "Approved" },
+    ])}
+    ${para("You can now log in to your partner dashboard to set up your venue, create events, and start accepting bookings.")}
+    ${btn("Open Partner Dashboard", dashboardUrl)}
+    ${divider()}
+    <p style="margin:0;color:#888888;font-size:13px;">Welcome to the Royvento partner community. If you have any questions, feel free to reach out to our team.</p>
+    ${signature()}
+  `);
+
+  const text = [
+    `Hi ${firstName},`,
+    ``,
+    `Great news — your application to become a Royvento partner has been approved!`,
+    ``,
+    `  Business: ${params.businessName}`,
+    `  Status:   Approved`,
+    ``,
+    `Log in to your partner dashboard to set up your venue, create events, and start accepting bookings:`,
+    ``,
+    `  ${dashboardUrl}`,
+    ``,
+    `Welcome to the Royvento partner community. If you have any questions, feel free to reach out to our team.`,
+    ``,
+    `— The Royvento team`,
+  ].join("\n");
+
+  await deliver("Partner Request Approved", {
+    to: params.to,
+    toName: params.toName,
+    subject: "You're approved as a Royvento partner!",
+    text,
+    html,
+  });
+}
+
+// ─── Event / Pub Approved ──────────────────────────────────────────────────────
+
+export async function sendEventApprovedEmail(params: {
+  to: string;
+  toName: string;
+  businessName: string;
+  eventTitle: string;
+  eventId: number;
+}): Promise<void> {
+  const firstName = params.toName.split(" ")[0];
+  const dashboardUrl = `${getAppUrl()}/dashboard/vendor`;
+  const eventUrl = `${getAppUrl()}/event/${params.eventId}`;
+
+  const html = layout(`
+    ${greeting(firstName)}
+    <p style="margin:0 0 20px 0;">
+      <span style="display:inline-block;background:#22c55e20;color:#16a34a;font-size:12px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:4px;">LIVE</span>
+    </p>
+    ${para("Your event has been reviewed and approved by the Royvento team. It is now live and visible to customers.")}
+    ${card([
+      { label: "Event", value: params.eventTitle },
+      { label: "Venue", value: params.businessName },
+      { label: "Status", value: "Live" },
+    ])}
+    ${btn("View Live Event", eventUrl)}
+    <p style="margin:8px 0 24px 0;font-size:13px;color:#666666;text-align:center;">
+      or visit your <a href="${esc(dashboardUrl)}" style="color:#e53e3e;text-decoration:none;font-weight:600;">partner dashboard</a> to manage all events
+    </p>
+    ${signature()}
+  `);
+
+  const text = [
+    `Hi ${firstName},`,
+    ``,
+    `Your event has been reviewed and approved by the Royvento team. It is now live and visible to customers.`,
+    ``,
+    `  Event:  ${params.eventTitle}`,
+    `  Venue:  ${params.businessName}`,
+    `  Status: Live`,
+    ``,
+    `View your live event:`,
+    `  ${eventUrl}`,
+    ``,
+    `Or manage all events from your partner dashboard:`,
+    `  ${dashboardUrl}`,
+    ``,
+    `— The Royvento team`,
+  ].join("\n");
+
+  await deliver("Event Approved", {
+    to: params.to,
+    toName: params.toName,
+    subject: `Your event is live — ${params.eventTitle}`,
+    text,
+    html,
+  });
+}
+
+// ─── Customer Cancelled Booking ────────────────────────────────────────────────
+
 export async function sendCustomerCancelledBookingEmail(
   b: CustomerCancelledNotification,
 ): Promise<void> {

@@ -16,6 +16,8 @@ import {
 import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
+import { createUserNotification } from "../lib/notify";
+import { sendEventApprovedEmail } from "../lib/notifications";
 import { generateTicketCode } from "../lib/ticketCode";
 import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
 import { respondInvalid } from "../lib/validationError";
@@ -520,6 +522,39 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     return;
   }
   res.json({ ok: true, approvalStatus: updated.approvalStatus });
+  // Send email + in-app notification to the vendor owner when their event is approved
+  if (data.approvalStatus === "approved") {
+    const [vendor] = await db
+      .select()
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, updated.vendorId))
+      .limit(1);
+    if (vendor) {
+      const [vendorUser] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, vendor.userId))
+        .limit(1);
+      if (vendorUser) {
+        await Promise.allSettled([
+          sendEventApprovedEmail({
+            to: vendorUser.email,
+            toName: vendorUser.name,
+            businessName: vendor.businessName,
+            eventTitle: updated.title,
+            eventId: updated.id,
+          }),
+          createUserNotification({
+            userId: vendorUser.id,
+            title: "Event approved and live!",
+            message: `Your event "${updated.title}" has been approved and is now live on Royvento.`,
+            url: "/dashboard/vendor",
+            tag: `event-approved-${updated.id}`,
+          }),
+        ]);
+      }
+    }
+  }
 });
 
 router.delete("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
