@@ -359,10 +359,11 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
-  const isEventMode = b.pubMode === "event";
-  const total = isEventMode
-    ? b.guests
-    : (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+  const isEventMode = b.pubMode !== "ticket";
+  const ticketSum = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+  // For non-ticket pub modes (event/free/legacy) ticketWomen/Men/Couple are 0 — use b.guests instead.
+  // Also fall back to b.guests for ticket mode if all counts are somehow 0.
+  const total = ticketSum > 0 ? ticketSum : b.guests;
   const hideAmountPaid = Number(b.finalPrice ?? b.totalPrice ?? 0) === 0;
   const isCod = (b.paymentMethod ?? "").toLowerCase() === "cod";
   const amountLabel = isCod ? t("bookings.amount_due") : t("bookings.amount_paid");
@@ -410,16 +411,15 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
       qrSvgHtml = `<div class="qr-frame"><p class="qr-venue">${esc(b.vendorName)}</p></div>`;
     }
 
-    const ticketBreakdown = isEventMode
-      ? `${b.guests} ${esc(t("bookings.guests"))}`
-      : [
-          b.ticketWomen ? `${b.ticketWomen}\u00d7 ${t("bookings.women")}` : "",
-          b.ticketMen ? `${b.ticketMen}\u00d7 ${t("bookings.men")}` : "",
-          b.ticketCouple ? `${b.ticketCouple}\u00d7 ${t("bookings.couple")}` : "",
-        ].filter(Boolean).map(esc).join(" &middot; ");
-    const ticketsFieldHtml = isEventMode
-      ? `<div class="field-val">${ticketBreakdown}</div>`
-      : `<div class="field-val-sm">${ticketBreakdown || "&mdash;"}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} ${esc(t("bookings.guests"))}</span></div>`;
+    const pdfBreakdownParts = [
+      b.ticketWomen ? `${b.ticketWomen}\u00d7 ${t("bookings.women")}` : "",
+      b.ticketMen ? `${b.ticketMen}\u00d7 ${t("bookings.men")}` : "",
+      b.ticketCouple ? `${b.ticketCouple}\u00d7 ${t("bookings.couple")}` : "",
+    ].filter(Boolean).map(esc);
+    const ticketBreakdown = pdfBreakdownParts.join(" &middot; ");
+    const ticketsFieldHtml = ticketBreakdown
+      ? `<div class="field-val-sm">${ticketBreakdown}<br/><span style="color:rgba(255,255,255,.4);font-size:11px;">${total} ${esc(t("bookings.guests"))}</span></div>`
+      : `<div class="field-val">${total} ${esc(t("bookings.guests"))}</div>`;
 
     w.document.write(`<!doctype html><html><head>
       <meta charset="utf-8">
