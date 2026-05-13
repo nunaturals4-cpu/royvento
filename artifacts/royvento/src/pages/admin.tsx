@@ -4005,57 +4005,6 @@ function CommissionsAdmin() {
                       {/* Expanded breakdown */}
                       {expanded && (
                         <div className="border-t border-white/8 bg-white/[0.02] px-4 py-3 space-y-4">
-                          {/* Type breakdown */}
-                          {(row.freeEntryCount > 0 || row.ticketCount > 0 || row.tableCount > 0) && (
-                            <div>
-                              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">By booking type</p>
-                              <table className="w-full text-xs">
-                                <thead className="text-muted-foreground">
-                                  <tr>
-                                    <th className="text-left py-1 pr-3">Type</th>
-                                    <th className="text-right py-1 px-2">Count</th>
-                                    <th className="text-right py-1 px-2">No of People</th>
-                                    <th className="text-right py-1 px-2">Gross</th>
-                                    <th className="text-right py-1 px-2">Rate</th>
-                                    <th className="text-right py-1 pl-2">Commission</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {row.freeEntryCount > 0 && (
-                                    <tr className="border-t border-white/5">
-                                      <td className="py-1.5 pr-3">Free Entry</td>
-                                      <td className="text-right px-2">{row.freeEntryCount}</td>
-                                      <td className="text-right px-2">{row.freeEntryPeople ?? 0}</td>
-                                      <td className="text-right px-2">{formatINR(row.freeEntryRevenue)}</td>
-                                      <td className="text-right px-2">₹{row.appliedRates.freeEntryRate}/person</td>
-                                      <td className="text-right pl-2 text-primary">{formatINR(row.freeEntryCommission)}</td>
-                                    </tr>
-                                  )}
-                                  {row.ticketCount > 0 && (
-                                    <tr className="border-t border-white/5">
-                                      <td className="py-1.5 pr-3">Ticket</td>
-                                      <td className="text-right px-2">{row.ticketCount}</td>
-                                      <td className="text-right px-2">{row.ticketPeople ?? 0}</td>
-                                      <td className="text-right px-2">{formatINR(row.ticketRevenue)}</td>
-                                      <td className="text-right px-2">₹{row.appliedRates.ticketRate}/ticket</td>
-                                      <td className="text-right pl-2 text-primary">{formatINR(row.ticketCommission)}</td>
-                                    </tr>
-                                  )}
-                                  {row.tableCount > 0 && (
-                                    <tr className="border-t border-white/5">
-                                      <td className="py-1.5 pr-3">Table Booking</td>
-                                      <td className="text-right px-2">{row.tableCount}</td>
-                                      <td className="text-right px-2">{row.tablePeople ?? 0}</td>
-                                      <td className="text-right px-2">{formatINR(row.tableRevenue)}</td>
-                                      <td className="text-right px-2">₹{row.appliedRates.tableBookingRate}/booking</td>
-                                      <td className="text-right pl-2 text-primary">{formatINR(row.tableCommission)}</td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-
                           {/* Individual booking lines */}
                           {row.bookings.length > 0 && (
                             <div>

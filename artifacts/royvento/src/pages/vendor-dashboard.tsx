@@ -3570,23 +3570,23 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
             </div>
           </div>
 
-          {/* Gross → Net summary — only shown when there are actual earnings */}
+          {/* Gross → Commission → Net summary — only shown when there are actual earnings */}
           {data.grossEarnings > 0 && (
             <div className="grid grid-cols-3 gap-4">
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Gross earnings</p>
                 <p className="stat-number text-2xl">{formatINR(data.grossEarnings)}</p>
-                <p className="text-xs text-muted-foreground mt-1">before platform fee</p>
+                <p className="text-xs text-muted-foreground mt-1">total revenue collected</p>
               </div>
-              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Platform fee</p>
-                <p className="stat-number text-2xl text-red-400">−{formatINR(data.totalCommission)}</p>
-                <p className="text-xs text-muted-foreground mt-1">deducted by Royvento</p>
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total commission</p>
+                <p className="stat-number text-2xl text-primary">{formatINR(data.totalCommission)}</p>
+                <p className="text-xs text-muted-foreground mt-1">charged by Royvento</p>
               </div>
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net earnings</p>
                 <p className="stat-number text-2xl text-emerald-300">{formatINR(data.netEarnings)}</p>
-                <p className="text-xs text-muted-foreground mt-1">after platform fee</p>
+                <p className="text-xs text-muted-foreground mt-1">gross − total commission</p>
               </div>
             </div>
           )}
