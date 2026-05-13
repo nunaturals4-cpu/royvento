@@ -136,11 +136,9 @@ export function computeCommissionFromPlanned(
       raw = ticketFee * totalUnits;
     }
   }
-  // Paid bookings: cap commission at the price actually collected so the platform
-  // never earns more than the customer paid.
-  // Free-entry bookings: the platform fee is a per-head VENDOR charge — the
-  // customer pays nothing, so there is no revenue to cap against. Never cap it.
-  const amount = bookingType === "free_entry" ? round2(raw) : round2(Math.min(raw, price));
+  // Table and free-entry commission: per-head VENDOR charge — uncapped.
+  // Ticket commission: capped at the price actually collected by the customer.
+  const amount = bookingType === "ticket" ? round2(Math.min(raw, price)) : round2(raw);
   return { bookingType, ratePerUnit, unitCount, amount };
 }
 
@@ -182,14 +180,11 @@ export function computeCommissionFromActuals(
   }
 
   if (bookingType === "table") {
-    // Table commission scales with attendees; cash collected is pro-rated by
-    // attendance ratio so partial no-shows aren't over-charged.
+    // Table commission: per-head VENDOR charge × actual attendees, uncapped.
     const ratePerUnit = tableFee;
-    const guests = Math.max(1, b.guests);
     const unitCount = Math.max(0, ag);
-    const cashCollected = (ag / guests) * Number(b.finalPrice);
     const raw = tableFee * unitCount;
-    return { bookingType, ratePerUnit, unitCount, amount: round2(Math.min(raw, Math.max(0, cashCollected))) };
+    return { bookingType, ratePerUnit, unitCount, amount: round2(raw) };
   }
 
   // ticket mode COD — split per-tier when FER is active (free tiers billed

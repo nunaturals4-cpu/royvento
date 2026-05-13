@@ -849,7 +849,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     if (b.pubMode === "table") {
       const guests = Math.max(0, b.guests);
       out.table.count = 1;
-      out.table.comm = Math.min(commTableFee * guests, fp);
+      out.table.comm = commTableFee * guests;
       out.table.gross = grossRev;
       out.table.people = guests;
       return out;
