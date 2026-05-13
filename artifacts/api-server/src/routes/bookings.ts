@@ -972,20 +972,25 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     const split = calcCommSplit(b, bookingRevenue);
     splitCache.set(b.id, split);
     const ledgerAmt = ledgerAmtByBookingId.get(b.id);
-    const comm = ledgerAmt ?? commTotal(split);
-    totalCommission += comm;
+    const splitTotal = commTotal(split);
+    const realisedComm = ledgerAmt ?? splitTotal;
+    totalCommission += realisedComm;
     if (ledgerAmt !== undefined) collectedCommission += ledgerAmt;
-    else pendingCommission += commTotal(split);
-    if (isCod) codCommission += comm;
-    else onlineCommission += comm;
+    else pendingCommission += splitTotal;
+    if (isCod) codCommission += realisedComm;
+    else onlineCommission += realisedComm;
     // Per-booking-type commission summary. Counts are mutually exclusive
     // (booking goes into a single bucket); commission and gross revenue are
     // distributed per-tier so partial-FER ticket bookings show their free
     // tiers under freeEntry and paid tiers under ticket.
+    // When the ledger has a realised amount that differs from planned (actuals
+    // recorded at door), scale each bucket proportionally so the per-type
+    // breakdown always sums to totalCommission.
+    const commScale = (ledgerAmt !== undefined && splitTotal > 0) ? ledgerAmt / splitTotal : 1;
     for (const k of ["freeEntry", "ticket", "table"] as const) {
       commSummary[k].count += split[k].count;
       commSummary[k].grossRevenue += split[k].gross;
-      commSummary[k].commissionAmount += split[k].comm;
+      commSummary[k].commissionAmount += rnd2(split[k].comm * commScale);
       commSummary[k].peopleCount += split[k].people;
     }
   }

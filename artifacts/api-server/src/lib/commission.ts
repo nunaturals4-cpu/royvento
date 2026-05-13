@@ -120,9 +120,12 @@ export function computeCommissionFromPlanned(
     // ticket mode. On a partial-FER day, free tiers are billed at freeEntryFee
     // and paid tiers at ticketFee; otherwise all tickets bill at ticketFee.
     const totalUnits = Math.max(0, b.ticketWomen + b.ticketMen + b.ticketCouple);
-    unitCount = totalUnits;
+    // Event/legacy-mode bookings (pubMode !== "ticket") store headcount in
+    // b.guests rather than in per-tier ticket counts. Fall back so those
+    // bookings are never silently charged 0 commission.
+    unitCount = totalUnits > 0 ? totalUnits : Math.max(0, b.guests);
     const flags = ferTierFreeFlags(b.bookingDate ?? null, fer ?? null);
-    if (flags.active) {
+    if (flags.active && totalUnits > 0) {
       const freeUnits =
         (flags.women ? b.ticketWomen : 0) +
         (flags.men ? b.ticketMen : 0) +
@@ -133,7 +136,7 @@ export function computeCommissionFromPlanned(
       ratePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
     } else {
       ratePerUnit = ticketFee;
-      raw = ticketFee * totalUnits;
+      raw = ticketFee * unitCount;
     }
   }
   // Table and free-entry commission: per-head VENDOR charge — uncapped.

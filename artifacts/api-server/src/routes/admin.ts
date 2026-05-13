@@ -1976,14 +1976,20 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   const eventFerMap = new Map(
     reportEventRows.map((e) => [e.id, e.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | null]),
   );
-  // Index ledger rows by (vendorId → totalCollected) and the set of bookingIds
-  // that have any collected entry so we can mark per-booking pending vs collected.
+  // Index ledger rows by vendorId (collected totals) and bookingId (per-booking
+  // realised amounts). Both are needed: vendor totals for collectedCommission;
+  // per-booking amounts so totalCommission uses ledger for scanned bookings and
+  // planned commission only for bookings not yet realised.
   const collectedByVendor = new Map<number, number>();
   const collectedBookingIds = new Set<number>();
+  const ledgerAmtByBookingId = new Map<number, number>();
   for (const row of ledgerRows) {
     const amt = Number(row.amount ?? 0);
     collectedByVendor.set(row.vendorId, (collectedByVendor.get(row.vendorId) ?? 0) + amt);
-    if (row.bookingId != null) collectedBookingIds.add(row.bookingId);
+    if (row.bookingId != null) {
+      collectedBookingIds.add(row.bookingId);
+      ledgerAmtByBookingId.set(row.bookingId, (ledgerAmtByBookingId.get(row.bookingId) ?? 0) + amt);
+    }
   }
 
   type BookingLineItem = {
@@ -2081,7 +2087,12 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     const bookingType = comm.bookingType;
     const feePerUnit = comm.ratePerUnit;
     const unitCount = comm.unitCount;
-    const commissionAmount = comm.amount;
+    const isCollected = collectedBookingIds.has(b.id);
+    const realisedAmt = ledgerAmtByBookingId.get(b.id);
+    // For scanned/paid bookings use the ledger amount (reflects actual attendance
+    // when actuals were recorded at the door). For pending bookings fall back to
+    // planned commission so the report always shows the best available estimate.
+    const commissionAmount = (isCollected && realisedAmt !== undefined) ? realisedAmt : comm.amount;
 
     // Skip bookings from vendors not in the approved list
     if (!summaryMap.has(b.vendorId)) continue;
@@ -2090,7 +2101,6 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     s.totalBookings += 1;
     s.totalRevenue += price;
     s.totalCommission += commissionAmount;
-    const isCollected = collectedBookingIds.has(b.id);
     s.bookings.push({
       id: b.id,
       finalPrice: price,
@@ -2101,10 +2111,10 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       collected: isCollected,
       createdAt: b.createdAt,
     });
-    // Per-booking pending: if no ledger entry exists yet for this booking,
-    // its planned commission counts as pending.
+    // Pending commission uses planned amount (not ledger) so it represents
+    // the theoretical amount expected when the booking is eventually realised.
     if (!isCollected) {
-      s.pendingCommission += commissionAmount;
+      s.pendingCommission += comm.amount;
     }
 
     if (bookingType === "free_entry") {
