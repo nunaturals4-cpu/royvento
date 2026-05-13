@@ -911,6 +911,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let codRevenue = 0;
   let onlineRevenue = 0;
   let totalCommission = 0;
+  let collectedCommission = 0;
+  let pendingCommission = 0;
   let codCommission = 0;
   let onlineCommission = 0;
   const commSummary = {
@@ -963,8 +965,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     // Commission: use ledger amount when realised; fall back to planned split.
     const split = calcCommSplit(b, bookingRevenue);
     splitCache.set(b.id, split);
-    const comm = ledgerAmtByBookingId.get(b.id) ?? commTotal(split);
+    const ledgerAmt = ledgerAmtByBookingId.get(b.id);
+    const comm = ledgerAmt ?? commTotal(split);
     totalCommission += comm;
+    if (ledgerAmt !== undefined) collectedCommission += ledgerAmt;
+    else pendingCommission += commTotal(split);
     if (isCod) codCommission += comm;
     else onlineCommission += comm;
     // Per-booking-type commission summary. Counts are mutually exclusive
@@ -1063,6 +1068,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     grossEarnings: Math.round(totalEarnings),
     netEarnings: Math.round(totalEarnings - totalCommission),
     totalCommission: rnd2(totalCommission),
+    collectedCommission: rnd2(collectedCommission),
+    pendingCommission: rnd2(pendingCommission),
     codCommission: rnd2(codCommission),
     onlineCommission: rnd2(onlineCommission),
     commissionRates: {
@@ -1986,47 +1993,19 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   // Pre-compute commission for this booking
   const scanComm = scanCommissionRows[0];
+  // Thin wrapper around the shared helper so all scan paths (lookup, confirm,
+  // actualEntry) use identical math to the payment webhook and admin report.
   function calcScanCommission(booking: typeof b) {
     const price = Number(booking.finalPrice);
-    const freeEntryFee = Number(scanComm?.freeEntryRate ?? 0);
-    const ticketFee = Number(scanComm?.ticketRate ?? 0);
-    const tableFee = Number(scanComm?.tableBookingRate ?? 0);
-    // Mirror the partner-analytics per-tier split: table → tableFee×guests;
-    // ticket-mode on a partial-FER day → free tiers charge freeEntryFee,
-    // paid tiers charge ticketFee, aggregate capped at finalPrice.
-    let commissionAmount: number;
-    let feePerUnit: number;
-    if (booking.pubMode === "table") {
-      feePerUnit = tableFee;
-      commissionAmount = tableFee * Math.max(0, booking.guests);
-    } else if (booking.pubMode === "ticket") {
-      const dayName = booking.bookingDate
-        ? SCAN_FREE_ENTRY_DAY_ABBRS[new Date(`${booking.bookingDate}T12:00:00`).getDay()]
-        : "";
-      const ferActiveLocal = !!(scanFer?.enabled && dayName && Array.isArray(scanFer.days) && scanFer.days.includes(dayName));
-      const ferGendersLocal = ferActiveLocal ? (scanFer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
-      const tierFree = (g: "women" | "men" | "couple") => ferActiveLocal && ferGendersLocal.includes(g);
-      const freeUnits =
-        (tierFree("women") ? booking.ticketWomen : 0) +
-        (tierFree("men") ? booking.ticketMen : 0) +
-        (tierFree("couple") ? booking.ticketCouple : 0);
-      const totalUnits = booking.ticketWomen + booking.ticketMen + booking.ticketCouple;
-      const paidUnits = Math.max(0, totalUnits - freeUnits);
-      commissionAmount = freeEntryFee * freeUnits + ticketFee * paidUnits;
-      // Surface the dominant per-unit fee (paid if any paid units, else free).
-      feePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
-    } else if (price === 0 || booking.pubMode === "free") {
-      feePerUnit = freeEntryFee;
-      commissionAmount = freeEntryFee * Math.max(0, booking.guests);
-    } else {
-      feePerUnit = ticketFee;
-      commissionAmount = ticketFee * Math.max(0, booking.guests);
-    }
-    commissionAmount = Math.round(Math.min(commissionAmount, price) * 100) / 100;
+    const result = computeCommissionFromPlanned(
+      booking,
+      scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      scanFer ?? null,
+    );
     return {
-      commissionRate: feePerUnit,
-      commissionAmount,
-      netAmount: Math.round((price - commissionAmount) * 100) / 100,
+      commissionRate: result.ratePerUnit,
+      commissionAmount: result.amount,
+      netAmount: Math.round((price - result.amount) * 100) / 100,
     };
   }
   const scanCommInfo = calcScanCommission(b);
@@ -2260,6 +2239,28 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
             .where(eq(vendorsTable.id, updatedActuals.vendorId));
         }
       });
+    } else {
+      // Online payment: commission was recorded at payment success. This is a
+      // safe fallback in case the PhonePe webhook missed the ledger write —
+      // onConflictDoNothing on (bookingId, trigger) makes it a no-op when the
+      // entry already exists, so there is no risk of double-charging.
+      const onlineComm = computeCommissionFromPlanned(
+        updatedActuals,
+        scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+        scanFer ?? null,
+      );
+      if (onlineComm.amount > 0) {
+        await db
+          .insert(commissionLedgerTable)
+          .values({
+            vendorId: updatedActuals.vendorId,
+            bookingId: updatedActuals.id,
+            amount: String(onlineComm.amount),
+            bookingType: onlineComm.bookingType,
+            trigger: "online_payment",
+          })
+          .onConflictDoNothing();
+      }
     }
     const [out] = await serializeBookings([updatedActuals]);
     const okComm = calcScanCommission(updatedActuals);
@@ -2359,36 +2360,45 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   const [out] = await serializeBookings([updated]);
 
   // Credit admin commission immediately on first check-in, based on booked counts.
-  // Uses the same idempotent ledger transaction as the actualEntry path so that
-  // if the manager later records actuals the delta is cleanly adjusted.
-  // Online-payment bookings already had commission deducted at payment time —
-  // only COD and free-entry bookings are credited here.
+  // COD / free-entry: idempotent upsert that delta-updates commissionOwed.
+  // Online payment: commission was already recorded at payment success; this
+  // block adds a safe onConflictDoNothing fallback to recover missed webhook
+  // writes without any risk of double-charging.
   const confirmIsCod = updated.paymentMethod === "cod";
   const confirmIsFreeEntry =
     classifyBookingType({ pubMode: updated.pubMode, finalPrice: updated.finalPrice }) === "free_entry";
-  if (confirmIsCod || confirmIsFreeEntry) {
-    const confirmTrigger: "cod_checkin" | "free_checkin" = confirmIsFreeEntry ? "free_checkin" : "cod_checkin";
-    const confirmComm = calcScanCommission(updated);
-    try {
-      await db.transaction(async (tx) => {
+  const confirmTrigger: "cod_checkin" | "free_checkin" | "online_payment" = confirmIsFreeEntry
+    ? "free_checkin"
+    : confirmIsCod
+      ? "cod_checkin"
+      : "online_payment";
+  const confirmComm = computeCommissionFromPlanned(
+    updated,
+    scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+    scanFer ?? null,
+  );
+  try {
+    await db.transaction(async (tx) => {
+      if (confirmIsCod || confirmIsFreeEntry) {
+        // COD / free-entry: idempotent upsert with delta update to commissionOwed.
         const [existingLedger] = await tx
           .select({ id: commissionLedgerTable.id, amount: commissionLedgerTable.amount })
           .from(commissionLedgerTable)
           .where(and(eq(commissionLedgerTable.bookingId, updated.id), eq(commissionLedgerTable.trigger, confirmTrigger)))
           .limit(1);
         const oldAmt = existingLedger ? Number(existingLedger.amount) : 0;
-        const delta = confirmComm.commissionAmount - oldAmt;
+        const delta = confirmComm.amount - oldAmt;
         if (existingLedger) {
           await tx
             .update(commissionLedgerTable)
-            .set({ amount: String(confirmComm.commissionAmount), bookingType: classifyBookingType(updated) })
+            .set({ amount: String(confirmComm.amount), bookingType: confirmComm.bookingType })
             .where(eq(commissionLedgerTable.id, existingLedger.id));
         } else {
           await tx.insert(commissionLedgerTable).values({
             vendorId: updated.vendorId,
             bookingId: updated.id,
-            amount: String(confirmComm.commissionAmount),
-            bookingType: classifyBookingType(updated),
+            amount: String(confirmComm.amount),
+            bookingType: confirmComm.bookingType,
             trigger: confirmTrigger,
           });
         }
@@ -2398,10 +2408,22 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
             .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
             .where(eq(vendorsTable.id, updated.vendorId));
         }
-      });
-    } catch (err) {
-      req.log.error({ err, bookingId: updated.id }, "Failed to credit commission on scan confirm");
-    }
+      } else if (confirmComm.amount > 0) {
+        // Online payment: no-op if the entry already exists from the webhook.
+        await tx
+          .insert(commissionLedgerTable)
+          .values({
+            vendorId: updated.vendorId,
+            bookingId: updated.id,
+            amount: String(confirmComm.amount),
+            bookingType: confirmComm.bookingType,
+            trigger: "online_payment",
+          })
+          .onConflictDoNothing();
+      }
+    });
+  } catch (err) {
+    req.log.error({ err, bookingId: updated.id }, "Failed to credit commission on scan confirm");
   }
 
   // Award 100 loyalty points to the booking owner for attending the event (atomic increment)
