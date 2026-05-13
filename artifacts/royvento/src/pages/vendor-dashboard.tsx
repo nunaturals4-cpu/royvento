@@ -3571,40 +3571,23 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
 
           {/* Gross → Net summary — only shown when there are actual earnings */}
           {data.grossEarnings > 0 && (
-            <>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Gross earnings</p>
-                  <p className="stat-number text-2xl">{formatINR(data.grossEarnings)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">before platform fee</p>
-                </div>
-                <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Platform fee (total)</p>
-                  <p className="stat-number text-2xl text-red-400">−{formatINR(data.totalCommission)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">deducted by Royvento</p>
-                </div>
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net earnings</p>
-                  <p className="stat-number text-2xl text-emerald-300">{formatINR(data.netEarnings)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">after platform fee</p>
-                </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Gross earnings</p>
+                <p className="stat-number text-2xl">{formatINR(data.grossEarnings)}</p>
+                <p className="text-xs text-muted-foreground mt-1">before platform fee</p>
               </div>
-              {/* Collected vs Pending split — shows after QR scan so partners can track real-time status */}
-              {(data.collectedCommission !== undefined || data.pendingCommission !== undefined) && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Collected</p>
-                    <p className="stat-number text-xl text-emerald-400">−{formatINR(data.collectedCommission ?? 0)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">realised — scanned / paid online</p>
-                  </div>
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Pending</p>
-                    <p className="stat-number text-xl text-amber-400">−{formatINR(data.pendingCommission ?? 0)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">awaiting check-in</p>
-                  </div>
-                </div>
-              )}
-            </>
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Platform fee</p>
+                <p className="stat-number text-2xl text-red-400">−{formatINR(data.totalCommission)}</p>
+                <p className="text-xs text-muted-foreground mt-1">deducted by Royvento</p>
+              </div>
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net earnings</p>
+                <p className="stat-number text-2xl text-emerald-300">{formatINR(data.netEarnings)}</p>
+                <p className="text-xs text-muted-foreground mt-1">after platform fee</p>
+              </div>
+            </div>
           )}
 
           {/* Per-type breakdown */}
