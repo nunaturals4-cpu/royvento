@@ -603,10 +603,200 @@ interface AdminVendor {
   createdAt: string;
 }
 
+interface VendorManagerUser {
+  id: number;
+  name: string;
+  email: string;
+  profileImage: string;
+  phone: string;
+}
+
+interface VendorManagerRow {
+  id: number;
+  vendorId: number;
+  invitedEmail: string;
+  status: string;
+  createdAt: string;
+  manager: VendorManagerUser | null;
+  invitedBy: VendorManagerUser | null;
+}
+
 function statusColor(s: string) {
   if (s === "approved") return "bg-green-500/20 text-green-300 border-green-500/30";
   if (s === "rejected") return "bg-red-500/20 text-red-300 border-red-500/30";
   return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+}
+
+function managerStatusColor(s: string) {
+  if (s === "accepted") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/25";
+  if (s === "rejected") return "bg-red-500/15 text-red-300 border-red-500/25";
+  return "bg-amber-500/15 text-amber-300 border-amber-500/25";
+}
+
+function UserAvatar({ name, photo, size = "md" }: { name: string; photo?: string; size?: "sm" | "md" }) {
+  const initials = name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
+  const dim = size === "sm" ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-xs";
+  if (photo) {
+    return <img src={photo} alt={name} className={`${dim} rounded-full object-cover shrink-0 border border-white/10`} />;
+  }
+  return (
+    <div className={`${dim} rounded-full bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center shrink-0 font-semibold text-white/80`}>
+      {initials}
+    </div>
+  );
+}
+
+function ManagersPanel({ vendorId, vendorName }: { vendorId: number; vendorName: string }) {
+  const [managers, setManagers] = useState<VendorManagerRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [removing, setRemoving] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<VendorManagerRow[]>(`/api/admin/vendors/${vendorId}/managers`)
+      .then(setManagers)
+      .catch((e) => toast({ title: "Failed to load managers", description: e?.message, variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [vendorId]);
+
+  const remove = async (mgr: VendorManagerRow) => {
+    const label = mgr.manager?.name || mgr.invitedEmail;
+    if (!confirm(`Remove "${label}" as manager of ${vendorName}?`)) return;
+    setRemoving(mgr.id);
+    try {
+      await apiDelete(`/api/admin/vendors/${vendorId}/managers/${mgr.id}`);
+      toast({ title: "Manager removed" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  const filtered = managers.filter((m) => {
+    const q = search.toLowerCase();
+    const nameMatch = (m.manager?.name ?? "").toLowerCase().includes(q);
+    const emailMatch = m.invitedEmail.toLowerCase().includes(q);
+    if (q && !nameMatch && !emailMatch) return false;
+    if (statusFilter !== "all" && m.status !== statusFilter) return false;
+    return true;
+  });
+
+  return (
+    <div className="border-t border-white/[0.08] bg-gradient-to-b from-black/30 to-black/10">
+      <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Users className="h-3.5 w-3.5 text-primary/70" />
+          </div>
+          <span className="text-sm font-medium text-white/90">Managers</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.07] border border-white/[0.12] text-white/50 font-medium">
+            {managers.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white/30" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name or email..."
+              className="pl-7 pr-3 py-1.5 text-xs bg-white/[0.05] border border-white/[0.10] rounded-lg text-white/80 placeholder:text-white/30 focus:outline-none focus:border-primary/30 w-44"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-xs bg-white/[0.05] border border-white/[0.10] rounded-lg px-2.5 py-1.5 text-white/70 focus:outline-none focus:border-primary/30"
+          >
+            <option value="all">All status</option>
+            <option value="accepted">Accepted</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+      </div>
+      <div className="px-5 pb-5">
+        {loading ? (
+          <div className="flex items-center gap-2 py-6 text-white/40 text-sm">
+            <div className="h-4 w-4 rounded-full border-2 border-white/20 border-t-primary/60 animate-spin" />
+            Loading managers...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-8 text-center">
+            <div className="h-10 w-10 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-3">
+              <Users className="h-5 w-5 text-white/25" />
+            </div>
+            <p className="text-sm text-white/40">
+              {search || statusFilter !== "all" ? "No managers match your filters" : "No managers assigned yet"}
+            </p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filtered.map((mgr) => (
+              <div
+                key={mgr.id}
+                className="group relative rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/[0.14] transition-all duration-200 p-4"
+              >
+                <div className="absolute top-3 right-3">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold capitalize ${managerStatusColor(mgr.status)}`}>
+                    {mgr.status}
+                  </span>
+                </div>
+                <div className="flex items-start gap-3 mb-3 pr-16">
+                  <UserAvatar name={mgr.manager?.name || mgr.invitedEmail} photo={mgr.manager?.profileImage || undefined} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white/90 truncate leading-tight">
+                      {mgr.manager?.name || "—"}
+                    </p>
+                    <p className="text-[11px] text-white/45 mt-0.5 leading-tight">Scanner Manager</p>
+                  </div>
+                </div>
+                <div className="space-y-1.5 text-[11px]">
+                  <div className="flex items-center gap-2 text-white/55">
+                    <Mail className="h-3 w-3 shrink-0 text-white/30" />
+                    <span className="truncate">{mgr.invitedEmail}</span>
+                  </div>
+                  {mgr.manager?.phone && (
+                    <div className="flex items-center gap-2 text-white/55">
+                      <span className="h-3 w-3 shrink-0 flex items-center justify-center text-[10px]">📞</span>
+                      <span>{mgr.manager.phone}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-white/40">
+                    <Clock className="h-3 w-3 shrink-0 text-white/25" />
+                    <span>Invited {new Date(mgr.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                  </div>
+                  {mgr.invitedBy && (
+                    <div className="flex items-center gap-2 text-white/40">
+                      <UserCheck className="h-3 w-3 shrink-0 text-white/25" />
+                      <span className="truncate">By {mgr.invitedBy.name}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 pt-3 border-t border-white/[0.06]">
+                  <button
+                    onClick={() => remove(mgr)}
+                    disabled={removing === mgr.id}
+                    className="flex items-center gap-1.5 text-[11px] text-red-400/70 hover:text-red-400 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {removing === mgr.id ? "Removing..." : "Remove manager"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function AllVendorsAdmin() {
@@ -618,6 +808,8 @@ function AllVendorsAdmin() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<AdminVendor>>({});
   const [saving, setSaving] = useState(false);
+  const [expandedManagers, setExpandedManagers] = useState<Set<number>>(new Set());
+  const [globalSearch, setGlobalSearch] = useState("");
   const { toast } = useToast();
   const vendorFormErrors = useFormErrors();
   const approve = useApproveVendor();
@@ -672,154 +864,218 @@ function AllVendorsAdmin() {
     }
   };
 
-  if (loading) return <p className="text-muted-foreground">Loading...</p>;
+  const toggleManagers = (id: number) => {
+    setExpandedManagers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const filteredVendors = vendors.filter((v) => {
+    if (!globalSearch) return true;
+    const q = globalSearch.toLowerCase();
+    return v.businessName.toLowerCase().includes(q) || v.userEmail.toLowerCase().includes(q) || v.city.toLowerCase().includes(q);
+  });
+
+  if (loading) return (
+    <div className="flex items-center gap-3 py-12 text-white/40">
+      <div className="h-5 w-5 rounded-full border-2 border-white/20 border-t-primary/60 animate-spin" />
+      <span className="text-sm">Loading partners...</span>
+    </div>
+  );
   if (vendors.length === 0 && serverTotal === 0) return <p className="text-muted-foreground">No partners found.</p>;
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{serverTotal} partner{serverTotal !== 1 ? "s" : ""} total</p>
-      {vendors.map((v) => (
-        <div key={v.id} className="rounded-2xl glass-card overflow-hidden">
-          <div className="flex flex-col md:flex-row">
-            {v.bannerImage && (
-              <div className="md:w-40 aspect-video md:aspect-auto shrink-0 bg-muted">
-                <img src={v.bannerImage} alt="" className="h-full w-full object-cover" />
+    <div className="space-y-5">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-lg font-semibold text-white/90">{serverTotal} Partner{serverTotal !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-white/40 mt-0.5">Manage pub partners, their listings and assigned managers</p>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+          <input
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            placeholder="Search partners..."
+            className="pl-9 pr-4 py-2 text-sm bg-white/[0.05] border border-white/[0.10] rounded-xl text-white/80 placeholder:text-white/30 focus:outline-none focus:border-primary/30 w-56"
+          />
+        </div>
+      </div>
+
+      {/* Vendor cards */}
+      <div className="space-y-4">
+        {filteredVendors.map((v) => (
+          <div key={v.id} className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/60 to-black/40 overflow-hidden transition-all duration-200 hover:border-white/[0.13]">
+
+            {/* Vendor main row */}
+            <div className="flex flex-col md:flex-row">
+              {v.bannerImage && (
+                <div className="md:w-36 aspect-video md:aspect-auto shrink-0 bg-white/[0.03]">
+                  <img src={v.bannerImage} alt="" className="h-full w-full object-cover opacity-80" />
+                </div>
+              )}
+              <div className="flex-1 p-5 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-semibold capitalize ${statusColor(v.status)}`}>{v.status}</span>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full border border-white/[0.12] bg-white/[0.05] text-white/55 font-medium">{v.category}</span>
+                  </div>
+                  <p className="font-serif text-lg leading-tight text-white/95">{v.businessName}</p>
+                  <p className="text-xs text-white/45 mt-1">
+                    {v.userEmail}{v.city ? ` · ${v.city}` : ""}{v.state ? `, ${v.state}` : ""}
+                  </p>
+                  <div className="flex items-center gap-4 mt-2">
+                    <span className="text-xs text-white/35">{v.eventCount} listing{v.eventCount !== 1 ? "s" : ""}</span>
+                    <span className="text-xs text-white/25">·</span>
+                    <span className="text-xs text-white/35">Since {new Date(v.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</span>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0 flex-wrap items-start">
+                  {v.status === "pending" && (
+                    <>
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs h-8"
+                        onClick={() => approve.mutate({ vendorId: v.id }, {
+                          onSuccess: () => { toast({ title: "Approved" }); load(); },
+                          onError: (e: unknown) => toast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+                        })}
+                      ><CheckCircle className="h-3.5 w-3.5 mr-1" />Approve</Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs border-red-500/30 text-red-300 h-8"
+                        onClick={() => reject.mutate({ vendorId: v.id }, {
+                          onSuccess: () => { toast({ title: "Rejected" }); load(); },
+                          onError: (e: unknown) => toast({ title: "Failed to reject", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
+                        })}
+                      ><XCircle className="h-3.5 w-3.5 mr-1" />Reject</Button>
+                    </>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs border-white/[0.12] h-8"
+                    onClick={() => editingId === v.id ? setEditingId(null) : startEdit(v)}
+                  ><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs border-red-500/20 text-red-400/80 hover:bg-red-900/20 hover:text-red-300 h-8"
+                    onClick={() => remove(v)}
+                  ><Trash2 className="h-3.5 w-3.5 mr-1" />Delete</Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Edit panel */}
+            {editingId === v.id && (
+              <div className="border-t border-white/[0.08] px-5 py-5 bg-black/20 space-y-4">
+                <p className="text-sm font-medium text-white/80">Edit partner profile</p>
+                {vendorFormErrors.topError && <p className="text-xs text-red-400">{vendorFormErrors.topError}</p>}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-white/60">Business name</Label>
+                    <Input
+                      value={editForm.businessName ?? ""}
+                      onChange={(e) => { setEditForm((f) => ({ ...f, businessName: e.target.value })); vendorFormErrors.clearField("businessName"); }}
+                      className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("businessName"))}
+                    />
+                    {vendorFormErrors.fieldError("businessName") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("businessName")}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-white/60">Category</Label>
+                    <Input
+                      value={editForm.category ?? ""}
+                      onChange={(e) => { setEditForm((f) => ({ ...f, category: e.target.value })); vendorFormErrors.clearField("category"); }}
+                      className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("category"))}
+                    />
+                    {vendorFormErrors.fieldError("category") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("category")}</p>}
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs text-white/60">Location</Label>
+                    <LocationSelect
+                      country={editForm.country ?? ""}
+                      state={editForm.state ?? ""}
+                      city={editForm.city ?? ""}
+                      onChange={(loc) => { setEditForm((f) => ({ ...f, country: loc.country, state: loc.state, city: loc.city })); vendorFormErrors.clearField("country"); vendorFormErrors.clearField("state"); vendorFormErrors.clearField("city"); }}
+                      className="[&>button]:bg-black/40 [&>button]:border-white/10"
+                    />
+                    {(vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")) && (
+                      <p className="text-xs text-red-400">{vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-white/60">Status</Label>
+                    <Select
+                      value={editForm.status ?? "pending"}
+                      onValueChange={(val) => { setEditForm((f) => ({ ...f, status: val })); vendorFormErrors.clearField("status"); }}
+                    >
+                      <SelectTrigger className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("status"))}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {vendorFormErrors.fieldError("status") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("status")}</p>}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-white/60">Description</Label>
+                  <Textarea
+                    rows={3}
+                    value={editForm.description ?? ""}
+                    onChange={(e) => { setEditForm((f) => ({ ...f, description: e.target.value })); vendorFormErrors.clearField("description"); }}
+                    className={fieldClass("bg-black/40 border-white/10 text-sm", vendorFormErrors.fieldError("description"))}
+                  />
+                  {vendorFormErrors.fieldError("description") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("description")}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={saving} onClick={() => saveEdit(v.id)} className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs">
+                    {saving ? "Saving..." : "Save changes"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-xs" onClick={() => setEditingId(null)}>Cancel</Button>
+                </div>
               </div>
             )}
-            <div className="flex-1 p-5 flex flex-col md:flex-row md:items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statusColor(v.status)}`}>{v.status}</span>
-                  <Badge variant="outline" className="text-xs">{v.category}</Badge>
-                </div>
-                <p className="font-serif text-lg leading-tight">{v.businessName}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{v.userEmail}{v.city ? ` Â· ${v.city}` : ""}{v.state ? `, ${v.state}` : ""}</p>
-                <p className="text-xs text-muted-foreground mt-1">{v.eventCount} listing{v.eventCount !== 1 ? "s" : ""}</p>
-              </div>
-              <div className="flex gap-2 shrink-0 flex-wrap">
-                {v.status === "pending" && (
-                  <>
-                    <Button
-                      size="sm"
-                      className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs"
-                      onClick={() => approve.mutate({ vendorId: v.id }, {
-                        onSuccess: () => { toast({ title: "Approved" }); load(); },
-                        onError: (e: unknown) => toast({ title: "Failed", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
-                      })}
-                    ><CheckCircle className="h-3.5 w-3.5 mr-1" />Approve</Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs border-red-500/30 text-red-300"
-                      onClick={() => reject.mutate({ vendorId: v.id }, {
-                        onSuccess: () => { toast({ title: "Rejected" }); load(); },
-                        onError: (e: unknown) => toast({ title: "Failed to reject", description: e instanceof Error ? e.message : undefined, variant: "destructive" }),
-                      })}
-                    ><XCircle className="h-3.5 w-3.5 mr-1" />Reject</Button>
-                  </>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs"
-                  onClick={() => editingId === v.id ? setEditingId(null) : startEdit(v)}
-                ><Pencil className="h-3.5 w-3.5 mr-1" />Edit</Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs border-red-500/30 text-red-300 hover:bg-red-900/20"
-                  onClick={() => remove(v)}
-                ><Trash2 className="h-3.5 w-3.5 mr-1" />Delete</Button>
-              </div>
-            </div>
-          </div>
 
-          {editingId === v.id && (
-            <div className="border-t border-white/10 p-5 bg-black/20 space-y-4">
-              <p className="text-sm font-medium">Edit partner profile</p>
-              {vendorFormErrors.topError && <p className="text-xs text-red-400">{vendorFormErrors.topError}</p>}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Business name</Label>
-                  <Input
-                    value={editForm.businessName ?? ""}
-                    onChange={(e) => { setEditForm((f) => ({ ...f, businessName: e.target.value })); vendorFormErrors.clearField("businessName"); }}
-                    className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("businessName"))}
-                  />
-                  {vendorFormErrors.fieldError("businessName") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("businessName")}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Category</Label>
-                  <Input
-                    value={editForm.category ?? ""}
-                    onChange={(e) => { setEditForm((f) => ({ ...f, category: e.target.value })); vendorFormErrors.clearField("category"); }}
-                    className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("category"))}
-                  />
-                  {vendorFormErrors.fieldError("category") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("category")}</p>}
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs">Location</Label>
-                  <LocationSelect
-                    country={editForm.country ?? ""}
-                    state={editForm.state ?? ""}
-                    city={editForm.city ?? ""}
-                    onChange={(loc) => { setEditForm((f) => ({ ...f, country: loc.country, state: loc.state, city: loc.city })); vendorFormErrors.clearField("country"); vendorFormErrors.clearField("state"); vendorFormErrors.clearField("city"); }}
-                    className="[&>button]:bg-black/40 [&>button]:border-white/10"
-                  />
-                  {(vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")) && (
-                    <p className="text-xs text-red-400">{vendorFormErrors.fieldError("country") || vendorFormErrors.fieldError("state") || vendorFormErrors.fieldError("city")}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Status</Label>
-                  <Select
-                    value={editForm.status ?? "pending"}
-                    onValueChange={(val) => { setEditForm((f) => ({ ...f, status: val })); vendorFormErrors.clearField("status"); }}
-                  >
-                    <SelectTrigger className={fieldClass("bg-black/40 border-white/10 h-9 text-sm", vendorFormErrors.fieldError("status"))}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {vendorFormErrors.fieldError("status") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("status")}</p>}
-                </div>
+            {/* Managers toggle bar */}
+            <button
+              onClick={() => toggleManagers(v.id)}
+              className="w-full flex items-center justify-between px-5 py-3 border-t border-white/[0.06] hover:bg-white/[0.02] transition-colors group"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="h-3.5 w-3.5 text-white/35 group-hover:text-primary/60 transition-colors" />
+                <span className="text-xs text-white/50 group-hover:text-white/70 transition-colors font-medium">
+                  {expandedManagers.has(v.id) ? "Hide" : "View"} Managers
+                </span>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Description</Label>
-                <Textarea
-                  rows={3}
-                  value={editForm.description ?? ""}
-                  onChange={(e) => { setEditForm((f) => ({ ...f, description: e.target.value })); vendorFormErrors.clearField("description"); }}
-                  className={fieldClass("bg-black/40 border-white/10 text-sm", vendorFormErrors.fieldError("description"))}
-                />
-                {vendorFormErrors.fieldError("description") && <p className="text-xs text-red-400">{vendorFormErrors.fieldError("description")}</p>}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  disabled={saving}
-                  onClick={() => saveEdit(v.id)}
-                  className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs"
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </Button>
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => setEditingId(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+              {expandedManagers.has(v.id)
+                ? <ChevronUp className="h-3.5 w-3.5 text-white/30 group-hover:text-white/60 transition-colors" />
+                : <ChevronDown className="h-3.5 w-3.5 text-white/30 group-hover:text-white/60 transition-colors" />
+              }
+            </button>
+
+            {/* Managers panel */}
+            {expandedManagers.has(v.id) && (
+              <ManagersPanel vendorId={v.id} vendorName={v.businessName} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
       {serverTotalPages > 1 && (
-        <div className="flex items-center justify-between pt-4 border-t border-white/10">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => load(page - 1)}>â† Prev</Button>
-          <span className="text-xs text-muted-foreground">Page {page} of {serverTotalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= serverTotalPages} onClick={() => load(page + 1)}>Next â†’</Button>
+        <div className="flex items-center justify-between pt-4 border-t border-white/[0.08]">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => load(page - 1)} className="text-xs border-white/10">Prev</Button>
+          <span className="text-xs text-white/40">Page {page} of {serverTotalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= serverTotalPages} onClick={() => load(page + 1)} className="text-xs border-white/10">Next</Button>
         </div>
       )}
     </div>

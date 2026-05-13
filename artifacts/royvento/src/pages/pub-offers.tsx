@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { SEO } from "@/components/SEO";
 import {
   ArrowRight, Calendar, Clock, GlassWater, Megaphone,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Wine, Ticket,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
@@ -26,18 +26,6 @@ interface Announcement {
 
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
-const DEAL_TYPE_LABELS: Record<string, string> = {
-  welcome: "Free Drink",
-  unlimited: "Unlimited",
-  ticket: "With Ticket",
-  custom: "Discount",
-};
-const DEAL_TYPE_COLORS: Record<string, string> = {
-  welcome: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
-  unlimited: "bg-primary/15 text-primary border-primary/25",
-  ticket: "bg-violet-500/15 text-violet-400 border-violet-500/25",
-  custom: "bg-amber-500/15 text-amber-400 border-amber-500/25",
-};
 
 const SLIDE_LIGHT_GRADIENTS = [
   "from-rose-50 via-slate-50 to-gray-50",
@@ -240,6 +228,253 @@ function getPlanLabel(plan: DrinkPlanSummary): string {
   return plan.productName || "Drinks discount";
 }
 
+type VendorWithPlans = { offer: VendorDrinkOffer; plans: DrinkPlanSummary[] };
+
+function FreeDrinkCard({ offer, plans }: VendorWithPlans) {
+  const { t } = useTranslation();
+  return (
+    <Link
+      href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
+      className="snap-start flex-shrink-0 md:flex-shrink block group"
+    >
+      <div className="relative w-[300px] md:w-auto rounded-2xl overflow-hidden flex flex-col h-full
+        bg-gradient-to-b from-zinc-900 to-[#0c0c0e]
+        border border-white/[0.07]
+        transition-all duration-300
+        hover:border-primary/25
+        hover:shadow-[0_8px_40px_rgba(220,38,38,0.10)]">
+
+        {/* Top accent line */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
+
+        {/* Card header */}
+        <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mt-0.5">
+              <Wine className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-serif text-base leading-snug text-white line-clamp-2">
+                {offer.vendorName}
+              </h3>
+              <p className="text-[10px] text-white/40 uppercase tracking-[0.18em] mt-0.5">Free Drink Offers</p>
+            </div>
+          </div>
+          <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full bg-primary/15 text-primary border border-primary/25">
+            FREE
+          </span>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-5 h-px bg-white/[0.07]" />
+
+        {/* Plans */}
+        <div className="px-5 pt-4 pb-4 flex flex-col gap-5 flex-1">
+          {plans.slice(0, 3).map((plan, i) => {
+            const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
+            const showTime = !!(plan.timeFrom && plan.timeTo);
+            return (
+              <div key={i} className={`flex flex-col gap-2.5 ${i > 0 ? "pt-4 border-t border-white/[0.07]" : ""}`}>
+
+                {/* Type badge + Drink name on own line */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`flex-shrink-0 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg border ${
+                    plan.type === "welcome"
+                      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                      : "bg-primary/15 text-primary border-primary/30"
+                  }`}>
+                    {plan.type === "welcome" ? "Welcome" : "Unlimited"}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-white leading-snug">
+                  {plan.productName || getPlanLabel(plan)}
+                </p>
+
+                {/* Guest type */}
+                <span className={`self-start inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg border ${
+                  plan.gender === "female"
+                    ? "bg-rose-500/15 text-rose-300 border-rose-500/25"
+                    : "bg-white/[0.08] text-white/75 border-white/[0.15]"
+                }`}>
+                  {plan.gender === "female" ? "👩 Ladies Only" : "👥 " + t("pub_offers.gender_all")}
+                </span>
+
+                {/* Days + Time pills */}
+                {(showDays || showTime) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {showDays && plan.days!.map((d) => (
+                      <span key={d} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85">
+                        {d.slice(0, 3)}
+                      </span>
+                    ))}
+                    {showTime && (
+                      <span className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85 flex items-center gap-1.5">
+                        <Clock className="h-3 w-3 text-white/60 flex-shrink-0" />
+                        {plan.timeFrom} – {plan.timeTo}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {plan.description && (
+                  <p className="text-xs text-white/50 italic leading-snug line-clamp-2">{plan.description}</p>
+                )}
+              </div>
+            );
+          })}
+          {plans.length > 3 && (
+            <p className="text-xs text-white/45 pt-1">
+              +{plans.length - 3} more offer{plans.length - 3 !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+
+        {/* CTA */}
+        <div className="px-5 pb-5">
+          <div className="flex items-center justify-between rounded-xl px-4 py-3
+            bg-primary/[0.09] border border-primary/[0.20]
+            group-hover:bg-primary/[0.16] group-hover:border-primary/35
+            transition-all duration-300">
+            <span className="text-sm font-semibold text-primary">
+              {offer.pubEventId ? "Claim Deal" : "View Venue"}
+            </span>
+            <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform duration-200" />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function TicketCard({ offer, plans }: VendorWithPlans) {
+  const { t } = useTranslation();
+  return (
+    <Link
+      href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
+      className="snap-start flex-shrink-0 md:flex-shrink block group"
+    >
+      <div className="relative w-[300px] md:w-auto rounded-2xl overflow-hidden flex flex-col h-full
+        bg-gradient-to-b from-zinc-900 to-[#0c0c0e]
+        border border-white/[0.07]
+        transition-all duration-300
+        hover:border-amber-500/25
+        hover:shadow-[0_8px_40px_rgba(245,158,11,0.09)]">
+
+        {/* Top accent line */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+
+        {/* Card header */}
+        <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mt-0.5">
+              <Ticket className="h-5 w-5 text-amber-400" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-serif text-base leading-snug text-white line-clamp-2">
+                {offer.vendorName}
+              </h3>
+              <p className="text-[10px] text-white/40 uppercase tracking-[0.18em] mt-0.5">Ticket Package</p>
+            </div>
+          </div>
+          <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
+            TICKET
+          </span>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-5 h-px bg-white/[0.07]" />
+
+        {/* Plans */}
+        <div className="px-5 pt-4 pb-4 flex flex-col gap-5 flex-1">
+          {plans.slice(0, 2).map((plan, i) => {
+            const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
+            const showTime = !!(plan.timeFrom && plan.timeTo);
+            const lineItems = (plan.lineItems ?? []).filter((li) => li.name);
+            return (
+              <div key={i} className={`flex flex-col gap-3 ${i > 0 ? "pt-4 border-t border-white/[0.07]" : ""}`}>
+
+                {/* Plan name */}
+                <p className="text-sm font-semibold text-white leading-snug">
+                  {plan.productName || "Ticket Package"}
+                </p>
+
+                {/* Guest type */}
+                <span className={`self-start inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg border ${
+                  plan.gender === "female"
+                    ? "bg-rose-500/15 text-rose-300 border-rose-500/25"
+                    : "bg-white/[0.08] text-white/75 border-white/[0.15]"
+                }`}>
+                  {plan.gender === "female" ? "👩 Ladies Only" : "👥 " + t("pub_offers.gender_all")}
+                </span>
+
+                {/* Included items */}
+                {lineItems.length > 0 && (
+                  <div className="rounded-xl bg-white/[0.05] border border-white/[0.09] px-4 py-3">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-amber-400/80 font-bold mb-2.5">What's Included</p>
+                    <div className="flex flex-col gap-2">
+                      {lineItems.slice(0, 4).map((item, j) => (
+                        <div key={j} className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400/60 flex-shrink-0" />
+                            <span className="text-sm text-white/80 truncate">{item.name}</span>
+                          </div>
+                          <span className="text-sm font-bold text-amber-400 flex-shrink-0 tabular-nums">×{item.qty}</span>
+                        </div>
+                      ))}
+                      {lineItems.length > 4 && (
+                        <p className="text-xs text-white/45 mt-0.5">+{lineItems.length - 4} more included</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Days + Time pills */}
+                {(showDays || showTime) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {showDays && plan.days!.map((d) => (
+                      <span key={d} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85">
+                        {d.slice(0, 3)}
+                      </span>
+                    ))}
+                    {showTime && (
+                      <span className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85 flex items-center gap-1.5">
+                        <Clock className="h-3 w-3 text-white/60 flex-shrink-0" />
+                        {plan.timeFrom} – {plan.timeTo}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {plan.description && (
+                  <p className="text-xs text-white/50 italic leading-snug line-clamp-2">{plan.description}</p>
+                )}
+              </div>
+            );
+          })}
+          {plans.length > 2 && (
+            <p className="text-xs text-white/45 pt-1">
+              +{plans.length - 2} more package{plans.length - 2 !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+
+        {/* CTA */}
+        <div className="px-5 pb-5">
+          <div className="flex items-center justify-between rounded-xl px-4 py-3
+            bg-amber-500/[0.09] border border-amber-500/[0.20]
+            group-hover:bg-amber-500/[0.16] group-hover:border-amber-500/35
+            transition-all duration-300">
+            <span className="text-sm font-semibold text-amber-400">
+              {offer.pubEventId ? "Book Now" : "View Venue"}
+            </span>
+            <ArrowRight className="h-4 w-4 text-amber-400 group-hover:translate-x-0.5 transition-transform duration-200" />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export function PubOffers() {
   const { t } = useTranslation();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -247,7 +482,6 @@ export function PubOffers() {
 
   const [annGenreFilter, setAnnGenreFilter] = useState("");
   const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
-  const [dealTypeFilter, setDealTypeFilter] = useState("");
   const [dealGenderFilter, setDealGenderFilter] = useState("");
 
   useEffect(() => {
@@ -261,15 +495,29 @@ export function PubOffers() {
   });
 
   const filteredDeals = (drinkOffers as VendorDrinkOffer[]).filter((offer) => {
-    if (!dealTypeFilter && !dealGenderFilter) return true;
-    return offer.plans.some((p) => {
-      const typeMatch = !dealTypeFilter || p.type === dealTypeFilter;
-      const genderMatch =
-        !dealGenderFilter ||
-        (dealGenderFilter === "female" ? p.gender === "female" : p.gender !== "female");
-      return typeMatch && genderMatch;
-    });
+    if (!dealGenderFilter) return true;
+    return offer.plans.some((p) =>
+      dealGenderFilter === "female" ? p.gender === "female" : p.gender !== "female"
+    );
   });
+
+  const genderMatch = (p: DrinkPlanSummary) =>
+    !dealGenderFilter ||
+    (dealGenderFilter === "female" ? p.gender === "female" : p.gender !== "female");
+
+  const freeVendors: VendorWithPlans[] = filteredDeals
+    .map((offer) => ({
+      offer,
+      plans: offer.plans.filter((p) => (p.type === "welcome" || p.type === "unlimited") && genderMatch(p)),
+    }))
+    .filter((v) => v.plans.length > 0);
+
+  const ticketVendors: VendorWithPlans[] = filteredDeals
+    .map((offer) => ({
+      offer,
+      plans: offer.plans.filter((p) => p.type === "ticket" && genderMatch(p)),
+    }))
+    .filter((v) => v.plans.length > 0);
 
   const [sliderAnnouncements, setSliderAnnouncements] = useState<Announcement[]>([]);
   useEffect(() => {
@@ -287,7 +535,7 @@ export function PubOffers() {
         description="Live pub offers from across India: ladies' nights, happy hours, free entry, unlimited drinks and weekend deals. Updated daily on Royvento."
         canonical="/pub-offers"
       />
-      {/* Page header — hidden when slider is active */}
+
       {!hasSlider && (
         <header className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">
           <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
@@ -306,49 +554,37 @@ export function PubOffers() {
         </div>
       )}
 
-      {/* Full-bleed hero announcement slider */}
       {hasSlider && <AnnouncementSlider announcements={sliderAnnouncements} />}
 
-      {/* Drink Deals */}
+      {/* ════════════════════════════════════════
+          DRINK DEAL SECTION — Premium Redesign
+          ════════════════════════════════════════ */}
       {hasDeals && (
         <div className="container mx-auto px-4 md:px-6">
           <section>
-            <div className="flex items-center gap-3 mb-4">
+
+            {/* Section header */}
+            <div className="flex items-center gap-3 mb-7">
               <div className="flex items-center gap-2">
                 <GlassWater className="h-4 w-4 text-primary" />
-                <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">
+                <span className="text-xs uppercase tracking-[0.22em] text-primary font-semibold">
                   {t("pub_offers.drink_deals")}
                 </span>
               </div>
-              <div className="flex-1 h-px bg-white/10" />
+              <div className="flex-1 h-px bg-gradient-to-r from-primary/20 to-transparent" />
               <Link href="/pubs">
-                <span className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                <span className="text-xs text-white/30 hover:text-white/60 flex items-center gap-1 transition-colors">
                   {t("pub_offers.browse_pubs")} <ArrowRight className="h-3 w-3" />
                 </span>
               </Link>
             </div>
 
-            {/* Filters */}
-            <div className="mb-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("pub_offers.filter_deal_type")}</p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {(["", "welcome", "unlimited", "ticket", "custom"] as string[]).map((dt) => (
-                  <button
-                    key={dt || "all"}
-                    type="button"
-                    onClick={() => setDealTypeFilter(dt === dealTypeFilter ? "" : dt)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      dealTypeFilter === dt
-                        ? "bg-primary/20 border-primary text-primary"
-                        : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
-                    }`}
-                  >
-                    {dt ? (DEAL_TYPE_LABELS[dt] ?? dt) : t("pub_offers.filter_all")}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("pub_offers.filter_for")}</p>
-              <div className="flex flex-wrap gap-2 mb-6">
+            {/* Gender filter */}
+            <div className="flex items-center gap-3 mb-9 flex-wrap">
+              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider whitespace-nowrap">
+                {t("pub_offers.filter_for")}
+              </p>
+              <div className="flex gap-2 flex-wrap">
                 {[
                   { key: "", label: t("pub_offers.filter_everyone") },
                   { key: "female", label: t("pub_offers.filter_ladies") },
@@ -358,10 +594,10 @@ export function PubOffers() {
                     key={opt.key || "all"}
                     type="button"
                     onClick={() => setDealGenderFilter(opt.key === dealGenderFilter ? "" : opt.key)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    className={`px-4 py-1.5 rounded-full text-[11px] font-semibold border transition-all duration-200 ${
                       dealGenderFilter === opt.key
-                        ? "bg-primary/20 border-primary text-primary"
-                        : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
+                        ? "bg-primary/15 border-primary/50 text-primary shadow-[0_0_16px_rgba(220,38,38,0.15)]"
+                        : "border-white/[0.08] text-white/35 hover:border-white/20 hover:text-white/55"
                     }`}
                   >
                     {opt.label}
@@ -370,94 +606,67 @@ export function PubOffers() {
               </div>
             </div>
 
-            {filteredDeals.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4">No deals match these filters.</p>
+            {freeVendors.length === 0 && ticketVendors.length === 0 ? (
+              <p className="text-sm text-white/30 py-4">No deals match these filters.</p>
             ) : (
-              <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-3 lg:grid-cols-4 md:overflow-visible">
-                {filteredDeals.map((offer: VendorDrinkOffer) => (
-                  <Link
-                    key={offer.vendorId}
-                    href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
-                    className="snap-start flex-shrink-0 md:flex-shrink"
-                  >
-                    <div className="rounded-2xl w-64 md:w-auto flex flex-col group cursor-pointer border border-white/10 hover:border-primary/30 bg-zinc-900/90 transition-all duration-300 hover:shadow-[0_0_20px_rgba(220,38,38,0.12)] overflow-hidden h-full">
-                      {/* Venue header */}
-                      <div className="px-4 pt-4 pb-3 flex items-start gap-2.5 border-b border-white/[0.07]">
-                        <span className="flex-shrink-0 h-8 w-8 rounded-xl bg-primary/15 flex items-center justify-center mt-0.5">
-                          <GlassWater className="h-3.5 w-3.5 text-primary" />
-                        </span>
-                        <div className="min-w-0">
-                          <h3 className="font-serif text-base leading-snug tracking-tight text-white line-clamp-2">
-                            {offer.vendorName}
-                          </h3>
-                          <p className="text-[9px] text-white/35 uppercase tracking-wider mt-0.5">{t("pub_offers.drink_deals")}</p>
+              <div className="space-y-14">
+
+                {/* ── Part 1: Free Drinks ── */}
+                {freeVendors.length > 0 && (
+                  <div>
+                    {/* Subsection label */}
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                          <Wine className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-primary/50 uppercase tracking-[0.25em] font-bold leading-none">Section 01</p>
+                          <h3 className="text-sm font-bold text-white/90 tracking-tight leading-tight mt-0.5">Free Drinks</h3>
                         </div>
                       </div>
-                      {/* Plan rows */}
-                      <div className="px-3.5 pb-3.5 pt-3 flex flex-col gap-2 flex-1">
-                        {offer.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
-                          const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
-                          const showTime = plan.timeFrom && plan.timeTo;
-                          return (
-                            <div key={i} className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span
-                                  className={`flex-shrink-0 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border whitespace-nowrap ${
-                                    DEAL_TYPE_COLORS[plan.type as keyof typeof DEAL_TYPE_COLORS] ??
-                                    "bg-white/10 text-white/60 border-white/15"
-                                  }`}
-                                >
-                                  {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
-                                </span>
-                                <span className="text-xs text-white/65 flex-1 leading-snug truncate">
-                                  {getPlanLabel(plan)}
-                                </span>
-                                <span
-                                  className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                                    plan.gender === "female"
-                                      ? "bg-rose-500/20 text-rose-300"
-                                      : "bg-primary/20 text-primary"
-                                  }`}
-                                >
-                                  {plan.gender === "female" ? t("pub_offers.gender_ladies") : t("pub_offers.gender_all")}
-                                </span>
-                              </div>
-                              {(showDays || showTime) && (
-                                <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                                  {showDays && plan.days!.map((d) => (
-                                    <span key={d} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
-                                      {d.slice(0, 3)}
-                                    </span>
-                                  ))}
-                                  {showTime && (
-                                    <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
-                                      <Clock className="h-2.5 w-2.5 shrink-0" />
-                                      {plan.timeFrom}–{plan.timeTo}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              {plan.description && (
-                                <p className="text-[8px] text-white/30 italic truncate">{plan.description}</p>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {offer.plans.length > 3 && (
-                          <span className="text-[10px] text-white/40">
-                            +{offer.plans.length - 3} more
-                          </span>
-                        )}
-                        <div className="rounded-lg bg-primary/10 border border-primary/25 px-3 py-1.5 flex items-center justify-between group-hover:bg-primary/20 transition-colors mt-auto">
-                          <span className="text-xs font-semibold text-primary">
-                            {offer.pubEventId ? t("pub_offers.book_now") : t("pub_offers.view_venue")}
-                          </span>
-                          <ArrowRight className="h-3 w-3 text-primary" />
-                        </div>
-                      </div>
+                      <div className="flex-1 h-px bg-gradient-to-r from-primary/15 to-transparent" />
+                      <span className="text-[10px] text-white/20 font-mono tabular-nums">
+                        {freeVendors.length} {freeVendors.length === 1 ? "venue" : "venues"}
+                      </span>
                     </div>
-                  </Link>
-                ))}
+
+                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
+                      {freeVendors.map((v) => (
+                        <FreeDrinkCard key={v.offer.vendorId} offer={v.offer} plans={v.plans} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Part 2: Included With Ticket ── */}
+                {ticketVendors.length > 0 && (
+                  <div>
+                    {/* Subsection label */}
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                          <Ticket className="h-3.5 w-3.5 text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-amber-400/50 uppercase tracking-[0.25em] font-bold leading-none">Section 02</p>
+                          <h3 className="text-sm font-bold text-white/90 tracking-tight leading-tight mt-0.5">Included With Ticket</h3>
+                        </div>
+                      </div>
+                      <div className="flex-1 h-px bg-gradient-to-r from-amber-500/15 to-transparent" />
+                      <span className="text-[10px] text-white/20 font-mono tabular-nums">
+                        {ticketVendors.length} {ticketVendors.length === 1 ? "venue" : "venues"}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
+                      {ticketVendors.map((v) => (
+                        <TicketCard key={v.offer.vendorId} offer={v.offer} plans={v.plans} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </section>
@@ -477,7 +686,6 @@ export function PubOffers() {
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          {/* Filters */}
           <div className="mb-4 space-y-3">
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Genre</p>
@@ -528,7 +736,6 @@ export function PubOffers() {
               {filteredAnnouncements.map((a) => {
                 const cardInner = (
                   <div className="rounded-2xl border border-amber-400/15 bg-zinc-900/90 hover:bg-zinc-800/80 transition-colors w-[300px] sm:w-[320px] flex flex-col overflow-hidden h-full group">
-                    {/* Image area */}
                     <div className="relative h-40 flex-shrink-0 bg-zinc-800 overflow-hidden">
                       {a.imageUrl ? (
                         <img
@@ -549,7 +756,6 @@ export function PubOffers() {
                         </span>
                       </div>
                     </div>
-                    {/* Text body */}
                     <div className="p-5 flex flex-col gap-2.5 flex-1">
                       <h3 className="font-serif text-xl leading-snug tracking-tight text-white">{a.title}</h3>
                       {a.body && (

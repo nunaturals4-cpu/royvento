@@ -11,6 +11,7 @@ import {
   vendorCommissionsTable,
   commissionLedgerTable,
   vendorRequestsTable,
+  vendorManagersTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
@@ -896,6 +897,47 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
   await db
     .delete(vendorRequestsTable)
     .where(eq(vendorRequestsTable.userId, target.userId));
+  res.json({ ok: true });
+});
+
+// ── Admin: vendor managers ────────────────────────────────────────────────────
+
+router.get("/admin/vendors/:id/managers", requireAuth(["admin"]), async (req, res) => {
+  const vendorId = Number(req.params["id"]);
+  if (!Number.isFinite(vendorId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const rows = await db.select().from(vendorManagersTable).where(eq(vendorManagersTable.vendorId, vendorId));
+
+  const managerIds = rows.map((r) => r.managerId).filter((id): id is number => id != null);
+  const inviterIds = [...new Set(rows.map((r) => r.invitedBy))];
+  const allUserIds = [...new Set([...managerIds, ...inviterIds])];
+
+  const userRows = allUserIds.length > 0
+    ? await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, profileImage: usersTable.profileImage, phone: usersTable.phone })
+        .from(usersTable).where(inArray(usersTable.id, allUserIds))
+    : [];
+  const uMap = new Map(userRows.map((u) => [u.id, u]));
+
+  res.json(rows.map((r) => ({
+    id: r.id,
+    vendorId: r.vendorId,
+    invitedEmail: r.invitedEmail,
+    status: r.status,
+    createdAt: r.createdAt.toISOString(),
+    manager: r.managerId ? (uMap.get(r.managerId) ?? null) : null,
+    invitedBy: uMap.get(r.invitedBy) ?? null,
+  })));
+});
+
+router.delete("/admin/vendors/:id/managers/:managerId", requireAuth(["admin"]), async (req, res) => {
+  const vendorId = Number(req.params["id"]);
+  const managerId = Number(req.params["managerId"]);
+  if (!Number.isFinite(vendorId) || !Number.isFinite(managerId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  await db.delete(vendorManagersTable)
+    .where(and(eq(vendorManagersTable.vendorId, vendorId), eq(vendorManagersTable.id, managerId)));
   res.json({ ok: true });
 });
 
