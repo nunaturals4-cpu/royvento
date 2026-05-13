@@ -538,19 +538,35 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
 
   return (
     <div className="border-t border-white/10 pt-5 mt-2">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs uppercase tracking-wider text-amber-400/80 flex items-center gap-1.5">
-          <TicketIcon className="h-3.5 w-3.5" /> {t("bookings.your_ticket")}
+      {/* Header: label + action buttons */}
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <p className="text-xs uppercase tracking-wider text-amber-400/80 flex items-center gap-1.5 shrink-0">
+          <TicketIcon className="h-3.5 w-3.5" />
+          <span>{t("bookings.your_ticket")}</span>
         </p>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={shareTicket} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
-            <Share2 className="h-3.5 w-3.5" />Share
+        <div className="flex gap-1.5">
+          <Button
+            size="sm" variant="outline" onClick={shareTicket}
+            className="h-8 gap-1 px-2.5 sm:px-3 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40"
+          >
+            <Share2 className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">Share</span>
           </Button>
-          <Button size="sm" variant="outline" onClick={() => printTicket(window.open("about:blank", "_blank"))} className="gap-1.5 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40">
-            <Printer className="h-3.5 w-3.5" />{t("bookings.print")}
+          <Button
+            size="sm" variant="outline"
+            onClick={() => printTicket(window.open("about:blank", "_blank"))}
+            className="h-8 gap-1 px-2.5 sm:px-3 border-amber-400/20 text-amber-400/80 hover:text-amber-300 hover:border-amber-400/40"
+          >
+            <Printer className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">{t("bookings.print")}</span>
           </Button>
-          <Button size="sm" onClick={() => printTicket(window.open("about:blank", "_blank"))} className="gap-1.5 bg-gradient-to-br from-amber-600 to-amber-800 border-0 text-black font-semibold hover:from-amber-500 hover:to-amber-700">
-            <Download className="h-3.5 w-3.5" />{t("bookings.pdf")}
+          <Button
+            size="sm"
+            onClick={() => printTicket(window.open("about:blank", "_blank"))}
+            className="h-8 gap-1 px-2.5 sm:px-3 bg-gradient-to-br from-amber-600 to-amber-800 border-0 text-black font-semibold hover:from-amber-500 hover:to-amber-700"
+          >
+            <Download className="h-3.5 w-3.5 shrink-0" />
+            <span>{t("bookings.pdf")}</span>
           </Button>
         </div>
       </div>
@@ -565,12 +581,9 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         }}
       >
         {/* Watermark */}
-        <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
-          aria-hidden
-        >
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden" aria-hidden>
           <span
-            className="font-serif text-8xl tracking-[0.2em] whitespace-nowrap"
+            className="font-serif text-7xl sm:text-8xl tracking-[0.2em] whitespace-nowrap"
             style={{ color: "rgba(212,168,83,0.035)", transform: "rotate(-28deg) translateY(10%)" }}
           >
             ROYVENTO
@@ -578,13 +591,13 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         </div>
 
         {/* Corner ornaments */}
-        <svg className="absolute top-4 left-4 w-12 h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none">
+        <svg className="absolute top-3 left-3 sm:top-4 sm:left-4 w-9 h-9 sm:w-12 sm:h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none">
           <path d="M2 2 L18 2 L2 18 Z" stroke="#d4a853" strokeWidth="1" fill="none"/>
           <path d="M2 2 L8 2 L2 8 Z" fill="rgba(212,168,83,0.4)"/>
           <circle cx="24" cy="2" r="1.2" fill="#d4a853"/>
           <circle cx="2" cy="24" r="1.2" fill="#d4a853"/>
         </svg>
-        <svg className="absolute top-4 right-4 w-12 h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none" style={{ transform: "scaleX(-1)" }}>
+        <svg className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-12 sm:h-12 opacity-30" aria-hidden viewBox="0 0 48 48" fill="none" style={{ transform: "scaleX(-1)" }}>
           <path d="M2 2 L18 2 L2 18 Z" stroke="#d4a853" strokeWidth="1" fill="none"/>
           <path d="M2 2 L8 2 L2 8 Z" fill="rgba(212,168,83,0.4)"/>
           <circle cx="24" cy="2" r="1.2" fill="#d4a853"/>
@@ -592,13 +605,15 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         </svg>
 
         {/* Top section */}
-        <div className="relative z-10 px-7 pt-7 pb-6">
-          {/* Brand + ticket code row */}
-          <div className="flex justify-between items-center mb-5">
-            <span className="text-[10px] tracking-[0.55em] uppercase text-amber-400/55 font-medium">ROYVENTO</span>
+        <div className="relative z-10 px-4 sm:px-7 pt-5 sm:pt-7 pb-4 sm:pb-6">
+
+          {/* Brand + ticket code */}
+          <div className="flex justify-between items-center mb-4 sm:mb-5">
+            <span className="text-[9px] sm:text-[10px] tracking-[0.4em] sm:tracking-[0.55em] uppercase text-amber-400/55 font-medium">ROYVENTO</span>
             <span
-              className="text-[10px] font-mono tracking-[0.1em] px-2.5 py-1 rounded"
+              className="text-[8px] sm:text-[10px] font-mono px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded max-w-[52%] truncate"
               style={{
+                letterSpacing: "0.06em",
                 color: "rgba(212,168,83,0.7)",
                 background: "rgba(212,168,83,0.07)",
                 border: "1px solid rgba(212,168,83,0.2)",
@@ -608,76 +623,81 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
             </span>
           </div>
 
-          {/* Hero + QR */}
-          <div className="flex justify-between items-start gap-6">
-            <div className="flex-1 min-w-0">
-              <h2 className="font-serif text-2xl leading-tight" style={{ color: "#d4a853" }}>{b.vendorName}</h2>
-              <p className="text-base text-white/75 mt-1 font-light">{b.eventTitle}</p>
-              {b.eventCity && <p className="text-xs text-white/35 mt-0.5 tracking-wide">{b.eventCity}</p>}
+          {/* Venue name + event + city — full width on all sizes */}
+          <h2 className="font-serif text-xl sm:text-2xl leading-tight" style={{ color: "#d4a853" }}>{b.vendorName}</h2>
+          <p className="text-sm sm:text-base text-white/75 mt-1 font-light">{b.eventTitle}</p>
+          {b.eventCity && <p className="text-[11px] sm:text-xs text-white/35 mt-0.5 tracking-wide">{b.eventCity}</p>}
 
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4 mt-6">
-                <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
-                <TicketField label={t("bookings.date")} value={b.bookingDate} />
-                <TicketField
-                  label={t("bookings.tickets")}
-                  value={
-                    ticketBreakdownParts.length > 0 ? (
-                      <>
-                        {ticketBreakdownParts.join(" · ")}
-                        <span className="text-white/35 ml-1 text-xs">({total} {t("bookings.guests")})</span>
-                      </>
-                    ) : `${total} ${t("bookings.guests")}`
-                  }
-                />
-                <TicketField label={t("bookings.approved_by")} value={<span className="capitalize">{b.approvedBy || t("bookings.partner")}</span>} />
+          {/* QR code — mobile only, centered below venue info */}
+          <div className="flex justify-center mt-4 sm:hidden">
+            <div className="flex flex-col items-center gap-2">
+              <div className="p-2 rounded-xl" style={{ background: "#fff", border: "2px solid rgba(212,168,83,0.4)" }}>
+                <QRCodeSVG value={ticketCode} size={112} level="M" />
               </div>
+              <p className="text-[9px] font-mono tracking-wider text-center leading-tight" style={{ color: "rgba(212,168,83,0.5)", maxWidth: 120 }}>
+                {b.vendorName}
+              </p>
+            </div>
+          </div>
+
+          {/* Details grid + QR (desktop) */}
+          <div className="flex items-start gap-6 mt-4 sm:mt-6">
+            <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-3 sm:gap-y-4 flex-1 min-w-0">
+              <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
+              <TicketField label={t("bookings.date")} value={b.bookingDate} />
+              <TicketField
+                label={t("bookings.tickets")}
+                value={
+                  ticketBreakdownParts.length > 0 ? (
+                    <>
+                      {ticketBreakdownParts.join(" · ")}
+                      <span className="text-white/35 ml-1 text-xs">({total} {t("bookings.guests")})</span>
+                    </>
+                  ) : `${total} ${t("bookings.guests")}`
+                }
+              />
+              <TicketField label={t("bookings.approved_by")} value={<span className="capitalize">{b.approvedBy || t("bookings.partner")}</span>} />
             </div>
 
-            {/* QR code block */}
-            <div className="shrink-0 flex flex-col items-center gap-2">
-              <div
-                className="p-2.5 rounded-xl"
-                style={{ background: "#fff", border: "2px solid rgba(212,168,83,0.4)" }}
-              >
+            {/* QR — desktop only */}
+            <div className="hidden sm:flex flex-col items-center gap-2 shrink-0">
+              <div className="p-2.5 rounded-xl" style={{ background: "#fff", border: "2px solid rgba(212,168,83,0.4)" }}>
                 <QRCodeSVG value={ticketCode} size={120} level="M" />
               </div>
-              <p
-                className="text-[9px] font-mono tracking-wider text-center max-w-[132px] leading-tight"
-                style={{ color: "rgba(212,168,83,0.5)" }}
-              >
+              <p className="text-[9px] font-mono tracking-wider text-center max-w-[132px] leading-tight" style={{ color: "rgba(212,168,83,0.5)" }}>
                 {b.vendorName}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Perforated tear line with ticket code */}
+        {/* Perforated tear line */}
         <div className="relative z-10 flex items-center">
-          <div className="w-5 h-10 rounded-r-full shrink-0" style={{ background: "rgba(0,0,0,0.55)" }} />
-          <div className="relative flex-1 flex items-center justify-center" style={{ borderTop: "2px dashed rgba(212,168,83,0.22)", height: "2.5rem" }}>
+          <div className="w-4 sm:w-5 h-8 sm:h-10 rounded-r-full shrink-0" style={{ background: "rgba(0,0,0,0.55)" }} />
+          <div className="relative flex-1 flex items-center justify-center overflow-hidden" style={{ borderTop: "2px dashed rgba(212,168,83,0.22)", height: "2rem" }}>
             <span
-              className="absolute font-mono text-base tracking-[0.35em] px-4 py-0.5"
+              className="absolute font-mono text-[10px] sm:text-base px-2 sm:px-4 py-0.5 whitespace-nowrap"
               style={{
+                letterSpacing: "0.15em",
                 color: "#d4a853",
                 background: "linear-gradient(145deg, #14090f, #1e0e1a)",
-                letterSpacing: "0.35em",
               }}
             >
               {ticketCode}
             </span>
           </div>
-          <div className="w-5 h-10 rounded-l-full shrink-0" style={{ background: "rgba(0,0,0,0.55)" }} />
+          <div className="w-4 sm:w-5 h-8 sm:h-10 rounded-l-full shrink-0" style={{ background: "rgba(0,0,0,0.55)" }} />
         </div>
 
-        {/* Footer section */}
-        <div className="relative z-10 flex justify-between items-center px-7 py-5">
+        {/* Footer */}
+        <div className="relative z-10 flex justify-between items-center px-4 sm:px-7 py-4 sm:py-5 gap-3">
           {hideAmountPaid ? <div /> : (
             <div>
               <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>{amountLabel}</p>
-              <p className="font-serif text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
+              <p className="font-serif text-xl sm:text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
             </div>
           )}
-          <p className="text-[10px] text-right leading-relaxed max-w-44" style={{ color: "rgba(255,255,255,0.25)" }}>
+          <p className="text-[9px] text-right leading-relaxed" style={{ color: "rgba(255,255,255,0.25)", maxWidth: 140 }}>
             Present this ticket at the entrance.<br />Non-transferable · Royvento
           </p>
         </div>
