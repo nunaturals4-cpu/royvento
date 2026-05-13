@@ -3701,12 +3701,15 @@ interface CommissionVendorRow {
   freeEntryCount: number;
   freeEntryRevenue: number;
   freeEntryCommission: number;
+  freeEntryPeople: number;
   ticketCount: number;
   ticketRevenue: number;
   ticketCommission: number;
+  ticketPeople: number;
   tableCount: number;
   tableRevenue: number;
   tableCommission: number;
+  tablePeople: number;
   bookings: CommissionBookingLine[];
 }
 
@@ -4011,6 +4014,7 @@ function CommissionsAdmin() {
                                   <tr>
                                     <th className="text-left py-1 pr-3">Type</th>
                                     <th className="text-right py-1 px-2">Count</th>
+                                    <th className="text-right py-1 px-2">No of People</th>
                                     <th className="text-right py-1 px-2">Gross</th>
                                     <th className="text-right py-1 px-2">Rate</th>
                                     <th className="text-right py-1 pl-2">Commission</th>
@@ -4021,8 +4025,9 @@ function CommissionsAdmin() {
                                     <tr className="border-t border-white/5">
                                       <td className="py-1.5 pr-3">Free Entry</td>
                                       <td className="text-right px-2">{row.freeEntryCount}</td>
+                                      <td className="text-right px-2">{row.freeEntryPeople ?? 0}</td>
                                       <td className="text-right px-2">{formatINR(row.freeEntryRevenue)}</td>
-                                      <td className="text-right px-2">â‚¹{row.appliedRates.freeEntryRate}/person</td>
+                                      <td className="text-right px-2">₹{row.appliedRates.freeEntryRate}/person</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.freeEntryCommission)}</td>
                                     </tr>
                                   )}
@@ -4030,8 +4035,9 @@ function CommissionsAdmin() {
                                     <tr className="border-t border-white/5">
                                       <td className="py-1.5 pr-3">Ticket</td>
                                       <td className="text-right px-2">{row.ticketCount}</td>
+                                      <td className="text-right px-2">{row.ticketPeople ?? 0}</td>
                                       <td className="text-right px-2">{formatINR(row.ticketRevenue)}</td>
-                                      <td className="text-right px-2">â‚¹{row.appliedRates.ticketRate}/ticket</td>
+                                      <td className="text-right px-2">₹{row.appliedRates.ticketRate}/ticket</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.ticketCommission)}</td>
                                     </tr>
                                   )}
@@ -4039,8 +4045,9 @@ function CommissionsAdmin() {
                                     <tr className="border-t border-white/5">
                                       <td className="py-1.5 pr-3">Table Booking</td>
                                       <td className="text-right px-2">{row.tableCount}</td>
+                                      <td className="text-right px-2">{row.tablePeople ?? 0}</td>
                                       <td className="text-right px-2">{formatINR(row.tableRevenue)}</td>
-                                      <td className="text-right px-2">â‚¹{row.appliedRates.tableBookingRate}/booking</td>
+                                      <td className="text-right px-2">₹{row.appliedRates.tableBookingRate}/booking</td>
                                       <td className="text-right pl-2 text-primary">{formatINR(row.tableCommission)}</td>
                                     </tr>
                                   )}

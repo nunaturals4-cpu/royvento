@@ -3210,6 +3210,7 @@ interface AnalyticsTypeSummary {
   grossRevenue: number;
   commissionAmount: number;
   netRevenue: number;
+  peopleCount?: number;
 }
 
 interface AnalyticsData {
@@ -3609,6 +3610,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
                       <tr>
                         <th className="text-left py-2 pr-4">Type</th>
                         <th className="text-right py-2 px-2">Bookings</th>
+                        <th className="text-right py-2 px-2">No of People</th>
                         <th className="text-right py-2 px-2">Gross</th>
                         <th className="text-right py-2 px-2">Commission</th>
                         <th className="text-right py-2 pl-2">Net</th>
@@ -3621,6 +3623,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
                           <tr key={key} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                             <td className="py-3 pr-4 font-medium">{label}</td>
                             <td className="text-right px-2 tabular-nums">{row.count}</td>
+                            <td className="text-right px-2 tabular-nums">{row.peopleCount ?? 0}</td>
                             <td className="text-right px-2 tabular-nums">{formatINR(row.grossRevenue)}</td>
                             <td className="text-right px-2 tabular-nums text-red-400">−{formatINR(row.commissionAmount)}</td>
                             <td className="text-right pl-2 tabular-nums text-emerald-300 font-medium">{formatINR(row.netRevenue)}</td>
@@ -3633,6 +3636,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
                         <tr>
                           <td className="py-2 pr-4 font-semibold text-foreground">Total</td>
                           <td className="text-right px-2 font-semibold tabular-nums">{active.reduce((s, t) => s + cs[t.key].count, 0)}</td>
+                          <td className="text-right px-2 font-semibold tabular-nums">{active.reduce((s, t) => s + (cs[t.key].peopleCount ?? 0), 0)}</td>
                           <td className="text-right px-2 font-semibold tabular-nums">{formatINR(active.reduce((s, t) => s + cs[t.key].grossRevenue, 0))}</td>
                           <td className="text-right px-2 text-red-400 font-semibold tabular-nums">−{formatINR(active.reduce((s, t) => s + cs[t.key].commissionAmount, 0))}</td>
                           <td className="text-right pl-2 text-emerald-300 font-semibold tabular-nums">{formatINR(active.reduce((s, t) => s + cs[t.key].netRevenue, 0))}</td>

@@ -842,15 +842,16 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   function calcCommSplit(b: { eventId: number; bookingDate: string; pubMode: string; guests: number; ticketWomen: number; ticketMen: number; ticketCouple: number; finalPrice: string }, grossRev: number) {
     const fp = Number(b.finalPrice);
     const out = {
-      freeEntry: { count: 0, comm: 0, gross: 0 },
-      ticket:    { count: 0, comm: 0, gross: 0 },
-      table:     { count: 0, comm: 0, gross: 0 },
+      freeEntry: { count: 0, comm: 0, gross: 0, people: 0 },
+      ticket:    { count: 0, comm: 0, gross: 0, people: 0 },
+      table:     { count: 0, comm: 0, gross: 0, people: 0 },
     };
     if (b.pubMode === "table") {
       const guests = Math.max(0, b.guests);
       out.table.count = 1;
       out.table.comm = Math.min(commTableFee * guests, fp);
       out.table.gross = grossRev;
+      out.table.people = guests;
       return out;
     }
     if (b.pubMode !== "ticket") {
@@ -863,10 +864,13 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
         const headCount = ticketTotal > 0 ? ticketTotal : Math.max(0, b.guests);
         out.freeEntry.comm = commFreeEntryFee * headCount;
         out.freeEntry.gross = grossRev;
+        out.freeEntry.people = headCount;
       } else {
+        const eventGuests = Math.max(0, b.guests);
         out.ticket.count = 1;
-        out.ticket.comm = Math.min(commTicketFee * Math.max(0, b.guests), fp);
+        out.ticket.comm = Math.min(commTicketFee * eventGuests, fp);
         out.ticket.gross = grossRev;
+        out.ticket.people = eventGuests;
       }
       return out;
     }
@@ -896,8 +900,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     } else {
       out.ticket.count = 1;
     }
-    if (freeUnits > 0) { out.freeEntry.comm = cFree; out.freeEntry.gross = gFree; }
-    if (paidUnits > 0) { out.ticket.comm = cPaid; out.ticket.gross = gPaid; }
+    if (freeUnits > 0) { out.freeEntry.comm = cFree; out.freeEntry.gross = gFree; out.freeEntry.people = freeUnits; }
+    if (paidUnits > 0) { out.ticket.comm = cPaid; out.ticket.gross = gPaid; out.ticket.people = paidUnits; }
     return out;
   }
 
@@ -918,9 +922,9 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let codCommission = 0;
   let onlineCommission = 0;
   const commSummary = {
-    freeEntry: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
-    ticket: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
-    table: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0 },
+    freeEntry: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    ticket: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    table: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
   };
 
   // Per-booking effective revenue: online → finalPrice; COD → actual cash collected (₹0 if not recorded).
@@ -982,6 +986,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       commSummary[k].count += split[k].count;
       commSummary[k].grossRevenue += split[k].gross;
       commSummary[k].commissionAmount += split[k].comm;
+      commSummary[k].peopleCount += split[k].people;
     }
   }
   // Compute net per type
@@ -1080,9 +1085,9 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       tableBookingRate: commRow?.tableBookingRate ?? "0",
     },
     commissionSummary: {
-      freeEntry: { count: commSummary.freeEntry.count, grossRevenue: Math.round(commSummary.freeEntry.grossRevenue), commissionAmount: rnd2(commSummary.freeEntry.commissionAmount), netRevenue: Math.round(commSummary.freeEntry.netRevenue) },
-      ticket: { count: commSummary.ticket.count, grossRevenue: Math.round(commSummary.ticket.grossRevenue), commissionAmount: rnd2(commSummary.ticket.commissionAmount), netRevenue: Math.round(commSummary.ticket.netRevenue) },
-      table: { count: commSummary.table.count, grossRevenue: Math.round(commSummary.table.grossRevenue), commissionAmount: rnd2(commSummary.table.commissionAmount), netRevenue: Math.round(commSummary.table.netRevenue) },
+      freeEntry: { count: commSummary.freeEntry.count, grossRevenue: Math.round(commSummary.freeEntry.grossRevenue), commissionAmount: rnd2(commSummary.freeEntry.commissionAmount), netRevenue: Math.round(commSummary.freeEntry.netRevenue), peopleCount: commSummary.freeEntry.peopleCount },
+      ticket: { count: commSummary.ticket.count, grossRevenue: Math.round(commSummary.ticket.grossRevenue), commissionAmount: rnd2(commSummary.ticket.commissionAmount), netRevenue: Math.round(commSummary.ticket.netRevenue), peopleCount: commSummary.ticket.peopleCount },
+      table: { count: commSummary.table.count, grossRevenue: Math.round(commSummary.table.grossRevenue), commissionAmount: rnd2(commSummary.table.commissionAmount), netRevenue: Math.round(commSummary.table.netRevenue), peopleCount: commSummary.table.peopleCount },
     },
     perEvent: perEventArr,
     dailyRevenue,

@@ -2021,12 +2021,15 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     freeEntryCount: number;
     freeEntryRevenue: number;
     freeEntryCommission: number;
+    freeEntryPeople: number;
     ticketCount: number;
     ticketRevenue: number;
     ticketCommission: number;
+    ticketPeople: number;
     tableCount: number;
     tableRevenue: number;
     tableCommission: number;
+    tablePeople: number;
     bookings: BookingLineItem[];
   };
 
@@ -2052,12 +2055,15 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       freeEntryCount: 0,
       freeEntryRevenue: 0,
       freeEntryCommission: 0,
+      freeEntryPeople: 0,
       ticketCount: 0,
       ticketRevenue: 0,
       ticketCommission: 0,
+      ticketPeople: 0,
       tableCount: 0,
       tableRevenue: 0,
       tableCommission: 0,
+      tablePeople: 0,
       bookings: [],
     });
   }
@@ -2105,14 +2111,17 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       s.freeEntryCount += 1;
       s.freeEntryRevenue += price;
       s.freeEntryCommission += commissionAmount;
+      s.freeEntryPeople += unitCount;
     } else if (bookingType === "ticket") {
       s.ticketCount += 1;
       s.ticketRevenue += price;
       s.ticketCommission += commissionAmount;
+      s.ticketPeople += unitCount;
     } else {
       s.tableCount += 1;
       s.tableRevenue += price;
       s.tableCommission += commissionAmount;
+      s.tablePeople += unitCount;
     }
   }
 
