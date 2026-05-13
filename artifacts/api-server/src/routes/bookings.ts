@@ -19,6 +19,7 @@ import {
   computeCommissionFromPlanned,
   computeCommissionFromActuals,
   classifyBookingType,
+  REALISED_COMMISSION_TRIGGERS,
 } from "../lib/commission";
 import { sendExpoPushToUser } from "../lib/expoPush";
 import { createUserNotification } from "../lib/notify";
@@ -924,6 +925,31 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const { byBookingId: revenueByBookingId, actualCodRevenue, actualCodRecordedCount, pendingActualsCount } =
     await computeEffectiveRevenues(allBookings);
 
+  // Fetch realised commission amounts from the ledger. For bookings that have
+  // already been checked in or paid online the ledger entry is the source of
+  // truth; calcCommSplit() is only used as a fallback for bookings not yet
+  // realised (e.g. a COD booking awaiting check-in).
+  const allBookingIds = allBookings.map((b) => b.id);
+  const ledgerEntries = allBookingIds.length > 0
+    ? await db
+        .select({ bookingId: commissionLedgerTable.bookingId, amount: commissionLedgerTable.amount })
+        .from(commissionLedgerTable)
+        .where(
+          and(
+            inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
+            inArray(commissionLedgerTable.bookingId, allBookingIds),
+          ),
+        )
+    : [];
+  const ledgerAmtByBookingId = new Map<number, number>();
+  for (const row of ledgerEntries) {
+    if (row.bookingId != null) {
+      ledgerAmtByBookingId.set(row.bookingId, (ledgerAmtByBookingId.get(row.bookingId) ?? 0) + Number(row.amount ?? 0));
+    }
+  }
+
+  const splitCache = new Map<number, ReturnType<typeof calcCommSplit>>();
+
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
     const isCod = b.paymentMethod === "cod";
@@ -934,9 +960,10 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     totalEarnings += bookingRevenue;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
 
-    // Commission is computed on booked finalPrice (per task spec — unchanged).
+    // Commission: use ledger amount when realised; fall back to planned split.
     const split = calcCommSplit(b, bookingRevenue);
-    const comm = commTotal(split);
+    splitCache.set(b.id, split);
+    const comm = ledgerAmtByBookingId.get(b.id) ?? commTotal(split);
     totalCommission += comm;
     if (isCod) codCommission += comm;
     else onlineCommission += comm;
@@ -1007,7 +1034,9 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     const rev = revenueByBookingId.get(b.id) ?? 0;
     if (dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
-      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + commTotal(calcCommSplit(b, rev)));
+      const cachedSplit = splitCache.get(b.id);
+      const dayComm = ledgerAmtByBookingId.get(b.id) ?? (cachedSplit ? commTotal(cachedSplit) : 0);
+      dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + dayComm);
     }
   }
   const dailyRevenue = Array.from(dailyMap.entries())

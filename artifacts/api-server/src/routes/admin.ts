@@ -1918,7 +1918,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     ...(to ? [lte(bookingsTable.createdAt, to)] : []),
   ];
 
-  const [bookings, commissions, approvedVendors, ledgerRows] = await Promise.all([
+  const [bookings, commissions, approvedVendors] = await Promise.all([
     db
       .select({
         id: bookingsTable.id,
@@ -1941,26 +1941,26 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city })
       .from(vendorsTable)
       .where(eq(vendorsTable.status, "approved")),
-    // Per-booking ledger entries (online_payment, cod_checkin, free_checkin)
-    // are the source of truth for "collected" commission. settlement_offset
-    // entries are excluded — they record realisation against vendor balance,
-    // not new commission earned. The from/to window MUST match the bookings
-    // window so collected/pending totals are consistent with the report period.
-    db
-      .select({
-        vendorId: commissionLedgerTable.vendorId,
-        bookingId: commissionLedgerTable.bookingId,
-        amount: commissionLedgerTable.amount,
-      })
-      .from(commissionLedgerTable)
-      .where(
-        and(
-          inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
-          ...(from ? [gte(commissionLedgerTable.createdAt, from)] : []),
-          ...(to ? [lte(commissionLedgerTable.createdAt, to)] : []),
-        ),
-      ),
   ]);
+  // Fetch ledger entries for exactly these bookings — filtering by bookingId
+  // (not by createdAt) means a booking created in December that gets scanned
+  // in January is correctly shown as "collected" in the December report.
+  const bookingIds = bookings.map((b) => b.id);
+  const ledgerRows = bookingIds.length > 0
+    ? await db
+        .select({
+          vendorId: commissionLedgerTable.vendorId,
+          bookingId: commissionLedgerTable.bookingId,
+          amount: commissionLedgerTable.amount,
+        })
+        .from(commissionLedgerTable)
+        .where(
+          and(
+            inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
+            inArray(commissionLedgerTable.bookingId, bookingIds),
+          ),
+        )
+    : [];
 
   const commissionMap = new Map(commissions.map((c) => [c.vendorId, c]));
 

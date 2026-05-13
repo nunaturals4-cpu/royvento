@@ -46,7 +46,7 @@ import {
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
-  Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation,
+  Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -3729,6 +3729,7 @@ function CommissionsAdmin() {
   const [reportTo, setReportTo] = useState("");
   const [report, setReport] = useState<CommissionReport | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [reportLastUpdated, setReportLastUpdated] = useState<Date | null>(null);
   const [expandedVendors, setExpandedVendors] = useState<Set<number>>(new Set());
 
   const loadRates = async () => {
@@ -3756,6 +3757,7 @@ function CommissionsAdmin() {
       if (reportTo) qs.set("to", reportTo);
       const data = await apiGet<CommissionReport>(`/api/admin/commission-report${qs.toString() ? `?${qs}` : ""}`);
       setReport(data);
+      setReportLastUpdated(new Date());
     } catch (e: any) {
       toast({ title: "Failed to load report", description: e?.message, variant: "destructive" });
     } finally {
@@ -3937,6 +3939,15 @@ function CommissionsAdmin() {
           {(reportFrom || reportTo) && (
             <Button variant="outline" size="sm" onClick={() => { setReportFrom(""); setReportTo(""); }}>Clear dates</Button>
           )}
+          <div className="ml-auto flex items-center gap-3">
+            {reportLastUpdated && (
+              <p className="text-xs text-muted-foreground">Updated {reportLastUpdated.toLocaleTimeString()}</p>
+            )}
+            <Button variant="outline" size="sm" onClick={loadReport} disabled={reportLoading}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${reportLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {reportLoading ? (

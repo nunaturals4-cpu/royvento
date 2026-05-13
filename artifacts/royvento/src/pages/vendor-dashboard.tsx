@@ -28,7 +28,7 @@ import {
   Trash2, Calendar as CalIcon, Image as ImageIcon, Video,
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck, Check,
-  Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent,
+  Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent, RefreshCw,
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -3259,6 +3259,7 @@ function toAnalyticsDateStr(d: Date) {
 function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [preset, setPreset] = useState<AnalyticsPreset>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -3281,7 +3282,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
     if (to) qs.set("to", to);
     const qStr = qs.toString();
     apiGet<AnalyticsData>(`/api/partner/analytics${qStr ? `?${qStr}` : ""}`)
-      .then(setData)
+      .then((d) => { setData(d); setLastUpdated(new Date()); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }
@@ -3310,7 +3311,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
     <div className="space-y-6">
       {/* Time-range filter */}
       <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-3">
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Time range</p>
           <div className="flex flex-wrap gap-2">
             {(["today", "7d", "30d", "3m", "6m", "custom"] as AnalyticsPreset[]).map((p) => (
@@ -3336,6 +3337,19 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
             </div>
           </div>
         )}
+        <div className="flex items-center gap-3 ml-auto">
+          {lastUpdated && (
+            <p className="text-xs text-muted-foreground hidden sm:block">Updated {lastUpdated.toLocaleTimeString()}</p>
+          )}
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Earnings summary cards */}
