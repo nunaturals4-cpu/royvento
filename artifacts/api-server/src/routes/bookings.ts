@@ -857,7 +857,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       // event-mode / legacy: bucket by whole-day-free vs paid
       if (fp === 0 || b.pubMode === "free") {
         out.freeEntry.count = 1;
-        out.freeEntry.comm = Math.min(commFreeEntryFee * Math.max(0, b.guests), fp);
+        // Free-entry platform fee is a vendor charge — no cap at finalPrice=0.
+        // Ticket-mode free-entry stores counts in ticketWomen/Men/Couple.
+        const ticketTotal = b.ticketWomen + b.ticketMen + b.ticketCouple;
+        const headCount = ticketTotal > 0 ? ticketTotal : Math.max(0, b.guests);
+        out.freeEntry.comm = commFreeEntryFee * headCount;
         out.freeEntry.gross = grossRev;
       } else {
         out.ticket.count = 1;
@@ -877,12 +881,10 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     const paidUnits = totalUnits - freeUnits;
     const rawFree = commFreeEntryFee * freeUnits;
     const rawPaid = commTicketFee * paidUnits;
-    const rawTotal = rawFree + rawPaid;
-    let cFree = rawFree, cPaid = rawPaid;
-    if (rawTotal > fp && rawTotal > 0) {
-      cFree = (rawFree / rawTotal) * fp;
-      cPaid = (rawPaid / rawTotal) * fp;
-    }
+    // Free-tier commission: no cap — vendor charge regardless of customer payment.
+    // Paid-tier commission: capped at the revenue actually collected for paid entries.
+    const cFree = rawFree;
+    const cPaid = paidUnits > 0 ? Math.min(rawPaid, Math.max(0, fp)) : 0;
     const gFree = totalUnits > 0 ? grossRev * (freeUnits / totalUnits) : 0;
     const gPaid = grossRev - gFree;
     // Booking is counted once in its primary bucket so per-bucket counts still

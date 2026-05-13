@@ -111,7 +111,10 @@ export function computeCommissionFromPlanned(
     raw = tableFee * unitCount;
   } else if (bookingType === "free_entry") {
     ratePerUnit = freeEntryFee;
-    unitCount = Math.max(0, b.guests);
+    // Ticket-mode bookings that end up free (all tiers free on an FER day) store
+    // counts in ticketWomen/Men/Couple, not guests. Use ticket counts when present.
+    const ticketTotal = Math.max(0, b.ticketWomen + b.ticketMen + b.ticketCouple);
+    unitCount = ticketTotal > 0 ? ticketTotal : Math.max(0, b.guests);
     raw = freeEntryFee * unitCount;
   } else {
     // ticket mode. On a partial-FER day, free tiers are billed at freeEntryFee
@@ -133,8 +136,11 @@ export function computeCommissionFromPlanned(
       raw = ticketFee * totalUnits;
     }
   }
-  // Online payments are always capped at the price actually collected.
-  const amount = round2(Math.min(raw, price));
+  // Paid bookings: cap commission at the price actually collected so the platform
+  // never earns more than the customer paid.
+  // Free-entry bookings: the platform fee is a per-head VENDOR charge — the
+  // customer pays nothing, so there is no revenue to cap against. Never cap it.
+  const amount = bookingType === "free_entry" ? round2(raw) : round2(Math.min(raw, price));
   return { bookingType, ratePerUnit, unitCount, amount };
 }
 
