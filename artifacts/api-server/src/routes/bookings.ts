@@ -744,32 +744,30 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     totalEarnings += bookingRevenue;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
 
-    // Matches Admin Panel → Commission Report:
-    //   • The reported commission AMOUNT always comes from the deterministic
-    //     People × Rate calculation (computeCommissionFromPlanned).
-    //   • The commission_ledger is ONLY used as a realisation marker — it
-    //     decides "collected" vs "pending", not the amount itself.
-    //   • Same booking is never counted twice: each booking contributes its
-    //     commission to exactly one of collected/pending and one type bucket.
-    const split = calcCommSplit(b, bookingRevenue);
+    const isCollected = ledgerAmtByBookingId.has(b.id);
+
+    // GROSS rule: the actual money received from a scanned booking is its
+    // finalPrice (the customer paid this at the door for COD, or already
+    // paid online). Use it for the per-type gross when the booking is
+    // collected (has a commission_ledger entry from successful QR scan).
+    // For commission math we still pass the conservative bookingRevenue
+    // (actuals-aware) so it stays consistent with the rest of the report.
+    const grossForBuckets = isCollected ? fp : 0;
+    const split = calcCommSplit(b, grossForBuckets);
     splitCache.set(b.id, split);
     const commissionAmount = commTotal(split);
-    const isCollected = ledgerAmtByBookingId.has(b.id);
     totalCommission += commissionAmount;
     if (isCollected) collectedCommission += commissionAmount;
     else pendingCommission += commissionAmount;
     if (isCod) codCommission += commissionAmount;
     else onlineCommission += commissionAmount;
     // Per-booking-type breakdown — each booking falls into a single bucket
-    // (free_entry / ticket / table). Sum of bucket commissions === totalCommission.
-    //
-    // GROSS rule: only count revenue for bookings that have been QR-scanned
-    // (i.e., have a commission_ledger entry — `isCollected`). This makes
-    // "GROSS" reflect the actual amount received from scanned bookings,
-    // matching the Pub Manager / Pub Owner check-in flow.
+    // (free_entry / ticket / table). GROSS = finalPrice for scanned bookings,
+    // ₹0 for pending. Commission AMOUNT is deterministic (People × Rate)
+    // and matches the Admin Panel → Commission Report.
     for (const k of ["freeEntry", "ticket", "table"] as const) {
       commSummary[k].count += split[k].count;
-      commSummary[k].grossRevenue += isCollected ? split[k].gross : 0;
+      commSummary[k].grossRevenue += split[k].gross;
       commSummary[k].commissionAmount += rnd2(split[k].comm);
       commSummary[k].peopleCount += split[k].people;
     }
