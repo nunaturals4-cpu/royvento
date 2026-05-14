@@ -230,11 +230,18 @@ async function ensureDemoEvents(vendorId: number) {
 
 async function main() {
   await ensureAdmin();
-  const vendor = await ensureDemoPartner();
-  await ensureDemoEvents(vendor.id);
+  // Demo partner ("Royvento Studio") and its DEMO_PUBS listings are intentionally
+  // NOT seeded — production tenants should not have placeholder vendors leaking
+  // into the Commission tab. The helpers are retained below for ad-hoc local
+  // demos but are not wired into the default seed.
   logger.info("Seed complete.");
   process.exit(0);
 }
+
+// Suppress "unused" warnings for the demo helpers; they are kept as a
+// reference for spinning up local demo data on demand.
+void ensureDemoPartner;
+void ensureDemoEvents;
 
 main().catch((err) => {
   logger.error(err);

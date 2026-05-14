@@ -1,17 +1,28 @@
 /**
  * Shared commission calculator. Single source of truth for the per-booking
- * commission math used by the online-payment success path, the COD/free-entry
- * check-in path, and the admin commission report.
+ * commission math used by online-payment, the COD/free-entry check-in path,
+ * and the admin commission report.
  *
- * Industry-standard rule set: commission = unitCount × rate, deterministic.
- * No FER-tier discount, no price cap, no actuals haircut. Actuals are an
- * attendance log; they do NOT change the per-booking commission. This makes
- * the report match the rate card and gives vendors a predictable per-booking
- * fee they can audit.
+ * Per-tier mixed-booking model:
  *
- *   Free Entry  → number of people × freeEntryRate
- *   Ticket      → number of tickets × ticketRate
- *   Table       → number of guests  × tableBookingRate
+ *   Free Entry classification (price = 0 or pubMode = "free")
+ *     commission = freeEntryRate × people   (couple counts as 2 people)
+ *
+ *   Ticket classification (price > 0, pubMode = "ticket")
+ *     For each tier (women / men / couple), the unit bills at
+ *       freeEntryRate  if the event's Free-Entry-Rules mark that gender free
+ *                      on the booking's date,
+ *       ticketRate     otherwise.
+ *     commission = Σ over tiers (ticketCount_tier × rate_tier)
+ *     (1 couple ticket = 1 unit at this tier's rate.)
+ *
+ *   Table classification (pubMode = "table")
+ *     commission = tableBookingRate × guests
+ *
+ * Actuals (door counts) are an attendance log only — they NEVER change the
+ * per-booking commission. This keeps the report deterministic against the
+ * current rate card and prevents zero-actual scans from wiping a realised
+ * commission to ₹0.
  */
 
 export type BookingType = "free_entry" | "ticket" | "table";
@@ -47,9 +58,9 @@ export interface FreeEntryRulesShape {
 const FER_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
- * Retained for routes that still display "is today an FER day" badges in the
- * scanner UI. Commission math no longer consults FER — every booked unit
- * bills at the classification's flat rate regardless of which tier was free.
+ * Returns which ticket tiers are zero-priced at the door for a given booking
+ * date under the event's free-entry rules. Tokens in `genders` are normalised
+ * to lowercase and matched against canonical "women" / "men" / "couple".
  */
 export function ferTierFreeFlags(bookingDate: string | null | undefined, fer: FreeEntryRulesShape | null | undefined) {
   const day = bookingDate ? FER_DAY_ABBRS[new Date(`${bookingDate}T12:00:00`).getDay()] : "";
@@ -93,33 +104,22 @@ export function classifyBookingType(b: { pubMode: string; finalPrice: string | n
   return "ticket";
 }
 
-/**
- * Count people for a free-entry booking: 1 woman = 1 person, 1 man = 1 person,
- * 1 couple = 2 people. Falls back to `guests` when no per-tier counts were
- * recorded (table-mode bookings that ended up as free entry).
- */
+/** Count people for a free-entry classification: couple = 2 people, else 1. */
 function freeEntryPeopleCount(b: PlannedBookingShape): number {
   const tierHeads = b.ticketWomen + b.ticketMen + b.ticketCouple * 2;
   if (tierHeads > 0) return Math.max(0, tierHeads);
   return Math.max(0, b.guests);
 }
 
-/** Count tickets for a ticket booking: 1 row per booked seat (couple = 1 ticket). */
-function ticketCount(b: PlannedBookingShape): number {
-  const total = b.ticketWomen + b.ticketMen + b.ticketCouple;
-  if (total > 0) return Math.max(0, total);
-  return Math.max(0, b.guests);
-}
-
 /**
- * Compute commission from the booking's planned counts. This is the
- * canonical commission for every trigger (online payment, COD check-in,
- * free-entry check-in). The admin report mirrors this exact computation.
+ * Canonical commission computation. Called by online-payment success, the
+ * COD / free-entry check-in path, and the admin commission report so all
+ * three surfaces agree to the rupee.
  */
 export function computeCommissionFromPlanned(
   b: PlannedBookingShape,
   rates: CommissionRatesInput,
-  _fer?: FreeEntryRulesShape | null,
+  fer?: FreeEntryRulesShape | null,
 ): CommissionResult {
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketFee = Number(rates.ticketRate ?? 0);
@@ -127,30 +127,49 @@ export function computeCommissionFromPlanned(
 
   const bookingType = classifyBookingType(b);
 
-  let ratePerUnit = 0;
-  let unitCount = 0;
   if (bookingType === "table") {
-    ratePerUnit = tableFee;
-    unitCount = Math.max(0, b.guests);
-  } else if (bookingType === "free_entry") {
-    ratePerUnit = freeEntryFee;
-    unitCount = freeEntryPeopleCount(b);
-  } else {
-    ratePerUnit = ticketFee;
-    unitCount = ticketCount(b);
+    const unitCount = Math.max(0, b.guests);
+    return { bookingType, ratePerUnit: tableFee, unitCount, amount: round2(tableFee * unitCount) };
   }
 
-  return { bookingType, ratePerUnit, unitCount, amount: round2(ratePerUnit * unitCount) };
+  if (bookingType === "free_entry") {
+    const unitCount = freeEntryPeopleCount(b);
+    return { bookingType, ratePerUnit: freeEntryFee, unitCount, amount: round2(freeEntryFee * unitCount) };
+  }
+
+  // ticket — per-tier mixed split when FER is active for one or more tiers.
+  const w = Math.max(0, b.ticketWomen);
+  const m = Math.max(0, b.ticketMen);
+  const c = Math.max(0, b.ticketCouple);
+  const totalUnits = w + m + c;
+
+  // Legacy / event-mode bookings store headcount in `guests`, not per-tier
+  // counts. Fall back so those bookings never silently bill ₹0.
+  if (totalUnits === 0) {
+    const guests = Math.max(0, b.guests);
+    return { bookingType, ratePerUnit: ticketFee, unitCount: guests, amount: round2(ticketFee * guests) };
+  }
+
+  const flags = ferTierFreeFlags(b.bookingDate ?? null, fer ?? null);
+  const wRate = flags.women ? freeEntryFee : ticketFee;
+  const mRate = flags.men ? freeEntryFee : ticketFee;
+  const cRate = flags.couple ? freeEntryFee : ticketFee;
+
+  const raw = wRate * w + mRate * m + cRate * c;
+
+  // Surface the dominant per-unit rate so the report's "Rate" column shows a
+  // sensible scalar. The exact amount is what the ledger and totals key off.
+  const paidUnits = (flags.women ? 0 : w) + (flags.men ? 0 : m) + (flags.couple ? 0 : c);
+  const ratePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
+
+  return { bookingType, ratePerUnit, unitCount: totalUnits, amount: round2(raw) };
 }
 
 /**
- * Compute commission from booking actuals.
- *
- * Per the platform's deterministic-rate model, commission is fixed at booking
- * time (units × rate). Actuals serve as an attendance log only — they do not
- * change the platform's per-booking fee. This function therefore delegates to
- * `computeCommissionFromPlanned`, guaranteeing that re-scans with zero
- * actuals can never zero out a realised commission.
+ * Actuals path delegates to the planned calculation. Actuals are an
+ * attendance log; the platform's per-booking commission is fixed at booking
+ * time against the current rate card so a re-scan with zero actuals can
+ * never zero out a realised commission.
  */
 export function computeCommissionFromActuals(
   b: ActualBookingShape,

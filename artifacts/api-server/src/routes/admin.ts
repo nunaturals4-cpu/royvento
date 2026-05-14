@@ -110,6 +110,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     .select({
       vendorId: bookingsTable.vendorId,
       eventId: bookingsTable.eventId,
+      bookingDate: bookingsTable.bookingDate,
       finalPrice: bookingsTable.finalPrice,
       ticketWomen: bookingsTable.ticketWomen,
       ticketMen: bookingsTable.ticketMen,
@@ -272,29 +273,36 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const allVendors = await db.select().from(vendorsTable);
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
 
-  // Total platform commission realised in the same date window. Reads
-  // directly from `commission_ledger` (online_payment + cod_checkin +
-  // free_checkin triggers) — the single source of truth for "money the
-  // platform has actually earned". This matches the user spec exactly:
-  // an online booking earns its commission at payment; a COD booking
-  // earns at check-in (capped by cash collected); a free-entry booking
-  // earns `freeEntryRate × heads` at check-in (and ₹0 if never scanned
-  // in). It is also the same value the Commissions tab already exposes
-  // as `totals.collectedCommission`, so the two surfaces agree to the
-  // rupee for any date window.
-  const realisedCommissionRow = await db
-    .select({
-      total: sql<string>`coalesce(sum(${commissionLedgerTable.amount}), 0)::text`,
-    })
-    .from(commissionLedgerTable)
-    .where(
-      and(
-        inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
-        gte(commissionLedgerTable.createdAt, rangeStart),
-        lte(commissionLedgerTable.createdAt, rangeEnd),
-      ),
-    );
-  const totalCommission = Number(realisedCommissionRow[0]?.total ?? 0);
+  // Total platform commission across every confirmed/completed booking in
+  // the window, computed from the current rate card (commission =
+  // Σ per-tier units × per-tier rate). Mirrors the per-vendor numbers in
+  // `/admin/commission-report` so both surfaces agree to the rupee. The
+  // commission_ledger table is treated purely as a realisation marker
+  // (scanned vs pending); amounts come from the deterministic calc.
+  const vendorCommissionRows = await db.select().from(vendorCommissionsTable);
+  const vendorCommissionMap = new Map(vendorCommissionRows.map((r) => [r.vendorId, r]));
+
+  const analyticsEventIds = Array.from(new Set(confirmedBookings.map((b) => b.eventId)));
+  const analyticsEventRows = analyticsEventIds.length > 0
+    ? await db
+        .select({ id: eventsTable.id, freeEntryRules: eventsTable.freeEntryRules })
+        .from(eventsTable)
+        .where(inArray(eventsTable.id, analyticsEventIds))
+    : [];
+  const analyticsFerMap = new Map(
+    analyticsEventRows.map((e) => [
+      e.id,
+      e.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | null,
+    ]),
+  );
+
+  let totalCommission = 0;
+  for (const b of confirmedBookings) {
+    const rates = vendorCommissionMap.get(b.vendorId) ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 };
+    const comm = computeCommissionFromPlanned(b, rates, analyticsFerMap.get(b.eventId) ?? null);
+    totalCommission += comm.amount;
+  }
+  totalCommission = Math.round(totalCommission * 100) / 100;
 
   const perVendor = Array.from(perVendorMap.values())
     .map((pv) => ({ ...pv, vendorName: allVMap.get(pv.vendorId)?.businessName ?? `Partner #${pv.vendorId}` }))
