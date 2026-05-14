@@ -638,101 +638,46 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   ]);
 
   const commRow = commissions[0];
-  const commFreeEntryFee = Number(commRow?.freeEntryRate ?? 0);
-  const commTicketFee = Number(commRow?.ticketRate ?? 0);
-  const commTableFee = Number(commRow?.tableBookingRate ?? 0);
 
-  // Pre-fetch every event referenced by these bookings so the per-tier free-entry
-  // commission split can read freeEntryRules without an N+1 lookup.
+  // Pre-fetch every event so we can read freeEntryRules without N+1 lookups.
+  // Source of truth for commission math: lib/commission.ts → computeCommissionFromPlanned.
+  // The Admin Panel → Commission Report uses the same helper, so Partner
+  // Dashboard → Analytics → Platform Charges now agrees with admin to the rupee.
   const _commEventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
   const _commEventRows = _commEventIds.length > 0
     ? await db.select().from(eventsTable).where(inArray(eventsTable.id, _commEventIds))
     : [];
   const commEventMap = new Map(_commEventRows.map((e) => [e.id, e]));
-  const COMM_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  function ferStateForBooking(b: { eventId: number; bookingDate: string }) {
-    const evt = commEventMap.get(b.eventId);
-    const fer = (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules;
-    const day = b.bookingDate ? COMM_DAY_ABBRS[new Date(`${b.bookingDate}T12:00:00`).getDay()] : "";
-    const active = !!(fer?.enabled && day && Array.isArray(fer.days) && fer.days.includes(day));
-    const genders = active ? (fer?.genders ?? []).map((g) => String(g).toLowerCase()) : [];
-    return { active, isTierFree: (g: "women" | "men" | "couple") => active && genders.includes(g) };
-  }
 
-  // Split a single booking's commission and gross revenue across the
-  // freeEntry/ticket/table buckets. Per spec:
-  //   • table   → tableFee × guests, capped at finalPrice
-  //   • ticket-mode + partial FER → free tiers get freeEntryFee×count, paid
-  //     tiers get ticketFee×count; aggregate capped at finalPrice and gross
-  //     revenue split proportionally to per-tier units
-  //   • whole-day-free / pubMode==="free" → freeEntry bucket, freeEntryFee×guests
-  //   • plain ticket booking (no FER) → ticket bucket, ticketFee×ticketCount
-  function calcCommSplit(b: { eventId: number; bookingDate: string; pubMode: string; guests: number; ticketWomen: number; ticketMen: number; ticketCouple: number; finalPrice: string }, grossRev: number) {
-    const fp = Number(b.finalPrice);
+  // Wrapper that emits the {freeEntry, ticket, table} split shape used by the
+  // dashboard. Each booking falls into exactly ONE bucket (matching admin's
+  // classifyBookingType). Per the rate-card spec:
+  //   Free Entry    = freeEntryRate × people  (couple = 2 people)
+  //   Ticket        = sum over tiers of ticketRate × tickets (free tiers
+  //                   billed at freeEntryRate under FER)
+  //   Table Booking = tableBookingRate × guests
+  function calcCommSplit(b: typeof allBookings[number], grossRev: number) {
     const out = {
       freeEntry: { count: 0, comm: 0, gross: 0, people: 0 },
       ticket:    { count: 0, comm: 0, gross: 0, people: 0 },
       table:     { count: 0, comm: 0, gross: 0, people: 0 },
     };
-    // "event" is the legacy frontend value for Table Booking — bucket it as
-    // table so the partner commission report matches the admin classifier
-    // (see `classifyBookingType` in lib/commission.ts).
-    if (b.pubMode === "table" || b.pubMode === "event") {
-      const guests = Math.max(0, b.guests);
-      out.table.count = 1;
-      out.table.comm = commTableFee * guests;
-      out.table.gross = grossRev;
-      out.table.people = guests;
-      return out;
-    }
-    if (b.pubMode !== "ticket") {
-      // legacy: bucket by whole-day-free vs paid
-      if (fp === 0 || b.pubMode === "free") {
-        out.freeEntry.count = 1;
-        // Free-entry platform fee is a vendor charge — no cap at finalPrice=0.
-        // Ticket-mode free-entry stores counts in ticketWomen/Men/Couple.
-        const ticketTotal = b.ticketWomen + b.ticketMen + b.ticketCouple;
-        const headCount = ticketTotal > 0 ? ticketTotal : Math.max(0, b.guests);
-        out.freeEntry.comm = commFreeEntryFee * headCount;
-        out.freeEntry.gross = grossRev;
-        out.freeEntry.people = headCount;
-      } else {
-        const eventGuests = Math.max(0, b.guests);
-        out.ticket.count = 1;
-        out.ticket.comm = Math.min(commTicketFee * eventGuests, fp);
-        out.ticket.gross = grossRev;
-        out.ticket.people = eventGuests;
-      }
-      return out;
-    }
-    // pubMode === "ticket"
-    const fer = ferStateForBooking(b);
-    const tw = b.ticketWomen, tm = b.ticketMen, tc = b.ticketCouple;
-    const totalUnits = tw + tm + tc;
-    const freeUnits =
-      (fer.isTierFree("women") ? tw : 0) +
-      (fer.isTierFree("men") ? tm : 0) +
-      (fer.isTierFree("couple") ? tc : 0);
-    const paidUnits = totalUnits - freeUnits;
-    const rawFree = commFreeEntryFee * freeUnits;
-    const rawPaid = commTicketFee * paidUnits;
-    // Free-tier commission: no cap — vendor charge regardless of customer payment.
-    // Paid-tier commission: capped at the revenue actually collected for paid entries.
-    const cFree = rawFree;
-    const cPaid = paidUnits > 0 ? Math.min(rawPaid, Math.max(0, fp)) : 0;
-    const gFree = totalUnits > 0 ? grossRev * (freeUnits / totalUnits) : 0;
-    const gPaid = grossRev - gFree;
-    // Booking is counted once in its primary bucket so per-bucket counts still
-    // sum to allBookings.length. Whole-day-free ticket bookings stay in
-    // "freeEntry"; otherwise the booking belongs to "ticket" (commission and
-    // gross are still split per-tier even when the count goes to ticket).
-    if (fp === 0 || paidUnits === 0) {
-      out.freeEntry.count = 1;
-    } else {
-      out.ticket.count = 1;
-    }
-    if (freeUnits > 0) { out.freeEntry.comm = cFree; out.freeEntry.gross = gFree; out.freeEntry.people = freeUnits; }
-    if (paidUnits > 0) { out.ticket.comm = cPaid; out.ticket.gross = gPaid; out.ticket.people = paidUnits; }
+    const evt = commEventMap.get(b.eventId);
+    const fer = (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules ?? null;
+    const result = computeCommissionFromPlanned(
+      b,
+      commRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      fer,
+    );
+    const bucket = result.bookingType === "free_entry"
+      ? "freeEntry"
+      : result.bookingType === "ticket"
+        ? "ticket"
+        : "table";
+    out[bucket].count = 1;
+    out[bucket].comm = result.amount;
+    out[bucket].gross = grossRev;
+    out[bucket].people = result.unitCount;
     return out;
   }
 
@@ -799,29 +744,28 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     totalEarnings += bookingRevenue;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
 
-    // Commission: use ledger amount when realised; fall back to planned split.
+    // Matches Admin Panel → Commission Report:
+    //   • The reported commission AMOUNT always comes from the deterministic
+    //     People × Rate calculation (computeCommissionFromPlanned).
+    //   • The commission_ledger is ONLY used as a realisation marker — it
+    //     decides "collected" vs "pending", not the amount itself.
+    //   • Same booking is never counted twice: each booking contributes its
+    //     commission to exactly one of collected/pending and one type bucket.
     const split = calcCommSplit(b, bookingRevenue);
     splitCache.set(b.id, split);
-    const ledgerAmt = ledgerAmtByBookingId.get(b.id);
-    const splitTotal = commTotal(split);
-    const realisedComm = ledgerAmt ?? splitTotal;
-    totalCommission += realisedComm;
-    if (ledgerAmt !== undefined) collectedCommission += ledgerAmt;
-    else pendingCommission += splitTotal;
-    if (isCod) codCommission += realisedComm;
-    else onlineCommission += realisedComm;
-    // Per-booking-type commission summary. Counts are mutually exclusive
-    // (booking goes into a single bucket); commission and gross revenue are
-    // distributed per-tier so partial-FER ticket bookings show their free
-    // tiers under freeEntry and paid tiers under ticket.
-    // When the ledger has a realised amount that differs from planned (actuals
-    // recorded at door), scale each bucket proportionally so the per-type
-    // breakdown always sums to totalCommission.
-    const commScale = (ledgerAmt !== undefined && splitTotal > 0) ? ledgerAmt / splitTotal : 1;
+    const commissionAmount = commTotal(split);
+    const isCollected = ledgerAmtByBookingId.has(b.id);
+    totalCommission += commissionAmount;
+    if (isCollected) collectedCommission += commissionAmount;
+    else pendingCommission += commissionAmount;
+    if (isCod) codCommission += commissionAmount;
+    else onlineCommission += commissionAmount;
+    // Per-booking-type breakdown — each booking falls into a single bucket
+    // (free_entry / ticket / table). Sum of bucket commissions === totalCommission.
     for (const k of ["freeEntry", "ticket", "table"] as const) {
       commSummary[k].count += split[k].count;
       commSummary[k].grossRevenue += split[k].gross;
-      commSummary[k].commissionAmount += rnd2(split[k].comm * commScale);
+      commSummary[k].commissionAmount += rnd2(split[k].comm);
       commSummary[k].peopleCount += split[k].people;
     }
   }
