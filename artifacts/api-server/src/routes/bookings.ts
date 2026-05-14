@@ -453,11 +453,11 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     paymentMethod: (wantsOnline ? "online" : "cod") as "online" | "cod",
   };
 
-  // For the online+bypass path we MUST atomically (a) confirm the booking,
-  // (b) credit the vendor net of commission, and (c) write the commission
-  // ledger row — otherwise a partial failure could leave a confirmed booking
-  // with no commission record. Pre-compute commission first so the tx body
-  // contains only writes (kept short).
+  // For the online+bypass path we atomically (a) confirm the booking and
+  // (b) credit the vendor net of commission. Admin commission is NOT written
+  // to the ledger here — by product decision, commission is realised only
+  // when the pub/partner scans the user's QR at check-in. We still compute
+  // commission to correctly net the vendor's `onlineBalance` credit.
   let bMaybe: typeof bookingsTable.$inferSelect | undefined;
   if (isOnlineBypass) {
     const [vcRow] = await db
@@ -487,18 +487,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         .update(vendorsTable)
         .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
         .where(eq(vendorsTable.id, evt.vendorId));
-      if (comm.amount > 0) {
-        await tx
-          .insert(commissionLedgerTable)
-          .values({
-            vendorId: evt.vendorId,
-            bookingId: inserted.id,
-            amount: String(comm.amount),
-            bookingType: comm.bookingType,
-            trigger: "online_payment",
-          })
-          .onConflictDoNothing();
-      }
     });
   } else {
     [bMaybe] = await db.insert(bookingsTable).values(bookingValues).returning();
@@ -2236,6 +2224,8 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
           // "checked in (commission realised, even if zero)" apart from
           // "still pending check-in". Without this, a free-entry booking
           // with a zero rate would stay forever "pending" in the report.
+          // Admin commission is added ONLY here on first scan (booking-time
+          // writes were removed by product decision).
           await tx.insert(commissionLedgerTable).values({
             vendorId: updatedActuals.vendorId,
             bookingId: updatedActuals.id,
@@ -2252,10 +2242,10 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
         }
       });
     } else {
-      // Online payment: commission was recorded at payment success. This is a
-      // safe fallback in case the PhonePe webhook missed the ledger write —
-      // onConflictDoNothing on (bookingId, trigger) makes it a no-op when the
-      // entry already exists, so there is no risk of double-charging.
+      // Online payment: commission is realised here on first scan/check-in
+      // (booking-time no longer writes the ledger). Uses onConflictDoNothing
+      // on (bookingId, trigger) so a repeat scan / camera double-fire is a
+      // structural no-op — admin commission can never double-count.
       const onlineComm = computeCommissionFromPlanned(
         updatedActuals,
         scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },

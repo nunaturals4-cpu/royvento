@@ -4005,6 +4005,46 @@ function CommissionsAdmin() {
                       {/* Expanded breakdown */}
                       {expanded && (
                         <div className="border-t border-white/8 bg-white/[0.02] px-4 py-3 space-y-4">
+                          {/* Booking-type breakdown — one row per booking type
+                              (Free Entry / Ticket Booking / Table Booking),
+                              showing total people and realised commission. */}
+                          <div>
+                            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Booking type breakdown</p>
+                            <div className="overflow-hidden rounded-lg border border-white/8">
+                              <table className="w-full text-xs">
+                                <thead className="bg-white/[0.04] text-muted-foreground">
+                                  <tr>
+                                    <th className="text-left py-2 px-3 font-medium">Booking Type</th>
+                                    <th className="text-right py-2 px-3 font-medium">No of People</th>
+                                    <th className="text-right py-2 px-3 font-medium">Commission Amount</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                  <tr>
+                                    <td className="py-2 px-3">Free Entry</td>
+                                    <td className="text-right px-3 tabular-nums">{row.freeEntryPeople}</td>
+                                    <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.freeEntryCommission)}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 px-3">Ticket Booking</td>
+                                    <td className="text-right px-3 tabular-nums">{row.ticketPeople}</td>
+                                    <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.ticketCommission)}</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="py-2 px-3">Table Booking</td>
+                                    <td className="text-right px-3 tabular-nums">{row.tablePeople}</td>
+                                    <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.tableCommission)}</td>
+                                  </tr>
+                                  <tr className="bg-white/[0.04] font-medium">
+                                    <td className="py-2 px-3">Total</td>
+                                    <td className="text-right px-3 tabular-nums">{row.freeEntryPeople + row.ticketPeople + row.tablePeople}</td>
+                                    <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.totalCommission)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
                           {/* Individual booking lines */}
                           {row.bookings.length > 0 && (
                             <div>

@@ -7,7 +7,6 @@ import {
   subscriptionsTable,
   vendorsTable,
   vendorCommissionsTable,
-  commissionLedgerTable,
   usersTable,
   eventsTable,
   availabilityTable,
@@ -98,12 +97,18 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
   );
   const netCredit = Math.max(0, Number(booking.finalPrice ?? 0) - comm.amount);
 
-  // Atomic activation: payment status gate, booking confirmation, vendor net
-  // credit, and commission ledger insert all happen in a single transaction.
-  // The initiated→success gate lives INSIDE the tx so a concurrent caller
-  // either sees us mid-flight (and rolls back) or finds status=success and
-  // no-ops. If anything inside fails, payment status stays `initiated` and the
-  // next callback/webhook can safely retry.
+  // Atomic activation: payment status gate, booking confirmation, and vendor
+  // net credit happen in a single transaction. The initiated→success gate
+  // lives INSIDE the tx so a concurrent caller either sees us mid-flight (and
+  // rolls back) or finds status=success and no-ops. If anything inside fails,
+  // payment status stays `initiated` and the next callback/webhook can safely
+  // retry.
+  //
+  // Admin commission is intentionally NOT recorded here anymore — by product
+  // decision, commission is realised in `commission_ledger` only when the
+  // pub/partner scans the user's QR at check-in (see scan-ticket route).
+  // Booking-time still computes commission so the vendor wallet credit
+  // (`onlineBalance += finalPrice − commission`) stays correct.
   let activated = false;
   await db.transaction(async (tx) => {
     const gated = await tx
@@ -113,8 +118,6 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
       .returning({ id: paymentsTable.id });
 
     if (gated.length === 0) return; // already activated by a concurrent caller — nothing to do
-
-    const paymentRowId = gated[0]!.id;
 
     await tx
       .update(bookingsTable)
@@ -126,19 +129,6 @@ async function activateBookingAfterPayment(bookingId: number, phonepeTransaction
       .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
       .where(eq(vendorsTable.id, booking.vendorId));
 
-    if (comm.amount > 0) {
-      await tx
-        .insert(commissionLedgerTable)
-        .values({
-          vendorId: booking.vendorId,
-          bookingId: booking.id,
-          amount: String(comm.amount),
-          bookingType: comm.bookingType,
-          trigger: "online_payment",
-          paymentId: paymentRowId,
-        })
-        .onConflictDoNothing();
-    }
     activated = true;
   });
 

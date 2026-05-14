@@ -114,12 +114,13 @@ async function auditPasswordHashes() {
 }
 
 /**
- * One-time idempotent startup cleanup: remove the legacy demo vendor
- * "Royvento Studio" (originally created by `pnpm seed`'s `ensureDemoPartner`,
- * since disarmed) from every environment it accidentally landed in. Matches
- * strictly on `businessName = 'Royvento Studio'` AND the seed-script demo
- * user email `showcase@royvento.in`, so a real partner who happens to be
- * named "Royvento Studio" cannot be deleted by accident.
+ * Idempotent startup cleanup: remove the legacy demo vendor "Royvento Studio"
+ * (originally created by `pnpm seed`'s `ensureDemoPartner`, since disarmed)
+ * from every environment it landed in. By explicit product decision the match
+ * is now on `businessName = 'Royvento Studio'` alone — the previous owner-
+ * email guard let stray copies created under different emails survive in
+ * production. "Royvento Studio" is reserved for the demo vendor and is not
+ * usable as a real partner business name.
  */
 async function removeLegacyDemoVendor() {
   try {
@@ -132,19 +133,15 @@ async function removeLegacyDemoVendor() {
       return;
     }
     for (const v of targets) {
-      // Confirm this vendor is the seed-created demo one by checking its
-      // owning user email. Real partners with this name are untouched.
       const [owner] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, v.userId)).limit(1);
-      if (!owner || owner.email !== "showcase@royvento.in") {
-        logger.warn({ vendorId: v.id, ownerEmail: owner?.email }, "Startup cleanup: skipping 'Royvento Studio' vendor — owner email not the seed demo user; manual review required");
-        continue;
-      }
+      logger.warn({ vendorId: v.id, ownerEmail: owner?.email }, "Startup cleanup: removing 'Royvento Studio' vendor by business-name match");
       await db.execute(sql`
         DO $$
         DECLARE
           ev_ids INT[];
         BEGIN
           SELECT array_agg(id) INTO ev_ids FROM events WHERE vendor_id = ${v.id};
+          DELETE FROM commission_ledger WHERE vendor_id = ${v.id};
           DELETE FROM bookings WHERE vendor_id = ${v.id};
           DELETE FROM reviews WHERE vendor_id = ${v.id};
           IF ev_ids IS NOT NULL THEN DELETE FROM wishlists WHERE event_id = ANY(ev_ids); END IF;
@@ -158,8 +155,14 @@ async function removeLegacyDemoVendor() {
           DELETE FROM vendor_managers WHERE vendor_id = ${v.id};
           DELETE FROM availability WHERE vendor_id = ${v.id};
           DELETE FROM review_deletions WHERE vendor_id = ${v.id};
+          DELETE FROM vendor_commissions WHERE vendor_id = ${v.id};
           DELETE FROM vendors WHERE id = ${v.id};
-          DELETE FROM users WHERE id = ${v.userId};
+          -- Only drop the owner user if this was their ONLY vendor. Prevents
+          -- collateral damage if someone shared an account across multiple
+          -- vendor profiles.
+          DELETE FROM users
+            WHERE id = ${v.userId}
+              AND NOT EXISTS (SELECT 1 FROM vendors WHERE user_id = ${v.userId});
         END $$;
       `);
       logger.info({ vendorId: v.id, userId: v.userId }, "Startup cleanup: removed legacy demo vendor 'Royvento Studio' and its data");
