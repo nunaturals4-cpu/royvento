@@ -113,6 +113,62 @@ async function auditPasswordHashes() {
   }
 }
 
+/**
+ * One-time idempotent startup cleanup: remove the legacy demo vendor
+ * "Royvento Studio" (originally created by `pnpm seed`'s `ensureDemoPartner`,
+ * since disarmed) from every environment it accidentally landed in. Matches
+ * strictly on `businessName = 'Royvento Studio'` AND the seed-script demo
+ * user email `showcase@royvento.in`, so a real partner who happens to be
+ * named "Royvento Studio" cannot be deleted by accident.
+ */
+async function removeLegacyDemoVendor() {
+  try {
+    const targets = await db
+      .select({ id: vendorsTable.id, userId: vendorsTable.userId })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.businessName, "Royvento Studio"));
+    if (targets.length === 0) {
+      logger.info("Startup cleanup: no legacy 'Royvento Studio' vendor to remove");
+      return;
+    }
+    for (const v of targets) {
+      // Confirm this vendor is the seed-created demo one by checking its
+      // owning user email. Real partners with this name are untouched.
+      const [owner] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, v.userId)).limit(1);
+      if (!owner || owner.email !== "showcase@royvento.in") {
+        logger.warn({ vendorId: v.id, ownerEmail: owner?.email }, "Startup cleanup: skipping 'Royvento Studio' vendor — owner email not the seed demo user; manual review required");
+        continue;
+      }
+      await db.execute(sql`
+        DO $$
+        DECLARE
+          ev_ids INT[];
+        BEGIN
+          SELECT array_agg(id) INTO ev_ids FROM events WHERE vendor_id = ${v.id};
+          DELETE FROM bookings WHERE vendor_id = ${v.id};
+          DELETE FROM reviews WHERE vendor_id = ${v.id};
+          IF ev_ids IS NOT NULL THEN DELETE FROM wishlists WHERE event_id = ANY(ev_ids); END IF;
+          DELETE FROM announcements WHERE vendor_id = ${v.id};
+          DELETE FROM events WHERE vendor_id = ${v.id};
+          DELETE FROM partner_media WHERE vendor_id = ${v.id};
+          DELETE FROM partner_blocked_dates WHERE vendor_id = ${v.id};
+          DELETE FROM ads_requests WHERE vendor_id = ${v.id};
+          DELETE FROM profile_views WHERE vendor_id = ${v.id};
+          DELETE FROM coupons WHERE vendor_id = ${v.id};
+          DELETE FROM vendor_managers WHERE vendor_id = ${v.id};
+          DELETE FROM availability WHERE vendor_id = ${v.id};
+          DELETE FROM review_deletions WHERE vendor_id = ${v.id};
+          DELETE FROM vendors WHERE id = ${v.id};
+          DELETE FROM users WHERE id = ${v.userId};
+        END $$;
+      `);
+      logger.info({ vendorId: v.id, userId: v.userId }, "Startup cleanup: removed legacy demo vendor 'Royvento Studio' and its data");
+    }
+  } catch (err) {
+    logger.error({ err }, "Startup cleanup failed (Royvento Studio demo vendor)");
+  }
+}
+
 const ADMIN_EMAIL = "royvento56@gmail.com";
 const ADMIN_PASSWORD = "admin123@";
 
@@ -179,6 +235,7 @@ app.listen(port, (err) => {
     .then(() => auditPasswordHashes())
     .then(() => backfillVendorTicketPrefixes())
     .then(() => auditVendorManagerOverlap())
+    .then(() => removeLegacyDemoVendor())
     .catch((err) => logger.error({ err }, "Startup admin/audit chain failed"));
   runCleanup();
 

@@ -1936,15 +1936,26 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
 // ─── Commission Report ────────────────────────────────────────────────────────
 
 router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) => {
+  // Default window = same one `/admin/analytics` uses (last 12 months, starting
+  // from the first of the month 12 months ago). Sharing this default guarantees
+  // the commission-report's `collectedCommission` total equals the analytics
+  // dashboard's `totalCommission` tile to the rupee when neither endpoint has
+  // explicit date filters applied by the caller.
+  const now = new Date();
+  const defaultStart = new Date(now);
+  defaultStart.setFullYear(defaultStart.getFullYear() - 1);
+  defaultStart.setDate(1);
+  defaultStart.setHours(0, 0, 0, 0);
+
   const fromStr = req.query["from"] as string | undefined;
   const toStr = req.query["to"] as string | undefined;
-  const from = fromStr ? new Date(`${fromStr}T00:00:00Z`) : undefined;
-  const to = toStr ? new Date(`${toStr}T23:59:59Z`) : undefined;
+  const from = fromStr ? new Date(`${fromStr}T00:00:00Z`) : defaultStart;
+  const to = toStr ? new Date(`${toStr}T23:59:59Z`) : now;
 
   const whereConditions = [
     sql`${bookingsTable.status} IN ('confirmed', 'completed')`,
-    ...(from ? [gte(bookingsTable.createdAt, from)] : []),
-    ...(to ? [lte(bookingsTable.createdAt, to)] : []),
+    gte(bookingsTable.createdAt, from),
+    lte(bookingsTable.createdAt, to),
   ];
 
   const [bookings, commissions, approvedVendors] = await Promise.all([
