@@ -64,31 +64,16 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
     price = Math.round(price * 0.5);
   }
 
-  const usePhonePe = isPhonePeConfigured() && price > 0;
-  const hasPaymentBypass = process.env.PAYMENT_BYPASS === "true";
-
-  if (!usePhonePe && price > 0) {
-    if (!hasPaymentBypass) {
-      return res.status(503).json({
-        error: "Payment system not configured. Set PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, PHONEPE_SALT_INDEX, and PHONEPE_ENV environment variables, or set PAYMENT_BYPASS=true for development.",
-      });
-    }
-    req.log.warn("PAYMENT_BYPASS=true — auto-activating subscription without payment. Remove PAYMENT_BYPASS before going live.");
-  }
-
-  const subStatus = usePhonePe ? "pending" : "active";
-
-  if (!usePhonePe) {
-    await db
-      .update(subscriptionsTable)
-      .set({ status: "expired" })
-      .where(
-        and(
-          eq(subscriptionsTable.userId, user.id),
-          eq(subscriptionsTable.status, "active"),
-        ),
-      );
-  }
+  // Online payment disabled — subscriptions are activated immediately.
+  await db
+    .update(subscriptionsTable)
+    .set({ status: "expired" })
+    .where(
+      and(
+        eq(subscriptionsTable.userId, user.id),
+        eq(subscriptionsTable.status, "active"),
+      ),
+    );
 
   const [sub] = await db
     .insert(subscriptionsTable)
@@ -97,53 +82,20 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
       planType,
       planPeriod,
       price: String(price),
-      status: subStatus,
+      status: "active",
       expiresAt: expiresFor(planPeriod),
     })
     .returning();
 
   if (!sub) return res.status(500).json({ error: "Failed to create subscription" });
 
-  if (!usePhonePe) {
-    if (planType === "partner") {
-      await db
-        .update(vendorsTable)
-        .set({ isPremium: true })
-        .where(eq(vendorsTable.userId, user.id));
-    }
-    return res.json(sub);
+  if (planType === "partner") {
+    await db
+      .update(vendorsTable)
+      .set({ isPremium: true })
+      .where(eq(vendorsTable.userId, user.id));
   }
-
-  const merchantTransactionId = `SUB${sub.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
-  const appUrl = getAppUrl();
-  const callbackUrl = `${appUrl}/api/payments/subscription-callback?merchantTransactionId=${merchantTransactionId}${callbackScheme ? `&callbackScheme=${encodeURIComponent(callbackScheme)}` : ""}`;
-  const webhookUrl = `${appUrl}/api/payments/webhook`;
-
-  await db.insert(paymentsTable).values({
-    merchantTransactionId,
-    subscriptionId: sub.id,
-    amount: price * 100,
-    status: "initiated",
-  });
-
-  try {
-    const phone = user.phone || undefined;
-    const { redirectUrl } = await initiatePayment({
-      merchantTransactionId,
-      merchantUserId: `U${user.id}`,
-      amountPaise: price * 100,
-      redirectUrl: callbackUrl,
-      callbackUrl: webhookUrl,
-      ...(phone ? { mobileNumber: phone } : {}),
-    });
-    return res.json({ redirectUrl, subscriptionId: sub.id, requiresPayment: true });
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : "Unknown error";
-    req.log.error({ err, errMsg }, "[subscriptions] PhonePe initiation failed");
-    await db.update(subscriptionsTable).set({ status: "expired" }).where(eq(subscriptionsTable.id, sub.id));
-    await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
-    return res.status(502).json({ error: `Payment initiation failed: ${errMsg}` });
-  }
+  return res.json(sub);
 });
 
 router.get("/subscriptions/me", requireAuth(), async (req, res) => {

@@ -401,30 +401,10 @@ router.post("/bookings", requireAuth(), async (req, res) => {
 
   const finalPrice = Math.max(0, totalPrice - discountAmount - pointsDeduction);
 
-  const wantsOnline = parsed.data.paymentMethod !== "cod";
-  const usePhonePe = wantsOnline && isPhonePeConfigured() && finalPrice > 0;
-  const hasPaymentBypass = process.env.PAYMENT_BYPASS === "true";
-
-  // Online payment requested but PhonePe not configured — reject unless bypass is on.
-  // COD bookings always confirm immediately (no gateway needed).
-  if (wantsOnline && !isPhonePeConfigured() && finalPrice > 0) {
-    if (!hasPaymentBypass) {
-      if (validCode) {
-        await db.update(couponsTable).set({ used: false }).where(and(eq(couponsTable.code, validCode), eq(couponsTable.userId, user.id)));
-      }
-      if (pointsUsed > 0) {
-        await db.update(usersTable).set({ points: user.points }).where(eq(usersTable.id, user.id));
-      }
-      return res.status(503).json({
-        error: "Online payments are not set up yet — please choose Pay at Venue.",
-        code: "PHONEPE_UNCONFIGURED",
-      });
-    }
-    req.log.warn("PAYMENT_BYPASS=true — auto-confirming booking without payment. Remove PAYMENT_BYPASS before going live.");
-  }
-
-  const bookingStatus = usePhonePe ? "payment_pending" : "confirmed";
-  const isOnlineBypass = wantsOnline && finalPrice > 0 && !usePhonePe;
+  // Online payment / PhonePe disabled — all bookings are COD.
+  const wantsOnline = false;
+  const usePhonePe = false;
+  const bookingStatus = "confirmed";
 
   const bookingValues = {
     eventId: evt.id,
@@ -449,94 +429,18 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     phone: parsed.data.phone ?? "",
     pointsUsed,
     arrivalTime: parsed.data.arrivalTime || null,
-    approvedBy: usePhonePe ? "" : "auto",
-    paymentMethod: (wantsOnline ? "online" : "cod") as "online" | "cod",
+    approvedBy: "auto",
+    paymentMethod: "cod" as const,
   };
 
-  // For the online+bypass path we atomically (a) confirm the booking and
-  // (b) credit the vendor net of commission. Admin commission is NOT written
-  // to the ledger here — by product decision, commission is realised only
-  // when the pub/partner scans the user's QR at check-in. We still compute
-  // commission to correctly net the vendor's `onlineBalance` credit.
-  let bMaybe: typeof bookingsTable.$inferSelect | undefined;
-  if (isOnlineBypass) {
-    const [vcRow] = await db
-      .select()
-      .from(vendorCommissionsTable)
-      .where(eq(vendorCommissionsTable.vendorId, evt.vendorId))
-      .limit(1);
-    const comm = computeCommissionFromPlanned(
-      {
-        pubMode: parsed.data.pubMode || "",
-        finalPrice,
-        guests: guestsCount,
-        ticketWomen: parsed.data.ticketWomen || 0,
-        ticketMen: parsed.data.ticketMen || 0,
-        ticketCouple: parsed.data.ticketCouple || 0,
-        bookingDate: dateStr,
-      },
-      vcRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
-      (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null }).freeEntryRules ?? null,
-    );
-    const netCredit = Math.max(0, finalPrice - comm.amount);
-    await db.transaction(async (tx) => {
-      const [inserted] = await tx.insert(bookingsTable).values(bookingValues).returning();
-      if (!inserted) throw new Error("Failed to insert booking");
-      bMaybe = inserted;
-      await tx
-        .update(vendorsTable)
-        .set({ onlineBalance: sql`${vendorsTable.onlineBalance} + ${String(netCredit)}` })
-        .where(eq(vendorsTable.id, evt.vendorId));
-    });
-  } else {
-    [bMaybe] = await db.insert(bookingsTable).values(bookingValues).returning();
-  }
+  // All bookings are confirmed immediately (COD only — online payment disabled).
+  // No vendor balance credit since commission is realised at scan time.
+  const [bMaybe] = await db.insert(bookingsTable).values(bookingValues).returning();
   if (!bMaybe) {
     res.status(500).json({ error: "Failed" });
     return;
   }
   const b = bMaybe;
-
-  if (usePhonePe) {
-    const merchantTransactionId = `BK${b.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
-    const appUrl = getAppUrl();
-    const { callbackScheme } = parsed.data;
-    const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}${callbackScheme ? `&callbackScheme=${encodeURIComponent(callbackScheme)}` : ""}`;
-    const webhookUrl = `${appUrl}/api/payments/webhook`;
-
-    await db.insert(paymentsTable).values({
-      merchantTransactionId,
-      bookingId: b.id,
-      amount: Math.round(finalPrice * 100),
-      status: "initiated",
-    });
-
-    try {
-      const phone = parsed.data.phone || user.phone;
-      const { redirectUrl } = await initiatePayment({
-        merchantTransactionId,
-        merchantUserId: `U${user.id}`,
-        amountPaise: Math.round(finalPrice * 100),
-        redirectUrl: callbackUrl,
-        callbackUrl: webhookUrl,
-        ...(phone ? { mobileNumber: phone } : {}),
-      });
-      res.json({ redirectUrl, bookingId: b.id, requiresPayment: true });
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "Unknown error";
-      req.log.error({ err, errMsg, bookingId: b.id }, "PhonePe initiation failed");
-      await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
-      await db.update(bookingsTable).set({ status: "cancelled", rejectionReason: `Payment initiation failed: ${errMsg}` }).where(eq(bookingsTable.id, b.id));
-      if (validCode) {
-        await db.update(couponsTable).set({ used: false }).where(and(eq(couponsTable.code, validCode), eq(couponsTable.userId, user.id)));
-      }
-      if (pointsUsed > 0) {
-        await db.update(usersTable).set({ points: user.points }).where(eq(usersTable.id, user.id));
-      }
-      res.status(502).json({ error: `Payment initiation failed: ${errMsg}` });
-    }
-    return;
-  }
 
   await db
     .insert(availabilityTable)
@@ -545,10 +449,6 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       target: [availabilityTable.vendorId, availabilityTable.date],
       set: { status: "booked" },
     });
-
-  // (Online+bypass commission credit is handled inside the booking-insert
-  // transaction above so booking confirmation, vendor credit, and ledger row
-  // all apply atomically.)
 
   const [out] = await serializeBookings([b]);
 
@@ -677,70 +577,8 @@ router.get("/bookings/me", requireAuth(), async (req, res) => {
   res.json(await serializeBookings(rows));
 });
 
-router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
-  const user = await loadUserFromRequest(req);
-  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
-
-  const paramsParsed = RetryBookingPaymentParams.safeParse(req.params);
-  if (!paramsParsed.success) { respondInvalid(res, paramsParsed.error); return; }
-  const bookingId = paramsParsed.data.id;
-
-  const [booking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.userId, user.id)))
-    .limit(1);
-
-  if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
-  if (booking.status !== "payment_pending") {
-    res.status(409).json({ error: `Booking is already ${booking.status}` });
-    return;
-  }
-  if (!isPhonePeConfigured()) {
-    res.status(503).json({ error: "Payment system not configured" });
-    return;
-  }
-
-  const finalPrice = parseFloat(String(booking.finalPrice ?? booking.totalPrice ?? 0));
-  if (finalPrice <= 0) { res.status(400).json({ error: "No payment required for this booking" }); return; }
-
-  const parsedBody = RetryBookingPaymentBody.safeParse(req.body ?? {});
-  if (!parsedBody.success) {
-    respondInvalid(res, parsedBody.error);
-    return;
-  }
-  const retryCallbackScheme = parsedBody.data.callbackScheme;
-
-  const merchantTransactionId = `BK${booking.id}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
-  const appUrl = getAppUrl();
-  const callbackUrl = `${appUrl}/api/payments/booking-callback?merchantTransactionId=${merchantTransactionId}${retryCallbackScheme ? `&callbackScheme=${encodeURIComponent(retryCallbackScheme)}` : ""}`;
-  const webhookUrl = `${appUrl}/api/payments/webhook`;
-
-  await db.insert(paymentsTable).values({
-    merchantTransactionId,
-    bookingId: booking.id,
-    amount: Math.round(finalPrice * 100),
-    status: "initiated",
-  });
-
-  try {
-    const { redirectUrl } = await initiatePayment({
-      merchantTransactionId,
-      merchantUserId: `U${user.id}`,
-      amountPaise: Math.round(finalPrice * 100),
-      redirectUrl: callbackUrl,
-      callbackUrl: webhookUrl,
-      ...(booking.phone ? { mobileNumber: booking.phone } : {}),
-    });
-    res.json({ redirectUrl, bookingId: booking.id, requiresPayment: true });
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : "Unknown error";
-    req.log.error({ err, errMsg, bookingId: booking.id }, "[bookings] PhonePe retry initiation failed");
-    await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() })
-      .where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
-    res.status(502).json({ error: `Payment initiation failed: ${errMsg}` });
-  }
-});
+// Online payment / retry-payment disabled — all bookings are COD
+// router.post("/bookings/:id/retry-payment", ...);
 
 // Partner analytics — earnings summary, per-event breakdown, daily revenue
 router.get("/partner/commission", requireAuth(["vendor"]), async (req, res) => {
