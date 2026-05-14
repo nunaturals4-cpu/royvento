@@ -4,8 +4,8 @@ import { runCleanup } from "./jobs/cleanup";
 import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingReminders";
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import cron from "node-cron";
-import { db, usersTable, vendorsTable } from "@workspace/db";
-import { eq, or, sql } from "drizzle-orm";
+import { db, usersTable, vendorsTable, eventsTable, wishlistsTable } from "@workspace/db";
+import { eq, or, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "./lib/ticketCode";
 
@@ -137,16 +137,16 @@ async function removeLegacyDemoVendor() {
       logger.warn({ vendorId: v.id, ownerEmail: owner?.email }, "Startup cleanup: removing 'Royvento Studio' vendor by business-name match");
       // Individual DELETEs (PostgreSQL DO $$ blocks don't support bind params).
       await db.transaction(async (tx) => {
-        const evIds = await tx.execute<{ id: number }>(sql`SELECT id FROM events WHERE vendor_id = ${v.id}`);
-        const eventIds = ((evIds as unknown as { rows?: Array<{ id: number }> }).rows
-          ?? (evIds as unknown as Array<{ id: number }>))
-          .map((r) => r.id);
+        const evRows = await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.vendorId, v.id));
+        const eventIds = evRows.map((r) => r.id);
 
         await tx.execute(sql`DELETE FROM commission_ledger WHERE vendor_id = ${v.id}`);
         await tx.execute(sql`DELETE FROM bookings WHERE vendor_id = ${v.id}`);
         await tx.execute(sql`DELETE FROM reviews WHERE vendor_id = ${v.id}`);
+        // Drizzle's typed delete + inArray emits `IN ($1, $2, ...)` which
+        // PostgreSQL accepts — `ANY((1,2,3))` does NOT work for row tuples.
         if (eventIds.length > 0) {
-          await tx.execute(sql`DELETE FROM wishlists WHERE event_id = ANY(${eventIds})`);
+          await tx.delete(wishlistsTable).where(inArray(wishlistsTable.eventId, eventIds));
         }
         await tx.execute(sql`DELETE FROM announcements WHERE vendor_id = ${v.id}`);
         await tx.execute(sql`DELETE FROM events WHERE vendor_id = ${v.id}`);

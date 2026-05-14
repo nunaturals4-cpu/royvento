@@ -858,10 +858,14 @@ function AllVendorsAdmin() {
     if (!confirm(`Delete "${v.businessName}" and all ${v.eventCount} of their listings? This cannot be undone.`)) return;
     try {
       await apiDelete(`/api/admin/vendors/${v.id}`);
-      toast({ title: "Partner deleted" });
+      toast({ title: "Partner deleted", description: `${v.businessName} and all related data removed.` });
       load(page);
     } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+      toast({
+        title: "Failed to delete partner",
+        description: e?.message ?? "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

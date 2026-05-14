@@ -12,6 +12,7 @@ import {
   commissionLedgerTable,
   vendorRequestsTable,
   vendorManagersTable,
+  wishlistsTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
@@ -965,16 +966,17 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
   // ("bind message supplies N parameters, but prepared statement requires 0").
   try {
     await db.transaction(async (tx) => {
-      const evIds = await tx.execute<{ id: number }>(sql`SELECT id FROM events WHERE vendor_id = ${id}`);
-      const eventIds = ((evIds as unknown as { rows?: Array<{ id: number }> }).rows
-        ?? (evIds as unknown as Array<{ id: number }>))
-        .map((r) => r.id);
+      const evRows = await tx.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.vendorId, id));
+      const eventIds = evRows.map((r) => r.id);
 
       await tx.execute(sql`DELETE FROM commission_ledger WHERE vendor_id = ${id}`);
       await tx.execute(sql`DELETE FROM bookings WHERE vendor_id = ${id}`);
       await tx.execute(sql`DELETE FROM reviews WHERE vendor_id = ${id}`);
+      // Drizzle's typed delete + inArray produces `IN ($1, $2, ...)` which
+      // PostgreSQL accepts — `ANY((1,2,3))` (a row, not an array) does NOT
+      // work and was the cause of "Failed query: DELETE FROM wishlists".
       if (eventIds.length > 0) {
-        await tx.execute(sql`DELETE FROM wishlists WHERE event_id = ANY(${eventIds})`);
+        await tx.delete(wishlistsTable).where(inArray(wishlistsTable.eventId, eventIds));
       }
       await tx.execute(sql`DELETE FROM announcements WHERE vendor_id = ${id}`);
       await tx.execute(sql`DELETE FROM events WHERE vendor_id = ${id}`);
