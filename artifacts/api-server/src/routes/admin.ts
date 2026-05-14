@@ -1976,20 +1976,14 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   const eventFerMap = new Map(
     reportEventRows.map((e) => [e.id, e.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | null]),
   );
-  // Index ledger rows by vendorId (collected totals) and bookingId (per-booking
-  // realised amounts). Both are needed: vendor totals for collectedCommission;
-  // per-booking amounts so totalCommission uses ledger for scanned bookings and
-  // planned commission only for bookings not yet realised.
-  const collectedByVendor = new Map<number, number>();
+  // We use the ledger purely as a realisation marker (has this booking been
+  // QR-scanned / paid yet?). The reported commission AMOUNT always comes from
+  // the deterministic `units × rate` calculation so the report matches the
+  // current rate card to the rupee — even when historical ledger rows from
+  // earlier code paths recorded actuals-based or FER-split values.
   const collectedBookingIds = new Set<number>();
-  const ledgerAmtByBookingId = new Map<number, number>();
   for (const row of ledgerRows) {
-    const amt = Number(row.amount ?? 0);
-    collectedByVendor.set(row.vendorId, (collectedByVendor.get(row.vendorId) ?? 0) + amt);
-    if (row.bookingId != null) {
-      collectedBookingIds.add(row.bookingId);
-      ledgerAmtByBookingId.set(row.bookingId, (ledgerAmtByBookingId.get(row.bookingId) ?? 0) + amt);
-    }
+    if (row.bookingId != null) collectedBookingIds.add(row.bookingId);
   }
 
   type BookingLineItem = {
@@ -2088,11 +2082,9 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     const feePerUnit = comm.ratePerUnit;
     const unitCount = comm.unitCount;
     const isCollected = collectedBookingIds.has(b.id);
-    const realisedAmt = ledgerAmtByBookingId.get(b.id);
-    // For scanned/paid bookings use the ledger amount (reflects actual attendance
-    // when actuals were recorded at the door). For pending bookings fall back to
-    // planned commission so the report always shows the best available estimate.
-    const commissionAmount = (isCollected && realisedAmt !== undefined) ? realisedAmt : comm.amount;
+    // Deterministic per-booking commission: always units × rate from the
+    // current rate card. The ledger only marks realisation (scanned vs pending).
+    const commissionAmount = comm.amount;
 
     // Skip bookings from vendors not in the approved list
     if (!summaryMap.has(b.vendorId)) continue;
@@ -2111,10 +2103,12 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       collected: isCollected,
       createdAt: b.createdAt,
     });
-    // Pending commission uses planned amount (not ledger) so it represents
-    // the theoretical amount expected when the booking is eventually realised.
-    if (!isCollected) {
-      s.pendingCommission += comm.amount;
+    // Realised vs pending split is driven solely by the ledger marker.
+    // Amounts on both sides come from the deterministic units × rate calc.
+    if (isCollected) {
+      s.collectedCommission += commissionAmount;
+    } else {
+      s.pendingCommission += commissionAmount;
     }
 
     if (bookingType === "free_entry") {
@@ -2135,10 +2129,9 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     }
   }
 
-  // Collected commission per vendor comes straight from the ledger (already
-  // window-filtered). Pending was accumulated per-booking above; just round.
+  // Both buckets were accumulated per-booking above using planned amounts.
   for (const s of summaryMap.values()) {
-    s.collectedCommission = Math.round((collectedByVendor.get(s.vendorId) ?? 0) * 100) / 100;
+    s.collectedCommission = Math.max(0, Math.round(s.collectedCommission * 100) / 100);
     s.pendingCommission = Math.max(0, Math.round(s.pendingCommission * 100) / 100);
   }
 

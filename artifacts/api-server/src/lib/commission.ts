@@ -3,8 +3,15 @@
  * commission math used by the online-payment success path, the COD/free-entry
  * check-in path, and the admin commission report.
  *
- * The rate model itself (free-entry / ticket / table-booking rates) is owned
- * by the `vendor_commissions` table and is not changed here.
+ * Industry-standard rule set: commission = unitCount × rate, deterministic.
+ * No FER-tier discount, no price cap, no actuals haircut. Actuals are an
+ * attendance log; they do NOT change the per-booking commission. This makes
+ * the report match the rate card and gives vendors a predictable per-booking
+ * fee they can audit.
+ *
+ *   Free Entry  → number of people × freeEntryRate
+ *   Ticket      → number of tickets × ticketRate
+ *   Table       → number of guests  × tableBookingRate
  */
 
 export type BookingType = "free_entry" | "ticket" | "table";
@@ -39,9 +46,11 @@ export interface FreeEntryRulesShape {
 
 const FER_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** Returns which ticket tiers are zero-priced at the door for a given booking
- * date under the event's free-entry rules. Tokens in `genders` are normalised
- * to lowercase and matched against canonical "women"/"men"/"couple". */
+/**
+ * Retained for routes that still display "is today an FER day" badges in the
+ * scanner UI. Commission math no longer consults FER — every booked unit
+ * bills at the classification's flat rate regardless of which tier was free.
+ */
 export function ferTierFreeFlags(bookingDate: string | null | undefined, fer: FreeEntryRulesShape | null | undefined) {
   const day = bookingDate ? FER_DAY_ABBRS[new Date(`${bookingDate}T12:00:00`).getDay()] : "";
   const active = !!(fer?.enabled && day && Array.isArray(fer.days) && fer.days.includes(day));
@@ -76,8 +85,7 @@ export interface CommissionResult {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Classify a booking by its mode + price. Mirrors the inline logic that used to
- * live in `/admin/commission-report`. */
+/** Classify a booking by its mode + price. */
 export function classifyBookingType(b: { pubMode: string; finalPrice: string | number }): BookingType {
   const price = Number(b.finalPrice);
   if (b.pubMode === "table") return "table";
@@ -86,16 +94,33 @@ export function classifyBookingType(b: { pubMode: string; finalPrice: string | n
 }
 
 /**
- * Compute commission for the **online** payment path using the booking's
- * planned counts. Capped by `finalPrice` (commission can never exceed the
- * money actually paid online).
+ * Count people for a free-entry booking: 1 woman = 1 person, 1 man = 1 person,
+ * 1 couple = 2 people. Falls back to `guests` when no per-tier counts were
+ * recorded (table-mode bookings that ended up as free entry).
+ */
+function freeEntryPeopleCount(b: PlannedBookingShape): number {
+  const tierHeads = b.ticketWomen + b.ticketMen + b.ticketCouple * 2;
+  if (tierHeads > 0) return Math.max(0, tierHeads);
+  return Math.max(0, b.guests);
+}
+
+/** Count tickets for a ticket booking: 1 row per booked seat (couple = 1 ticket). */
+function ticketCount(b: PlannedBookingShape): number {
+  const total = b.ticketWomen + b.ticketMen + b.ticketCouple;
+  if (total > 0) return Math.max(0, total);
+  return Math.max(0, b.guests);
+}
+
+/**
+ * Compute commission from the booking's planned counts. This is the
+ * canonical commission for every trigger (online payment, COD check-in,
+ * free-entry check-in). The admin report mirrors this exact computation.
  */
 export function computeCommissionFromPlanned(
   b: PlannedBookingShape,
   rates: CommissionRatesInput,
-  fer?: FreeEntryRulesShape | null,
+  _fer?: FreeEntryRulesShape | null,
 ): CommissionResult {
-  const price = Number(b.finalPrice);
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketFee = Number(rates.ticketRate ?? 0);
   const tableFee = Number(rates.tableBookingRate ?? 0);
@@ -104,128 +129,39 @@ export function computeCommissionFromPlanned(
 
   let ratePerUnit = 0;
   let unitCount = 0;
-  let raw = 0;
   if (bookingType === "table") {
     ratePerUnit = tableFee;
     unitCount = Math.max(0, b.guests);
-    raw = tableFee * unitCount;
   } else if (bookingType === "free_entry") {
     ratePerUnit = freeEntryFee;
-    // Ticket-mode bookings that end up free (all tiers free on an FER day) store
-    // counts in ticketWomen/Men/Couple, not guests. Use ticket counts when present.
-    const ticketTotal = Math.max(0, b.ticketWomen + b.ticketMen + b.ticketCouple);
-    unitCount = ticketTotal > 0 ? ticketTotal : Math.max(0, b.guests);
-    raw = freeEntryFee * unitCount;
+    unitCount = freeEntryPeopleCount(b);
   } else {
-    // ticket mode. On a partial-FER day, free tiers are billed at freeEntryFee
-    // and paid tiers at ticketFee; otherwise all tickets bill at ticketFee.
-    const totalUnits = Math.max(0, b.ticketWomen + b.ticketMen + b.ticketCouple);
-    // Event/legacy-mode bookings (pubMode !== "ticket") store headcount in
-    // b.guests rather than in per-tier ticket counts. Fall back so those
-    // bookings are never silently charged 0 commission.
-    unitCount = totalUnits > 0 ? totalUnits : Math.max(0, b.guests);
-    const flags = ferTierFreeFlags(b.bookingDate ?? null, fer ?? null);
-    if (flags.active && totalUnits > 0) {
-      const freeUnits =
-        (flags.women ? b.ticketWomen : 0) +
-        (flags.men ? b.ticketMen : 0) +
-        (flags.couple ? b.ticketCouple : 0);
-      const paidUnits = Math.max(0, totalUnits - freeUnits);
-      raw = freeEntryFee * freeUnits + ticketFee * paidUnits;
-      // Surface the dominant per-unit fee (paid if any paid tickets, else free).
-      ratePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
-    } else {
-      ratePerUnit = ticketFee;
-      raw = ticketFee * unitCount;
-    }
+    ratePerUnit = ticketFee;
+    unitCount = ticketCount(b);
   }
-  // Table and free-entry commission: per-head VENDOR charge — uncapped.
-  // Ticket commission: capped at the price actually collected by the customer.
-  const amount = bookingType === "ticket" ? round2(Math.min(raw, price)) : round2(raw);
-  return { bookingType, ratePerUnit, unitCount, amount };
+
+  return { bookingType, ratePerUnit, unitCount, amount: round2(ratePerUnit * unitCount) };
 }
 
 /**
- * Compute commission for the **COD / free-entry check-in** path using the
- * booking's recorded `actual*` counts.
+ * Compute commission from booking actuals.
  *
- * - Free entry: per-head free-entry rate × actual heads (uncapped — there is
- *   no cash collected to cap against; the platform earns its per-head fee
- *   when the customer actually shows up).
- * - COD ticket: ticket rate × actual ticket count, capped by actual cash
- *   collected at the door (sum of per-type counts × per-type prices).
- * - COD table: flat table rate, capped by actual cash collected at the door
- *   (pro-rated finalPrice by attendance ratio).
+ * Per the platform's deterministic-rate model, commission is fixed at booking
+ * time (units × rate). Actuals serve as an attendance log only — they do not
+ * change the platform's per-booking fee. This function therefore delegates to
+ * `computeCommissionFromPlanned`, guaranteeing that re-scans with zero
+ * actuals can never zero out a realised commission.
  */
 export function computeCommissionFromActuals(
   b: ActualBookingShape,
   rates: CommissionRatesInput,
-  event: EventPriceShape,
+  _event: EventPriceShape,
   fer?: FreeEntryRulesShape | null,
 ): CommissionResult {
-  const freeEntryFee = Number(rates.freeEntryRate ?? 0);
-  const ticketFee = Number(rates.ticketRate ?? 0);
-  const tableFee = Number(rates.tableBookingRate ?? 0);
-
-  const bookingType = classifyBookingType(b);
-  const aw = b.actualWomen ?? 0;
-  const am = b.actualMen ?? 0;
-  const ac = b.actualCouple ?? 0;
-  const ag = b.actualGuests ?? 0;
-
-  if (bookingType === "free_entry") {
-    // Free entry: prefer actualGuests (table-mode free entry); for ticket-mode
-    // free entry, fall back to per-type actuals (couples count as 2 heads).
-    const heads = ag > 0 ? ag : aw + am + ac * 2;
-    const ratePerUnit = freeEntryFee;
-    const unitCount = Math.max(0, heads);
-    return { bookingType, ratePerUnit, unitCount, amount: round2(freeEntryFee * unitCount) };
-  }
-
-  if (bookingType === "table") {
-    // Table commission: per-head VENDOR charge × actual attendees, uncapped.
-    const ratePerUnit = tableFee;
-    const unitCount = Math.max(0, ag);
-    const raw = tableFee * unitCount;
-    return { bookingType, ratePerUnit, unitCount, amount: round2(raw) };
-  }
-
-  // ticket mode COD — split per-tier when FER is active (free tiers billed
-  // at freeEntryFee × actuals; paid tiers at ticketFee × actuals; aggregate
-  // capped by cash actually collected at the door).
-  const flags = ferTierFreeFlags(b.bookingDate ?? null, fer ?? null);
-  const pw = Number(event.priceWomen ?? 0);
-  const pm = Number(event.priceMen ?? 0);
-  const pc = Number(event.priceCouple ?? 0);
-  const unitCount = Math.max(0, aw + am + ac);
-  let raw: number;
-  let ratePerUnit: number;
-  let cashCollected: number;
-  if (flags.active) {
-    const freeUnits =
-      (flags.women ? aw : 0) +
-      (flags.men ? am : 0) +
-      (flags.couple ? ac : 0);
-    const paidUnits = Math.max(0, unitCount - freeUnits);
-    raw = freeEntryFee * freeUnits + ticketFee * paidUnits;
-    ratePerUnit = paidUnits > 0 ? ticketFee : freeEntryFee;
-    cashCollected =
-      (flags.women ? 0 : aw * pw) +
-      (flags.men ? 0 : am * pm) +
-      (flags.couple ? 0 : ac * pc);
-  } else {
-    ratePerUnit = ticketFee;
-    raw = ticketFee * unitCount;
-    cashCollected = aw * pw + am * pm + ac * pc;
-  }
-  return { bookingType, ratePerUnit, unitCount, amount: round2(Math.min(raw, Math.max(0, cashCollected))) };
+  return computeCommissionFromPlanned(b, rates, fer);
 }
 
-/** Commission ledger triggers that represent realised platform earnings.
- * Excludes `settlement_offset` which only records realisation against a
- * vendor's running balance (not new commission earned). This is the
- * canonical set used by both the Commissions tab's "Collected" column
- * and the Admin Analytics Total Commission KPI. */
+/** Commission ledger triggers that represent realised platform earnings. */
 export const REALISED_COMMISSION_TRIGGERS = [
   "online_payment",
   "cod_checkin",
