@@ -138,10 +138,11 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
     });
     return res.json({ redirectUrl, subscriptionId: sub.id, requiresPayment: true });
   } catch (err) {
-    req.log.error({ err }, "[subscriptions] PhonePe initiation failed");
+    const errMsg = err instanceof Error ? err.message : "Unknown error";
+    req.log.error({ err, errMsg }, "[subscriptions] PhonePe initiation failed");
     await db.update(subscriptionsTable).set({ status: "expired" }).where(eq(subscriptionsTable.id, sub.id));
     await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
-    return res.status(502).json({ error: "Payment initiation failed. Please try again." });
+    return res.status(502).json({ error: `Payment initiation failed: ${errMsg}` });
   }
 });
 

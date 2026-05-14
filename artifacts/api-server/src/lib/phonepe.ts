@@ -136,6 +136,34 @@ export async function initiatePayment(params: {
     throw new Error("PhonePe is not configured. Please set PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, and PHONEPE_SALT_INDEX in environment secrets.");
   }
 
+  // PhonePe rejects amounts below 100 paise (₹1) with a generic
+  // "Problem processing request" error on its payment page. Catch this
+  // early so users see a useful error instead of getting stuck on PhonePe.
+  if (!Number.isFinite(params.amountPaise) || params.amountPaise < 100) {
+    throw new Error(`PhonePe requires a minimum amount of ₹1. Got ${params.amountPaise} paise.`);
+  }
+
+  // PhonePe payment links must use HTTPS — http URLs (or relative ones)
+  // are silently rejected by the gateway and surface as "Problem processing
+  // request" on PhonePe's UI. Validate before sending.
+  if (!/^https:\/\//.test(params.redirectUrl)) {
+    throw new Error(`PhonePe redirectUrl must be HTTPS. Got: ${params.redirectUrl}`);
+  }
+  if (!/^https:\/\//.test(params.callbackUrl)) {
+    throw new Error(`PhonePe callbackUrl must be HTTPS. Got: ${params.callbackUrl}`);
+  }
+
+  // Strip non-digits from mobileNumber so PhonePe receives a clean 10-digit
+  // string. Numbers with +91 prefix or spaces ("+91 98765 43210") cause the
+  // payment page to fail with "Problem processing request".
+  let cleanMobile: string | undefined;
+  if (params.mobileNumber) {
+    const digits = params.mobileNumber.replace(/\D/g, "").slice(-10);
+    if (/^\d{10}$/.test(digits)) {
+      cleanMobile = digits;
+    }
+  }
+
   const payload = {
     merchantId,
     merchantTransactionId: params.merchantTransactionId,
@@ -144,13 +172,24 @@ export async function initiatePayment(params: {
     redirectUrl: params.redirectUrl,
     redirectMode: "REDIRECT",
     callbackUrl: params.callbackUrl,
-    ...(params.mobileNumber ? { mobileNumber: params.mobileNumber } : {}),
+    ...(cleanMobile ? { mobileNumber: cleanMobile } : {}),
     paymentInstrument: { type: "PAY_PAGE" },
   };
 
   const base64Payload = Buffer.from(JSON.stringify(payload)).toString("base64");
   const endpoint = "/pg/v1/pay";
   const checksum = buildChecksum(base64Payload, endpoint, saltKey, saltIndex);
+
+  phonepeLogger.info(
+    {
+      merchantId,
+      merchantTransactionId: params.merchantTransactionId,
+      amountPaise: params.amountPaise,
+      hasMobile: !!cleanMobile,
+      baseUrl,
+    },
+    "[phonepe] Initiating payment",
+  );
 
   const raw = await httpPost(
     `${baseUrl}${endpoint}`,
@@ -163,7 +202,7 @@ export async function initiatePayment(params: {
 
   if (!isPhonePeInitiateResponse(raw) || !raw.success) {
     const msg = isPhonePeInitiateResponse(raw) ? raw.message : "Unknown PhonePe error";
-    phonepeLogger.error({ raw }, "[phonepe] Initiate payment failed");
+    phonepeLogger.error({ raw, payloadSummary: { amountPaise: params.amountPaise, hasMobile: !!cleanMobile } }, "[phonepe] Initiate payment failed");
     throw new Error(msg ?? "PhonePe payment initiation failed");
   }
 

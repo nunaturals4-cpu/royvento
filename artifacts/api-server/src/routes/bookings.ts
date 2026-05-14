@@ -523,16 +523,17 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       });
       res.json({ redirectUrl, bookingId: b.id, requiresPayment: true });
     } catch (err) {
-      req.log.error({ err }, "PhonePe initiation failed");
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
+      req.log.error({ err, errMsg, bookingId: b.id }, "PhonePe initiation failed");
       await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
-      await db.update(bookingsTable).set({ status: "cancelled", rejectionReason: "Payment initiation failed" }).where(eq(bookingsTable.id, b.id));
+      await db.update(bookingsTable).set({ status: "cancelled", rejectionReason: `Payment initiation failed: ${errMsg}` }).where(eq(bookingsTable.id, b.id));
       if (validCode) {
         await db.update(couponsTable).set({ used: false }).where(and(eq(couponsTable.code, validCode), eq(couponsTable.userId, user.id)));
       }
       if (pointsUsed > 0) {
         await db.update(usersTable).set({ points: user.points }).where(eq(usersTable.id, user.id));
       }
-      res.status(502).json({ error: "Payment initiation failed. Please try again." });
+      res.status(502).json({ error: `Payment initiation failed: ${errMsg}` });
     }
     return;
   }
@@ -733,10 +734,11 @@ router.post("/bookings/:id/retry-payment", requireAuth(), async (req, res) => {
     });
     res.json({ redirectUrl, bookingId: booking.id, requiresPayment: true });
   } catch (err) {
-    req.log.error({ err }, "[bookings] PhonePe retry initiation failed");
+    const errMsg = err instanceof Error ? err.message : "Unknown error";
+    req.log.error({ err, errMsg, bookingId: booking.id }, "[bookings] PhonePe retry initiation failed");
     await db.update(paymentsTable).set({ status: "failed", updatedAt: new Date() })
       .where(eq(paymentsTable.merchantTransactionId, merchantTransactionId));
-    res.status(502).json({ error: "Payment initiation failed — please try again" });
+    res.status(502).json({ error: `Payment initiation failed: ${errMsg}` });
   }
 });
 
