@@ -1,4 +1,5 @@
-﻿import { SEO } from "@/components/SEO";
+﻿// Trigger Railway deploy: API-only changes are skipped by watch-path filter
+import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
   useListPendingVendors,
