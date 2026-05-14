@@ -66,10 +66,7 @@ export function EventCard({
 
   function formatPrice(v: number) {
     if (v <= 0) return "Free";
-    if (v >= 10000000) return `₹${(v / 10000000).toFixed(1)}Cr`;
-    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
-    if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`;
-    return `₹${Math.round(v)}`;
+    return `₹${Math.round(v).toLocaleString("en-IN")}`;
   }
 
   const fer = freeEntryRules;

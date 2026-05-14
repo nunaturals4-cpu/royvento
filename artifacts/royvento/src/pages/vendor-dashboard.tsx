@@ -2427,7 +2427,7 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                   />
                   <YAxis
                     tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={(v: number) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
                     width={48}
                     domain={[0, Math.ceil(chartMax * 1.15)]}
                   />
@@ -3456,7 +3456,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v) => v === 0 ? "₹0" : `₹${(v / 1000).toFixed(0)}k`}
+                tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
                 width={48}
                 domain={[0, Math.ceil(chartMax * 1.15)]}
               />

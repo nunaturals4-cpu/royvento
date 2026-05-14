@@ -108,6 +108,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   // Ticket breakdown + daily revenue + per-vendor breakdown (all filtered by date range)
   const confirmedBookings = await db
     .select({
+      id: bookingsTable.id,
       vendorId: bookingsTable.vendorId,
       eventId: bookingsTable.eventId,
       bookingDate: bookingsTable.bookingDate,
@@ -273,12 +274,14 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const allVendors = await db.select().from(vendorsTable);
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
 
-  // Total platform commission across every confirmed/completed booking in
-  // the window, computed from the current rate card (commission =
-  // Σ per-tier units × per-tier rate). Mirrors the per-vendor numbers in
-  // `/admin/commission-report` so both surfaces agree to the rupee. The
-  // commission_ledger table is treated purely as a realisation marker
-  // (scanned vs pending); amounts come from the deterministic calc.
+  // "Total Commission" KPI = "Commission Collected" in the commission report.
+  // Sum of planned commission (current rate card) for every confirmed/completed
+  // booking in the window that has been realised — i.e. has a row in
+  // commission_ledger with a REALISED trigger (online_payment / cod_checkin /
+  // free_checkin). The ledger's UNIQUE (booking_id, trigger) constraint
+  // guarantees one realisation per trigger so duplicate aggregation is
+  // structurally impossible. Amounts come from the deterministic calc, not the
+  // ledger amount, so historical buggy ledger values never leak into the KPI.
   const vendorCommissionRows = await db.select().from(vendorCommissionsTable);
   const vendorCommissionMap = new Map(vendorCommissionRows.map((r) => [r.vendorId, r]));
 
@@ -296,8 +299,26 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     ]),
   );
 
+  const analyticsBookingIds = confirmedBookings.map((b) => b.id);
+  const realisedLedgerRows = analyticsBookingIds.length > 0
+    ? await db
+        .select({ bookingId: commissionLedgerTable.bookingId })
+        .from(commissionLedgerTable)
+        .where(
+          and(
+            inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
+            inArray(commissionLedgerTable.bookingId, analyticsBookingIds),
+          ),
+        )
+    : [];
+  const realisedBookingIds = new Set<number>();
+  for (const row of realisedLedgerRows) {
+    if (row.bookingId != null) realisedBookingIds.add(row.bookingId);
+  }
+
   let totalCommission = 0;
   for (const b of confirmedBookings) {
+    if (!realisedBookingIds.has(b.id)) continue;
     const rates = vendorCommissionMap.get(b.vendorId) ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 };
     const comm = computeCommissionFromPlanned(b, rates, analyticsFerMap.get(b.eventId) ?? null);
     totalCommission += comm.amount;

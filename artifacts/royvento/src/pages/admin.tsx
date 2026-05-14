@@ -300,7 +300,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
           valueClassName="text-amber-300"
           subHint={
             (data as { pendingActualsCount?: number }).pendingActualsCount
-              ? `${data.actualCodRecordedCount ?? 0} recorded Â· ${(data as { pendingActualsCount?: number }).pendingActualsCount} pending`
+              ? `${data.actualCodRecordedCount ?? 0} recorded · ${(data as { pendingActualsCount?: number }).pendingActualsCount} pending`
               : `${data.actualCodRecordedCount ?? 0} bookings recorded`
           }
         />
@@ -415,7 +415,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v: number) => v === 0 ? "â‚¹0" : `â‚¹${(v / 1000).toFixed(0)}k`}
+                tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
                 width={48}
                 domain={[0, Math.ceil(monthlyChartMax * 1.15)]}
               />
@@ -456,7 +456,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v: number) => v === 0 ? "â‚¹0" : `â‚¹${(v / 1000).toFixed(0)}k`}
+                tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
                 width={48}
                 domain={[0, Math.ceil(dailyChartMax * 1.15)]}
               />
@@ -507,7 +507,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
             ) : data.topVendors.map((v) => (
               <div key={v.vendorId} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
                 <span className="font-medium">{v.businessName}</span>
-                <span className="text-muted-foreground">{v.bookingCount} bookings Â· {formatINR(v.revenue)}</span>
+                <span className="text-muted-foreground">{v.bookingCount} bookings · {formatINR(v.revenue)}</span>
               </div>
             ))}
           </div>
@@ -570,7 +570,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
             <div key={b.id} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
               <div>
                 <span className="font-medium">{b.eventTitle}</span>
-                <span className="text-muted-foreground"> Â· {b.userName}</span>
+                <span className="text-muted-foreground"> · {b.userName}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Badge variant="secondary">{b.status}</Badge>
@@ -1187,7 +1187,7 @@ function EventApprovalsAdmin() {
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
                   <p className="font-serif text-lg">{e.title}</p>
-                  <p className="text-xs text-muted-foreground">{e.partnerName} Â· {e.city}{e.state ? `, ${e.state}` : ""}</p>
+                  <p className="text-xs text-muted-foreground">{e.partnerName} · {e.city}{e.state ? `, ${e.state}` : ""}</p>
                 </div>
                 <div className="flex gap-1 flex-wrap">
                   <Badge variant="outline">{e.type}</Badge>
@@ -1736,8 +1736,8 @@ function VendorRequests() {
               </div>
               <p className="font-serif text-xl">{r.businessName}</p>
               <p className="text-sm text-muted-foreground">
-                From {r.user.name} Â· {r.user.email}
-                {r.user.phone ? <> Â· {r.user.phone}</> : null}
+                From {r.user.name} · {r.user.email}
+                {r.user.phone ? <> · {r.user.phone}</> : null}
               </p>
               <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{r.message}</p>
               <p className="mt-2 text-xs text-muted-foreground">Submitted {new Date(r.createdAt).toLocaleString()}</p>
@@ -1812,8 +1812,8 @@ function Messages() {
                 <p className="font-serif text-lg">{m.subject || "(no subject)"}</p>
               </div>
               <p className="text-sm text-muted-foreground">
-                From <span className="font-medium text-foreground">{m.name}</span> Â· {m.email}
-                {m.phone ? <> Â· {m.phone}</> : null}
+                From <span className="font-medium text-foreground">{m.name}</span> · {m.email}
+                {m.phone ? <> · {m.phone}</> : null}
               </p>
               <p className="mt-3 whitespace-pre-wrap text-sm">{m.message}</p>
               <p className="mt-3 text-xs text-muted-foreground">{new Date(m.createdAt).toLocaleString()}</p>
@@ -1969,7 +1969,7 @@ function BlogsAdmin() {
                 {b.imageUrl && <img src={b.imageUrl} alt={b.title} className="w-16 h-12 rounded-lg object-cover shrink-0" />}
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{b.title}</p>
-                  <p className="text-xs text-muted-foreground">{b.slug} Â· {b.authorName}</p>
+                  <p className="text-xs text-muted-foreground">{b.slug} · {b.authorName}</p>
                   <div className="flex gap-1 mt-1">
                     {b.tags.slice(0, 3).map((t) => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{t}</span>)}
                     {!b.published && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Draft</span>}
@@ -2415,9 +2415,9 @@ function BookingReport() {
                         <p className="text-muted-foreground">Tickets</p>
                         <p className="font-semibold">
                           <span className="text-pink-400">{v.ticketWomen}W</span>
-                          {" Â· "}
+                          {" · "}
                           <span className="text-blue-400">{v.ticketMen}M</span>
-                          {" Â· "}
+                          {" · "}
                           <span className="text-purple-400">{v.ticketCouple}C</span>
                         </p>
                       </div>
@@ -2461,7 +2461,7 @@ function BookingReport() {
               <thead>
                 <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wider">
                   <th className="px-4 py-3 text-left">#</th>
-                  <th className="px-4 py-3 text-left">Partner Â· Event</th>
+                  <th className="px-4 py-3 text-left">Partner · Event</th>
                   <th className="px-4 py-3 text-left">Customer</th>
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Mode</th>
@@ -2799,7 +2799,7 @@ function AttendanceReport() {
                         </td>
                         <td className="py-2 px-3 text-right tabular-nums">
                           {t.codDue > 0
-                            ? <span className="text-amber-300 font-semibold">â‚¹{t.codDue.toLocaleString("en-IN")}</span>
+                            ? <span className="text-amber-300 font-semibold">₹{t.codDue.toLocaleString("en-IN")}</span>
                             : <span className="text-muted-foreground/50">--</span>}
                         </td>
                       </tr>
@@ -2864,7 +2864,7 @@ function AttendanceReport() {
                         ? <span className="text-muted-foreground/40">--</span>
                         : b.actualAmountDue == null
                           ? <span className="text-muted-foreground/60">--</span>
-                          : <span className="text-amber-300 font-semibold">â‚¹{b.actualAmountDue.toLocaleString("en-IN")}</span>}
+                          : <span className="text-amber-300 font-semibold">₹{b.actualAmountDue.toLocaleString("en-IN")}</span>}
                     </td>
                     <td className="py-2.5 pr-3">
                       {b.checkedIn ? (
@@ -3831,7 +3831,7 @@ function CommissionsAdmin() {
           </div>
           <div>
             <h2 className="font-serif text-2xl">Commission fees per partner</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Set the flat platform fee (â‚¹) per person/booking applied to each booking type for every approved vendor.</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Set the flat platform fee (₹) per person/booking applied to each booking type for every approved vendor.</p>
           </div>
         </div>
 
@@ -3845,9 +3845,9 @@ function CommissionsAdmin() {
               <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
                 <tr>
                   <th className="text-left py-2 pr-4">Partner</th>
-                  <th className="text-right py-2 px-3">Free Entry â‚¹/person</th>
-                  <th className="text-right py-2 px-3">Ticket â‚¹/ticket</th>
-                  <th className="text-right py-2 px-3">Table â‚¹/booking</th>
+                  <th className="text-right py-2 px-3">Free Entry ₹/person</th>
+                  <th className="text-right py-2 px-3">Ticket ₹/ticket</th>
+                  <th className="text-right py-2 px-3">Table ₹/booking</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
               </thead>
@@ -3989,9 +3989,9 @@ function CommissionsAdmin() {
                         className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> Â· {row.city}</span> : ""}</p>
+                          <p className="font-medium text-sm">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> · {row.city}</span> : ""}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Fees: FE â‚¹{row.appliedRates.freeEntryRate}/person Â· Ticket â‚¹{row.appliedRates.ticketRate}/ticket Â· Table â‚¹{row.appliedRates.tableBookingRate}/booking
+                            Fees: FE ₹{row.appliedRates.freeEntryRate}/person · Ticket ₹{row.appliedRates.ticketRate}/ticket · Table ₹{row.appliedRates.tableBookingRate}/booking
                           </p>
                         </div>
                         <div className="flex items-center gap-6 tabular-nums text-sm shrink-0">
@@ -4031,7 +4031,7 @@ function CommissionsAdmin() {
                                       <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
                                       <td className="text-right px-2">
                                         {b.commissionRate > 0
-                                          ? `â‚¹${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)} Ã— ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
+                                          ? `₹${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)} × ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
                                           : "--"}
                                       </td>
                                       <td className="text-right pl-2 text-primary">{formatINR(b.commissionAmount)}</td>
@@ -4089,7 +4089,7 @@ function AnnouncementSliderRow({
           {item.vendorName}
           {item.announceDate && (
             <span className="ml-2">
-              Â· {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+              · {new Date(item.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
             </span>
           )}
         </p>
@@ -4363,8 +4363,8 @@ function ReviewsAdmin() {
                   <div>
                     <p className="font-medium text-sm">{r.userName}</p>
                     <p className="text-xs text-muted-foreground">
-                      on <span className="text-foreground">{r.vendorName}</span> Â· {new Date(r.createdAt).toLocaleString()}
-                      {r.verifiedBooking ? " Â· âœ“ verified" : ""}
+                      on <span className="text-foreground">{r.vendorName}</span> · {new Date(r.createdAt).toLocaleString()}
+                      {r.verifiedBooking ? " · âœ“ verified" : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -5141,7 +5141,7 @@ function CreatePubAdmin() {
                 const setter = label === "Women" ? setPriceWomen : label === "Men" ? setPriceMen : setPriceCouple;
                 return (
                   <div key={label} className="space-y-1.5">
-                    <Label className="text-xs">{label} (â‚¹)</Label>
+                    <Label className="text-xs">{label} (₹)</Label>
                     <Input type="number" min={0} placeholder="0" value={val}
                       onChange={(e) => setter(e.target.value)} className="bg-black/40 border-white/10" />
                   </div>
@@ -5158,9 +5158,9 @@ function CreatePubAdmin() {
                   <thead>
                     <tr className="text-muted-foreground">
                       <th className="text-left pb-1.5 font-normal">Day</th>
-                      <th className="pb-1.5 font-normal">Women (â‚¹)</th>
-                      <th className="pb-1.5 font-normal">Men (â‚¹)</th>
-                      <th className="pb-1.5 font-normal">Couple (â‚¹)</th>
+                      <th className="pb-1.5 font-normal">Women (₹)</th>
+                      <th className="pb-1.5 font-normal">Men (₹)</th>
+                      <th className="pb-1.5 font-normal">Couple (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">

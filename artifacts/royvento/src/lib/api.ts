@@ -121,11 +121,14 @@ export const INDIAN_STATES = [
   "Kerala", "Goa", "Madhya Pradesh", "Haryana", "Bihar",
 ] as const;
 
+/**
+ * Format an INR amount with the real numeric value (e.g. ₹4,200 — never "₹4.2K").
+ * `formatINR` and `formatINRExact` now behave identically; the compact
+ * abbreviation has been removed platform-wide so reports, KPIs, and tables
+ * always show actual rupee figures.
+ */
 export function formatINR(value: number): string {
-  if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)} Cr`;
-  if (value >= 100000) return `₹${(value / 100000).toFixed(2)} L`;
-  if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
-  return `₹${value.toLocaleString("en-IN")}`;
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
 }
 
 export function formatINRExact(value: number): string {
