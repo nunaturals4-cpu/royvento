@@ -135,36 +135,38 @@ async function removeLegacyDemoVendor() {
     for (const v of targets) {
       const [owner] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, v.userId)).limit(1);
       logger.warn({ vendorId: v.id, ownerEmail: owner?.email }, "Startup cleanup: removing 'Royvento Studio' vendor by business-name match");
-      await db.execute(sql`
-        DO $$
-        DECLARE
-          ev_ids INT[];
-        BEGIN
-          SELECT array_agg(id) INTO ev_ids FROM events WHERE vendor_id = ${v.id};
-          DELETE FROM commission_ledger WHERE vendor_id = ${v.id};
-          DELETE FROM bookings WHERE vendor_id = ${v.id};
-          DELETE FROM reviews WHERE vendor_id = ${v.id};
-          IF ev_ids IS NOT NULL THEN DELETE FROM wishlists WHERE event_id = ANY(ev_ids); END IF;
-          DELETE FROM announcements WHERE vendor_id = ${v.id};
-          DELETE FROM events WHERE vendor_id = ${v.id};
-          DELETE FROM partner_media WHERE vendor_id = ${v.id};
-          DELETE FROM partner_blocked_dates WHERE vendor_id = ${v.id};
-          DELETE FROM ads_requests WHERE vendor_id = ${v.id};
-          DELETE FROM profile_views WHERE vendor_id = ${v.id};
-          DELETE FROM coupons WHERE vendor_id = ${v.id};
-          DELETE FROM vendor_managers WHERE vendor_id = ${v.id};
-          DELETE FROM availability WHERE vendor_id = ${v.id};
-          DELETE FROM review_deletions WHERE vendor_id = ${v.id};
-          DELETE FROM vendor_commissions WHERE vendor_id = ${v.id};
-          DELETE FROM vendors WHERE id = ${v.id};
-          -- Only drop the owner user if this was their ONLY vendor. Prevents
-          -- collateral damage if someone shared an account across multiple
-          -- vendor profiles.
+      // Individual DELETEs (PostgreSQL DO $$ blocks don't support bind params).
+      await db.transaction(async (tx) => {
+        const evIds = await tx.execute<{ id: number }>(sql`SELECT id FROM events WHERE vendor_id = ${v.id}`);
+        const eventIds = ((evIds as unknown as { rows?: Array<{ id: number }> }).rows
+          ?? (evIds as unknown as Array<{ id: number }>))
+          .map((r) => r.id);
+
+        await tx.execute(sql`DELETE FROM commission_ledger WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM bookings WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM reviews WHERE vendor_id = ${v.id}`);
+        if (eventIds.length > 0) {
+          await tx.execute(sql`DELETE FROM wishlists WHERE event_id = ANY(${eventIds})`);
+        }
+        await tx.execute(sql`DELETE FROM announcements WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM events WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM partner_media WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM partner_blocked_dates WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM ads_requests WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM profile_views WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM coupons WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM vendor_managers WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM availability WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM review_deletions WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM vendor_commissions WHERE vendor_id = ${v.id}`);
+        await tx.execute(sql`DELETE FROM vendors WHERE id = ${v.id}`);
+        // Only drop the owner user if this was their ONLY vendor.
+        await tx.execute(sql`
           DELETE FROM users
             WHERE id = ${v.userId}
-              AND NOT EXISTS (SELECT 1 FROM vendors WHERE user_id = ${v.userId});
-        END $$;
-      `);
+              AND NOT EXISTS (SELECT 1 FROM vendors WHERE user_id = ${v.userId})
+        `);
+      });
       logger.info({ vendorId: v.id, userId: v.userId }, "Startup cleanup: removed legacy demo vendor 'Royvento Studio' and its data");
     }
   } catch (err) {
