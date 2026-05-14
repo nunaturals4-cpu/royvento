@@ -2249,23 +2249,23 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       // (booking-time no longer writes the ledger). Uses onConflictDoNothing
       // on (bookingId, trigger) so a repeat scan / camera double-fire is a
       // structural no-op — admin commission can never double-count.
+      // Always insert even for zero commission so the booking shows as
+      // "realised" in the admin report (not "pending").
       const onlineComm = computeCommissionFromPlanned(
         updatedActuals,
         scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
         scanFer ?? null,
       );
-      if (onlineComm.amount > 0) {
-        await db
-          .insert(commissionLedgerTable)
-          .values({
-            vendorId: updatedActuals.vendorId,
-            bookingId: updatedActuals.id,
-            amount: String(onlineComm.amount),
-            bookingType: onlineComm.bookingType,
-            trigger: "online_payment",
-          })
-          .onConflictDoNothing();
-      }
+      await db
+        .insert(commissionLedgerTable)
+        .values({
+          vendorId: updatedActuals.vendorId,
+          bookingId: updatedActuals.id,
+          amount: String(onlineComm.amount),
+          bookingType: onlineComm.bookingType,
+          trigger: "online_payment",
+        })
+        .onConflictDoNothing();
     }
     const [out] = await serializeBookings([updatedActuals]);
     const okComm = calcScanCommission(updatedActuals);
@@ -2413,8 +2413,10 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
             .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
             .where(eq(vendorsTable.id, updated.vendorId));
         }
-      } else if (confirmComm.amount > 0) {
+      } else {
         // Online payment: no-op if the entry already exists from the webhook.
+        // Always insert even for zero commission so the booking shows as
+        // "realised" in the admin report (not "pending").
         await tx
           .insert(commissionLedgerTable)
           .values({
