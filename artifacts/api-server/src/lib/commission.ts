@@ -96,10 +96,18 @@ export interface CommissionResult {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Classify a booking by its mode + price. */
+/** Classify a booking by its mode + price.
+ *
+ * `pubMode === "event"` is the legacy value the frontend Buy Tickets / Table
+ * Booking radio sends when the user picks Table Booking (the option is
+ * labelled "Table Booking" or "VIP Table" in the UI but submits the string
+ * "event"). Treat it as `table` so the commission report's per-pub Booking
+ * Type table puts these bookings in the Table Booking row — not the Ticket
+ * Booking row, which was the symptom the team was seeing on the admin panel.
+ */
 export function classifyBookingType(b: { pubMode: string; finalPrice: string | number }): BookingType {
   const price = Number(b.finalPrice);
-  if (b.pubMode === "table") return "table";
+  if (b.pubMode === "table" || b.pubMode === "event") return "table";
   if (price === 0 || b.pubMode === "free") return "free_entry";
   return "ticket";
 }

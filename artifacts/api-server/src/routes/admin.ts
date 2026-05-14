@@ -949,8 +949,43 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
     res.status(404).json({ error: "Not found" });
     return;
   }
-  await db.delete(eventsTable).where(eq(eventsTable.vendorId, id));
-  await db.delete(vendorsTable).where(eq(vendorsTable.id, id));
+  // Manually delete every child row that does NOT cascade from `vendors`.
+  // - `bookings.event_id` is `ON DELETE RESTRICT`, so deleting `events` while
+  //   bookings exist FK-errors out (this was the 500 root cause).
+  // - `events.vendor_id`, `bookings.vendor_id`, and several other vendor-
+  //   scoped tables have no FK to `vendors` at all (just an integer column),
+  //   so the cascade chain skips them entirely.
+  // Order matters: leaf rows first, then events, then vendors.
+  try {
+    await db.execute(sql`
+      DO $$
+      DECLARE
+        ev_ids INT[];
+      BEGIN
+        SELECT array_agg(id) INTO ev_ids FROM events WHERE vendor_id = ${id};
+        DELETE FROM commission_ledger WHERE vendor_id = ${id};
+        DELETE FROM bookings WHERE vendor_id = ${id};
+        DELETE FROM reviews WHERE vendor_id = ${id};
+        IF ev_ids IS NOT NULL THEN DELETE FROM wishlists WHERE event_id = ANY(ev_ids); END IF;
+        DELETE FROM announcements WHERE vendor_id = ${id};
+        DELETE FROM events WHERE vendor_id = ${id};
+        DELETE FROM partner_media WHERE vendor_id = ${id};
+        DELETE FROM partner_blocked_dates WHERE vendor_id = ${id};
+        DELETE FROM ads_requests WHERE vendor_id = ${id};
+        DELETE FROM profile_views WHERE vendor_id = ${id};
+        DELETE FROM coupons WHERE vendor_id = ${id};
+        DELETE FROM vendor_managers WHERE vendor_id = ${id};
+        DELETE FROM availability WHERE vendor_id = ${id};
+        DELETE FROM review_deletions WHERE vendor_id = ${id};
+        DELETE FROM vendor_commissions WHERE vendor_id = ${id};
+        DELETE FROM vendors WHERE id = ${id};
+      END $$;
+    `);
+  } catch (err) {
+    req.log.error({ err, vendorId: id }, "Failed to delete vendor");
+    res.status(500).json({ error: "Failed to delete vendor" });
+    return;
+  }
   // Revoke partner access and wipe prior applications so the user is locked
   // out of the partner dashboard and the become-vendor form treats them as a
   // fresh applicant.

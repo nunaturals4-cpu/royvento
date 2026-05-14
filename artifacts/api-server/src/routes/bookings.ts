@@ -834,7 +834,10 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       ticket:    { count: 0, comm: 0, gross: 0, people: 0 },
       table:     { count: 0, comm: 0, gross: 0, people: 0 },
     };
-    if (b.pubMode === "table") {
+    // "event" is the legacy frontend value for Table Booking — bucket it as
+    // table so the partner commission report matches the admin classifier
+    // (see `classifyBookingType` in lib/commission.ts).
+    if (b.pubMode === "table" || b.pubMode === "event") {
       const guests = Math.max(0, b.guests);
       out.table.count = 1;
       out.table.comm = commTableFee * guests;
@@ -843,7 +846,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       return out;
     }
     if (b.pubMode !== "ticket") {
-      // event-mode / legacy: bucket by whole-day-free vs paid
+      // legacy: bucket by whole-day-free vs paid
       if (fp === 0 || b.pubMode === "free") {
         out.freeEntry.count = 1;
         // Free-entry platform fee is a vendor charge — no cap at finalPrice=0.
