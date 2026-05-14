@@ -664,7 +664,7 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
           {[
             { label: "Total Bookings", value: String(report.totals.totalBookings), icon: "ticket-outline" as const },
             { label: "Booking Revenue", value: fmt(report.totals.totalRevenue), icon: "cash-outline" as const },
-            { label: "Commission Collected", value: fmt(report.totals.collectedCommission), icon: "trending-up-outline" as const },
+            { label: "Commission Collected", value: fmt(report.totals.totalCommission), icon: "trending-up-outline" as const },
           ].map((kpi) => (
             <View key={kpi.label} style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 6, alignItems: "center" }}>
               <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + "20", alignItems: "center", justifyContent: "center" }}>
