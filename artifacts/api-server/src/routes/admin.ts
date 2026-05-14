@@ -950,6 +950,9 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
     return;
   }
   // Manually delete every child row that does NOT cascade from `vendors`.
+  // Wrapped in db.transaction; do NOT use DO $$ ... END $$ — PostgreSQL
+  // rejects bind parameters inside DO blocks ("bind message supplies N
+  // parameters, but prepared statement requires 0").
   // - `bookings.event_id` is `ON DELETE RESTRICT`, so deleting `events` while
   //   bookings exist FK-errors out (this was the original 500 root cause).
   // - `events.vendor_id`, `bookings.vendor_id`, and several other vendor-
