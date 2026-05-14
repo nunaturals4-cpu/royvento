@@ -762,9 +762,14 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     else onlineCommission += commissionAmount;
     // Per-booking-type breakdown — each booking falls into a single bucket
     // (free_entry / ticket / table). Sum of bucket commissions === totalCommission.
+    //
+    // GROSS rule: only count revenue for bookings that have been QR-scanned
+    // (i.e., have a commission_ledger entry — `isCollected`). This makes
+    // "GROSS" reflect the actual amount received from scanned bookings,
+    // matching the Pub Manager / Pub Owner check-in flow.
     for (const k of ["freeEntry", "ticket", "table"] as const) {
       commSummary[k].count += split[k].count;
-      commSummary[k].grossRevenue += split[k].gross;
+      commSummary[k].grossRevenue += isCollected ? split[k].gross : 0;
       commSummary[k].commissionAmount += rnd2(split[k].comm);
       commSummary[k].peopleCount += split[k].people;
     }
