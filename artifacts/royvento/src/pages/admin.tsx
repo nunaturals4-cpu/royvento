@@ -1,4 +1,4 @@
-﻿// Trigger Railway deploy: API-only changes are skipped by watch-path filter
+// Trigger Railway deploy: API-only changes are skipped by watch-path filter
 import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
@@ -78,7 +78,6 @@ export function AdminPanel() {
   const rawTab = new URLSearchParams(search).get("tab");
   const initialTab = isValidAdminTab(rawTab) ? rawTab : DEFAULT_ADMIN_TAB;
   const [activeTab, setActiveTab] = useState<string>(initialTab);
-  const [perVendorPage, setPerVendorPage] = useState(1);
 
   useEffect(() => {
     const t = new URLSearchParams(search).get("tab");
@@ -127,7 +126,7 @@ export function AdminPanel() {
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
         </div>
-        <TabsContent value="analytics"><Analytics perVendorPage={perVendorPage} setPerVendorPage={setPerVendorPage} /></TabsContent>
+        <TabsContent value="analytics"><Analytics /></TabsContent>
         <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
         <TabsContent value="requests"><VendorRequests /></TabsContent>
         <TabsContent value="event-approvals"><EventApprovalsAdmin /></TabsContent>
@@ -179,10 +178,9 @@ function toDateStr(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-const ADMIN_PER_VENDOR_PAGE_SIZE = 10;
 const ADMIN_VENDOR_PAGE_SIZE = 10;
 
-function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number; setPerVendorPage: React.Dispatch<React.SetStateAction<number>> }) {
+function Analytics() {
   const [preset, setPreset] = useState<AnalyticsPreset>("30d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -200,11 +198,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
     };
   })();
 
-  const { data, isLoading } = useGetAdminAnalytics({
-    ...computedRange,
-    page: perVendorPage,
-    limit: ADMIN_PER_VENDOR_PAGE_SIZE,
-  });
+  const { data, isLoading } = useGetAdminAnalytics(computedRange);
 
   const adminData = (data ?? {}) as typeof data & {
     totalWomen?: number;
@@ -241,7 +235,7 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
       <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
         <div>
           <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Time range</Label>
-          <Select value={preset} onValueChange={(v) => { setPreset(v as AnalyticsPreset); setPerVendorPage(1); }}>
+          <Select value={preset} onValueChange={(v) => setPreset(v as AnalyticsPreset)}>
             <SelectTrigger className="w-44">
               <SelectValue>{presetLabel[preset]}</SelectValue>
             </SelectTrigger>
@@ -515,71 +509,44 @@ function Analytics({ perVendorPage, setPerVendorPage }: { perVendorPage: number;
         </div>
       </div>
 
-      {/* Ticket sales by venue */}
-      {(() => {
-        const pv = adminData.perVendorPaginated;
-        if (!pv || pv.total === 0) return null;
-        return (
-          <div className="rounded-2xl glass-card p-6">
-            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              <h3 className="font-serif text-xl">Ticket sales by venue</h3>
-              <span className="text-xs text-muted-foreground">{pv.total} venue{pv.total !== 1 ? "s" : ""}</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[520px]">
-                <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
-                  <tr>
-                    <th className="text-left py-2 pr-4">Venue</th>
-                    <th className="text-right py-2 px-2">Bookings</th>
-                    <th className="text-right py-2 px-2 text-pink-300">Women</th>
-                    <th className="text-right py-2 px-2 text-blue-300">Men</th>
-                    <th className="text-right py-2 px-2 text-purple-300">Couples</th>
-                    <th className="text-right py-2 pl-2">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pv.data.map((row) => (
-                    <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="py-3 pr-4 font-medium">{row.vendorName}</td>
-                      <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
-                      <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "--"}</td>
-                      <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "--"}</td>
-                      <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "--"}</td>
-                      <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {pv.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-                <Button variant="outline" size="sm" disabled={pv.page <= 1} onClick={() => setPerVendorPage((p) => p - 1)}>â† Prev</Button>
-                <span className="text-xs text-muted-foreground">Page {pv.page} of {pv.totalPages}</span>
-                <Button variant="outline" size="sm" disabled={pv.page >= pv.totalPages} onClick={() => setPerVendorPage((p) => p + 1)}>Next â†’</Button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       <div className="rounded-2xl glass-card p-6">
         <h3 className="font-serif text-xl mb-4">Recent bookings</h3>
-        <div className="space-y-2">
-          {data.recentBookings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No bookings yet.</p>
-          ) : data.recentBookings.map((b) => (
-            <div key={b.id} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
-              <div>
-                <span className="font-medium">{b.eventTitle}</span>
-                <span className="text-muted-foreground"> · {b.userName}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary">{b.status}</Badge>
-                <span className="text-muted-foreground">{formatINR(b.totalPrice)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {data.recentBookings.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No bookings yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-4">Event</th>
+                  <th className="text-left py-2 px-2">User</th>
+                  <th className="text-left py-2 px-2">Booking date &amp; time</th>
+                  <th className="text-right py-2 px-2">No of users</th>
+                  <th className="text-center py-2 px-2">Status</th>
+                  <th className="text-right py-2 pl-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentBookings.map((b) => {
+                  const bx = b as typeof b & { peopleCount?: number };
+                  const peopleCount = bx.peopleCount ?? bx.guests ?? 0;
+                  const bookedAt = new Date(bx.createdAt);
+                  const bookedAtStr = `${bookedAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}, ${bookedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
+                  return (
+                    <tr key={bx.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-3 pr-4 font-medium">{bx.eventTitle}</td>
+                      <td className="px-2 text-muted-foreground">{bx.userName}</td>
+                      <td className="px-2 text-muted-foreground tabular-nums whitespace-nowrap">{bookedAtStr}</td>
+                      <td className="text-right px-2 tabular-nums">{peopleCount}</td>
+                      <td className="text-center px-2"><Badge variant="secondary">{bx.status}</Badge></td>
+                      <td className="text-right pl-2 tabular-nums text-muted-foreground">{formatINR(bx.totalPrice)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
       </>
       )}

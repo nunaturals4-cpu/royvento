@@ -144,10 +144,38 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     : [];
   const _codEventMap = new Map(_codEvents.map((e) => [e.id, e]));
 
-  // Per-booking effective revenue: online → finalPrice; COD → actual cash collected at door
-  // (₹0 if no actuals recorded yet — STRICT mode). Drives totalRevenue, monthlyRevenue,
-  // dailyRevenue, perVendor.revenue, and topVendors. finalPrice is still kept for the
-  // `codRevenue` and `onlineRevenue` breakdown fields above (booked-price view).
+  // Marker for "this booking has been QR-scanned" — a row in commission_ledger
+  // with a REALISED trigger (online_payment / cod_checkin / free_checkin).
+  // The UNIQUE (booking_id, trigger) constraint makes the marker dedup-safe.
+  // Source of truth for the "after QR scans" gating used by both the Revenue
+  // KPI's COD slice and the COD Collected (Actual) KPI below.
+  const analyticsBookingIds = confirmedBookings.map((b) => b.id);
+  const realisedLedgerRows = analyticsBookingIds.length > 0
+    ? await db
+        .select({ bookingId: commissionLedgerTable.bookingId })
+        .from(commissionLedgerTable)
+        .where(
+          and(
+            inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
+            inArray(commissionLedgerTable.bookingId, analyticsBookingIds),
+          ),
+        )
+    : [];
+  const realisedBookingIds = new Set<number>();
+  for (const row of realisedLedgerRows) {
+    if (row.bookingId != null) realisedBookingIds.add(row.bookingId);
+  }
+
+  // Per-booking effective revenue.
+  // Revenue KPI rule (matches user spec):
+  //   online → finalPrice for every successful online booking (status reaches
+  //            confirmed/completed only after payment success).
+  //   cod    → ₹0 until the QR scan creates a cod_checkin ledger entry. After
+  //            scan, revenue = actual cash collected (priceWomen × actualWomen
+  //            + ... for ticket-mode, or pro-rata of finalPrice by actual
+  //            guests for table/free-entry mode).
+  // COD Collected (Actual) KPI is the COD slice of this same calculation, so
+  // the two KPIs cannot diverge.
   let actualCodRevenue = 0;
   let actualCodRecordedCount = 0;
   let pendingActualsCount = 0;
@@ -155,25 +183,22 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     let bookingRevenue = 0;
     if (b.paymentMethod !== "cod") {
       bookingRevenue = Number(b.finalPrice);
-    } else {
+    } else if (realisedBookingIds.has(b.id)) {
       const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
-      const hasActuals = aw != null || am != null || ac != null || ag != null;
-      if (hasActuals) {
-        actualCodRecordedCount++;
-        if (b.pubMode === "ticket") {
-          const ev = _codEventMap.get(b.eventId);
-          const pw = Number(ev?.priceWomen ?? 0);
-          const pm = Number(ev?.priceMen ?? 0);
-          const pc = Number(ev?.priceCouple ?? 0);
-          bookingRevenue = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
-        } else {
-          const guests = Math.max(1, b.guests);
-          bookingRevenue = ((ag ?? 0) / guests) * Number(b.finalPrice);
-        }
-        actualCodRevenue += bookingRevenue;
+      actualCodRecordedCount++;
+      if (b.pubMode === "ticket") {
+        const ev = _codEventMap.get(b.eventId);
+        const pw = Number(ev?.priceWomen ?? 0);
+        const pm = Number(ev?.priceMen ?? 0);
+        const pc = Number(ev?.priceCouple ?? 0);
+        bookingRevenue = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
       } else {
-        pendingActualsCount++;
+        const guests = Math.max(1, b.guests);
+        bookingRevenue = ((ag ?? 0) / guests) * Number(b.finalPrice);
       }
+      actualCodRevenue += bookingRevenue;
+    } else {
+      pendingActualsCount++;
     }
     // Attach revenue directly to booking object for downstream loops
     (b as unknown as { _rev: number })._rev = bookingRevenue;
@@ -275,14 +300,11 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const allVendors = await db.select().from(vendorsTable);
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
 
-  // "Total Commission" KPI = "Commission Collected" in the commission report.
-  // Sum of planned commission (current rate card) for every confirmed/completed
-  // booking in the window that has been realised — i.e. has a row in
-  // commission_ledger with a REALISED trigger (online_payment / cod_checkin /
-  // free_checkin). The ledger's UNIQUE (booking_id, trigger) constraint
-  // guarantees one realisation per trigger so duplicate aggregation is
-  // structurally impossible. Amounts come from the deterministic calc, not the
-  // ledger amount, so historical buggy ledger values never leak into the KPI.
+  // "Total Commission" KPI = Commission Report totals.totalCommission.
+  // Sum of planned commission (current rate card) for EVERY confirmed/completed
+  // booking in the window, regardless of QR-scan status. Matches the Commission
+  // Report's per-vendor totalCommission aggregation to the rupee. Each booking
+  // contributes once (we iterate over the deduped confirmedBookings list).
   const vendorCommissionRows = await db.select().from(vendorCommissionsTable);
   const vendorCommissionMap = new Map(vendorCommissionRows.map((r) => [r.vendorId, r]));
 
@@ -300,26 +322,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     ]),
   );
 
-  const analyticsBookingIds = confirmedBookings.map((b) => b.id);
-  const realisedLedgerRows = analyticsBookingIds.length > 0
-    ? await db
-        .select({ bookingId: commissionLedgerTable.bookingId })
-        .from(commissionLedgerTable)
-        .where(
-          and(
-            inArray(commissionLedgerTable.trigger, [...REALISED_COMMISSION_TRIGGERS]),
-            inArray(commissionLedgerTable.bookingId, analyticsBookingIds),
-          ),
-        )
-    : [];
-  const realisedBookingIds = new Set<number>();
-  for (const row of realisedLedgerRows) {
-    if (row.bookingId != null) realisedBookingIds.add(row.bookingId);
-  }
-
   let totalCommission = 0;
   for (const b of confirmedBookings) {
-    if (!realisedBookingIds.has(b.id)) continue;
     const rates = vendorCommissionMap.get(b.vendorId) ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 };
     const comm = computeCommissionFromPlanned(b, rates, analyticsFerMap.get(b.eventId) ?? null);
     totalCommission += comm.amount;
@@ -386,6 +390,11 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     const e = eMap.get(b.eventId);
     const u = uMap.get(b.userId);
     const v = vMap2.get(b.vendorId);
+    // Total people in the booking, matching freeEntryPeopleCount() in
+    // lib/commission.ts: prefer per-tier headcount (couple = 2 people),
+    // fall back to `guests` for table-mode and legacy event-mode rows.
+    const tierHeads = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
+    const peopleCount = tierHeads > 0 ? tierHeads : Math.max(0, b.guests);
     return {
       id: b.id,
       eventId: b.eventId,
@@ -393,6 +402,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       vendorId: b.vendorId,
       bookingDate: b.bookingDate,
       guests: b.guests,
+      peopleCount,
       totalPrice: Number(b.totalPrice),
       notes: b.notes ?? "",
       status: b.status,
