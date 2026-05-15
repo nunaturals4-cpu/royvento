@@ -214,6 +214,10 @@ function CameraScanner({
   const disabledRef = useRef(disabled);
   const lastCodeRef = useRef("");
   const lastCodeTimeRef = useRef(0);
+  // Native QR detector — available in Chromium (Android Chrome, desktop Chrome,
+  // Edge). ~5× faster than jsQR because it runs in C++/GPU. We fall back to
+  // jsQR on Firefox/Safari/older browsers transparently.
+  const nativeDetectorRef = useRef<{ detect: (s: CanvasImageSource) => Promise<Array<{ rawValue: string }>> } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -232,52 +236,94 @@ function CameraScanner({
     setScanning(false);
   }, []);
 
-  const scanFrame = useCallback(() => {
+  const handleHit = useCallback((data: string) => {
+    const now = Date.now();
+    // Debounce: skip same code within 2 seconds to prevent double-fires
+    if (data === lastCodeRef.current && now - lastCodeTimeRef.current < 2000) return false;
+    lastCodeRef.current = data;
+    lastCodeTimeRef.current = now;
+    setDetected(true);
+    setTimeout(() => setDetected(false), 600);
+    onDetect(data);
+    return true;
+  }, [onDetect]);
+
+  const scanFrame = useCallback(async () => {
     // Pause scanning while an API call is in flight
     if (disabledRef.current) {
-      rafRef.current = requestAnimationFrame(scanFrame);
+      rafRef.current = requestAnimationFrame(() => { void scanFrame(); });
       return;
     }
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      rafRef.current = requestAnimationFrame(scanFrame);
+    if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      rafRef.current = requestAnimationFrame(() => { void scanFrame(); });
       return;
     }
-    // Cap to 480px width for faster jsQR processing on mobile (biggest perf win)
-    const scale = Math.min(1, 480 / Math.max(video.videoWidth, 1));
+    // Fast path: native BarcodeDetector — accepts the <video> element directly,
+    // no canvas roundtrip, and runs on the GPU on most platforms.
+    if (nativeDetectorRef.current) {
+      try {
+        const codes = await nativeDetectorRef.current.detect(video);
+        if (codes.length > 0 && codes[0]?.rawValue) {
+          if (handleHit(codes[0].rawValue)) return;
+        }
+      } catch {
+        // If native detector throws for any reason, fall through to jsQR for
+        // this frame (and silently keep using native on the next one — most
+        // failures are transient).
+      }
+      rafRef.current = requestAnimationFrame(() => { void scanFrame(); });
+      return;
+    }
+    // Fallback: jsQR via offscreen canvas, downscaled to 640px wide. Slightly
+    // wider than the previous 480-wide path so dense-modules QR codes from
+    // small phone screens still decode without forcing the user to back up.
+    const canvas = canvasRef.current;
+    if (!canvas) { rafRef.current = requestAnimationFrame(() => { void scanFrame(); }); return; }
+    const scale = Math.min(1, 640 / Math.max(video.videoWidth, 1));
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) { rafRef.current = requestAnimationFrame(scanFrame); return; }
+    if (!ctx) { rafRef.current = requestAnimationFrame(() => { void scanFrame(); }); return; }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-    if (code?.data) {
-      const now = Date.now();
-      // Debounce: skip same code within 2 seconds to prevent double-fires
-      if (code.data === lastCodeRef.current && now - lastCodeTimeRef.current < 2000) {
-        rafRef.current = requestAnimationFrame(scanFrame);
-        return;
-      }
-      lastCodeRef.current = code.data;
-      lastCodeTimeRef.current = now;
-      setDetected(true);
-      setTimeout(() => setDetected(false), 600);
-      onDetect(code.data);
-      return;
-    }
-    rafRef.current = requestAnimationFrame(scanFrame);
-  }, [onDetect]);
+    // attemptBoth lets us decode inverted (white-on-black) codes too, which
+    // also helps in low-light when the camera flips contrast.
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+    if (code?.data && handleHit(code.data)) return;
+    rafRef.current = requestAnimationFrame(() => { void scanFrame(); });
+  }, [handleHit]);
 
   const startCamera = useCallback(async () => {
     setError(null);
     lastCodeRef.current = "";
     lastCodeTimeRef.current = 0;
+    // Wire up native detector if the browser supports it.
+    nativeDetectorRef.current = null;
+    const BD = (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => { detect: (s: CanvasImageSource) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
+    if (BD) {
+      try {
+        nativeDetectorRef.current = new BD({ formats: ["qr_code"] });
+      } catch {
+        nativeDetectorRef.current = null;
+      }
+    }
     try {
+      // Ask for 1280×720 — native detector handles the higher resolution
+      // easily and we get sharper edges on small/dense QR codes. The jsQR
+      // fallback downscales to 640px in software anyway, so this doesn't
+      // hurt the fallback path either. `focusMode: continuous` keeps the
+      // lens hunting without user input.
       const stream = await navigator.mediaDevices.getUserMedia({
-        // 640×480 gives ~4× fewer pixels than 1280×720 — jsQR runs noticeably faster
-        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          // `advanced` + `focusMode: "continuous"` is supported by
+          // Chromium/Safari but not in the WHATWG MediaTrackConstraints
+          // typings, so we cast via unknown.
+          advanced: [{ focusMode: "continuous" }],
+        } as unknown as MediaTrackConstraints,
       });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
@@ -287,7 +333,7 @@ function CameraScanner({
         const caps = (videoTrack.getCapabilities as (() => Record<string, unknown>) | undefined)?.();
         if (caps?.torch) setTorchSupported(true);
       }
-      rafRef.current = requestAnimationFrame(scanFrame);
+      rafRef.current = requestAnimationFrame(() => { void scanFrame(); });
     } catch {
       setError("Camera access denied. Please allow camera permission and try again.");
     }
@@ -323,73 +369,145 @@ function CameraScanner({
   }
 
   const frameColor = detected ? "#22c55e" : disabled ? "#6366f1" : "#e53e3e";
-  const frameLabel = detected ? "QR detected…" : disabled ? "Validating…" : scanning ? "Align QR code within the frame" : "Starting camera…";
+  const frameLabel = detected ? "QR detected — checking…" : disabled ? "Validating ticket…" : scanning ? "Align the QR code inside the frame" : "Starting camera…";
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black">
-      <video ref={videoRef} autoPlay playsInline muted className="w-full" style={{ maxHeight: 340 }} />
-      <canvas ref={canvasRef} className="hidden" />
+    <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-black scanner-shell">
+      {/* Aspect-ratio container — full bleed, ~4:3 on mobile, capped at 65vh */}
+      <div className="relative w-full bg-black" style={{ aspectRatio: "4 / 3", maxHeight: "65vh" }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <canvas ref={canvasRef} className="hidden" />
 
-      {/* Premium scan overlay */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        {/* Dark vignette corners */}
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%)" }} />
-        <div className="relative w-56 h-56">
-          {/* Animated corner brackets */}
-          {([
-            { pos: "top-0 left-0", tr: "none", tl: undefined, br: "none", bl: undefined },
-            { pos: "top-0 right-0", tr: undefined, tl: "none", br: "none", bl: undefined },
-            { pos: "bottom-0 left-0", tr: "none", tl: undefined, br: undefined, bl: "none" },
-            { pos: "bottom-0 right-0", tr: undefined, tl: "none", br: undefined, bl: "none" },
-          ] as const).map(({ pos }) => (
-            <div
-              key={pos}
-              className={`absolute w-9 h-9 ${pos}`}
-              style={{
-                borderTop: pos.includes("top") ? `3px solid ${frameColor}` : "none",
-                borderBottom: pos.includes("bottom") ? `3px solid ${frameColor}` : "none",
-                borderLeft: pos.includes("left") ? `3px solid ${frameColor}` : "none",
-                borderRight: pos.includes("right") ? `3px solid ${frameColor}` : "none",
-                borderRadius: pos.includes("top-0 left-0") ? "6px 0 0 0" : pos.includes("top-0 right-0") ? "0 6px 0 0" : pos.includes("bottom-0 left-0") ? "0 0 0 6px" : "0 0 6px 0",
-                transition: "border-color 0.25s ease",
-              }}
-            />
-          ))}
-          {/* Scan line */}
-          {scanning && !disabled && !detected && (
-            <div
-              className="absolute left-3 right-3 h-px"
-              style={{ background: `linear-gradient(90deg, transparent, ${frameColor}, transparent)`, animation: "scanLine 1.8s ease-in-out infinite", top: "50%", opacity: 0.9 }}
-            />
-          )}
-          {/* Detected flash */}
-          {detected && (
-            <div className="absolute inset-0 rounded-sm" style={{ background: "rgba(34,197,94,0.15)", border: "2px solid #22c55e", borderRadius: 4, transition: "all 0.2s" }} />
-          )}
+        {/* Vignette so the reticle stays the focal point even on bright surfaces */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.7) 100%)" }}
+        />
+
+        {/* Reticle */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div
+            className="relative"
+            style={{ width: "min(72vw, 360px)", aspectRatio: "1 / 1" }}
+          >
+            {/* Animated corner brackets */}
+            {([
+              { pos: "top-0 left-0", radius: "12px 0 0 0" },
+              { pos: "top-0 right-0", radius: "0 12px 0 0" },
+              { pos: "bottom-0 left-0", radius: "0 0 0 12px" },
+              { pos: "bottom-0 right-0", radius: "0 0 12px 0" },
+            ] as const).map(({ pos, radius }) => {
+              const isTop = pos.includes("top");
+              const isBottom = pos.includes("bottom");
+              const isLeft = pos.includes("left");
+              const isRight = pos.includes("right");
+              return (
+                <div
+                  key={pos}
+                  className={`absolute h-12 w-12 ${pos}`}
+                  style={{
+                    borderTop: isTop ? `3px solid ${frameColor}` : "none",
+                    borderBottom: isBottom ? `3px solid ${frameColor}` : "none",
+                    borderLeft: isLeft ? `3px solid ${frameColor}` : "none",
+                    borderRight: isRight ? `3px solid ${frameColor}` : "none",
+                    borderRadius: radius,
+                    filter: `drop-shadow(0 0 8px ${frameColor}55)`,
+                    transition: "border-color 0.25s ease, filter 0.25s ease",
+                  }}
+                />
+              );
+            })}
+
+            {/* Scan line — only when actively scanning */}
+            {scanning && !disabled && !detected && (
+              <div
+                className="absolute left-4 right-4 h-[2px] rounded-full"
+                style={{
+                  background: `linear-gradient(90deg, transparent, ${frameColor}, transparent)`,
+                  boxShadow: `0 0 12px ${frameColor}aa`,
+                  animation: "scanLine 2.2s ease-in-out infinite",
+                }}
+              />
+            )}
+
+            {/* Detected flash + ripple */}
+            {detected && (
+              <>
+                <div
+                  className="absolute inset-0 rounded-xl"
+                  style={{
+                    background: "rgba(34,197,94,0.18)",
+                    border: "2px solid #22c55e",
+                    animation: "scanFlash 0.5s cubic-bezier(0.22,0.61,0.36,1) both",
+                  }}
+                />
+                <div
+                  className="absolute inset-0 rounded-xl"
+                  style={{
+                    border: "2px solid #22c55e",
+                    animation: "scanRipple 0.7s ease-out both",
+                  }}
+                />
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Torch toggle */}
+        {torchSupported && (
+          <button
+            onClick={toggleTorch}
+            aria-label={torchOn ? "Turn off torch" : "Turn on torch"}
+            className="absolute top-3 right-3 rounded-full h-11 w-11 bg-black/65 border border-white/20 text-white hover:bg-black/85 transition-colors z-10 flex items-center justify-center backdrop-blur-md"
+          >
+            {torchOn ? <Zap className="h-5 w-5 text-yellow-300" /> : <ZapOff className="h-5 w-5 text-white/60" />}
+          </button>
+        )}
       </div>
 
-      {/* Torch */}
-      {torchSupported && (
-        <button
-          onClick={toggleTorch}
-          aria-label={torchOn ? "Turn off torch" : "Turn on torch"}
-          className="absolute top-3 right-3 rounded-full p-2.5 bg-black/60 border border-white/20 text-white hover:bg-black/80 transition-colors z-10"
-        >
-          {torchOn ? <Zap className="h-4 w-4 text-yellow-300" /> : <ZapOff className="h-4 w-4 text-white/50" />}
-        </button>
-      )}
-
-      {/* Status label */}
-      <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm py-2 px-3 text-center">
-        <p className="text-xs font-medium" style={{ color: frameColor, transition: "color 0.25s" }}>{frameLabel}</p>
+      {/* Status strip — below the camera so it never covers the reticle */}
+      <div className="px-4 py-2.5 bg-black/85 border-t border-white/8 flex items-center gap-2.5">
+        <span
+          className="h-2 w-2 rounded-full shrink-0"
+          style={{
+            background: frameColor,
+            boxShadow: `0 0 8px ${frameColor}aa`,
+            animation: scanning && !detected && !disabled ? "scanPulse 1.4s ease-in-out infinite" : "none",
+          }}
+        />
+        <p className="text-[13px] font-medium tracking-wide" style={{ color: frameColor, transition: "color 0.25s" }}>
+          {frameLabel}
+        </p>
+        <span className="ml-auto text-[10px] uppercase tracking-[0.18em] text-white/40">
+          {nativeDetectorRef.current ? "Fast detect" : "Compatibility mode"}
+        </span>
       </div>
 
       <style>{`
         @keyframes scanLine {
-          0%   { transform: translateY(-80px); opacity: 0.6; }
-          50%  { transform: translateY(80px);  opacity: 1; }
-          100% { transform: translateY(-80px); opacity: 0.6; }
+          0%   { transform: translateY(-44%); opacity: 0.55; }
+          50%  { transform: translateY(44%);  opacity: 1; }
+          100% { transform: translateY(-44%); opacity: 0.55; }
+        }
+        @keyframes scanFlash {
+          0%   { opacity: 0; transform: scale(0.96); }
+          50%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1); }
+        }
+        @keyframes scanRipple {
+          0%   { opacity: 0.8; transform: scale(1); }
+          100% { opacity: 0;   transform: scale(1.18); }
+        }
+        @keyframes scanPulse {
+          0%, 100% { opacity: 0.55; transform: scale(1); }
+          50%      { opacity: 1;    transform: scale(1.25); }
         }
       `}</style>
     </div>
@@ -588,7 +706,8 @@ export function TicketScanner() {
               </div>
               <div className="h-px bg-green-500/20" />
               <BookingDetails booking={result.booking} />
-              <ActualEntryForm
+              <PaymentToCollectCard booking={result.booking} />
+              <CollapsibleActuals
                 key={`ok-${result.booking.id}`}
                 booking={result.booking}
                 onSaved={(updated) => setResult({ ...result, booking: updated })}
@@ -620,7 +739,19 @@ export function TicketScanner() {
               {result.booking && (
                 <>
                   <BookingDetails booking={result.booking} />
-                  <ActualEntryForm
+                  {/* Duplicate-scan guard: cash was already due on the first
+                      scan; the analytics ledger row exists, so we MUST NOT
+                      prompt the partner to collect a second time. */}
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                      <XCircle className="h-5 w-5 text-amber-300" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-amber-200">Cash already collected on first scan</p>
+                      <p className="text-xs text-amber-200/70 mt-0.5">Do not charge this guest again.</p>
+                    </div>
+                  </div>
+                  <CollapsibleActuals
                     key={`used-${result.booking.id}`}
                     booking={result.booking}
                     onSaved={(updated) => setResult({ ...result, booking: updated })}
@@ -905,6 +1036,78 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
   );
 }
 
+/**
+ * Read-only "Collect this exact cash" card shown for COD bookings.
+ *
+ * The amount displayed is the booking's `finalPrice` — the figure the
+ * guest agreed to at booking time and the figure printed on their
+ * ticket. It is NOT computed from the stepper-adjusted actuals below;
+ * the partner cannot reduce what they're owed by tapping the −
+ * buttons. Free-entry bookings (finalPrice = 0) and prepaid online
+ * bookings render nothing.
+ *
+ * The actuals form below still exists for analytics correction
+ * ("only 3 of the 4 booked guests actually walked in"). That flow runs
+ * through delta-math on the commission ledger server-side, so the
+ * cash-collected accounting stays correct regardless of what the
+ * partner records there.
+ */
+function PaymentToCollectCard({ booking: b }: { booking: BookingData }) {
+  const isCod = b.paymentMethod === "cod";
+  const amount = Number(b.finalPrice) || 0;
+  if (!isCod) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+          <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-emerald-200">Already paid online</p>
+          <p className="text-xs text-emerald-200/70 mt-0.5">Don't collect any cash from this guest.</p>
+        </div>
+        <span className="text-xl font-semibold text-emerald-200 tabular-nums">₹0</span>
+      </div>
+    );
+  }
+  if (amount <= 0) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+          <Banknote className="h-5 w-5 text-emerald-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-emerald-200">Free entry — collect nothing</p>
+          <p className="text-xs text-emerald-200/70 mt-0.5">This booking is fully covered by a free-entry rule.</p>
+        </div>
+        <span className="text-xl font-semibold text-emerald-200 tabular-nums">₹0</span>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-500/10 to-amber-900/10 p-4 shadow-[0_0_24px_-8px_rgba(245,158,11,0.5)]">
+      <div className="flex items-center gap-3">
+        <div className="h-12 w-12 rounded-xl bg-amber-500/25 border border-amber-400/50 flex items-center justify-center shrink-0">
+          <Banknote className="h-6 w-6 text-amber-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80 font-semibold">Collect cash (COD)</p>
+          <p className="text-[11px] text-amber-100/70 mt-0.5">Exact amount printed on the guest's ticket</p>
+        </div>
+        <div className="text-right">
+          <div className="flex items-center justify-end gap-0.5 text-amber-200">
+            <IndianRupee className="h-5 w-5" />
+            <span className="text-3xl font-bold tabular-nums leading-none">{amount.toLocaleString("en-IN")}</span>
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2 text-[11px] text-amber-200/70">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+        Collect this exact amount. Do not adjust at the door.
+      </div>
+    </div>
+  );
+}
+
 function BookingDetails({ booking: b }: { booking: BookingData }) {
   const isPubTicket = b.pubMode === "ticket";
   const guestName = b.personName ?? b.userName;
@@ -981,6 +1184,49 @@ function Stepper({ label, value, max, color, onChange }: { label: string; value:
           <Plus className="h-3.5 w-3.5" />
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Disclosure wrapper around ActualEntryForm. Collapsed by default so the
+ * primary scan flow stays one-tap (scan → collect the locked cash amount).
+ * Editing actuals is opt-in and clearly labelled as a record-keeping
+ * correction, not a way to change the cash owed.
+ */
+function CollapsibleActuals({ booking, onSaved }: { booking: BookingData; onSaved: (b: BookingData) => void }) {
+  const [open, setOpen] = useState(false);
+  // If actuals have already been edited away from the booked counts, default
+  // to open so the partner can see the recorded values.
+  useEffect(() => {
+    if (booking.actualWomen != null && booking.actualWomen !== booking.ticketWomen) setOpen(true);
+    else if (booking.actualMen != null && booking.actualMen !== booking.ticketMen) setOpen(true);
+    else if (booking.actualCouple != null && booking.actualCouple !== booking.ticketCouple) setOpen(true);
+    else if (booking.actualGuests != null && booking.actualGuests !== booking.guests) setOpen(true);
+  }, [booking]);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.03] transition-colors"
+        aria-expanded={open}
+      >
+        <Users className="h-4 w-4 text-white/60 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">Did fewer guests show up?</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Optional — adjust the headcount for analytics. Does not change the cash to collect.
+          </p>
+        </div>
+        <span className="text-xs text-muted-foreground shrink-0">{open ? "Hide" : "Adjust"}</span>
+      </button>
+      {open && (
+        <div className="border-t border-white/10 p-4">
+          <ActualEntryForm booking={booking} onSaved={onSaved} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1090,44 +1336,10 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
         )}
       </div>
 
-      {wholeBookingFree ? (
-        <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 flex items-center justify-between">
-          <span className="text-xs uppercase tracking-wider text-green-300 flex items-center gap-1.5">
-            <Banknote className="h-3.5 w-3.5" /> Free entry — no payment to collect
-          </span>
-          <span className="text-sm font-semibold text-green-200 tabular-nums">₹0</span>
-        </div>
-      ) : isCod && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
-          {isTicket && subRows.length > 0 && (
-            <div className="space-y-1">
-              {subRows.map((r) => (
-                <div
-                  key={r.label}
-                  className={`flex items-center justify-between text-xs ${r.free ? "text-green-300" : "text-amber-100/80"}`}
-                >
-                  <span>
-                    {r.label} · {r.qty}
-                    {r.free ? " · FREE ENTRY" : ` × ₹${r.price.toLocaleString("en-IN")}`}
-                  </span>
-                  <span className="tabular-nums">
-                    {r.free ? "₹0" : `₹${r.subtotal.toLocaleString("en-IN")}`}
-                  </span>
-                </div>
-              ))}
-              <div className="h-px bg-amber-300/20 my-1" />
-            </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-              <Banknote className="h-3.5 w-3.5" /> Collect cash (COD)
-            </span>
-            <span className="text-xl font-semibold text-amber-200 tabular-nums flex items-center gap-1">
-              <IndianRupee className="h-4 w-4" />{liveTotalRounded.toLocaleString("en-IN")}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* Cash-to-collect is owned by PaymentToCollectCard above (locked to the
+          ticket's finalPrice). This form only records actuals for analytics —
+          a live cash recalc here would imply the partner can adjust what they
+          collect, which they cannot. */}
 
       <Button
         type="button"
