@@ -15,6 +15,7 @@ import {
   wishlistsTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
+import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { createUserNotification } from "../lib/notify";
@@ -2296,6 +2297,30 @@ router.post("/admin/users/:userId/send-coupon", requireAuth(["admin"]), async (r
     .returning();
 
   res.json(c);
+});
+
+/**
+ * One-shot migrator for moving every file under LOCAL_STORAGE_DIR (the
+ * Railway Volume) into the configured S3 bucket. Removed in a follow-up
+ * commit once the migration is complete — this endpoint is not part of
+ * the long-term admin surface.
+ *
+ * Body: { confirm: "yes" }. Idempotent — re-running skips files already
+ * present in the bucket. Hard timeout left to the request gateway; if it
+ * times out, just call it again.
+ */
+router.post("/admin/migrate-media", requireAuth(["admin"]), async (req, res) => {
+  if (req.body?.confirm !== "yes") {
+    res.status(400).json({ error: "Set { confirm: \"yes\" } in the body to run the migration." });
+    return;
+  }
+  try {
+    const report = await migrateMediaToS3({ concurrency: 8 });
+    res.json(report);
+  } catch (err) {
+    req.log.error({ err }, "media migration failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Migration failed" });
+  }
 });
 
 export default router;
