@@ -29,9 +29,11 @@ import {
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck, Check,
   Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent, RefreshCw,
+  FileText, Star, Menu, X, Sparkles, ArrowUpRight, Bell,
 } from "lucide-react";
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Area, AreaChart,
 } from "recharts";
 import {
   apiGet, apiPost, apiDelete, apiPatch, apiPut,
@@ -193,6 +195,190 @@ interface Lead {
   message?: string;
 }
 
+interface NavItem {
+  value: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  group: "studio" | "growth" | "ops" | "money";
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { value: "overview",      label: "Profile",          icon: Building2,    group: "studio" },
+  { value: "events",        label: "Pubs & Clubs",     icon: TicketIcon,   group: "studio" },
+  { value: "bookings",      label: "Booking Report",   icon: FileText,     group: "studio" },
+  { value: "analytics",     label: "Analytics",        icon: TrendingUp,   group: "studio" },
+  { value: "calendar",      label: "Calendar",         icon: CalIcon,      group: "ops" },
+  { value: "attendance",    label: "Attendance",       icon: UserCheck,    group: "ops" },
+  { value: "managers",      label: "Managers",         icon: Users,        group: "ops" },
+  { value: "ads",           label: "Ads",              icon: Sparkles,     group: "growth" },
+  { value: "announcements", label: "Announcements",    icon: Megaphone,    group: "growth" },
+  { value: "leads",         label: "Leads",            icon: Crown,        group: "growth" },
+  { value: "drinkplans",    label: "Drink Plans",      icon: GlassWater,   group: "growth" },
+  { value: "banking",       label: "Banking",          icon: Banknote,     group: "money" },
+  { value: "reviews",       label: "Reviews",          icon: Star,         group: "money" },
+];
+
+const GROUP_LABELS: Record<NavItem["group"], string> = {
+  studio: "Studio",
+  growth: "Growth",
+  ops: "Operations",
+  money: "Finance",
+};
+
+const LOCKED_TAB_VALUES = new Set(["overview", "events"]);
+
+function SidebarTabsTrigger({
+  value, label, Icon, active,
+}: { value: string; label: string; Icon: React.ComponentType<{ className?: string }>; active: boolean }) {
+  return (
+    <TabsTrigger
+      value={value}
+      className={
+        "group relative w-full justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-medium " +
+        "transition-all duration-200 border border-transparent " +
+        "data-[state=active]:bg-white/[0.07] data-[state=active]:border-white/[0.10] " +
+        "data-[state=active]:text-white data-[state=active]:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_-12px_rgba(0,0,0,0.8)] " +
+        "data-[state=inactive]:text-white/55 hover:text-white hover:bg-white/[0.04] " +
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+      }
+    >
+      <span className={
+        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-colors " +
+        (active
+          ? "bg-primary/15 text-primary border border-primary/30"
+          : "bg-white/[0.04] text-white/50 border border-white/[0.06] group-hover:bg-white/[0.08] group-hover:text-white/80")
+      }>
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="flex-1 text-left truncate">{label}</span>
+      {active && (
+        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
+      )}
+    </TabsTrigger>
+  );
+}
+
+function PartnerNav({
+  currentTab,
+  vendor,
+  isApprovedAndListed,
+}: {
+  currentTab: string;
+  vendor: any;
+  isApprovedAndListed: boolean;
+}) {
+  const items = NAV_ITEMS.filter((i) => isApprovedAndListed || LOCKED_TAB_VALUES.has(i.value));
+  const groups: NavItem["group"][] = ["studio", "ops", "growth", "money"];
+
+  return (
+    <div className="flex h-full flex-col gap-1 px-3 py-5">
+      <div className="px-3 pb-5 mb-2 border-b border-white/[0.06]">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <span className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
+            <Crown className="h-4 w-4 text-primary" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-serif text-lg tracking-tight leading-none">Royvento</p>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">Partner Studio</p>
+          </div>
+        </Link>
+        {vendor?.businessName && (
+          <p className="mt-3 text-sm text-white/70 line-clamp-1" title={vendor.businessName}>
+            {vendor.businessName}
+          </p>
+        )}
+      </div>
+
+      <TabsList className="flex flex-col w-full h-auto items-stretch bg-transparent p-0 gap-0 overflow-visible">
+        {groups.map((g) => {
+          const gItems = items.filter((i) => i.group === g);
+          if (gItems.length === 0) return null;
+          return (
+            <div key={g} className="mb-3 w-full">
+              <p className="px-3 mb-1.5 text-[10px] uppercase tracking-[0.2em] text-white/30 font-semibold">
+                {GROUP_LABELS[g]}
+              </p>
+              <div className="flex flex-col gap-0.5">
+                {gItems.map((item) => (
+                  <SidebarTabsTrigger
+                    key={item.value}
+                    value={item.value}
+                    label={item.label}
+                    Icon={item.icon}
+                    active={currentTab === item.value}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </TabsList>
+
+      <div className="mt-auto px-3 pt-3 border-t border-white/[0.06]">
+        <Link href="/dashboard/vendor/scanner">
+          <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-[0_4px_20px_-6px_rgba(220,38,38,0.4)] hover:shadow-[0_6px_24px_-6px_rgba(220,38,38,0.55)]">
+            <ScanLine className="h-4 w-4" />
+            <span>Ticket scanner</span>
+          </button>
+        </Link>
+        {vendor?.isPremium && (
+          <div className="mt-3 rounded-xl border border-primary/25 bg-primary/[0.06] px-3.5 py-2.5 flex items-center gap-2">
+            <Crown className="h-3.5 w-3.5 text-primary shrink-0" />
+            <p className="text-xs font-medium text-primary">Premium partner</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PartnerHeader({
+  vendor,
+  currentTabLabel,
+  onMenu,
+}: {
+  vendor: any;
+  currentTabLabel: string;
+  onMenu: () => void;
+}) {
+  const greetingName = vendor?.businessName?.split(" ")[0] || "Partner";
+  return (
+    <header className="sticky top-[68px] z-30 px-4 md:px-8 py-4 md:py-5 backdrop-blur-xl bg-background/70 border-b border-white/[0.06]">
+      <div className="flex items-center gap-3 md:gap-5">
+        <button
+          type="button"
+          onClick={onMenu}
+          className="md:hidden h-9 w-9 rounded-lg flex items-center justify-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/70 transition-colors"
+          aria-label="Open navigation"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 font-semibold leading-none">
+            {currentTabLabel}
+          </p>
+          <h1 className="font-serif text-xl md:text-2xl tracking-tight mt-1.5 leading-none truncate">
+            Hello, {greetingName} <span className="text-white/30 font-normal">— welcome back</span>
+          </h1>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            className="h-9 w-9 rounded-lg flex items-center justify-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 transition-colors relative"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+          </button>
+          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/25 flex items-center justify-center text-xs font-semibold text-white">
+            {greetingName.slice(0, 2).toUpperCase()}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 export function VendorDashboard() {
   const search = useSearch();
   const rawTab = new URLSearchParams(search).get("tab") ?? "overview";
@@ -211,7 +397,6 @@ export function VendorDashboard() {
     } as any,
   });
   const events = eventsResp?.data ?? [];
-  const hasPub = events.some((e: any) => e.type === "pub");
 
   // Lock the dashboard down to Profile + Events&Pubs until the partner is
   // approved AND has at least one ADMIN-APPROVED event/pub. A freshly created
@@ -228,116 +413,127 @@ export function VendorDashboard() {
     if (hasApprovedEvent) setPollActive(false);
   }, [hasApprovedEvent]);
 
-  const ALLOWED_LOCKED_TABS = ["overview", "events"] as const;
   const safeInitialTab = isApprovedAndListed
     ? initialTab
-    : (ALLOWED_LOCKED_TABS as readonly string[]).includes(initialTab) ? initialTab : "overview";
+    : LOCKED_TAB_VALUES.has(initialTab) ? initialTab : "overview";
 
+  const [tab, setTab] = useState(safeInitialTab);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [bookTablePage, setBookTablePage] = useState(1);
 
-  return (
-    <div className="container mx-auto px-4 md:px-6 py-14">
-      <SEO title="Partner dashboard | Royvento" canonical="/dashboard/vendor" noindex />
-      <header className="mb-10 flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Partner</p>
-          <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">Studio dashboard</h1>
-        </div>
-        {vendor?.isPremium && (
-          <Badge className="bg-primary border-0 text-primary-foreground red-glow gap-1">
-            <Crown className="h-3.5 w-3.5" /> Premium partner
-          </Badge>
-        )}
-      </header>
+  useEffect(() => { setDrawerOpen(false); }, [tab]);
 
-      {!vendor ? (
-        <div className="rounded-3xl glass-card p-10 text-center">
+  const currentTabLabel = NAV_ITEMS.find((i) => i.value === tab)?.label ?? "Studio";
+
+  if (!vendor) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-14">
+        <SEO title="Partner dashboard | Royvento" canonical="/dashboard/vendor" noindex />
+        <div className="rounded-3xl glass-card p-10 text-center max-w-xl mx-auto">
           <p className="font-serif text-2xl mb-2">Setting up your dashboard…</p>
           <p className="text-muted-foreground">Your partner profile is being prepared. Please refresh in a moment or contact support if this persists.</p>
         </div>
-      ) : (
-        <Tabs defaultValue={safeInitialTab} className="space-y-6">
-          {!isApprovedAndListed && (
-            <div className="rounded-2xl glass-card border border-amber-500/30 bg-amber-500/5 p-5 flex items-start gap-3">
-              <Megaphone className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-serif text-lg text-amber-100">
-                  {vendor.status !== "approved"
-                    ? "Your partner profile is awaiting Royvento approval"
-                    : hasPendingEvent
-                      ? "Your listing is awaiting Royvento approval"
-                      : allRejected
-                        ? "Your listings need updates before going live"
-                        : "Add your first event or pub to unlock the full dashboard"}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {vendor.status !== "approved"
-                    ? "We're reviewing your profile. As soon as it's approved (and you list at least one event or pub that we approve), Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."
-                    : hasPendingEvent
-                      ? "Your listing is in review. As soon as our team approves it, Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."
-                      : allRejected
-                        ? "None of your listings are currently approved. Edit them to address the reviewer's notes (or add a new one) — once we approve a listing, Bookings, Analytics, Scanner and the rest of the studio tools will appear here."
-                        : "Once you list an event or pub and we approve it, Bookings, Analytics, Scanner and the rest of the studio tools become available."}
-                </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SEO title="Partner dashboard | Royvento" canonical="/dashboard/vendor" noindex />
+
+      <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="block">
+        <div className="md:grid md:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)] min-h-[calc(100vh-68px)]">
+          {/* Desktop sidebar */}
+          <aside className="hidden md:block sticky top-[68px] h-[calc(100vh-68px)] overflow-y-auto border-r border-white/[0.06] bg-sidebar/40 backdrop-blur-xl">
+            <PartnerNav
+              currentTab={tab}
+              vendor={vendor}
+              isApprovedAndListed={isApprovedAndListed}
+            />
+          </aside>
+
+          {/* Mobile drawer */}
+          {drawerOpen && (
+            <div className="md:hidden fixed inset-0 z-[60] flex">
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setDrawerOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="relative w-72 max-w-[85vw] h-full bg-sidebar/95 backdrop-blur-xl border-r border-white/[0.08] overflow-y-auto animate-in slide-in-from-left">
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  className="absolute top-4 right-3 h-8 w-8 rounded-lg flex items-center justify-center bg-white/[0.04] text-white/60 hover:bg-white/[0.08] z-10"
+                  aria-label="Close navigation"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <PartnerNav
+                  currentTab={tab}
+                  vendor={vendor}
+                  isApprovedAndListed={isApprovedAndListed}
+                />
               </div>
             </div>
           )}
-          <div className="overflow-x-auto scrollbar-thin-x pb-2">
-          <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
-            <TabsTrigger value="overview">Profile</TabsTrigger>
-            <TabsTrigger value="events">Pubs &amp; Clubs</TabsTrigger>
-            {isApprovedAndListed && <>
-              <TabsTrigger value="bookings">Booking Report</TabsTrigger>
-              <TabsTrigger value="analytics">
-                <TrendingUp className="h-3.5 w-3.5 mr-1 text-primary" /> Analytics
-              </TabsTrigger>
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              <TabsTrigger value="ads">Ads</TabsTrigger>
-              <TabsTrigger value="announcements">
-                <Megaphone className="h-3.5 w-3.5 mr-1 text-primary" /> Announcements
-              </TabsTrigger>
-              <TabsTrigger value="leads">
-                <Crown className="h-3.5 w-3.5 mr-1 text-primary" /> Leads
-              </TabsTrigger>
-              <TabsTrigger value="drinkplans">
-                <GlassWater className="h-3.5 w-3.5 mr-1 text-primary" /> Drink Plans
-              </TabsTrigger>
-              <TabsTrigger value="attendance">
-                <UserCheck className="h-3.5 w-3.5 mr-1 text-primary" /> Attendance
-              </TabsTrigger>
-              <TabsTrigger value="managers">
-                <Users className="h-3.5 w-3.5 mr-1 text-primary" /> Managers
-              </TabsTrigger>
-              <TabsTrigger value="banking">
-                <Banknote className="h-3.5 w-3.5 mr-1 text-primary" /> Banking &amp; Settlement
-              </TabsTrigger>
-              <TabsTrigger value="reviews">Reviews</TabsTrigger>
-              <Link href="/dashboard/vendor/scanner">
-                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors">
-                  <ScanLine className="h-3.5 w-3.5" /> Ticket scanner
-                </button>
-              </Link>
-            </>}
-          </TabsList>
-          </div>
 
-          <TabsContent value="overview"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
-          <TabsContent value="events"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>
-          {isApprovedAndListed && <>
-            <TabsContent value="bookings"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
-            <TabsContent value="analytics"><AnalyticsPanel vendorCategory={vendor?.category ?? ""} /></TabsContent>
-            <TabsContent value="calendar"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
-            <TabsContent value="ads"><AdsPanel /></TabsContent>
-            <TabsContent value="announcements"><AnnouncementsPanel /></TabsContent>
-            <TabsContent value="leads"><LeadsPanel /></TabsContent>
-            <TabsContent value="drinkplans"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
-            <TabsContent value="attendance"><AttendancePanel /></TabsContent>
-            <TabsContent value="managers"><ManagersPanel /></TabsContent>
-            <TabsContent value="banking"><BankingPanel /></TabsContent>
-            <TabsContent value="reviews"><PartnerReviewsPanel /></TabsContent>
-          </>}
-        </Tabs>
-      )}
+          {/* Main content */}
+          <main className="min-w-0">
+            <PartnerHeader
+              vendor={vendor}
+              currentTabLabel={currentTabLabel}
+              onMenu={() => setDrawerOpen(true)}
+            />
+
+            <div className="px-4 md:px-8 py-6 md:py-8 space-y-6">
+              {!isApprovedAndListed && (
+                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.04] p-5 flex items-start gap-3 backdrop-blur">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+                    <Megaphone className="h-4 w-4 text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-serif text-lg text-amber-100 leading-snug">
+                      {vendor.status !== "approved"
+                        ? "Your partner profile is awaiting Royvento approval"
+                        : hasPendingEvent
+                          ? "Your listing is awaiting Royvento approval"
+                          : allRejected
+                            ? "Your listings need updates before going live"
+                            : "Add your first event or pub to unlock the full dashboard"}
+                    </p>
+                    <p className="text-sm text-white/55 mt-1.5 leading-relaxed">
+                      {vendor.status !== "approved"
+                        ? "We're reviewing your profile. As soon as it's approved (and you list at least one event or pub that we approve), Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."
+                        : hasPendingEvent
+                          ? "Your listing is in review. As soon as our team approves it, Bookings, Analytics, Ticket Scanner and the rest of the studio tools will appear here."
+                          : allRejected
+                            ? "None of your listings are currently approved. Edit them to address the reviewer's notes (or add a new one) — once we approve a listing, Bookings, Analytics, Scanner and the rest of the studio tools become available."
+                            : "Once you list an event or pub and we approve it, Bookings, Analytics, Scanner and the rest of the studio tools become available."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <TabsContent value="overview" className="mt-0"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
+              <TabsContent value="events" className="mt-0"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>
+              {isApprovedAndListed && <>
+                <TabsContent value="bookings" className="mt-0"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
+                <TabsContent value="analytics" className="mt-0"><AnalyticsPanel vendorCategory={vendor?.category ?? ""} /></TabsContent>
+                <TabsContent value="calendar" className="mt-0"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
+                <TabsContent value="ads" className="mt-0"><AdsPanel /></TabsContent>
+                <TabsContent value="announcements" className="mt-0"><AnnouncementsPanel /></TabsContent>
+                <TabsContent value="leads" className="mt-0"><LeadsPanel /></TabsContent>
+                <TabsContent value="drinkplans" className="mt-0"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
+                <TabsContent value="attendance" className="mt-0"><AttendancePanel /></TabsContent>
+                <TabsContent value="managers" className="mt-0"><ManagersPanel /></TabsContent>
+                <TabsContent value="banking" className="mt-0"><BankingPanel /></TabsContent>
+                <TabsContent value="reviews" className="mt-0"><PartnerReviewsPanel /></TabsContent>
+              </>}
+            </div>
+          </main>
+        </div>
+      </Tabs>
     </div>
   );
 }
@@ -3320,212 +3516,306 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
     };
   }, [preset, customFrom, customTo]);
 
-  if (loading) {
-    return <p className="text-muted-foreground py-8 text-center">Loading analytics…</p>;
-  }
-
-  if (!data) {
-    return <p className="text-muted-foreground py-8 text-center">Could not load analytics.</p>;
-  }
-
-  const hasData = data.totalEarnings > 0 || data.perEvent.length > 0;
-
-  const chartMax = Math.max(...data.dailyRevenue.map((d) => d.revenue), 1);
-  const hasTickets = (data.totalWomen + data.totalMen + data.totalCouple) > 0;
-
   const PRESET_LABELS: Record<AnalyticsPreset, string> = {
     today: "Today", "7d": "Last 7 days", "30d": "Last 30 days",
     "3m": "Last 3 months", "6m": "Last 6 months", custom: "Custom",
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[0,1,2].map((i) => (
+            <div key={i} className="rounded-2xl glass-card p-5 h-32 animate-pulse">
+              <div className="h-3 w-24 rounded bg-white/[0.06] mb-3" />
+              <div className="h-8 w-32 rounded bg-white/[0.08] mb-2" />
+              <div className="h-3 w-40 rounded bg-white/[0.05]" />
+            </div>
+          ))}
+        </div>
+        <div className="rounded-3xl glass-card-strong h-72 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="rounded-3xl glass-card p-10 text-center">
+        <p className="font-serif text-2xl mb-2">Could not load analytics</p>
+        <p className="text-muted-foreground text-sm">Please try again in a moment.</p>
+      </div>
+    );
+  }
+
+  const hasData = data.totalEarnings > 0 || data.perEvent.length > 0;
+  const chartMax = Math.max(...data.dailyRevenue.map((d) => d.revenue), 1);
+  const hasTickets = (data.totalWomen + data.totalMen + data.totalCouple) > 0;
+
+  const pendingActuals = (data as { pendingActualsCount?: number }).pendingActualsCount ?? 0;
+
+  // Donut data — booking type mix
+  const cs = data.commissionSummary;
+  const tableLabel = vendorCategory === "Club" ? "VIP Table" : "Table";
+  const typeMix = [
+    { key: "freeEntry", name: "Free Entry", value: cs.freeEntry.grossRevenue, color: "#22d3ee" },
+    { key: "ticket",    name: "Ticket",     value: cs.ticket.grossRevenue,    color: "hsl(var(--primary))" },
+    { key: "table",     name: tableLabel,   value: cs.table.grossRevenue,     color: "#f59e0b" },
+  ].filter((t) => t.value > 0);
+  const typeMixTotal = typeMix.reduce((s, t) => s + t.value, 0);
+
   return (
     <div className="space-y-6">
-      {/* Time-range filter */}
-      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Time range</p>
-          <div className="flex flex-wrap gap-2">
+      {/* ─── Filter bar ─── */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] backdrop-blur-xl p-4 md:p-5">
+        <div className="flex flex-wrap items-center gap-3 md:gap-4">
+          <div className="flex items-center gap-2 mr-1">
+            <div className="h-8 w-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-semibold">Analytics</p>
+              <p className="text-sm font-medium text-white/90">{PRESET_LABELS[preset]}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1 ml-auto rounded-xl border border-white/[0.07] bg-white/[0.02] p-1">
             {(["today", "7d", "30d", "3m", "6m", "custom"] as AnalyticsPreset[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPreset(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${preset === p ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                className={
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all " +
+                  (preset === p
+                    ? "bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                    : "text-white/55 hover:text-white hover:bg-white/[0.04]")
+                }
               >
                 {PRESET_LABELS[p]}
               </button>
             ))}
           </div>
-        </div>
-        {preset === "custom" && (
-          <div className="flex gap-3 items-end">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">From</p>
-              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm" max={customTo || toAnalyticsDateStr(new Date())} />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">To</p>
-              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm" min={customFrom} max={toAnalyticsDateStr(new Date())} />
-            </div>
-          </div>
-        )}
-        <div className="flex items-center gap-3 ml-auto">
-          {lastUpdated && (
-            <p className="text-xs text-muted-foreground hidden sm:block">Updated {lastUpdated.toLocaleTimeString()}</p>
-          )}
+
           <button
             onClick={() => load()}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/70 transition-colors disabled:opacity-50"
+            aria-label="Refresh analytics"
           >
-            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
+
+        {preset === "custom" && (
+          <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-white/[0.06]">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-1.5 font-semibold">From</p>
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 text-sm" max={customTo || toAnalyticsDateStr(new Date())} />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-1.5 font-semibold">To</p>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 text-sm" min={customFrom} max={toAnalyticsDateStr(new Date())} />
+            </div>
+          </div>
+        )}
+
+        {lastUpdated && (
+          <p className="text-[11px] text-white/30 mt-3 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Live · Updated {lastUpdated.toLocaleTimeString()}
+          </p>
+        )}
       </div>
 
-      {/* Earnings summary cards */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-            <IndianRupee className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total earnings</p>
-            <p className="stat-number text-3xl">{formatINR(data.totalEarnings)}</p>
-            <p className="text-xs text-muted-foreground mt-1">gross earnings across all bookings</p>
-            {(data as { pendingActualsCount?: number }).pendingActualsCount ? (
-              <p className="text-[11px] text-amber-400 mt-1">
-                {(data as { pendingActualsCount?: number }).pendingActualsCount} COD bookings awaiting QR scan
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
-            <Banknote className="h-5 w-5 text-amber-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">COD collected (actual)</p>
-            <p className="stat-number text-3xl text-amber-300">{formatINR(data.actualCodRevenue ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{data.actualCodRecordedCount ?? 0} bookings scanned at door</p>
-          </div>
-        </div>
-        <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
-            <CreditCard className="h-5 w-5 text-emerald-400" />
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Online payments</p>
-            <p className="stat-number text-3xl text-emerald-300">{formatINR(data.onlineRevenue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">paid via gateway</p>
-          </div>
-        </div>
+      {/* ─── KPI cards ─── */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <KpiCard
+          label="Total earnings"
+          value={formatINR(data.totalEarnings)}
+          hint="Gross earnings across all bookings"
+          accent="primary"
+          Icon={IndianRupee}
+          warning={pendingActuals > 0 ? `${pendingActuals} COD bookings awaiting QR scan` : null}
+        />
+        <KpiCard
+          label="COD collected (actual)"
+          value={formatINR(data.actualCodRevenue ?? 0)}
+          hint={`${data.actualCodRecordedCount ?? 0} bookings scanned at door`}
+          accent="amber"
+          Icon={Banknote}
+        />
+        <KpiCard
+          label="Online payments"
+          value={formatINR(data.onlineRevenue)}
+          hint="Paid via gateway"
+          accent="emerald"
+          Icon={CreditCard}
+        />
       </div>
 
-      {/* Ticket audience mix */}
+      {/* ─── Ticket audience strip ─── */}
       {hasTickets && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
-              <span className="text-pink-400 text-base">♀</span>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
-              <p className="stat-number text-2xl text-pink-300">{data.totalWomen}</p>
-              <p className="text-xs text-muted-foreground mt-1">tickets total</p>
-            </div>
-          </div>
-          <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-              <span className="text-blue-400 text-base">♂</span>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
-              <p className="stat-number text-2xl text-blue-300">{data.totalMen}</p>
-              <p className="text-xs text-muted-foreground mt-1">tickets total</p>
-            </div>
-          </div>
-          <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-              <span className="text-purple-400 text-base">⚭</span>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
-              <p className="stat-number text-2xl text-purple-300">{data.totalCouple}</p>
-              <p className="text-xs text-muted-foreground mt-1">tickets total</p>
-            </div>
-          </div>
+        <div className="grid grid-cols-3 gap-3">
+          <AudienceChip label="Women" count={data.totalWomen} tint="pink" />
+          <AudienceChip label="Men" count={data.totalMen} tint="blue" />
+          <AudienceChip label="Couples" count={data.totalCouple} tint="purple" />
         </div>
       )}
 
       {!hasData && (
-        <div className="rounded-3xl glass-card p-10 text-center">
-          <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-40" />
+        <div className="rounded-3xl glass-card p-10 md:p-14 text-center">
+          <div className="h-14 w-14 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mx-auto mb-4">
+            <TrendingUp className="h-6 w-6 text-white/30" />
+          </div>
           <p className="font-serif text-2xl mb-2">No earnings yet</p>
           <p className="text-muted-foreground text-sm">Analytics will appear here once you have confirmed bookings.</p>
         </div>
       )}
 
-      {/* Daily revenue chart */}
+      {/* ─── Revenue chart + Type mix donut ─── */}
       {data.dailyRevenue.some((d) => d.revenue > 0) && (
-        <div className="rounded-3xl glass-card-strong p-6">
-          <p className="font-serif text-xl mb-5">Revenue — {PRESET_LABELS[preset].toLowerCase()}</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={data.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(d) => {
-                  const dt = new Date(d);
-                  return `${dt.getDate()}/${dt.getMonth() + 1}`;
-                }}
-                interval={4}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
-                width={48}
-                domain={[0, Math.ceil(chartMax * 1.15)]}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "12px",
-                  fontSize: "12px",
-                }}
-                formatter={(v: number) => [formatINR(v), "Revenue"]}
-                labelFormatter={(label) => new Date(label).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-              />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 4, fill: "hsl(var(--primary))" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="grid lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl p-5 md:p-6">
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Revenue</p>
+                <p className="font-serif text-xl tracking-tight">Daily earnings — {PRESET_LABELS[preset].toLowerCase()}</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/25 px-3 py-1">
+                <ArrowUpRight className="h-3 w-3 text-primary" />
+                <span className="text-[11px] font-semibold text-primary">{formatINR(data.totalEarnings)}</span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={data.dailyRevenue} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                  tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                  tickFormatter={(d) => {
+                    const dt = new Date(d);
+                    return `${dt.getDate()}/${dt.getMonth() + 1}`;
+                  }}
+                  interval={Math.max(1, Math.floor(data.dailyRevenue.length / 8) - 1)}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
+                  width={56}
+                  domain={[0, Math.ceil(chartMax * 1.15)]}
+                />
+                <Tooltip
+                  cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}
+                  contentStyle={{
+                    background: "rgba(15,15,17,0.95)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "12px",
+                    fontSize: "12px",
+                    backdropFilter: "blur(10px)",
+                  }}
+                  formatter={(v: number) => [formatINR(v), "Revenue"]}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2.5}
+                  fill="url(#revGrad)"
+                  dot={false}
+                  activeDot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "rgba(0,0,0,0.4)" }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {typeMix.length > 0 && (
+            <div className="rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl p-5 md:p-6 flex flex-col">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Booking type</p>
+              <p className="font-serif text-xl tracking-tight mb-4">Revenue mix</p>
+              <div className="relative h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={typeMix}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={48}
+                      outerRadius={75}
+                      strokeWidth={2}
+                      stroke="rgba(0,0,0,0.3)"
+                      paddingAngle={2}
+                    >
+                      {typeMix.map((slice) => (
+                        <Cell key={slice.key} fill={slice.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(15,15,17,0.95)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "10px",
+                        fontSize: "12px",
+                      }}
+                      formatter={(v: number) => [formatINR(v), null]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold">Total</p>
+                  <p className="stat-number text-lg leading-tight">{formatINR(typeMixTotal)}</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2 text-xs">
+                {typeMix.map((slice) => {
+                  const pct = typeMixTotal > 0 ? Math.round((slice.value / typeMixTotal) * 100) : 0;
+                  return (
+                    <div key={slice.key} className="flex items-center gap-2.5">
+                      <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: slice.color }} />
+                      <span className="text-white/65 flex-1 truncate">{slice.name}</span>
+                      <span className="tabular-nums text-white/90 font-medium">{pct}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Per-event breakdown table */}
+      {/* ─── Per-event table ─── */}
       {data.perEvent.length > 0 && (
-        <div className="rounded-3xl glass-card-strong p-6">
-          <p className="font-serif text-xl mb-4">Ticket breakdown by listing</p>
+        <div className="rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl overflow-hidden">
+          <div className="px-5 md:px-6 pt-5 md:pt-6 pb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Listings</p>
+              <p className="font-serif text-xl tracking-tight">Ticket breakdown</p>
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-white/30 font-mono tabular-nums">
+              {data.perEvent.length} {data.perEvent.length === 1 ? "listing" : "listings"}
+            </span>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-y border-white/[0.05] bg-white/[0.02]">
                 <tr>
-                  <th className="text-left py-2 pr-4">Listing</th>
-                  <th className="text-right py-2 px-2">Bookings</th>
-                  <th className="text-right py-2 px-2">Women</th>
-                  <th className="text-right py-2 px-2">Men</th>
-                  <th className="text-right py-2 px-2">Couples</th>
-                  <th className="text-right py-2 px-2">No of guest</th>
-                  <th className="text-right py-2 pl-2">Revenue</th>
+                  <th className="text-left py-3 px-5 md:px-6">Listing</th>
+                  <th className="text-right py-3 px-3">Bookings</th>
+                  <th className="text-right py-3 px-3">Women</th>
+                  <th className="text-right py-3 px-3">Men</th>
+                  <th className="text-right py-3 px-3">Couples</th>
+                  <th className="text-right py-3 px-3">Guests</th>
+                  <th className="text-right py-3 pr-5 md:pr-6 pl-3">Revenue</th>
                 </tr>
               </thead>
               <tbody>
@@ -3533,41 +3823,41 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
                   const rx = row as typeof row & { peopleCount?: number };
                   const guests = rx.peopleCount ?? (rx.ticketWomen + rx.ticketMen + rx.ticketCouple * 2);
                   return (
-                    <tr key={rx.eventId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="py-3 pr-4 font-medium">{rx.eventTitle}</td>
-                      <td className="text-right px-2 tabular-nums">{rx.bookingCount}</td>
-                      <td className="text-right px-2 tabular-nums text-pink-300">{rx.ticketWomen || "—"}</td>
-                      <td className="text-right px-2 tabular-nums text-blue-300">{rx.ticketMen || "—"}</td>
-                      <td className="text-right px-2 tabular-nums text-purple-300">{rx.ticketCouple || "—"}</td>
-                      <td className="text-right px-2 tabular-nums">{guests || "—"}</td>
-                      <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(rx.revenue)}</td>
+                    <tr key={rx.eventId} className="border-t border-white/[0.04] hover:bg-white/[0.025] transition-colors">
+                      <td className="py-3.5 px-5 md:px-6 font-medium text-white/90">{rx.eventTitle}</td>
+                      <td className="text-right px-3 tabular-nums text-white/80">{rx.bookingCount}</td>
+                      <td className="text-right px-3 tabular-nums text-pink-300">{rx.ticketWomen || "—"}</td>
+                      <td className="text-right px-3 tabular-nums text-blue-300">{rx.ticketMen || "—"}</td>
+                      <td className="text-right px-3 tabular-nums text-purple-300">{rx.ticketCouple || "—"}</td>
+                      <td className="text-right px-3 tabular-nums text-white/80">{guests || "—"}</td>
+                      <td className="text-right pr-5 md:pr-6 pl-3 tabular-nums text-primary font-semibold">{formatINR(rx.revenue)}</td>
                     </tr>
                   );
                 })}
               </tbody>
               {data.perEvent.length > 1 && (
-                <tfoot className="border-t border-white/15 text-xs text-muted-foreground">
+                <tfoot className="border-t border-white/[0.1] bg-white/[0.02] text-xs">
                   <tr>
-                    <td className="py-2 pr-4 font-semibold text-foreground">Total</td>
-                    <td className="text-right px-2 font-semibold text-foreground tabular-nums">
+                    <td className="py-3 px-5 md:px-6 font-semibold text-white">Total</td>
+                    <td className="text-right px-3 font-semibold tabular-nums text-white">
                       {data.perEvent.reduce((s, r) => s + r.bookingCount, 0)}
                     </td>
-                    <td className="text-right px-2 text-pink-300 tabular-nums">
+                    <td className="text-right px-3 text-pink-300 tabular-nums font-semibold">
                       {data.perEvent.reduce((s, r) => s + r.ticketWomen, 0) || "—"}
                     </td>
-                    <td className="text-right px-2 text-blue-300 tabular-nums">
+                    <td className="text-right px-3 text-blue-300 tabular-nums font-semibold">
                       {data.perEvent.reduce((s, r) => s + r.ticketMen, 0) || "—"}
                     </td>
-                    <td className="text-right px-2 text-purple-300 tabular-nums">
+                    <td className="text-right px-3 text-purple-300 tabular-nums font-semibold">
                       {data.perEvent.reduce((s, r) => s + r.ticketCouple, 0) || "—"}
                     </td>
-                    <td className="text-right px-2 font-semibold text-foreground tabular-nums">
+                    <td className="text-right px-3 font-semibold tabular-nums text-white">
                       {data.perEvent.reduce((s, r) => {
                         const rx = r as typeof r & { peopleCount?: number };
                         return s + (rx.peopleCount ?? (rx.ticketWomen + rx.ticketMen + rx.ticketCouple * 2));
                       }, 0) || "—"}
                     </td>
-                    <td className="text-right pl-2 text-primary font-semibold tabular-nums">
+                    <td className="text-right pr-5 md:pr-6 pl-3 text-primary font-semibold tabular-nums">
                       {formatINR(data.perEvent.reduce((s, r) => s + r.revenue, 0))}
                     </td>
                   </tr>
@@ -3578,62 +3868,35 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
         </div>
       )}
 
-      {/* Commission breakdown */}
+      {/* ─── Platform charges & commission ─── */}
       {data.commissionRates && (
-        <div className="rounded-3xl glass-card-strong p-6 space-y-5">
+        <div className="rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl p-5 md:p-6 space-y-6">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-              <Percent className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+              <Percent className="h-4.5 w-4.5 text-primary" />
             </div>
             <div>
-              <p className="font-serif text-xl">Platform charges</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Flat fees charged by the platform per person/ticket/booking.</p>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Platform charges</p>
+              <p className="font-serif text-xl tracking-tight leading-tight">Commission &amp; fees</p>
+              <p className="text-sm text-white/50 mt-1">Flat fees applied per person, per ticket, or per booking.</p>
             </div>
           </div>
 
-          {/* Applied flat fees */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Free Entry fee</p>
-              <p className="text-2xl font-semibold tabular-nums">₹{data.commissionRates.freeEntryRate}</p>
-              <p className="text-xs text-muted-foreground mt-1">per person</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Ticket fee</p>
-              <p className="text-2xl font-semibold tabular-nums">₹{data.commissionRates.ticketRate}</p>
-              <p className="text-xs text-muted-foreground mt-1">per ticket</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Table Booking fee</p>
-              <p className="text-2xl font-semibold tabular-nums">₹{data.commissionRates.tableBookingRate}</p>
-              <p className="text-xs text-muted-foreground mt-1">per booking</p>
-            </div>
+            <FeeChip label="Free entry" value={`₹${data.commissionRates.freeEntryRate}`} hint="per person" />
+            <FeeChip label="Ticket" value={`₹${data.commissionRates.ticketRate}`} hint="per ticket" />
+            <FeeChip label="Table booking" value={`₹${data.commissionRates.tableBookingRate}`} hint="per booking" />
           </div>
 
-          {/* Gross → Commission → Net summary — only shown when there are actual earnings */}
           {data.grossEarnings > 0 && (
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Gross earnings</p>
-                <p className="stat-number text-2xl">{formatINR(data.grossEarnings)}</p>
-                <p className="text-xs text-muted-foreground mt-1">total revenue collected</p>
-              </div>
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total commission</p>
-                <p className="stat-number text-2xl text-primary">{formatINR(data.totalCommission)}</p>
-                <p className="text-xs text-muted-foreground mt-1">charged by Royvento</p>
-              </div>
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net earnings</p>
-                <p className="stat-number text-2xl text-emerald-300">{formatINR(data.netEarnings)}</p>
-                <p className="text-xs text-muted-foreground mt-1">gross − total commission</p>
-              </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <SummaryBox label="Gross earnings" value={formatINR(data.grossEarnings)} hint="Total revenue collected" tone="neutral" />
+              <SummaryBox label="Total commission" value={formatINR(data.totalCommission)} hint="Charged by Royvento" tone="primary" />
+              <SummaryBox label="Net earnings" value={formatINR(data.netEarnings)} hint="Gross − commission" tone="emerald" />
             </div>
           )}
 
-          {/* Per-type breakdown */}
           {(() => {
-            const cs = data.commissionSummary;
             const types: { key: keyof typeof cs; label: string }[] = [
               { key: "freeEntry", label: "Free Entry" },
               { key: "ticket", label: "Ticket" },
@@ -3643,43 +3906,43 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
             if (active.length === 0) return null;
             return (
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Breakdown by booking type</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[480px]">
-                    <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold mb-3">Breakdown by booking type</p>
+                <div className="overflow-x-auto rounded-2xl border border-white/[0.06]">
+                  <table className="w-full text-sm min-w-[520px]">
+                    <thead className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-b border-white/[0.05] bg-white/[0.02]">
                       <tr>
-                        <th className="text-left py-2 pr-4">Type</th>
-                        <th className="text-right py-2 px-2">Bookings</th>
-                        <th className="text-right py-2 px-2">No of People</th>
-                        <th className="text-right py-2 px-2">Gross</th>
-                        <th className="text-right py-2 px-2">Commission</th>
-                        <th className="text-right py-2 pl-2">Net</th>
+                        <th className="text-left py-3 px-4">Type</th>
+                        <th className="text-right py-3 px-3">Bookings</th>
+                        <th className="text-right py-3 px-3">People</th>
+                        <th className="text-right py-3 px-3">Gross</th>
+                        <th className="text-right py-3 px-3">Commission</th>
+                        <th className="text-right py-3 pl-3 pr-4">Net</th>
                       </tr>
                     </thead>
                     <tbody>
                       {active.map(({ key, label }) => {
                         const row = cs[key];
                         return (
-                          <tr key={key} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                            <td className="py-3 pr-4 font-medium">{label}</td>
-                            <td className="text-right px-2 tabular-nums">{row.count}</td>
-                            <td className="text-right px-2 tabular-nums">{row.peopleCount ?? 0}</td>
-                            <td className="text-right px-2 tabular-nums">{formatINR(row.grossRevenue)}</td>
-                            <td className="text-right px-2 tabular-nums text-red-400">−{formatINR(row.commissionAmount)}</td>
-                            <td className="text-right pl-2 tabular-nums text-emerald-300 font-medium">{formatINR(row.netRevenue)}</td>
+                          <tr key={key} className="border-t border-white/[0.04] hover:bg-white/[0.025] transition-colors">
+                            <td className="py-3 px-4 font-medium text-white/90">{label}</td>
+                            <td className="text-right px-3 tabular-nums text-white/80">{row.count}</td>
+                            <td className="text-right px-3 tabular-nums text-white/80">{row.peopleCount ?? 0}</td>
+                            <td className="text-right px-3 tabular-nums text-white/90">{formatINR(row.grossRevenue)}</td>
+                            <td className="text-right px-3 tabular-nums text-red-400">−{formatINR(row.commissionAmount)}</td>
+                            <td className="text-right pl-3 pr-4 tabular-nums text-emerald-300 font-semibold">{formatINR(row.netRevenue)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                     {active.length > 1 && (
-                      <tfoot className="border-t border-white/15 text-xs">
+                      <tfoot className="border-t border-white/[0.1] bg-white/[0.02] text-xs">
                         <tr>
-                          <td className="py-2 pr-4 font-semibold text-foreground">Total</td>
-                          <td className="text-right px-2 font-semibold tabular-nums">{active.reduce((s, t) => s + cs[t.key].count, 0)}</td>
-                          <td className="text-right px-2 font-semibold tabular-nums">{active.reduce((s, t) => s + (cs[t.key].peopleCount ?? 0), 0)}</td>
-                          <td className="text-right px-2 font-semibold tabular-nums">{formatINR(active.reduce((s, t) => s + cs[t.key].grossRevenue, 0))}</td>
-                          <td className="text-right px-2 text-red-400 font-semibold tabular-nums">−{formatINR(active.reduce((s, t) => s + cs[t.key].commissionAmount, 0))}</td>
-                          <td className="text-right pl-2 text-emerald-300 font-semibold tabular-nums">{formatINR(active.reduce((s, t) => s + cs[t.key].netRevenue, 0))}</td>
+                          <td className="py-3 px-4 font-semibold text-white">Total</td>
+                          <td className="text-right px-3 font-semibold tabular-nums text-white">{active.reduce((s, t) => s + cs[t.key].count, 0)}</td>
+                          <td className="text-right px-3 font-semibold tabular-nums text-white">{active.reduce((s, t) => s + (cs[t.key].peopleCount ?? 0), 0)}</td>
+                          <td className="text-right px-3 font-semibold tabular-nums text-white">{formatINR(active.reduce((s, t) => s + cs[t.key].grossRevenue, 0))}</td>
+                          <td className="text-right px-3 text-red-400 font-semibold tabular-nums">−{formatINR(active.reduce((s, t) => s + cs[t.key].commissionAmount, 0))}</td>
+                          <td className="text-right pl-3 pr-4 text-emerald-300 font-semibold tabular-nums">{formatINR(active.reduce((s, t) => s + cs[t.key].netRevenue, 0))}</td>
                         </tr>
                       </tfoot>
                     )}
@@ -3690,6 +3953,95 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
           })()}
         </div>
       )}
+    </div>
+  );
+}
+
+function KpiCard({
+  label, value, hint, Icon, accent, warning,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  accent: "primary" | "amber" | "emerald";
+  warning?: string | null;
+}) {
+  const accents = {
+    primary: { chip: "bg-primary/15 border-primary/25 text-primary", text: "" },
+    amber:   { chip: "bg-amber-500/15 border-amber-500/25 text-amber-400", text: "text-amber-300" },
+    emerald: { chip: "bg-emerald-500/15 border-emerald-500/25 text-emerald-400", text: "text-emerald-300" },
+  }[accent];
+  return (
+    <div className="group relative rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-white/[0.01] backdrop-blur-xl p-5 transition-all duration-300 hover:border-white/[0.12] hover:shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]">
+      <div className="flex items-start gap-3 mb-4">
+        <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${accents.chip} shrink-0`}>
+          <Icon className="h-4.5 w-4.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold leading-none">{label}</p>
+        </div>
+        <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white/40 transition-colors" />
+      </div>
+      <p className={`stat-number text-3xl md:text-[2rem] leading-none tabular-nums ${accents.text}`}>{value}</p>
+      {hint && <p className="text-xs text-white/45 mt-2">{hint}</p>}
+      {warning && (
+        <p className="text-[11px] text-amber-300/90 mt-2 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          {warning}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AudienceChip({ label, count, tint }: { label: string; count: number; tint: "pink" | "blue" | "purple" }) {
+  const tints = {
+    pink:   { bg: "bg-pink-500/10 border-pink-500/20",     text: "text-pink-300",   sym: "♀" },
+    blue:   { bg: "bg-blue-500/10 border-blue-500/20",     text: "text-blue-300",   sym: "♂" },
+    purple: { bg: "bg-purple-500/10 border-purple-500/20", text: "text-purple-300", sym: "⚭" },
+  }[tint];
+  return (
+    <div className={`rounded-xl border ${tints.bg} px-4 py-3 flex items-center gap-3`}>
+      <span className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg ${tints.text} bg-black/20`}>
+        {tints.sym}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold">{label}</p>
+        <p className={`stat-number text-xl ${tints.text} tabular-nums leading-tight`}>{count}</p>
+      </div>
+    </div>
+  );
+}
+
+function FeeChip({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-center">
+      <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold mb-1">{label}</p>
+      <p className="text-2xl font-semibold tabular-nums text-white">{value}</p>
+      <p className="text-[11px] text-white/40 mt-0.5">{hint}</p>
+    </div>
+  );
+}
+
+function SummaryBox({
+  label, value, hint, tone,
+}: { label: string; value: string; hint: string; tone: "neutral" | "primary" | "emerald" }) {
+  const tones = {
+    neutral: "border-white/[0.07] bg-white/[0.02]",
+    primary: "border-primary/25 bg-primary/[0.06]",
+    emerald: "border-emerald-500/25 bg-emerald-500/[0.05]",
+  }[tone];
+  const valueClass = {
+    neutral: "",
+    primary: "text-primary",
+    emerald: "text-emerald-300",
+  }[tone];
+  return (
+    <div className={`rounded-xl border ${tones} p-4`}>
+      <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold mb-1">{label}</p>
+      <p className={`stat-number text-2xl tabular-nums ${valueClass}`}>{value}</p>
+      <p className="text-[11px] text-white/45 mt-1">{hint}</p>
     </div>
   );
 }
