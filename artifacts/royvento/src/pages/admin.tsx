@@ -48,11 +48,12 @@ import {
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
   Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
+  Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, Bell, ShieldCheck, BookOpen,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  LineChart, Line,
+  LineChart, Line, Area, AreaChart, PieChart, Pie, Cell,
 } from "recharts";
 import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -72,12 +73,170 @@ const DEFAULT_ADMIN_TAB = "analytics";
 const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
   !!t && (ADMIN_TABS as readonly string[]).includes(t);
 
+interface AdminNavItem {
+  value: typeof ADMIN_TABS[number];
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  group: "control" | "partners" | "customers" | "growth" | "finance";
+}
+
+const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+  { value: "analytics",            label: "Analytics",         icon: TrendingUp,    group: "control" },
+  { value: "live-occupancy",       label: "Live Occupancy",    icon: Activity,      group: "control" },
+  { value: "commissions",          label: "Commissions",       icon: Percent,       group: "control" },
+  { value: "vendors",              label: "Partners",          icon: Briefcase,     group: "partners" },
+  { value: "requests",             label: "Partner Requests",  icon: UserPlus,      group: "partners" },
+  { value: "event-approvals",      label: "Event Approvals",   icon: ShieldCheck,   group: "partners" },
+  { value: "events",               label: "Events",            icon: Tag,           group: "partners" },
+  { value: "create-pub",           label: "Create Pub/Club",   icon: Plus,          group: "partners" },
+  { value: "users",                label: "Users",             icon: Users,         group: "customers" },
+  { value: "booking-report",       label: "Booking Report",    icon: FileText,      group: "customers" },
+  { value: "attendance",           label: "Attendance",        icon: UserCheck,     group: "customers" },
+  { value: "crm-leads",            label: "CRM & Leads",       icon: Crown,         group: "customers" },
+  { value: "reviews",              label: "Reviews",           icon: Star,          group: "customers" },
+  { value: "messages",             label: "Messages",          icon: Mail,          group: "customers" },
+  { value: "subscriptions",        label: "Subscriptions",     icon: Trophy,        group: "growth" },
+  { value: "coupons",              label: "Coupons",           icon: Gift,          group: "growth" },
+  { value: "ads",                  label: "Ads",               icon: Sparkles,      group: "growth" },
+  { value: "announcement-slider",  label: "Announcement Slider", icon: Megaphone,   group: "growth" },
+  { value: "blogs",                label: "Blogs",             icon: BookOpen,      group: "growth" },
+  { value: "settlements",          label: "Settlements",       icon: Banknote,      group: "finance" },
+];
+
+const ADMIN_GROUP_LABELS: Record<AdminNavItem["group"], string> = {
+  control: "Control Room",
+  partners: "Partners",
+  customers: "Customers",
+  growth: "Growth",
+  finance: "Finance",
+};
+
+function AdminSidebarTrigger({
+  value, label, Icon, active,
+}: { value: string; label: string; Icon: React.ComponentType<{ className?: string }>; active: boolean }) {
+  return (
+    <TabsTrigger
+      value={value}
+      className={
+        "group relative w-full justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-medium " +
+        "transition-all duration-200 border border-transparent " +
+        "data-[state=active]:bg-white/[0.07] data-[state=active]:border-white/[0.10] " +
+        "data-[state=active]:text-white data-[state=active]:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_-12px_rgba(0,0,0,0.8)] " +
+        "data-[state=inactive]:text-white/55 hover:text-white hover:bg-white/[0.04] " +
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+      }
+    >
+      <span className={
+        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-colors " +
+        (active
+          ? "bg-primary/15 text-primary border border-primary/30"
+          : "bg-white/[0.04] text-white/50 border border-white/[0.06] group-hover:bg-white/[0.08] group-hover:text-white/80")
+      }>
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="flex-1 text-left truncate">{label}</span>
+      {active && (
+        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
+      )}
+    </TabsTrigger>
+  );
+}
+
+function AdminNav({ currentTab }: { currentTab: string }) {
+  const groups: AdminNavItem["group"][] = ["control", "partners", "customers", "growth", "finance"];
+  return (
+    <div className="flex h-full flex-col gap-1 px-3 py-5">
+      <div className="px-3 pb-5 mb-2 border-b border-white/[0.06]">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <span className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-serif text-lg tracking-tight leading-none">Royvento</p>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">Control Room</p>
+          </div>
+        </Link>
+      </div>
+
+      <TabsList className="flex flex-col w-full h-auto items-stretch bg-transparent p-0 gap-0 overflow-visible">
+        {groups.map((g) => {
+          const gItems = ADMIN_NAV_ITEMS.filter((i) => i.group === g);
+          if (gItems.length === 0) return null;
+          return (
+            <div key={g} className="mb-3 w-full">
+              <p className="px-3 mb-1.5 text-[10px] uppercase tracking-[0.2em] text-white/30 font-semibold">
+                {ADMIN_GROUP_LABELS[g]}
+              </p>
+              <div className="flex flex-col gap-0.5">
+                {gItems.map((item) => (
+                  <AdminSidebarTrigger
+                    key={item.value}
+                    value={item.value}
+                    label={item.label}
+                    Icon={item.icon}
+                    active={currentTab === item.value}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </TabsList>
+    </div>
+  );
+}
+
+function AdminHeader({
+  currentTabLabel,
+  onMenu,
+}: {
+  currentTabLabel: string;
+  onMenu: () => void;
+}) {
+  return (
+    <header className="sticky top-[68px] z-30 px-4 md:px-8 py-4 md:py-5 backdrop-blur-xl bg-background/70 border-b border-white/[0.06]">
+      <div className="flex items-center gap-3 md:gap-5">
+        <button
+          type="button"
+          onClick={onMenu}
+          className="md:hidden h-9 w-9 rounded-lg flex items-center justify-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/70 transition-colors"
+          aria-label="Open navigation"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 font-semibold leading-none">
+            {currentTabLabel}
+          </p>
+          <h1 className="font-serif text-xl md:text-2xl tracking-tight mt-1.5 leading-none truncate">
+            Royvento <span className="text-white/30 font-normal">Control Room</span>
+          </h1>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            className="h-9 w-9 rounded-lg flex items-center justify-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 transition-colors relative"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+          </button>
+          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/25 flex items-center justify-center text-xs font-semibold text-white">
+            AD
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 export function AdminPanel() {
   const search = useSearch();
   const [, navigate] = useLocation();
   const rawTab = new URLSearchParams(search).get("tab");
   const initialTab = isValidAdminTab(rawTab) ? rawTab : DEFAULT_ADMIN_TAB;
   const [activeTab, setActiveTab] = useState<string>(initialTab);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const t = new URLSearchParams(search).get("tab");
@@ -88,64 +247,78 @@ export function AdminPanel() {
     }
   }, [search]);
 
+  useEffect(() => { setDrawerOpen(false); }, [activeTab]);
+
   const handleTabChange = (t: string) => {
     setActiveTab(t);
     navigate(`/admin?tab=${t}`, { replace: true });
   };
 
-  return (
-    <div className="container mx-auto px-4 md:px-6 py-14">
-      <SEO title="Admin | Royvento" canonical="/admin" noindex />
-      <header className="mb-10">
-        <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">Admin</p>
-        <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">Royvento control room</h1>
-      </header>
+  const currentTabLabel = ADMIN_NAV_ITEMS.find((i) => i.value === activeTab)?.label ?? "Control Room";
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <div className="overflow-x-auto scrollbar-thin-x pb-2">
-        <TabsList className="bg-card/80 border border-border/50 rounded-2xl h-auto p-1.5 gap-1 w-max min-w-full backdrop-blur">
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="commissions">Commissions</TabsTrigger>
-          <TabsTrigger value="vendors">Partners</TabsTrigger>
-          <TabsTrigger value="requests">Partner requests</TabsTrigger>
-          <TabsTrigger value="event-approvals">Event Approvals</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-          <TabsTrigger value="coupons">Coupons</TabsTrigger>
-          <TabsTrigger value="ads">Ads</TabsTrigger>
-          <TabsTrigger value="messages">Messages</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="blogs">Blogs</TabsTrigger>
-          <TabsTrigger value="booking-report">Booking Report</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="live-occupancy">Live Occupancy</TabsTrigger>
-          <TabsTrigger value="crm-leads">CRM &amp; Leads</TabsTrigger>
-          <TabsTrigger value="create-pub">Create Pub/Club</TabsTrigger>
-          <TabsTrigger value="announcement-slider">Announcement Slider</TabsTrigger>
-          <TabsTrigger value="settlements"><Banknote className="h-3.5 w-3.5 mr-1" />Settlements</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews</TabsTrigger>
-        </TabsList>
+  return (
+    <div>
+      <SEO title="Admin | Royvento" canonical="/admin" noindex />
+
+      <Tabs value={activeTab} onValueChange={handleTabChange} orientation="vertical" className="block">
+        <div className="md:grid md:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)] min-h-[calc(100vh-68px)]">
+          {/* Desktop sidebar */}
+          <aside className="hidden md:block sticky top-[68px] h-[calc(100vh-68px)] overflow-y-auto border-r border-white/[0.06] bg-sidebar/40 backdrop-blur-xl">
+            <AdminNav currentTab={activeTab} />
+          </aside>
+
+          {/* Mobile drawer */}
+          {drawerOpen && (
+            <div className="md:hidden fixed inset-0 z-[60] flex">
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setDrawerOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="relative w-72 max-w-[85vw] h-full bg-sidebar/95 backdrop-blur-xl border-r border-white/[0.08] overflow-y-auto animate-in slide-in-from-left">
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  className="absolute top-4 right-3 h-8 w-8 rounded-lg flex items-center justify-center bg-white/[0.04] text-white/60 hover:bg-white/[0.08] z-10"
+                  aria-label="Close navigation"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <AdminNav currentTab={activeTab} />
+              </div>
+            </div>
+          )}
+
+          {/* Main */}
+          <main className="min-w-0">
+            <AdminHeader
+              currentTabLabel={currentTabLabel}
+              onMenu={() => setDrawerOpen(true)}
+            />
+            <div className="px-4 md:px-8 py-6 md:py-8 space-y-6">
+              <TabsContent value="analytics" className="mt-0"><Analytics /></TabsContent>
+              <TabsContent value="vendors" className="mt-0"><AllVendorsAdmin /></TabsContent>
+              <TabsContent value="requests" className="mt-0"><VendorRequests /></TabsContent>
+              <TabsContent value="event-approvals" className="mt-0"><EventApprovalsAdmin /></TabsContent>
+              <TabsContent value="events" className="mt-0"><EventsAdmin /></TabsContent>
+              <TabsContent value="subscriptions" className="mt-0"><SubscriptionsAdmin /></TabsContent>
+              <TabsContent value="coupons" className="mt-0"><CouponsAdmin /></TabsContent>
+              <TabsContent value="ads" className="mt-0"><AdsAdmin /></TabsContent>
+              <TabsContent value="messages" className="mt-0"><Messages /></TabsContent>
+              <TabsContent value="users" className="mt-0"><UsersPanel /></TabsContent>
+              <TabsContent value="blogs" className="mt-0"><BlogsAdmin /></TabsContent>
+              <TabsContent value="booking-report" className="mt-0"><BookingReport /></TabsContent>
+              <TabsContent value="attendance" className="mt-0"><AttendanceReport /></TabsContent>
+              <TabsContent value="live-occupancy" className="mt-0"><LiveOccupancyAdmin /></TabsContent>
+              <TabsContent value="crm-leads" className="mt-0"><CrmLeads /></TabsContent>
+              <TabsContent value="create-pub" className="mt-0"><CreatePubAdmin /></TabsContent>
+              <TabsContent value="announcement-slider" className="mt-0"><AnnouncementSliderAdmin /></TabsContent>
+              <TabsContent value="commissions" className="mt-0"><CommissionsAdmin /></TabsContent>
+              <TabsContent value="settlements" className="mt-0"><SettlementsAdmin /></TabsContent>
+              <TabsContent value="reviews" className="mt-0"><ReviewsAdmin /></TabsContent>
+            </div>
+          </main>
         </div>
-        <TabsContent value="analytics"><Analytics /></TabsContent>
-        <TabsContent value="vendors"><AllVendorsAdmin /></TabsContent>
-        <TabsContent value="requests"><VendorRequests /></TabsContent>
-        <TabsContent value="event-approvals"><EventApprovalsAdmin /></TabsContent>
-        <TabsContent value="events"><EventsAdmin /></TabsContent>
-        <TabsContent value="subscriptions"><SubscriptionsAdmin /></TabsContent>
-        <TabsContent value="coupons"><CouponsAdmin /></TabsContent>
-        <TabsContent value="ads"><AdsAdmin /></TabsContent>
-        <TabsContent value="messages"><Messages /></TabsContent>
-        <TabsContent value="users"><UsersPanel /></TabsContent>
-        <TabsContent value="blogs"><BlogsAdmin /></TabsContent>
-        <TabsContent value="booking-report"><BookingReport /></TabsContent>
-        <TabsContent value="attendance"><AttendanceReport /></TabsContent>
-        <TabsContent value="live-occupancy"><LiveOccupancyAdmin /></TabsContent>
-        <TabsContent value="crm-leads"><CrmLeads /></TabsContent>
-        <TabsContent value="create-pub"><CreatePubAdmin /></TabsContent>
-        <TabsContent value="announcement-slider"><AnnouncementSliderAdmin /></TabsContent>
-        <TabsContent value="commissions"><CommissionsAdmin /></TabsContent>
-        <TabsContent value="settlements"><SettlementsAdmin /></TabsContent>
-        <TabsContent value="reviews"><ReviewsAdmin /></TabsContent>
       </Tabs>
     </div>
   );
@@ -229,301 +402,320 @@ function Analytics() {
     custom: "Custom range",
   };
 
+  const pendingActuals = (data as { pendingActualsCount?: number } | undefined)?.pendingActualsCount ?? 0;
+  const totalCommission = (data as { totalCommission?: number } | undefined)?.totalCommission ?? 0;
+
   return (
     <div className="space-y-6">
       {/* Date range filter */}
-      <div className="rounded-2xl glass-card p-4 flex flex-wrap items-end gap-4">
-        <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Time range</Label>
-          <Select value={preset} onValueChange={(v) => setPreset(v as AnalyticsPreset)}>
-            <SelectTrigger className="w-44">
-              <SelectValue>{presetLabel[preset]}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="3m">Last 3 months</SelectItem>
-              <SelectItem value="6m">Last 6 months</SelectItem>
-              <SelectItem value="custom">Custom range</SelectItem>
-            </SelectContent>
-          </Select>
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] backdrop-blur-xl p-4 md:p-5">
+        <div className="flex flex-wrap items-center gap-3 md:gap-4">
+          <div className="flex items-center gap-2 mr-1">
+            <div className="h-8 w-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-semibold">Platform analytics</p>
+              <p className="text-sm font-medium text-white/90">{presetLabel[preset]}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1 ml-auto rounded-xl border border-white/[0.07] bg-white/[0.02] p-1">
+            {(["today", "7d", "30d", "3m", "6m", "custom"] as AnalyticsPreset[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPreset(p)}
+                className={
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all " +
+                  (preset === p
+                    ? "bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                    : "text-white/55 hover:text-white hover:bg-white/[0.04]")
+                }
+              >
+                {presetLabel[p]}
+              </button>
+            ))}
+          </div>
+
+          {(preset !== "30d" || customStart || customEnd) && (
+            <Button variant="outline" size="sm" onClick={() => { setPreset("30d"); setCustomStart(""); setCustomEnd(""); }}>
+              Clear
+            </Button>
+          )}
         </div>
+
         {preset === "custom" && (
-          <>
+          <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-white/[0.06]">
             <div>
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">From</Label>
-              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="w-40" max={customEnd || toDateStr(now)} />
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-1.5 font-semibold">From</p>
+              <Input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="h-9 w-40 rounded-lg border-white/[0.08] bg-white/[0.03]" max={customEnd || toDateStr(now)} />
             </div>
             <div>
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">To</Label>
-              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="w-40" min={customStart} max={toDateStr(now)} />
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-1.5 font-semibold">To</p>
+              <Input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="h-9 w-40 rounded-lg border-white/[0.08] bg-white/[0.03]" min={customStart} max={toDateStr(now)} />
             </div>
-          </>
-        )}
-        {(preset !== "30d" || customStart || customEnd) && (
-          <Button variant="outline" size="sm" onClick={() => { setPreset("30d"); setCustomStart(""); setCustomEnd(""); }}>
-            Clear
-          </Button>
+          </div>
         )}
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground">Loading...</p>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {[0,1,2,3,4,5,6,7].map((i) => (
+              <div key={i} className="rounded-2xl glass-card p-5 h-32 animate-pulse">
+                <div className="h-3 w-24 rounded bg-white/[0.06] mb-3" />
+                <div className="h-8 w-32 rounded bg-white/[0.08] mb-2" />
+                <div className="h-3 w-40 rounded bg-white/[0.05]" />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-3xl glass-card-strong h-72 animate-pulse" />
+        </div>
       ) : !data ? null : (
       <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-        <Stat icon={Users} label="New users" value={String(data.totalUsers)} />
-        <Stat icon={Briefcase} label="New partners" value={String(data.totalVendors)} />
-        <Stat icon={Clock} label="Pending approval" value={String(data.pendingVendors)} />
-        <Stat icon={CalendarCheck} label="Bookings" value={String(data.totalBookings)} />
-        <Stat
-          icon={IndianRupee}
-          label="Revenue"
-          value={formatINR(data.totalRevenue)}
-        />
-        <Stat
-          icon={Percent}
-          label="Total commission"
-          value={formatINR((data as { totalCommission?: number }).totalCommission ?? 0)}
-          valueClassName="text-emerald-300"
-        />
-        <Stat
-          icon={Banknote}
-          label="COD collected (actual)"
-          value={formatINR(data.actualCodRevenue ?? 0)}
-          valueClassName="text-amber-300"
-          subHint={
-            (data as { pendingActualsCount?: number }).pendingActualsCount
-              ? `${data.actualCodRecordedCount ?? 0} recorded · ${(data as { pendingActualsCount?: number }).pendingActualsCount} pending`
-              : `${data.actualCodRecordedCount ?? 0} bookings recorded`
-          }
-        />
-        <Stat icon={CreditCard} label="Online payments" value={formatINR(data.onlineRevenue)} />
+      {/* Primary KPI tiles */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <AdminKpi label="Revenue" value={formatINR(data.totalRevenue)} hint="Total bookings revenue" Icon={IndianRupee} accent="primary" />
+        <AdminKpi label="COD collected (actual)" value={formatINR(data.actualCodRevenue ?? 0)} hint={`${data.actualCodRecordedCount ?? 0} bookings scanned`} Icon={Banknote} accent="amber" warning={pendingActuals > 0 ? `${pendingActuals} bookings awaiting QR scan` : null} />
+        <AdminKpi label="Online payments" value={formatINR(data.onlineRevenue)} hint="Paid via gateway" Icon={CreditCard} accent="emerald" />
+        <AdminKpi label="Total commission" value={formatINR(totalCommission)} hint="Platform commission charged" Icon={Percent} accent="violet" />
       </div>
 
-      {/* Platform ticket breakdown */}
+      {/* Secondary count tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <AdminCountTile label="New users" value={data.totalUsers} Icon={Users} />
+        <AdminCountTile label="New partners" value={data.totalVendors} Icon={Briefcase} />
+        <AdminCountTile label="Pending approval" value={data.pendingVendors} Icon={Clock} tone="amber" />
+        <AdminCountTile label="Bookings" value={data.totalBookings} Icon={CalendarCheck} />
+      </div>
+
+      {/* Ticket audience strip */}
       {hasTickets && (
-        <div className="space-y-4">
-          <h3 className="font-serif text-xl">Platform ticket breakdown</h3>
-
-          {/* Tickets sold (booked) */}
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Tickets sold</p>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
-                  <span className="text-pink-400 text-base">â™€</span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
-                  <p className="stat-number text-2xl text-pink-300">{adminData.totalWomen ?? 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
-                </div>
-              </div>
-              <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-                  <span className="text-blue-400 text-base">â™‚</span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
-                  <p className="stat-number text-2xl text-blue-300">{adminData.totalMen ?? 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
-                </div>
-              </div>
-              <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-                  <span className="text-purple-400 text-base">âš­</span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
-                  <p className="stat-number text-2xl text-purple-300">{adminData.totalCouple ?? 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">tickets sold</p>
-                </div>
-              </div>
-            </div>
+        <div className="space-y-3">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold">Tickets sold</p>
+          <div className="grid grid-cols-3 gap-3">
+            <AudienceTile label="Women" count={adminData.totalWomen ?? 0} tint="pink" />
+            <AudienceTile label="Men" count={adminData.totalMen ?? 0} tint="blue" />
+            <AudienceTile label="Couples" count={adminData.totalCouple ?? 0} tint="purple" />
           </div>
-
-          {/* Real check-ins (actuals captured at the door). Only show
-              once there's at least one eligible booking in the window;
-              numbers will be 0 until staff scan/record actuals. */}
           {(adminData.actualsEligibleCount ?? 0) > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-baseline justify-between">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Real check-ins</p>
-                <p className="text-xs text-muted-foreground">
+            <>
+              <div className="flex items-baseline justify-between pt-2">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold">Real check-ins</p>
+                <p className="text-[11px] text-white/45">
                   {adminData.actualsRecordedCount ?? 0} of {adminData.actualsEligibleCount ?? 0} bookings recorded
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-pink-500/15 flex items-center justify-center shrink-0">
-                    <span className="text-pink-400 text-base">â™€</span>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Women</p>
-                    <p className="stat-number text-2xl text-pink-300">{adminData.actualWomen ?? 0}</p>
-                    <p className="text-xs text-muted-foreground mt-1">checked in</p>
-                  </div>
-                </div>
-                <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-                    <span className="text-blue-400 text-base">â™‚</span>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Men</p>
-                    <p className="stat-number text-2xl text-blue-300">{adminData.actualMen ?? 0}</p>
-                    <p className="text-xs text-muted-foreground mt-1">checked in</p>
-                  </div>
-                </div>
-                <div className="rounded-2xl glass-card p-5 flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-                    <span className="text-purple-400 text-base">âš­</span>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Couples</p>
-                    <p className="stat-number text-2xl text-purple-300">{adminData.actualCouple ?? 0}</p>
-                    <p className="text-xs text-muted-foreground mt-1">checked in</p>
-                  </div>
-                </div>
+              <div className="grid grid-cols-3 gap-3">
+                <AudienceTile label="Women" count={adminData.actualWomen ?? 0} tint="pink" sub="checked in" />
+                <AudienceTile label="Men" count={adminData.actualMen ?? 0} tint="blue" sub="checked in" />
+                <AudienceTile label="Couples" count={adminData.actualCouple ?? 0} tint="purple" sub="checked in" />
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
 
-      {/* Monthly revenue bar chart -- always shown when data is loaded */}
-      {(adminData.monthlyRevenue ?? []).length > 0 && (
-        <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-5">Monthly revenue -- {presetLabel[preset]}</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={adminData.monthlyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(m: string) => {
-                  const [y, mo] = m.split("-");
-                  const d = new Date(Number(y), Number(mo) - 1, 1);
-                  return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
-                }}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
-                width={48}
-                domain={[0, Math.ceil(monthlyChartMax * 1.15)]}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "12px",
-                  fontSize: "12px",
-                }}
-                formatter={(v: number) => [formatINR(v), "Revenue"]}
-                labelFormatter={(label: string) => {
-                  const [y, mo] = label.split("-");
-                  return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-                }}
-              />
-              <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Platform daily revenue -- always last 30 days ending at range end */}
+      {/* Revenue area chart */}
       {hasDailyRevenue && (
-        <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-5">Daily revenue -- last 30 days</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={adminData.dailyRevenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+        <div className="rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl p-5 md:p-6">
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Revenue</p>
+              <p className="font-serif text-xl tracking-tight">Daily earnings — last 30 days</p>
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/25 px-3 py-1">
+              <ArrowUpRight className="h-3 w-3 text-primary" />
+              <span className="text-[11px] font-semibold text-primary">{formatINR(data.totalRevenue)}</span>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={adminData.dailyRevenue} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="adminRevGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.45} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                tickLine={false}
+                axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
                 tickFormatter={(d: string) => {
                   const dt = new Date(d);
                   return `${dt.getDate()}/${dt.getMonth() + 1}`;
                 }}
-                interval={4}
+                interval={Math.max(1, Math.floor((adminData.dailyRevenue ?? []).length / 8) - 1)}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                tickLine={false}
+                axisLine={false}
                 tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
-                width={48}
+                width={56}
                 domain={[0, Math.ceil(dailyChartMax * 1.15)]}
               />
               <Tooltip
+                cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}
                 contentStyle={{
-                  background: "hsl(var(--card))",
+                  background: "rgba(15,15,17,0.95)",
                   border: "1px solid rgba(255,255,255,0.1)",
                   borderRadius: "12px",
                   fontSize: "12px",
+                  backdropFilter: "blur(10px)",
                 }}
                 formatter={(v: number) => [formatINR(v), "Revenue"]}
-                labelFormatter={(label: string) => new Date(label).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                labelFormatter={(label: string) => new Date(label).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               />
-              <Line
+              <Area
                 type="monotone"
                 dataKey="revenue"
                 stroke="hsl(var(--primary))"
                 strokeWidth={2.5}
+                fill="url(#adminRevGrad)"
                 dot={false}
-                activeDot={{ r: 4, fill: "hsl(var(--primary))" }}
+                activeDot={{ r: 5, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "rgba(0,0,0,0.4)" }}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-4">Bookings by status</h3>
-          <div className="h-64">
-            <ResponsiveContainer>
-              <BarChart data={data.bookingsByStatus}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="status" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+      {/* Monthly bars + booking status side-by-side */}
+      <div className="grid lg:grid-cols-3 gap-5">
+        {(adminData.monthlyRevenue ?? []).length > 0 && (
+          <div className="lg:col-span-2 rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl p-5 md:p-6">
+            <div className="mb-5">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Monthly revenue</p>
+              <p className="font-serif text-xl tracking-tight">{presetLabel[preset]}</p>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={adminData.monthlyRevenue} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                  tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                  tickFormatter={(m: string) => {
+                    const [y, mo] = m.split("-");
+                    const d = new Date(Number(y), Number(mo) - 1, 1);
+                    return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+                  }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`}
+                  width={56}
+                  domain={[0, Math.ceil(monthlyChartMax * 1.15)]}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  contentStyle={{
+                    background: "rgba(15,15,17,0.95)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "12px",
+                    fontSize: "12px",
+                  }}
+                  formatter={(v: number) => [formatINR(v), "Revenue"]}
+                  labelFormatter={(label: string) => {
+                    const [y, mo] = label.split("-");
+                    return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+                  }}
+                />
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        )}
 
-        <div className="rounded-2xl glass-card p-6">
-          <h3 className="font-serif text-xl mb-4">Top partners</h3>
-          <div className="space-y-3">
-            {data.topVendors.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No data yet.</p>
-            ) : data.topVendors.map((v) => (
-              <div key={v.vendorId} className="flex items-center justify-between text-sm border-b border-white/5 pb-2 last:border-0">
-                <span className="font-medium">{v.businessName}</span>
-                <span className="text-muted-foreground">{v.bookingCount} bookings · {formatINR(v.revenue)}</span>
-              </div>
-            ))}
-          </div>
+        <div className="rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl p-5 md:p-6">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Bookings</p>
+          <p className="font-serif text-xl tracking-tight mb-4">Status mix</p>
+          {data.bookingsByStatus.length === 0 || data.bookingsByStatus.every((s) => s.count === 0) ? (
+            <p className="text-sm text-white/40 py-8 text-center">No bookings yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={data.bookingsByStatus} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="status" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} tickLine={false} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} />
+                <YAxis tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} tickLine={false} axisLine={false} width={32} />
+                <Tooltip
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  contentStyle={{
+                    background: "rgba(15,15,17,0.95)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "12px",
+                    fontSize: "12px",
+                  }}
+                />
+                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
-      <div className="rounded-2xl glass-card p-6">
-        <h3 className="font-serif text-xl mb-4">Recent bookings</h3>
+      {/* Top partners */}
+      <div className="rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl p-5 md:p-6">
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Top performers</p>
+            <p className="font-serif text-xl tracking-tight">Highest-grossing partners</p>
+          </div>
+          <Trophy className="h-5 w-5 text-amber-400/60" />
+        </div>
+        {data.topVendors.length === 0 ? (
+          <p className="text-sm text-white/40">No data yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {data.topVendors.map((v, i) => (
+              <div key={v.vendorId} className="flex items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 hover:bg-white/[0.04] transition-colors">
+                <span className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold tabular-nums shrink-0 ${
+                  i === 0 ? "bg-amber-500/15 text-amber-300 border border-amber-500/30" :
+                  i === 1 ? "bg-white/[0.08] text-white/80 border border-white/[0.12]" :
+                  i === 2 ? "bg-orange-500/10 text-orange-300 border border-orange-500/25" :
+                  "bg-white/[0.04] text-white/45 border border-white/[0.06]"
+                }`}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="font-medium text-white/90 truncate flex-1">{v.businessName}</span>
+                <span className="text-xs text-white/45 tabular-nums whitespace-nowrap hidden sm:inline">{v.bookingCount} bookings</span>
+                <span className="text-sm font-semibold text-primary tabular-nums whitespace-nowrap">{formatINR(v.revenue)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recent bookings */}
+      <div className="rounded-3xl border border-white/[0.07] bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl overflow-hidden">
+        <div className="px-5 md:px-6 pt-5 md:pt-6 pb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Recent bookings</p>
+            <p className="font-serif text-xl tracking-tight">Latest activity</p>
+          </div>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-white/30 font-mono tabular-nums">
+            {data.recentBookings.length} {data.recentBookings.length === 1 ? "row" : "rows"}
+          </span>
+        </div>
         {data.recentBookings.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No bookings yet.</p>
+          <p className="text-sm text-white/40 px-5 md:px-6 pb-6">No bookings yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-y border-white/[0.05] bg-white/[0.02]">
                 <tr>
-                  <th className="text-left py-2 pr-4">Event</th>
-                  <th className="text-left py-2 px-2">User</th>
-                  <th className="text-left py-2 px-2">Booking date &amp; time</th>
-                  <th className="text-right py-2 px-2">No of users</th>
-                  <th className="text-center py-2 px-2">Status</th>
-                  <th className="text-right py-2 pl-2">Amount</th>
+                  <th className="text-left py-3 px-5 md:px-6">Event</th>
+                  <th className="text-left py-3 px-3">User</th>
+                  <th className="text-left py-3 px-3">Booked at</th>
+                  <th className="text-right py-3 px-3">People</th>
+                  <th className="text-center py-3 px-3">Status</th>
+                  <th className="text-right py-3 pr-5 md:pr-6 pl-3">Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -533,13 +725,20 @@ function Analytics() {
                   const bookedAt = new Date(bx.createdAt);
                   const bookedAtStr = `${bookedAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}, ${bookedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
                   return (
-                    <tr key={bx.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="py-3 pr-4 font-medium">{bx.eventTitle}</td>
-                      <td className="px-2 text-muted-foreground">{bx.userName}</td>
-                      <td className="px-2 text-muted-foreground tabular-nums whitespace-nowrap">{bookedAtStr}</td>
-                      <td className="text-right px-2 tabular-nums">{peopleCount}</td>
-                      <td className="text-center px-2"><Badge variant="secondary">{bx.status}</Badge></td>
-                      <td className="text-right pl-2 tabular-nums text-muted-foreground">{formatINR(bx.totalPrice)}</td>
+                    <tr key={bx.id} className="border-t border-white/[0.04] hover:bg-white/[0.025] transition-colors">
+                      <td className="py-3.5 px-5 md:px-6 font-medium text-white/90">{bx.eventTitle}</td>
+                      <td className="px-3 text-white/70">{bx.userName}</td>
+                      <td className="px-3 text-white/60 tabular-nums whitespace-nowrap">{bookedAtStr}</td>
+                      <td className="text-right px-3 tabular-nums text-white/80">{peopleCount}</td>
+                      <td className="text-center px-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                          bx.status === "completed" ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" :
+                          bx.status === "confirmed" ? "bg-blue-500/10 text-blue-300 border-blue-500/20" :
+                          bx.status === "cancelled" ? "bg-red-500/10 text-red-300 border-red-500/20" :
+                          "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                        }`}>{bx.status}</span>
+                      </td>
+                      <td className="text-right pr-5 md:pr-6 pl-3 tabular-nums text-primary font-semibold">{formatINR(bx.totalPrice)}</td>
                     </tr>
                   );
                 })}
@@ -550,6 +749,81 @@ function Analytics() {
       </div>
       </>
       )}
+    </div>
+  );
+}
+
+function AdminKpi({
+  label, value, hint, Icon, accent, warning,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  accent: "primary" | "amber" | "emerald" | "violet";
+  warning?: string | null;
+}) {
+  const accents = {
+    primary: { chip: "bg-primary/15 border-primary/25 text-primary", text: "" },
+    amber:   { chip: "bg-amber-500/15 border-amber-500/25 text-amber-400", text: "text-amber-300" },
+    emerald: { chip: "bg-emerald-500/15 border-emerald-500/25 text-emerald-400", text: "text-emerald-300" },
+    violet:  { chip: "bg-violet-500/15 border-violet-500/25 text-violet-400", text: "text-violet-300" },
+  }[accent];
+  return (
+    <div className="group relative rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-white/[0.01] backdrop-blur-xl p-5 transition-all duration-300 hover:border-white/[0.12] hover:shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]">
+      <div className="flex items-start gap-3 mb-4">
+        <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${accents.chip} shrink-0`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold leading-none">{label}</p>
+        </div>
+        <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white/40 transition-colors" />
+      </div>
+      <p className={`stat-number text-3xl md:text-[2rem] leading-none tabular-nums ${accents.text}`}>{value}</p>
+      {hint && <p className="text-xs text-white/45 mt-2">{hint}</p>}
+      {warning && (
+        <p className="text-[11px] text-amber-300/90 mt-2 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          {warning}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AdminCountTile({
+  label, value, Icon, tone,
+}: { label: string; value: number; Icon: React.ComponentType<{ className?: string }>; tone?: "amber" }) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 flex items-center gap-3">
+      <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${tone === "amber" ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-white/[0.04] text-white/55 border border-white/[0.06]"}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold leading-none">{label}</p>
+        <p className={`stat-number text-2xl tabular-nums leading-tight mt-1 ${tone === "amber" ? "text-amber-200" : ""}`}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function AudienceTile({ label, count, tint, sub }: { label: string; count: number; tint: "pink" | "blue" | "purple"; sub?: string }) {
+  const tints = {
+    pink:   { bg: "bg-pink-500/10 border-pink-500/20",     text: "text-pink-300",   sym: "♀" },
+    blue:   { bg: "bg-blue-500/10 border-blue-500/20",     text: "text-blue-300",   sym: "♂" },
+    purple: { bg: "bg-purple-500/10 border-purple-500/20", text: "text-purple-300", sym: "⚭" },
+  }[tint];
+  return (
+    <div className={`rounded-xl border ${tints.bg} px-4 py-3 flex items-center gap-3`}>
+      <span className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg ${tints.text} bg-black/20`}>
+        {tints.sym}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold">{label}</p>
+        <p className={`stat-number text-xl ${tints.text} tabular-nums leading-tight`}>{count}</p>
+        {sub && <p className="text-[10px] text-white/35">{sub}</p>}
+      </div>
     </div>
   );
 }
