@@ -746,14 +746,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
 
     const isCollected = ledgerAmtByBookingId.has(b.id);
 
-    // GROSS rule: the actual money received from a scanned booking is its
-    // finalPrice (the customer paid this at the door for COD, or already
-    // paid online). Use it for the per-type gross when the booking is
-    // collected (has a commission_ledger entry from successful QR scan).
-    // For commission math we still pass the conservative bookingRevenue
-    // (actuals-aware) so it stays consistent with the rest of the report.
-    const grossForBuckets = isCollected ? fp : 0;
-    const split = calcCommSplit(b, grossForBuckets);
+    // GROSS rule: matches Admin Panel → Commission Report exactly — sum of
+    // finalPrice for every confirmed/completed booking in the window,
+    // regardless of QR-scan status. Keeps partner Platform Charges → Gross
+    // identical to the admin per-vendor totals to the rupee.
+    const split = calcCommSplit(b, fp);
     splitCache.set(b.id, split);
     const commissionAmount = commTotal(split);
     totalCommission += commissionAmount;
