@@ -43,7 +43,7 @@ import {
   sendCustomerCancelledBookingEmail,
 } from "../lib/notifications";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
-import { computeEffectiveRevenues } from "../lib/effectiveRevenue";
+import { computeEffectiveRevenues, bookingDiscountRatio } from "../lib/effectiveRevenue";
 import { respondInvalid } from "../lib/validationError";
 
 /** How many hours before the event date customers are locked out of self-service cancellation. */
@@ -1796,9 +1796,13 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       const pw = isTierFree("women") ? 0 : Number(scanEvent?.priceWomen ?? 0);
       const pm = isTierFree("men") ? 0 : Number(scanEvent?.priceMen ?? 0);
       const pc = isTierFree("couple") ? 0 : Number(scanEvent?.priceCouple ?? 0);
-      // Cash collected at the door = per-type counts × per-type ticket price
-      // (zero for free tiers, no coupon/points scaling for paid tiers).
-      return Math.round((w * pw + m * pm + c * pc) * 100) / 100;
+      // Cash collected at the door = per-type counts × per-type ticket price,
+      // scaled by the booking's discount ratio so a guest who paid with a
+      // coupon (or new-user discount, or loyalty points) only owes the
+      // discounted amount at the door — not the full per-tier sticker price.
+      const gross = w * pw + m * pm + c * pc;
+      const due = gross * bookingDiscountRatio(booking);
+      return Math.round(due * 100) / 100;
     }
     if (ag == null) return null;
     if (ferAllGendersFree) return 0;

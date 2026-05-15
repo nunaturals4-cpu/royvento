@@ -15,6 +15,7 @@ import {
   wishlistsTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
+import { bookingDiscountRatio } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -1340,7 +1341,11 @@ router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => 
         const pw = isTierFree("women") ? 0 : Number(ev?.priceWomen ?? 0);
         const pm = isTierFree("men") ? 0 : Number(ev?.priceMen ?? 0);
         const pc = isTierFree("couple") ? 0 : Number(ev?.priceCouple ?? 0);
-        return Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
+        // Scale by the booking's discount ratio so coupon / new-user discount
+        // / loyalty-points reductions applied at booking time aren't reverted
+        // when displaying the door-due amount.
+        const gross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+        return Math.round(gross * bookingDiscountRatio(b) * 100) / 100;
       }
       if (ag == null) return null;
       if (ferAllFree) return 0;

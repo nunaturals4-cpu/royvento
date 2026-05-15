@@ -5,6 +5,13 @@ export interface EffectiveRevenueBooking {
   id: number;
   eventId: number;
   finalPrice: string | number;
+  /**
+   * Pre-discount gross stored on the booking row (sum of per-tier price ×
+   * count, with free-entry-rules already zeroed out at booking time).
+   * Needed so ticket-mode revenue can be scaled back down by the coupon /
+   * points discount the guest received.
+   */
+  totalPrice: string | number | null;
   paymentMethod: string | null;
   pubMode: string | null;
   guests: number;
@@ -19,6 +26,31 @@ export interface EffectiveRevenueResult {
   actualCodRevenue: number;
   actualCodRecordedCount: number;
   pendingActualsCount: number;
+}
+
+/**
+ * Fraction of the gross the guest actually owes after coupon + points were
+ * applied at booking time. Used to scale ticket-mode per-tier revenue at
+ * scan / analytics time so coupon discounts aren't silently reverted.
+ *
+ *   ratio = finalPrice / totalPrice
+ *
+ * Examples:
+ *   - No discount:    finalPrice = totalPrice  → ratio = 1
+ *   - 50% coupon:     finalPrice = totalPrice/2 → ratio = 0.5
+ *   - 100% coupon:    finalPrice = 0           → ratio = 0
+ *   - Legacy / weird data (totalPrice missing or 0): ratio = 1 (preserve old
+ *     behaviour rather than divide by zero; the FER-zeroed per-tier prices
+ *     still drive the result to 0 in genuinely-free cases).
+ */
+export function bookingDiscountRatio(
+  b: { finalPrice: string | number; totalPrice: string | number | null | undefined },
+): number {
+  const tp = Number(b.totalPrice ?? 0);
+  const fp = Number(b.finalPrice ?? 0);
+  if (!Number.isFinite(tp) || tp <= 0) return 1;
+  if (!Number.isFinite(fp) || fp <= 0) return 0;
+  return Math.min(1, fp / tp);
 }
 
 /**
@@ -70,11 +102,17 @@ export async function computeEffectiveRevenues(
       if (hasActuals) {
         actualCodRecordedCount++;
         if (b.pubMode === "ticket") {
+          // Ticket mode: gross-from-actuals × per-tier price, then scaled by
+          // the booking's discount ratio so coupons/points applied at booking
+          // time aren't silently reverted at scan/analytics time.
+          // The non-ticket branch below uses finalPrice directly so it's
+          // already discount-aware.
           const ev = eventMap.get(b.eventId);
           const pw = Number(ev?.priceWomen ?? 0);
           const pm = Number(ev?.priceMen ?? 0);
           const pc = Number(ev?.priceCouple ?? 0);
-          rev = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+          const gross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+          rev = gross * bookingDiscountRatio(b);
         } else {
           const guests = Math.max(1, b.guests);
           rev = ((ag ?? 0) / guests) * fp;
