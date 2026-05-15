@@ -733,6 +733,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   }
 
   const splitCache = new Map<number, ReturnType<typeof calcCommSplit>>();
+  // Gross Earnings KPI = sum of finalPrice for every confirmed/completed
+  // booking, i.e. exactly the sum of the per-type Gross column in the
+  // Breakdown by Booking Type table. This matches the Admin Commission
+  // Report's per-vendor totalRevenue to the rupee.
+  let grossEarnings = 0;
 
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
@@ -740,6 +745,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     if (isCod) codRevenue += fp;
     else onlineRevenue += fp;
 
+    grossEarnings += fp;
     const bookingRevenue = revenueByBookingId.get(b.id) ?? 0;
     totalEarnings += bookingRevenue;
     if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
@@ -852,8 +858,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     actualCodRevenue: Math.round(actualCodRevenue),
     actualCodRecordedCount,
     pendingActualsCount,
-    grossEarnings: Math.round(totalEarnings),
-    netEarnings: Math.round(totalEarnings - totalCommission),
+    grossEarnings: Math.round(grossEarnings),
+    netEarnings: Math.round(grossEarnings - totalCommission),
     totalCommission: rnd2(totalCommission),
     collectedCommission: rnd2(collectedCommission),
     pendingCommission: rnd2(pendingCommission),
