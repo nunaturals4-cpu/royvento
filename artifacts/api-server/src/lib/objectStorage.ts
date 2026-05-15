@@ -1,4 +1,11 @@
 import { Storage, File as GCSFile } from "@google-cloud/storage";
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { readFile, writeFile, mkdir, unlink, access } from "fs/promises";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
@@ -35,20 +42,53 @@ export class ObjectNotFoundError extends Error {
 }
 
 type LocalFileRef = { _local: true; filePath: string; contentType?: string };
+type S3Ref = { _s3: true; key: string };
 
-function isLocalFileRef(f: GCSFile | LocalFileRef): f is LocalFileRef {
+function isLocalFileRef(f: GCSFile | LocalFileRef | S3Ref): f is LocalFileRef {
   return (f as LocalFileRef)._local === true;
+}
+function isS3Ref(f: GCSFile | LocalFileRef | S3Ref): f is S3Ref {
+  return (f as S3Ref)._s3 === true;
+}
+
+type S3Config = { client: S3Client; bucket: string };
+
+let cachedS3: S3Config | null | undefined;
+function getS3(): S3Config | null {
+  if (cachedS3 !== undefined) return cachedS3;
+  const bucket = process.env.S3_BUCKET;
+  const endpoint = process.env.S3_ENDPOINT;
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+  if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) {
+    cachedS3 = null;
+    return null;
+  }
+  const client = new S3Client({
+    endpoint,
+    region: process.env.S3_REGION || "auto",
+    credentials: { accessKeyId, secretAccessKey },
+    // Path-style addressing works for every S3-compatible host (Railway Bucket,
+    // MinIO, Cloudflare R2, Backblaze B2). Real AWS still understands it too.
+    forcePathStyle: true,
+  });
+  cachedS3 = { client, bucket };
+  return cachedS3;
 }
 
 export class ObjectStorageService {
   constructor() {}
 
+  private get s3(): S3Config | null {
+    return getS3();
+  }
+
   private get localDir(): string | null {
+    if (this.s3) return null;
     if (process.env.LOCAL_STORAGE_DIR) return process.env.LOCAL_STORAGE_DIR;
-    // When neither LOCAL_STORAGE_DIR nor the Replit GCS env vars are configured,
-    // fall back to a system temp directory so uploads succeed without explicit setup.
-    // Files written here are ephemeral — set LOCAL_STORAGE_DIR to a persistent
-    // path (e.g. a Railway Volume at /data) for production durability.
+    // When neither LOCAL_STORAGE_DIR, S3, nor the Replit GCS env vars are
+    // configured, fall back to a system temp directory so uploads succeed
+    // without explicit setup. Files written here are ephemeral.
     const hasGCS = process.env.PRIVATE_OBJECT_DIR || process.env.PUBLIC_OBJECT_SEARCH_PATHS;
     if (!hasGCS) return path.join(os.tmpdir(), "royvento-uploads");
     return null;
@@ -86,7 +126,17 @@ export class ObjectStorageService {
     return dir;
   }
 
-  async searchPublicObject(filePath: string): Promise<GCSFile | LocalFileRef | null> {
+  async searchPublicObject(filePath: string): Promise<GCSFile | LocalFileRef | S3Ref | null> {
+    if (this.s3) {
+      const key = `public/${filePath}`;
+      try {
+        await this.s3.client.send(new HeadObjectCommand({ Bucket: this.s3.bucket, Key: key }));
+        return { _s3: true, key };
+      } catch {
+        return null;
+      }
+    }
+
     if (this.localDir) {
       const fullPath = path.join(this.localDir, "public", filePath);
       try {
@@ -108,17 +158,49 @@ export class ObjectStorageService {
     return null;
   }
 
-  async downloadObject(file: GCSFile | LocalFileRef, cacheTtlSec: number = 3600): Promise<Response> {
+  async downloadObject(file: GCSFile | LocalFileRef | S3Ref, cacheTtlSec: number = 3600): Promise<Response> {
     if (isLocalFileRef(file)) {
       const buffer = await readFile(file.filePath);
       const contentType = file.contentType || "application/octet-stream";
       return new Response(buffer, {
         headers: {
           "Content-Type": contentType,
-          "Cache-Control": `public, max-age=${cacheTtlSec}`,
+          "Cache-Control": `public, max-age=${cacheTtlSec}, immutable`,
           "Content-Length": String(buffer.length),
         },
       });
+    }
+
+    if (isS3Ref(file)) {
+      const s3 = this.s3!;
+      let out;
+      try {
+        out = await s3.client.send(new GetObjectCommand({ Bucket: s3.bucket, Key: file.key }));
+      } catch (err: unknown) {
+        // S3 SDK throws NoSuchKey on missing objects. Translate so callers
+        // can return a 404 instead of leaking a 500.
+        const code = (err as { name?: string } | null)?.name ?? "";
+        if (code === "NoSuchKey" || code === "NotFound") throw new ObjectNotFoundError();
+        throw err;
+      }
+      const body = out.Body;
+      const contentType = out.ContentType || "application/octet-stream";
+      const headers: Record<string, string> = {
+        "Content-Type": contentType,
+        // Upload keys are UUID-suffixed and never overwritten, so the bytes
+        // at this URL are immutable — let browsers/CDNs cache aggressively.
+        "Cache-Control": `public, max-age=${cacheTtlSec}, immutable`,
+      };
+      if (out.ContentLength != null) headers["Content-Length"] = String(out.ContentLength);
+      if (out.ETag) headers["ETag"] = out.ETag;
+      if (!body) return new Response(null, { headers });
+      // Body is a Node Readable when running on Node; cast to ReadableStream
+      // for the Web Response.
+      const webStream =
+        body instanceof Readable
+          ? (Readable.toWeb(body) as unknown as ReadableStream<Uint8Array>)
+          : (body as unknown as ReadableStream<Uint8Array>);
+      return new Response(webStream, { headers });
     }
 
     const [metadata] = await file.getMetadata();
@@ -140,6 +222,10 @@ export class ObjectStorageService {
   }
 
   async getObjectEntityUploadURL(): Promise<string> {
+    // S3 mode and the HMAC-signed server upload path don't need this — the
+    // /storage/uploads/request-url route returns a server-issued URL and
+    // streams the upload through the api so the image compressor can run.
+    // This method is kept for the legacy direct-to-GCS callers.
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -161,7 +247,7 @@ export class ObjectStorageService {
     });
   }
 
-  async getObjectEntityFile(objectPath: string): Promise<GCSFile | LocalFileRef> {
+  async getObjectEntityFile(objectPath: string): Promise<GCSFile | LocalFileRef | S3Ref> {
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();
     }
@@ -172,6 +258,13 @@ export class ObjectStorageService {
     }
 
     const entityId = parts.slice(1).join("/");
+
+    if (this.s3) {
+      // Skip an explicit HeadObject — the streaming GET in downloadObject()
+      // already maps NoSuchKey to ObjectNotFoundError, saving one round trip
+      // on every successful read.
+      return { _s3: true, key: entityId };
+    }
 
     if (this.localDir) {
       const filePath = path.join(this.localDir, entityId);
@@ -205,6 +298,21 @@ export class ObjectStorageService {
   }
 
   async uploadBuffer(uuid: string, buffer: Buffer, contentType: string): Promise<void> {
+    if (this.s3) {
+      await this.s3.client.send(
+        new PutObjectCommand({
+          Bucket: this.s3.bucket,
+          Key: `uploads/${uuid}`,
+          Body: buffer,
+          ContentType: contentType,
+          // CacheControl baked into the object so any direct/CDN access
+          // (not just the proxied /objects/ route) gets long-lived caching.
+          CacheControl: "public, max-age=31536000, immutable",
+        }),
+      );
+      return;
+    }
+
     if (this.localDir) {
       const uploadsDir = path.join(this.localDir, "uploads");
       await mkdir(uploadsDir, { recursive: true });
@@ -254,6 +362,13 @@ export class ObjectStorageService {
       const parts = objectPath.slice(1).split("/");
       const entityId = parts.slice(1).join("/");
       if (!entityId) return;
+
+      if (this.s3) {
+        await this.s3.client.send(
+          new DeleteObjectCommand({ Bucket: this.s3.bucket, Key: entityId }),
+        );
+        return;
+      }
 
       if (this.localDir) {
         const filePath = path.join(this.localDir, entityId);
