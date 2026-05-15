@@ -3364,10 +3364,10 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total earnings</p>
             <p className="stat-number text-3xl">{formatINR(data.totalEarnings)}</p>
-            <p className="text-xs text-muted-foreground mt-1">online + actual cash collected</p>
+            <p className="text-xs text-muted-foreground mt-1">gross earnings across all bookings</p>
             {(data as { pendingActualsCount?: number }).pendingActualsCount ? (
               <p className="text-[11px] text-amber-400 mt-1">
-                {(data as { pendingActualsCount?: number }).pendingActualsCount} bookings pending actuals
+                {(data as { pendingActualsCount?: number }).pendingActualsCount} COD bookings awaiting QR scan
               </p>
             ) : null}
           </div>
@@ -3379,7 +3379,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">COD collected (actual)</p>
             <p className="stat-number text-3xl text-amber-300">{formatINR(data.actualCodRevenue ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{data.actualCodRecordedCount ?? 0} bookings recorded</p>
+            <p className="text-xs text-muted-foreground mt-1">{data.actualCodRecordedCount ?? 0} bookings scanned at door</p>
           </div>
         </div>
         <div className="rounded-2xl glass-card p-5 flex items-start gap-4">
@@ -3496,20 +3496,26 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
                   <th className="text-right py-2 px-2">Women</th>
                   <th className="text-right py-2 px-2">Men</th>
                   <th className="text-right py-2 px-2">Couples</th>
+                  <th className="text-right py-2 px-2">No of guest</th>
                   <th className="text-right py-2 pl-2">Revenue</th>
                 </tr>
               </thead>
               <tbody>
-                {data.perEvent.map((row) => (
-                  <tr key={row.eventId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="py-3 pr-4 font-medium">{row.eventTitle}</td>
-                    <td className="text-right px-2 tabular-nums">{row.bookingCount}</td>
-                    <td className="text-right px-2 tabular-nums text-pink-300">{row.ticketWomen || "—"}</td>
-                    <td className="text-right px-2 tabular-nums text-blue-300">{row.ticketMen || "—"}</td>
-                    <td className="text-right px-2 tabular-nums text-purple-300">{row.ticketCouple || "—"}</td>
-                    <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(row.revenue)}</td>
-                  </tr>
-                ))}
+                {data.perEvent.map((row) => {
+                  const rx = row as typeof row & { peopleCount?: number };
+                  const guests = rx.peopleCount ?? (rx.ticketWomen + rx.ticketMen + rx.ticketCouple * 2);
+                  return (
+                    <tr key={rx.eventId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-3 pr-4 font-medium">{rx.eventTitle}</td>
+                      <td className="text-right px-2 tabular-nums">{rx.bookingCount}</td>
+                      <td className="text-right px-2 tabular-nums text-pink-300">{rx.ticketWomen || "—"}</td>
+                      <td className="text-right px-2 tabular-nums text-blue-300">{rx.ticketMen || "—"}</td>
+                      <td className="text-right px-2 tabular-nums text-purple-300">{rx.ticketCouple || "—"}</td>
+                      <td className="text-right px-2 tabular-nums">{guests || "—"}</td>
+                      <td className="text-right pl-2 tabular-nums text-primary font-medium">{formatINR(rx.revenue)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
               {data.perEvent.length > 1 && (
                 <tfoot className="border-t border-white/15 text-xs text-muted-foreground">
@@ -3526,6 +3532,12 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
                     </td>
                     <td className="text-right px-2 text-purple-300 tabular-nums">
                       {data.perEvent.reduce((s, r) => s + r.ticketCouple, 0) || "—"}
+                    </td>
+                    <td className="text-right px-2 font-semibold text-foreground tabular-nums">
+                      {data.perEvent.reduce((s, r) => {
+                        const rx = r as typeof r & { peopleCount?: number };
+                        return s + (rx.peopleCount ?? (rx.ticketWomen + rx.ticketMen + rx.ticketCouple * 2));
+                      }, 0) || "—"}
                     </td>
                     <td className="text-right pl-2 text-primary font-semibold tabular-nums">
                       {formatINR(data.perEvent.reduce((s, r) => s + r.revenue, 0))}

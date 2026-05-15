@@ -688,7 +688,6 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   // Summary figures
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  let totalEarnings = 0;
   let monthEarnings = 0;
   let codRevenue = 0;
   let onlineRevenue = 0;
@@ -703,11 +702,13 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     table: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
   };
 
-  // Per-booking effective revenue: online → finalPrice; COD → actual cash collected (₹0 if not recorded).
-  // Shared with /bookings/vendor/summary and /admin/analytics so all "Revenue"/"Total Earnings"
-  // figures stay consistent. Commission is still computed from finalPrice (booked price).
-  const { byBookingId: revenueByBookingId, actualCodRevenue, actualCodRecordedCount, pendingActualsCount } =
-    await computeEffectiveRevenues(allBookings);
+  // Per-booking effective revenue: online → finalPrice; COD → actual cash
+  // collected (₹0 if not recorded). Still computed because the partner
+  // dashboard's COD Collected (Actual) card needs the per-booking cash
+  // value to attribute to scanned bookings. The recorded/pending counts
+  // and aggregate from the helper are derived below from the QR-scan
+  // gating instead, so we deliberately discard those helper outputs.
+  const { byBookingId: revenueByBookingId } = await computeEffectiveRevenues(allBookings);
 
   // Fetch realised commission amounts from the ledger. For bookings that have
   // already been checked in or paid online the ledger entry is the source of
@@ -738,6 +739,14 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   // Breakdown by Booking Type table. This matches the Admin Commission
   // Report's per-vendor totalRevenue to the rupee.
   let grossEarnings = 0;
+  // COD Collected (Actual) KPI = sum of actuals-based revenue for COD
+  // bookings that have a realised commission_ledger entry (i.e. a QR scan
+  // has happened). Bookings whose actuals were edited by some other path
+  // without a scan don't count toward the displayed total — the spec calls
+  // for cash collected AFTER a successful scan.
+  let scannedCodRevenue = 0;
+  let scannedCodRecordedCount = 0;
+  let scannedPendingCount = 0;
 
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
@@ -747,10 +756,17 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
 
     grossEarnings += fp;
     const bookingRevenue = revenueByBookingId.get(b.id) ?? 0;
-    totalEarnings += bookingRevenue;
-    if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
+    if (new Date(b.createdAt) >= monthStart) monthEarnings += fp;
 
     const isCollected = ledgerAmtByBookingId.has(b.id);
+    if (isCod) {
+      if (isCollected) {
+        scannedCodRevenue += bookingRevenue;
+        scannedCodRecordedCount++;
+      } else {
+        scannedPendingCount++;
+      }
+    }
 
     // GROSS rule: matches Admin Panel → Commission Report exactly — sum of
     // finalPrice for every confirmed/completed booking in the window,
@@ -788,10 +804,19 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const eTitleMap = new Map(_events.map((e) => [e.id, e.title]));
   const perEventMap = new Map<number, {
     eventId: number; eventTitle: string;
-    bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
+    bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number;
+    revenue: number; peopleCount: number;
   }>();
   for (const b of allBookings) {
-    const rev = revenueByBookingId.get(b.id) ?? 0;
+    // Revenue column tracks Gross Earnings: sum of finalPrice for every
+    // confirmed/completed booking, so the column total reconciles with the
+    // Platform Charges → Gross Earnings KPI.
+    const rev = Number(b.finalPrice);
+    // People count per booking: prefer per-tier headcount (couple = 2),
+    // fall back to `guests` for table-mode and legacy event-mode rows.
+    // Same rule as freeEntryPeopleCount() in lib/commission.ts.
+    const tierHeads = b.ticketWomen + b.ticketMen + b.ticketCouple * 2;
+    const people = tierHeads > 0 ? tierHeads : Math.max(0, b.guests);
     const existing = perEventMap.get(b.eventId);
     if (existing) {
       existing.bookingCount += 1;
@@ -799,6 +824,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       existing.ticketMen += b.ticketMen;
       existing.ticketCouple += b.ticketCouple;
       existing.revenue += rev;
+      existing.peopleCount += people;
     } else {
       perEventMap.set(b.eventId, {
         eventId: b.eventId,
@@ -808,6 +834,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
         ticketMen: b.ticketMen,
         ticketCouple: b.ticketCouple,
         revenue: rev,
+        peopleCount: people,
       });
     }
   }
@@ -829,7 +856,9 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   }
   for (const b of allBookings) {
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
-    const rev = revenueByBookingId.get(b.id) ?? 0;
+    // Daily revenue chart sums finalPrice so its column total reconciles
+    // with Total Earnings / Gross Earnings on the same page.
+    const rev = Number(b.finalPrice);
     if (dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
       const cachedSplit = splitCache.get(b.id);
@@ -851,13 +880,20 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
 
   function rnd2(n: number) { return Math.round(n * 100) / 100; }
   res.json({
-    totalEarnings: Math.round(totalEarnings),
+    // Total Earnings now mirrors the Gross Earnings KPI: sum of finalPrice
+    // for every confirmed/completed booking. The actuals-aware totalEarnings
+    // is no longer surfaced — the COD Collected (Actual) card below covers
+    // the cash-collected view.
+    totalEarnings: Math.round(grossEarnings),
     monthEarnings: Math.round(monthEarnings),
     codRevenue: Math.round(codRevenue),
     onlineRevenue: Math.round(onlineRevenue),
-    actualCodRevenue: Math.round(actualCodRevenue),
-    actualCodRecordedCount,
-    pendingActualsCount,
+    // COD Collected (Actual) — actuals × per-type prices for COD bookings
+    // that have a realised commission_ledger entry (= QR-scanned). Bookings
+    // without a scan contribute ₹0.
+    actualCodRevenue: Math.round(scannedCodRevenue),
+    actualCodRecordedCount: scannedCodRecordedCount,
+    pendingActualsCount: scannedPendingCount,
     grossEarnings: Math.round(grossEarnings),
     netEarnings: Math.round(grossEarnings - totalCommission),
     totalCommission: rnd2(totalCommission),
