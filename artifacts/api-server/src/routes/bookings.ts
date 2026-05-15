@@ -2139,11 +2139,39 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // Atomic check-in: only update if checkedIn is still false (prevents double-scan race)
+  // Atomic check-in: only update if checkedIn is still false (prevents double-scan race).
+  //
+  // Default actuals to the BOOKED counts when they are still NULL so the
+  // Partner Analytics → "COD Collected (Actual)" KPI updates the instant the
+  // scan succeeds, without waiting for the manager to tap "Save Actual
+  // Entry". `computeEffectiveRevenues()` derives the displayed cash from
+  // actualWomen/Men/Couple (or actualGuests) × per-tier price, so defaulting
+  // those to ticketWomen/Men/Couple / guests makes the card jump immediately.
+  // If the manager later corrects via the Save-Actual-Entry form, the
+  // existing actualEntry path (above) updates the ledger and commissionOwed
+  // via delta math, so no double-counting can occur.
+  // We only default when each field is NULL — any value previously written
+  // (e.g. via a prior partial save) is preserved.
   const now = new Date();
+  const isTicketMode = b.pubMode === "ticket";
+  const checkInUpdate: {
+    checkedIn: true;
+    checkedInAt: Date;
+    actualWomen?: number;
+    actualMen?: number;
+    actualCouple?: number;
+    actualGuests?: number;
+  } = { checkedIn: true, checkedInAt: now };
+  if (isTicketMode) {
+    if (b.actualWomen === null) checkInUpdate.actualWomen = b.ticketWomen;
+    if (b.actualMen === null) checkInUpdate.actualMen = b.ticketMen;
+    if (b.actualCouple === null) checkInUpdate.actualCouple = b.ticketCouple;
+  } else if (b.actualGuests === null) {
+    checkInUpdate.actualGuests = Math.max(0, b.guests);
+  }
   const [updated] = await db
     .update(bookingsTable)
-    .set({ checkedIn: true, checkedInAt: now })
+    .set(checkInUpdate)
     .where(and(eq(bookingsTable.id, b.id), eq(bookingsTable.checkedIn, false)))
     .returning();
 
