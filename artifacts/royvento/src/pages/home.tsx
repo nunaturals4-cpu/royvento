@@ -12,14 +12,17 @@ import {
   Megaphone,
   Clock,
   GlassWater,
+  Wine,
+  Ticket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents, useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
-import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
+import type { VendorDrinkOffer } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
 import { apiGet, formatINR } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { SEO } from "@/components/SEO";
+import { FreeDrinkCard, TicketCard, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 
 interface PublicEvent {
   id: number;
@@ -59,30 +62,6 @@ function sortCityFirst<T extends { city: string }>(items: T[], userCity: string)
     ...items.filter((e) => cityMatch(e.city, userCity)),
     ...items.filter((e) => !cityMatch(e.city, userCity)),
   ];
-}
-
-const DEAL_TYPE_LABELS: Record<string, string> = {
-  welcome: "Free Drink",
-  unlimited: "Unlimited",
-  ticket: "With Ticket",
-  custom: "Discount",
-};
-
-const DEAL_TYPE_COLORS: Record<string, string> = {
-  welcome: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
-  unlimited: "bg-primary/15 text-primary border-primary/25",
-  ticket: "bg-violet-500/15 text-violet-400 border-violet-500/25",
-  custom: "bg-amber-500/15 text-amber-400 border-amber-500/25",
-};
-
-function getPlanLabel(plan: DrinkPlanSummary): string {
-  if (plan.type === "welcome") return "Free welcome drink";
-  if (plan.type === "unlimited") return "Unlimited drinks";
-  if (plan.type === "ticket") {
-    const count = (plan.lineItems ?? []).filter((i) => i.name).length;
-    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} with ticket` : "Drinks with ticket";
-  }
-  return plan.productName || "Drinks discount";
 }
 
 function SectionHeader({
@@ -267,107 +246,78 @@ export function Home() {
         </section>
       )}
 
-      {/* Drink Deals */}
-      {drinkOffers.length > 0 && (
-        <section className="py-16 md:py-24">
-          <div className="container mx-auto px-4 md:px-6">
-            <SectionHeader
-              icon={<GlassWater className="h-3.5 w-3.5" />}
-              eyebrow={t("pub_offers.deal_eyebrow")}
-              title={t("events.drink_deals")}
-              seeAllHref="/pubs"
-              seeAllLabel={t("pub_offers.browse_pubs")}
-            />
+      {/* Drink Deals — same two-section design as /pub-offers */}
+      {drinkOffers.length > 0 && (() => {
+        const { freeVendors, ticketVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[]);
+        if (freeVendors.length === 0 && ticketVendors.length === 0) return null;
+        return (
+          <section className="py-16 md:py-24">
+            <div className="container mx-auto px-4 md:px-6">
+              <SectionHeader
+                icon={<GlassWater className="h-3.5 w-3.5" />}
+                eyebrow={t("pub_offers.deal_eyebrow")}
+                title={t("events.drink_deals")}
+                seeAllHref="/pub-offers"
+                seeAllLabel={t("pub_offers.browse_pubs")}
+              />
 
-            <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
-              {drinkOffers.map((offer: VendorDrinkOffer) => (
-                <Link
-                  key={offer.vendorId}
-                  href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
-                  className="snap-start flex-shrink-0"
-                >
-                  <div className="rounded-2xl w-[300px] sm:w-[320px] flex flex-col group cursor-pointer border border-white/10 hover:border-primary/30 bg-zinc-900/90 transition-all duration-300 hover:shadow-[0_0_28px_rgba(220,38,38,0.15)] overflow-hidden">
-                    {/* Venue header */}
-                    <div className="px-5 pt-5 pb-4 flex items-start gap-3 border-b border-white/[0.07]">
-                      <span className="flex-shrink-0 h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center mt-0.5">
-                        <GlassWater className="h-4 w-4 text-primary" />
+              <div className="space-y-14">
+                {freeVendors.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                          <Wine className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-primary/50 uppercase tracking-[0.25em] font-bold leading-none">Section 01</p>
+                          <h3 className="text-sm font-bold text-white/90 tracking-tight leading-tight mt-0.5">Free Drinks</h3>
+                        </div>
+                      </div>
+                      <div className="flex-1 h-px bg-gradient-to-r from-primary/15 to-transparent" />
+                      <span className="text-[10px] text-white/20 font-mono tabular-nums">
+                        {freeVendors.length} {freeVendors.length === 1 ? "venue" : "venues"}
                       </span>
-                      <div className="min-w-0">
-                        <h3 className="font-serif text-[1.15rem] leading-snug tracking-tight text-white line-clamp-2">
-                          {offer.vendorName}
-                        </h3>
-                        <p className="text-[10px] text-white/35 uppercase tracking-wider mt-0.5">Drink Deals</p>
-                      </div>
                     </div>
-                    {/* Plan rows */}
-                    <div className="p-4 flex flex-col gap-2.5 flex-1">
-                      {offer.plans.slice(0, 3).map((plan: DrinkPlanSummary, i: number) => {
-                        const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
-                        const showTime = plan.timeFrom && plan.timeTo;
-                        return (
-                          <div key={i} className="flex flex-col gap-0.5">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span
-                                className={`flex-shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border whitespace-nowrap ${
-                                  DEAL_TYPE_COLORS[plan.type as keyof typeof DEAL_TYPE_COLORS] ??
-                                  "bg-white/10 text-white/60 border-white/15"
-                                }`}
-                              >
-                                {DEAL_TYPE_LABELS[plan.type] ?? plan.type}
-                              </span>
-                              <span className="text-xs text-white/65 flex-1 leading-snug truncate">
-                                {getPlanLabel(plan)}
-                              </span>
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                                  plan.gender === "female"
-                                    ? "bg-rose-500/20 text-rose-300"
-                                    : "bg-primary/20 text-primary"
-                                }`}
-                              >
-                                {plan.gender === "female" ? t("pub_offers.gender_ladies") : t("pub_offers.gender_all")}
-                              </span>
-                            </div>
-                            {(showDays || showTime) && (
-                              <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                                {showDays && plan.days!.map((d) => (
-                                  <span key={d} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
-                                    {d.slice(0, 3)}
-                                  </span>
-                                ))}
-                                {showTime && (
-                                  <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
-                                    <Clock className="h-2.5 w-2.5 shrink-0" />
-                                    {plan.timeFrom}–{plan.timeTo}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            {plan.description && (
-                              <p className="text-[9px] text-white/30 italic truncate">{plan.description}</p>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {offer.plans.length > 3 && (
-                        <span className="text-xs text-white/30">
-                          +{offer.plans.length - 3} more offer{offer.plans.length - 3 !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                      <div className="mt-auto pt-3 rounded-xl bg-primary/10 border border-primary/25 px-4 py-2.5 flex items-center justify-between group-hover:bg-primary/20 transition-colors">
-                        <span className="text-sm font-semibold text-primary">
-                          {offer.pubEventId ? t("pub_offers.book_now") : t("pub_offers.view_venue")}
-                        </span>
-                        <ArrowRight className="h-4 w-4 text-primary" />
-                      </div>
+
+                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
+                      {freeVendors.map((v) => (
+                        <FreeDrinkCard key={v.offer.vendorId} offer={v.offer} plans={v.plans} />
+                      ))}
                     </div>
                   </div>
-                </Link>
-              ))}
+                )}
+
+                {ticketVendors.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                          <Ticket className="h-3.5 w-3.5 text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-amber-400/50 uppercase tracking-[0.25em] font-bold leading-none">Section 02</p>
+                          <h3 className="text-sm font-bold text-white/90 tracking-tight leading-tight mt-0.5">Included With Ticket</h3>
+                        </div>
+                      </div>
+                      <div className="flex-1 h-px bg-gradient-to-r from-amber-500/15 to-transparent" />
+                      <span className="text-[10px] text-white/20 font-mono tabular-nums">
+                        {ticketVendors.length} {ticketVendors.length === 1 ? "venue" : "venues"}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
+                      {ticketVendors.map((v) => (
+                        <TicketCard key={v.offer.vendorId} offer={v.offer} plans={v.plans} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        );
+      })()}
 
       {/* Featured events */}
       <section className="container mx-auto px-4 md:px-6 py-12">

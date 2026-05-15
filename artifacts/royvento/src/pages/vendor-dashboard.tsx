@@ -3277,8 +3277,8 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
     return { from: customFrom || undefined, to: customTo || undefined };
   }
 
-  function load() {
-    setLoading(true);
+  function load(opts?: { silent?: boolean }) {
+    if (!opts?.silent) setLoading(true);
     const { from, to } = buildParams();
     const qs = new URLSearchParams();
     if (from) qs.set("from", from);
@@ -3287,10 +3287,38 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
     apiGet<AnalyticsData>(`/api/partner/analytics${qStr ? `?${qStr}` : ""}`)
       .then((d) => { setData(d); setLastUpdated(new Date()); })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!opts?.silent) setLoading(false); });
   }
 
   useEffect(() => { load(); }, [preset, customFrom, customTo]);
+
+  // Real-time refresh: poll every 20s while tab is visible, plus refresh on
+  // window focus. Keeps COD Collected (Actual) up to date as Pub Managers /
+  // Owners scan QR tickets — the value can only grow because the backend
+  // gates each booking on a unique (booking_id, "cod_checkin") ledger row.
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    function start() {
+      if (timer || document.hidden) return;
+      timer = setInterval(() => load({ silent: true }), 20000);
+    }
+    function stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+    }
+    function onVisibility() {
+      if (document.hidden) stop();
+      else { load({ silent: true }); start(); }
+    }
+    function onFocus() { load({ silent: true }); }
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [preset, customFrom, customTo]);
 
   if (loading) {
     return <p className="text-muted-foreground py-8 text-center">Loading analytics…</p>;
@@ -3345,7 +3373,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
             <p className="text-xs text-muted-foreground hidden sm:block">Updated {lastUpdated.toLocaleTimeString()}</p>
           )}
           <button
-            onClick={load}
+            onClick={() => load()}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
           >
