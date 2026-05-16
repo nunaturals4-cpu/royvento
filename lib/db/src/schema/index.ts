@@ -763,3 +763,35 @@ export const seoPagesTable = pgTable(
 );
 
 export type SeoPage = typeof seoPagesTable.$inferSelect;
+
+// Append-only audit trail for the "Save Actual Entry" finalization flow.
+// One row per save; the most-recent row's `after_json` reflects the final
+// stored state. `before_json` captures what we overwrote so admins can
+// reconstruct who corrected what at the door.
+export const bookingAuditLogTable = pgTable(
+  "booking_audit_log",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookingsTable.id, { onDelete: "cascade" }),
+    vendorId: integer("vendor_id")
+      .notNull()
+      .references(() => vendorsTable.id, { onDelete: "cascade" }),
+    actorUserId: integer("actor_user_id"),
+    action: varchar("action", { length: 40 }).notNull(),
+    beforeJson: jsonb("before_json").notNull().default(sql`'{}'::jsonb`),
+    afterJson: jsonb("after_json").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    bookingIdx: index("booking_audit_log_booking_idx").on(t.bookingId),
+    vendorIdx: index("booking_audit_log_vendor_idx").on(t.vendorId),
+    actionIdx: index("booking_audit_log_action_idx").on(t.action),
+    createdIdx: index("booking_audit_log_created_idx").on(t.createdAt),
+  }),
+);
+
+export type BookingAuditLog = typeof bookingAuditLogTable.$inferSelect;

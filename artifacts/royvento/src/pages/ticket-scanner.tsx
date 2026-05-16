@@ -14,6 +14,16 @@ import {
   usePartnerCheckoutTicket,
   getGetPartnerScannerBookingsQueryKey,
   getGetPartnerScannerOccupancyQueryKey,
+  getGetPartnerAnalyticsQueryKey,
+  getGetPartnerLeadsQueryKey,
+  getGetPartnerCommissionQueryKey,
+  getGetPartnerCheckinReportQueryKey,
+  getGetAdminAnalyticsQueryKey,
+  getGetAdminBookingsReportQueryKey,
+  getGetAdminCheckinReportQueryKey,
+  getGetAdminLeadsQueryKey,
+  getGetCommissionReportQueryKey,
+  getGetAdminLiveOccupancyQueryKey,
 } from "@workspace/api-client-react";
 import type {
   ScannerBookingRow as ApiScannerBookingRow,
@@ -81,17 +91,30 @@ function bookingFerState(b: Pick<BookingData, "bookingDate" | "freeEntryRules">)
   };
 }
 
-interface ScanSuccess {
-  code: "OK";
-  checkedInAt: string;
+// Lookup result: the QR resolved to a valid booking that has NOT been
+// finalized. The scanner UI surfaces the editable headcount form so the
+// manager can confirm/adjust counts and tap Save Actual Entry to finalize.
+interface ScanReady {
+  code: "READY";
+  checkedInAt: string | null;
   booking: BookingData;
 }
 
-interface ScanAlreadyUsed {
-  code: "ALREADY_CHECKED_IN";
-  message: string;
+// Lookup result: the booking has already been finalized via Save Actual
+// Entry. Locked — show recorded counts read-only.
+interface ScanAlreadyFinalized {
+  code: "ALREADY_FINALIZED";
+  message?: string;
   checkedInAt: string | null;
   booking: BookingData;
+}
+
+// Returned from a successful Save Actual Entry (or grace-window duplicate).
+interface ScanFinalized {
+  code: "OK";
+  checkedInAt: string;
+  booking: BookingData;
+  justFinalized?: boolean;
 }
 
 interface ScanError {
@@ -99,14 +122,16 @@ interface ScanError {
   message: string;
 }
 
-type ScanResult = ScanSuccess | ScanAlreadyUsed | ScanError;
+type ScanResult = ScanReady | ScanAlreadyFinalized | ScanFinalized | ScanError;
 
-function isScanSuccess(r: ScanResult): r is ScanSuccess {
+function isScanReady(r: ScanResult): r is ScanReady {
+  return r.code === "READY";
+}
+function isScanFinalized(r: ScanResult): r is ScanFinalized {
   return r.code === "OK";
 }
-
-function isScanAlreadyUsed(r: ScanResult): r is ScanAlreadyUsed {
-  return r.code === "ALREADY_CHECKED_IN";
+function isScanAlreadyFinalized(r: ScanResult): r is ScanAlreadyFinalized {
+  return r.code === "ALREADY_FINALIZED";
 }
 
 interface Invitation {
@@ -530,37 +555,44 @@ export function TicketScanner() {
     // Haptic feedback on scan start
     if ("vibrate" in navigator) navigator.vibrate(40);
     try {
+      // Lookup only — no `confirm`, no `actualEntry`. Server returns the
+      // booking with status (READY / ALREADY_FINALIZED / ALREADY_CHECKED_OUT)
+      // and performs ZERO writes. Finalization happens later when the
+      // manager taps Save Actual Entry.
       const res = await fetch("/api/partner/scan-ticket", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, confirm: true }),
+        body: JSON.stringify({ code }),
       });
+      const json = (await res.json()) as Record<string, unknown>;
       if (res.ok) {
-        const json = (await res.json()) as ScanSuccess;
-        setResult(json);
-        if ("vibrate" in navigator) navigator.vibrate([80, 40, 80]);
-        void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerOccupancyQueryKey() });
-        void queryClient.invalidateQueries({ queryKey: getGetPartnerScannerBookingsQueryKey() });
-      } else {
-        const json = (await res.json()) as Record<string, unknown>;
-        const errCode = typeof json.code === "string" ? json.code : "UNKNOWN";
-        const message = typeof json.message === "string" ? json.message : `Error ${res.status}`;
-        if (errCode === "ALREADY_CHECKED_IN") {
-          const scanResult: ScanAlreadyUsed = {
-            code: "ALREADY_CHECKED_IN",
-            message,
-            checkedInAt: typeof json.checkedInAt === "string" ? json.checkedInAt : null,
-            booking: json.booking as BookingData,
-          };
-          setResult(scanResult);
+        const lookupCode = typeof json["code"] === "string" ? (json["code"] as string) : "";
+        const booking = json["booking"] as BookingData | undefined;
+        const checkedInAt = typeof json["checkedInAt"] === "string" ? (json["checkedInAt"] as string) : null;
+        if (lookupCode === "ALREADY_FINALIZED" && booking) {
+          setResult({ code: "ALREADY_FINALIZED", checkedInAt, booking });
           if ("vibrate" in navigator) navigator.vibrate([200, 60, 200]);
+        } else if (lookupCode === "READY" && booking) {
+          setResult({ code: "READY", checkedInAt, booking });
+          if ("vibrate" in navigator) navigator.vibrate([80, 40, 80]);
+        } else if (lookupCode === "ALREADY_CHECKED_OUT" && booking) {
+          setResult({
+            code: "ALREADY_FINALIZED",
+            message: "Guest already checked out.",
+            checkedInAt,
+            booking,
+          });
         } else {
-          const scanResult: ScanError = { code: errCode, message };
-          setResult(scanResult);
-          if ("vibrate" in navigator) navigator.vibrate(300);
-          toast({ title: "Scan failed", description: message, variant: "destructive" });
+          const message = typeof json["message"] === "string" ? (json["message"] as string) : "Unexpected response.";
+          setResult({ code: lookupCode || "UNKNOWN", message });
         }
+      } else {
+        const errCode = typeof json["code"] === "string" ? (json["code"] as string) : "UNKNOWN";
+        const message = typeof json["message"] === "string" ? (json["message"] as string) : `Error ${res.status}`;
+        setResult({ code: errCode, message });
+        if ("vibrate" in navigator) navigator.vibrate(300);
+        toast({ title: "Scan failed", description: message, variant: "destructive" });
       }
     } catch {
       const scanErr: ScanError = { code: "NETWORK_ERROR", message: "Network error. Check your connection." };
@@ -676,25 +708,59 @@ export function TicketScanner() {
       {result && (
         <div
           className={`mt-5 rounded-3xl overflow-hidden border ${
-            result.code === "OK"
+            isScanFinalized(result)
               ? "border-green-500/50 bg-gradient-to-b from-green-950/60 to-green-950/30"
-              : result.code === "ALREADY_CHECKED_IN"
+              : isScanReady(result)
+              ? "border-primary/40 bg-gradient-to-b from-primary/10 to-black/40"
+              : isScanAlreadyFinalized(result)
               ? "border-amber-500/50 bg-gradient-to-b from-amber-950/60 to-amber-950/30"
               : "border-red-500/40 bg-gradient-to-b from-red-950/60 to-red-950/30"
           }`}
           style={{ animation: "resultSlideIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both" }}
         >
-          {isScanSuccess(result) ? (
+          {isScanReady(result) ? (
             <div className="p-5 space-y-4">
-              {/* Success header */}
+              {/* Ready-to-finalize header — scan validated the ticket but
+                  nothing has been written yet. Manager edits counts, then
+                  taps Save Actual Entry to finalize. */}
+              <div className="flex items-center gap-4">
+                <div className="rounded-2xl bg-primary/20 border border-primary/40 p-3 shrink-0">
+                  <ScanLine className="h-8 w-8 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-foreground font-bold text-xl tracking-tight">Ticket valid · confirm headcount</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Adjust counts below if fewer guests showed up, then tap Save Actual Entry.
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setResult(null); setInput(""); }}
+                  className="ml-auto shrink-0 rounded-xl border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="h-px bg-primary/20" />
+              <BookingDetails booking={result.booking} />
+              <FinalizeActualEntry
+                key={`ready-${result.booking.id}`}
+                booking={result.booking}
+                onFinalized={(updated, checkedInAt) =>
+                  setResult({ code: "OK", booking: updated, checkedInAt, justFinalized: true })
+                }
+              />
+            </div>
+          ) : isScanFinalized(result) ? (
+            <div className="p-5 space-y-4">
               <div className="flex items-center gap-4">
                 <div className="rounded-2xl bg-green-500/20 border border-green-500/40 p-3 shrink-0">
                   <CheckCircle2 className="h-8 w-8 text-green-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-green-300 font-bold text-xl tracking-tight">Entry granted</p>
+                  <p className="text-green-300 font-bold text-xl tracking-tight">Entry finalized</p>
                   <p className="text-xs text-green-300/60 mt-0.5">
-                    ✓ Checked in at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                    ✓ Saved at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                    {" · analytics & commission updated"}
                   </p>
                 </div>
                 <button
@@ -706,26 +772,20 @@ export function TicketScanner() {
               </div>
               <div className="h-px bg-green-500/20" />
               <BookingDetails booking={result.booking} />
-              <PaymentToCollectCard booking={result.booking} />
-              <CollapsibleActuals
-                key={`ok-${result.booking.id}`}
-                booking={result.booking}
-                onSaved={(updated) => setResult({ ...result, booking: updated })}
-              />
+              <FinalizedSummary booking={result.booking} />
             </div>
-          ) : isScanAlreadyUsed(result) ? (
+          ) : isScanAlreadyFinalized(result) ? (
             <div className="p-5 space-y-4">
-              {/* Already used header */}
               <div className="flex items-center gap-4">
                 <div className="rounded-2xl bg-amber-500/20 border border-amber-500/40 p-3 shrink-0">
                   <XCircle className="h-8 w-8 text-amber-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-amber-300 font-bold text-xl tracking-tight">Ticket already used</p>
+                  <p className="text-amber-300 font-bold text-xl tracking-tight">Already finalized</p>
                   <p className="text-xs text-amber-300/70 mt-0.5">
                     {result.checkedInAt
-                      ? `First scan: ${new Date(result.checkedInAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}`
-                      : "This ticket has already been checked in."}
+                      ? `Saved ${new Date(result.checkedInAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}`
+                      : "This ticket has already been finalized at the door."}
                   </p>
                 </div>
                 <button
@@ -739,23 +799,16 @@ export function TicketScanner() {
               {result.booking && (
                 <>
                   <BookingDetails booking={result.booking} />
-                  {/* Duplicate-scan guard: cash was already due on the first
-                      scan; the analytics ledger row exists, so we MUST NOT
-                      prompt the partner to collect a second time. */}
                   <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-center gap-3">
                     <div className="h-10 w-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
                       <XCircle className="h-5 w-5 text-amber-300" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-amber-200">Cash already collected on first scan</p>
-                      <p className="text-xs text-amber-200/70 mt-0.5">Do not charge this guest again.</p>
+                      <p className="text-sm font-semibold text-amber-200">Locked — no further edits</p>
+                      <p className="text-xs text-amber-200/70 mt-0.5">Cash and commission have been recorded. Contact admin to correct.</p>
                     </div>
                   </div>
-                  <CollapsibleActuals
-                    key={`used-${result.booking.id}`}
-                    booking={result.booking}
-                    onSaved={(updated) => setResult({ ...result, booking: updated })}
-                  />
+                  <FinalizedSummary booking={result.booking} />
                 </>
               )}
             </div>
@@ -1036,78 +1089,6 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
   );
 }
 
-/**
- * Read-only "Collect this exact cash" card shown for COD bookings.
- *
- * The amount displayed is the booking's `finalPrice` — the figure the
- * guest agreed to at booking time and the figure printed on their
- * ticket. It is NOT computed from the stepper-adjusted actuals below;
- * the partner cannot reduce what they're owed by tapping the −
- * buttons. Free-entry bookings (finalPrice = 0) and prepaid online
- * bookings render nothing.
- *
- * The actuals form below still exists for analytics correction
- * ("only 3 of the 4 booked guests actually walked in"). That flow runs
- * through delta-math on the commission ledger server-side, so the
- * cash-collected accounting stays correct regardless of what the
- * partner records there.
- */
-function PaymentToCollectCard({ booking: b }: { booking: BookingData }) {
-  const isCod = b.paymentMethod === "cod";
-  const amount = Number(b.finalPrice) || 0;
-  if (!isCod) {
-    return (
-      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-          <CheckCircle2 className="h-5 w-5 text-emerald-300" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-emerald-200">Already paid online</p>
-          <p className="text-xs text-emerald-200/70 mt-0.5">Don't collect any cash from this guest.</p>
-        </div>
-        <span className="text-xl font-semibold text-emerald-200 tabular-nums">₹0</span>
-      </div>
-    );
-  }
-  if (amount <= 0) {
-    return (
-      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-          <Banknote className="h-5 w-5 text-emerald-300" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-emerald-200">Free entry — collect nothing</p>
-          <p className="text-xs text-emerald-200/70 mt-0.5">This booking is fully covered by a free-entry rule.</p>
-        </div>
-        <span className="text-xl font-semibold text-emerald-200 tabular-nums">₹0</span>
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-500/10 to-amber-900/10 p-4 shadow-[0_0_24px_-8px_rgba(245,158,11,0.5)]">
-      <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-xl bg-amber-500/25 border border-amber-400/50 flex items-center justify-center shrink-0">
-          <Banknote className="h-6 w-6 text-amber-300" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80 font-semibold">Collect cash (COD)</p>
-          <p className="text-[11px] text-amber-100/70 mt-0.5">Exact amount printed on the guest's ticket</p>
-        </div>
-        <div className="text-right">
-          <div className="flex items-center justify-end gap-0.5 text-amber-200">
-            <IndianRupee className="h-5 w-5" />
-            <span className="text-3xl font-bold tabular-nums leading-none">{amount.toLocaleString("en-IN")}</span>
-          </div>
-        </div>
-      </div>
-      <div className="mt-3 flex items-center gap-2 text-[11px] text-amber-200/70">
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-        Collect this exact amount. Do not adjust at the door.
-      </div>
-    </div>
-  );
-}
-
 function BookingDetails({ booking: b }: { booking: BookingData }) {
   const isPubTicket = b.pubMode === "ticket";
   const guestName = b.personName ?? b.userName;
@@ -1189,87 +1170,49 @@ function Stepper({ label, value, max, color, onChange }: { label: string; value:
 }
 
 /**
- * Disclosure wrapper around ActualEntryForm. Collapsed by default so the
- * primary scan flow stays one-tap (scan → collect the locked cash amount).
- * Editing actuals is opt-in and clearly labelled as a record-keeping
- * correction, not a way to change the cash owed.
+ * The single "Save Actual Entry" form shown after a successful scan lookup.
+ * The manager confirms or adjusts per-tier headcounts; for COD bookings the
+ * cash-to-collect recalculates live from the current stepper values. Tapping
+ * Save finalizes the booking server-side in one transaction (check-in,
+ * commission ledger, vendor commissionOwed, loyalty, coupon lock, audit log)
+ * and invalidates every analytics/commission/booking-report query key so
+ * the admin and partner dashboards reflect the new totals immediately.
  */
-function CollapsibleActuals({ booking, onSaved }: { booking: BookingData; onSaved: (b: BookingData) => void }) {
-  const [open, setOpen] = useState(false);
-  // If actuals have already been edited away from the booked counts, default
-  // to open so the partner can see the recorded values.
-  useEffect(() => {
-    if (booking.actualWomen != null && booking.actualWomen !== booking.ticketWomen) setOpen(true);
-    else if (booking.actualMen != null && booking.actualMen !== booking.ticketMen) setOpen(true);
-    else if (booking.actualCouple != null && booking.actualCouple !== booking.ticketCouple) setOpen(true);
-    else if (booking.actualGuests != null && booking.actualGuests !== booking.guests) setOpen(true);
-  }, [booking]);
-
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.03] transition-colors"
-        aria-expanded={open}
-      >
-        <Users className="h-4 w-4 text-white/60 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">Did fewer guests show up?</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Optional — adjust the headcount for analytics. Does not change the cash to collect.
-          </p>
-        </div>
-        <span className="text-xs text-muted-foreground shrink-0">{open ? "Hide" : "Adjust"}</span>
-      </button>
-      {open && (
-        <div className="border-t border-white/10 p-4">
-          <ActualEntryForm booking={booking} onSaved={onSaved} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSaved: (b: BookingData) => void }) {
+function FinalizeActualEntry({
+  booking: b,
+  onFinalized,
+}: {
+  booking: BookingData;
+  onFinalized: (updated: BookingData, checkedInAt: string) => void;
+}) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const isTicket = b.pubMode === "ticket";
-  const initWomen = b.actualWomen ?? b.ticketWomen;
-  const initMen = b.actualMen ?? b.ticketMen;
-  const initCouple = b.actualCouple ?? b.ticketCouple;
-  const initGuests = b.actualGuests ?? b.guests;
-  const [w, setW] = useState<number>(initWomen);
-  const [m, setM] = useState<number>(initMen);
-  const [c, setC] = useState<number>(initCouple);
-  const [g, setG] = useState<number>(initGuests);
-  const [saving, setSaving] = useState(false);
   const isCod = b.paymentMethod === "cod";
-  const ferState = bookingFerState(b);
-  // Only suppress the cash callout entirely when EVERY tier in this booking
-  // is free. On a partial FER day (e.g. Ladies-free, Men-paid) we still need
-  // to tell the manager to collect cash for the paid tiers.
-  const wholeBookingFree = isTicket
-    ? (b.ticketWomen === 0 || ferState.isTierFree("women")) &&
-      (b.ticketMen === 0 || ferState.isTierFree("men")) &&
-      (b.ticketCouple === 0 || ferState.isTierFree("couple"))
-    : ferState.allGendersFree;
-  const alreadyRecorded = (
-    b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null
-  );
+  // Pre-fill with the booked counts so a zero-edit Save records "everyone
+  // showed up" — the manager only has to touch the steppers when reality
+  // differs from the booking.
+  const [w, setW] = useState<number>(b.actualWomen ?? b.ticketWomen);
+  const [m, setM] = useState<number>(b.actualMen ?? b.ticketMen);
+  const [c, setC] = useState<number>(b.actualCouple ?? b.ticketCouple);
+  const [g, setG] = useState<number>(b.actualGuests ?? b.guests);
+  const [saving, setSaving] = useState(false);
 
-  // LIVE running total computed from current stepper values (not server response,
-  // which is null until the user saves). Per-tier zeroing matches server's
-  // calcActualAmountDue: free tiers contribute ₹0 even if booked qty > 0.
+  const ferState = bookingFerState(b);
   const priceWomen = ferState.isTierFree("women") ? 0 : (b.priceWomen ?? 0);
   const priceMen = ferState.isTierFree("men") ? 0 : (b.priceMen ?? 0);
   const priceCouple = ferState.isTierFree("couple") ? 0 : (b.priceCouple ?? 0);
+
+  // Live recalc mirrors server's calcActualAmountDue (per-tier × edited
+  // count, scaled by discount ratio for non-ticket modes).
   const liveTotal = isTicket
     ? w * priceWomen + m * priceMen + c * priceCouple
     : ferState.allGendersFree
       ? 0
       : (g / Math.max(1, b.guests)) * b.finalPrice;
   const liveTotalRounded = Math.round(liveTotal * 100) / 100;
-  const subRows: { label: string; qty: number; price: number; subtotal: number; free: boolean }[] = isTicket
+
+  const subRows = isTicket
     ? [
         { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen, free: ferState.isTierFree("women") },
         { label: "Men", qty: m, price: priceMen, subtotal: m * priceMen, free: ferState.isTierFree("men") },
@@ -1277,22 +1220,39 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
       ].filter((r) => r.qty > 0)
     : [];
 
-  // Hide entirely when no relevant booked counts (e.g. ticket-mode with 0 across the board)
   const hasAnyBookedTicket = b.ticketWomen > 0 || b.ticketMen > 0 || b.ticketCouple > 0;
   if (isTicket && !hasAnyBookedTicket) return null;
   if (!isTicket && b.guests <= 0) return null;
 
+  // Every query key whose underlying aggregate reads from bookings or
+  // commission_ledger. Invalidated on save so the Admin Panel (Analytics /
+  // Booking Report / Commission Tab) and Partner Dashboard (Analytics /
+  // Leads / Booking Report) refetch with the new totals on next focus.
+  const invalidateDashboards = () => {
+    const keys = [
+      getGetPartnerScannerOccupancyQueryKey(),
+      getGetPartnerScannerBookingsQueryKey(),
+      getGetPartnerAnalyticsQueryKey(),
+      getGetPartnerLeadsQueryKey(),
+      getGetPartnerCommissionQueryKey(),
+      getGetPartnerCheckinReportQueryKey(),
+      getGetAdminAnalyticsQueryKey(),
+      getGetAdminBookingsReportQueryKey(),
+      getGetAdminCheckinReportQueryKey(),
+      getGetAdminLeadsQueryKey(),
+      getGetCommissionReportQueryKey(),
+      getGetAdminLiveOccupancyQueryKey(),
+    ];
+    for (const key of keys) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
+
   const submit = async () => {
     setSaving(true);
     try {
-      // Always submit the authoritative per-pub ticketCode returned by the
-      // server. The legacy `RV-{id}` fallback is only used if the booking
-      // payload predates the per-pub code rollout (defensive only — the boot
-      // backfill ensures every vendor has a prefix/salt).
       const code = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
-      const actualEntry = isTicket
-        ? { women: w, men: m, couple: c }
-        : { guests: g };
+      const actualEntry = isTicket ? { women: w, men: m, couple: c } : { guests: g };
       const res = await fetch("/api/partner/scan-ticket", {
         method: "POST",
         credentials: "include",
@@ -1301,11 +1261,19 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
       });
       const json = (await res.json()) as Record<string, unknown>;
       if (res.ok && json["booking"]) {
-        toast({ title: "Actual entry saved" });
-        onSaved(json["booking"] as BookingData);
+        const updated = json["booking"] as BookingData;
+        const checkedInAt = typeof json["checkedInAt"] === "string" ? (json["checkedInAt"] as string) : new Date().toISOString();
+        toast({ title: "Entry finalized", description: "Analytics and commission updated." });
+        invalidateDashboards();
+        onFinalized(updated, checkedInAt);
       } else {
-        const msg = typeof json["message"] === "string" ? (json["message"] as string) : "Failed to save actuals.";
-        toast({ title: "Couldn't save", description: msg, variant: "destructive" });
+        const errCode = typeof json["code"] === "string" ? (json["code"] as string) : "";
+        const msg = typeof json["message"] === "string" ? (json["message"] as string) : "Failed to finalize.";
+        if (errCode === "ALREADY_FINALIZED") {
+          toast({ title: "Already finalized", description: msg, variant: "destructive" });
+        } else {
+          toast({ title: "Couldn't save", description: msg, variant: "destructive" });
+        }
       }
     } catch {
       toast({ title: "Network error", description: "Couldn't reach server.", variant: "destructive" });
@@ -1315,14 +1283,16 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
   };
 
   return (
-    <div className="rounded-2xl bg-black/30 border border-white/10 p-4 space-y-3">
+    <div className="rounded-2xl bg-black/30 border border-primary/30 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Actual entry</p>
-        {alreadyRecorded && (
-          <span className="text-[10px] uppercase tracking-wider text-green-300/80">Recorded</span>
-        )}
+        <p className="text-sm font-semibold flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" /> Actual entry
+        </p>
+        <span className="text-[10px] uppercase tracking-wider text-primary/80">Not yet finalized</span>
       </div>
-      <p className="text-xs text-muted-foreground -mt-1">Adjust if fewer guests showed up than booked.</p>
+      <p className="text-xs text-muted-foreground -mt-1">
+        Confirm how many guests actually entered. Tap Save Actual Entry to lock the booking and update analytics.
+      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {isTicket ? (
@@ -1336,10 +1306,61 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
         )}
       </div>
 
-      {/* Cash-to-collect is owned by PaymentToCollectCard above (locked to the
-          ticket's finalPrice). This form only records actuals for analytics —
-          a live cash recalc here would imply the partner can adjust what they
-          collect, which they cannot. */}
+      {/* Live cash callout — only for COD, since prepaid bookings are
+          already settled. The amount recalculates as the manager edits
+          counts and matches what the server will write on Save. */}
+      {isCod && liveTotalRounded > 0 && (
+        <div className="rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-500/10 to-amber-900/10 p-4 shadow-[0_0_24px_-8px_rgba(245,158,11,0.5)]">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-amber-500/25 border border-amber-400/50 flex items-center justify-center shrink-0">
+              <Banknote className="h-6 w-6 text-amber-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80 font-semibold">Collect cash (COD)</p>
+              <p className="text-[11px] text-amber-100/70 mt-0.5">Recalculates as you edit counts</p>
+            </div>
+            <div className="text-right">
+              <div className="flex items-center justify-end gap-0.5 text-amber-200">
+                <IndianRupee className="h-5 w-5" />
+                <span className="text-3xl font-bold tabular-nums leading-none">{liveTotalRounded.toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+          </div>
+          {isTicket && subRows.length > 0 && (
+            <div className="mt-3 space-y-1 text-[11px] text-amber-100/80">
+              {subRows.map((r) => (
+                <div key={r.label} className="flex justify-between">
+                  <span>{r.label} · {r.qty}{r.free ? " · FREE" : ` × ₹${r.price.toLocaleString("en-IN")}`}</span>
+                  <span className="tabular-nums">{r.free ? "—" : `₹${r.subtotal.toLocaleString("en-IN")}`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {isCod && liveTotalRounded === 0 && (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+            <Banknote className="h-5 w-5 text-emerald-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-emerald-200">No cash to collect</p>
+            <p className="text-xs text-emerald-200/70 mt-0.5">Free entry or zero guests admitted.</p>
+          </div>
+          <span className="text-xl font-semibold text-emerald-200 tabular-nums">₹0</span>
+        </div>
+      )}
+      {!isCod && (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-emerald-200">Already paid online</p>
+            <p className="text-xs text-emerald-200/70 mt-0.5">Don't collect any cash. Counts above are recorded for analytics only.</p>
+          </div>
+        </div>
+      )}
 
       <Button
         type="button"
@@ -1347,8 +1368,60 @@ function ActualEntryForm({ booking: b, onSaved }: { booking: BookingData; onSave
         disabled={saving}
         className="w-full bg-gradient-to-br from-primary to-primary/70 border-0 text-base py-3 gap-2"
       >
-        {saving ? "Saving…" : alreadyRecorded ? "Update actual entry" : "Save actual entry"}
+        {saving ? "Saving…" : "Save Actual Entry"}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Read-only summary card shown after a booking has been finalized — either
+ * from a fresh successful Save (green path) or a re-scan of an already-
+ * finalized ticket (amber path). Renders the recorded counts and the
+ * amount that was written to the ledger; the form is intentionally absent
+ * because edits are locked after Save.
+ */
+function FinalizedSummary({ booking: b }: { booking: BookingData }) {
+  const isTicket = b.pubMode === "ticket";
+  const aw = b.actualWomen ?? 0;
+  const am = b.actualMen ?? 0;
+  const ac = b.actualCouple ?? 0;
+  const ag = b.actualGuests ?? 0;
+  const amountDue = b.actualAmountDue ?? 0;
+  const isCod = b.paymentMethod === "cod";
+  const rows = isTicket
+    ? [
+        { label: "Women", qty: aw, booked: b.ticketWomen },
+        { label: "Men", qty: am, booked: b.ticketMen },
+        { label: "Couples", qty: ac, booked: b.ticketCouple },
+      ].filter((r) => r.booked > 0)
+    : [{ label: "Guests", qty: ag, booked: b.guests }];
+  return (
+    <div className="rounded-2xl bg-black/30 border border-white/10 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Recorded entry</p>
+        <span className="text-[10px] uppercase tracking-wider text-green-300/80">Locked</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {rows.map((r) => (
+          <div key={r.label} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">{r.label}</p>
+            <p className="text-lg font-semibold tabular-nums">{r.qty}<span className="text-xs text-muted-foreground"> / {r.booked} booked</span></p>
+          </div>
+        ))}
+      </div>
+      {isCod && (
+        <div className="rounded-xl border border-amber-400/30 bg-amber-500/5 p-3 flex items-center gap-3">
+          <Banknote className="h-5 w-5 text-amber-300 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-amber-200/80">Cash collected (COD)</p>
+            <div className="flex items-center gap-0.5 text-amber-200">
+              <IndianRupee className="h-4 w-4" />
+              <span className="text-xl font-bold tabular-nums">{Number(amountDue).toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

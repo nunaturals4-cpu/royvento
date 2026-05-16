@@ -83,20 +83,29 @@ function bookingFerState(b: Pick<BookingData, "bookingDate" | "freeEntryRules">)
 }
 
 interface ScanResult {
+  // READY            : lookup hit a valid, not-yet-finalized booking. The
+  //                    actuals sheet is auto-opened so the manager can adjust
+  //                    counts and tap Save Actual Entry to finalize.
+  // OK               : Save Actual Entry succeeded. Booking is now locked;
+  //                    commission/ledger/loyalty/coupon side-effects fired.
+  // ALREADY_FINALIZED: re-scan of a ticket already saved at the door.
+  //                    Read-only summary; no further edits.
+  // ALREADY_CHECKED_OUT: guest already left for the night.
   code: string;
-  // Higher-resolution status from the server. Scanning auto-confirms now,
-  // so `ready_to_check_in` no longer reaches the client. `already_checked_in`
-  // covers grace-window re-confirms and out-of-grace duplicate scans.
-  // `checked_out` is set after a successful POST /partner/checkout-ticket.
-  status?: "checked_in" | "already_checked_in" | "checked_out" | "ready_to_check_out" | "already_checked_out" | "not_checked_in";
+  status?:
+    | "ready_to_finalize"
+    | "finalized"
+    | "already_finalized"
+    | "ready_to_check_out"
+    | "checked_out"
+    | "already_checked_out";
   checkedOutAt?: string | null;
   justCheckedOut?: boolean;
-  // True only when this exact request burned the ticket. False for grace-window
-  // re-confirms so we can show "Checked in just now" instead of a fresh "Entry granted".
-  justCheckedIn?: boolean;
-  // True when a re-scan hit an already-checked-in booking inside the ~30s
-  // grace window (camera double-fire, fast retap).
-  recentlyCheckedIn?: boolean;
+  // True only when this exact Save Actual Entry request burned the ticket.
+  // False for grace-window duplicates (manager double-taps Save).
+  justFinalized?: boolean;
+  recentlyFinalized?: boolean;
+  finalized?: boolean;
   message?: string;
   checkedInAt?: string;
   booking?: BookingData;
@@ -113,14 +122,12 @@ export default function ScannerScreen() {
   // Bump this to force the occupancy + bookings panels to refetch immediately
   // after a successful auto check-in, instead of waiting for the next poll.
   const [panelsTick, setPanelsTick] = useState(0);
-  // Auto-open the actuals sheet on a successful check-in or already-checked-in
-  // result so the manager can immediately log per-tier counts without an
-  // extra tap. There is no longer a lookup-only state — scanning auto-confirms.
+  // Auto-open the actuals sheet on a READY lookup so the manager can
+  // immediately edit counts and tap Save Actual Entry — the only path
+  // that finalizes the booking and updates analytics/commission.
+  // ALREADY_FINALIZED is shown as a read-only summary (sheet stays closed).
   useEffect(() => {
-    if (
-      result?.booking &&
-      (result.code === "OK" || result.code === "ALREADY_CHECKED_IN")
-    ) {
+    if (result?.booking && result.code === "READY") {
       setSheetOpen(true);
     } else {
       setSheetOpen(false);
@@ -140,23 +147,18 @@ export default function ScannerScreen() {
     setLoading(true);
     setResult(null);
     try {
-      // Auto check-in: a single POST with `confirm: true` performs the
-      // check-in immediately. The server's duplicate-scan guard still returns
-      // ALREADY_CHECKED_IN (or, within the grace window, status=already_checked_in
-      // with recentlyCheckedIn=true) for repeat scans of the same QR.
+      // Lookup only — the scan no longer auto-finalizes. Server returns
+      // READY (open the actuals sheet) or ALREADY_FINALIZED (locked,
+      // show read-only summary). ZERO writes happen here; the manager
+      // taps Save Actual Entry inside the sheet to finalize.
       const res = await customFetch<ScanResult>("/api/partner/scan-ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: trimmed, confirm: true }),
+        body: JSON.stringify({ code: trimmed }),
       });
       setResult(res);
-      // Refresh live occupancy + bookings so the new "currently inside" count
-      // appears without waiting for the 15s/20s poll.
-      if (res.code === "OK") setPanelsTick((t) => t + 1);
     } catch (e: unknown) {
       const err = e as { message?: string; code?: string; checkedInAt?: string; booking?: BookingData };
-      // Outside the grace window the server returns 409 ALREADY_CHECKED_IN
-      // with the booking payload — surface that to the manager unchanged.
       setResult({
         code: err.code ?? "ERROR",
         message: err.message ?? "Network error. Try again.",
@@ -202,24 +204,30 @@ export default function ScannerScreen() {
   };
 
   useEffect(() => {
-    if (result && result.code !== "OK" && result.code !== "ALREADY_CHECKED_IN") {
+    if (
+      result &&
+      result.code !== "READY" &&
+      result.code !== "OK" &&
+      result.code !== "ALREADY_FINALIZED"
+    ) {
       const t = setTimeout(() => manualInputRef.current?.focus(), 100);
       return () => clearTimeout(t);
     }
   }, [result]);
 
-  // Color the result banner by the high-resolution status:
-  //   checked_in / grace-window OK → green
-  //   already_checked_in (out-of-grace re-confirm) → orange
-  //   ready_to_check_out / checked_out → purple/green
-  //   anything else (not found, invalid status, network) → red
+  // Color the result banner by the new lookup/finalize status:
+  //   READY (lookup OK, not yet finalized)        → primary
+  //   OK / finalized / grace-window dup           → green
+  //   ALREADY_FINALIZED (locked re-scan)          → orange
+  //   ready_to_check_out / checked_out            → purple/green
+  //   anything else (not found, network, etc.)    → red
   const resultColor = result == null ? "#ef4444"
     : result.status === "ready_to_check_out" ? "#a855f7"
     : result.status === "checked_out" || result.justCheckedOut ? "#22c55e"
     : result.status === "already_checked_out" ? "#f97316"
     : result.code === "OK" ? "#22c55e"
-    : result.code === "ALREADY_CHECKED_IN" && result.recentlyCheckedIn ? "#22c55e"
-    : result.code === "ALREADY_CHECKED_IN" ? "#f97316"
+    : result.code === "READY" ? colors.primary
+    : result.code === "ALREADY_FINALIZED" ? "#f97316"
     : "#ef4444";
 
   const hasCameraPermission = permission?.granted;
@@ -345,7 +353,8 @@ export default function ScannerScreen() {
                 <Ionicons
                   name={
                     result.code === "OK" ? "checkmark-circle"
-                      : result.code === "ALREADY_CHECKED_IN" ? "time-outline"
+                      : result.code === "READY" ? "scan-outline"
+                      : result.code === "ALREADY_FINALIZED" ? "lock-closed"
                       : "close-circle"
                   }
                   size={28}
@@ -354,14 +363,14 @@ export default function ScannerScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.resultTitle, { color: resultColor }]}>
-                  {result.recentlyCheckedIn ? "Checked in just now"
-                    : result.code === "OK" ? "Entry granted"
-                    : result.code === "ALREADY_CHECKED_IN" ? "Already used"
+                  {result.code === "OK" ? "Entry finalized"
+                    : result.code === "READY" ? "Ticket valid · confirm headcount"
+                    : result.code === "ALREADY_FINALIZED" ? "Already finalized"
                     : "Invalid ticket"}
                 </Text>
                 {result.checkedInAt && (
                   <Text style={[styles.resultSub, { color: colors.mutedForeground }]}>
-                    {result.code === "OK" && !result.recentlyCheckedIn ? "Checked in" : "Was checked in"} at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                    {result.code === "OK" ? "Saved" : "Was saved"} at {new Date(result.checkedInAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
                 )}
                 {result.message && result.code !== "OK" && (
@@ -370,9 +379,9 @@ export default function ScannerScreen() {
               </View>
             </View>
 
-            {/* Check-out button — appears when scan returns ALREADY_CHECKED_IN
-                outside the grace window. Re-POSTs to /partner/checkout-ticket. */}
-            {result.code === "ALREADY_CHECKED_IN" && !result.recentlyCheckedIn && result.booking && result.status !== "checked_out" && (
+            {/* Check-out button — appears for a finalized booking that still
+                shows the guest as inside. Re-POSTs to /partner/checkout-ticket. */}
+            {result.code === "ALREADY_FINALIZED" && result.booking && result.status !== "checked_out" && result.status !== "already_checked_out" && (
               <TouchableOpacity
                 onPress={checkout}
                 disabled={checkingOut}
@@ -512,12 +521,25 @@ export default function ScannerScreen() {
 
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
-      {result?.booking && (result.code === "OK" || result.code === "ALREADY_CHECKED_IN") && (
+      {result?.booking && result.code === "READY" && (
         <ActualEntrySheet
           booking={result.booking}
           visible={sheetOpen}
           onClose={() => setSheetOpen(false)}
-          onSaved={(updated) => setResult({ ...result, booking: updated })}
+          onSaved={(updated, checkedInAt) => {
+            // Save Actual Entry succeeded — flip the banner to the green
+            // finalized state, refresh the live occupancy + bookings
+            // panels, and let the manager move to the next ticket.
+            setResult({
+              code: "OK",
+              status: "finalized",
+              finalized: true,
+              justFinalized: true,
+              checkedInAt,
+              booking: updated,
+            });
+            setPanelsTick((t) => t + 1);
+          }}
         />
       )}
     </KeyboardAvoidingView>
@@ -564,7 +586,7 @@ function ActualEntrySheet({
   booking: BookingData;
   visible: boolean;
   onClose: () => void;
-  onSaved: (b: BookingData) => void;
+  onSaved: (b: BookingData, checkedInAt: string) => void;
 }) {
   const colors = useColors();
   const isTicket = b.pubMode === "ticket";
@@ -609,19 +631,19 @@ function ActualEntrySheet({
   const submit = async () => {
     setSaving(true);
     try {
-      // Use the per-pub ticketCode from the lookup response. Falling back to
-      // the legacy `RV-{id}` form would fail the server's checksum check
-      // because every vendor now has a real ticketPrefix/ticketSalt (boot
-      // backfill in api-server/src/index.ts).
+      // Save Actual Entry — the sole transaction that finalizes the booking
+      // server-side: check-in, commission ledger, vendor commissionOwed,
+      // loyalty points, coupon lock, audit log. The lookup-only scan above
+      // performed ZERO writes.
       const code = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
       const actualEntry = isTicket ? { women: w, men: m, couple: c } : { guests: g };
-      const res = await customFetch<{ booking?: BookingData }>("/api/partner/scan-ticket", {
+      const res = await customFetch<{ booking?: BookingData; checkedInAt?: string }>("/api/partner/scan-ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, actualEntry }),
       });
       if (res.booking) {
-        onSaved(res.booking);
+        onSaved(res.booking, res.checkedInAt ?? new Date().toISOString());
         onClose();
       }
     } catch {

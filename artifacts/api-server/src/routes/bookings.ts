@@ -14,6 +14,7 @@ import {
   vendorManagersTable,
   vendorCommissionsTable,
   commissionLedgerTable,
+  bookingAuditLogTable,
 } from "@workspace/db";
 import {
   computeCommissionFromPlanned,
@@ -1689,12 +1690,14 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     }
     actualEntry = parsed.data;
   }
-  // Two-step scan flow: a request with neither `confirm: true` nor `actualEntry`
-  // performs a read-only lookup and returns booking details without writing
-  // checkedIn. The manager must then re-POST with confirm/actualEntry to
-  // actually mark the ticket used. This stops a stray camera read from
-  // immediately consuming the ticket before the manager has admitted the guest.
-  const confirmRequested = body["confirm"] === true;
+  // Single finalize-trigger flow: only requests carrying `actualEntry` mutate
+  // state. Plain scans (with or without legacy `confirm: true`) are read-only
+  // lookups — they open the booking on the scanner UI for the manager to
+  // confirm headcounts and tap "Save Actual Entry". That Save is the ONE
+  // transaction that flips `checkedIn`, writes `commission_ledger`, credits
+  // `commissionOwed`, awards loyalty, locks coupons, and writes the audit
+  // log. `confirm: true` is accepted for backwards compatibility with old
+  // app builds but is treated as a lookup.
   const GRACE_WINDOW_MS = 30_000;
 
   // Determine booking ID and whether this is a new-format code (needs checksum verification)
@@ -1845,12 +1848,13 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   // Lazy backfill: if vendor has no prefix/salt yet, generate them now so all
   // future codes are secure. Skip on lookup-only requests so the read-only
-  // lookup phase performs ZERO writes (Task #539). On a fresh confirm/actualEntry
-  // the backfill will run as before. (Vendors needing the backfill are also
-  // those whose existing tickets are legacy RV-* codes, which don't require
-  // checksum verification — so skipping here doesn't break legacy lookups.)
+  // lookup phase performs ZERO writes (Task #539). The backfill only runs
+  // when the request is the actualEntry finalize transaction. (Vendors
+  // needing the backfill are also those whose existing tickets are legacy
+  // RV-* codes, which don't require checksum verification — so skipping
+  // here doesn't break legacy lookups.)
   let resolvedVendor = scanVendor;
-  const willMutate = actualEntry !== null || confirmRequested;
+  const willMutate = actualEntry !== null;
   if (willMutate && scanVendor && (!scanVendor.ticketPrefix || !scanVendor.ticketSalt)) {
     const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
     const newPrefix = await generateUniqueTicketPrefix(
@@ -1889,42 +1893,35 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // ── Lookup-only path: no actualEntry and confirm not requested → read-only ──
-  // Returns the booking details and a status field WITHOUT marking checkedIn.
-  // The manager must re-POST with `confirm: true` (or actualEntry) to actually
-  // burn the ticket. Loyalty/coupon side effects MUST NOT fire here — they
-  // only run on the real first check-in below.
-  if (!actualEntry && !confirmRequested) {
+  // ── Lookup path: any request without actualEntry is read-only ──
+  // Returns the booking details and a status flag so the scanner UI can
+  // open the editable headcount form. Performs ZERO writes — no checkedIn
+  // flip, no ledger row, no loyalty, no coupon lock. All of those happen
+  // only inside the actualEntry finalize transaction below.
+  if (!actualEntry) {
     const [out] = await serializeBookings([b]);
     const lookupActualAmountDue = calcActualAmountDue(b);
     const checkedInAtIso = b.checkedInAt ? b.checkedInAt.toISOString() : null;
-    // Grace window: if this booking was checked in within the last 30s, treat
-    // a lookup-only re-scan as a benign duplicate ("Checked in just now")
-    // rather than the orange "Already used" state. This is what the manager
-    // sees when they scan the same QR twice in quick succession at the door.
-    const recentlyCheckedIn =
-      b.checkedIn && b.checkedInAt
-        ? Date.now() - b.checkedInAt.getTime() <= GRACE_WINDOW_MS
-        : false;
-    // Surface the checked-out state distinctly from the orange "already
-    // checked in" path so clients can present the correct UX (e.g. "Guest
-    // already left at 22:14"). The lookup remains read-only.
     const checkedOutAtIso = b.checkedOutAt ? b.checkedOutAt.toISOString() : null;
+    // `checkedIn=true` now means "Save Actual Entry has been submitted" —
+    // i.e. the ticket is fully finalized and locked. ALREADY_FINALIZED
+    // tells the UI to render the read-only summary card.
+    const finalized = b.checkedIn;
     const codeOut = b.checkedOut
       ? "ALREADY_CHECKED_OUT"
-      : b.checkedIn
-        ? "ALREADY_CHECKED_IN"
-        : "OK";
+      : finalized
+        ? "ALREADY_FINALIZED"
+        : "READY";
     const statusOut = b.checkedOut
       ? "already_checked_out"
-      : b.checkedIn
-        ? "already_checked_in"
-        : "ready_to_check_in";
+      : finalized
+        ? "already_finalized"
+        : "ready_to_finalize";
     res.json({
       code: codeOut,
       status: statusOut,
       lookupOnly: true,
-      recentlyCheckedIn,
+      finalized,
       checkedInAt: checkedInAtIso,
       checkedOutAt: checkedOutAtIso,
       booking: out
@@ -1934,404 +1931,347 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     return;
   }
 
-  // ── Two-step path: actualEntry provided → record per-type actuals (and check-in if needed) ──
-  if (actualEntry) {
-    // Reject empty payloads ({} or all-undefined) so we never mark a booking checked-in
-    // without recording at least one per-type count.
-    if (
-      actualEntry.women === undefined &&
-      actualEntry.men === undefined &&
-      actualEntry.couple === undefined &&
-      actualEntry.guests === undefined
-    ) {
-      res.status(400).json({
-        code: "INVALID_ACTUAL_ENTRY",
-        message: "actualEntry must include at least one of women/men/couple/guests.",
+  // ── Finalize path: actualEntry provided → single transaction ──
+  // This is the SOLE path that mutates state. It:
+  //   1. Validates the ticket isn't already finalized (lock semantics).
+  //   2. Validates per-tier counts against booked counts.
+  //   3. Writes actuals + checkedIn + checkedInAt atomically.
+  //   4. Inserts the commission_ledger row (cod_checkin / free_checkin /
+  //      online_payment) and credits vendor commissionOwed (COD/free only).
+  //   5. Awards 100 loyalty points and locks the coupon (if used).
+  //   6. Writes a booking_audit_log row with before/after snapshots.
+  // Duplicate Save inside a 30s grace window is treated as a benign no-op
+  // (manager double-tap / camera double-fire); outside that window an
+  // ALREADY_FINALIZED 409 protects against retro-edits to closed books.
+  //
+  // Reject empty payloads ({} or all-undefined).
+  if (
+    actualEntry.women === undefined &&
+    actualEntry.men === undefined &&
+    actualEntry.couple === undefined &&
+    actualEntry.guests === undefined
+  ) {
+    res.status(400).json({
+      code: "INVALID_ACTUAL_ENTRY",
+      message: "actualEntry must include at least one of women/men/couple/guests.",
+    });
+    return;
+  }
+
+  // ── Lock check: refuse retro-edits once Save has been submitted ──
+  if (b.checkedIn) {
+    const checkedInAt = b.checkedInAt ? b.checkedInAt.toISOString() : null;
+    const ageMs = b.checkedInAt ? Date.now() - b.checkedInAt.getTime() : Infinity;
+    // Grace window: a duplicate Save within 30s is treated as a no-op
+    // success (manager taps Save twice, camera double-fires, etc.) — we
+    // re-serialize the existing state and return 200 instead of 409.
+    if (ageMs >= 0 && ageMs <= GRACE_WINDOW_MS) {
+      const [out] = await serializeBookings([b]);
+      const recheckComm = calcScanCommission(b);
+      const recheckDue = calcActualAmountDue(b);
+      res.json({
+        code: "OK",
+        status: "already_finalized",
+        finalized: true,
+        recentlyFinalized: true,
+        checkedInAt,
+        booking: out
+          ? { ...out, ...recheckComm, ...scanPriceInfo, actualAmountDue: recheckDue, actualEntry: buildActualEntry(b) }
+          : null,
       });
       return;
     }
-    const isTicket = b.pubMode === "ticket";
-    // Preserve existing recorded values for fields the client omits, so a partial
-    // payload only updates what it explicitly provides rather than zeroing the rest.
-    let aw: number | null = b.actualWomen;
-    let am: number | null = b.actualMen;
-    let ac: number | null = b.actualCouple;
-    let ag: number | null = b.actualGuests;
-    const overLimit = (label: string, value: number, max: number) => {
-      res.status(400).json({
-        code: "INVALID_ACTUAL_ENTRY",
-        message: `Actual ${label} (${value}) exceeds booked count (${max}).`,
+    const [out] = await serializeBookings([b]);
+    const finComm = calcScanCommission(b);
+    const finDue = calcActualAmountDue(b);
+    res.status(409).json({
+      code: "ALREADY_FINALIZED",
+      status: "already_finalized",
+      message: "This ticket has already been finalized and cannot be edited at the door. Contact admin to correct.",
+      checkedInAt,
+      booking: out
+        ? { ...out, ...finComm, ...scanPriceInfo, actualAmountDue: finDue, actualEntry: buildActualEntry(b) }
+        : null,
+    });
+    return;
+  }
+
+  // ── Validate per-tier counts ──
+  const isTicket = b.pubMode === "ticket";
+  let aw: number | null = b.actualWomen;
+  let am: number | null = b.actualMen;
+  let ac: number | null = b.actualCouple;
+  let ag: number | null = b.actualGuests;
+  const overLimit = (label: string, value: number, max: number) => {
+    res.status(400).json({
+      code: "INVALID_ACTUAL_ENTRY",
+      message: `Actual ${label} (${value}) exceeds booked count (${max}).`,
+    });
+  };
+  if (isTicket) {
+    if (actualEntry.women !== undefined) {
+      if (actualEntry.women < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
+      if (actualEntry.women > b.ticketWomen) { overLimit("women", actualEntry.women, b.ticketWomen); return; }
+      aw = actualEntry.women;
+    }
+    if (actualEntry.men !== undefined) {
+      if (actualEntry.men < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
+      if (actualEntry.men > b.ticketMen) { overLimit("men", actualEntry.men, b.ticketMen); return; }
+      am = actualEntry.men;
+    }
+    if (actualEntry.couple !== undefined) {
+      if (actualEntry.couple < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
+      if (actualEntry.couple > b.ticketCouple) { overLimit("couples", actualEntry.couple, b.ticketCouple); return; }
+      ac = actualEntry.couple;
+    }
+    if (actualEntry.guests !== undefined) {
+      res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "guests is not valid for ticket-mode bookings; use women/men/couple." });
+      return;
+    }
+  } else {
+    if (actualEntry.women !== undefined || actualEntry.men !== undefined || actualEntry.couple !== undefined) {
+      res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "women/men/couple are only valid for ticket-mode bookings." });
+      return;
+    }
+    if (actualEntry.guests !== undefined) {
+      if (actualEntry.guests < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual guests cannot be negative." }); return; }
+      const cap = Math.max(b.guests, 0);
+      if (actualEntry.guests > cap) { overLimit("guests", actualEntry.guests, cap); return; }
+      ag = actualEntry.guests;
+    }
+  }
+
+  // Snapshot original state for the audit log before we mutate anything.
+  const beforeSnapshot = {
+    booked: {
+      pubMode: b.pubMode,
+      ticketWomen: b.ticketWomen,
+      ticketMen: b.ticketMen,
+      ticketCouple: b.ticketCouple,
+      guests: b.guests,
+      finalPrice: Number(b.finalPrice),
+      totalPrice: Number(b.totalPrice),
+    },
+    actuals: {
+      women: b.actualWomen,
+      men: b.actualMen,
+      couple: b.actualCouple,
+      guests: b.actualGuests,
+    },
+    checkedIn: b.checkedIn,
+    checkedInAt: b.checkedInAt ? b.checkedInAt.toISOString() : null,
+    paymentMethod: b.paymentMethod,
+  };
+
+  // ── Atomic finalize: race-protected on checkedIn=false ──
+  const finalizedAt = new Date();
+  const [updatedActuals] = await db
+    .update(bookingsTable)
+    .set({
+      actualWomen: aw,
+      actualMen: am,
+      actualCouple: ac,
+      actualGuests: ag,
+      checkedIn: true,
+      checkedInAt: finalizedAt,
+    })
+    .where(and(eq(bookingsTable.id, b.id), eq(bookingsTable.checkedIn, false)))
+    .returning();
+  if (!updatedActuals) {
+    // Another concurrent Save beat us. Re-read current state and apply the
+    // same grace-window / lock rules as the pre-check above.
+    const [current] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, b.id)).limit(1);
+    if (!current) {
+      res.status(500).json({ code: "SERVER_ERROR", message: "Failed to save actual entry. Please try again." });
+      return;
+    }
+    const checkedInAtIso = current.checkedInAt ? current.checkedInAt.toISOString() : null;
+    const ageMs = current.checkedInAt ? Date.now() - current.checkedInAt.getTime() : Infinity;
+    const [out] = await serializeBookings([current]);
+    const raceComm = calcScanCommission(current);
+    const raceDue = calcActualAmountDue(current);
+    const payload = out
+      ? { ...out, ...raceComm, ...scanPriceInfo, actualAmountDue: raceDue, actualEntry: buildActualEntry(current) }
+      : null;
+    if (ageMs >= 0 && ageMs <= GRACE_WINDOW_MS) {
+      res.json({
+        code: "OK",
+        status: "already_finalized",
+        finalized: true,
+        recentlyFinalized: true,
+        checkedInAt: checkedInAtIso,
+        booking: payload,
       });
-    };
-    if (isTicket) {
-      if (actualEntry.women !== undefined) {
-        if (actualEntry.women < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
-        if (actualEntry.women > b.ticketWomen) { overLimit("women", actualEntry.women, b.ticketWomen); return; }
-        aw = actualEntry.women;
-      }
-      if (actualEntry.men !== undefined) {
-        if (actualEntry.men < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
-        if (actualEntry.men > b.ticketMen) { overLimit("men", actualEntry.men, b.ticketMen); return; }
-        am = actualEntry.men;
-      }
-      if (actualEntry.couple !== undefined) {
-        if (actualEntry.couple < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual counts cannot be negative." }); return; }
-        if (actualEntry.couple > b.ticketCouple) { overLimit("couples", actualEntry.couple, b.ticketCouple); return; }
-        ac = actualEntry.couple;
-      }
-      if (actualEntry.guests !== undefined) {
-        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "guests is not valid for ticket-mode bookings; use women/men/couple." });
-        return;
-      }
     } else {
-      if (actualEntry.women !== undefined || actualEntry.men !== undefined || actualEntry.couple !== undefined) {
-        res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "women/men/couple are only valid for ticket-mode bookings." });
-        return;
-      }
-      if (actualEntry.guests !== undefined) {
-        if (actualEntry.guests < 0) { res.status(400).json({ code: "INVALID_ACTUAL_ENTRY", message: "Actual guests cannot be negative." }); return; }
-        const cap = Math.max(b.guests, 0);
-        if (actualEntry.guests > cap) { overLimit("guests", actualEntry.guests, cap); return; }
-        ag = actualEntry.guests;
-      }
+      res.status(409).json({
+        code: "ALREADY_FINALIZED",
+        status: "already_finalized",
+        message: "This ticket has already been finalized and cannot be edited at the door. Contact admin to correct.",
+        checkedInAt: checkedInAtIso,
+        booking: payload,
+      });
     }
-    const wasCheckedIn = b.checkedIn;
-    const checkedInAtNow = b.checkedInAt ?? new Date();
-    const [updatedActuals] = await db
-      .update(bookingsTable)
-      .set({
-        actualWomen: aw,
-        actualMen: am,
-        actualCouple: ac,
-        actualGuests: ag,
-        checkedIn: true,
-        checkedInAt: checkedInAtNow,
-      })
-      .where(eq(bookingsTable.id, b.id))
-      .returning();
-    if (!updatedActuals) {
-      res.status(500).json({ code: "SERVER_ERROR", message: "Failed to record actual entry. Please try again." });
-      return;
-    }
-    // Record COD / free-entry commission against this booking's actuals.
-    // Idempotent: re-scanning to correct actuals updates the existing ledger
-    // row in place (and adjusts commissionOwed by the delta) instead of
-    // double-charging. Online bookings already had commission deducted at
-    // payment success — we never record a second entry for them here.
-    // pubMode is the source of truth for free-entry vs ticket vs table — there
-    // is no separate "free-entry rules" mechanism. classifyBookingType uses
-    // pubMode + finalPrice exactly as the rest of the system does.
-    const isCod = updatedActuals.paymentMethod === "cod";
-    const isFreeEntry =
-      classifyBookingType({ pubMode: updatedActuals.pubMode, finalPrice: updatedActuals.finalPrice }) === "free_entry";
-    if (isCod || isFreeEntry) {
-      const trigger: "cod_checkin" | "free_checkin" = isFreeEntry ? "free_checkin" : "cod_checkin";
-      const comm = computeCommissionFromActuals(
+    return;
+  }
+
+  // ── Commission ledger + commissionOwed credit ──
+  // COD / free-entry: amount is computed from the manager's edited per-tier
+  // counts so the manager-collected cash matches the realised commission.
+  // Online: amount is computed from the original planned counts — the
+  // customer already paid the full finalPrice upstream, and we don't
+  // retroactively shrink platform revenue when fewer guests show up.
+  // The booking_trigger uniqueIndex still protects against double-inserts.
+  const isCod = updatedActuals.paymentMethod === "cod";
+  const isFreeEntry =
+    classifyBookingType({ pubMode: updatedActuals.pubMode, finalPrice: updatedActuals.finalPrice }) === "free_entry";
+  const ledgerTrigger: "cod_checkin" | "free_checkin" | "online_payment" = isFreeEntry
+    ? "free_checkin"
+    : isCod
+      ? "cod_checkin"
+      : "online_payment";
+  const ledgerAmount = isCod || isFreeEntry
+    ? computeCommissionFromActuals(
         updatedActuals,
         scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
         { priceWomen: scanPriceInfo.priceWomen, priceMen: scanPriceInfo.priceMen, priceCouple: scanPriceInfo.priceCouple },
         scanFer ?? null,
-      );
-      // No try/catch wrapping: if commission persistence fails, the whole
-      // request fails with 500 so the operator sees the error and can retry,
-      // rather than silently losing commission accounting. The check-in
-      // actuals write above (line ~1886) will remain applied; the caller can
-      // safely re-scan to retry the commission write (idempotent on
-      // (booking_id, trigger)).
-      await db.transaction(async (tx) => {
-        const [existing] = await tx
-          .select({ id: commissionLedgerTable.id, amount: commissionLedgerTable.amount })
-          .from(commissionLedgerTable)
-          .where(and(eq(commissionLedgerTable.bookingId, updatedActuals.id), eq(commissionLedgerTable.trigger, trigger)))
-          .limit(1);
-        const oldAmount = existing ? Number(existing.amount) : 0;
-        const delta = comm.amount - oldAmount;
-        if (existing) {
-          await tx
-            .update(commissionLedgerTable)
-            .set({ amount: String(comm.amount), bookingType: comm.bookingType })
-            .where(eq(commissionLedgerTable.id, existing.id));
-        } else {
-          // Always insert the ledger marker on check-in — even when the
-          // commission amount is 0 — so the admin commission report can tell
-          // "checked in (commission realised, even if zero)" apart from
-          // "still pending check-in". Without this, a free-entry booking
-          // with a zero rate would stay forever "pending" in the report.
-          // Admin commission is added ONLY here on first scan (booking-time
-          // writes were removed by product decision).
-          await tx.insert(commissionLedgerTable).values({
-            vendorId: updatedActuals.vendorId,
-            bookingId: updatedActuals.id,
-            amount: String(comm.amount),
-            bookingType: comm.bookingType,
-            trigger,
-          });
-        }
-        if (delta !== 0) {
-          await tx
-            .update(vendorsTable)
-            .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
-            .where(eq(vendorsTable.id, updatedActuals.vendorId));
-        }
-      });
-    } else {
-      // Online payment: commission is realised here on first scan/check-in
-      // (booking-time no longer writes the ledger). Uses onConflictDoNothing
-      // on (bookingId, trigger) so a repeat scan / camera double-fire is a
-      // structural no-op — admin commission can never double-count.
-      // Always insert even for zero commission so the booking shows as
-      // "realised" in the admin report (not "pending").
-      const onlineComm = computeCommissionFromPlanned(
+      )
+    : computeCommissionFromPlanned(
         updatedActuals,
         scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
         scanFer ?? null,
       );
-      await db
-        .insert(commissionLedgerTable)
-        .values({
-          vendorId: updatedActuals.vendorId,
-          bookingId: updatedActuals.id,
-          amount: String(onlineComm.amount),
-          bookingType: onlineComm.bookingType,
-          trigger: "online_payment",
-        })
-        .onConflictDoNothing();
-    }
-    const [out] = await serializeBookings([updatedActuals]);
-    const okComm = calcScanCommission(updatedActuals);
-    const actualAmountDue = calcActualAmountDue(updatedActuals);
-    res.json({
-      code: "OK",
-      status: "checked_in",
-      checkedInAt: checkedInAtNow.toISOString(),
-      justCheckedIn: !wasCheckedIn,
-      booking: out ? { ...out, ...okComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(updatedActuals), justCheckedIn: !wasCheckedIn } : null,
-    });
-    return;
-  }
 
-  // Already checked in?
-  if (b.checkedIn) {
-    const checkedInAt = b.checkedInAt ? b.checkedInAt.toISOString() : null;
-    const [out] = await serializeBookings([b]);
-    const actualAmountDue = calcActualAmountDue(b);
-    const bookingPayload = out
-      ? { ...out, ...scanCommInfo, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(b) }
-      : null;
-    // Grace window: if the existing check-in happened in the last ~30s, treat
-    // a fresh confirm as a duplicate scan (camera double-fire / quick retry)
-    // and return success with justCheckedIn=false instead of a red 409.
-    const ageMs = b.checkedInAt ? Date.now() - b.checkedInAt.getTime() : Infinity;
-    if (ageMs >= 0 && ageMs <= GRACE_WINDOW_MS) {
-      res.json({
-        code: "OK",
-        status: "already_checked_in",
-        checkedInAt,
-        justCheckedIn: false,
-        recentlyCheckedIn: true,
-        booking: bookingPayload,
-      });
-      return;
-    }
-    res.status(409).json({
-      code: "ALREADY_CHECKED_IN",
-      status: "already_checked_in",
-      message: "This ticket has already been used for entry.",
-      checkedInAt,
-      booking: bookingPayload,
-    });
-    return;
-  }
-
-  // Atomic check-in: only update if checkedIn is still false (prevents double-scan race).
-  //
-  // Default actuals to the BOOKED counts when they are still NULL so the
-  // Partner Analytics → "COD Collected (Actual)" KPI updates the instant the
-  // scan succeeds, without waiting for the manager to tap "Save Actual
-  // Entry". `computeEffectiveRevenues()` derives the displayed cash from
-  // actualWomen/Men/Couple (or actualGuests) × per-tier price, so defaulting
-  // those to ticketWomen/Men/Couple / guests makes the card jump immediately.
-  // If the manager later corrects via the Save-Actual-Entry form, the
-  // existing actualEntry path (above) updates the ledger and commissionOwed
-  // via delta math, so no double-counting can occur.
-  // We only default when each field is NULL — any value previously written
-  // (e.g. via a prior partial save) is preserved.
-  const now = new Date();
-  const isTicketMode = b.pubMode === "ticket";
-  const checkInUpdate: {
-    checkedIn: true;
-    checkedInAt: Date;
-    actualWomen?: number;
-    actualMen?: number;
-    actualCouple?: number;
-    actualGuests?: number;
-  } = { checkedIn: true, checkedInAt: now };
-  if (isTicketMode) {
-    if (b.actualWomen === null) checkInUpdate.actualWomen = b.ticketWomen;
-    if (b.actualMen === null) checkInUpdate.actualMen = b.ticketMen;
-    if (b.actualCouple === null) checkInUpdate.actualCouple = b.ticketCouple;
-  } else if (b.actualGuests === null) {
-    checkInUpdate.actualGuests = Math.max(0, b.guests);
-  }
-  const [updated] = await db
-    .update(bookingsTable)
-    .set(checkInUpdate)
-    .where(and(eq(bookingsTable.id, b.id), eq(bookingsTable.checkedIn, false)))
-    .returning();
-
-  // Zero rows updated = another request beat us to it; re-fetch the current state
-  if (!updated) {
-    const [current] = await db
-      .select()
-      .from(bookingsTable)
-      .where(eq(bookingsTable.id, b.id));
-    if (current) {
-      const checkedInAt = current.checkedInAt ? current.checkedInAt.toISOString() : null;
-      const [out] = await serializeBookings([current]);
-      const currComm = calcScanCommission(current);
-      const actualAmountDue = calcActualAmountDue(current);
-      const bookingPayload = out
-        ? { ...out, ...currComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(current) }
-        : null;
-      // Same grace window as the pre-check 409: another writer just won the
-      // atomic update; if it was within ~30s, treat as a duplicate confirm.
-      const ageMs = current.checkedInAt ? Date.now() - current.checkedInAt.getTime() : Infinity;
-      if (ageMs >= 0 && ageMs <= GRACE_WINDOW_MS) {
-        res.json({
-          code: "OK",
-          status: "already_checked_in",
-          checkedInAt,
-          justCheckedIn: false,
-          recentlyCheckedIn: true,
-          booking: bookingPayload,
-        });
-      } else {
-        res.status(409).json({
-          code: "ALREADY_CHECKED_IN",
-          status: "already_checked_in",
-          message: "This ticket has already been used for entry.",
-          checkedInAt,
-          booking: bookingPayload,
-        });
-      }
-    } else {
-      res.status(500).json({ code: "SERVER_ERROR", message: "Failed to check in. Please try again." });
-    }
-    return;
-  }
-
-  const [out] = await serializeBookings([updated]);
-
-  // Credit admin commission immediately on first check-in, based on booked counts.
-  // COD / free-entry: idempotent upsert that delta-updates commissionOwed.
-  // Online payment: commission was already recorded at payment success; this
-  // block adds a safe onConflictDoNothing fallback to recover missed webhook
-  // writes without any risk of double-charging.
-  const confirmIsCod = updated.paymentMethod === "cod";
-  const confirmIsFreeEntry =
-    classifyBookingType({ pubMode: updated.pubMode, finalPrice: updated.finalPrice }) === "free_entry";
-  const confirmTrigger: "cod_checkin" | "free_checkin" | "online_payment" = confirmIsFreeEntry
-    ? "free_checkin"
-    : confirmIsCod
-      ? "cod_checkin"
-      : "online_payment";
-  const confirmComm = computeCommissionFromPlanned(
-    updated,
-    scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
-    scanFer ?? null,
-  );
   try {
     await db.transaction(async (tx) => {
-      if (confirmIsCod || confirmIsFreeEntry) {
-        // COD / free-entry: idempotent upsert with delta update to commissionOwed.
-        const [existingLedger] = await tx
-          .select({ id: commissionLedgerTable.id, amount: commissionLedgerTable.amount })
-          .from(commissionLedgerTable)
-          .where(and(eq(commissionLedgerTable.bookingId, updated.id), eq(commissionLedgerTable.trigger, confirmTrigger)))
-          .limit(1);
-        const oldAmt = existingLedger ? Number(existingLedger.amount) : 0;
-        const delta = confirmComm.amount - oldAmt;
-        if (existingLedger) {
-          await tx
-            .update(commissionLedgerTable)
-            .set({ amount: String(confirmComm.amount), bookingType: confirmComm.bookingType })
-            .where(eq(commissionLedgerTable.id, existingLedger.id));
-        } else {
-          await tx.insert(commissionLedgerTable).values({
-            vendorId: updated.vendorId,
-            bookingId: updated.id,
-            amount: String(confirmComm.amount),
-            bookingType: confirmComm.bookingType,
-            trigger: confirmTrigger,
-          });
-        }
-        if (delta !== 0) {
+      if (isCod || isFreeEntry) {
+        // Idempotent insert: the (booking_id, trigger) uniqueIndex makes a
+        // duplicate Save inside the grace window a structural no-op. We
+        // still bump commissionOwed only on the FIRST insert (i.e. when a
+        // row was actually written), so concurrent retries can never
+        // double-credit.
+        const inserted = await tx
+          .insert(commissionLedgerTable)
+          .values({
+            vendorId: updatedActuals.vendorId,
+            bookingId: updatedActuals.id,
+            amount: String(ledgerAmount.amount),
+            bookingType: ledgerAmount.bookingType,
+            trigger: ledgerTrigger,
+          })
+          .onConflictDoNothing()
+          .returning({ id: commissionLedgerTable.id });
+        if (inserted.length > 0 && ledgerAmount.amount !== 0) {
           await tx
             .update(vendorsTable)
-            .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(delta)})` })
-            .where(eq(vendorsTable.id, updated.vendorId));
+            .set({ commissionOwed: sql`GREATEST(0, ${vendorsTable.commissionOwed} + ${String(ledgerAmount.amount)})` })
+            .where(eq(vendorsTable.id, updatedActuals.vendorId));
         }
       } else {
-        // Online payment: no-op if the entry already exists from the webhook.
-        // Always insert even for zero commission so the booking shows as
-        // "realised" in the admin report (not "pending").
+        // Online: ledger may already exist from the payment-success webhook;
+        // onConflictDoNothing leaves it alone in that case.
         await tx
           .insert(commissionLedgerTable)
           .values({
-            vendorId: updated.vendorId,
-            bookingId: updated.id,
-            amount: String(confirmComm.amount),
-            bookingType: confirmComm.bookingType,
+            vendorId: updatedActuals.vendorId,
+            bookingId: updatedActuals.id,
+            amount: String(ledgerAmount.amount),
+            bookingType: ledgerAmount.bookingType,
             trigger: "online_payment",
           })
           .onConflictDoNothing();
       }
     });
   } catch (err) {
-    req.log.error({ err, bookingId: updated.id }, "Failed to credit commission on scan confirm");
+    req.log.error({ err, bookingId: updatedActuals.id }, "Failed to credit commission on Save Actual Entry");
   }
 
-  // Award 100 loyalty points to the booking owner for attending the event (atomic increment)
+  // Award 100 loyalty points to the booking owner for attending the event
+  // (atomic increment). Errors are logged but don't fail the finalize —
+  // loyalty is a non-financial side effect.
   try {
     const [scanEvt] = await db
       .select({ title: eventsTable.title })
       .from(eventsTable)
-      .where(eq(eventsTable.id, updated.eventId))
+      .where(eq(eventsTable.id, updatedActuals.eventId))
       .limit(1);
     await Promise.all([
       db.update(usersTable)
         .set({ points: sql`${usersTable.points} + 100` })
-        .where(eq(usersTable.id, updated.userId)),
+        .where(eq(usersTable.id, updatedActuals.userId)),
       createUserNotification({
-        userId: updated.userId,
+        userId: updatedActuals.userId,
         title: "You earned 100 points!",
         message: `You earned 100 points for attending "${scanEvt?.title ?? "this event"}"!`,
       }),
     ]);
   } catch (err) {
-    req.log.error({ err, bookingId: updated.id }, "Failed to award scan-in loyalty points");
+    req.log.error({ err, bookingId: updatedActuals.id }, "Failed to award scan-in loyalty points");
   }
 
-  // Ensure any coupon used on this booking is marked as used (idempotent — belt-and-suspenders for partner_lead codes)
-  if (updated.couponCode) {
+  // Lock any coupon used on this booking (idempotent).
+  if (updatedActuals.couponCode) {
     try {
       await db
         .update(couponsTable)
         .set({ used: true })
-        .where(and(eq(couponsTable.code, updated.couponCode), eq(couponsTable.used, false)));
+        .where(and(eq(couponsTable.code, updatedActuals.couponCode), eq(couponsTable.used, false)));
     } catch (err) {
-      req.log.error({ err, couponCode: updated.couponCode }, "Failed to mark coupon used at scan time");
+      req.log.error({ err, couponCode: updatedActuals.couponCode }, "Failed to mark coupon used at finalize time");
     }
   }
 
-  const okComm = calcScanCommission(updated);
-  const actualAmountDue = calcActualAmountDue(updated);
+  const finalAmountDue = calcActualAmountDue(updatedActuals);
+  const finalComm = calcScanCommission(updatedActuals);
+
+  // Audit log: append-only, captures what we overwrote and what we wrote.
+  // Best-effort — a logging failure does not roll back the finalize.
+  try {
+    await db.insert(bookingAuditLogTable).values({
+      bookingId: updatedActuals.id,
+      vendorId: updatedActuals.vendorId,
+      actorUserId: user.id,
+      action: "actual_entry_finalize",
+      beforeJson: beforeSnapshot,
+      afterJson: {
+        actuals: {
+          women: updatedActuals.actualWomen,
+          men: updatedActuals.actualMen,
+          couple: updatedActuals.actualCouple,
+          guests: updatedActuals.actualGuests,
+        },
+        checkedInAt: finalizedAt.toISOString(),
+        amountDue: finalAmountDue,
+        commission: {
+          rate: finalComm.commissionRate,
+          amount: finalComm.commissionAmount,
+          net: finalComm.netAmount,
+        },
+        ledger: {
+          trigger: ledgerTrigger,
+          amount: ledgerAmount.amount,
+          bookingType: ledgerAmount.bookingType,
+        },
+        scanner: {
+          userId: user.id,
+          email: user.email,
+        },
+      },
+    });
+  } catch (err) {
+    req.log.error({ err, bookingId: updatedActuals.id }, "Failed to write booking audit log");
+  }
+
+  const [out] = await serializeBookings([updatedActuals]);
   res.json({
     code: "OK",
-    status: "checked_in",
-    checkedInAt: now.toISOString(),
-    justCheckedIn: true,
-    booking: out ? { ...out, ...okComm, ...scanPriceInfo, actualAmountDue, actualEntry: buildActualEntry(updated) } : null,
+    status: "finalized",
+    finalized: true,
+    justFinalized: true,
+    checkedInAt: finalizedAt.toISOString(),
+    booking: out
+      ? { ...out, ...finalComm, ...scanPriceInfo, actualAmountDue: finalAmountDue, actualEntry: buildActualEntry(updatedActuals) }
+      : null,
   });
 });
 
