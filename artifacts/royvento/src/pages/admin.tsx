@@ -48,7 +48,7 @@ import {
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
   Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
-  Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, Bell, ShieldCheck, BookOpen,
+  Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -212,19 +212,6 @@ function AdminHeader({
             <span className="whitespace-nowrap">Royvento</span>
             <span className="text-white/30 font-normal hidden sm:inline"> Control Room</span>
           </h1>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            className="h-9 w-9 rounded-lg flex items-center justify-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 transition-colors relative"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-          </button>
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/25 flex items-center justify-center text-xs font-semibold text-white">
-            AD
-          </div>
         </div>
       </div>
     </header>
