@@ -15,7 +15,7 @@ import {
   wishlistsTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
-import { bookingDiscountRatio } from "../lib/effectiveRevenue";
+import { bookingDiscountRatio, ferTierFreeness } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -193,10 +193,18 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
       actualCodRecordedCount++;
       if (b.pubMode === "ticket") {
+        // Per-tier prices with FER-free tiers zeroed for THIS booking's
+        // weekday — mirrors lib/effectiveRevenue.ts so the admin KPI and
+        // partner KPI agree on a mixed booking like
+        //   1 female (FER-free) + 1 male (₹1000 paid) → COD = ₹1000.
         const ev = _codEventMap.get(b.eventId);
-        const pw = Number(ev?.priceWomen ?? 0);
-        const pm = Number(ev?.priceMen ?? 0);
-        const pc = Number(ev?.priceCouple ?? 0);
+        const flags = ferTierFreeness(
+          b.bookingDate,
+          (ev as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules ?? null,
+        );
+        const pw = flags.women ? 0 : Number(ev?.priceWomen ?? 0);
+        const pm = flags.men ? 0 : Number(ev?.priceMen ?? 0);
+        const pc = flags.couple ? 0 : Number(ev?.priceCouple ?? 0);
         bookingRevenue = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
       } else {
         const guests = Math.max(1, b.guests);

@@ -898,23 +898,29 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const totalCouple = perEventArr.reduce((s, r) => s + r.ticketCouple, 0);
 
   function rnd2(n: number) { return Math.round(n * 100) / 100; }
+  // Total Earnings = realised cash + online payments, per the spec:
+  // partners want to see actual money that landed (whether at the door for
+  // COD or in the online wallet). It is NOT the planned/booked finalPrice
+  // sum — that figure overstates earnings when COD bookings finalise to
+  // a lower headcount or when bookings haven't been finalised yet.
+  // COD slice uses the scanned/actuals calculation (per-tier FER-aware,
+  // discount-ratio applied), online slice is finalPrice (already
+  // settled upstream). Net Earnings is Total minus realised commission.
+  const realisedTotalEarnings = scannedCodRevenue + onlineRevenue;
   res.json({
-    // Total Earnings now mirrors the Gross Earnings KPI: sum of finalPrice
-    // for every confirmed/completed booking. The actuals-aware totalEarnings
-    // is no longer surfaced — the COD Collected (Actual) card below covers
-    // the cash-collected view.
-    totalEarnings: Math.round(grossEarnings),
+    totalEarnings: Math.round(realisedTotalEarnings),
     monthEarnings: Math.round(monthEarnings),
     codRevenue: Math.round(codRevenue),
     onlineRevenue: Math.round(onlineRevenue),
     // COD Collected (Actual) — actuals × per-type prices for COD bookings
-    // that have a realised commission_ledger entry (= QR-scanned). Bookings
-    // without a scan contribute ₹0.
+    // that have a realised commission_ledger entry (= QR-scanned). Mixed
+    // bookings (some tiers FER-free, some paid) now correctly count only
+    // the paid tiers. Pure free-entry bookings contribute ₹0.
     actualCodRevenue: Math.round(scannedCodRevenue),
     actualCodRecordedCount: scannedCodRecordedCount,
     pendingActualsCount: scannedPendingCount,
     grossEarnings: Math.round(grossEarnings),
-    netEarnings: Math.round(grossEarnings - totalCommission),
+    netEarnings: Math.round(realisedTotalEarnings - collectedCommission),
     totalCommission: rnd2(totalCommission),
     collectedCommission: rnd2(collectedCommission),
     pendingCommission: rnd2(pendingCommission),

@@ -15,10 +15,44 @@ export interface EffectiveRevenueBooking {
   paymentMethod: string | null;
   pubMode: string | null;
   guests: number;
+  // Booking date is needed to determine whether the event's FER applies
+  // for this booking's weekday. Without it, mixed-tier bookings (one
+  // free, one paid) over-count the free portion at the per-tier sticker
+  // price, breaking the COD Collected (Actual) KPI.
+  bookingDate: string | null;
   actualWomen: number | null;
   actualMen: number | null;
   actualCouple: number | null;
   actualGuests: number | null;
+}
+
+// Day-name list matches the abbreviations stored in events.freeEntryRules.days.
+const FER_DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/**
+ * Returns which tiers (women/men/couple) are zero-priced for a booking under
+ * the event's free-entry-rules on the booking's weekday. Mirrors the same
+ * logic in routes/bookings.ts (calcActualAmountDue) and the create-booking
+ * handler so all three surfaces compute identical per-tier prices.
+ *
+ * If FER is not active for the booking's weekday, all tiers are paid (no
+ * change). If FER lists women only, women are free but men/couple still pay.
+ */
+export function ferTierFreeness(
+  bookingDate: string | null | undefined,
+  fer: { enabled?: boolean; days?: string[]; genders?: string[] } | null | undefined,
+): { women: boolean; men: boolean; couple: boolean } {
+  if (!fer?.enabled || !bookingDate) return { women: false, men: false, couple: false };
+  const dayName = FER_DAY_ABBRS[new Date(`${bookingDate}T12:00:00`).getDay()];
+  if (!dayName || !Array.isArray(fer.days) || !fer.days.includes(dayName)) {
+    return { women: false, men: false, couple: false };
+  }
+  const genders = (fer.genders ?? []).map((g) => String(g).toLowerCase());
+  return {
+    women: genders.includes("women"),
+    men: genders.includes("men"),
+    couple: genders.includes("couple"),
+  };
 }
 
 export interface EffectiveRevenueResult {
@@ -102,15 +136,25 @@ export async function computeEffectiveRevenues(
       if (hasActuals) {
         actualCodRecordedCount++;
         if (b.pubMode === "ticket") {
-          // Ticket mode: gross-from-actuals × per-tier price, then scaled by
-          // the booking's discount ratio so coupons/points applied at booking
+          // Ticket mode: gross-from-actuals × per-tier price, with FER-free
+          // tiers zeroed out for THIS booking's weekday, then scaled by the
+          // booking's discount ratio so coupons/points applied at booking
           // time aren't silently reverted at scan/analytics time.
-          // The non-ticket branch below uses finalPrice directly so it's
-          // already discount-aware.
+          //
+          // Mixed bookings — e.g. 1 female (FER-free) + 1 male (₹1000 paid)
+          // — used to over-count the free tier at its sticker price OR
+          // collapse to ₹0 when finalPrice equalled zero across a fully-
+          // free portion. Per-tier FER zeroing fixes both: the woman
+          // contributes ₹0, the man contributes ₹1000, COD Collected
+          // (Actual) shows ₹1000.
           const ev = eventMap.get(b.eventId);
-          const pw = Number(ev?.priceWomen ?? 0);
-          const pm = Number(ev?.priceMen ?? 0);
-          const pc = Number(ev?.priceCouple ?? 0);
+          const flags = ferTierFreeness(
+            b.bookingDate,
+            (ev as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules ?? null,
+          );
+          const pw = flags.women ? 0 : Number(ev?.priceWomen ?? 0);
+          const pm = flags.men ? 0 : Number(ev?.priceMen ?? 0);
+          const pc = flags.couple ? 0 : Number(ev?.priceCouple ?? 0);
           const gross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
           rev = gross * bookingDiscountRatio(b);
         } else {
