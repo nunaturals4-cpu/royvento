@@ -120,6 +120,9 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       eventId: bookingsTable.eventId,
       bookingDate: bookingsTable.bookingDate,
       finalPrice: bookingsTable.finalPrice,
+      // Needed by bookingDiscountRatio() so the admin COD figure scales
+      // down for coupon/points discounts the same way the partner KPI does.
+      totalPrice: bookingsTable.totalPrice,
       ticketWomen: bookingsTable.ticketWomen,
       ticketMen: bookingsTable.ticketMen,
       ticketCouple: bookingsTable.ticketCouple,
@@ -194,9 +197,12 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       actualCodRecordedCount++;
       if (b.pubMode === "ticket") {
         // Per-tier prices with FER-free tiers zeroed for THIS booking's
-        // weekday — mirrors lib/effectiveRevenue.ts so the admin KPI and
-        // partner KPI agree on a mixed booking like
-        //   1 female (FER-free) + 1 male (₹1000 paid) → COD = ₹1000.
+        // weekday, then scaled by the booking's discount ratio so coupons
+        // and reward-points deductions applied at booking time also reduce
+        // the COD shown on the admin KPI. Mirrors lib/effectiveRevenue.ts
+        // so admin and partner KPIs agree to the rupee. Example:
+        //   Mixed booking 1F (FER-free) + 1M (₹1000 paid), no coupon →
+        //   COD Collected (Actual) = ₹1000. With 50% coupon → ₹500.
         const ev = _codEventMap.get(b.eventId);
         const flags = ferTierFreeness(
           b.bookingDate,
@@ -205,7 +211,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
         const pw = flags.women ? 0 : Number(ev?.priceWomen ?? 0);
         const pm = flags.men ? 0 : Number(ev?.priceMen ?? 0);
         const pc = flags.couple ? 0 : Number(ev?.priceCouple ?? 0);
-        bookingRevenue = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+        const gross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+        bookingRevenue = gross * bookingDiscountRatio(b);
       } else {
         const guests = Math.max(1, b.guests);
         bookingRevenue = ((ag ?? 0) / guests) * Number(b.finalPrice);
