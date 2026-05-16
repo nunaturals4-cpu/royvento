@@ -208,8 +208,9 @@ function AdminHeader({
           <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 font-semibold leading-none">
             {currentTabLabel}
           </p>
-          <h1 className="font-serif text-xl md:text-2xl tracking-tight mt-1.5 leading-none truncate">
-            Royvento <span className="text-white/30 font-normal">Control Room</span>
+          <h1 className="font-serif text-lg sm:text-xl md:text-2xl tracking-tight mt-1.5 leading-tight truncate">
+            <span className="whitespace-nowrap">Royvento</span>
+            <span className="text-white/30 font-normal hidden sm:inline"> Control Room</span>
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -4203,19 +4204,21 @@ function CommissionsAdmin() {
           <p className="text-muted-foreground text-sm">Loading report...</p>
         ) : !report ? null : (
           <div className="space-y-6">
-            {/* Platform totals */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            {/* Platform totals — single column on small screens so the rupee
+                values never get clipped at the card edge. Original 3-col
+                layout returns at sm+. */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total bookings</p>
-                <p className="stat-number text-2xl">{report.totals.totalBookings}</p>
+                <p className="stat-number text-xl sm:text-2xl truncate">{report.totals.totalBookings}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Gross revenue</p>
-                <p className="stat-number text-2xl">{formatINR(report.totals.totalRevenue)}</p>
+                <p className="stat-number text-xl sm:text-2xl truncate" title={formatINR(report.totals.totalRevenue)}>{formatINR(report.totals.totalRevenue)}</p>
               </div>
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="min-w-0 rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Commission collected</p>
-                <p className="stat-number text-2xl text-primary">{formatINR(report.totals.totalCommission)}</p>
+                <p className="stat-number text-xl sm:text-2xl text-primary truncate" title={formatINR(report.totals.totalCommission)}>{formatINR(report.totals.totalCommission)}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">Sum of commission across all pubs in this window.</p>
               </div>
             </div>
@@ -4232,19 +4235,24 @@ function CommissionsAdmin() {
                       {/* Vendor summary row */}
                       <button
                         onClick={() => toggleVendor(row.vendorId)}
-                        className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left"
+                        className="w-full flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left"
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> · {row.city}</span> : ""}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Fees: FE ₹{row.appliedRates.freeEntryRate}/person · Ticket ₹{row.appliedRates.ticketRate}/ticket · Table ₹{row.appliedRates.tableBookingRate}/booking
+                        <div className="flex-1 min-w-0 w-full">
+                          <p className="font-medium text-sm break-words">{row.businessName}{row.city ? <span className="text-muted-foreground font-normal"> · {row.city}</span> : ""}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                            <span className="opacity-80">Fees:</span>{" "}
+                            <span className="whitespace-nowrap">FE ₹{row.appliedRates.freeEntryRate}/person</span>
+                            <span className="opacity-40"> · </span>
+                            <span className="whitespace-nowrap">Ticket ₹{row.appliedRates.ticketRate}/ticket</span>
+                            <span className="opacity-40"> · </span>
+                            <span className="whitespace-nowrap">Table ₹{row.appliedRates.tableBookingRate}/booking</span>
                           </p>
                         </div>
-                        <div className="flex items-center gap-6 tabular-nums text-sm shrink-0">
-                          <span className="text-muted-foreground">{row.totalBookings} booking{row.totalBookings !== 1 ? "s" : ""}</span>
-                          <span>{formatINR(row.totalRevenue)}</span>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 tabular-nums text-sm sm:shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                          <span className="text-muted-foreground text-xs sm:text-sm">{row.totalBookings} booking{row.totalBookings !== 1 ? "s" : ""}</span>
+                          <span className="ml-auto sm:ml-0">{formatINR(row.totalRevenue)}</span>
                           <span className="text-primary font-semibold">{formatINR(row.totalCommission)}</span>
-                          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
                         </div>
                       </button>
 

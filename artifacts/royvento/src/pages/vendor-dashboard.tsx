@@ -357,8 +357,9 @@ function PartnerHeader({
           <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 font-semibold leading-none">
             {currentTabLabel}
           </p>
-          <h1 className="font-serif text-xl md:text-2xl tracking-tight mt-1.5 leading-none truncate">
-            Hello, {greetingName} <span className="text-white/30 font-normal">— welcome back</span>
+          <h1 className="font-serif text-lg sm:text-xl md:text-2xl tracking-tight mt-1.5 leading-tight truncate">
+            <span className="whitespace-nowrap">Hello, {greetingName}</span>
+            <span className="text-white/30 font-normal hidden sm:inline"> — welcome back</span>
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -4016,10 +4017,10 @@ function AudienceChip({ label, count, tint }: { label: string; count: number; ti
 
 function FeeChip({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-center">
-      <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold mb-1">{label}</p>
-      <p className="text-2xl font-semibold tabular-nums text-white">{value}</p>
-      <p className="text-[11px] text-white/40 mt-0.5">{hint}</p>
+    <div className="min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.02] px-2 py-3 sm:px-4 text-center overflow-hidden">
+      <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.14em] sm:tracking-[0.18em] text-white/40 font-semibold mb-1 truncate" title={label}>{label}</p>
+      <p className="text-base sm:text-2xl font-semibold tabular-nums text-white truncate" title={value}>{value}</p>
+      <p className="text-[10px] sm:text-[11px] text-white/40 mt-0.5 truncate">{hint}</p>
     </div>
   );
 }
