@@ -80,7 +80,9 @@ function DashboardRedirect() {
       setLocation("/login");
       return;
     }
-    if (data.user.role === "vendor" || data.user.role === "admin") {
+    if (data.user.role === "admin") {
+      setLocation("/admin");
+    } else if (data.user.role === "vendor") {
       setLocation("/dashboard/vendor");
     } else {
       setLocation("/dashboard/profile");
