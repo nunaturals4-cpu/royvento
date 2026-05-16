@@ -1044,7 +1044,7 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
       <div className="rounded-2xl border border-white/10 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-black/40 text-xs uppercase text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-black/90 backdrop-blur text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="text-left p-3">Ticket</th>
                 <th className="text-left p-3">Guest</th>

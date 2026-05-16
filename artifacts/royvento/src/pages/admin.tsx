@@ -706,9 +706,9 @@ function Analytics() {
         {data.recentBookings.length === 0 ? (
           <p className="text-sm text-white/40 px-5 md:px-6 pb-6">No bookings yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[720px]">
-              <thead className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-y border-white/[0.05] bg-white/[0.02]">
+              <thead className="sticky top-0 z-10 text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-y border-white/[0.05] bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-3 px-5 md:px-6">Event</th>
                   <th className="text-left py-3 px-3">User</th>
@@ -1608,9 +1608,9 @@ function EventsAdmin() {
       {filtered.length === 0 ? (
         <p className="text-muted-foreground text-sm">No events match the current filters.</p>
       ) : (
-        <div className="rounded-2xl glass-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
+          <table className="w-full text-sm min-w-[760px]">
+            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="text-left p-3">Title</th>
                 <th className="text-left p-3">Partner</th>
@@ -1681,12 +1681,12 @@ function SubscriptionsAdmin() {
   const load = () => apiGet<AdminSub[]>("/api/admin/subscriptions").then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
   return (
-    <div className="rounded-2xl glass-card overflow-hidden">
+    <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
       {items.length === 0 ? (
         <p className="p-6 text-muted-foreground">No subscriptions yet.</p>
       ) : (
-        <table className="w-full text-sm">
-          <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+        <table className="w-full text-sm min-w-[640px]">
+          <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
               <th className="text-left p-3">User</th>
               <th className="text-left p-3">Plan</th>
@@ -1774,12 +1774,12 @@ function CouponsAdmin() {
       </form>
       {formErrors.topError && <p className="text-sm text-red-400">{formErrors.topError}</p>}
 
-      <div className="rounded-2xl glass-card overflow-hidden">
+      <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
         {items.length === 0 ? (
           <p className="p-6 text-muted-foreground">No coupons issued.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="text-left p-3">Code</th>
                 <th className="text-left p-3">Owner</th>
@@ -1871,9 +1871,9 @@ function UsersPanel() {
   const { toast } = useToast();
 
   return (
-    <div className="rounded-2xl glass-card overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
+      <table className="w-full text-sm min-w-[760px]">
+        <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="text-left p-4">Name</th>
             <th className="text-left p-4">Email</th>
@@ -2702,7 +2702,7 @@ function BookingReport() {
         </div>
       ) : (
         <div className="rounded-2xl glass-card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wider">
@@ -3056,9 +3056,9 @@ function AttendanceReport() {
             );
           })()}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[900px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("id")}>ID<SortIcon k="id" /></th>
                   <th className="text-left py-2 pr-3 cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => handleSort("userName")}>Guest<SortIcon k="userName" /></th>
@@ -3321,9 +3321,9 @@ function CrmLeads() {
         <div className="rounded-2xl glass-card p-6">
           <h3 className="font-serif text-xl mb-1">Per-partner breakdown</h3>
           <p className="text-xs text-muted-foreground mb-4">Click a row to filter the leads table to that partner.</p>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[600px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pr-4">Venue</th>
                   <th className="text-left py-2 pr-4">City</th>
@@ -3375,9 +3375,9 @@ function CrmLeads() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
               <table className="w-full text-sm min-w-[820px]">
-                <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                   <tr>
                     <th className="text-left py-3 px-6">Visitor</th>
                     <th className="text-left py-3 px-3">Venue visited</th>
@@ -4086,9 +4086,9 @@ function CommissionsAdmin() {
         ) : !ratesReport || ratesReport.rows.length === 0 ? (
           <p className="text-muted-foreground text-sm">No approved partners found.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[680px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pr-4">Partner</th>
                   <th className="text-right py-2 px-3">Free Entry ₹/person</th>
@@ -4792,9 +4792,9 @@ function LiveOccupancyAdmin() {
       </div>
 
       <div className="rounded-2xl border border-white/10 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
           <table className="w-full text-sm">
-            <thead className="bg-black/40 text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-black/90 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="text-left p-3">Pub</th>
                 <th className="text-left p-3">City</th>
@@ -4889,8 +4889,8 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
           ) : rows.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground">No bookings.</div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-black/40 text-xs uppercase text-muted-foreground sticky top-0">
+            <table className="w-full text-sm min-w-[840px]">
+              <thead className="bg-black/40 text-xs uppercase text-muted-foreground sticky top-0 z-10 backdrop-blur">
                 <tr>
                   <th className="text-left p-3">Ticket</th>
                   <th className="text-left p-3">Guest</th>
@@ -5439,7 +5439,7 @@ function CreatePubAdmin() {
               <Label htmlFor="cp-varybyday" className="text-sm cursor-pointer select-none">Vary prices by day</Label>
             </div>
             {varyByDay && (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-muted-foreground">

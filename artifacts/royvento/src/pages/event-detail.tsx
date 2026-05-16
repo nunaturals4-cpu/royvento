@@ -1460,7 +1460,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     <div><Label htmlFor="guests3" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.guests_field")}</Label><Input id="guests3" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" /></div>
                   </>
                 )}
-                {!bookingIsFullyFree && pointsAvail > 0 && <div><Label htmlFor="ppoints2" className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Coins className="h-3.5 w-3.5 text-primary" />{t("events.use_points_avail", { n: discountInfo?.points ?? 0 })}</Label><Input id="ppoints2" type="number" min={0} max={pointsAvail} value={pointsToUse} onChange={(e) => setPointsToUse(Math.min(pointsAvail, Math.max(0, Number(e.target.value) || 0)))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" /></div>}
+                {!bookingIsFullyFree && pointsAvail > 0 && <div><Label htmlFor="ppoints2" className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Coins className="h-3.5 w-3.5 text-primary" />{t("events.use_points_avail", { n: discountInfo?.points ?? 0 })}</Label><Input id="ppoints2" type="number" min={0} max={pointsAvail} placeholder="0" value={pointsToUse === 0 ? "" : pointsToUse} onChange={(e) => setPointsToUse(Math.min(pointsAvail, Math.max(0, Number(e.target.value) || 0)))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" /></div>}
                 {!bookingIsFullyFree && (
                   <div>
                     <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Tag className="h-3.5 w-3.5 text-primary" />{t("events.coupon_code_label")}{!me?.user && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}</Label>
@@ -1566,7 +1566,8 @@ function TicketRow({ label, price, value, onChange, hidePrice, freeBadge }: { la
         <input
           type="number"
           min={0}
-          value={value}
+          placeholder="0"
+          value={value === 0 ? "" : value}
           onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
           className="h-7 w-12 rounded border border-border bg-background text-center text-sm text-foreground"
         />

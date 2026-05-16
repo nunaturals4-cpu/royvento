@@ -2655,9 +2655,9 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                   {brTableTotal} booking{brTableTotal !== 1 ? "s" : ""}
                 </span>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
                 <table className="w-full text-sm min-w-[640px]">
-                  <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                  <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                     <tr>
                       <th className="text-left py-2 pr-3">ID</th>
                       <th className="text-left py-2 pr-3">Date</th>
@@ -2721,9 +2721,9 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
           {perEvent.length > 0 && (
             <div className="rounded-2xl glass-card p-6">
               <h3 className="font-serif text-xl mb-4">Revenue by event</h3>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
                 <table className="w-full text-sm min-w-[480px]">
-                  <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                  <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                     <tr>
                       <th className="text-left py-2 pr-4">Event</th>
                       <th className="text-right py-2 px-2">Bookings</th>
@@ -2954,9 +2954,9 @@ function AttendancePanel() {
           <h3 className="font-serif text-xl mb-4">
             {statusFilter === "checkedIn" ? "Checked-in guests" : statusFilter === "notArrived" ? "Not-arrived guests" : "All confirmed guests"}
           </h3>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[750px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pr-3">Guest</th>
                   <th className="text-left py-2 pr-3">Email</th>
@@ -3805,9 +3805,9 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
               {data.perEvent.length} {data.perEvent.length === 1 ? "listing" : "listings"}
             </span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[640px]">
-              <thead className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-y border-white/[0.05] bg-white/[0.02]">
+              <thead className="sticky top-0 z-10 text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-y border-white/[0.05] bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-3 px-5 md:px-6">Listing</th>
                   <th className="text-right py-3 px-3">Bookings</th>
@@ -3909,7 +3909,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
                 <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold mb-3">Breakdown by booking type</p>
                 <div className="overflow-x-auto rounded-2xl border border-white/[0.06]">
                   <table className="w-full text-sm min-w-[520px]">
-                    <thead className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-b border-white/[0.05] bg-white/[0.02]">
+                    <thead className="sticky top-0 z-10 text-[10px] uppercase tracking-[0.18em] text-white/40 font-semibold border-b border-white/[0.05] bg-black/90 backdrop-blur">
                       <tr>
                         <th className="text-left py-3 px-4">Type</th>
                         <th className="text-right py-3 px-3">Bookings</th>
@@ -4178,9 +4178,9 @@ function ManagersPanel() {
           <p className="text-sm text-muted-foreground mb-5">
             Other partners have added you as a scanner manager at these venues. Their bookings appear in your Ticket Scanner. Tap Leave to remove yourself — only your own pub will remain.
           </p>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pb-3">Venue</th>
                   <th />
@@ -4258,9 +4258,9 @@ function ManagersPanel() {
         ) : managers.length === 0 ? (
           <p className="text-muted-foreground text-sm">No managers yet. Invite someone above.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pb-3">Email</th>
                   <th className="text-left py-2 pb-3">Name</th>
@@ -4352,9 +4352,9 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
         </p>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[860px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pr-3">#</th>
                   <th className="text-left py-2 pr-3">Event / Pub</th>
@@ -4596,15 +4596,16 @@ function LeadsPanel() {
         {data.views.length === 0 ? (
           <p className="text-sm text-muted-foreground">No one has viewed your profile yet.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase tracking-wider text-muted-foreground">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh] rounded-xl border border-white/10 bg-black/20">
+          <table className="w-full text-sm min-w-[560px]">
+            <thead className="sticky top-0 z-10 bg-black/90 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="text-left py-2">Name</th>
-                <th className="text-left hidden sm:table-cell">Email</th>
-                <th className="text-left hidden md:table-cell">Phone</th>
-                <th className="text-right">Visits</th>
-                <th className="text-right hidden lg:table-cell">Last visit</th>
-                <th className="text-right">Action</th>
+                <th className="text-left py-2 px-3">Name</th>
+                <th className="text-left px-3 hidden sm:table-cell">Email</th>
+                <th className="text-left px-3 hidden md:table-cell">Phone</th>
+                <th className="text-right px-3">Visits</th>
+                <th className="text-right px-3 hidden lg:table-cell">Last visit</th>
+                <th className="text-right px-3">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -4652,6 +4653,7 @@ function LeadsPanel() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       <LeadBookingTable bookings={bookings} />
@@ -5503,9 +5505,9 @@ function BankingPanel() {
         ) : requests.length === 0 ? (
           <p className="text-sm text-muted-foreground">{banking ? "No settlement requests yet." : ""}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
             <table className="w-full text-sm min-w-[480px]">
-              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pr-4">Date</th>
                   <th className="text-right py-2 px-2">Amount</th>
