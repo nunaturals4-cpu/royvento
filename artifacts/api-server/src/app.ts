@@ -125,13 +125,28 @@ app.use(sitemapRouter);
 // claim here.
 app.use(legacyRedirectsRouter);
 
-// Serve the built frontend in production (same origin = no CORS needed)
-const frontendDist = path.resolve(process.cwd(), "artifacts/royvento/dist/public");
-if (existsSync(frontendDist)) {
+// Serve the built frontend in production (same origin = no CORS needed).
+// We try several candidate locations because the cwd at boot depends on how
+// the service is started (e.g. `pnpm --filter @workspace/api-server start`
+// sets cwd to the package dir, while a direct `node dist/index.mjs` from
+// the repo root keeps cwd at the repo root). Picking the first one that
+// exists makes the static mount robust to start-command changes — a recent
+// railway.json edit broke prod for ~10 min by silently moving cwd.
+const frontendCandidates = [
+  path.resolve(process.cwd(), "artifacts/royvento/dist/public"),
+  path.resolve(process.cwd(), "../royvento/dist/public"),
+  path.resolve(process.cwd(), "../../artifacts/royvento/dist/public"),
+  "/app/artifacts/royvento/dist/public",
+];
+const frontendDist = frontendCandidates.find((p) => existsSync(p));
+if (frontendDist) {
+  logger.info({ frontendDist }, "Serving frontend dist");
   app.use(express.static(frontendDist));
   app.get(/.*/, (_req, res) => {
     res.sendFile(path.join(frontendDist, "index.html"));
   });
+} else {
+  logger.warn({ tried: frontendCandidates }, "No frontend dist found — only API routes will respond");
 }
 
 export default app;
