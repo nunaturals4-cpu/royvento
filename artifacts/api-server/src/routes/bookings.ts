@@ -623,6 +623,15 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const rangeStart = fromStr ? new Date(`${fromStr}T00:00:00Z`) : undefined;
   const rangeEnd = toStr ? new Date(`${toStr}T23:59:59Z`) : undefined;
 
+  // Revenue / commission / earnings KPIs are gated on `checkedIn = true`.
+  // After the QR-scan refactor, that flag flips ONLY when the manager taps
+  // "Save Actual Entry" in the scanner — never on a bare scan. So Partner
+  // Analytics shows ₹0 / 0 commission for a booking until its check-in is
+  // finalized at the door, matching the spec: "Only when they click the
+  // 'Save Actual Entry' button … trigger all analytics and commission
+  // calculations." Bookings that are confirmed but not yet finalized still
+  // exist for the partner — they appear in the Bookings tab and Live
+  // Occupancy panel — they just don't move money in the analytics.
   const [allBookings, commissions] = await Promise.all([
     db
       .select()
@@ -631,6 +640,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
         and(
           eq(bookingsTable.vendorId, vendor.id),
           inArray(bookingsTable.status, ["confirmed", "completed"]),
+          eq(bookingsTable.checkedIn, true),
           rangeStart ? gte(bookingsTable.createdAt, rangeStart) : undefined,
           rangeEnd ? lte(bookingsTable.createdAt, rangeEnd) : undefined,
         ),
@@ -1091,11 +1101,17 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res)
     }).from(bookingsTable).where(baseWhere)
       .groupBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`)
       .orderBy(sql`to_char(${bookingsTable.bookingDate}, 'YYYY-MM')`),
-    // Pull confirmed/completed bookings into memory so totalRevenue, monthlyRevenue,
-    // and perEvent.revenue use the unified effective-revenue rule (online finalPrice +
-    // actual cash collected; COD without recorded actuals contributes ₹0).
+    // Revenue / per-event totals only count FINALIZED bookings (checkedIn=true,
+    // which now flips only when the manager taps Save Actual Entry). The
+    // counts above (totalBookings / countConfirmed / …) still count every
+    // confirmed booking so the partner can see "you have N bookings"; only
+    // the money columns are gated.
     db.select().from(bookingsTable)
-      .where(and(baseWhere, inArray(bookingsTable.status, [...confirmedStatuses]))),
+      .where(and(
+        baseWhere,
+        inArray(bookingsTable.status, [...confirmedStatuses]),
+        eq(bookingsTable.checkedIn, true),
+      )),
   ]);
 
   const { byBookingId } = await computeEffectiveRevenues(confirmedBookings);

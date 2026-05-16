@@ -77,6 +77,10 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
         ),
     ]);
 
+  // Revenue / commission KPIs gated on `checkedIn = true` (Save Actual Entry
+  // is the sole trigger for that flag). Bookings that are paid but not yet
+  // finalized at the door don't contribute to the KPIs — matches the spec:
+  // analytics update only on Save Actual Entry, never on a bare QR scan.
   const paymentSplitRows = await db
     .select({
       paymentMethod: bookingsTable.paymentMethod,
@@ -84,7 +88,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     })
     .from(bookingsTable)
     .where(
-      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.checkedIn} = true AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
     )
     .groupBy(bookingsTable.paymentMethod);
 
@@ -130,7 +134,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     })
     .from(bookingsTable)
     .where(
-      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
+      sql`${bookingsTable.status} IN ('confirmed', 'completed') AND ${bookingsTable.checkedIn} = true AND ${bookingsTable.createdAt} >= ${rangeStart} AND ${bookingsTable.createdAt} <= ${rangeEnd}`,
     );
 
   // Pre-fetch events for ticket-mode per-type prices, used to compute actual COD revenue.
@@ -1201,7 +1205,10 @@ router.get("/admin/bookings/partner-summary", requireAuth(["admin"]), async (_re
       ticketWomen: sql<number>`coalesce(sum(${bookingsTable.ticketWomen}), 0)::int`,
       ticketMen: sql<number>`coalesce(sum(${bookingsTable.ticketMen}), 0)::int`,
       ticketCouple: sql<number>`coalesce(sum(${bookingsTable.ticketCouple}), 0)::int`,
-      revenue: sql<string>`coalesce(sum(case when ${bookingsTable.status} IN ('confirmed','completed') then ${bookingsTable.finalPrice} else 0 end), 0)::text`,
+      // Revenue gated on `checkedIn = true` so a booking only contributes
+      // after Save Actual Entry is tapped. bookingCount stays as-is — it
+      // counts every booking regardless of finalize status.
+      revenue: sql<string>`coalesce(sum(case when ${bookingsTable.status} IN ('confirmed','completed') AND ${bookingsTable.checkedIn} = true then ${bookingsTable.finalPrice} else 0 end), 0)::text`,
       checkedInCount: sql<number>`coalesce(sum(case when ${bookingsTable.checkedIn} then 1 else 0 end), 0)::int`,
     })
     .from(bookingsTable)
@@ -1412,10 +1419,10 @@ router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
   const vMap = new Map(vendorRows.map((v) => [v.id, v]));
   const uMap = new Map(userRows.map((u) => [u.id, u]));
 
-  // Conversion: fetch ALL confirmed/completed booking timestamps per (userId, vendorId).
-  // A view converts if ANY booking for that (userId, vendorId) was created AFTER this specific view.
-  // Using all timestamps (not just MIN) correctly handles repeat-booking users who had an
-  // earlier booking before the view and a later booking after.
+  // Conversion is FINALIZED (Save Actual Entry tapped at the door), not
+  // merely "booked & paid". A profile view converts only when the user
+  // later showed up AND the manager finalized their check-in. Matches the
+  // spec — every value in the Leads tab updates only on Save Actual Entry.
   const allBookings = userIds.length && vendorIds.length
     ? await db.select({
         userId: bookingsTable.userId,
@@ -1427,6 +1434,7 @@ router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
           inArray(bookingsTable.userId, userIds),
           inArray(bookingsTable.vendorId, vendorIds),
           sql`${bookingsTable.status} IN ('confirmed','completed')`,
+          eq(bookingsTable.checkedIn, true),
         ))
     : [];
   // Group booking dates by (userId:vendorId) key
@@ -1506,9 +1514,8 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
   const knownUserIds = Array.from(new Set(knownViewRecords.map((r) => r.viewerUserId).filter((x): x is number => x !== null)));
   const knownVendorIds = Array.from(new Set(knownViewRecords.map((r) => r.vendorId)));
 
-  // Fetch ALL confirmed/completed booking timestamps per (userId, vendorId) — same approach as
-  // /admin/leads: a view converts if ANY booking was created AFTER this specific view,
-  // correctly handling users who had an earlier booking before the view.
+  // Same finalize gate as /admin/leads — conversion = manager tapped
+  // Save Actual Entry at the door, not merely "user booked".
   const allSummaryBookings = knownUserIds.length && knownVendorIds.length
     ? await db.select({
         userId: bookingsTable.userId,
@@ -1520,6 +1527,7 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
           inArray(bookingsTable.userId, knownUserIds),
           inArray(bookingsTable.vendorId, knownVendorIds),
           sql`${bookingsTable.status} IN ('confirmed','completed')`,
+          eq(bookingsTable.checkedIn, true),
         ))
     : [];
   const summaryBookingDatesMap = new Map<string, Date[]>();
@@ -1585,8 +1593,12 @@ function buildTopBookingConditions(
   endDate?: string,
   partnerId?: number | null,
 ) {
+  // Top-users / top-pubs only count FINALIZED bookings (checkedIn=true,
+  // flipped only by Save Actual Entry). A guest who booked 10 tickets
+  // but never showed up doesn't show up on these leaderboards.
   const conds: ReturnType<typeof sql>[] = [
     sql`${bookingsTable.status} IN ('confirmed', 'completed')`,
+    sql`${bookingsTable.checkedIn} = true`,
   ];
   if (startDate) conds.push(sql`${bookingsTable.bookingDate} >= ${startDate}`);
   if (endDate) conds.push(sql`${bookingsTable.bookingDate} <= ${endDate}`);
@@ -2014,8 +2026,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   const from = fromStr ? new Date(`${fromStr}T00:00:00Z`) : defaultStart;
   const to = toStr ? new Date(`${toStr}T23:59:59Z`) : now;
 
+  // Gated on `checkedIn = true` (Save Actual Entry is the sole trigger).
+  // The Commission Report only counts revenue / commission for bookings
+  // that have been finalized at the door — paid-but-unscanned bookings
+  // don't move money in the report.
   const whereConditions = [
     sql`${bookingsTable.status} IN ('confirmed', 'completed')`,
+    eq(bookingsTable.checkedIn, true),
     gte(bookingsTable.createdAt, from),
     lte(bookingsTable.createdAt, to),
   ];
