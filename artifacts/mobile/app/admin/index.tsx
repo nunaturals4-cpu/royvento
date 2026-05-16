@@ -18,11 +18,14 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -216,9 +219,39 @@ interface AdminBlog {
   id: number;
   title: string;
   slug: string;
+  // Full fields are needed so the edit modal can prefill from the list payload
+  // without an extra GET. Optional only because legacy responses may omit them.
+  excerpt?: string;
+  content?: string;
+  imageUrl?: string;
+  authorName?: string;
+  tags?: string[];
   published: boolean;
   createdAt: string;
 }
+
+// Shape held by the mobile blog editor while the user is typing. `tags` is a
+// CSV string here (matching the web form's UX); we split + trim on save.
+interface BlogEditorForm {
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  imageUrl: string;
+  authorName: string;
+  tags: string;
+  published: boolean;
+}
+const EMPTY_BLOG_FORM: BlogEditorForm = {
+  title: "",
+  slug: "",
+  excerpt: "",
+  content: "",
+  imageUrl: "",
+  authorName: "Royvento Editorial",
+  tags: "",
+  published: true,
+};
 
 // ─── AdminSettlementsTab ──────────────────────────────────────────────────────
 
@@ -1234,6 +1267,76 @@ export default function AdminPanelScreen() {
   // ─── BLOGS ──────────────────────────────────────────────────────────────────
   const [blogs, setBlogs] = useState<AdminBlog[]>([]);
   const [blogLoading, setBlogLoading] = useState(false);
+
+  // Editor state mirrors the web blog form (admin.tsx ~L2095). Opening the
+  // editor with a non-null id puts it in EDIT mode (PATCH); null id = CREATE
+  // mode (POST). Mobile uses a Modal sheet instead of an inline form for
+  // ergonomics on a small screen.
+  const [blogEditorOpen, setBlogEditorOpen] = useState(false);
+  const [editingBlogId, setEditingBlogId] = useState<number | null>(null);
+  const [blogForm, setBlogForm] = useState<BlogEditorForm>(EMPTY_BLOG_FORM);
+  const [savingBlog, setSavingBlog] = useState(false);
+
+  const openBlogEditor = useCallback((b: AdminBlog | null) => {
+    if (b) {
+      setEditingBlogId(b.id);
+      setBlogForm({
+        title: b.title ?? "",
+        slug: b.slug ?? "",
+        excerpt: b.excerpt ?? "",
+        content: b.content ?? "",
+        imageUrl: b.imageUrl ?? "",
+        authorName: b.authorName ?? "Royvento Editorial",
+        tags: (b.tags ?? []).join(", "),
+        published: b.published,
+      });
+    } else {
+      setEditingBlogId(null);
+      setBlogForm(EMPTY_BLOG_FORM);
+    }
+    setBlogEditorOpen(true);
+  }, []);
+
+  const saveBlog = useCallback(async () => {
+    if (!blogForm.title.trim()) {
+      Alert.alert("Title required", "Please enter a blog title before saving.");
+      return;
+    }
+    if (!blogForm.slug.trim()) {
+      Alert.alert("Slug required", "Please enter a URL slug before saving.");
+      return;
+    }
+    setSavingBlog(true);
+    try {
+      const body = {
+        ...blogForm,
+        tags: blogForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      };
+      if (editingBlogId != null) {
+        await customFetch(`/api/admin/blogs/${editingBlogId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        Alert.alert("Saved", "Blog post updated.");
+      } else {
+        await customFetch("/api/admin/blogs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        Alert.alert("Saved", "Blog post created.");
+      }
+      setBlogEditorOpen(false);
+      setEditingBlogId(null);
+      setBlogForm(EMPTY_BLOG_FORM);
+      fetchBlogs();
+    } catch (e: any) {
+      Alert.alert("Save failed", e?.message ?? "Could not save the blog post.");
+    } finally {
+      setSavingBlog(false);
+    }
+  }, [blogForm, editingBlogId]);
 
   const fetchBlogs = useCallback(() => {
     setBlogLoading(true);
@@ -2675,7 +2778,16 @@ export default function AdminPanelScreen() {
         ))}
 
         {/* BLOGS SECTION */}
-        <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>BLOGS ({blogs.length})</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 20, marginBottom: 8 }}>
+          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 0 }]}>BLOGS ({blogs.length})</Text>
+          <TouchableOpacity
+            onPress={() => openBlogEditor(null)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.primary + "20", borderWidth: 1, borderColor: colors.primary + "40" }}
+          >
+            <Ionicons name="add" size={14} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>New Post</Text>
+          </TouchableOpacity>
+        </View>
         {blogs.length === 0 && !blogLoading && (
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" }}>No blogs found</Text>
         )}
@@ -2685,14 +2797,22 @@ export default function AdminPanelScreen() {
               <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>{b.title}</Text>
               <Text style={[styles.itemSub, { color: colors.mutedForeground }]}>{b.slug}</Text>
             </View>
-            <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+              <TouchableOpacity
+                onPress={() => openBlogEditor(b)}
+                accessibilityLabel="Edit blog post"
+              >
+                <Ionicons name="create-outline" size={18} color={colors.primary} />
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => Alert.alert(b.published ? "Unpublish?" : "Publish?", `${b.published ? "Hide" : "Publish"} "${b.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Confirm", onPress: () => toggleBlogPublished(b.id, b.published) }])}
+                accessibilityLabel={b.published ? "Unpublish blog post" : "Publish blog post"}
               >
                 <Ionicons name={b.published ? "eye-outline" : "eye-off-outline"} size={18} color={b.published ? "#22c55e" : colors.mutedForeground} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => Alert.alert("Delete Blog?", `Delete "${b.title}"?`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteBlog(b.id) }])}
+                accessibilityLabel="Delete blog post"
               >
                 <Ionicons name="trash-outline" size={16} color={colors.destructive} />
               </TouchableOpacity>
@@ -2811,6 +2931,172 @@ export default function AdminPanelScreen() {
       {activeTab === "settlements" && <AdminSettlementsTab colors={colors} />}
       {activeTab === "live-occupancy" && <AdminLiveOccupancyTab colors={colors} />}
       {activeTab === "reviews" && <AdminReviewsTab colors={colors} />}
+
+      {/* Blog editor sheet — full-screen modal so the long content textarea
+          has room. Renders at the page root so it overlays the active tab. */}
+      <Modal
+        visible={blogEditorOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => { if (!savingBlog) setBlogEditorOpen(false); }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1, backgroundColor: colors.background }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card }}>
+            <TouchableOpacity
+              onPress={() => { if (!savingBlog) setBlogEditorOpen(false); }}
+              disabled={savingBlog}
+              hitSlop={8}
+            >
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 14 }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 15 }}>
+              {editingBlogId != null ? "Edit blog post" : "New blog post"}
+            </Text>
+            <TouchableOpacity
+              onPress={saveBlog}
+              disabled={savingBlog}
+              hitSlop={8}
+            >
+              {savingBlog ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 14 }}>
+                  {editingBlogId != null ? "Update" : "Create"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            contentContainerStyle={{ padding: 16, paddingBottom: 80, gap: 14 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <BlogEditorField
+              label="Title"
+              required
+              value={blogForm.title}
+              onChangeText={(v) => setBlogForm((p) => ({ ...p, title: v }))}
+              colors={colors}
+              placeholder="A great night out in Mumbai"
+            />
+            <BlogEditorField
+              label="Slug (URL)"
+              required
+              value={blogForm.slug}
+              onChangeText={(v) => setBlogForm((p) => ({ ...p, slug: v.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") }))}
+              colors={colors}
+              placeholder="great-night-out-mumbai"
+              autoCapitalize="none"
+            />
+            <BlogEditorField
+              label="Excerpt"
+              value={blogForm.excerpt}
+              onChangeText={(v) => setBlogForm((p) => ({ ...p, excerpt: v }))}
+              colors={colors}
+              multiline
+              numberOfLines={2}
+              placeholder="Short summary that shows in listing cards"
+            />
+            <BlogEditorField
+              label="Content (HTML)"
+              value={blogForm.content}
+              onChangeText={(v) => setBlogForm((p) => ({ ...p, content: v }))}
+              colors={colors}
+              multiline
+              numberOfLines={10}
+              placeholder="<p>Article body…</p>"
+              monospace
+            />
+            <BlogEditorField
+              label="Image URL"
+              value={blogForm.imageUrl}
+              onChangeText={(v) => setBlogForm((p) => ({ ...p, imageUrl: v }))}
+              colors={colors}
+              placeholder="https://…"
+              autoCapitalize="none"
+            />
+            <BlogEditorField
+              label="Author"
+              value={blogForm.authorName}
+              onChangeText={(v) => setBlogForm((p) => ({ ...p, authorName: v }))}
+              colors={colors}
+              placeholder="Royvento Editorial"
+            />
+            <BlogEditorField
+              label="Tags (comma-separated)"
+              value={blogForm.tags}
+              onChangeText={(v) => setBlogForm((p) => ({ ...p, tags: v }))}
+              colors={colors}
+              placeholder="Mumbai, Nightlife, Guide"
+            />
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Published</Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 2 }}>
+                  Visible on the public blog list when on
+                </Text>
+              </View>
+              <Switch
+                value={blogForm.published}
+                onValueChange={(v) => setBlogForm((p) => ({ ...p, published: v }))}
+                trackColor={{ false: colors.border, true: colors.primary + "80" }}
+                thumbColor={blogForm.published ? colors.primary : colors.mutedForeground}
+              />
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  );
+}
+
+// Small labelled text input used by the blog editor. Centralised so all
+// fields get consistent label/placeholder styling and multiline support.
+function BlogEditorField({
+  label, value, onChangeText, colors, required, placeholder, multiline, numberOfLines, monospace, autoCapitalize,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  colors: ReturnType<typeof useColors>;
+  required?: boolean;
+  placeholder?: string;
+  multiline?: boolean;
+  numberOfLines?: number;
+  monospace?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+}) {
+  return (
+    <View>
+      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+        {label}{required ? " *" : ""}
+      </Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={!monospace}
+        spellCheck={!monospace}
+        style={{
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          borderWidth: 1,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: multiline ? 10 : 12,
+          color: colors.foreground,
+          fontSize: monospace ? 12 : 14,
+          fontFamily: monospace ? (Platform.OS === "ios" ? "Menlo" : "monospace") : "Inter_400Regular",
+          minHeight: multiline && numberOfLines ? numberOfLines * 18 + 20 : undefined,
+          textAlignVertical: multiline ? "top" : "auto",
+        }}
+      />
     </View>
   );
 }
