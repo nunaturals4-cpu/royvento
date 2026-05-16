@@ -41,7 +41,16 @@ interface BookingData {
   ticketMen: number;
   ticketCouple: number;
   guests: number;
+  // Pre-discount booking gross. Used with finalPrice to derive the
+  // discount ratio (= finalPrice / totalPrice) so the door cash matches
+  // the discounted amount on the guest's ticket — without this the
+  // manager would over-collect for any booking that used a coupon code
+  // or reward points.
+  totalPrice?: number;
   finalPrice?: number;
+  discountAmount?: number;
+  pointsUsed?: number;
+  couponCode?: string;
   priceWomen?: number;
   priceMen?: number;
   priceCouple?: number;
@@ -614,12 +623,25 @@ function ActualEntrySheet({
   const priceWomen = ferState.isTierFree("women") ? 0 : (b.priceWomen ?? 0);
   const priceMen = ferState.isTierFree("men") ? 0 : (b.priceMen ?? 0);
   const priceCouple = ferState.isTierFree("couple") ? 0 : (b.priceCouple ?? 0);
+  // Booking discount ratio (= finalPrice / totalPrice) folds coupon codes
+  // and reward-points deductions into a single multiplier so the door cash
+  // matches the discounted amount on the guest's ticket. Mirrors
+  // bookingDiscountRatio() in api-server/src/lib/effectiveRevenue.ts.
+  const totalPrice = Number(b.totalPrice ?? 0);
+  const finalPrice = Number(b.finalPrice ?? 0);
+  const discountRatio = totalPrice > 0
+    ? Math.min(1, Math.max(0, finalPrice / totalPrice))
+    : 1;
+  const hasDiscount = discountRatio < 1 - 1e-6;
+  const grossLive = isTicket ? w * priceWomen + m * priceMen + c * priceCouple : 0;
   const liveTotal = isTicket
-    ? w * priceWomen + m * priceMen + c * priceCouple
+    ? grossLive * discountRatio
     : ferState.allGendersFree
       ? 0
-      : (g / Math.max(1, b.guests)) * (b.finalPrice ?? 0);
+      : (g / Math.max(1, b.guests)) * finalPrice;
   const liveTotalRounded = Math.round(liveTotal * 100) / 100;
+  const grossLiveRounded = Math.round(grossLive * 100) / 100;
+  const liveDiscountAmount = Math.round((grossLive - liveTotal) * 100) / 100;
   const subRows = isTicket
     ? [
         { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen, free: ferState.isTierFree("women") },
@@ -695,13 +717,35 @@ function ActualEntrySheet({
                       </Text>
                     </View>
                   ))}
+                  {hasDiscount && liveDiscountAmount > 0 && (
+                    <>
+                      <View style={{ height: 1, backgroundColor: "#f59e0b30" }} />
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#fcd34d" }}>Subtotal</Text>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#fcd34d" }}>₹{grossLiveRounded.toLocaleString("en-IN")}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#22c55e" }}>
+                          Discount{b.couponCode ? ` (${b.couponCode})` : ""}{b.pointsUsed && b.pointsUsed > 0 ? ` · ${b.pointsUsed} pts` : ""}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#22c55e" }}>−₹{liveDiscountAmount.toLocaleString("en-IN")}</Text>
+                      </View>
+                    </>
+                  )}
                   <View style={{ height: 1, backgroundColor: "#f59e0b30" }} />
                 </>
               )}
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5 }}>Total to collect (COD)</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  {hasDiscount ? "Final payable (COD)" : "Total to collect (COD)"}
+                </Text>
                 <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: "#f59e0b" }}>₹{liveTotalRounded.toLocaleString("en-IN")}</Text>
               </View>
+              {hasDiscount && (
+                <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#fcd34d", opacity: 0.7, textAlign: "center" }}>
+                  Matches the amount on the guest's ticket
+                </Text>
+              )}
             </View>
           )}
           <TouchableOpacity

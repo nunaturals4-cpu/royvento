@@ -173,12 +173,20 @@ async function serializeBookings(rows: BookingRow[]) {
           const pw = serIsTierFree("women") ? 0 : Number(e?.priceWomen ?? 0);
           const pm = serIsTierFree("men") ? 0 : Number(e?.priceMen ?? 0);
           const pc = serIsTierFree("couple") ? 0 : Number(e?.priceCouple ?? 0);
-          actualAmountDue = Math.round(((aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc) * 100) / 100;
+          // Scale per-tier gross by the booking's discount ratio so coupon
+          // codes and reward-points deductions applied at booking time flow
+          // through to the door. Without this, a guest who paid online with
+          // a 50% coupon would owe the full sticker price at the door —
+          // mismatching the amount shown on their ticket.
+          const gross = (aw ?? 0) * pw + (am ?? 0) * pm + (ac ?? 0) * pc;
+          actualAmountDue = Math.round(gross * bookingDiscountRatio(b) * 100) / 100;
         }
       } else if (ag != null) {
         if (serFerAllFree) {
           actualAmountDue = 0;
         } else {
+          // Non-ticket mode already uses finalPrice (post-discount) directly,
+          // so the discount is implicitly applied.
           const guests = Math.max(1, b.guests);
           actualAmountDue = Math.round(((ag / guests) * Number(b.finalPrice)) * 100) / 100;
         }

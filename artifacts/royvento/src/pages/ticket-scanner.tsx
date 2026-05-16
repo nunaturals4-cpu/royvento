@@ -46,7 +46,15 @@ interface BookingData {
   ticketMen: number;
   ticketCouple: number;
   guests: number;
+  // Pre-discount booking gross (per-tier × per-tier-price, FER applied).
+  // Used with finalPrice to derive the discount ratio so the live cash
+  // total at the door matches the amount printed on the guest's ticket.
+  totalPrice?: number;
+  // Post-discount amount the guest paid online or owes at the door.
   finalPrice: number;
+  discountAmount?: number;
+  pointsUsed?: number;
+  couponCode?: string;
   priceWomen?: number;
   priceMen?: number;
   priceCouple?: number;
@@ -1203,14 +1211,33 @@ function FinalizeActualEntry({
   const priceMen = ferState.isTierFree("men") ? 0 : (b.priceMen ?? 0);
   const priceCouple = ferState.isTierFree("couple") ? 0 : (b.priceCouple ?? 0);
 
-  // Live recalc mirrors server's calcActualAmountDue (per-tier × edited
-  // count, scaled by discount ratio for non-ticket modes).
-  const liveTotal = isTicket
+  // Booking discount ratio = finalPrice / totalPrice. Captures BOTH coupon
+  // codes AND reward-points deductions in a single multiplier. Without this
+  // the door cash would show the FULL sticker gross while the guest's
+  // ticket shows the discounted finalPrice — leading the manager to over-
+  // collect. Mirrors server-side bookingDiscountRatio() in lib/effectiveRevenue.ts.
+  const totalPrice = Number(b.totalPrice ?? 0);
+  const finalPrice = Number(b.finalPrice ?? 0);
+  const discountRatio = totalPrice > 0
+    ? Math.min(1, Math.max(0, finalPrice / totalPrice))
+    : 1;
+  const hasDiscount = discountRatio < 1 - 1e-6;
+
+  // Live recalc mirrors server's calcActualAmountDue: per-tier × edited
+  // count, scaled by the booking's discount ratio so coupon/points apply
+  // at the door too. For non-ticket modes finalPrice is already post-
+  // discount, so the prorated calculation needs no extra scaling.
+  const grossLive = isTicket
     ? w * priceWomen + m * priceMen + c * priceCouple
+    : 0;
+  const liveTotal = isTicket
+    ? grossLive * discountRatio
     : ferState.allGendersFree
       ? 0
-      : (g / Math.max(1, b.guests)) * b.finalPrice;
+      : (g / Math.max(1, b.guests)) * finalPrice;
   const liveTotalRounded = Math.round(liveTotal * 100) / 100;
+  const grossLiveRounded = Math.round(grossLive * 100) / 100;
+  const liveDiscountAmount = Math.round((grossLive - liveTotal) * 100) / 100;
 
   const subRows = isTicket
     ? [
@@ -1317,9 +1344,18 @@ function FinalizeActualEntry({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80 font-semibold">Collect cash (COD)</p>
-              <p className="text-[11px] text-amber-100/70 mt-0.5">Recalculates as you edit counts</p>
+              <p className="text-[11px] text-amber-100/70 mt-0.5">
+                {hasDiscount && isTicket
+                  ? "Matches the discounted amount on the guest's ticket"
+                  : "Recalculates as you edit counts"}
+              </p>
             </div>
             <div className="text-right">
+              {hasDiscount && isTicket && grossLiveRounded > liveTotalRounded && (
+                <div className="text-[11px] text-amber-200/50 line-through tabular-nums leading-none mb-0.5">
+                  ₹{grossLiveRounded.toLocaleString("en-IN")}
+                </div>
+              )}
               <div className="flex items-center justify-end gap-0.5 text-amber-200">
                 <IndianRupee className="h-5 w-5" />
                 <span className="text-3xl font-bold tabular-nums leading-none">{liveTotalRounded.toLocaleString("en-IN")}</span>
@@ -1334,6 +1370,26 @@ function FinalizeActualEntry({
                   <span className="tabular-nums">{r.free ? "—" : `₹${r.subtotal.toLocaleString("en-IN")}`}</span>
                 </div>
               ))}
+              {hasDiscount && liveDiscountAmount > 0 && (
+                <>
+                  <div className="flex justify-between pt-1.5 border-t border-amber-500/20">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">₹{grossLiveRounded.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-300/90">
+                    <span>
+                      Discount
+                      {b.couponCode ? ` (${b.couponCode})` : ""}
+                      {b.pointsUsed && b.pointsUsed > 0 ? ` · ${b.pointsUsed} pts` : ""}
+                    </span>
+                    <span className="tabular-nums">-₹{liveDiscountAmount.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-200 font-semibold pt-1.5 border-t border-amber-500/20">
+                    <span>Final payable</span>
+                    <span className="tabular-nums">₹{liveTotalRounded.toLocaleString("en-IN")}</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
