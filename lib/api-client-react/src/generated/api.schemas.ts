@@ -1309,6 +1309,8 @@ export const CommissionReportBookingLineBookingType = {
 export interface CommissionReportBookingLine {
   id: number;
   finalPrice: number;
+  /** Actual collected amount: actuals × per-tier price for COD, finalPrice for online */
+  effectiveRevenue: number;
   bookingType: CommissionReportBookingLineBookingType;
   /** Flat fee in INR per unit (per person, per ticket, or per table booking) */
   commissionRate: number;

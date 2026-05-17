@@ -4078,6 +4078,7 @@ export const GetCommissionReportResponse = zod.object({
         zod.object({
           id: zod.number(),
           finalPrice: zod.number(),
+          effectiveRevenue: zod.number().describe("Actual collected amount: actuals × per-tier price for COD, finalPrice for online"),
           bookingType: zod.enum(["free_entry", "ticket", "table"]),
           commissionRate: zod
             .number()

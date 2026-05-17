@@ -930,7 +930,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     actualCodRecordedCount: scannedCodRecordedCount,
     pendingActualsCount: scannedPendingCount,
     grossEarnings: Math.round(grossEarnings),
-    netEarnings: Math.round(grossEarnings - collectedCommission),
+    netEarnings: Math.round(grossEarnings - totalCommission),
     totalCommission: rnd2(totalCommission),
     collectedCommission: rnd2(collectedCommission),
     pendingCommission: rnd2(pendingCommission),

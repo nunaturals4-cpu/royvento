@@ -2094,6 +2094,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         actualMen: bookingsTable.actualMen,
         actualCouple: bookingsTable.actualCouple,
         actualGuests: bookingsTable.actualGuests,
+        paymentMethod: bookingsTable.paymentMethod,
         createdAt: bookingsTable.createdAt,
         status: bookingsTable.status,
       })
@@ -2156,9 +2157,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     if (row.bookingId != null) collectedBookingIds.add(row.bookingId);
   }
 
+  // Compute per-booking effective revenue (actuals × price for COD, finalPrice for online)
+  const { byBookingId: commReportEffRevById } = await computeEffectiveRevenues(bookings);
+
   type BookingLineItem = {
     id: number;
     finalPrice: number;
+    effectiveRevenue: number;
     bookingType: "free_entry" | "ticket" | "table";
     commissionRate: number;
     unitCount: number;
@@ -2239,7 +2244,10 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   }
 
   for (const b of bookings) {
-    const price = Number(b.finalPrice);
+    // Use actual collected amount (actuals × price for COD, finalPrice for online).
+    // Every booking here has checkedIn=true so effective revenue is always meaningful.
+    const effRev = commReportEffRevById.get(b.id) ?? Number(b.finalPrice);
+    const price = effRev;
     const rates = commissionMap.get(b.vendorId);
     // Use actuals-aware helper so the report reflects verified door counts,
     // not booked counts. Falls back to booked counts when actuals are null
@@ -2268,7 +2276,8 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     s.totalCommission += commissionAmount;
     s.bookings.push({
       id: b.id,
-      finalPrice: price,
+      finalPrice: Number(b.finalPrice),
+      effectiveRevenue: price,
       bookingType,
       commissionRate: feePerUnit,
       unitCount,

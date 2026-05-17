@@ -3936,10 +3936,12 @@ interface CommissionRates {
 interface CommissionBookingLine {
   id: number;
   finalPrice: number;
+  effectiveRevenue: number;
   bookingType: "free_entry" | "ticket" | "table";
   commissionRate: number;
   unitCount: number;
   commissionAmount: number;
+  collected: boolean;
   createdAt: string;
 }
 
@@ -4332,7 +4334,12 @@ function CommissionsAdmin() {
                                         {new Date(b.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
                                       </td>
                                       <td className="py-1.5 pr-3">{bookingTypeLabel(b.bookingType)}</td>
-                                      <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
+                                      <td className="text-right px-2">
+                                        {formatINR(b.effectiveRevenue ?? b.finalPrice)}
+                                        {b.effectiveRevenue != null && b.effectiveRevenue !== b.finalPrice && (
+                                          <p className="text-xs text-muted-foreground">booked {formatINR(b.finalPrice)}</p>
+                                        )}
+                                      </td>
                                       <td className="text-right px-2">
                                         {b.commissionRate > 0
                                           ? b.bookingType === "ticket"
