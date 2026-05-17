@@ -659,9 +659,9 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const commRow = commissions[0];
 
   // Pre-fetch every event so we can read freeEntryRules without N+1 lookups.
-  // Source of truth for commission math: lib/commission.ts → computeCommissionFromPlanned.
+  // Source of truth for commission math: lib/commission.ts → computeCommissionFromActuals.
   // The Admin Panel → Commission Report uses the same helper, so Partner
-  // Dashboard → Analytics → Platform Charges now agrees with admin to the rupee.
+  // Dashboard → Analytics → Platform Charges agrees with admin to the rupee.
   const _commEventIds = Array.from(new Set(allBookings.map((b) => b.eventId)));
   const _commEventRows = _commEventIds.length > 0
     ? await db.select().from(eventsTable).where(inArray(eventsTable.id, _commEventIds))
@@ -683,9 +683,14 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     };
     const evt = commEventMap.get(b.eventId);
     const fer = (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules ?? null;
-    const result = computeCommissionFromPlanned(
+    // Actuals-aware: commission scales with the headcount the manager
+    // verified at the door, not the booked counts. People-count in the
+    // breakdown table also reflects actuals so the partner sees
+    // "10 people walked in, ₹500 commission" (not the booked 15).
+    const result = computeCommissionFromActuals(
       b,
       commRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      { priceWomen: evt?.priceWomen, priceMen: evt?.priceMen, priceCouple: evt?.priceCouple },
       fer,
     );
     const bucket = result.bookingType === "free_entry"
@@ -770,12 +775,17 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   for (const b of allBookings) {
     const fp = Number(b.finalPrice);
     const isCod = b.paymentMethod === "cod";
-    if (isCod) codRevenue += fp;
-    else onlineRevenue += fp;
-
-    grossEarnings += fp;
+    // Per-booking realised revenue. For COD bookings this is the actuals
+    // × FER-aware per-tier price × discount ratio (from computeEffectiveRevenues).
+    // For online bookings it's finalPrice (already settled upstream — we
+    // don't issue refunds when fewer guests show up).
     const bookingRevenue = revenueByBookingId.get(b.id) ?? 0;
-    if (new Date(b.createdAt) >= monthStart) monthEarnings += fp;
+
+    if (isCod) codRevenue += bookingRevenue;
+    else onlineRevenue += bookingRevenue;
+
+    grossEarnings += bookingRevenue;
+    if (new Date(b.createdAt) >= monthStart) monthEarnings += bookingRevenue;
 
     const isCollected = ledgerAmtByBookingId.has(b.id);
     if (isCod) {
@@ -787,11 +797,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       }
     }
 
-    // GROSS rule: matches Admin Panel → Commission Report exactly — sum of
-    // finalPrice for every confirmed/completed booking in the window,
-    // regardless of QR-scan status. Keeps partner Platform Charges → Gross
-    // identical to the admin per-vendor totals to the rupee.
-    const split = calcCommSplit(b, fp);
+    // Commission split — uses actuals via calcCommSplit → computeCommissionFromActuals.
+    // The bucket Gross is the booking's realised revenue so a partner who
+    // reduced 5 booked → 3 actual sees both gross and commission drop in
+    // lockstep on this card.
+    const split = calcCommSplit(b, bookingRevenue);
     splitCache.set(b.id, split);
     const commissionAmount = commTotal(split);
     totalCommission += commissionAmount;
@@ -799,10 +809,6 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     else pendingCommission += commissionAmount;
     if (isCod) codCommission += commissionAmount;
     else onlineCommission += commissionAmount;
-    // Per-booking-type breakdown — each booking falls into a single bucket
-    // (free_entry / ticket / table). GROSS = finalPrice for scanned bookings,
-    // ₹0 for pending. Commission AMOUNT is deterministic (People × Rate)
-    // and matches the Admin Panel → Commission Report.
     for (const k of ["freeEntry", "ticket", "table"] as const) {
       commSummary[k].count += split[k].count;
       commSummary[k].grossRevenue += split[k].gross;
@@ -827,21 +833,23 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     revenue: number; peopleCount: number;
   }>();
   for (const b of allBookings) {
-    // Revenue column tracks Gross Earnings: sum of finalPrice for every
-    // confirmed/completed booking, so the column total reconciles with the
-    // Platform Charges → Gross Earnings KPI.
-    const rev = Number(b.finalPrice);
-    // People count per booking: prefer per-tier headcount (couple = 2),
-    // fall back to `guests` for table-mode and legacy event-mode rows.
-    // Same rule as freeEntryPeopleCount() in lib/commission.ts.
-    const tierHeads = b.ticketWomen + b.ticketMen + b.ticketCouple * 2;
-    const people = tierHeads > 0 ? tierHeads : Math.max(0, b.guests);
+    // Revenue, headcount, and people-count all follow ACTUAL door counts
+    // when the manager has saved them; otherwise fall back to booked.
+    // Keeps the per-event row consistent with the Gross Earnings KPI
+    // above (which is now realised revenue, not sum-of-finalPrice).
+    const rev = revenueByBookingId.get(b.id) ?? 0;
+    const aw = b.actualWomen ?? b.ticketWomen;
+    const am = b.actualMen ?? b.ticketMen;
+    const ac = b.actualCouple ?? b.ticketCouple;
+    const ag = b.actualGuests ?? b.guests;
+    const tierHeads = aw + am + ac * 2;
+    const people = tierHeads > 0 ? tierHeads : Math.max(0, ag);
     const existing = perEventMap.get(b.eventId);
     if (existing) {
       existing.bookingCount += 1;
-      existing.ticketWomen += b.ticketWomen;
-      existing.ticketMen += b.ticketMen;
-      existing.ticketCouple += b.ticketCouple;
+      existing.ticketWomen += aw;
+      existing.ticketMen += am;
+      existing.ticketCouple += ac;
       existing.revenue += rev;
       existing.peopleCount += people;
     } else {
@@ -849,9 +857,9 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
         eventId: b.eventId,
         eventTitle: eTitleMap.get(b.eventId) ?? `Event #${b.eventId}`,
         bookingCount: 1,
-        ticketWomen: b.ticketWomen,
-        ticketMen: b.ticketMen,
-        ticketCouple: b.ticketCouple,
+        ticketWomen: aw,
+        ticketMen: am,
+        ticketCouple: ac,
         revenue: rev,
         peopleCount: people,
       });
@@ -875,13 +883,18 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   }
   for (const b of allBookings) {
     const day = new Date(b.createdAt).toISOString().slice(0, 10);
-    // Daily revenue chart sums finalPrice so its column total reconciles
-    // with Total Earnings / Gross Earnings on the same page.
-    const rev = Number(b.finalPrice);
+    // Daily revenue chart uses realised per-booking revenue (actuals-aware
+    // for COD, finalPrice for online) so the column total reconciles with
+    // Total Earnings / Gross Earnings tiles above.
+    const rev = revenueByBookingId.get(b.id) ?? 0;
     if (dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
       const cachedSplit = splitCache.get(b.id);
-      const dayComm = ledgerAmtByBookingId.get(b.id) ?? (cachedSplit ? commTotal(cachedSplit) : 0);
+      // Always use the actuals-based computed commission (same as totalCommission
+      // above) so the daily chart is consistent with every other commission tile.
+      // Using ledger amounts here caused stale values for online bookings whose
+      // ledger was written at payment-webhook time (before actuals were known).
+      const dayComm = cachedSplit ? commTotal(cachedSplit) : 0;
       dailyCommissionMap.set(day, (dailyCommissionMap.get(day) ?? 0) + dayComm);
     }
   }
@@ -898,29 +911,26 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   const totalCouple = perEventArr.reduce((s, r) => s + r.ticketCouple, 0);
 
   function rnd2(n: number) { return Math.round(n * 100) / 100; }
-  // Total Earnings = realised cash + online payments, per the spec:
-  // partners want to see actual money that landed (whether at the door for
-  // COD or in the online wallet). It is NOT the planned/booked finalPrice
-  // sum — that figure overstates earnings when COD bookings finalise to
-  // a lower headcount or when bookings haven't been finalised yet.
-  // COD slice uses the scanned/actuals calculation (per-tier FER-aware,
-  // discount-ratio applied), online slice is finalPrice (already
-  // settled upstream). Net Earnings is Total minus realised commission.
-  const realisedTotalEarnings = scannedCodRevenue + onlineRevenue;
+  // Every revenue figure on this page is now actuals-aware: COD bookings
+  // use sum(actualCounts × FER-aware per-tier price × discount ratio),
+  // online bookings use finalPrice (no refund issued for fewer guests).
+  // Gross Earnings, Total Earnings, and Net Earnings all derive from the
+  // same realised number so the tiles can never diverge. Reducing
+  // headcount at Save Actual Entry instantly drops every figure on the
+  // page on next refetch.
   res.json({
-    totalEarnings: Math.round(realisedTotalEarnings),
+    totalEarnings: Math.round(grossEarnings),
     monthEarnings: Math.round(monthEarnings),
     codRevenue: Math.round(codRevenue),
     onlineRevenue: Math.round(onlineRevenue),
     // COD Collected (Actual) — actuals × per-type prices for COD bookings
-    // that have a realised commission_ledger entry (= QR-scanned). Mixed
-    // bookings (some tiers FER-free, some paid) now correctly count only
-    // the paid tiers. Pure free-entry bookings contribute ₹0.
+    // that have a realised commission_ledger entry. Mixed bookings (some
+    // tiers FER-free, some paid) correctly count only the paid tiers.
     actualCodRevenue: Math.round(scannedCodRevenue),
     actualCodRecordedCount: scannedCodRecordedCount,
     pendingActualsCount: scannedPendingCount,
     grossEarnings: Math.round(grossEarnings),
-    netEarnings: Math.round(realisedTotalEarnings - collectedCommission),
+    netEarnings: Math.round(grossEarnings - collectedCommission),
     totalCommission: rnd2(totalCommission),
     collectedCommission: rnd2(collectedCommission),
     pendingCommission: rnd2(pendingCommission),
@@ -1859,13 +1869,16 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
 
   // Pre-compute commission for this booking
   const scanComm = scanCommissionRows[0];
-  // Thin wrapper around the shared helper so all scan paths (lookup, confirm,
-  // actualEntry) use identical math to the payment webhook and admin report.
+  // Actuals-aware wrapper: uses actual door counts when present (after Save
+  // Actual Entry) and falls back to booked counts when actuals are null (lookup
+  // phase). This keeps the scanner's commission display consistent with every
+  // other analytics surface (partner dashboard, admin commission report).
   function calcScanCommission(booking: typeof b) {
     const price = Number(booking.finalPrice);
-    const result = computeCommissionFromPlanned(
+    const result = computeCommissionFromActuals(
       booking,
       scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      scanPriceInfo,
       scanFer ?? null,
     );
     return {
@@ -2159,18 +2172,18 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     : isCod
       ? "cod_checkin"
       : "online_payment";
-  const ledgerAmount = isCod || isFreeEntry
-    ? computeCommissionFromActuals(
-        updatedActuals,
-        scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
-        { priceWomen: scanPriceInfo.priceWomen, priceMen: scanPriceInfo.priceMen, priceCouple: scanPriceInfo.priceCouple },
-        scanFer ?? null,
-      )
-    : computeCommissionFromPlanned(
-        updatedActuals,
-        scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
-        scanFer ?? null,
-      );
+  // Every path uses computeCommissionFromActuals now — including online —
+  // so the ledger row records what the manager actually verified at the
+  // door. Online still uses paymentMethod !== "cod" so the trigger stays
+  // "online_payment", but the AMOUNT scales with actuals. Net effect: a
+  // pre-paid online booking where 3 of 5 showed up bills the platform
+  // for 3 × per-ticket-rate, not 5.
+  const ledgerAmount = computeCommissionFromActuals(
+    updatedActuals,
+    scanComm ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+    { priceWomen: scanPriceInfo.priceWomen, priceMen: scanPriceInfo.priceMen, priceCouple: scanPriceInfo.priceCouple },
+    scanFer ?? null,
+  );
 
   try {
     await db.transaction(async (tx) => {

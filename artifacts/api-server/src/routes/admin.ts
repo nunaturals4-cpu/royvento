@@ -14,7 +14,7 @@ import {
   vendorManagersTable,
   wishlistsTable,
 } from "@workspace/db";
-import { computeCommissionFromPlanned, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
+import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { bookingDiscountRatio, ferTierFreeness } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
@@ -274,9 +274,15 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number;
   }>();
   for (const b of confirmedBookings) {
-    totalWomen += b.ticketWomen;
-    totalMen += b.ticketMen;
-    totalCouple += b.ticketCouple;
+    // Headcount totals follow ACTUAL door counts when present, fall back
+    // to booked. Reducing a count via Save Actual Entry now flows
+    // through to totalWomen/Men/Couple and the per-vendor row too.
+    const aw = b.actualWomen ?? b.ticketWomen;
+    const am = b.actualMen ?? b.ticketMen;
+    const ac = b.actualCouple ?? b.ticketCouple;
+    totalWomen += aw;
+    totalMen += am;
+    totalCouple += ac;
     actualWomenTotal += b.actualWomen ?? 0;
     actualMenTotal += b.actualMen ?? 0;
     actualCoupleTotal += b.actualCouple ?? 0;
@@ -296,17 +302,17 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     const pv = perVendorMap.get(b.vendorId);
     if (pv) {
       pv.bookingCount += 1;
-      pv.ticketWomen += b.ticketWomen;
-      pv.ticketMen += b.ticketMen;
-      pv.ticketCouple += b.ticketCouple;
+      pv.ticketWomen += aw;
+      pv.ticketMen += am;
+      pv.ticketCouple += ac;
       pv.revenue += rev;
     } else {
       perVendorMap.set(b.vendorId, {
         vendorId: b.vendorId,
         bookingCount: 1,
-        ticketWomen: b.ticketWomen,
-        ticketMen: b.ticketMen,
-        ticketCouple: b.ticketCouple,
+        ticketWomen: aw,
+        ticketMen: am,
+        ticketCouple: ac,
         revenue: rev,
       });
     }
@@ -322,10 +328,11 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const allVMap = new Map(allVendors.map((v) => [v.id, v]));
 
   // "Total Commission" KPI = Commission Report totals.totalCommission.
-  // Sum of planned commission (current rate card) for EVERY confirmed/completed
-  // booking in the window, regardless of QR-scan status. Matches the Commission
-  // Report's per-vendor totalCommission aggregation to the rupee. Each booking
-  // contributes once (we iterate over the deduped confirmedBookings list).
+  // Sum of actuals-based commission (current rate card × verified door counts)
+  // for every confirmed/completed+checkedIn booking in the window. Falls back
+  // to booked counts only when actuals are null (should not happen for
+  // checkedIn=true rows, but guards against partial data). Matches the
+  // Commission Report's per-vendor totalCommission aggregation to the rupee.
   const vendorCommissionRows = await db.select().from(vendorCommissionsTable);
   const vendorCommissionMap = new Map(vendorCommissionRows.map((r) => [r.vendorId, r]));
 
@@ -346,7 +353,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   let totalCommission = 0;
   for (const b of confirmedBookings) {
     const rates = vendorCommissionMap.get(b.vendorId) ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 };
-    const comm = computeCommissionFromPlanned(b, rates, analyticsFerMap.get(b.eventId) ?? null);
+    const comm = computeCommissionFromActuals(b, rates, { priceWomen: null, priceMen: null, priceCouple: null }, analyticsFerMap.get(b.eventId) ?? null);
     totalCommission += comm.amount;
   }
   totalCommission = Math.round(totalCommission * 100) / 100;
@@ -2065,6 +2072,10 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         ticketWomen: bookingsTable.ticketWomen,
         ticketMen: bookingsTable.ticketMen,
         ticketCouple: bookingsTable.ticketCouple,
+        actualWomen: bookingsTable.actualWomen,
+        actualMen: bookingsTable.actualMen,
+        actualCouple: bookingsTable.actualCouple,
+        actualGuests: bookingsTable.actualGuests,
         createdAt: bookingsTable.createdAt,
         status: bookingsTable.status,
       })
@@ -2205,11 +2216,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   for (const b of bookings) {
     const price = Number(b.finalPrice);
     const rates = commissionMap.get(b.vendorId);
-    // Use the shared helper so this report always agrees with the live
-    // online-payment + COD/free check-in flows.
-    const comm = computeCommissionFromPlanned(
+    // Use actuals-aware helper so the report reflects verified door counts,
+    // not booked counts. Falls back to booked counts when actuals are null
+    // (guards against edge cases; checkedIn=true rows should always have actuals).
+    const comm = computeCommissionFromActuals(
       b,
       rates ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      { priceWomen: null, priceMen: null, priceCouple: null },
       eventFerMap.get(b.eventId) ?? null,
     );
     const bookingType = comm.bookingType;

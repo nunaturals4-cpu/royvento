@@ -19,10 +19,18 @@
  *   Table classification (pubMode = "table")
  *     commission = tableBookingRate × guests
  *
- * Actuals (door counts) are an attendance log only — they NEVER change the
- * per-booking commission. This keeps the report deterministic against the
- * current rate card and prevents zero-actual scans from wiping a realised
- * commission to ₹0.
+ * Actuals-aware mode: when a booking has been finalised at the door
+ * (Save Actual Entry on the scanner has set actualWomen/Men/Couple/
+ * Guests), all downstream commission math uses those actual counts in
+ * place of the booked ticketWomen/Men/Couple/guests. Bookings that
+ * haven't been finalised yet fall back to the booked counts so pending-
+ * estimate displays still work.
+ *
+ * The "zero-actual wipe" risk that used to motivate locking commission
+ * to booked counts no longer applies: the scanner endpoint now LOCKS
+ * a booking after the first Save Actual Entry (30-second grace window
+ * for duplicates), so a stray re-scan with zero actuals can't zero out
+ * a realised ledger entry.
  */
 
 export type BookingType = "free_entry" | "ticket" | "table";
@@ -174,10 +182,21 @@ export function computeCommissionFromPlanned(
 }
 
 /**
- * Actuals path delegates to the planned calculation. Actuals are an
- * attendance log; the platform's per-booking commission is fixed at booking
- * time against the current rate card so a re-scan with zero actuals can
- * never zero out a realised commission.
+ * Actuals-aware commission. Substitutes actual door counts for the booked
+ * counts when present, then runs the same per-tier FER-aware math as
+ * computeCommissionFromPlanned. Reducing headcount at Save Actual Entry
+ * therefore reduces the commission charged (and, downstream, the
+ * commission shown in the partner Analytics tab and the admin Commission
+ * Report).
+ *
+ * Fallback to booked counts when any actual is null (i.e. the booking
+ * has been confirmed but not finalised at the door yet) so pending-
+ * estimate displays in Admin still show a sensible figure.
+ *
+ * `classifyBookingType` still keys off `finalPrice`, not actuals — a
+ * booking with finalPrice = 0 is still "free_entry" even if actuals
+ * land at zero. That preserves the per-person freeEntryRate for
+ * ladies-night / no-cover bookings.
  */
 export function computeCommissionFromActuals(
   b: ActualBookingShape,
@@ -185,7 +204,16 @@ export function computeCommissionFromActuals(
   _event: EventPriceShape,
   fer?: FreeEntryRulesShape | null,
 ): CommissionResult {
-  return computeCommissionFromPlanned(b, rates, fer);
+  const effective: PlannedBookingShape = {
+    pubMode: b.pubMode,
+    finalPrice: b.finalPrice,
+    guests: b.actualGuests ?? b.guests,
+    ticketWomen: b.actualWomen ?? b.ticketWomen,
+    ticketMen: b.actualMen ?? b.ticketMen,
+    ticketCouple: b.actualCouple ?? b.ticketCouple,
+    bookingDate: b.bookingDate,
+  };
+  return computeCommissionFromPlanned(effective, rates, fer);
 }
 
 /** Commission ledger triggers that represent realised platform earnings. */
