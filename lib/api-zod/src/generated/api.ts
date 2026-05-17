@@ -2756,7 +2756,7 @@ export const GetPartnerCommissionResponse = zod
       .describe("Flat fee in INR per person (stored as decimal string)"),
     ticketRate: zod
       .string()
-      .describe("Flat fee in INR per ticket (stored as decimal string)"),
+      .describe("Ticket commission percentage (0–100, stored as decimal string)"),
     tableBookingRate: zod
       .string()
       .describe("Flat fee in INR per table booking (stored as decimal string)"),
@@ -2809,7 +2809,7 @@ export const GetPartnerAnalyticsResponse = zod.object({
         .describe("Flat fee in INR per person (stored as decimal string)"),
       ticketRate: zod
         .string()
-        .describe("Flat fee in INR per ticket (stored as decimal string)"),
+        .describe("Ticket commission percentage (0–100, stored as decimal string)"),
       tableBookingRate: zod
         .string()
         .describe(
@@ -3987,7 +3987,7 @@ export const setVendorCommissionBodyFreeEntryRateMin = 0;
 export const setVendorCommissionBodyFreeEntryRateMax = 99999.99;
 
 export const setVendorCommissionBodyTicketRateMin = 0;
-export const setVendorCommissionBodyTicketRateMax = 99999.99;
+export const setVendorCommissionBodyTicketRateMax = 100;
 
 export const setVendorCommissionBodyTableBookingRateMin = 0;
 export const setVendorCommissionBodyTableBookingRateMax = 99999.99;
@@ -4003,7 +4003,7 @@ export const SetVendorCommissionBody = zod
       .number()
       .min(setVendorCommissionBodyTicketRateMin)
       .max(setVendorCommissionBodyTicketRateMax)
-      .describe("Flat fee in INR per ticket"),
+      .describe("Percentage of ticket revenue charged as platform commission (0–100)"),
     tableBookingRate: zod
       .number()
       .min(setVendorCommissionBodyTableBookingRateMin)

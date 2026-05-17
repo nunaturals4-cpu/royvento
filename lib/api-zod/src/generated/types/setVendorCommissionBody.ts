@@ -14,9 +14,9 @@ export interface SetVendorCommissionBody {
    */
   freeEntryRate: number;
   /**
-   * Flat fee in INR per ticket
+   * Percentage of ticket revenue charged as platform commission (0–100)
    * @minimum 0
-   * @maximum 99999.99
+   * @maximum 100
    */
   ticketRate: number;
   /**

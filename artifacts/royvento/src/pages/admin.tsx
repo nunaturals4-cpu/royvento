@@ -4016,6 +4016,10 @@ function CommissionsAdmin() {
       toast({ title: "Fees must be valid non-negative numbers", variant: "destructive" });
       return;
     }
+    if (ticket > 100) {
+      toast({ title: "Ticket rate must be 0–100%", variant: "destructive" });
+      return;
+    }
     setSavingId(vendorId);
     try {
       await apiPut(`/api/admin/vendors/${vendorId}/commission`, {
@@ -4080,7 +4084,7 @@ function CommissionsAdmin() {
                 <tr>
                   <th className="text-left py-2 pr-4">Partner</th>
                   <th className="text-right py-2 px-3">Free Entry ₹/person</th>
-                  <th className="text-right py-2 px-3">Ticket ₹/ticket</th>
+                  <th className="text-right py-2 px-3">Ticket %</th>
                   <th className="text-right py-2 px-3">Table ₹/booking</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
@@ -4113,7 +4117,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          max={99999.99}
+                          max={100}
                           step={0.01}
                           value={edits.ticketRate}
                           onChange={(e) => updateRate(row.vendorId, "ticketRate", e.target.value)}
@@ -4230,7 +4234,7 @@ function CommissionsAdmin() {
                             <span className="opacity-80">Fees:</span>{" "}
                             <span className="whitespace-nowrap">FE ₹{row.appliedRates.freeEntryRate}/person</span>
                             <span className="opacity-40"> · </span>
-                            <span className="whitespace-nowrap">Ticket ₹{row.appliedRates.ticketRate}/ticket</span>
+                            <span className="whitespace-nowrap">Ticket {row.appliedRates.ticketRate}%</span>
                             <span className="opacity-40"> · </span>
                             <span className="whitespace-nowrap">Table ₹{row.appliedRates.tableBookingRate}/booking</span>
                           </p>
@@ -4312,7 +4316,9 @@ function CommissionsAdmin() {
                                       <td className="text-right px-2">{formatINR(b.finalPrice)}</td>
                                       <td className="text-right px-2">
                                         {b.commissionRate > 0
-                                          ? `₹${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)} × ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : b.bookingType === "ticket" ? "ticket" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
+                                          ? b.bookingType === "ticket"
+                                            ? `${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)}%`
+                                            : `₹${b.commissionRate % 1 === 0 ? b.commissionRate.toFixed(0) : b.commissionRate.toFixed(2)} × ${b.unitCount} ${b.bookingType === "free_entry" ? "person" : "booking"}${b.unitCount !== 1 ? "s" : ""}`
                                           : "--"}
                                       </td>
                                       <td className="text-right pl-2 text-primary">{formatINR(b.commissionAmount)}</td>

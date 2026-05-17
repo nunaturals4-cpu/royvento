@@ -339,21 +339,30 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const analyticsEventIds = Array.from(new Set(confirmedBookings.map((b) => b.eventId)));
   const analyticsEventRows = analyticsEventIds.length > 0
     ? await db
-        .select({ id: eventsTable.id, freeEntryRules: eventsTable.freeEntryRules })
+        .select({
+          id: eventsTable.id,
+          freeEntryRules: eventsTable.freeEntryRules,
+          priceWomen: eventsTable.priceWomen,
+          priceMen: eventsTable.priceMen,
+          priceCouple: eventsTable.priceCouple,
+        })
         .from(eventsTable)
         .where(inArray(eventsTable.id, analyticsEventIds))
     : [];
-  const analyticsFerMap = new Map(
-    analyticsEventRows.map((e) => [
-      e.id,
-      e.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | null,
-    ]),
-  );
+  // Single map carries both FER rules and per-tier prices so the
+  // percentage-based ticket commission has all the data it needs.
+  const analyticsEventMap = new Map(analyticsEventRows.map((e) => [e.id, e]));
 
   let totalCommission = 0;
   for (const b of confirmedBookings) {
     const rates = vendorCommissionMap.get(b.vendorId) ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 };
-    const comm = computeCommissionFromActuals(b, rates, { priceWomen: null, priceMen: null, priceCouple: null }, analyticsFerMap.get(b.eventId) ?? null);
+    const ev = analyticsEventMap.get(b.eventId);
+    const comm = computeCommissionFromActuals(
+      b,
+      rates,
+      { priceWomen: ev?.priceWomen, priceMen: ev?.priceMen, priceCouple: ev?.priceCouple },
+      (ev?.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | null) ?? null,
+    );
     totalCommission += comm.amount;
   }
   totalCommission = Math.round(totalCommission * 100) / 100;
@@ -2067,6 +2076,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         eventId: bookingsTable.eventId,
         bookingDate: bookingsTable.bookingDate,
         finalPrice: bookingsTable.finalPrice,
+        totalPrice: bookingsTable.totalPrice,
         pubMode: bookingsTable.pubMode,
         guests: bookingsTable.guests,
         ticketWomen: bookingsTable.ticketWomen,
@@ -2114,10 +2124,17 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
   const reportEventIds = Array.from(new Set(bookings.map((b) => b.eventId)));
   const reportEventRows = reportEventIds.length > 0
     ? await db
-        .select({ id: eventsTable.id, freeEntryRules: eventsTable.freeEntryRules })
+        .select({
+          id: eventsTable.id,
+          freeEntryRules: eventsTable.freeEntryRules,
+          priceWomen: eventsTable.priceWomen,
+          priceMen: eventsTable.priceMen,
+          priceCouple: eventsTable.priceCouple,
+        })
         .from(eventsTable)
         .where(inArray(eventsTable.id, reportEventIds))
     : [];
+  const reportEventMap = new Map(reportEventRows.map((e) => [e.id, e]));
   const eventFerMap = new Map(
     reportEventRows.map((e) => [e.id, e.freeEntryRules as { enabled?: boolean; days?: string[]; genders?: string[] } | null]),
   );
@@ -2219,10 +2236,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     // Use actuals-aware helper so the report reflects verified door counts,
     // not booked counts. Falls back to booked counts when actuals are null
     // (guards against edge cases; checkedIn=true rows should always have actuals).
+    const reportEv = reportEventMap.get(b.eventId);
     const comm = computeCommissionFromActuals(
       b,
       rates ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
-      { priceWomen: null, priceMen: null, priceCouple: null },
+      { priceWomen: reportEv?.priceWomen, priceMen: reportEv?.priceMen, priceCouple: reportEv?.priceCouple },
       eventFerMap.get(b.eventId) ?? null,
     );
     const bookingType = comm.bookingType;
