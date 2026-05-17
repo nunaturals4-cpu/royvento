@@ -945,9 +945,14 @@ export interface AdminBookingRow {
   ticketWomen: number;
   ticketMen: number;
   ticketCouple: number;
+  actualWomen: number | null;
+  actualMen: number | null;
+  actualCouple: number | null;
+  actualGuests: number | null;
   totalPrice: number;
   discountAmount: number;
   finalPrice: number;
+  effectiveRevenue: number;
   paymentMethod: string;
   status: string;
   notes: string;

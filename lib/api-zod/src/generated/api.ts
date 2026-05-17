@@ -2177,6 +2177,7 @@ export const ListVendorBookingsResponse = zod.object({
       actualCouple: zod.number().nullish(),
       actualGuests: zod.number().nullish(),
       actualAmountDue: zod.number().nullish(),
+      effectiveRevenue: zod.number().optional(),
       actualEntry: zod
         .object({
           women: zod.number().nullish(),
@@ -3798,9 +3799,14 @@ export const GetAdminBookingsReportResponse = zod.object({
       ticketWomen: zod.number(),
       ticketMen: zod.number(),
       ticketCouple: zod.number(),
+      actualWomen: zod.number().nullable(),
+      actualMen: zod.number().nullable(),
+      actualCouple: zod.number().nullable(),
+      actualGuests: zod.number().nullable(),
       totalPrice: zod.number(),
       discountAmount: zod.number(),
       finalPrice: zod.number(),
+      effectiveRevenue: zod.number(),
       paymentMethod: zod.string(),
       status: zod.string(),
       notes: zod.string(),

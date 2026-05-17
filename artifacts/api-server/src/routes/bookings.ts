@@ -1151,21 +1151,25 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res)
     totalRevenue += rev;
     const month = (b.bookingDate ?? "").slice(0, 7);
     if (month) monthlyRevMap.set(month, (monthlyRevMap.get(month) ?? 0) + rev);
+    // All confirmedBookings are checkedIn=true, so prefer actual door counts.
+    const ew = b.actualWomen ?? b.ticketWomen;
+    const em = b.actualMen ?? b.ticketMen;
+    const ec = b.actualCouple ?? b.ticketCouple;
     const existing = perEventMap.get(b.eventId);
     if (existing) {
       existing.bookingCount += 1;
-      existing.ticketWomen += b.ticketWomen;
-      existing.ticketMen += b.ticketMen;
-      existing.ticketCouple += b.ticketCouple;
+      existing.ticketWomen += ew;
+      existing.ticketMen += em;
+      existing.ticketCouple += ec;
       existing.revenue += rev;
     } else {
       perEventMap.set(b.eventId, {
         eventId: b.eventId,
         eventTitle: "",
         bookingCount: 1,
-        ticketWomen: b.ticketWomen,
-        ticketMen: b.ticketMen,
-        ticketCouple: b.ticketCouple,
+        ticketWomen: ew,
+        ticketMen: em,
+        ticketCouple: ec,
         revenue: rev,
       });
     }
@@ -1237,7 +1241,15 @@ router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
     .limit(limit)
     .offset(offset);
 
-  res.json({ data: await serializeBookings(rows), total, page, totalPages });
+  const [serialized, { byBookingId: effById }] = await Promise.all([
+    serializeBookings(rows),
+    computeEffectiveRevenues(rows),
+  ]);
+  const data = serialized.map((b) => ({
+    ...b,
+    effectiveRevenue: effById.get(b.id) ?? b.finalPrice,
+  }));
+  res.json({ data, total, page, totalPages });
 });
 
 router.patch(

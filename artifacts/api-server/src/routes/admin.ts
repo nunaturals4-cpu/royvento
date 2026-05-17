@@ -15,7 +15,7 @@ import {
   wishlistsTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
-import { bookingDiscountRatio, ferTierFreeness } from "../lib/effectiveRevenue";
+import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -1108,13 +1108,14 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
   const userIds = [...new Set(rows.map((r) => r.userId))];
   const vendorIds = [...new Set(rows.map((r) => r.vendorId))];
   const bookingIds = rows.map((r) => r.id);
-  const [events, users, vendors, payments] = await Promise.all([
+  const [events, users, vendors, payments, { byBookingId: effectiveByBookingId }] = await Promise.all([
     db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)),
     db.select().from(usersTable).where(inArray(usersTable.id, userIds)),
     db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
     db.select({ bookingId: paymentsTable.bookingId, phonepeTransactionId: paymentsTable.phonepeTransactionId, status: paymentsTable.status })
       .from(paymentsTable)
       .where(inArray(paymentsTable.bookingId, bookingIds)),
+    computeEffectiveRevenues(rows),
   ]);
   const eMap = new Map(events.map((e) => [e.id, e]));
   const uMap = new Map(users.map((u) => [u.id, u]));
@@ -1151,9 +1152,16 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
       ticketWomen: b.ticketWomen,
       ticketMen: b.ticketMen,
       ticketCouple: b.ticketCouple,
+      actualWomen: b.actualWomen ?? null,
+      actualMen: b.actualMen ?? null,
+      actualCouple: b.actualCouple ?? null,
+      actualGuests: b.actualGuests ?? null,
       totalPrice: Number(b.totalPrice),
       discountAmount: Number(b.discountAmount),
       finalPrice: Number(b.finalPrice),
+      /** Actual amount collected: for online = finalPrice; for COD checked-in =
+       *  actual-count-based revenue; for pending COD = 0. */
+      effectiveRevenue: effectiveByBookingId.get(b.id) ?? Number(b.finalPrice),
       paymentMethod,
       status: b.status,
       notes: b.notes,

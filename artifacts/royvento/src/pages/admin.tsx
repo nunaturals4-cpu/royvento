@@ -2737,18 +2737,37 @@ function BookingReport() {
                       <span className="text-xs capitalize">{b.pubMode?.replace("_", " ")}</span>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap text-xs">
-                      {b.ticketWomen > 0 && <span className="text-pink-400 mr-1">{b.ticketWomen}W</span>}
-                      {b.ticketMen > 0 && <span className="text-blue-400 mr-1">{b.ticketMen}M</span>}
-                      {b.ticketCouple > 0 && <span className="text-purple-400">{b.ticketCouple}C</span>}
-                      {b.ticketWomen === 0 && b.ticketMen === 0 && b.ticketCouple === 0 && (
-                        <span className="text-muted-foreground">{b.guests}g</span>
-                      )}
+                      {(() => {
+                        const hasActuals = b.checkedIn && (b.actualWomen != null || b.actualMen != null || b.actualCouple != null || b.actualGuests != null);
+                        const w = hasActuals ? (b.actualWomen ?? 0) : b.ticketWomen;
+                        const m = hasActuals ? (b.actualMen ?? 0) : b.ticketMen;
+                        const c = hasActuals ? (b.actualCouple ?? 0) : b.ticketCouple;
+                        const g = hasActuals ? (b.actualGuests ?? b.guests) : b.guests;
+                        const hasTiers = w > 0 || m > 0 || c > 0;
+                        return <>
+                          {w > 0 && <span className={`mr-1 ${hasActuals ? "text-pink-300" : "text-pink-400"}`}>{w}W</span>}
+                          {m > 0 && <span className={`mr-1 ${hasActuals ? "text-blue-300" : "text-blue-400"}`}>{m}M</span>}
+                          {c > 0 && <span className={hasActuals ? "text-purple-300" : "text-purple-400"}>{c}C</span>}
+                          {!hasTiers && <span className="text-muted-foreground">{g}g</span>}
+                          {hasActuals && <span className="ml-1 text-green-400 opacity-70">✓</span>}
+                        </>;
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <span className="font-medium text-primary">{formatINR(b.finalPrice)}</span>
-                      {b.discountAmount > 0 && (
-                        <p className="text-xs text-muted-foreground line-through">{formatINR(b.totalPrice)}</p>
-                      )}
+                      {(() => {
+                        const isCOD = b.paymentMethod === "COD";
+                        const collected = isCOD && b.checkedIn;
+                        const displayAmt = collected ? b.effectiveRevenue ?? b.finalPrice : b.finalPrice;
+                        return <>
+                          <span className="font-medium text-primary">{formatINR(displayAmt)}</span>
+                          {isCOD && !b.checkedIn && b.finalPrice > 0 && (
+                            <p className="text-xs text-muted-foreground">est.</p>
+                          )}
+                          {!isCOD && b.discountAmount > 0 && (
+                            <p className="text-xs text-muted-foreground line-through">{formatINR(b.totalPrice)}</p>
+                          )}
+                        </>;
+                      })()}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-xs text-muted-foreground">{b.paymentMethod}</span>

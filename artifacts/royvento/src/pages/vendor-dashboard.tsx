@@ -2667,6 +2667,7 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                       <th className="text-left py-2 pr-3">Mode</th>
                       <th className="text-left py-2 pr-3">Arrival</th>
                       <th className="text-right py-2 pr-3">Guests</th>
+                      <th className="text-right py-2 pr-3">Price</th>
                       <th className="text-left py-2">Status</th>
                     </tr>
                   </thead>
@@ -2685,7 +2686,33 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                             ? <span className="text-primary font-medium tabular-nums">{new Date(b.checkedInAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                             : <span className="text-muted-foreground">—</span>}
                         </td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums">{b.guests ?? "—"}</td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
+                          {(() => {
+                            const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
+                            const hasActuals = aw != null || am != null || ac != null;
+                            if (hasActuals) {
+                              const hasTiers = (aw ?? 0) > 0 || (am ?? 0) > 0 || (ac ?? 0) > 0;
+                              return <span className="text-green-300">
+                                {(aw ?? 0) > 0 && <span className="text-pink-300 mr-1">{aw}W</span>}
+                                {(am ?? 0) > 0 && <span className="text-blue-300 mr-1">{am}M</span>}
+                                {(ac ?? 0) > 0 && <span className="text-purple-300 mr-1">{ac}C</span>}
+                                {!hasTiers && (ag != null ? ag : b.guests)}
+                              </span>;
+                            }
+                            return <span>{b.guests ?? "—"}</span>;
+                          })()}
+                        </td>
+                        <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
+                          {(() => {
+                            const isCOD = b.paymentMethod === "cod";
+                            const eff = b.effectiveRevenue;
+                            if (isCOD && !b.checkedIn) {
+                              return <span className="text-muted-foreground">{formatINR(b.finalPrice)}<span className="text-[10px] ml-0.5 opacity-60">est</span></span>;
+                            }
+                            const amt = eff != null ? eff : b.finalPrice;
+                            return <span className={amt > 0 ? "text-primary font-medium" : "text-muted-foreground"}>{formatINR(amt)}</span>;
+                          })()}
+                        </td>
                         <td className="py-2.5">
                           {(() => {
                             const isCancelled = b.status === "cancelled";
