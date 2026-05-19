@@ -3982,14 +3982,14 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
             <div>
               <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold mb-1">Platform charges</p>
               <p className="font-serif text-xl tracking-tight leading-tight">Commission &amp; fees</p>
-              <p className="text-sm text-white/50 mt-1">Flat fees per person/booking; percentage of revenue for tickets.</p>
+              <p className="text-sm text-white/50 mt-1">Free entry is a flat ₹ per person; ticket and table are a percentage of final verified revenue.</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <FeeChip label="Free entry" value={`₹${data.commissionRates.freeEntryRate}`} hint="per person" />
             <FeeChip label="Ticket" value={`${data.commissionRates.ticketRate}%`} hint="of ticket revenue" />
-            <FeeChip label="Table booking" value={`₹${data.commissionRates.tableBookingRate}`} hint="per booking" />
+            <FeeChip label="Table booking" value={`${data.commissionRates.tableBookingRate}%`} hint="of table revenue" />
           </div>
 
           {data.grossEarnings > 0 && (

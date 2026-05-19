@@ -20,9 +20,9 @@ export interface SetVendorCommissionBody {
    */
   ticketRate: number;
   /**
-   * Flat fee in INR per table booking
+   * Percentage of table revenue charged as platform commission (0–100)
    * @minimum 0
-   * @maximum 99999.99
+   * @maximum 100
    */
   tableBookingRate: number;
 }

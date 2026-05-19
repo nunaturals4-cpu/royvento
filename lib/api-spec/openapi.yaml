@@ -4365,13 +4365,13 @@ components:
         ticketRate:
           type: number
           minimum: 0
-          maximum: 99999.99
-          description: Flat fee in INR per ticket
+          maximum: 100
+          description: Percentage of ticket revenue charged as platform commission (0–100)
         tableBookingRate:
           type: number
           minimum: 0
-          maximum: 99999.99
-          description: Flat fee in INR per table booking
+          maximum: 100
+          description: Percentage of table revenue charged as platform commission (0–100)
       required: [freeEntryRate, ticketRate, tableBookingRate]
 
     CommissionReportBookingLine:

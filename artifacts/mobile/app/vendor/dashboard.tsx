@@ -2978,15 +2978,17 @@ export default function VendorDashboardScreen() {
             <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>Platform fees applied to your bookings</Text>
           </View>
           {[
-            { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0", unit: "/person" },
-            { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0", unit: "/ticket" },
-            { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0", unit: "/booking" },
+            { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0", kind: "flat" as const, unit: "/person" },
+            { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0", kind: "percent" as const, unit: " of ticket revenue" },
+            { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0", kind: "percent" as const, unit: " of table revenue" },
           ].map((r) => (
             <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{r.label}</Text>
               <View style={{ backgroundColor: "#f59e0b20", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
                 <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#f59e0b" }}>
-                  {`₹${Number(r.value) % 1 === 0 ? Number(r.value).toFixed(0) : Number(r.value).toFixed(2)}${r.unit}`}
+                  {r.kind === "flat"
+                    ? `₹${Number(r.value) % 1 === 0 ? Number(r.value).toFixed(0) : Number(r.value).toFixed(2)}${r.unit}`
+                    : `${Number(r.value) % 1 === 0 ? Number(r.value).toFixed(0) : Number(r.value).toFixed(2)}%${r.unit}`}
                 </Text>
               </View>
             </View>

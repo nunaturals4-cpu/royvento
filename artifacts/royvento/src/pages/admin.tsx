@@ -4114,6 +4114,10 @@ function CommissionsAdmin() {
       toast({ title: "Ticket rate must be 0–100%", variant: "destructive" });
       return;
     }
+    if (table > 100) {
+      toast({ title: "Table rate must be 0–100%", variant: "destructive" });
+      return;
+    }
     setSavingId(vendorId);
     try {
       await apiPut(`/api/admin/vendors/${vendorId}/commission`, {
@@ -4163,7 +4167,7 @@ function CommissionsAdmin() {
           </div>
           <div>
             <h2 className="font-serif text-2xl">Commission fees per partner</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Set the flat platform fee (₹) per person/booking applied to each booking type for every approved vendor.</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Set platform commission per booking type: Free Entry is a flat ₹ per person; Ticket and Table are a percentage (%) of the final verified revenue.</p>
           </div>
         </div>
 
@@ -4179,7 +4183,7 @@ function CommissionsAdmin() {
                   <th className="text-left py-2 pr-4">Partner</th>
                   <th className="text-right py-2 px-3">Free Entry ₹/person</th>
                   <th className="text-right py-2 px-3">Ticket %</th>
-                  <th className="text-right py-2 px-3">Table ₹/booking</th>
+                  <th className="text-right py-2 px-3">Table %</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
               </thead>
@@ -4222,7 +4226,7 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          max={99999.99}
+                          max={100}
                           step={0.01}
                           value={edits.tableBookingRate}
                           onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}
@@ -4330,7 +4334,7 @@ function CommissionsAdmin() {
                             <span className="opacity-40"> · </span>
                             <span className="whitespace-nowrap">Ticket {row.appliedRates.ticketRate}%</span>
                             <span className="opacity-40"> · </span>
-                            <span className="whitespace-nowrap">Table ₹{row.appliedRates.tableBookingRate}/booking</span>
+                            <span className="whitespace-nowrap">Table {row.appliedRates.tableBookingRate}%</span>
                           </p>
                         </div>
                         <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 tabular-nums text-sm sm:shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-white/5">

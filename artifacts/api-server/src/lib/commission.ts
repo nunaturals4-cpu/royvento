@@ -19,7 +19,11 @@
  *       naturally excludes them; the flat freeEntryRate still applies.
  *
  *   Table classification (pubMode = "table")
- *     commission = tableBookingRate × guests   (flat ₹, unchanged)
+ *     commission = (tableBookingRate / 100) × final payable table revenue
+ *       tableBookingRate is stored as a percentage (0–100), e.g. "10.00" = 10%.
+ *       Actuals path computes revenue from per-tier prices × actual counts
+ *       × discount ratio (same as ticket), so guest-count edits at the scanner
+ *       reduce commission in real time.
  *
  * Actuals-aware mode: when a booking has been finalised at the door
  * (Save Actual Entry on the scanner has set actualWomen/Men/Couple/
@@ -157,13 +161,14 @@ export function computeCommissionFromPlanned(
 ): CommissionResult {
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketPct = Number(rates.ticketRate ?? 0); // stored as percentage (0–100)
-  const tableFee = Number(rates.tableBookingRate ?? 0);
+  const tablePct = Number(rates.tableBookingRate ?? 0); // stored as percentage (0–100)
 
   const bookingType = classifyBookingType(b);
 
   if (bookingType === "table") {
     const unitCount = Math.max(0, b.guests);
-    return { bookingType, ratePerUnit: tableFee, unitCount, amount: round2(tableFee * unitCount) };
+    const amount = round2((tablePct / 100) * Number(b.finalPrice));
+    return { bookingType, ratePerUnit: tablePct, unitCount, amount };
   }
 
   if (bookingType === "free_entry") {
@@ -237,6 +242,39 @@ export function computeCommissionFromActuals(
 ): CommissionResult {
   const bookingType = classifyBookingType(b);
 
+  // ── Table: percentage of actual table revenue ───────────────────────────
+  if (bookingType === "table") {
+    const tablePct = Number(rates.tableBookingRate ?? 0); // percentage (0–100)
+
+    const aw = b.actualWomen ?? b.ticketWomen;
+    const am = b.actualMen ?? b.ticketMen;
+    const ac = b.actualCouple ?? b.ticketCouple;
+    const ag = b.actualGuests ?? b.guests;
+    const totalUnits = aw + am + ac;
+
+    const pw = Number(event.priceWomen ?? 0);
+    const pm = Number(event.priceMen ?? 0);
+    const pc = Number(event.priceCouple ?? 0);
+    const hasPrices = pw > 0 || pm > 0 || pc > 0;
+
+    let tableRevenue: number;
+    if (totalUnits === 0 || !hasPrices) {
+      // No per-tier prices or no per-tier counts — fall back to finalPrice.
+      tableRevenue = Number(b.finalPrice);
+    } else {
+      const grossActual = aw * pw + am * pm + ac * pc;
+      const tp = Number(b.totalPrice ?? 0);
+      const fp = Number(b.finalPrice ?? 0);
+      // Preserve coupon / points discount via discount ratio (same as ticket).
+      const discRatio = tp > 0 ? Math.min(1, fp / tp) : 1;
+      tableRevenue = grossActual * discRatio;
+    }
+
+    const amount = round2((tablePct / 100) * tableRevenue);
+    const units = totalUnits > 0 ? totalUnits : Math.max(0, ag);
+    return { bookingType: "table", ratePerUnit: tablePct, unitCount: units, amount };
+  }
+
   // ── Ticket: percentage of actual ticket revenue ──────────────────────────
   if (bookingType === "ticket") {
     const freeEntryFee = Number(rates.freeEntryRate ?? 0);
@@ -288,7 +326,7 @@ export function computeCommissionFromActuals(
     return { bookingType: "ticket", ratePerUnit: ticketPct, unitCount: units, amount };
   }
 
-  // ── Free entry & table: delegate to planned with actual counts ───────────
+  // ── Free entry: delegate to planned with actual counts ──────────────────
   const effective: PlannedBookingShape = {
     pubMode: b.pubMode,
     finalPrice: b.finalPrice,
