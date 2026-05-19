@@ -571,7 +571,7 @@ const DANCE_FLOOR_OPTIONS = [
 const CROWD_LEVELS = [
   { value: "low", label: "Low Crowd", desc: "Quiet, easy to get in", color: "text-green-400", bg: "bg-green-500/10 border-green-500/30" },
   { value: "moderate", label: "Moderate Crowd", desc: "Getting busy, some wait", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30" },
-  { value: "party", label: "High Crowd \u{1F525}", desc: "Packed, full energy", color: "text-red-400", bg: "bg-red-500/10 border-red-500/30" },
+  { value: "party", label: "High Crowd 🔥", desc: "Packed, full energy", color: "text-red-400", bg: "bg-red-500/10 border-red-500/30" },
 ];
 
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
