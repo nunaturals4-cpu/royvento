@@ -17,6 +17,7 @@ import {
 import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
+import { seedDemoPubs } from "../lib/seedDemoPubs";
 import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { createUserNotification } from "../lib/notify";
@@ -2436,6 +2437,28 @@ router.post("/admin/migrate-media", requireAuth(["admin"]), async (req, res) => 
   } catch (err) {
     req.log.error({ err }, "media migration failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Migration failed" });
+  }
+});
+
+/**
+ * One-shot endpoint for seeding 10 demo pubs into the active database.
+ * Each pub becomes its own vendor with 1 cover, 5 gallery photos, 1
+ * dance-floor photo and 2 menu images, capacity 500, and distinct
+ * women/men/couple ticket prices all above ₹1000.
+ *
+ * Body: { confirm: "yes" }. Idempotent — re-running upserts by slug.
+ */
+router.post("/admin/seed-demo-pubs", requireAuth(["admin"]), async (req, res) => {
+  if (req.body?.confirm !== "yes") {
+    res.status(400).json({ error: "Set { confirm: \"yes\" } in the body to run the seed." });
+    return;
+  }
+  try {
+    const report = await seedDemoPubs();
+    res.json(report);
+  } catch (err) {
+    req.log.error({ err }, "demo-pubs seed failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
 });
 
