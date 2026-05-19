@@ -274,9 +274,7 @@ function PartnerNav({
     <div className="flex h-full flex-col gap-1 px-3 py-5">
       <div className="px-3 pb-5 mb-2 border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <span className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
-            <Crown className="h-4 w-4 text-primary" />
-          </span>
+          <img src="/favicon.svg" alt="Royvento" className="h-9 w-9 rounded-full object-cover" draggable={false} />
           <div className="min-w-0">
             <p className="font-serif text-lg tracking-tight leading-none">Royvento</p>
             <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">Partner Studio</p>
@@ -571,17 +569,16 @@ const DANCE_FLOOR_OPTIONS = [
 ] as const;
 
 const CROWD_LEVELS = [
-  { value: "low", label: "Low Crowd", desc: "Quiet, easy to get in", color: "text-green-400" },
-  { value: "moderate", label: "Moderate Crowd", desc: "Getting busy, some wait", color: "text-amber-400" },
-  { value: "party", label: "High Crowd 🔥", desc: "Packed, full energy", color: "text-red-400" },
+  { value: "low", label: "Low Crowd", desc: "Quiet, easy to get in", color: "text-green-400", bg: "bg-green-500/10 border-green-500/30" },
+  { value: "moderate", label: "Moderate Crowd", desc: "Getting busy, some wait", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30" },
+  { value: "party", label: "High Crowd \u{1F525}", desc: "Packed, full energy", color: "text-red-400", bg: "bg-red-500/10 border-red-500/30" },
 ];
 
 function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }) {
   const [businessName, setName] = useState(vendor.businessName);
   const [description, setDescription] = useState(vendor.description);
   const profileFormErrors = useFormErrors();
-  const [crowdLevel, setCrowdLevel] = useState<string | null>(vendor.crowdLevel ?? null);
-  const [savingCrowd, setSavingCrowd] = useState(false);
+  const crowdLevel: string | null = vendor.crowdLevel ?? null;
   const update = useUpdateMyVendor();
   const { toast } = useToast();
 
@@ -613,24 +610,6 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
       },
     );
   };
-
-  const saveCrowdLevel = async (level: string | null) => {
-    setSavingCrowd(true);
-    try {
-      await apiPatch("/api/partner/crowd-level", { crowdLevel: level });
-      setCrowdLevel(level);
-      onSaved();
-      toast({ title: "Crowd level updated" });
-    } catch {
-      toast({ title: "Failed to update crowd level", variant: "destructive" });
-    } finally {
-      setSavingCrowd(false);
-    }
-  };
-
-  useEffect(() => {
-    setCrowdLevel(vendor.crowdLevel ?? null);
-  }, [vendor.crowdLevel]);
 
   return (
     <div className="space-y-6">
@@ -666,35 +645,27 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
         </Button>
     </form>
 
-    {/* Live Crowd Level */}
+    {/* Live Crowd Level — read-only, managed by admin */}
     <div className="rounded-3xl glass-card-strong p-8 space-y-4">
-      <div>
-        <Label className="text-base font-semibold">Live Crowd Level</Label>
-        <p className="text-xs text-muted-foreground mt-0.5">Let guests know how busy your venue is right now.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Label className="text-base font-semibold">Live Crowd Level</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">Set by admin based on real-time venue activity.</p>
+        </div>
+        <span className="text-[10px] uppercase tracking-widest text-primary/60 border border-primary/20 bg-primary/5 rounded-full px-2 py-0.5 shrink-0">Admin controlled</span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {CROWD_LEVELS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            disabled={savingCrowd}
-            onClick={() => saveCrowdLevel(crowdLevel === opt.value ? null : opt.value)}
-            className={`rounded-2xl border p-4 text-left transition-all disabled:opacity-50 ${crowdLevel === opt.value ? "border-primary bg-primary/10" : "border-white/10 bg-black/30 hover:border-white/30"}`}
-          >
-            <div className={`text-sm font-semibold ${opt.color}`}>{opt.label}</div>
-            <div className="text-xs text-muted-foreground mt-1">{opt.desc}</div>
-          </button>
-        ))}
-      </div>
-      {crowdLevel && (
-        <button
-          type="button"
-          disabled={savingCrowd}
-          onClick={() => saveCrowdLevel(null)}
-          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors disabled:opacity-50"
-        >
-          Clear crowd level
-        </button>
+      {crowdLevel ? (() => {
+        const opt = CROWD_LEVELS.find((o) => o.value === crowdLevel);
+        return (
+          <div className={`rounded-2xl border p-4 ${opt?.bg ?? "border-white/10 bg-white/5"}`}>
+            <div className={`text-sm font-semibold ${opt?.color ?? "text-foreground"}`}>{opt?.label ?? crowdLevel}</div>
+            <div className="text-xs text-muted-foreground mt-1">{opt?.desc}</div>
+          </div>
+        );
+      })() : (
+        <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm text-muted-foreground">
+          No crowd level set — contact your account manager to update this.
+        </div>
       )}
     </div>
     </div>
@@ -1796,6 +1767,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
   const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(normalizeFreeEntryGenders(event.freeEntryRules?.genders));
   const [freeEntryDays, setFreeEntryDays] = useState<string[]>(event.freeEntryRules?.days ?? []);
   const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>(event.freeEntryRules?.beforeTime ?? "");
+  const [freeEntryForTable, setFreeEntryForTable] = useState<boolean>(!!(event.freeEntryForTable));
   const { toast } = useToast();
   const isPub = event.type === "pub";
   const [videoCompressing, setVideoCompressing] = useState(false);
@@ -2000,6 +1972,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
             days: freeEntryDays,
             ...(freeEntryBeforeTime ? { beforeTime: freeEntryBeforeTime } : {}),
           },
+          freeEntryForTable,
         } : {}),
       });
       formErrors.reset();
@@ -2257,6 +2230,36 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
             </div>
           </>
         )}
+        {/* Free Entry for Table Booking */}
+        {isPub && (
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">Free Entry for Table Booking</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  When enabled, guests can book a table with ₹0 entry fee.
+                  Commission will use the <span className="text-primary font-medium">Table Booking</span> rate — not the Free Entry rate.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={freeEntryForTable}
+                onClick={() => setFreeEntryForTable((v) => !v)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${freeEntryForTable ? "bg-primary" : "bg-white/20"}`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition-transform ${freeEntryForTable ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+            </div>
+            {freeEntryForTable && (
+              <div className="mt-3 rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 text-xs text-primary/90 flex items-start gap-2">
+                <span className="mt-0.5 h-3 w-3 rounded-full bg-primary shrink-0" />
+                Table bookings for this pub will show ₹0 entry. Commission is calculated at your table booking rate per guest.
+              </div>
+            )}
+          </div>
+        )}
+
         {isPub && (
           <div className="border-t border-white/10 pt-5 space-y-5">
             <p className="font-serif text-lg flex items-center gap-2">

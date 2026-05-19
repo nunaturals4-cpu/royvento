@@ -148,9 +148,7 @@ function AdminNav({ currentTab }: { currentTab: string }) {
     <div className="flex h-full flex-col gap-1 px-3 py-5">
       <div className="px-3 pb-5 mb-2 border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <span className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-          </span>
+          <img src="/favicon.svg" alt="Royvento" className="h-9 w-9 rounded-full object-cover" draggable={false} />
           <div className="min-w-0">
             <p className="font-serif text-lg tracking-tight leading-none">Royvento</p>
             <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">Control Room</p>
@@ -1318,6 +1316,7 @@ function AllVendorsAdmin() {
 
 interface AdminEvent {
   id: number;
+  vendorId: number;
   title: string;
   category: string;
   type: string;
@@ -1332,6 +1331,7 @@ interface AdminEvent {
   approvalStatus: string;
   imageUrl: string;
   retainForever: boolean;
+  vendorCrowdLevel: string | null;
 }
 
 interface PendingEvent {
@@ -1489,6 +1489,12 @@ function popularDays(popularSince: string | null): string {
   return `${days}d`;
 }
 
+const ADMIN_CROWD_LEVELS = [
+  { value: "low", label: "Low", color: "text-green-400", bg: "bg-green-500/15 border-green-500/30" },
+  { value: "moderate", label: "Moderate", color: "text-amber-400", bg: "bg-amber-500/15 border-amber-500/30" },
+  { value: "party", label: "High \u{1F525}", color: "text-red-400", bg: "bg-red-500/15 border-red-500/30" },
+] as const;
+
 function EventsAdmin() {
   const [items, setItems] = useState<AdminEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1496,6 +1502,8 @@ function EventsAdmin() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterPartner, setFilterPartner] = useState("all");
+  const [crowdLevelOpen, setCrowdLevelOpen] = useState<number | null>(null);
+  const [savingCrowd, setSavingCrowd] = useState<number | null>(null);
   const { toast } = useToast();
 
   const load = () => {
@@ -1535,6 +1543,28 @@ function EventsAdmin() {
       toast({ title: "Failed", description: err?.message, variant: "destructive" });
     }
   };
+
+  const setCrowdLevel = async (vendorId: number, level: string | null) => {
+    setSavingCrowd(vendorId);
+    try {
+      await apiPatch(`/api/admin/vendors/${vendorId}/crowd-level`, { crowdLevel: level });
+      setItems((prev) => prev.map((e) => e.vendorId === vendorId ? { ...e, vendorCrowdLevel: level } : e));
+      toast({ title: level ? `Crowd level set to "${level}"` : "Crowd level cleared" });
+      setCrowdLevelOpen(null);
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setSavingCrowd(null);
+    }
+  };
+
+  // Close crowd level dropdown when clicking outside
+  useEffect(() => {
+    if (!crowdLevelOpen) return;
+    const handler = () => setCrowdLevelOpen(null);
+    setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => document.removeEventListener("click", handler);
+  }, [crowdLevelOpen]);
 
   const uniqueTypes = Array.from(new Set(items.map((e) => e.type).filter(Boolean))).sort();
   const uniquePartners = Array.from(new Set(items.map((e) => e.partnerName).filter(Boolean))).sort();
@@ -1598,59 +1628,100 @@ function EventsAdmin() {
       ) : (
         <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
           <table className="w-full text-sm min-w-[760px]">
-            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className=”sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground”>
               <tr>
-                <th className="text-left p-3">Title</th>
-                <th className="text-left p-3">Partner</th>
-                <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">Location</th>
-                <th className="text-right p-3">Price</th>
-                <th className="text-center p-3">Status</th>
-                <th className="text-center p-3">Popular Since</th>
-                <th className="text-center p-3">Retain</th>
-                <th className="text-right p-3"></th>
+                <th className=”text-left p-3”>Title</th>
+                <th className=”text-left p-3”>Partner</th>
+                <th className=”text-left p-3”>Type</th>
+                <th className=”text-left p-3”>Location</th>
+                <th className=”text-right p-3”>Price</th>
+                <th className=”text-center p-3”>Status</th>
+                <th className=”text-center p-3”>Crowd Level</th>
+                <th className=”text-center p-3”>Popular Since</th>
+                <th className=”text-center p-3”>Retain</th>
+                <th className=”text-right p-3”></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => (
-                <tr key={e.id} className="border-t border-white/5">
-                  <td className="p-3 font-medium">{e.title}</td>
-                  <td className="p-3 text-muted-foreground">{e.partnerName}</td>
-                  <td className="p-3"><Badge variant="outline">{e.type}</Badge></td>
-                  <td className="p-3 text-muted-foreground">{e.city}{e.state ? `, ${e.state}` : ""}</td>
-                  <td className="p-3 text-right">{formatINR(e.price)}</td>
-                  <td className="p-3 text-center">
+              {filtered.map((e) => {
+                const crowdOpt = ADMIN_CROWD_LEVELS.find((o) => o.value === e.vendorCrowdLevel);
+                const isSaving = savingCrowd === e.vendorId;
+                return (
+                <tr key={e.id} className=”border-t border-white/5”>
+                  <td className=”p-3 font-medium”>{e.title}</td>
+                  <td className=”p-3 text-muted-foreground”>{e.partnerName}</td>
+                  <td className=”p-3”><Badge variant=”outline”>{e.type}</Badge></td>
+                  <td className=”p-3 text-muted-foreground”>{e.city}{e.state ? `, ${e.state}` : “”}</td>
+                  <td className=”p-3 text-right”>{formatINR(e.price)}</td>
+                  <td className=”p-3 text-center”>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      e.approvalStatus === "approved" ? "bg-green-500/20 text-green-300" :
-                      e.approvalStatus === "rejected" ? "bg-red-500/20 text-red-300" :
-                      "bg-amber-500/20 text-amber-300"
+                      e.approvalStatus === “approved” ? “bg-green-500/20 text-green-300” :
+                      e.approvalStatus === “rejected” ? “bg-red-500/20 text-red-300” :
+                      “bg-amber-500/20 text-amber-300”
                     }`}>{e.approvalStatus}</span>
                   </td>
-                  <td className="p-3 text-center">
+                  <td className=”p-3 text-center relative”>
+                    {e.type === “pub” ? (
+                      <div className=”inline-block relative”>
+                        <button
+                          disabled={isSaving}
+                          onClick={() => setCrowdLevelOpen(crowdLevelOpen === e.vendorId ? null : e.vendorId)}
+                          className={`text-xs px-2.5 py-1 rounded-full border inline-flex items-center gap-1 transition-colors disabled:opacity-50 ${crowdOpt ? `${crowdOpt.bg} ${crowdOpt.color}` : “bg-white/5 border-white/15 text-white/40 hover:border-white/30”}`}
+                        >
+                          {isSaving ? “…” : (crowdOpt?.label ?? “Set level”)}
+                        </button>
+                        {crowdLevelOpen === e.vendorId && (
+                          <div className=”absolute top-8 left-1/2 -translate-x-1/2 z-50 min-w-[160px] rounded-xl border border-white/15 bg-card shadow-2xl p-2 space-y-1”>
+                            {ADMIN_CROWD_LEVELS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setCrowdLevel(e.vendorId, opt.value)}
+                                className={`w-full text-left text-xs px-3 py-2 rounded-lg transition-colors ${e.vendorCrowdLevel === opt.value ? `${opt.bg} ${opt.color} font-semibold` : “text-foreground/80 hover:bg-white/8”}`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                            {e.vendorCrowdLevel && (
+                              <button
+                                onClick={() => setCrowdLevel(e.vendorId, null)}
+                                className=”w-full text-left text-xs px-3 py-2 rounded-lg text-muted-foreground hover:bg-white/8 transition-colors border-t border-white/8 mt-1 pt-2”
+                              >
+                                Clear crowd level
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className=”text-white/20 text-xs”>—</span>
+                    )}
+                  </td>
+                  <td className=”p-3 text-center”>
                     <button
                       onClick={() => togglePopular(e)}
-                      title={e.popular && e.popularSince ? `Popular since ${new Date(e.popularSince).toLocaleDateString()}` : "Mark as popular"}
-                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.popular ? "bg-amber-600/30 text-amber-200" : "bg-white/5 text-white/40"}`}
+                      title={e.popular && e.popularSince ? `Popular since ${new Date(e.popularSince).toLocaleDateString()}` : “Mark as popular”}
+                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.popular ? “bg-amber-600/30 text-amber-200” : “bg-white/5 text-white/40”}`}
                     >
-                      â˜… {popularDays(e.popular ? e.popularSince : null)}
+                      ★ {popularDays(e.popular ? e.popularSince : null)}
                     </button>
                   </td>
-                  <td className="p-3 text-center">
+                  <td className=”p-3 text-center”>
                     <button
                       onClick={() => toggleRetain(e)}
-                      title={e.retainForever ? "Click to allow cleanup deletion" : "Click to protect from cleanup deletion"}
-                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.retainForever ? "bg-blue-600/30 text-blue-200" : "bg-white/5 text-white/40"}`}
+                      title={e.retainForever ? “Click to allow cleanup deletion” : “Click to protect from cleanup deletion”}
+                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.retainForever ? “bg-blue-600/30 text-blue-200” : “bg-white/5 text-white/40”}`}
                     >
-                      {e.retainForever ? "ðŸ”’ Kept" : "-"}
+                      {e.retainForever ? “🔒 Kept” : “-”}
                     </button>
                   </td>
-                  <td className="p-3 text-right">
-                    <Button size="sm" variant="ghost" onClick={() => remove(e.id, e.title)}>
-                      <Trash2 className="h-4 w-4" />
+                  <td className=”p-3 text-right”>
+                    <Button size=”sm” variant=”ghost” onClick={() => remove(e.id, e.title)}>
+                      <Trash2 className=”h-4 w-4” />
                     </Button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

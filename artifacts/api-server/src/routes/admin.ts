@@ -506,23 +506,27 @@ router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
   const vendors = await db.select().from(vendorsTable);
   const vMap = new Map(vendors.map((v) => [v.id, v]));
   res.json(
-    rows.map((e) => ({
-      id: e.id,
-      vendorId: e.vendorId,
-      title: e.title,
-      type: e.type,
-      category: e.category,
-      city: e.city,
-      state: e.state,
-      price: Number(e.price),
-      imageUrl: e.imageUrl,
-      popular: e.popular,
-      popularSince: e.popularSince ? e.popularSince.toISOString() : null,
-      approvalStatus: e.approvalStatus,
-      retainForever: e.retainForever,
-      partnerName: vMap.get(e.vendorId)?.businessName ?? "",
-      createdAt: e.createdAt.toISOString(),
-    })),
+    rows.map((e) => {
+      const v = vMap.get(e.vendorId);
+      return {
+        id: e.id,
+        vendorId: e.vendorId,
+        title: e.title,
+        type: e.type,
+        category: e.category,
+        city: e.city,
+        state: e.state,
+        price: Number(e.price),
+        imageUrl: e.imageUrl,
+        popular: e.popular,
+        popularSince: e.popularSince ? e.popularSince.toISOString() : null,
+        approvalStatus: e.approvalStatus,
+        retainForever: e.retainForever,
+        partnerName: v?.businessName ?? "",
+        vendorCrowdLevel: (v as unknown as { crowdLevel?: string | null })?.crowdLevel ?? null,
+        createdAt: e.createdAt.toISOString(),
+      };
+    }),
   );
 });
 
@@ -759,6 +763,33 @@ router.patch("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
     return;
   }
   res.json({ ok: true, vendor: { id: v.id, businessName: v.businessName, status: v.status } });
+});
+
+// ── Admin: set live crowd level for a vendor ────────────────────────────────
+
+const VALID_CROWD_LEVELS = ["low", "moderate", "party"] as const;
+
+router.patch("/admin/vendors/:id/crowd-level", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id) || id < 1) {
+    res.status(400).json({ error: "Invalid vendor id" });
+    return;
+  }
+  const { crowdLevel } = req.body as { crowdLevel: string | null };
+  if (crowdLevel !== null && !VALID_CROWD_LEVELS.includes(crowdLevel as (typeof VALID_CROWD_LEVELS)[number])) {
+    res.status(400).json({ error: "crowdLevel must be 'low', 'moderate', 'party', or null" });
+    return;
+  }
+  const [v] = await db
+    .update(vendorsTable)
+    .set({ crowdLevel: crowdLevel })
+    .where(eq(vendorsTable.id, id))
+    .returning({ id: vendorsTable.id, businessName: vendorsTable.businessName, crowdLevel: vendorsTable.crowdLevel });
+  if (!v) {
+    res.status(404).json({ error: "Vendor not found" });
+    return;
+  }
+  res.json({ ok: true, vendorId: v.id, crowdLevel: v.crowdLevel ?? null });
 });
 
 // ── Admin: look up a partner by email (diagnostic before create-pub) ────────

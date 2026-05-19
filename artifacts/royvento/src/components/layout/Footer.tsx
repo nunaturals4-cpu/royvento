@@ -8,9 +8,12 @@ export function Footer() {
         {/* Brand */}
         <div className="space-y-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-br from-primary via-primary to-primary/70 rounded-lg flex items-center justify-center red-glow">
-              <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
-            </div>
+            <img
+              src="/favicon.svg"
+              alt="Royvento"
+              className="w-9 h-9 rounded-full object-cover"
+              draggable={false}
+            />
             <span className="font-serif font-bold text-xl tracking-tight text-primary">Royvento</span>
           </div>
           <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">

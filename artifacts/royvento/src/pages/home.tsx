@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelectedCity } from "@/components/LocationContext";
 import {
   ArrowRight,
@@ -14,15 +14,18 @@ import {
   GlassWater,
   Wine,
   Ticket,
+  MapPin,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents, useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
 import type { VendorDrinkOffer } from "@workspace/api-client-react";
 import { EventCard } from "@/components/EventCard";
-import { apiGet, formatINR } from "@/lib/api";
+import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { SEO } from "@/components/SEO";
 import { FreeDrinkCard, TicketCard, splitVendorsByPlanType } from "@/components/DrinkDealCards";
+import { COUNTRIES } from "@/lib/locations";
 
 interface PublicEvent {
   id: number;
@@ -99,6 +102,38 @@ function SectionHeader({
   );
 }
 
+function useUserLocation() {
+  const [country, setCountry] = useState<string>("");
+  const [state, setState] = useState<string>("");
+  const [detected, setDetected] = useState(false);
+
+  useEffect(() => {
+    if (!navigator.geolocation || detected) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+          );
+          if (!r.ok) return;
+          const data = await r.json();
+          const addr = data?.address ?? {};
+          const detectedCountry: string = addr.country ?? "";
+          const detectedState: string = addr.state ?? "";
+          if (detectedCountry) setCountry(detectedCountry);
+          if (detectedState) setState(detectedState);
+          setDetected(true);
+        } catch {}
+      },
+      () => { setDetected(true); },
+      { timeout: 5000 },
+    );
+  }, []);
+
+  return { country, state, setCountry, setState };
+}
+
 export function Home() {
   const { t } = useTranslation();
   const { data: me } = useGetMe();
@@ -106,18 +141,48 @@ export function Home() {
   const { data: featured = [] } = useListFeaturedEvents();
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
   const [popular, setPopular] = useState<PublicEvent[]>([]);
+  const [popularLoading, setPopularLoading] = useState(false);
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const { selectedCity: userCity } = useSelectedCity();
 
+  const { country: detectedCountry, state: detectedState, setCountry: setDetectedCountry, setState: setDetectedState } = useUserLocation();
+  const [filterCountry, setFilterCountry] = useState("");
+  const [filterState, setFilterState] = useState("");
+
+  // Sync detected location into filters (once, on first detection)
   useEffect(() => {
-    apiGet<PublicEvent[]>("/api/events/popular").then(setPopular).catch(() => {});
+    if (detectedCountry && !filterCountry) setFilterCountry(detectedCountry);
+    if (detectedState && !filterState) setFilterState(detectedState);
+  }, [detectedCountry, detectedState]);
+
+  const fetchPopular = useCallback((country: string, state: string) => {
+    setPopularLoading(true);
+    const params = new URLSearchParams();
+    if (country) params.set("country", country);
+    if (state) params.set("state", state);
+    const qs = params.toString();
+    apiGet<PublicEvent[]>(`/api/events/popular${qs ? `?${qs}` : ""}`)
+      .then(setPopular)
+      .catch(() => {})
+      .finally(() => setPopularLoading(false));
+  }, []);
+
+  useEffect(() => { fetchPopular(filterCountry, filterState); }, [filterCountry, filterState, fetchPopular]);
+
+  useEffect(() => {
     apiGet<PublicEvent[]>("/api/events?type=pub").then((r) => setPubs(r.slice(0, 6))).catch(() => {});
     apiGet<Announcement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
   }, []);
 
   const sortedPopular = useMemo(() => sortCityFirst(popular, userCity), [popular, userCity]);
   const sortedPubs = useMemo(() => sortCityFirst(pubs, userCity), [pubs, userCity]);
+
+  const countryOptions = COUNTRIES.map((c) => c.name);
+  const stateOptions = useMemo(() => {
+    const found = COUNTRIES.find((c) => c.name.toLowerCase() === filterCountry.toLowerCase());
+    return found ? found.states.map((s) => s.name) : [];
+  }, [filterCountry]);
 
   const features = [
     { icon: ShieldCheck, title: t("home.feature1_title"), body: t("home.feature1_body") },
@@ -138,6 +203,7 @@ export function Home() {
             name: "Royvento",
             url: "https://royvento.com",
             logo: "https://royvento.com/favicon.svg",
+            image: "https://royvento.com/favicon.svg",
             sameAs: [
               "https://www.instagram.com/royvento",
               "https://www.facebook.com/royvento",
@@ -231,20 +297,91 @@ export function Home() {
       </section>
 
       {/* Trending / Popular section */}
-      {popular.length > 0 && (
-        <section className="container mx-auto px-4 md:px-6 py-12">
-          <SectionHeader
-            icon={<Flame className="h-3.5 w-3.5" />}
-            eyebrow={t("home.trending_label")}
-            title={t("home.trending_title")}
-            seeAllHref="/explore"
-            seeAllLabel={t("home.view_all_events")}
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <section className="container mx-auto px-4 md:px-6 py-12">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-primary mb-2.5 flex items-center gap-2">
+                <Flame className="h-3.5 w-3.5" />
+                {t("home.trending_label")}
+              </p>
+              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">{t("home.trending_title")}</h2>
+            </div>
+            <Link
+              href="/explore"
+              className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+            >
+              {t("home.view_all_events")}
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
+
+          {/* Location filters */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 text-primary" />
+              <span>Filter by location:</span>
+            </div>
+            <div className="relative">
+              <select
+                value={filterCountry}
+                onChange={(e) => { setFilterCountry(e.target.value); setFilterState(""); }}
+                className="appearance-none h-8 pl-3 pr-8 rounded-full border border-border/70 bg-card/60 text-sm text-foreground/80 hover:border-primary/50 transition-colors focus:outline-none focus:border-primary/60 cursor-pointer"
+              >
+                <option value="">All Countries</option>
+                {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            </div>
+            {filterCountry && stateOptions.length > 0 && (
+              <div className="relative">
+                <select
+                  value={filterState}
+                  onChange={(e) => setFilterState(e.target.value)}
+                  className="appearance-none h-8 pl-3 pr-8 rounded-full border border-border/70 bg-card/60 text-sm text-foreground/80 hover:border-primary/50 transition-colors focus:outline-none focus:border-primary/60 cursor-pointer"
+                >
+                  <option value="">All States</option>
+                  {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+              </div>
+            )}
+            {(filterCountry || filterState) && (
+              <button
+                onClick={() => { setFilterCountry(""); setFilterState(""); }}
+                className="h-8 px-3 rounded-full text-xs text-muted-foreground border border-border/50 hover:border-destructive/50 hover:text-destructive transition-colors"
+              >
+                Clear
+              </button>
+            )}
+            {(filterCountry || filterState) && (
+              <span className="text-xs text-primary/70 ml-1">
+                {filterState ? `${filterState}, ${filterCountry}` : filterCountry}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {popularLoading ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mt-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white/5 animate-pulse h-64" />
+            ))}
+          </div>
+        ) : sortedPopular.length > 0 ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mt-8">
             {sortedPopular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} directBooking={e.type === "pub"} />)}
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="mt-8 rounded-2xl border border-white/8 bg-white/3 p-10 text-center">
+            <Flame className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-40" />
+            <p className="text-muted-foreground text-sm">No popular venues found for this location.</p>
+            <button onClick={() => { setFilterCountry(""); setFilterState(""); }} className="mt-3 text-xs text-primary hover:underline">
+              Show all popular venues
+            </button>
+          </div>
+        )}
+      </section>
 
       {/* Drink Deals — same two-section design as /pub-offers */}
       {drinkOffers.length > 0 && (() => {

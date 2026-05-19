@@ -347,19 +347,14 @@ router.patch("/vendors/me", requireAuth(["vendor"]), async (req, res) => {
   res.json(await serializeVendor(v));
 });
 
-router.patch("/partner/crowd-level", requireAuth(["vendor"]), async (req, res) => {
+// Crowd level is now admin-managed. Partners can read but not write.
+router.get("/partner/crowd-level", requireAuth(["vendor"]), async (req, res) => {
   const user = (req as import("../lib/auth").AuthedRequest).user;
-  const parsed = SetPartnerCrowdLevelBody.safeParse(req.body);
-  if (!parsed.success) {
-    respondInvalid(res, parsed.error);
-    return;
-  }
-  const crowdLevel = parsed.data.crowdLevel;
   const [v] = await db
-    .update(vendorsTable)
-    .set({ crowdLevel: crowdLevel })
+    .select({ crowdLevel: vendorsTable.crowdLevel })
+    .from(vendorsTable)
     .where(eq(vendorsTable.userId, user.id))
-    .returning();
+    .limit(1);
   if (!v) {
     res.status(404).json({ error: "Vendor profile not found" });
     return;

@@ -1410,7 +1410,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2"><Wine className="h-3.5 w-3.5 text-primary" />{t("events.booking_type")}</Label>
                       <RadioGroup value={pubMode} onValueChange={(v) => setPubMode(v as "ticket" | "event")} className="grid grid-cols-2 gap-2">
                         <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "ticket" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}><RadioGroupItem value="ticket" /><span className="text-sm font-medium">{t("events.buy_tickets")}</span></label>
-                        <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "event" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}><RadioGroupItem value="event" /><span className="text-sm font-medium">{(event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")}</span></label>
+                        <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "event" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
+                          <RadioGroupItem value="event" />
+                          <span className="text-sm font-medium">{(event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")}</span>
+                          {(event as any)?.freeEntryForTable && (
+                            <span className="ml-auto text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">Free Entry</span>
+                          )}
+                        </label>
                       </RadioGroup>
                     </div>
                     {pubMode === "ticket" && (

@@ -128,6 +128,7 @@ export const eventsTable = pgTable(
     freeEntryRules: jsonb("free_entry_rules").$type<{ enabled: boolean; genders: string[]; days: string[]; beforeTime?: string }>(),
     galleryImages: text("gallery_images").array(),
     galleryVideos: text("gallery_videos").array(),
+    freeEntryForTable: boolean("free_entry_for_table").notNull().default(false),
     retainForever: boolean("retain_forever").notNull().default(false),
     approvalStatus: varchar("approval_status", { length: 20 })
       .notNull()

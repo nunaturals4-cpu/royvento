@@ -99,6 +99,7 @@ async function serializeEvents(rows: EventRow[]) {
       pubEventTypes: e.pubEventTypes ?? [],
       dayPricing: e.dayPricing ?? null,
       freeEntryRules: e.freeEntryRules ?? null,
+      freeEntryForTable: (e as unknown as { freeEntryForTable?: boolean }).freeEntryForTable ?? false,
       galleryImages: e.galleryImages ?? [],
       galleryVideos: e.galleryVideos ?? [],
       approvalStatus: e.approvalStatus,
@@ -206,13 +207,32 @@ router.get("/events/featured", async (_req, res) => {
   res.json(await serializeEvents(rows));
 });
 
-router.get("/events/popular", async (_req, res) => {
+router.get("/events/popular", async (req, res) => {
+  const conditions = [eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved")];
+  const country = req.query["country"] as string | undefined;
+  const state = req.query["state"] as string | undefined;
+  if (country) conditions.push(ilike(eventsTable.country, `%${country}%`));
+  if (state) conditions.push(ilike(eventsTable.state, `%${state}%`));
+
   const rows = await db
     .select()
     .from(eventsTable)
-    .where(and(eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved")))
+    .where(and(...conditions))
     .orderBy(desc(eventsTable.createdAt))
-    .limit(8);
+    .limit(20);
+
+  // If location-filtered results are fewer than 4, fall back to all popular events
+  if (rows.length < 4 && (country || state)) {
+    const fallback = await db
+      .select()
+      .from(eventsTable)
+      .where(and(eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved")))
+      .orderBy(desc(eventsTable.createdAt))
+      .limit(20);
+    res.json(await serializeEvents(fallback));
+    return;
+  }
+
   res.json(await serializeEvents(rows));
 });
 
@@ -478,6 +498,9 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   }
   if (data.galleryImages !== undefined) updates["galleryImages"] = data.galleryImages;
   if (data.galleryVideos !== undefined) updates["galleryVideos"] = data.galleryVideos;
+  if ((data as Record<string, unknown>)["freeEntryForTable"] !== undefined) {
+    updates["freeEntryForTable"] = Boolean((data as Record<string, unknown>)["freeEntryForTable"]);
+  }
 
   const [updated] = await db
     .update(eventsTable)
