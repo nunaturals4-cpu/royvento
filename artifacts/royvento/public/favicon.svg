@@ -1,77 +1,29 @@
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <radialGradient id="bgGrad" cx="38%" cy="35%" r="70%" gradientUnits="objectBoundingBox">
-      <stop offset="0%" stop-color="#8E1C32"/>
-      <stop offset="55%" stop-color="#6B1225"/>
-      <stop offset="100%" stop-color="#3A060F"/>
-    </radialGradient>
-    <clipPath id="logoClip">
-      <circle cx="100" cy="100" r="98"/>
-    </clipPath>
+    <linearGradient id="rGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E73838"/>
+      <stop offset="55%" stop-color="#E73838"/>
+      <stop offset="100%" stop-color="#A12727"/>
+    </linearGradient>
+    <filter id="rGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
-  <!-- Circular background -->
-  <circle cx="100" cy="100" r="98" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="200" height="200" rx="44" ry="44" fill="url(#rGrad)"/>
 
-  <!-- Subtle inner rim -->
-  <circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-
-  <!-- RV Monogram — interlocking serif letters -->
-  <!-- R: upright serif capital -->
   <text
-    x="41" y="102"
+    x="100" y="102"
     font-family="Georgia, 'Times New Roman', 'Palatino Linotype', serif"
-    font-size="70"
+    font-size="138"
     font-weight="bold"
-    fill="white"
-    fill-opacity="0.97"
-    letter-spacing="-6"
+    fill="#ffffff"
+    text-anchor="middle"
+    dominant-baseline="central"
+    filter="url(#rGlow)"
   >R</text>
-  <!-- V: slightly offset, overlaps R -->
-  <text
-    x="83" y="102"
-    font-family="Georgia, 'Times New Roman', 'Palatino Linotype', serif"
-    font-size="70"
-    font-weight="bold"
-    fill="white"
-    fill-opacity="0.97"
-  >V</text>
-
-  <!-- Decorative top line pair above ROYVENTO -->
-  <line x1="24" y1="112" x2="176" y2="112" stroke="rgba(255,255,255,0.45)" stroke-width="0.7"/>
-
-  <!-- ROYVENTO lettering -->
-  <text
-    x="100" y="129"
-    font-family="Georgia, 'Times New Roman', 'Palatino Linotype', serif"
-    font-size="15"
-    font-weight="normal"
-    fill="white"
-    fill-opacity="0.95"
-    text-anchor="middle"
-    letter-spacing="5.5"
-  >ROYVENTO</text>
-
-  <!-- Diamond separator with flanking lines -->
-  <line x1="24" y1="141" x2="83" y2="141" stroke="rgba(255,255,255,0.45)" stroke-width="0.7"/>
-  <text
-    x="100" y="145"
-    font-family="serif"
-    font-size="9"
-    fill="rgba(255,255,255,0.85)"
-    text-anchor="middle"
-  >✦</text>
-  <line x1="117" y1="141" x2="176" y2="141" stroke="rgba(255,255,255,0.45)" stroke-width="0.7"/>
-
-  <!-- Tagline -->
-  <text
-    x="100" y="160"
-    font-family="'Helvetica Neue', Arial, sans-serif"
-    font-size="6.2"
-    fill="white"
-    fill-opacity="0.78"
-    text-anchor="middle"
-    letter-spacing="2.5"
-    font-weight="300"
-  >NIGHTLIFE · LUXURY · EXPERIENCE</text>
 </svg>

@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "tsx src/scripts/seed.ts",
     "seed:reviews": "tsx src/scripts/seedPubReviews.ts",
+    "seed:demo-pubs": "tsx src/scripts/seedDemoPubsProd.ts",
     "migrate:media": "tsx src/scripts/migrateMediaToS3.ts"
   },
   "dependencies": {
