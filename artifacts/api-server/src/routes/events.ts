@@ -100,6 +100,8 @@ async function serializeEvents(rows: EventRow[]) {
       dayPricing: e.dayPricing ?? null,
       freeEntryRules: e.freeEntryRules ?? null,
       freeEntryForTable: (e as unknown as { freeEntryForTable?: boolean }).freeEntryForTable ?? false,
+      freeEntryForTableDays: (e as unknown as { freeEntryForTableDays?: string[] | null }).freeEntryForTableDays ?? null,
+      freeEntryForTableBeforeTime: (e as unknown as { freeEntryForTableBeforeTime?: string | null }).freeEntryForTableBeforeTime ?? null,
       galleryImages: e.galleryImages ?? [],
       galleryVideos: e.galleryVideos ?? [],
       approvalStatus: e.approvalStatus,
@@ -500,6 +502,13 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   if (data.galleryVideos !== undefined) updates["galleryVideos"] = data.galleryVideos;
   if ((data as Record<string, unknown>)["freeEntryForTable"] !== undefined) {
     updates["freeEntryForTable"] = Boolean((data as Record<string, unknown>)["freeEntryForTable"]);
+  }
+  if ((data as Record<string, unknown>)["freeEntryForTableDays"] !== undefined) {
+    updates["freeEntryForTableDays"] = (data as Record<string, unknown>)["freeEntryForTableDays"] ?? null;
+  }
+  if ((data as Record<string, unknown>)["freeEntryForTableBeforeTime"] !== undefined) {
+    const t = (data as Record<string, unknown>)["freeEntryForTableBeforeTime"];
+    updates["freeEntryForTableBeforeTime"] = t ? String(t) : null;
   }
 
   const [updated] = await db

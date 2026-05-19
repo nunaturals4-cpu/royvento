@@ -274,7 +274,9 @@ function PartnerNav({
     <div className="flex h-full flex-col gap-1 px-3 py-5">
       <div className="px-3 pb-5 mb-2 border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <img src="/favicon.svg" alt="Royvento" className="h-9 w-9 rounded-full object-cover" draggable={false} />
+          <span className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
+            <Crown className="h-4 w-4 text-primary" />
+          </span>
           <div className="min-w-0">
             <p className="font-serif text-lg tracking-tight leading-none">Royvento</p>
             <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">Partner Studio</p>
@@ -823,6 +825,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>([]);
   const [freeEntryDays, setFreeEntryDays] = useState<string[]>([]);
   const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState("");
+  const [freeEntryForTable, setFreeEntryForTable] = useState(false);
+  const [freeEntryForTableDays, setFreeEntryForTableDays] = useState<string[]>([]);
+  const [freeEntryForTableBeforeTime, setFreeEntryForTableBeforeTime] = useState("");
   const [videoCompressing, setVideoCompressing] = useState(false);
   const create = useCreateEvent();
   const { toast } = useToast();
@@ -1157,6 +1162,9 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           days: freeEntryDays,
           ...(freeEntryBeforeTime ? { beforeTime: freeEntryBeforeTime } : {}),
         },
+        freeEntryForTable,
+        freeEntryForTableDays: freeEntryForTable ? freeEntryForTableDays : [],
+        freeEntryForTableBeforeTime: freeEntryForTable ? (freeEntryForTableBeforeTime || null) : null,
       } : {}),
     };
     create.mutate(
@@ -1403,6 +1411,50 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
                 <div>
                   <Label className="text-xs text-white/60 mb-1 block">Before time (optional, 24-hour format)</Label>
                   <Input value={freeEntryBeforeTime} onChange={(e) => setFreeEntryBeforeTime(e.target.value)} placeholder="e.g. 22:00" className="bg-black/40 border-white/10 text-sm max-w-xs" />
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Free Entry for Table Booking */}
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+            <button type="button" onClick={() => setFreeEntryForTable((v) => !v)}
+              aria-expanded={freeEntryForTable}
+              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
+                <span className={`inline-flex h-4 w-4 items-center justify-center rounded border ${freeEntryForTable ? "border-emerald-500 bg-emerald-500" : "border-emerald-500/40 bg-transparent"}`}>
+                  {freeEntryForTable && <Check className="h-3 w-3 text-black" />}
+                </span>
+                Free Entry for Table Booking
+              </span>
+              <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${freeEntryForTable ? "rotate-180" : ""}`} />
+            </button>
+            {freeEntryForTable && (
+              <div className="space-y-3 px-4 pb-4 pt-1">
+                <p className="text-xs text-emerald-300/70 leading-relaxed">
+                  Guests booking a table pay ₹0 entry fee. Commission uses the <span className="text-emerald-300 font-medium">Table Booking</span> rate.
+                </p>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days? (optional)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                      <button key={d} type="button"
+                        onClick={() => setFreeEntryForTableDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
+                        className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryForTableDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                      >{d}</button>
+                    ))}
+                  </div>
+                  {freeEntryForTableDays.length === 0 && (
+                    <p className="text-xs text-white/30 mt-1">No days selected — applies every day.</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1 block">Before time (optional, 24-hour format)</Label>
+                  <Input
+                    value={freeEntryForTableBeforeTime}
+                    onChange={(e) => setFreeEntryForTableBeforeTime(e.target.value)}
+                    placeholder="e.g. 22:00"
+                    className="bg-black/40 border-white/10 text-sm max-w-xs"
+                  />
                 </div>
               </div>
             )}
@@ -1768,6 +1820,8 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
   const [freeEntryDays, setFreeEntryDays] = useState<string[]>(event.freeEntryRules?.days ?? []);
   const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState<string>(event.freeEntryRules?.beforeTime ?? "");
   const [freeEntryForTable, setFreeEntryForTable] = useState<boolean>(!!(event.freeEntryForTable));
+  const [freeEntryForTableDays, setFreeEntryForTableDays] = useState<string[]>((event as any).freeEntryForTableDays ?? []);
+  const [freeEntryForTableBeforeTime, setFreeEntryForTableBeforeTime] = useState<string>((event as any).freeEntryForTableBeforeTime ?? "");
   const { toast } = useToast();
   const isPub = event.type === "pub";
   const [videoCompressing, setVideoCompressing] = useState(false);
@@ -1973,6 +2027,8 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
             ...(freeEntryBeforeTime ? { beforeTime: freeEntryBeforeTime } : {}),
           },
           freeEntryForTable,
+          freeEntryForTableDays: freeEntryForTable ? freeEntryForTableDays : [],
+          freeEntryForTableBeforeTime: freeEntryForTable ? (freeEntryForTableBeforeTime || null) : null,
         } : {}),
       });
       formErrors.reset();
@@ -2232,29 +2288,46 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
         )}
         {/* Free Entry for Table Booking */}
         {isPub && (
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">Free Entry for Table Booking</p>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  When enabled, guests can book a table with ₹0 entry fee.
-                  Commission will use the <span className="text-primary font-medium">Table Booking</span> rate — not the Free Entry rate.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={freeEntryForTable}
-                onClick={() => setFreeEntryForTable((v) => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${freeEntryForTable ? "bg-primary" : "bg-white/20"}`}
-              >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition-transform ${freeEntryForTable ? "translate-x-4" : "translate-x-0"}`} />
-              </button>
-            </div>
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+            <button type="button" onClick={() => setFreeEntryForTable((v) => !v)}
+              aria-expanded={freeEntryForTable}
+              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
+                <span className={`inline-flex h-4 w-4 items-center justify-center rounded border ${freeEntryForTable ? "border-emerald-500 bg-emerald-500" : "border-emerald-500/40 bg-transparent"}`}>
+                  {freeEntryForTable && <Check className="h-3 w-3 text-black" />}
+                </span>
+                Free Entry for Table Booking
+              </span>
+              <ChevronDown className={`h-4 w-4 text-emerald-400 transition-transform ${freeEntryForTable ? "rotate-180" : ""}`} />
+            </button>
             {freeEntryForTable && (
-              <div className="mt-3 rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 text-xs text-primary/90 flex items-start gap-2">
-                <span className="mt-0.5 h-3 w-3 rounded-full bg-primary shrink-0" />
-                Table bookings for this pub will show ₹0 entry. Commission is calculated at your table booking rate per guest.
+              <div className="space-y-3 px-4 pb-4 pt-1">
+                <p className="text-xs text-emerald-300/70 leading-relaxed">
+                  Guests booking a table pay ₹0 entry fee. Commission uses the <span className="text-emerald-300 font-medium">Table Booking</span> rate.
+                </p>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days? (optional)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                      <button key={d} type="button"
+                        onClick={() => setFreeEntryForTableDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
+                        className={`text-xs px-3 py-1.5 rounded-full border ${freeEntryForTableDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5"}`}
+                      >{d}</button>
+                    ))}
+                  </div>
+                  {freeEntryForTableDays.length === 0 && (
+                    <p className="text-xs text-white/30 mt-1">No days selected — applies every day.</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1 block">Before time (optional, 24-hour format)</Label>
+                  <Input
+                    value={freeEntryForTableBeforeTime}
+                    onChange={(e) => setFreeEntryForTableBeforeTime(e.target.value)}
+                    placeholder="e.g. 22:00"
+                    className="bg-black/40 border-white/10 text-sm max-w-xs"
+                  />
+                </div>
               </div>
             )}
           </div>

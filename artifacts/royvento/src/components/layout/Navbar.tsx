@@ -161,12 +161,11 @@ export function Navbar() {
         <div className="container mx-auto px-4 md:px-6 h-[68px] flex items-center justify-between relative gap-3">
           <div className="flex items-center gap-7 min-w-0">
             <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-              <img
-                src="/favicon.svg"
-                alt="Royvento"
-                className="w-9 h-9 rounded-full object-cover"
-                draggable={false}
-              />
+              <div className="relative">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center red-glow">
+                  <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
+                </div>
+              </div>
               <span className="font-serif font-bold text-xl tracking-tight">Royvento</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-7 text-sm font-medium">
