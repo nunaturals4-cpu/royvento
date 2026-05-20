@@ -9,6 +9,7 @@ import { eq, or, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "./lib/ticketCode";
 import { ensureEmailSchema } from "./lib/emailService";
+import { runInboundSync } from "./routes/emails";
 
 /**
  * Boot-time backfill: populate `ticketPrefix` / `ticketSalt` for any vendor
@@ -273,5 +274,12 @@ app.listen(port, (err) => {
     runExpoPushReceiptPoll().catch((err) =>
       logger.error({ err }, "Expo push receipt-poll job failed"),
     );
+  });
+
+  // Inbound email poll — pulls received emails from Resend every 2 minutes as
+  // a reliable fallback to the webhook (which can be misrouted, rejected, or
+  // not yet configured). Idempotent: already-stored emails are skipped.
+  cron.schedule("*/2 * * * *", () => {
+    runInboundSync().catch((err) => logger.error({ err }, "Inbound email sync failed"));
   });
 });

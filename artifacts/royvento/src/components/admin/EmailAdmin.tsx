@@ -274,19 +274,37 @@ export default function EmailAdmin() {
     }
   }, [folder, page, debouncedSearch, isFlatFolder, toast]);
 
+  // Pull any new inbound mail from Resend, then refresh the list. This is the
+  // reliable receive path — it doesn't depend on the webhook reaching us.
+  const [syncing, setSyncing] = useState(false);
+  const syncInbox = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setSyncing(true);
+    try {
+      await apiPost<{ found: number; synced: number }>("/api/admin/emails/sync");
+      await Promise.all([loadList({ silent: true }), loadStats()]);
+    } catch (e: any) {
+      if (!opts?.silent) toast({ title: "Sync failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }, [loadList, loadStats, toast]);
+
   useEffect(() => { setPage(1); }, [folder, debouncedSearch]);
   useEffect(() => { loadList(); loadStats(); }, [loadList, loadStats]);
+  // Auto-sync inbound mail when the Inbox tab is first shown.
+  useEffect(() => { if (folder === "inbox") syncInbox({ silent: true }); }, [folder, syncInbox]);
 
   // ── Polling for near-real-time updates ──
   useEffect(() => {
     const id = setInterval(() => {
       loadStats();
       loadList({ silent: true });
+      if (folder === "inbox") syncInbox({ silent: true });
       if (selectedThreadId) openThread(selectedThreadId, { silent: true });
     }, POLL_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadStats, loadList, selectedThreadId]);
+  }, [loadStats, loadList, selectedThreadId, folder, syncInbox]);
 
   // ── Open a thread ──
   const openThread = useCallback(async (id: number, opts?: { silent?: boolean }) => {
@@ -537,8 +555,14 @@ export default function EmailAdmin() {
                 className="pl-8 h-9 text-sm"
               />
             </div>
-            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => { loadList(); loadStats(); }}>
-              <RefreshCw className={"h-3.5 w-3.5 " + (listLoading ? "animate-spin" : "")} />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+              title={folder === "inbox" ? "Sync from Resend" : "Refresh"}
+              onClick={() => { if (folder === "inbox") syncInbox(); else { loadList(); loadStats(); } }}
+            >
+              <RefreshCw className={"h-3.5 w-3.5 " + (listLoading || syncing ? "animate-spin" : "")} />
             </Button>
           </div>
 

@@ -47,10 +47,12 @@ import {
   wrapHtmlEmail,
   fetchInboundEmail,
   fetchInboundAttachment,
+  listInboundEmails,
   BUILT_IN_TEMPLATES,
   INFO_EMAIL_ADDRESS,
   type SendAttachment,
 } from "../lib/emailService";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 const objectStorage = new ObjectStorageService();
@@ -734,45 +736,45 @@ function asEmailArray(value: unknown): string[] {
 }
 
 async function processInboundEmail(data: Record<string, unknown>, req: Request): Promise<void> {
-  // The email.received webhook is metadata-only — the body must be fetched
-  // from the Receiving API with the event's email_id. Start from the webhook
-  // metadata, then enrich with the full content when available.
   const emailId = (data["email_id"] ?? data["id"]) as string | undefined;
-
-  let from = parseAddress(String(data["from"] ?? ""));
-  let subject = (data["subject"] as string) ?? "(no subject)";
-  let html = (data["html"] as string) ?? "";
-  let text = (data["text"] as string) ?? "";
-  let to = asEmailArray(data["to"]);
-  let cc = asEmailArray(data["cc"]);
-  let messageId = (data["message_id"] as string) ?? "";
-  let inReplyTo = "";
-  let references: string[] = [];
-  let fetchedAttachments: { id: string; filename: string; contentType: string }[] = [];
-
-  if (emailId) {
-    const full = await fetchInboundEmail(emailId);
-    if (full) {
-      from = parseAddress(full.from || String(data["from"] ?? ""));
-      subject = full.subject || subject;
-      html = full.html || html;
-      text = full.text || text;
-      if (full.to.length) to = full.to.map((s) => s.toLowerCase());
-      if (full.cc.length) cc = full.cc.map((s) => s.toLowerCase());
-      messageId = full.messageId || messageId;
-      inReplyTo = pickHeader(full.headers, "In-Reply-To");
-      const refHeader = pickHeader(full.headers, "References");
-      references = refHeader ? refHeader.split(/\s+/).filter(Boolean) : [];
-      fetchedAttachments = full.attachments;
-    } else {
-      req.log.warn({ emailId }, "[email] could not fetch inbound content — storing metadata only");
-    }
-  }
-
-  if (!from.email) {
-    req.log.warn("[email] inbound webhook missing sender — skipped");
+  if (!emailId) {
+    req.log.warn("[email] inbound webhook missing email_id — skipped");
     return;
   }
+  await ingestInboundEmailById(emailId);
+}
+
+/**
+ * Fetch one received email from Resend by id and store it (idempotently).
+ * Shared by the webhook handler and the sync/poll path. Dedupes on the Resend
+ * email id stored in `resendId`, so re-running is safe. Returns the new
+ * message id, or null when skipped (already stored / no content).
+ */
+async function ingestInboundEmailById(emailId: string): Promise<number | null> {
+  const [existing] = await db
+    .select({ id: emailMessagesTable.id })
+    .from(emailMessagesTable)
+    .where(and(eq(emailMessagesTable.resendId, emailId), eq(emailMessagesTable.direction, "inbound")))
+    .limit(1);
+  if (existing) return null;
+
+  const full = await fetchInboundEmail(emailId);
+  if (!full) {
+    logger.warn({ emailId }, "[email] could not fetch inbound content");
+    return null;
+  }
+
+  const from = parseAddress(full.from);
+  if (!from.email) {
+    logger.warn({ emailId }, "[email] inbound email missing sender — skipped");
+    return null;
+  }
+  const subject = full.subject || "(no subject)";
+  const inReplyTo = pickHeader(full.headers, "In-Reply-To");
+  const refHeader = pickHeader(full.headers, "References");
+  const references = refHeader ? refHeader.split(/\s+/).filter(Boolean) : [];
+  const to = full.to.map((s) => s.toLowerCase());
+  const cc = full.cc.map((s) => s.toLowerCase());
 
   const threadId = await resolveInboundThread({
     fromEmail: from.email,
@@ -782,7 +784,7 @@ async function processInboundEmail(data: Record<string, unknown>, req: Request):
     references,
   });
 
-  const snippet = makeSnippet(text, html);
+  const snippet = makeSnippet(full.text, full.html);
   const [msg] = await db
     .insert(emailMessagesTable)
     .values({
@@ -795,22 +797,19 @@ async function processInboundEmail(data: Record<string, unknown>, req: Request):
       ccEmails: cc,
       bccEmails: [],
       subject,
-      bodyText: text || htmlToText(html),
-      bodyHtml: html,
+      bodyText: full.text || htmlToText(full.html),
+      bodyHtml: full.html,
       snippet,
-      messageId: messageId.slice(0, 998),
+      resendId: emailId,
+      messageId: full.messageId.slice(0, 998),
       inReplyTo: inReplyTo.slice(0, 998),
       referencesIds: references,
       isRead: false,
     })
     .returning({ id: emailMessagesTable.id });
 
-  // Download inbound attachments (signed URL expires) and persist to storage.
-  if (emailId && msg) {
-    const list = fetchedAttachments.length
-      ? fetchedAttachments
-      : (Array.isArray(data["attachments"]) ? (data["attachments"] as { id: string; filename?: string; content_type?: string }[]).map((a) => ({ id: a.id, filename: a.filename ?? "attachment", contentType: a.content_type ?? "application/octet-stream" })) : []);
-    for (const a of list) {
+  if (msg) {
+    for (const a of full.attachments) {
       try {
         const fetched = await fetchInboundAttachment(emailId, a.id);
         if (fetched) {
@@ -824,7 +823,6 @@ async function processInboundEmail(data: Record<string, unknown>, req: Request):
             storageKey: `/objects/uploads/${uuid}`,
           });
         } else {
-          // Couldn't pull bytes — still record metadata so the file shows up.
           await db.insert(emailAttachmentsTable).values({
             messageId: msg.id,
             filename: a.filename.slice(0, 500),
@@ -834,13 +832,39 @@ async function processInboundEmail(data: Record<string, unknown>, req: Request):
           });
         }
       } catch (err) {
-        req.log.error({ err }, "[email] failed to store inbound attachment");
+        logger.error({ err, emailId }, "[email] failed to store inbound attachment");
       }
     }
   }
 
   await recomputeThreadAggregates(threadId);
+  return msg?.id ?? null;
 }
+
+/**
+ * Pull recent received emails from Resend and store any not already saved.
+ * The dashboard's reliable receive path: works regardless of whether the
+ * webhook is reaching us. Returns how many were found vs newly imported.
+ */
+export async function runInboundSync(): Promise<{ found: number; synced: number }> {
+  const summaries = await listInboundEmails(100);
+  let synced = 0;
+  for (const s of summaries) {
+    try {
+      const id = await ingestInboundEmailById(s.id);
+      if (id) synced++;
+    } catch (err) {
+      logger.error({ err, emailId: s.id }, "[email] sync ingest failed");
+    }
+  }
+  if (summaries.length > 0) logger.info({ found: summaries.length, synced }, "[email] inbound sync complete");
+  return { found: summaries.length, synced };
+}
+
+router.post("/admin/emails/sync", requireAuth(["admin"]), async (_req, res) => {
+  const result = await runInboundSync();
+  res.json({ ok: true, ...result });
+});
 
 router.post("/webhooks/resend", handleResendWebhook);
 router.post("/webhooks/resend/inbound", handleResendWebhook);

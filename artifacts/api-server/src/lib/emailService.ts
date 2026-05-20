@@ -316,6 +316,40 @@ export async function fetchInboundEmail(emailId: string): Promise<FetchedInbound
   }
 }
 
+export interface InboundEmailSummary {
+  id: string;
+  from: string;
+  subject: string;
+  createdAt: string;
+}
+
+/**
+ * List recently-received inbound emails straight from Resend. Used by the
+ * "Sync" endpoint and the background poll so the dashboard inbox fills in
+ * even when the webhook isn't reaching us (misrouted, signature rejected,
+ * or simply not configured yet).
+ */
+export async function listInboundEmails(limit = 50): Promise<InboundEmailSummary[]> {
+  const client = getResendClient();
+  if (!client) return [];
+  try {
+    const { data, error } = await client.emails.receiving.list({ limit });
+    if (error || !data) {
+      logger.error({ err: error }, "[email] failed to list inbound emails");
+      return [];
+    }
+    return (data.data ?? []).map((e) => ({
+      id: e.id,
+      from: e.from ?? "",
+      subject: e.subject ?? "",
+      createdAt: e.created_at ?? "",
+    }));
+  } catch (err) {
+    logger.error({ err }, "[email] listInboundEmails threw");
+    return [];
+  }
+}
+
 /** Download an inbound attachment's bytes via its short-lived signed URL. */
 export async function fetchInboundAttachment(
   emailId: string,
