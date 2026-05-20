@@ -784,6 +784,14 @@ async function ingestInboundEmailById(emailId: string): Promise<number | null> {
     references,
   });
 
+  // Use the email's real received time so the inbox orders correctly. Resend
+  // returns e.g. "2026-05-20 06:54:50.068334+00" — normalise for Date().
+  const receivedAt = (() => {
+    if (!full.createdAt) return undefined;
+    const d = new Date(full.createdAt.replace(" ", "T"));
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  })();
+
   const snippet = makeSnippet(full.text, full.html);
   const [msg] = await db
     .insert(emailMessagesTable)
@@ -805,6 +813,7 @@ async function ingestInboundEmailById(emailId: string): Promise<number | null> {
       inReplyTo: inReplyTo.slice(0, 998),
       referencesIds: references,
       isRead: false,
+      ...(receivedAt ? { createdAt: receivedAt } : {}),
     })
     .returning({ id: emailMessagesTable.id });
 

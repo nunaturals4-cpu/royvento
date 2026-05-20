@@ -283,6 +283,7 @@ export interface FetchedInboundEmail {
   text: string;
   headers: Record<string, string>;
   messageId: string;
+  createdAt: string;
   attachments: { id: string; filename: string; contentType: string }[];
 }
 
@@ -304,6 +305,7 @@ export async function fetchInboundEmail(emailId: string): Promise<FetchedInbound
       text: data.text ?? "",
       headers: (data.headers ?? {}) as Record<string, string>,
       messageId: data.message_id ?? "",
+      createdAt: data.created_at ?? "",
       attachments: (data.attachments ?? []).map((a) => ({
         id: a.id,
         filename: a.filename ?? "attachment",
