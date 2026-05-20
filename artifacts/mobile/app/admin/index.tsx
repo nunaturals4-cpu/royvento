@@ -625,7 +625,7 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
             </View>
             <View style={{ flexDirection: "row", gap: 10 }}>
               {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
-                const fieldLabel = field === "freeEntryRate" ? "₹/person" : field === "ticketRate" ? "% of revenue" : "% of revenue";
+                const fieldLabel = field === "ticketRate" ? "% of revenue" : "₹/person";
                 const fieldTitle = field === "freeEntryRate" ? "Free Entry" : field === "ticketRate" ? "Ticket" : "Table";
                 return (
                   <View key={field} style={{ flex: 1, gap: 4 }}>
@@ -777,12 +777,12 @@ function AdminCommissionsTab({ colors }: { colors: ReturnType<typeof useColors> 
                   <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, marginRight: 4 }}>Fees:</Text>
                   {(["freeEntryRate", "ticketRate", "tableBookingRate"] as const).map((field) => {
                     const label = field === "freeEntryRate" ? "Free Entry" : field === "ticketRate" ? "Ticket" : "Table";
-                    const isFlat = field === "freeEntryRate";
+                    const isPercent = field === "ticketRate";
                     const val = row.appliedRates[field];
                     return (
                       <View key={field} style={{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
                         <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.foreground }}>
-                          {isFlat ? `${label}: ₹${val}/person` : `${label}: ${val}%`}
+                          {isPercent ? `${label}: ${val}%` : `${label}: ₹${val}/person`}
                         </Text>
                       </View>
                     );

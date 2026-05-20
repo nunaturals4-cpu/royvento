@@ -19,11 +19,11 @@
  *       naturally excludes them; the flat freeEntryRate still applies.
  *
  *   Table classification (pubMode = "table")
- *     commission = (tableBookingRate / 100) × final payable table revenue
- *       tableBookingRate is stored as a percentage (0–100), e.g. "10.00" = 10%.
- *       Actuals path computes revenue from per-tier prices × actual counts
- *       × discount ratio (same as ticket), so guest-count edits at the scanner
- *       reduce commission in real time.
+ *     commission = tableBookingRate × verifiedGuestCount
+ *       tableBookingRate is stored as a flat ₹ amount per person, e.g. "100.00" = ₹100/person.
+ *       verifiedGuestCount = actual door counts (actualWomen + actualMen + actualCouple, or
+ *       actualGuests as fallback) so guest-count edits at the scanner reduce commission in
+ *       real time. Never uses revenue — purely headcount-based.
  *
  * Actuals-aware mode: when a booking has been finalised at the door
  * (Save Actual Entry on the scanner has set actualWomen/Men/Couple/
@@ -161,13 +161,13 @@ export function computeCommissionFromPlanned(
 ): CommissionResult {
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketPct = Number(rates.ticketRate ?? 0); // stored as percentage (0–100)
-  const tablePct = Number(rates.tableBookingRate ?? 0); // stored as percentage (0–100)
+  const tablePct = Number(rates.tableBookingRate ?? 0); // stored as flat ₹ per person
 
   const bookingType = classifyBookingType(b);
 
   if (bookingType === "table") {
     const unitCount = Math.max(0, b.guests);
-    const amount = round2((tablePct / 100) * Number(b.finalPrice));
+    const amount = round2(tablePct * unitCount);
     return { bookingType, ratePerUnit: tablePct, unitCount, amount };
   }
 
@@ -213,11 +213,14 @@ export function computeCommissionFromPlanned(
 }
 
 /**
- * Actuals-aware commission for ticket bookings. Uses verified door counts and
- * per-tier event prices to compute the actual ticket revenue, then applies the
- * percentage. For free-entry and table bookings the behaviour is unchanged.
+ * Actuals-aware commission for all booking types.
  *
- * Ticket formula (per booking):
+ * Table formula:
+ *   commission = tableBookingRate × verifiedGuestCount
+ *   (verifiedGuestCount = actualWomen + actualMen + actualCouple, or
+ *    actualGuests as fallback, or booked counts if actuals are null)
+ *
+ * Ticket formula:
  *   commission = freeEntryRate × FER-free actual people
  *              + (ticketRate / 100) × actualTicketRevenue
  *
@@ -242,9 +245,9 @@ export function computeCommissionFromActuals(
 ): CommissionResult {
   const bookingType = classifyBookingType(b);
 
-  // ── Table: percentage of actual table revenue ───────────────────────────
+  // ── Table: flat ₹ per verified guest ────────────────────────────────────
   if (bookingType === "table") {
-    const tablePct = Number(rates.tableBookingRate ?? 0); // percentage (0–100)
+    const tableRatePerPerson = Number(rates.tableBookingRate ?? 0); // flat ₹ per person
 
     const aw = b.actualWomen ?? b.ticketWomen;
     const am = b.actualMen ?? b.ticketMen;
@@ -252,27 +255,10 @@ export function computeCommissionFromActuals(
     const ag = b.actualGuests ?? b.guests;
     const totalUnits = aw + am + ac;
 
-    const pw = Number(event.priceWomen ?? 0);
-    const pm = Number(event.priceMen ?? 0);
-    const pc = Number(event.priceCouple ?? 0);
-    const hasPrices = pw > 0 || pm > 0 || pc > 0;
-
-    let tableRevenue: number;
-    if (totalUnits === 0 || !hasPrices) {
-      // No per-tier prices or no per-tier counts — fall back to finalPrice.
-      tableRevenue = Number(b.finalPrice);
-    } else {
-      const grossActual = aw * pw + am * pm + ac * pc;
-      const tp = Number(b.totalPrice ?? 0);
-      const fp = Number(b.finalPrice ?? 0);
-      // Preserve coupon / points discount via discount ratio (same as ticket).
-      const discRatio = tp > 0 ? Math.min(1, fp / tp) : 1;
-      tableRevenue = grossActual * discRatio;
-    }
-
-    const amount = round2((tablePct / 100) * tableRevenue);
+    // Guest count: prefer per-tier actual sum; fall back to actualGuests / booked guests.
     const units = totalUnits > 0 ? totalUnits : Math.max(0, ag);
-    return { bookingType: "table", ratePerUnit: tablePct, unitCount: units, amount };
+    const amount = round2(tableRatePerPerson * units);
+    return { bookingType: "table", ratePerUnit: tableRatePerPerson, unitCount: units, amount };
   }
 
   // ── Ticket: percentage of actual ticket revenue ──────────────────────────

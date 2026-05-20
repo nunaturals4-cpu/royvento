@@ -4370,8 +4370,8 @@ components:
         tableBookingRate:
           type: number
           minimum: 0
-          maximum: 100
-          description: Percentage of table revenue charged as platform commission (0–100)
+          maximum: 99999.99
+          description: Flat fee in INR per verified guest for table booking commission
       required: [freeEntryRate, ticketRate, tableBookingRate]
 
     CommissionReportBookingLine:

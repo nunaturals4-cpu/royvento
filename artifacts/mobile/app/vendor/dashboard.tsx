@@ -2980,7 +2980,7 @@ export default function VendorDashboardScreen() {
           {[
             { label: "Free Entry", value: a?.commissionRates?.freeEntryRate ?? "0", kind: "flat" as const, unit: "/person" },
             { label: "Ticket", value: a?.commissionRates?.ticketRate ?? "0", kind: "percent" as const, unit: " of ticket revenue" },
-            { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0", kind: "percent" as const, unit: " of table revenue" },
+            { label: "Table Booking", value: a?.commissionRates?.tableBookingRate ?? "0", kind: "flat" as const, unit: "/person" },
           ].map((r) => (
             <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }}>{r.label}</Text>

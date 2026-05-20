@@ -3996,7 +3996,7 @@ export const setVendorCommissionBodyTicketRateMin = 0;
 export const setVendorCommissionBodyTicketRateMax = 100;
 
 export const setVendorCommissionBodyTableBookingRateMin = 0;
-export const setVendorCommissionBodyTableBookingRateMax = 100;
+export const setVendorCommissionBodyTableBookingRateMax = 99999.99;
 
 export const SetVendorCommissionBody = zod
   .object({
@@ -4014,7 +4014,7 @@ export const SetVendorCommissionBody = zod
       .number()
       .min(setVendorCommissionBodyTableBookingRateMin)
       .max(setVendorCommissionBodyTableBookingRateMax)
-      .describe("Percentage of table revenue charged as platform commission (0–100)"),
+      .describe("Flat fee in INR per verified guest for table booking commission"),
   })
   .strict();
 
