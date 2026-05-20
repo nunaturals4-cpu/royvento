@@ -45,6 +45,8 @@ import {
   parseAddress,
   verifyResendWebhook,
   wrapHtmlEmail,
+  fetchInboundEmail,
+  fetchInboundAttachment,
   BUILT_IN_TEMPLATES,
   INFO_EMAIL_ADDRESS,
   type SendAttachment,
@@ -604,6 +606,10 @@ router.get("/admin/emails/attachments/:id", requireAuth(["admin"]), async (req, 
     res.status(404).json({ error: "Attachment not found" });
     return;
   }
+  if (!att.storageKey) {
+    res.status(404).json({ error: "Attachment content unavailable" });
+    return;
+  }
   // Inbound (Resend-hosted) attachments may be stored as absolute URLs.
   if (/^https?:\/\//i.test(att.storageKey)) {
     res.redirect(att.storageKey);
@@ -728,22 +734,45 @@ function asEmailArray(value: unknown): string[] {
 }
 
 async function processInboundEmail(data: Record<string, unknown>, req: Request): Promise<void> {
-  const headers = data["headers"];
-  const fromRaw = (data["from"] as string) ?? pickHeader(headers, "From");
-  const from = typeof fromRaw === "string" ? parseAddress(fromRaw) : parseAddress(String((fromRaw as { email?: string })?.email ?? ""));
+  // The email.received webhook is metadata-only — the body must be fetched
+  // from the Receiving API with the event's email_id. Start from the webhook
+  // metadata, then enrich with the full content when available.
+  const emailId = (data["email_id"] ?? data["id"]) as string | undefined;
+
+  let from = parseAddress(String(data["from"] ?? ""));
+  let subject = (data["subject"] as string) ?? "(no subject)";
+  let html = (data["html"] as string) ?? "";
+  let text = (data["text"] as string) ?? "";
+  let to = asEmailArray(data["to"]);
+  let cc = asEmailArray(data["cc"]);
+  let messageId = (data["message_id"] as string) ?? "";
+  let inReplyTo = "";
+  let references: string[] = [];
+  let fetchedAttachments: { id: string; filename: string; contentType: string }[] = [];
+
+  if (emailId) {
+    const full = await fetchInboundEmail(emailId);
+    if (full) {
+      from = parseAddress(full.from || String(data["from"] ?? ""));
+      subject = full.subject || subject;
+      html = full.html || html;
+      text = full.text || text;
+      if (full.to.length) to = full.to.map((s) => s.toLowerCase());
+      if (full.cc.length) cc = full.cc.map((s) => s.toLowerCase());
+      messageId = full.messageId || messageId;
+      inReplyTo = pickHeader(full.headers, "In-Reply-To");
+      const refHeader = pickHeader(full.headers, "References");
+      references = refHeader ? refHeader.split(/\s+/).filter(Boolean) : [];
+      fetchedAttachments = full.attachments;
+    } else {
+      req.log.warn({ emailId }, "[email] could not fetch inbound content — storing metadata only");
+    }
+  }
+
   if (!from.email) {
     req.log.warn("[email] inbound webhook missing sender — skipped");
     return;
   }
-  const subject = (data["subject"] as string) ?? pickHeader(headers, "Subject") ?? "(no subject)";
-  const html = (data["html"] as string) ?? "";
-  const text = (data["text"] as string) ?? "";
-  const messageId = (data["message_id"] as string) ?? pickHeader(headers, "Message-ID") ?? pickHeader(headers, "Message-Id");
-  const inReplyTo = pickHeader(headers, "In-Reply-To");
-  const refHeader = pickHeader(headers, "References");
-  const references = refHeader ? refHeader.split(/\s+/).filter(Boolean) : [];
-  const to = asEmailArray(data["to"]);
-  const cc = asEmailArray(data["cc"]);
 
   const threadId = await resolveInboundThread({
     fromEmail: from.email,
@@ -776,25 +805,32 @@ async function processInboundEmail(data: Record<string, unknown>, req: Request):
     })
     .returning({ id: emailMessagesTable.id });
 
-  // Store inbound attachments (base64 or Resend-hosted URL).
-  const atts = data["attachments"];
-  if (Array.isArray(atts) && msg) {
-    for (const a of atts) {
+  // Download inbound attachments (signed URL expires) and persist to storage.
+  if (emailId && msg) {
+    const list = fetchedAttachments.length
+      ? fetchedAttachments
+      : (Array.isArray(data["attachments"]) ? (data["attachments"] as { id: string; filename?: string; content_type?: string }[]).map((a) => ({ id: a.id, filename: a.filename ?? "attachment", contentType: a.content_type ?? "application/octet-stream" })) : []);
+    for (const a of list) {
       try {
-        const filename = String(a?.filename ?? a?.name ?? "attachment").slice(0, 500);
-        const contentType = String(a?.content_type ?? a?.contentType ?? "application/octet-stream").slice(0, 200);
-        const contentB64 = a?.content as string | undefined;
-        const url = a?.url as string | undefined;
-        if (contentB64) {
-          const buffer = Buffer.from(contentB64, "base64");
+        const fetched = await fetchInboundAttachment(emailId, a.id);
+        if (fetched) {
           const uuid = randomUUID();
-          await objectStorage.uploadBuffer(uuid, buffer, contentType);
+          await objectStorage.uploadBuffer(uuid, fetched.buffer, fetched.contentType);
           await db.insert(emailAttachmentsTable).values({
-            messageId: msg.id, filename, contentType, sizeBytes: buffer.length, storageKey: `/objects/uploads/${uuid}`,
+            messageId: msg.id,
+            filename: a.filename.slice(0, 500),
+            contentType: (fetched.contentType || a.contentType).slice(0, 200),
+            sizeBytes: fetched.buffer.length,
+            storageKey: `/objects/uploads/${uuid}`,
           });
-        } else if (url) {
+        } else {
+          // Couldn't pull bytes — still record metadata so the file shows up.
           await db.insert(emailAttachmentsTable).values({
-            messageId: msg.id, filename, contentType, sizeBytes: Number(a?.size ?? 0) || 0, storageKey: url,
+            messageId: msg.id,
+            filename: a.filename.slice(0, 500),
+            contentType: a.contentType.slice(0, 200),
+            sizeBytes: 0,
+            storageKey: "",
           });
         }
       } catch (err) {

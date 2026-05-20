@@ -268,6 +268,77 @@ export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmail
   }
 }
 
+// ─── Inbound fetch (Resend Receiving API) ──────────────────────────────────────
+//
+// The `email.received` webhook carries metadata only — sender, subject, and an
+// attachment list — never the body. The actual content lives behind the
+// Receiving API and must be fetched with the event's email_id.
+
+export interface FetchedInboundEmail {
+  from: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  html: string;
+  text: string;
+  headers: Record<string, string>;
+  messageId: string;
+  attachments: { id: string; filename: string; contentType: string }[];
+}
+
+export async function fetchInboundEmail(emailId: string): Promise<FetchedInboundEmail | null> {
+  const client = getResendClient();
+  if (!client) return null;
+  try {
+    const { data, error } = await client.emails.receiving.get(emailId);
+    if (error || !data) {
+      logger.error({ err: error, emailId }, "[email] failed to fetch inbound email content");
+      return null;
+    }
+    return {
+      from: data.from ?? "",
+      to: data.to ?? [],
+      cc: data.cc ?? [],
+      subject: data.subject ?? "",
+      html: data.html ?? "",
+      text: data.text ?? "",
+      headers: (data.headers ?? {}) as Record<string, string>,
+      messageId: data.message_id ?? "",
+      attachments: (data.attachments ?? []).map((a) => ({
+        id: a.id,
+        filename: a.filename ?? "attachment",
+        contentType: a.content_type ?? "application/octet-stream",
+      })),
+    };
+  } catch (err) {
+    logger.error({ err, emailId }, "[email] fetchInboundEmail threw");
+    return null;
+  }
+}
+
+/** Download an inbound attachment's bytes via its short-lived signed URL. */
+export async function fetchInboundAttachment(
+  emailId: string,
+  attachmentId: string,
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const client = getResendClient();
+  if (!client) return null;
+  try {
+    const { data, error } = await client.emails.receiving.attachments.get({ emailId, id: attachmentId });
+    if (error || !data?.download_url) {
+      logger.error({ err: error, emailId, attachmentId }, "[email] failed to get attachment download url");
+      return null;
+    }
+    const res = await fetch(data.download_url, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return { buffer, contentType: data.content_type ?? "application/octet-stream" };
+  } catch (err) {
+    logger.error({ err, emailId, attachmentId }, "[email] fetchInboundAttachment threw");
+    return null;
+  }
+}
+
 // ─── Threading ──────────────────────────────────────────────────────────────
 
 /**
