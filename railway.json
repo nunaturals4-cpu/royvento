@@ -12,5 +12,8 @@
       "pnpm-workspace.yaml",
       "tsconfig.base.json"
     ]
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @workspace/api-server run start"
   }
 }
