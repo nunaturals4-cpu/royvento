@@ -333,14 +333,26 @@ export interface InboundEmailSummary {
  */
 export async function listInboundEmails(limit = 50): Promise<InboundEmailSummary[]> {
   const client = getResendClient();
-  if (!client) return [];
+  if (!client) {
+    logger.warn("[email] listInboundEmails: RESEND_API_KEY not set");
+    return [];
+  }
+  // Guard against an older Resend SDK lacking the Receiving API — surfaces a
+  // clear cause instead of a silent empty inbox.
+  const receiving = (client.emails as { receiving?: { list?: unknown; get?: unknown } }).receiving;
+  if (!receiving || typeof receiving.list !== "function") {
+    logger.error("[email] Resend SDK has no emails.receiving.list — upgrade the resend package");
+    return [];
+  }
   try {
     const { data, error } = await client.emails.receiving.list({ limit });
     if (error || !data) {
       logger.error({ err: error }, "[email] failed to list inbound emails");
       return [];
     }
-    return (data.data ?? []).map((e) => ({
+    const rows = data.data ?? [];
+    logger.info({ count: rows.length }, "[email] listed inbound emails from Resend");
+    return rows.map((e) => ({
       id: e.id,
       from: e.from ?? "",
       subject: e.subject ?? "",
