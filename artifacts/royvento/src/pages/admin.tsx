@@ -1,4 +1,5 @@
 // Trigger Railway deploy: API-only changes are skipped by watch-path filter
+// (bump) deploy inbound-email sync + receiving fixes — 2026-05-20
 import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
