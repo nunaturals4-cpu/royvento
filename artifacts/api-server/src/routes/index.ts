@@ -28,6 +28,7 @@ import managersRouter from "./managers";
 import placesRouter from "./places";
 import webPushRouter from "./webPush";
 import seoRouter from "./seo";
+import emailsRouter from "./emails";
 
 const router: IRouter = Router();
 
@@ -60,5 +61,6 @@ router.use(managersRouter);
 router.use(placesRouter);
 router.use(webPushRouter);
 router.use(seoRouter);
+router.use(emailsRouter);
 
 export default router;

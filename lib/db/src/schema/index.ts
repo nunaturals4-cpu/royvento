@@ -798,3 +798,110 @@ export const bookingAuditLogTable = pgTable(
 );
 
 export type BookingAuditLog = typeof bookingAuditLogTable.$inferSelect;
+
+// ─── Email Management System ────────────────────────────────────────────────
+//
+// Powers the Admin Panel → "Send & Receive Email" tab. Sending goes through
+// Resend (from info@royvento.com); receiving is fed by a Resend Inbound
+// webhook. Conversations are grouped into threads; each thread carries
+// denormalized folder flags (hasInbound/hasSent/hasDraft/hasFailed) so the
+// Inbox/Sent/Drafts/Failed sidebar can filter with a single indexed WHERE.
+
+export const emailThreadsTable = pgTable(
+  "email_threads",
+  {
+    id: serial("id").primaryKey(),
+    subject: text("subject").notNull().default(""),
+    // Subject with leading "Re:" / "Fwd:" stripped + lowercased — used to
+    // match an inbound reply to its conversation when headers are missing.
+    normalizedSubject: varchar("normalized_subject", { length: 500 }).notNull().default(""),
+    // The external (non-royvento) participant. One human = one thread per subject.
+    counterpartyEmail: varchar("counterparty_email", { length: 320 }).notNull().default(""),
+    counterpartyName: varchar("counterparty_name", { length: 255 }).notNull().default(""),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+    lastMessagePreview: varchar("last_message_preview", { length: 300 }).notNull().default(""),
+    lastDirection: varchar("last_direction", { length: 10 }).notNull().default("inbound"),
+    messageCount: integer("message_count").notNull().default(0),
+    hasUnread: boolean("has_unread").notNull().default(false),
+    // Denormalized folder membership, recomputed on every message change.
+    hasInbound: boolean("has_inbound").notNull().default(false),
+    hasSent: boolean("has_sent").notNull().default(false),
+    hasDraft: boolean("has_draft").notNull().default(false),
+    hasFailed: boolean("has_failed").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    lastMsgIdx: index("email_threads_last_msg_idx").on(t.lastMessageAt),
+    counterpartyIdx: index("email_threads_counterparty_idx").on(t.counterpartyEmail),
+    normSubjectIdx: index("email_threads_norm_subject_idx").on(t.normalizedSubject),
+    inboxIdx: index("email_threads_inbox_idx").on(t.hasInbound),
+    sentIdx: index("email_threads_sent_idx").on(t.hasSent),
+    draftIdx: index("email_threads_draft_idx").on(t.hasDraft),
+    failedIdx: index("email_threads_failed_idx").on(t.hasFailed),
+  }),
+);
+
+export type EmailThread = typeof emailThreadsTable.$inferSelect;
+
+export const emailMessagesTable = pgTable(
+  "email_messages",
+  {
+    id: serial("id").primaryKey(),
+    threadId: integer("thread_id").references(() => emailThreadsTable.id, { onDelete: "cascade" }),
+    direction: varchar("direction", { length: 10 }).notNull(), // inbound | outbound
+    // draft | queued | sent | delivered | opened | clicked | bounced | complained | failed | received
+    status: varchar("status", { length: 20 }).notNull().default("received"),
+    fromEmail: varchar("from_email", { length: 320 }).notNull().default(""),
+    fromName: varchar("from_name", { length: 255 }).notNull().default(""),
+    toEmails: jsonb("to_emails").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    ccEmails: jsonb("cc_emails").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    bccEmails: jsonb("bcc_emails").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    subject: text("subject").notNull().default(""),
+    bodyText: text("body_text").notNull().default(""),
+    bodyHtml: text("body_html").notNull().default(""),
+    snippet: varchar("snippet", { length: 300 }).notNull().default(""),
+    // Resend's email id (used to correlate delivery/open/click webhooks).
+    resendId: varchar("resend_id", { length: 255 }).notNull().default(""),
+    // RFC 5322 Message-ID header — the threading anchor for inbound replies.
+    messageId: varchar("message_id", { length: 998 }).notNull().default(""),
+    inReplyTo: varchar("in_reply_to", { length: 998 }).notNull().default(""),
+    referencesIds: jsonb("references_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    isRead: boolean("is_read").notNull().default(false),
+    errorMessage: text("error_message").notNull().default(""),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    clickedAt: timestamp("clicked_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    sentByUserId: integer("sent_by_user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    threadIdx: index("email_messages_thread_idx").on(t.threadId),
+    directionIdx: index("email_messages_direction_idx").on(t.direction),
+    statusIdx: index("email_messages_status_idx").on(t.status),
+    resendIdx: index("email_messages_resend_idx").on(t.resendId),
+    messageIdIdx: index("email_messages_message_id_idx").on(t.messageId),
+    createdIdx: index("email_messages_created_idx").on(t.createdAt),
+  }),
+);
+
+export type EmailMessage = typeof emailMessagesTable.$inferSelect;
+
+export const emailAttachmentsTable = pgTable(
+  "email_attachments",
+  {
+    id: serial("id").primaryKey(),
+    messageId: integer("message_id").references(() => emailMessagesTable.id, { onDelete: "cascade" }),
+    filename: varchar("filename", { length: 500 }).notNull().default("attachment"),
+    contentType: varchar("content_type", { length: 200 }).notNull().default("application/octet-stream"),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    // Storage object path (e.g. "/objects/uploads/<uuid>") resolvable via the
+    // ObjectStorageService, or an absolute URL for Resend-hosted inbound files.
+    storageKey: text("storage_key").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    messageIdx: index("email_attachments_message_idx").on(t.messageId),
+  }),
+);
+
+export type EmailAttachment = typeof emailAttachmentsTable.$inferSelect;

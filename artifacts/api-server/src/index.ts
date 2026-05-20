@@ -8,6 +8,7 @@ import { db, usersTable, vendorsTable, eventsTable, wishlistsTable } from "@work
 import { eq, or, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "./lib/ticketCode";
+import { ensureEmailSchema } from "./lib/emailService";
 
 /**
  * Boot-time backfill: populate `ticketPrefix` / `ticketSalt` for any vendor
@@ -241,6 +242,7 @@ app.listen(port, (err) => {
     .then(() => backfillVendorTicketPrefixes())
     .then(() => auditVendorManagerOverlap())
     .then(() => removeLegacyDemoVendor())
+    .then(() => ensureEmailSchema())
     .catch((err) => logger.error({ err }, "Startup admin/audit chain failed"));
   runCleanup();
 
