@@ -1,4 +1,4 @@
-import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable } from "@workspace/db";
+import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable } from "@workspace/db";
 import { and, ne, sql, lt, gte, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -211,9 +211,81 @@ export async function deleteOldNotifications(): Promise<void> {
   }
 }
 
+// ─── Email retention ───────────────────────────────────────────────────────
+//
+// Keeps the email_* tables (and their attachment blobs) from growing without
+// bound. Attachments are heavier than message rows, so they're purged sooner.
+
+const EMAIL_ATTACHMENT_MAX_AGE_DAYS = 30;
+const EMAIL_MESSAGE_MAX_AGE_DAYS = 90;
+
+/** Delete email attachments (storage blob + row) older than 30 days. */
+export async function deleteOldEmailAttachments(): Promise<void> {
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - EMAIL_ATTACHMENT_MAX_AGE_DAYS);
+
+    const rows = await db
+      .select({ id: emailAttachmentsTable.id, storageKey: emailAttachmentsTable.storageKey })
+      .from(emailAttachmentsTable)
+      .where(lt(emailAttachmentsTable.createdAt, cutoff));
+
+    if (rows.length === 0) return;
+
+    // deleteObject is a no-op for non-"/objects/" keys (e.g. Resend-hosted
+    // inbound URLs), so passing every storageKey is safe.
+    const fileFailCount = await deleteImages(rows.map((r) => r.storageKey));
+
+    const ids = rows.map((r) => r.id);
+    await db.delete(emailAttachmentsTable).where(sql`${emailAttachmentsTable.id} = ANY(${ids})`);
+
+    logger.info({ count: rows.length, fileFailCount }, "Cleanup: deleted old email attachments");
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to delete old email attachments");
+  }
+}
+
+/** Delete email messages older than 90 days, then prune now-empty threads. */
+export async function deleteOldEmails(): Promise<void> {
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - EMAIL_MESSAGE_MAX_AGE_DAYS);
+
+    const msgs = await db
+      .select({ id: emailMessagesTable.id })
+      .from(emailMessagesTable)
+      .where(lt(emailMessagesTable.createdAt, cutoff));
+    const msgIds = msgs.map((m) => m.id);
+
+    if (msgIds.length > 0) {
+      // Free any attachment blobs first (DB rows cascade-delete with the
+      // message, but the storage objects would otherwise be orphaned).
+      const atts = await db
+        .select({ storageKey: emailAttachmentsTable.storageKey })
+        .from(emailAttachmentsTable)
+        .where(sql`${emailAttachmentsTable.messageId} = ANY(${msgIds})`);
+      await deleteImages(atts.map((a) => a.storageKey));
+
+      await db.delete(emailMessagesTable).where(sql`${emailMessagesTable.id} = ANY(${msgIds})`);
+    }
+
+    // Remove conversation shells that no longer have any messages.
+    const pruned = await db
+      .delete(emailThreadsTable)
+      .where(sql`NOT EXISTS (SELECT 1 FROM email_messages em WHERE em.thread_id = ${emailThreadsTable.id})`)
+      .returning({ id: emailThreadsTable.id });
+
+    logger.info({ messages: msgIds.length, threadsPruned: pruned.length }, "Cleanup: deleted old emails");
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to delete old emails");
+  }
+}
+
 export async function runCleanup(): Promise<void> {
   await warnPartnersAboutUpcomingDeletion();
   await deletePastEvents();
   await deleteExpiredAnnouncements();
   await deleteOldNotifications();
+  await deleteOldEmailAttachments();
+  await deleteOldEmails();
 }

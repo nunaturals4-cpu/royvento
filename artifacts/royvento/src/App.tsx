@@ -11,33 +11,35 @@ import NotFound from "@/pages/not-found";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/SEO";
-// Eagerly loaded pages (small, frequently visited)
+
+// Home is the landing route — keep it eager so first paint needs no extra
+// round-trip. Every other page is code-split and loaded on demand, which
+// keeps the initial JS bundle small and the site fast to first interaction.
 import { Home } from "@/pages/home";
-import { Explore } from "@/pages/explore";
-import { Pubs } from "@/pages/pubs";
-import { PubOffers } from "@/pages/pub-offers";
-import { Vendors } from "@/pages/vendors";
-import { Login } from "@/pages/login";
-import { Register } from "@/pages/register";
-import { Contact } from "@/pages/contact";
-import { Bookings } from "@/pages/bookings";
-import { Profile } from "@/pages/profile";
-import { BecomeVendor } from "@/pages/become-vendor";
-import { Wishlist } from "@/pages/wishlist";
-import { Notifications } from "@/pages/notifications";
-import { ForgotPassword } from "@/pages/forgot-password";
-import { ResetPassword } from "@/pages/reset-password";
-import { PaymentResult } from "@/pages/payment-result";
-import { Terms } from "@/pages/terms";
-import { Privacy } from "@/pages/privacy";
-import { City } from "@/pages/city";
-import { CitySecondary } from "@/pages/city-secondary";
-import {
-  VendorSlugRoute,
-  EventSlugRoute,
-  VendorLegacyRedirect,
-  EventLegacyRedirect,
-} from "@/pages/slugged-detail-redirect";
+
+const Explore = lazy(() => import("@/pages/explore").then((m) => ({ default: m.Explore })));
+const Pubs = lazy(() => import("@/pages/pubs").then((m) => ({ default: m.Pubs })));
+const PubOffers = lazy(() => import("@/pages/pub-offers").then((m) => ({ default: m.PubOffers })));
+const Vendors = lazy(() => import("@/pages/vendors").then((m) => ({ default: m.Vendors })));
+const Login = lazy(() => import("@/pages/login").then((m) => ({ default: m.Login })));
+const Register = lazy(() => import("@/pages/register").then((m) => ({ default: m.Register })));
+const Contact = lazy(() => import("@/pages/contact").then((m) => ({ default: m.Contact })));
+const Bookings = lazy(() => import("@/pages/bookings").then((m) => ({ default: m.Bookings })));
+const Profile = lazy(() => import("@/pages/profile").then((m) => ({ default: m.Profile })));
+const BecomeVendor = lazy(() => import("@/pages/become-vendor").then((m) => ({ default: m.BecomeVendor })));
+const Wishlist = lazy(() => import("@/pages/wishlist").then((m) => ({ default: m.Wishlist })));
+const Notifications = lazy(() => import("@/pages/notifications").then((m) => ({ default: m.Notifications })));
+const ForgotPassword = lazy(() => import("@/pages/forgot-password").then((m) => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => import("@/pages/reset-password").then((m) => ({ default: m.ResetPassword })));
+const PaymentResult = lazy(() => import("@/pages/payment-result").then((m) => ({ default: m.PaymentResult })));
+const Terms = lazy(() => import("@/pages/terms").then((m) => ({ default: m.Terms })));
+const Privacy = lazy(() => import("@/pages/privacy").then((m) => ({ default: m.Privacy })));
+const City = lazy(() => import("@/pages/city").then((m) => ({ default: m.City })));
+const CitySecondary = lazy(() => import("@/pages/city-secondary").then((m) => ({ default: m.CitySecondary })));
+const VendorSlugRoute = lazy(() => import("@/pages/slugged-detail-redirect").then((m) => ({ default: m.VendorSlugRoute })));
+const EventSlugRoute = lazy(() => import("@/pages/slugged-detail-redirect").then((m) => ({ default: m.EventSlugRoute })));
+const VendorLegacyRedirect = lazy(() => import("@/pages/slugged-detail-redirect").then((m) => ({ default: m.VendorLegacyRedirect })));
+const EventLegacyRedirect = lazy(() => import("@/pages/slugged-detail-redirect").then((m) => ({ default: m.EventLegacyRedirect })));
 
 // Lazily loaded heavy/role-gated pages
 const VendorDashboard = lazy(() => import("@/pages/vendor-dashboard").then((m) => ({ default: m.VendorDashboard })));

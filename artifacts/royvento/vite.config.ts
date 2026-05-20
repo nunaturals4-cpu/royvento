@@ -60,6 +60,28 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Quiet the size warning now that heavy libs live in their own chunks.
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        // Split rarely-changing third-party libraries into stable, separately
+        // cacheable chunks. On repeat visits / new deploys the browser only
+        // re-downloads the small app chunk, not React/charts/icons.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          // Match on the package name at the start of the post-node_modules
+          // path so we don't accidentally sweep unrelated "react-*" packages
+          // (e.g. react-day-picker) into the React core chunk.
+          const pkg = id.split("node_modules/").pop() ?? "";
+          if (/^(react|react-dom|scheduler|react-is)\//.test(pkg)) return "react-vendor";
+          if (pkg.startsWith("@tanstack/")) return "query-vendor";
+          if (/^(recharts|d3-|victory-vendor|internmap)/.test(pkg)) return "charts-vendor";
+          if (pkg.startsWith("lucide-react/")) return "icons-vendor";
+          if (pkg.startsWith("wouter")) return "router-vendor";
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     port,

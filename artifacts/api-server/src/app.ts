@@ -150,8 +150,23 @@ const frontendCandidates = [
 const frontendDist = frontendCandidates.find((p) => existsSync(p));
 if (frontendDist) {
   logger.info({ frontendDist }, "Serving frontend dist");
-  app.use(express.static(frontendDist));
+  app.use(
+    express.static(frontendDist, {
+      setHeaders(res, filePath) {
+        // Vite emits content-hashed filenames under /assets, so those bytes
+        // never change for a given URL — cache them for a year, immutably,
+        // so repeat visits skip the network entirely. index.html must stay
+        // revalidated so a new deploy is picked up on the next load.
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    }),
+  );
   app.get(/.*/, (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(frontendDist, "index.html"));
   });
 } else {
