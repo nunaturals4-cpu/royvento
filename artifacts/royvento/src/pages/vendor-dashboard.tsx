@@ -3986,11 +3986,22 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <FeeChip label="Free entry" value={`₹${data.commissionRates.freeEntryRate}`} hint="per person" />
-            <FeeChip label="Ticket" value={`${data.commissionRates.ticketRate}%`} hint="of ticket revenue" />
-            <FeeChip label="Table booking" value={`₹${data.commissionRates.tableBookingRate}`} hint="per guest" />
-          </div>
+          {(() => {
+            const chips = [
+              parseFloat(data.commissionRates.freeEntryRate) > 0 && (
+                <FeeChip key="fe" label="Free entry" value={`₹${data.commissionRates.freeEntryRate}`} hint="per person" />
+              ),
+              parseFloat(data.commissionRates.ticketRate) > 0 && (
+                <FeeChip key="tk" label="Ticket" value={`${data.commissionRates.ticketRate}%`} hint="of ticket revenue" />
+              ),
+              parseFloat(data.commissionRates.tableBookingRate) > 0 && (
+                <FeeChip key="tb" label="Table booking" value={`₹${data.commissionRates.tableBookingRate}`} hint="per guest" />
+              ),
+            ].filter(Boolean);
+            if (chips.length === 0) return null;
+            const colClass = chips.length === 1 ? "grid-cols-1" : chips.length === 2 ? "grid-cols-2" : "grid-cols-3";
+            return <div className={`grid ${colClass} gap-3`}>{chips}</div>;
+          })()}
 
           {data.grossEarnings > 0 && (
             <div className="grid sm:grid-cols-3 gap-3">
