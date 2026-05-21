@@ -879,4 +879,21 @@ router.post("/webhooks/resend", handleResendWebhook);
 router.post("/webhooks/resend/inbound", handleResendWebhook);
 router.post("/webhooks/resend/events", handleResendWebhook);
 
+// TEMPORARY debug endpoint — will be removed immediately after use.
+const DEBUG_SYNC_SECRET = "rv-dbg-inbound-4x9k2m7p-2026-05-21";
+router.get("/debug/inbox-sync", async (req, res) => {
+  if (req.query["secret"] !== DEBUG_SYNC_SECRET) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  const apiKeyPresent = !!process.env["RESEND_API_KEY"];
+  const keyPrefix = apiKeyPresent ? process.env["RESEND_API_KEY"]!.slice(0, 8) + "..." : "MISSING";
+  try {
+    const result = await runInboundSync();
+    res.json({ ok: true, apiKeyPresent, keyPrefix, ...result });
+  } catch (err) {
+    res.status(500).json({ ok: false, apiKeyPresent, keyPrefix, error: String(err) });
+  }
+});
+
 export default router;
