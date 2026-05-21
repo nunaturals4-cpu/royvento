@@ -881,23 +881,64 @@ router.post("/webhooks/resend/events", handleResendWebhook);
 
 // TEMPORARY debug endpoint — will be removed immediately after use.
 const DEBUG_SYNC_SECRET = "rv-dbg-inbound-4x9k2m7p-2026-05-21";
+const TEST_EMAIL_ID = "218b342a-bd0b-41db-9725-e031cb19f7e8";
 router.get("/debug/inbox-sync", async (req, res) => {
   if (req.query["secret"] !== DEBUG_SYNC_SECRET) {
     res.status(403).json({ error: "forbidden" });
     return;
   }
-  const apiKeyPresent = !!process.env["RESEND_API_KEY"];
-  const keyPrefix = apiKeyPresent ? process.env["RESEND_API_KEY"]!.slice(0, 8) + "..." : "MISSING";
+  const steps: Record<string, unknown> = {};
+  // Step 1: fetch email from Resend
+  let full: Awaited<ReturnType<typeof fetchInboundEmail>>;
   try {
-    const syncResult = await runInboundSync();
-    // Query DB state directly so we can see what's actually stored.
-    const [threadRow] = await db.select({ total: sql<number>`count(*)::int`, inbound: sql<number>`sum(case when ${emailThreadsTable.hasInbound} then 1 else 0 end)::int` }).from(emailThreadsTable);
-    const [msgRow] = await db.select({ total: sql<number>`count(*)::int`, inboundMsgs: sql<number>`sum(case when ${emailMessagesTable.direction}='inbound' then 1 else 0 end)::int` }).from(emailMessagesTable);
-    const threads = await db.select({ id: emailThreadsTable.id, hasInbound: emailThreadsTable.hasInbound, subject: emailThreadsTable.subject, counterpartyEmail: emailThreadsTable.counterpartyEmail }).from(emailThreadsTable).limit(10);
-    res.json({ ok: true, apiKeyPresent, keyPrefix, ...syncResult, db: { threads: threadRow, messages: msgRow, sample: threads } });
-  } catch (err) {
-    res.status(500).json({ ok: false, apiKeyPresent, keyPrefix, error: String(err) });
-  }
+    full = await fetchInboundEmail(TEST_EMAIL_ID);
+    steps["1_fetch"] = full ? { ok: true, from: full.from, subject: full.subject, hasText: !!full.text, hasHtml: !!full.html, messageId: full.messageId?.slice(0, 60) } : { ok: false, error: "returned null" };
+  } catch (e) { steps["1_fetch"] = { ok: false, error: String(e) }; full = null; }
+  if (!full) { res.json({ steps }); return; }
+
+  // Step 2: resolve thread
+  let threadId: number;
+  try {
+    const from = parseAddress(full.from);
+    threadId = await resolveInboundThread({ fromEmail: from.email, fromName: from.name, subject: full.subject || "(no subject)", inReplyTo: "", references: [] });
+    steps["2_thread"] = { ok: true, threadId };
+  } catch (e) { steps["2_thread"] = { ok: false, error: String(e) }; res.json({ steps }); return; }
+
+  // Step 3: insert message
+  try {
+    const from = parseAddress(full.from);
+    const snippet = makeSnippet(full.text, full.html);
+    const [msg] = await db.insert(emailMessagesTable).values({
+      threadId,
+      direction: "inbound",
+      status: "received",
+      fromEmail: from.email,
+      fromName: from.name,
+      toEmails: full.to.length ? full.to.map(s => s.toLowerCase()) : [INFO_EMAIL_ADDRESS],
+      ccEmails: full.cc.map(s => s.toLowerCase()),
+      bccEmails: [],
+      subject: full.subject || "(no subject)",
+      bodyText: full.text || htmlToText(full.html),
+      bodyHtml: full.html,
+      snippet,
+      resendId: TEST_EMAIL_ID,
+      messageId: full.messageId.slice(0, 998),
+      inReplyTo: "",
+      referencesIds: [],
+      isRead: false,
+    }).returning({ id: emailMessagesTable.id });
+    steps["3_insert"] = { ok: true, messageId: msg?.id };
+    if (msg) await recomputeThreadAggregates(threadId);
+  } catch (e) { steps["3_insert"] = { ok: false, error: String(e) }; }
+
+  // Step 4: DB state
+  try {
+    const [tRow] = await db.select({ total: sql<number>`count(*)::int`, inbound: sql<number>`sum(case when ${emailThreadsTable.hasInbound} then 1 else 0 end)::int` }).from(emailThreadsTable);
+    const [mRow] = await db.select({ total: sql<number>`count(*)::int` }).from(emailMessagesTable);
+    steps["4_db"] = { threads: tRow, messages: mRow };
+  } catch (e) { steps["4_db"] = { error: String(e) }; }
+
+  res.json({ steps });
 });
 
 export default router;

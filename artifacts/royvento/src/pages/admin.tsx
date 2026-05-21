@@ -1,5 +1,5 @@
 // Trigger Railway deploy: API-only changes are skipped by watch-path filter
-// (bump) debug endpoint v2: DB state query — 2026-05-21d
+// (bump) debug endpoint v3: step-by-step ingest — 2026-05-21e
 import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
