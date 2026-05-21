@@ -1,5 +1,5 @@
 // Trigger Railway deploy: API-only changes are skipped by watch-path filter
-// (bump) boot-time inbound sync + SDK guard — 2026-05-20b
+// (bump) boot-time inbound sync + SDK guard — 2026-05-21a
 import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
