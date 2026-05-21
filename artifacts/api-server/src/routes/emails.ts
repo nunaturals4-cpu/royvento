@@ -450,7 +450,7 @@ router.post("/admin/emails/send", requireAuth(["admin"]), async (req, res) => {
       bccEmails: body.bcc ?? [],
       subject: subject || "(no subject)",
       bodyText: finalText,
-      bodyHtml: finalHtml ?? "",
+      bodyHtml: isHtml ? rawHtml : "",
       snippet,
       resendId: sendResult.id ?? "",
       inReplyTo: inReplyTo ?? "",

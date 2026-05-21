@@ -134,12 +134,16 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 
 function RichEditor({ html, onChange }: { html: string; onChange: (html: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const isTyping = useRef(false);
 
-  // Seed once; afterwards the contentEditable owns its DOM so we don't fight the cursor.
+  // Re-seed when html changes externally (e.g. template applied). Guard against
+  // re-seeding on every keystroke by checking the isTyping flag set in onInput.
   useEffect(() => {
-    if (ref.current && ref.current.innerHTML !== html) ref.current.innerHTML = html;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!isTyping.current && ref.current && ref.current.innerHTML !== html) {
+      ref.current.innerHTML = html;
+    }
+    isTyping.current = false;
+  }, [html]);
 
   const exec = (cmd: string, value?: string) => {
     document.execCommand(cmd, false, value);
@@ -200,7 +204,7 @@ function RichEditor({ html, onChange }: { html: string; onChange: (html: string)
       <div
         ref={ref}
         contentEditable
-        onInput={(e) => onChange((e.target as HTMLDivElement).innerHTML)}
+        onInput={(e) => { isTyping.current = true; onChange((e.target as HTMLDivElement).innerHTML); }}
         className="min-h-[220px] max-h-[420px] overflow-y-auto px-4 py-3 text-sm text-white/90 leading-relaxed focus:outline-none [&_a]:text-primary [&_h3]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-5"
         suppressContentEditableWarning
       />
