@@ -1,5 +1,5 @@
 // Trigger Railway deploy: API-only changes are skipped by watch-path filter
-// (bump) boot-time inbound sync + SDK guard — 2026-05-21b (apply RESEND_API_KEY)
+// (bump) deploy: inbound sync + debug endpoint + RESEND_API_KEY — 2026-05-21c
 import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
