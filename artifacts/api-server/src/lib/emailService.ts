@@ -17,7 +17,7 @@
 
 import { Resend } from "resend";
 import { createHmac, timingSafeEqual } from "crypto";
-import { sql, eq, desc, asc } from "drizzle-orm";
+import { sql, eq, desc, asc, inArray } from "drizzle-orm";
 import { db, emailThreadsTable, emailMessagesTable } from "@workspace/db";
 import { logger } from "./logger";
 
@@ -463,7 +463,7 @@ export async function resolveInboundThread(params: {
     const byHeader = await db
       .select({ threadId: emailMessagesTable.threadId })
       .from(emailMessagesTable)
-      .where(sql`${emailMessagesTable.messageId} = ANY(${refIds})`)
+      .where(inArray(emailMessagesTable.messageId, refIds))
       .limit(1);
     if (byHeader[0]?.threadId) return byHeader[0].threadId;
   }

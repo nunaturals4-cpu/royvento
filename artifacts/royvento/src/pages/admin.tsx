@@ -1,5 +1,5 @@
 // Trigger Railway deploy: API-only changes are skipped by watch-path filter
-// (bump) debug endpoint v3: step-by-step ingest — 2026-05-21e
+// (bump) fix: inArray for thread header match — 2026-05-21f
 import { SEO } from "@/components/SEO";
 import {
   useGetAdminAnalytics,
