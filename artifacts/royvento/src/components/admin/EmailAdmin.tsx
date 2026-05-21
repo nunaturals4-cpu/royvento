@@ -231,7 +231,6 @@ export default function EmailAdmin() {
   const [composer, setComposer] = useState<ComposerState>(EMPTY_COMPOSER);
   const [sending, setSending] = useState(false);
 
-  const conversationEndRef = useRef<HTMLDivElement>(null);
   const isFlatFolder = folder === "drafts" || folder === "failed";
 
   // ── Debounce search ──
@@ -326,10 +325,6 @@ export default function EmailAdmin() {
     }
   }, [folder, loadStats, toast]);
 
-  // Auto-scroll to latest message.
-  useEffect(() => {
-    if (detail) conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [detail]);
 
   // ── Composer actions ──
   const openCompose = () => setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" });
@@ -671,8 +666,7 @@ export default function EmailAdmin() {
 
               <div className="overflow-y-auto max-h-[60vh] min-h-[240px] p-4 space-y-3">
                 {detailLoading && <div className="text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>}
-                {detail.messages.map((m) => <MessageCard key={m.id} m={m} onCopy={copyEmail} />)}
-                <div ref={conversationEndRef} />
+                {[...detail.messages].reverse().map((m) => <MessageCard key={m.id} m={m} onCopy={copyEmail} />)}
               </div>
 
               <div className="p-3 border-t border-white/8">

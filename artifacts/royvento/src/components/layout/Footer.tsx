@@ -1,7 +1,12 @@
 import { Link } from "wouter";
-import { Crown, Instagram, Facebook, Twitter } from "lucide-react";
+import { Crown, Instagram, Facebook } from "lucide-react";
+import { useGetMe } from "@workspace/api-client-react";
 
 export function Footer() {
+  const { data } = useGetMe();
+  const role = data?.user?.role;
+  const showForPartners = !role || role === "user";
+
   return (
     <footer className="border-t border-border/60 bg-black/40 backdrop-blur mt-24">
       <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
@@ -18,7 +23,7 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-3 pt-1">
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/royvento_official/"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram"
@@ -27,22 +32,13 @@ export function Footer() {
               <Instagram className="h-3.5 w-3.5" />
             </a>
             <a
-              href="https://facebook.com"
+              href="https://www.facebook.com/profile.php?id=61589731466561"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Facebook"
               className="h-8 w-8 rounded-full border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
             >
               <Facebook className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href="https://x.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="X (Twitter)"
-              className="h-8 w-8 rounded-full border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
-            >
-              <Twitter className="h-3.5 w-3.5" />
             </a>
           </div>
         </div>
@@ -51,7 +47,6 @@ export function Footer() {
         <div className="space-y-3">
           <h4 className="font-semibold text-xs tracking-[0.18em] uppercase text-foreground/70">Discover</h4>
           <ul className="space-y-2.5 text-sm text-muted-foreground">
-            <li><Link href="/explore" className="hover:text-foreground transition-colors">Explore Events</Link></li>
             <li><Link href="/pubs" className="hover:text-foreground transition-colors">Browse Pubs</Link></li>
             <li><Link href="/pub-offers" className="hover:text-foreground transition-colors">Hot Deals</Link></li>
             <li><Link href="/blogs" className="hover:text-foreground transition-colors">Blog</Link></li>
@@ -59,7 +54,8 @@ export function Footer() {
           </ul>
         </div>
 
-        {/* For Partners */}
+        {/* For Partners — hidden for vendors and admins */}
+        {showForPartners && (
         <div className="space-y-3">
           <h4 className="font-semibold text-xs tracking-[0.18em] uppercase text-foreground/70">For Partners</h4>
           <ul className="space-y-2.5 text-sm text-muted-foreground">
@@ -73,6 +69,7 @@ export function Footer() {
             </li>
           </ul>
         </div>
+        )}
 
         {/* Legal */}
         <div className="space-y-3">
