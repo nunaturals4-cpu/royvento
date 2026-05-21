@@ -889,8 +889,12 @@ router.get("/debug/inbox-sync", async (req, res) => {
   const apiKeyPresent = !!process.env["RESEND_API_KEY"];
   const keyPrefix = apiKeyPresent ? process.env["RESEND_API_KEY"]!.slice(0, 8) + "..." : "MISSING";
   try {
-    const result = await runInboundSync();
-    res.json({ ok: true, apiKeyPresent, keyPrefix, ...result });
+    const syncResult = await runInboundSync();
+    // Query DB state directly so we can see what's actually stored.
+    const [threadRow] = await db.select({ total: sql<number>`count(*)::int`, inbound: sql<number>`sum(case when ${emailThreadsTable.hasInbound} then 1 else 0 end)::int` }).from(emailThreadsTable);
+    const [msgRow] = await db.select({ total: sql<number>`count(*)::int`, inboundMsgs: sql<number>`sum(case when ${emailMessagesTable.direction}='inbound' then 1 else 0 end)::int` }).from(emailMessagesTable);
+    const threads = await db.select({ id: emailThreadsTable.id, hasInbound: emailThreadsTable.hasInbound, subject: emailThreadsTable.subject, counterpartyEmail: emailThreadsTable.counterpartyEmail }).from(emailThreadsTable).limit(10);
+    res.json({ ok: true, apiKeyPresent, keyPrefix, ...syncResult, db: { threads: threadRow, messages: msgRow, sample: threads } });
   } catch (err) {
     res.status(500).json({ ok: false, apiKeyPresent, keyPrefix, error: String(err) });
   }
