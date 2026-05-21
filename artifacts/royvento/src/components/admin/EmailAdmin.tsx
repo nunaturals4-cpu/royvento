@@ -47,7 +47,6 @@ interface ThreadDetail {
   messages: ThreadMessage[];
 }
 
-interface EmailTemplate { id: string; name: string; category: string; subject: string; html: string }
 
 interface ComposerAttachment { filename: string; contentType: string; contentBase64: string; sizeBytes: number }
 
@@ -231,7 +230,6 @@ export default function EmailAdmin() {
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [composer, setComposer] = useState<ComposerState>(EMPTY_COMPOSER);
   const [sending, setSending] = useState(false);
 
@@ -242,13 +240,6 @@ export default function EmailAdmin() {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
-
-  // ── Load templates once ──
-  useEffect(() => {
-    apiGet<{ templates: EmailTemplate[] }>("/api/admin/emails/templates")
-      .then((r) => setTemplates(r.templates))
-      .catch(() => {});
-  }, []);
 
   // ── Load stats ──
   const loadStats = useCallback(async () => {
@@ -364,17 +355,6 @@ export default function EmailAdmin() {
   };
 
   const closeComposer = () => setComposer(EMPTY_COMPOSER);
-
-  const applyTemplate = (tplId: string) => {
-    const tpl = templates.find((t) => t.id === tplId);
-    if (!tpl) return;
-    setComposer((c) => ({
-      ...c,
-      isHtml: true,
-      subject: c.subject || tpl.subject,
-      bodyHtml: tpl.html,
-    }));
-  };
 
   const addAttachments = async (files: FileList | null) => {
     if (!files) return;
@@ -719,28 +699,16 @@ export default function EmailAdmin() {
               <Input value={composer.subject} onChange={(e) => setComposer((c) => ({ ...c, subject: e.target.value }))} placeholder="Subject" className="h-9 text-sm" />
             </div>
 
-            {/* Mode + templates */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-lg border border-white/10 overflow-hidden text-xs">
-                <button
-                  onClick={() => setComposer((c) => ({ ...c, isHtml: false }))}
-                  className={"px-3 py-1.5 flex items-center gap-1.5 " + (!composer.isHtml ? "bg-primary text-white" : "text-white/60 hover:bg-white/5")}
-                ><FileText className="h-3 w-3" /> Plain text</button>
-                <button
-                  onClick={() => setComposer((c) => ({ ...c, isHtml: true }))}
-                  className={"px-3 py-1.5 flex items-center gap-1.5 " + (composer.isHtml ? "bg-primary text-white" : "text-white/60 hover:bg-white/5")}
-                ><Code className="h-3 w-3" /> Rich HTML</button>
-              </div>
-              {composer.isHtml && templates.length > 0 && (
-                <select
-                  onChange={(e) => { if (e.target.value) { applyTemplate(e.target.value); e.target.value = ""; } }}
-                  className="h-8 rounded-lg bg-white/[0.04] border border-white/10 text-xs text-white/70 px-2"
-                  defaultValue=""
-                >
-                  <option value="" disabled>Insert template…</option>
-                  {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              )}
+            {/* Mode toggle */}
+            <div className="flex rounded-lg border border-white/10 overflow-hidden text-xs w-fit">
+              <button
+                onClick={() => setComposer((c) => ({ ...c, isHtml: false }))}
+                className={"px-3 py-1.5 flex items-center gap-1.5 " + (!composer.isHtml ? "bg-primary text-white" : "text-white/60 hover:bg-white/5")}
+              ><FileText className="h-3 w-3" /> Plain text</button>
+              <button
+                onClick={() => setComposer((c) => ({ ...c, isHtml: true }))}
+                className={"px-3 py-1.5 flex items-center gap-1.5 " + (composer.isHtml ? "bg-primary text-white" : "text-white/60 hover:bg-white/5")}
+              ><Code className="h-3 w-3" /> Rich HTML</button>
             </div>
 
             {/* Body */}
