@@ -50,6 +50,7 @@ import {
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
   Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
   Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen, Inbox,
+  Download, Users2, ArrowUpDown, ChevronRight,
 } from "lucide-react";
 import EmailAdmin from "@/components/admin/EmailAdmin";
 import { Switch } from "@/components/ui/switch";
@@ -2339,6 +2340,7 @@ function BookingReport() {
   const [page, setPage] = useState<number>(1);
   const [sortBy, setSortBy] = useState<string>("date");
   const [summaryOpen, setSummaryOpen] = useState(true);
+  const [reportSubTab, setReportSubTab] = useState<"all" | "unique">("all");
 
   type TopUser = { userId: number; name: string; email: string; phone: string; totalTickets: number; bookingCount: number };
   type TopPub = { vendorId: number; businessName: string; city: string; totalTickets: number; bookingCount: number };
@@ -2435,6 +2437,24 @@ function BookingReport() {
 
   return (
     <div className="space-y-6">
+      {/* Sub-tab switcher */}
+      <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10 w-fit">
+        {([
+          { id: "all" as const, label: "Ticket Sales" },
+          { id: "unique" as const, label: "Unique Customers" },
+        ]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setReportSubTab(tab.id)}
+            className={"flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors " + (reportSubTab === tab.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}
+          >
+            {tab.id === "unique" && <Users2 className="h-3.5 w-3.5" />}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {reportSubTab === "unique" ? <UniqueCustomerReport /> : <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -2914,6 +2934,230 @@ function BookingReport() {
           )}
         </div>
       )}
+      </>}
+    </div>
+  );
+}
+
+// ─── Unique Customer Report ───────────────────────────────────────────────────
+
+interface UniqueCustomer {
+  userId: number;
+  name: string;
+  email: string;
+  phone: string;
+  bookingCount: number;
+}
+
+interface UCRSummary {
+  totalCustomers: number;
+  totalBookings: number;
+  returningCustomers: number;
+  newCustomers: number;
+}
+
+function UniqueCustomerReport() {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<"name" | "email" | "bookings">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [customers, setCustomers] = useState<UniqueCustomer[]>([]);
+  const [summary, setSummary] = useState<UCRSummary>({ totalCustomers: 0, totalBookings: 0, returningCustomers: 0, newCustomers: 0 });
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const qs = new URLSearchParams({ page: String(page), sortBy, sortDir });
+    if (debouncedSearch) qs.set("search", debouncedSearch);
+    apiGet<{ customers: UniqueCustomer[]; total: number; totalPages: number; summary: UCRSummary }>(
+      `/api/admin/bookings/unique-customers?${qs}`,
+    ).then((r) => {
+      if (!cancelled) {
+        setCustomers(r.customers);
+        setTotal(r.total);
+        setTotalPages(r.totalPages);
+        setSummary(r.summary);
+      }
+    }).catch(() => {
+      if (!cancelled) toast({ title: "Failed to load customers", variant: "destructive" });
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [debouncedSearch, page, sortBy, sortDir, toast]);
+
+  const toggleSort = (col: typeof sortBy) => {
+    if (sortBy === col) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortBy(col); setSortDir("asc"); }
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (debouncedSearch) qs.set("search", debouncedSearch);
+      const url = `/api/admin/bookings/unique-customers/download${qs.toString() ? `?${qs}` : ""}`;
+      const resp = await fetch(url, { credentials: "include" });
+      if (!resp.ok) throw new Error("Download failed");
+      const blob = await resp.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `unique-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const SortIcon = ({ col }: { col: typeof sortBy }) => {
+    if (sortBy !== col) return <ArrowUpDown className="h-3 w-3 text-white/30" />;
+    return sortDir === "asc"
+      ? <ChevronRight className="h-3 w-3 rotate-90 text-primary" />
+      : <ChevronRight className="h-3 w-3 -rotate-90 text-primary" />;
+  };
+
+  const summaryCards = [
+    { label: "Total Unique Customers", value: summary.totalCustomers, icon: Users2, color: "text-sky-300" },
+    { label: "Total Bookings", value: summary.totalBookings, icon: CalendarCheck, color: "text-emerald-300" },
+    { label: "Returning Customers", value: summary.returningCustomers, icon: UserCheck, color: "text-violet-300" },
+    { label: "New Customers", value: summary.newCustomers, icon: UserPlus, color: "text-amber-300" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Users2 className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Unique Customer Report</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            All unique customers across all pubs — deduplicated by account.
+          </p>
+        </div>
+        <Button
+          onClick={handleDownload}
+          disabled={downloading || total === 0}
+          className="gap-2 shrink-0"
+          size="sm"
+        >
+          {downloading
+            ? <RefreshCw className="h-4 w-4 animate-spin" />
+            : <Download className="h-4 w-4" />}
+          Download Excel Report
+        </Button>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryCards.map((c) => (
+          <div key={c.label} className="rounded-2xl glass-card p-4 flex items-center gap-3">
+            <div className={"w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0 " + c.color}>
+              <c.icon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground truncate">{c.label}</p>
+              <p className={"text-2xl font-bold tabular-nums " + c.color}>{c.value.toLocaleString()}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="rounded-2xl glass-card p-4">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search name, email, or phone…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/10 bg-white/[0.03]">
+                <th className="text-left px-4 py-3 font-medium text-white/60 w-8">#</th>
+                <th className="text-left px-4 py-3">
+                  <button onClick={() => toggleSort("name")} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                    Customer Name <SortIcon col="name" />
+                  </button>
+                </th>
+                <th className="text-left px-4 py-3">
+                  <button onClick={() => toggleSort("email")} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                    Email Address <SortIcon col="email" />
+                  </button>
+                </th>
+                <th className="text-left px-4 py-3 hidden sm:table-cell">Phone Number</th>
+                <th className="text-right px-4 py-3">
+                  <button onClick={() => toggleSort("bookings")} className="flex items-center gap-1.5 hover:text-white transition-colors ml-auto">
+                    Bookings <SortIcon col="bookings" />
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                    <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2" />Loading…
+                  </td>
+                </tr>
+              ) : customers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                    <Users2 className="h-7 w-7 mx-auto mb-2 text-white/20" />
+                    {debouncedSearch ? "No customers match your search." : "No customer data yet."}
+                  </td>
+                </tr>
+              ) : (
+                customers.map((c, i) => (
+                  <tr key={c.userId} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                    <td className="px-4 py-3 text-white/30 text-xs tabular-nums">{(page - 1) * 25 + i + 1}</td>
+                    <td className="px-4 py-3 font-medium">{c.name || <span className="text-white/30 italic">—</span>}</td>
+                    <td className="px-4 py-3 text-white/70">{c.email || <span className="text-white/30 italic">—</span>}</td>
+                    <td className="px-4 py-3 text-white/70 hidden sm:table-cell">{c.phone || <span className="text-white/30 italic">—</span>}</td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={"text-xs font-semibold px-2 py-0.5 rounded-full " + (c.bookingCount > 1 ? "bg-violet-500/15 text-violet-300" : "bg-white/[0.06] text-white/50")}>
+                        {c.bookingCount}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-3 border-t border-white/8 flex items-center justify-between text-xs text-white/50">
+            <span>{total.toLocaleString()} total · page {page} of {totalPages}</span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="text-xs h-7">Prev</Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="text-xs h-7">Next</Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

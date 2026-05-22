@@ -18,7 +18,8 @@ import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_CO
 import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { seedDemoPubs } from "../lib/seedDemoPubs";
-import { eq, desc, sql, inArray, isNotNull, isNull, and, gte, lte } from "drizzle-orm";
+import { eq, desc, asc, sql, inArray, isNotNull, isNull, and, gte, lte, or } from "drizzle-orm";
+import * as XLSX from "xlsx";
 import { requireAuth } from "../lib/auth";
 import { createUserNotification } from "../lib/notify";
 import { sendEventApprovedEmail } from "../lib/notifications";
@@ -1742,6 +1743,139 @@ router.get("/admin/booking-report/top-pubs", requireAuth(["admin"]), async (req,
     totalTickets: r.totalTickets,
     bookingCount: r.bookingCount,
   })));
+});
+
+// ── Unique Customer Report ───────────────────────────────────────────────────
+
+const UCR_PAGE_SIZE = 25;
+
+async function getUniqueCustomerData(search?: string) {
+  // Optional: filter users by search term
+  let userIds: number[] | null = null;
+  if (search) {
+    const likeStr = `%${search.toLowerCase()}%`;
+    const matched = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        or(
+          sql`lower(${usersTable.name}) LIKE ${likeStr}`,
+          sql`lower(${usersTable.email}) LIKE ${likeStr}`,
+          sql`${usersTable.phone} LIKE ${`%${search}%`}`,
+        ),
+      );
+    if (matched.length === 0) return null;
+    userIds = matched.map((u) => u.id);
+  }
+
+  const bookingWhere = userIds ? inArray(bookingsTable.userId, userIds) : undefined;
+
+  // Count bookings per user (used for both summary stats and booking-count sort)
+  const perUserCounts = await db
+    .select({ userId: bookingsTable.userId, cnt: sql<number>`COUNT(*)::int` })
+    .from(bookingsTable)
+    .where(bookingWhere)
+    .groupBy(bookingsTable.userId);
+
+  return { perUserCounts, bookingWhere };
+}
+
+router.get("/admin/bookings/unique-customers", requireAuth(["admin"]), async (req, res) => {
+  const page = Math.max(1, parseInt(req.query["page"] as string) || 1);
+  const offset = (page - 1) * UCR_PAGE_SIZE;
+  const search = (req.query["search"] as string | undefined)?.trim();
+  const sortBy = (req.query["sortBy"] as string) || "name";
+  const sortDir = (req.query["sortDir"] as string) === "desc" ? "desc" : "asc";
+
+  const result = await getUniqueCustomerData(search);
+  const empty = { customers: [], total: 0, page, totalPages: 1, summary: { totalCustomers: 0, totalBookings: 0, returningCustomers: 0, newCustomers: 0 } };
+  if (search && result === null) { res.json(empty); return; }
+
+  const perUserCounts = result?.perUserCounts ?? [];
+  const bookingWhere = result?.bookingWhere;
+
+  const totalCustomers = perUserCounts.length;
+  const totalBookings = perUserCounts.reduce((s, r) => s + r.cnt, 0);
+  const returningCustomers = perUserCounts.filter((r) => r.cnt > 1).length;
+  const newCustomers = perUserCounts.filter((r) => r.cnt === 1).length;
+  const totalPages = Math.max(1, Math.ceil(totalCustomers / UCR_PAGE_SIZE));
+
+  let customers: { userId: number; name: string; email: string; phone: string; bookingCount: number }[];
+
+  if (sortBy === "bookings") {
+    const sorted = [...perUserCounts].sort((a, b) => sortDir === "desc" ? b.cnt - a.cnt : a.cnt - b.cnt);
+    const pageIds = sorted.slice(offset, offset + UCR_PAGE_SIZE).map((r) => r.userId);
+    if (pageIds.length === 0) { res.json({ ...empty, total: totalCustomers, totalPages, summary: { totalCustomers, totalBookings, returningCustomers, newCustomers } }); return; }
+    const userRows = await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, phone: usersTable.phone })
+      .from(usersTable).where(inArray(usersTable.id, pageIds));
+    const countMap = new Map(perUserCounts.map((r) => [r.userId, r.cnt]));
+    const uMap = new Map(userRows.map((u) => [u.id, u]));
+    customers = pageIds.map((uid) => {
+      const u = uMap.get(uid);
+      return { userId: uid, name: u?.name ?? "", email: u?.email ?? "", phone: u?.phone ?? "", bookingCount: countMap.get(uid) ?? 0 };
+    });
+  } else {
+    const orderExpr = sortBy === "email"
+      ? (sortDir === "desc" ? desc(usersTable.email) : asc(usersTable.email))
+      : (sortDir === "desc" ? desc(usersTable.name) : asc(usersTable.name));
+    const rows = await db
+      .select({
+        userId: bookingsTable.userId,
+        name: usersTable.name,
+        email: usersTable.email,
+        phone: usersTable.phone,
+        bookingCount: sql<number>`COUNT(${bookingsTable.id})::int`,
+      })
+      .from(bookingsTable)
+      .innerJoin(usersTable, eq(bookingsTable.userId, usersTable.id))
+      .where(bookingWhere)
+      .groupBy(bookingsTable.userId, usersTable.id, usersTable.name, usersTable.email, usersTable.phone)
+      .orderBy(orderExpr)
+      .limit(UCR_PAGE_SIZE)
+      .offset(offset);
+    customers = rows.map((r) => ({ userId: r.userId, name: r.name ?? "", email: r.email ?? "", phone: r.phone ?? "", bookingCount: r.bookingCount }));
+  }
+
+  res.json({ customers, total: totalCustomers, page, totalPages, summary: { totalCustomers, totalBookings, returningCustomers, newCustomers } });
+});
+
+router.get("/admin/bookings/unique-customers/download", requireAuth(["admin"]), async (req, res) => {
+  const search = (req.query["search"] as string | undefined)?.trim();
+
+  const result = await getUniqueCustomerData(search);
+  let rows: { name: string; email: string; phone: string; bookingCount: number }[] = [];
+
+  if (!search || result !== null) {
+    const bookingWhere = result?.bookingWhere;
+    const dbRows = await db
+      .select({
+        name: usersTable.name,
+        email: usersTable.email,
+        phone: usersTable.phone,
+        bookingCount: sql<number>`COUNT(${bookingsTable.id})::int`,
+      })
+      .from(bookingsTable)
+      .innerJoin(usersTable, eq(bookingsTable.userId, usersTable.id))
+      .where(bookingWhere)
+      .groupBy(usersTable.id, usersTable.name, usersTable.email, usersTable.phone)
+      .orderBy(asc(usersTable.name));
+    rows = dbRows.map((r) => ({ name: r.name ?? "", email: r.email ?? "", phone: r.phone ?? "", bookingCount: r.bookingCount }));
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ["Customer Name", "Email Address", "Phone Number", "Total Bookings"],
+    ...rows.map((r) => [r.name, r.email, r.phone, r.bookingCount]),
+  ]);
+  // Auto-size columns
+  ws["!cols"] = [{ wch: 30 }, { wch: 35 }, { wch: 18 }, { wch: 16 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Unique Customers");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+
+  const filename = `unique-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(buf);
 });
 
 // ── Google Places photo proxy (admin) ────────────────────────────────────────
