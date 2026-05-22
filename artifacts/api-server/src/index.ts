@@ -1,3 +1,6 @@
+import { fileURLToPath } from "url";
+import path from "path";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runCleanup } from "./jobs/cleanup";
@@ -231,15 +234,25 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
+(async () => {
+  const migrationsFolder = path.join(path.dirname(fileURLToPath(import.meta.url)), "migrations");
+  try {
+    await migrate(db, { migrationsFolder });
+    logger.info("Database migrations applied");
+  } catch (err) {
+    logger.error({ err }, "Database migration failed — aborting startup");
     process.exit(1);
   }
 
-  logger.info({ port }, "Server listening");
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
 
-  ensureAdminAccount()
+    logger.info({ port }, "Server listening");
+
+    ensureAdminAccount()
     .then(() => auditPasswordHashes())
     .then(() => backfillVendorTicketPrefixes())
     .then(() => auditVendorManagerOverlap())
@@ -295,4 +308,5 @@ app.listen(port, (err) => {
   cron.schedule("*/2 * * * *", () => {
     runInboundSync().catch((err) => logger.error({ err }, "Inbound email sync failed"));
   });
-});
+  });
+})();
