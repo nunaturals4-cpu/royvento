@@ -606,10 +606,15 @@ export const drinkPlansTable = pgTable(
     foodDiscountLabel: varchar("food_discount_label", { length: 255 }).notNull().default(""),
     validUntil: date("valid_until"),
     validFrom: date("valid_from"),
+    // Admin-set global priority (1–10). Plans with a value appear first in the
+    // Drinks Deals section of every pub page, in ascending priority order.
+    // NULL = not prioritised.
+    globalPriority: integer("global_priority"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     vendorIdx: index("drink_plans_vendor_idx").on(t.vendorId),
+    globalPriorityIdx: index("drink_plans_global_priority_idx").on(t.globalPriority),
   }),
 );
 

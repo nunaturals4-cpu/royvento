@@ -305,7 +305,7 @@ export function AdminPanel() {
               <TabsContent value="live-occupancy" className="mt-0"><LiveOccupancyAdmin /></TabsContent>
               <TabsContent value="crm-leads" className="mt-0"><CrmLeads /></TabsContent>
               <TabsContent value="create-pub" className="mt-0"><CreatePubAdmin /></TabsContent>
-              <TabsContent value="announcement-slider" className="mt-0"><AnnouncementSliderAdmin /></TabsContent>
+              <TabsContent value="announcement-slider" className="mt-0"><AnnouncementSliderAdmin /><DrinkPlanPriorityAdmin /></TabsContent>
               <TabsContent value="commissions" className="mt-0"><CommissionsAdmin /></TabsContent>
               <TabsContent value="settlements" className="mt-0"><SettlementsAdmin /></TabsContent>
               <TabsContent value="reviews" className="mt-0"><ReviewsAdmin /></TabsContent>
@@ -4246,6 +4246,180 @@ function AnnouncementSliderAdmin() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// --- Drink Plan Priority -----------------------------------------------------
+
+interface DrinkPlanRow {
+  id: number;
+  vendorId: number;
+  vendorName: string | null;
+  type: string;
+  productName: string | null;
+  price: number | null;
+  gender: string | null;
+  globalPriority: number | null;
+}
+
+function DrinkPlanPriorityAdmin() {
+  const [plans, setPlans] = useState<DrinkPlanRow[]>([]);
+  const [featured, setFeatured] = useState<DrinkPlanRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const { toast } = useToast();
+
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await apiGet<DrinkPlanRow[]>("/admin/drink-plans");
+      setPlans(data);
+      const prioritized = [...data]
+        .filter((p) => p.globalPriority !== null)
+        .sort((a, b) => (a.globalPriority ?? 999) - (b.globalPriority ?? 999));
+      setFeatured(prioritized);
+    } catch {
+      toast({ title: "Failed to load drink plans", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  const featuredIds = new Set(featured.map((p) => p.id));
+  const available = plans.filter((p) => !featuredIds.has(p.id));
+
+  function moveUp(idx: number) {
+    if (idx === 0) return;
+    setFeatured((prev) => {
+      const next = [...prev];
+      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      return next;
+    });
+    setDirty(true);
+  }
+
+  function moveDown(idx: number) {
+    setFeatured((prev) => {
+      if (idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      return next;
+    });
+    setDirty(true);
+  }
+
+  function addPlan(plan: DrinkPlanRow) {
+    if (featured.length >= 10) {
+      toast({ title: "Maximum 10 plans can be featured", variant: "destructive" });
+      return;
+    }
+    setFeatured((prev) => [...prev, plan]);
+    setDirty(true);
+  }
+
+  function removePlan(id: number) {
+    setFeatured((prev) => prev.filter((p) => p.id !== id));
+    setDirty(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await apiPost("/admin/drink-plans/priorities", { orderedIds: featured.map((p) => p.id) });
+      toast({ title: "Priority order saved" });
+      setDirty(false);
+      await load();
+    } catch {
+      toast({ title: "Failed to save priorities", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const planLabel = (p: DrinkPlanRow) =>
+    [p.productName || p.type, p.vendorName || "Unknown pub",
+     p.gender && p.gender !== "all" ? `(${p.gender})` : null,
+     p.price ? `₹${p.price}` : null]
+      .filter(Boolean).join(" — ");
+
+  return (
+    <div className="space-y-6 p-6 border-t mt-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Star className="w-5 h-5 text-yellow-500" />
+            Drinks Plan Priority
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Select up to 10 drinks plans to feature first on the Pub Offer Page. Use arrows to reorder.
+          </p>
+        </div>
+        <Button onClick={save} disabled={!dirty || saving} className="gap-2">
+          <Save className="w-4 h-4" />
+          {saving ? "Saving…" : "Save Order"}
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="border rounded-lg p-4 space-y-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-sm">Featured ({featured.length}/10)</h3>
+            </div>
+            {featured.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded">
+                Add plans from the right panel
+              </div>
+            ) : (
+              featured.map((p, idx) => (
+                <div key={p.id} className="flex items-center gap-2 bg-muted/50 rounded px-3 py-2">
+                  <span className="text-xs font-mono w-5 text-center text-muted-foreground">{idx + 1}</span>
+                  <span className="flex-1 text-sm truncate">{planLabel(p)}</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => moveUp(idx)} disabled={idx === 0}
+                      className="p-1 rounded hover:bg-background disabled:opacity-30">
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => moveDown(idx)} disabled={idx === featured.length - 1}
+                      className="p-1 rounded hover:bg-background disabled:opacity-30">
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => removePlan(p.id)}
+                      className="p-1 rounded hover:bg-background text-destructive ml-1">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="border rounded-lg p-4 space-y-2">
+            <h3 className="font-medium text-sm mb-3">Available Plans ({available.length})</h3>
+            {available.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-6">All plans are featured</div>
+            ) : (
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {available.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 rounded px-3 py-2 hover:bg-muted/50">
+                    <span className="flex-1 text-sm truncate">{planLabel(p)}</span>
+                    <button onClick={() => addPlan(p)} disabled={featured.length >= 10}
+                      className="text-xs text-primary font-medium hover:underline disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
+                      + Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

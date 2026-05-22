@@ -13,6 +13,7 @@ import {
   vendorRequestsTable,
   vendorManagersTable,
   wishlistsTable,
+  drinkPlansTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from "../lib/effectiveRevenue";
@@ -1179,7 +1180,7 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
       userId: b.userId,
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
-      phone: u?.phone ?? "",
+      phone: b.phone ?? "",
       bookingDate: b.bookingDate,
       guests: b.guests,
       pubMode: b.pubMode,
@@ -1390,7 +1391,7 @@ router.get("/admin/checkin-report", requireAuth(["admin"]), async (req, res) => 
     userId: b.userId,
     userName: enriched[i]?.userName ?? "",
     userEmail: enriched[i]?.userEmail ?? "",
-    phone: phoneMap.get(b.userId) ?? "",
+    phone: b.phone ?? "",
     bookingDate: b.bookingDate,
     guests: b.guests,
     ticketWomen: b.ticketWomen,
@@ -2595,6 +2596,54 @@ router.post("/admin/seed-demo-pubs", requireAuth(["admin"]), async (req, res) =>
     req.log.error({ err }, "demo-pubs seed failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
+});
+
+// ─── Drink Plan Priority Management ──────────────────────────────────────────
+
+// GET /admin/drink-plans — all plans across all pubs (with vendor name)
+router.get("/admin/drink-plans", requireAuth(["admin"]), async (_req, res) => {
+  const plans = await db
+    .select({
+      id: drinkPlansTable.id,
+      vendorId: drinkPlansTable.vendorId,
+      vendorName: vendorsTable.businessName,
+      type: drinkPlansTable.type,
+      productName: drinkPlansTable.productName,
+      price: drinkPlansTable.price,
+      gender: drinkPlansTable.gender,
+      days: drinkPlansTable.days,
+      validUntil: drinkPlansTable.validUntil,
+      globalPriority: drinkPlansTable.globalPriority,
+      createdAt: drinkPlansTable.createdAt,
+    })
+    .from(drinkPlansTable)
+    .leftJoin(vendorsTable, eq(vendorsTable.id, drinkPlansTable.vendorId))
+    .orderBy(drinkPlansTable.globalPriority, drinkPlansTable.createdAt);
+  res.json(plans);
+});
+
+// POST /admin/drink-plans/priorities — set the ordered top-10 list
+// Body: { orderedIds: number[] }  (1–10 items; extra items beyond 10 are ignored)
+router.post("/admin/drink-plans/priorities", requireAuth(["admin"]), async (req, res) => {
+  const body = req.body as unknown;
+  if (!body || typeof body !== "object" || !Array.isArray((body as Record<string, unknown>)["orderedIds"])) {
+    res.status(400).json({ error: "orderedIds array required" });
+    return;
+  }
+  const orderedIds: number[] = ((body as Record<string, unknown>)["orderedIds"] as unknown[])
+    .filter((x): x is number => typeof x === "number" && Number.isFinite(x) && x > 0)
+    .slice(0, 10);
+
+  // Clear all existing priorities, then set new ones
+  await db.update(drinkPlansTable).set({ globalPriority: null }).where(sql`${drinkPlansTable.globalPriority} IS NOT NULL`);
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db
+      .update(drinkPlansTable)
+      .set({ globalPriority: i + 1 })
+      .where(eq(drinkPlansTable.id, orderedIds[i]!));
+  }
+
+  res.json({ ok: true, count: orderedIds.length });
 });
 
 export default router;

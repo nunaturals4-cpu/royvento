@@ -590,7 +590,8 @@ router.get("/vendors/:vendorId/drink-plans", async (req, res) => {
     .select()
     .from(drinkPlansTable)
     .where(eq(drinkPlansTable.vendorId, id))
-    .orderBy(drinkPlansTable.createdAt);
+    // Admin-prioritised plans (globalPriority 1–10) come first; all others follow by createdAt.
+    .orderBy(sql`COALESCE(${drinkPlansTable.globalPriority}, 999)`, drinkPlansTable.createdAt);
   res.json(plans);
 });
 
