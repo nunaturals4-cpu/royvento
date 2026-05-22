@@ -672,6 +672,59 @@ router.delete("/admin/emails/threads/:id", requireAuth(["admin"]), async (req, r
   res.json({ ok: true });
 });
 
+// ─── Bulk delete folder ─────────────────────────────────────────────────────────
+
+router.delete("/admin/emails/folder", requireAuth(["admin"]), async (req, res) => {
+  const folder = String(req.query["folder"] ?? "inbox");
+  const user = await loadUserFromRequest(req);
+  let deletedCount = 0;
+
+  try {
+    if (folder === "drafts") {
+      const msgs = await db
+        .select({ id: emailMessagesTable.id, threadId: emailMessagesTable.threadId })
+        .from(emailMessagesTable)
+        .where(eq(emailMessagesTable.status, "draft"));
+      if (msgs.length > 0) {
+        await db.delete(emailMessagesTable).where(eq(emailMessagesTable.status, "draft"));
+        deletedCount = msgs.length;
+        const tids = [...new Set(msgs.map((m) => m.threadId).filter(Boolean))] as number[];
+        for (const tid of tids) await recomputeThreadAggregates(tid);
+      }
+    } else if (folder === "failed") {
+      const failCond = and(
+        eq(emailMessagesTable.direction, "outbound"),
+        inArray(emailMessagesTable.status, ["failed", "bounced", "complained"]),
+      );
+      const msgs = await db
+        .select({ id: emailMessagesTable.id, threadId: emailMessagesTable.threadId })
+        .from(emailMessagesTable)
+        .where(failCond);
+      if (msgs.length > 0) {
+        await db.delete(emailMessagesTable).where(failCond);
+        deletedCount = msgs.length;
+        const tids = [...new Set(msgs.map((m) => m.threadId).filter(Boolean))] as number[];
+        for (const tid of tids) await recomputeThreadAggregates(tid);
+      }
+    } else {
+      const folderCond = folder === "sent"
+        ? eq(emailThreadsTable.hasSent, true)
+        : eq(emailThreadsTable.hasInbound, true);
+      const rows = await db.select({ id: emailThreadsTable.id }).from(emailThreadsTable).where(folderCond);
+      if (rows.length > 0) {
+        await db.delete(emailThreadsTable).where(inArray(emailThreadsTable.id, rows.map((r) => r.id)));
+        deletedCount = rows.length;
+      }
+    }
+
+    logger.info({ folder, deletedCount, by: user?.id }, "[email] bulk folder delete");
+    res.json({ ok: true, deletedCount });
+  } catch (err) {
+    logger.error({ err, folder }, "[email] bulk folder delete failed");
+    res.status(500).json({ error: "Failed to delete emails" });
+  }
+});
+
 // ─── Attachment download ─────────────────────────────────────────────────────────
 
 router.get("/admin/emails/attachments/:id", requireAuth(["admin"]), async (req, res) => {

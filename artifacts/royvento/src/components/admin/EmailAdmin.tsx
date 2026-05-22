@@ -48,7 +48,6 @@ interface ThreadDetail {
   messages: ThreadMessage[];
 }
 
-
 interface ComposerAttachment { filename: string; contentType: string; contentBase64: string; sizeBytes: number }
 
 interface EmailIssue { severity: "error" | "warning" | "info"; code: string; message: string }
@@ -82,6 +81,11 @@ const EMPTY_COMPOSER: ComposerState = {
 
 const POLL_MS = 20_000;
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+const LS_KEY = "rv-email-autosave";
+
+function isDirty(c: Omit<ComposerState, "open">): boolean {
+  return !!(c.to || c.cc || c.bcc || c.subject || c.bodyText || c.bodyHtml || c.attachments.length > 0);
+}
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
@@ -148,8 +152,6 @@ function RichEditor({ html, onChange }: { html: string; onChange: (html: string)
   const ref = useRef<HTMLDivElement>(null);
   const isTyping = useRef(false);
 
-  // Re-seed when html changes externally (e.g. template applied). Guard against
-  // re-seeding on every keystroke by checking the isTyping flag set in onInput.
   useEffect(() => {
     if (!isTyping.current && ref.current && ref.current.innerHTML !== html) {
       ref.current.innerHTML = html;
@@ -250,7 +252,20 @@ export default function EmailAdmin() {
   const [deliverability, setDeliverability] = useState<DeliverabilityReport | null>(null);
   const [showDeliverability, setShowDeliverability] = useState(false);
 
+  // Delete All state
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+
+  // Draft recovery state
+  const [recoveryDraft, setRecoveryDraft] = useState<Omit<ComposerState, "open"> | null>(null);
+  const [showRecovery, setShowRecovery] = useState(false);
+
+  // Ref so beforeunload always sees the latest composer state
+  const composerRef = useRef<ComposerState>(composer);
+  composerRef.current = composer;
+
   const isFlatFolder = folder === "drafts" || folder === "failed";
+  const folderCount = folder === "inbox" ? stats.inbox : folder === "sent" ? stats.sent : folder === "drafts" ? stats.drafts : stats.failed;
 
   // ── Debounce search ──
   useEffect(() => {
@@ -273,6 +288,29 @@ export default function EmailAdmin() {
     }, 500);
     return () => clearTimeout(t);
   }, [composer.open, composer.subject, composer.isHtml, composer.bodyHtml, composer.bodyText, composer.to]);
+
+  // ── Auto-save to localStorage while composing (debounced 1.5 s) ──
+  useEffect(() => {
+    if (!composer.open || !isDirty(composer)) return;
+    const t = setTimeout(() => {
+      localStorage.setItem(LS_KEY, JSON.stringify({ ...composer, open: false }));
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [composer]);
+
+  // ── Save to localStorage on page unload if composer has data ──
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const c = composerRef.current;
+      if (c.open && isDirty(c)) {
+        localStorage.setItem(LS_KEY, JSON.stringify({ ...c, open: false }));
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load stats ──
   const loadStats = useCallback(async () => {
@@ -301,8 +339,6 @@ export default function EmailAdmin() {
     }
   }, [folder, page, debouncedSearch, isFlatFolder, toast]);
 
-  // Pull any new inbound mail from Resend, then refresh the list. This is the
-  // reliable receive path — it doesn't depend on the webhook reaching us.
   const [syncing, setSyncing] = useState(false);
   const syncInbox = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setSyncing(true);
@@ -318,10 +354,9 @@ export default function EmailAdmin() {
 
   useEffect(() => { setPage(1); }, [folder, debouncedSearch]);
   useEffect(() => { loadList(); loadStats(); }, [loadList, loadStats]);
-  // Auto-sync inbound mail when the Inbox tab is first shown.
   useEffect(() => { if (folder === "inbox") syncInbox({ silent: true }); }, [folder, syncInbox]);
 
-  // ── Polling for near-real-time updates ──
+  // ── Polling ──
   useEffect(() => {
     const id = setInterval(() => {
       loadStats();
@@ -340,7 +375,6 @@ export default function EmailAdmin() {
     try {
       const d = await apiGet<ThreadDetail>(`/api/admin/emails/threads/${id}`);
       setDetail(d);
-      // Mark inbound as read when viewing the inbox folder.
       if (folder === "inbox" && d.messages.some((m) => m.direction === "inbound" && !m.isRead)) {
         await apiPost(`/api/admin/emails/threads/${id}/read`, { read: true }).catch(() => {});
         loadStats();
@@ -353,9 +387,137 @@ export default function EmailAdmin() {
     }
   }, [folder, loadStats, toast]);
 
+  // ── Composer helpers ──
 
-  // ── Composer actions ──
-  const openCompose = () => { setHtmlView("visual"); setShowDeliverability(false); setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" }); };
+  /** Silently save to server. Returns the draftId on success. */
+  const saveDraftSilently = async (state: ComposerState): Promise<number | null> => {
+    try {
+      const payload = {
+        threadId: state.threadId ?? undefined,
+        to: parseEmails(state.to),
+        cc: state.showCcBcc ? parseEmails(state.cc) : undefined,
+        bcc: state.showCcBcc ? parseEmails(state.bcc) : undefined,
+        subject: state.subject,
+        isHtml: state.isHtml,
+        bodyHtml: state.isHtml ? state.bodyHtml : undefined,
+        bodyText: state.isHtml ? undefined : state.bodyText,
+      };
+      if (state.draftId) {
+        await apiPut(`/api/admin/emails/drafts/${state.draftId}`, payload);
+        return state.draftId;
+      } else {
+        const r = await apiPost<{ ok: boolean; messageId?: number }>("/api/admin/emails/drafts", payload);
+        return r.messageId ?? null;
+      }
+    } catch {
+      return null;
+    }
+  };
+
+  /** Close composer after send / explicit save — clears localStorage. */
+  const closeComposer = () => {
+    localStorage.removeItem(LS_KEY);
+    setComposer(EMPTY_COMPOSER);
+    setAnalysis(null);
+    setShowDeliverability(false);
+  };
+
+  /**
+   * Close composer initiated by the user (X, ESC, outside click, Cancel).
+   * Auto-saves dirty content as a draft before closing.
+   */
+  const handleComposerClose = async () => {
+    if (composer.open && isDirty(composer)) {
+      const snapshot = { ...composer, open: false };
+      localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+      const draftId = await saveDraftSilently(composer);
+      if (draftId) {
+        localStorage.setItem(LS_KEY, JSON.stringify({ ...snapshot, draftId }));
+      }
+      toast({ title: "Draft saved", description: "Closed without sending — your draft has been saved." });
+      await Promise.all([loadList(), loadStats()]);
+    } else {
+      localStorage.removeItem(LS_KEY);
+    }
+    setComposer(EMPTY_COMPOSER);
+    setAnalysis(null);
+    setShowDeliverability(false);
+  };
+
+  /** Open composer, checking for an unsaved draft in localStorage first. */
+  const openCompose = () => {
+    const stored = localStorage.getItem(LS_KEY);
+    if (stored) {
+      try {
+        const draft = JSON.parse(stored) as Omit<ComposerState, "open"> & { open?: boolean };
+        if (isDirty(draft)) {
+          setRecoveryDraft(draft);
+          setShowRecovery(true);
+          return;
+        }
+      } catch {
+        localStorage.removeItem(LS_KEY);
+      }
+    }
+    setHtmlView("visual");
+    setShowDeliverability(false);
+    setAnalysis(null);
+    setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" });
+  };
+
+  // ── Draft recovery handlers ──
+  const handleContinueDraft = () => {
+    if (!recoveryDraft) return;
+    setHtmlView(recoveryDraft.isHtml && recoveryDraft.bodyHtml ? "code" : "visual");
+    setShowDeliverability(false);
+    setAnalysis(null);
+    setComposer({ ...recoveryDraft, open: true });
+    setShowRecovery(false);
+    setRecoveryDraft(null);
+  };
+
+  const handleDiscardDraft = async () => {
+    if (recoveryDraft?.draftId) {
+      await apiDelete(`/api/admin/emails/messages/${recoveryDraft.draftId}`).catch(() => {});
+      await Promise.all([loadList({ silent: true }), loadStats()]);
+    }
+    localStorage.removeItem(LS_KEY);
+    setRecoveryDraft(null);
+    setShowRecovery(false);
+    setHtmlView("visual");
+    setShowDeliverability(false);
+    setAnalysis(null);
+    setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" });
+  };
+
+  const handleNewEmail = () => {
+    localStorage.removeItem(LS_KEY);
+    setRecoveryDraft(null);
+    setShowRecovery(false);
+    setHtmlView("visual");
+    setShowDeliverability(false);
+    setAnalysis(null);
+    setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" });
+  };
+
+  // ── Delete All ──
+  const deleteAll = async () => {
+    setDeletingAll(true);
+    try {
+      const result = await apiDelete<{ ok: boolean; deletedCount: number }>(`/api/admin/emails/folder?folder=${folder}`);
+      toast({
+        title: `Deleted ${result.deletedCount} item${result.deletedCount !== 1 ? "s" : ""}`,
+        description: `All ${folder} emails have been cleared.`,
+      });
+      if (selectedThreadId) { setSelectedThreadId(null); setDetail(null); }
+      await Promise.all([loadList(), loadStats()]);
+    } catch (e: any) {
+      toast({ title: "Failed to delete", description: e?.message, variant: "destructive" });
+    } finally {
+      setDeletingAll(false);
+      setDeleteAllConfirm(false);
+    }
+  };
 
   const loadDeliverability = async () => {
     setShowDeliverability((v) => !v);
@@ -395,8 +557,6 @@ export default function EmailAdmin() {
       bodyHtml: dr.bodyHtml,
     });
   };
-
-  const closeComposer = () => setComposer(EMPTY_COMPOSER);
 
   const addAttachments = async (files: FileList | null) => {
     if (!files) return;
@@ -441,7 +601,6 @@ export default function EmailAdmin() {
         bodyText: composer.isHtml ? undefined : composer.bodyText,
         attachments: composer.attachments.map((a) => ({ filename: a.filename, contentType: a.contentType, contentBase64: a.contentBase64 })),
       });
-      // If sent from a draft, remove the draft message now that it's sent.
       if (composer.draftId) await apiDelete(`/api/admin/emails/messages/${composer.draftId}`).catch(() => {});
       toast({ title: "Email sent", description: "Delivered via info@royvento.com" });
       closeComposer();
@@ -585,6 +744,18 @@ export default function EmailAdmin() {
             >
               <RefreshCw className={"h-3.5 w-3.5 " + (listLoading || syncing ? "animate-spin" : "")} />
             </Button>
+            {folderCount > 0 && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 text-white/40 hover:text-red-300 hover:border-red-500/30"
+                title={`Delete all ${folder}`}
+                onClick={() => setDeleteAllConfirm(true)}
+                disabled={listLoading || deletingAll}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
 
           <div className="overflow-y-auto max-h-[68vh] min-h-[300px]">
@@ -705,8 +876,71 @@ export default function EmailAdmin() {
         </div>
       </div>
 
+      {/* ── Delete All confirmation dialog ── */}
+      <Dialog open={deleteAllConfirm} onOpenChange={(o) => { if (!o) setDeleteAllConfirm(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete all {folder} emails?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will permanently delete all {folderCount} {folder} email{folderCount !== 1 ? "s" : ""}. This cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setDeleteAllConfirm(false)} disabled={deletingAll}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5 bg-red-600 hover:bg-red-700 text-white border-0"
+              onClick={deleteAll}
+              disabled={deletingAll}
+            >
+              {deletingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Delete All
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Draft recovery dialog ── */}
+      <Dialog open={showRecovery} onOpenChange={(o) => { if (!o) { setShowRecovery(false); setRecoveryDraft(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Unsent draft found</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            You have an unsent email draft{recoveryDraft?.subject ? ` — "${recoveryDraft.subject}"` : ""}. What would you like to do?
+          </p>
+          {recoveryDraft && (recoveryDraft.to || recoveryDraft.subject) && (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm space-y-1">
+              {recoveryDraft.to && (
+                <p className="text-white/50">To: <span className="text-white/80">{recoveryDraft.to}</span></p>
+              )}
+              {recoveryDraft.subject && (
+                <p className="text-white/50">Subject: <span className="text-white/80">{recoveryDraft.subject}</span></p>
+              )}
+            </div>
+          )}
+          <div className="flex flex-col gap-2 pt-1">
+            <Button onClick={handleContinueDraft} className="w-full gap-1.5">
+              <FileEdit className="h-4 w-4" /> Continue Draft
+            </Button>
+            <Button variant="outline" onClick={handleNewEmail} className="w-full gap-1.5">
+              <Plus className="h-4 w-4" /> Create New Email
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleDiscardDraft}
+              className="w-full gap-1.5 text-red-300 hover:text-red-300 hover:bg-red-500/10"
+            >
+              <Trash2 className="h-4 w-4" /> Discard Draft
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Composer modal ── */}
-      <Dialog open={composer.open} onOpenChange={(o) => { if (!o) closeComposer(); }}>
+      <Dialog open={composer.open} onOpenChange={(o) => { if (!o) void handleComposerClose(); }}>
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{composer.mode === "reply" ? "Reply" : composer.draftId ? "Edit draft" : "New email"}</DialogTitle>
@@ -756,7 +990,6 @@ export default function EmailAdmin() {
             {/* Body */}
             {composer.isHtml ? (
               <div className="space-y-2">
-                {/* Visual / HTML source / Preview sub-tabs */}
                 <div className="flex rounded-lg border border-white/10 overflow-hidden text-xs w-fit">
                   {([
                     { id: "visual", label: "Visual", icon: Type },
@@ -889,7 +1122,7 @@ export default function EmailAdmin() {
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/8">
             <Button variant="ghost" size="sm" onClick={handleSaveDraft} disabled={sending}>Save draft</Button>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={closeComposer} disabled={sending}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => void handleComposerClose()} disabled={sending}>Cancel</Button>
               <Button size="sm" className="gap-1.5" onClick={handleSend} disabled={sending}>
                 {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />} Send
               </Button>
@@ -942,7 +1175,6 @@ function MessageCard({ m, onCopy }: { m: ThreadMessage; onCopy: (e: string) => v
           </div>
           <p className="text-[11px] text-white/40 truncate">to {m.toEmails.join(", ")}{m.ccEmails.length ? ` · cc ${m.ccEmails.join(", ")}` : ""}</p>
 
-          {/* Delivery tracking chips for outbound */}
           {outbound && (m.deliveredAt || m.openedAt || m.clickedAt) && (
             <div className="flex items-center gap-2 mt-1.5">
               {m.deliveredAt && <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300"><CheckCheck className="h-3 w-3" /> Delivered</span>}
