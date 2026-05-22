@@ -1,6 +1,3 @@
-import { fileURLToPath } from "url";
-import path from "path";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runCleanup } from "./jobs/cleanup";
@@ -220,6 +217,16 @@ async function ensureAdminAccount() {
   }
 }
 
+async function applyPendingSchemaChanges() {
+  try {
+    await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "global_priority" integer`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "drink_plans_global_priority_idx" ON "drink_plans" ("global_priority")`);
+    logger.info("Schema: drink_plans.global_priority ensured");
+  } catch (err) {
+    logger.error({ err }, "Schema migration warning (drink_plans global_priority)");
+  }
+}
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
@@ -234,17 +241,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-(async () => {
-  const migrationsFolder = path.join(path.dirname(fileURLToPath(import.meta.url)), "migrations");
-  try {
-    await migrate(db, { migrationsFolder });
-    logger.info("Database migrations applied");
-  } catch (err) {
-    logger.error({ err }, "Database migration failed — aborting startup");
-    process.exit(1);
-  }
-
-  app.listen(port, (err) => {
+app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
@@ -253,6 +250,7 @@ if (Number.isNaN(port) || port <= 0) {
     logger.info({ port }, "Server listening");
 
     ensureAdminAccount()
+    .then(() => applyPendingSchemaChanges())
     .then(() => auditPasswordHashes())
     .then(() => backfillVendorTicketPrefixes())
     .then(() => auditVendorManagerOverlap())
@@ -308,5 +306,4 @@ if (Number.isNaN(port) || port <= 0) {
   cron.schedule("*/2 * * * *", () => {
     runInboundSync().catch((err) => logger.error({ err }, "Inbound email sync failed"));
   });
-  });
-})();
+});
