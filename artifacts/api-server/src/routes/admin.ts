@@ -1179,6 +1179,7 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
       userId: b.userId,
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
+      phone: u?.phone ?? "",
       bookingDate: b.bookingDate,
       guests: b.guests,
       pubMode: b.pubMode,
@@ -1246,7 +1247,7 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
     const matchingUsers = await db
       .select({ id: usersTable.id })
       .from(usersTable)
-      .where(sql`lower(${usersTable.name}) LIKE ${likeStr} OR lower(${usersTable.email}) LIKE ${likeStr}`);
+      .where(sql`lower(${usersTable.name}) LIKE ${likeStr} OR lower(${usersTable.email}) LIKE ${likeStr} OR ${usersTable.phone} LIKE ${`%${searchParam}%`}`);
     if (matchingUsers.length === 0) {
       res.json({ bookings: [], total: 0, page: pageNum, totalPages: 1 });
       return;

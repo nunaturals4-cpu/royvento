@@ -213,6 +213,7 @@ const NAV_ITEMS: NavItem[] = [
   { value: "ads",           label: "Ads",              icon: Sparkles,     group: "growth" },
   { value: "announcements", label: "Announcements",    icon: Megaphone,    group: "growth" },
   { value: "leads",         label: "Leads",            icon: Crown,        group: "growth" },
+  { value: "coupons",       label: "Coupons",          icon: Tag,          group: "growth" },
   { value: "drinkplans",    label: "Drink Plans",      icon: GlassWater,   group: "growth" },
   { value: "banking",       label: "Banking",          icon: Banknote,     group: "money" },
   { value: "reviews",       label: "Reviews",          icon: Star,         group: "money" },
@@ -525,6 +526,7 @@ export function VendorDashboard() {
                 <TabsContent value="ads" className="mt-0"><AdsPanel /></TabsContent>
                 <TabsContent value="announcements" className="mt-0"><AnnouncementsPanel /></TabsContent>
                 <TabsContent value="leads" className="mt-0"><LeadsPanel /></TabsContent>
+                <TabsContent value="coupons" className="mt-0"><CouponsPanel /></TabsContent>
                 <TabsContent value="drinkplans" className="mt-0"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
                 <TabsContent value="attendance" className="mt-0"><AttendancePanel /></TabsContent>
                 <TabsContent value="managers" className="mt-0"><ManagersPanel /></TabsContent>
@@ -2739,6 +2741,7 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                       <th className="text-left py-2 pr-3">ID</th>
                       <th className="text-left py-2 pr-3">Date</th>
                       <th className="text-left py-2 pr-3">Guest</th>
+                      <th className="text-left py-2 pr-3">Mobile</th>
                       <th className="text-left py-2 pr-3">Event</th>
                       <th className="text-left py-2 pr-3">Mode</th>
                       <th className="text-left py-2 pr-3">Arrival</th>
@@ -2755,6 +2758,7 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                         <td className="py-2.5 pr-3">
                           <span className="font-medium">{b.personName || "—"}</span>
                         </td>
+                        <td className="py-2.5 pr-3 text-muted-foreground text-xs tabular-nums">{(b as any).phone || "—"}</td>
                         <td className="py-2.5 pr-3 text-muted-foreground max-w-[120px] truncate">{b.eventTitle || "—"}</td>
                         <td className="py-2.5 pr-3 capitalize text-muted-foreground">{b.pubMode === "event" ? "Table" : b.pubMode === "ticket" ? "Ticket" : "—"}</td>
                         <td className="py-2.5 pr-3">
@@ -4869,6 +4873,271 @@ function LineItemsEditor({
         className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-1">
         <Plus className="h-3.5 w-3.5" /> Add item
       </button>
+    </div>
+  );
+}
+
+// ─── Coupons Panel ────────────────────────────────────────────────────────────
+
+interface VendorCoupon {
+  id: number;
+  code: string;
+  discountType: "percent" | "fixed";
+  discountValue: string;
+  applicableTo: "ticket" | "event" | "both";
+  active: boolean;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+const BLANK_COUPON: { code: string; discountType: "percent" | "fixed"; discountValue: string; applicableTo: "ticket" | "event" | "both"; active: boolean; maxUses: string; expiresAt: string } = { code: "", discountType: "percent", discountValue: "10", applicableTo: "both", active: true, maxUses: "", expiresAt: "" };
+
+function CouponsPanel() {
+  const { toast } = useToast();
+  const [coupons, setCoupons] = useState<VendorCoupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<VendorCoupon | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [form, setForm] = useState(BLANK_COUPON);
+
+  const load = async () => {
+    try {
+      const rows = await apiGet<VendorCoupon[]>("/api/partner/coupons");
+      setCoupons(rows);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const openCreate = () => { setForm(BLANK_COUPON); setEditing(null); setShowForm(true); };
+  const openEdit = (c: VendorCoupon) => {
+    setForm({ code: c.code, discountType: c.discountType, discountValue: String(c.discountValue), applicableTo: c.applicableTo, active: c.active, maxUses: c.maxUses != null ? String(c.maxUses) : "", expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "" });
+    setEditing(c);
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        discountType: form.discountType,
+        discountValue: Number(form.discountValue),
+        applicableTo: form.applicableTo,
+        active: form.active,
+        maxUses: form.maxUses ? Number(form.maxUses) : null,
+        expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+      };
+      if (!editing) payload.code = form.code.trim().toUpperCase() || undefined;
+
+      if (editing) {
+        await apiPatch(`/api/partner/coupons/${editing.id}`, payload);
+        toast({ title: "Coupon updated" });
+      } else {
+        await apiPost("/api/partner/coupons", payload);
+        toast({ title: "Coupon created" });
+      }
+      setShowForm(false);
+      void load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message ?? "Failed to save coupon", variant: "destructive" });
+    }
+    setSaving(false);
+  };
+
+  const deleteCoupon = async (id: number) => {
+    setDeleting(id);
+    try {
+      await apiDelete(`/api/partner/coupons/${id}`);
+      toast({ title: "Coupon deleted" });
+      setCoupons((prev) => prev.filter((c) => c.id !== id));
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
+    setDeleting(null);
+  };
+
+  const toggleActive = async (c: VendorCoupon) => {
+    try {
+      await apiPatch(`/api/partner/coupons/${c.id}`, { active: !c.active });
+      setCoupons((prev) => prev.map((x) => x.id === c.id ? { ...x, active: !x.active } : x));
+    } catch {
+      toast({ title: "Failed to update", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-serif text-2xl font-semibold">Coupon & Discount Management</h2>
+          <p className="text-muted-foreground text-sm mt-1">Create 5-character codes customers can apply at booking.</p>
+        </div>
+        <Button size="sm" className="gap-2" onClick={openCreate}>
+          <Plus className="h-4 w-4" /> New Coupon
+        </Button>
+      </div>
+
+      {/* Create / Edit form */}
+      {showForm && (
+        <div className="rounded-2xl glass-card p-6 space-y-5 border border-primary/20">
+          <h3 className="font-semibold text-lg">{editing ? "Edit Coupon" : "New Coupon"}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {!editing && (
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Code (leave blank to auto-generate)</Label>
+                <Input
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().slice(0, 10) })}
+                  placeholder="e.g. SAVE5"
+                  className="bg-black/40 border-white/10 rounded-xl font-mono tracking-widest"
+                  maxLength={10}
+                />
+              </div>
+            )}
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Discount Type</Label>
+              <Select value={form.discountType} onValueChange={(v) => setForm({ ...form, discountType: v as "percent" | "fixed" })}>
+                <SelectTrigger className="bg-black/40 border-white/10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percent">Percentage (%)</SelectItem>
+                  <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">
+                {form.discountType === "percent" ? "Discount %" : "Discount ₹"}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={form.discountType === "percent" ? 100 : undefined}
+                value={form.discountValue}
+                onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
+                className="bg-black/40 border-white/10 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Applicable To</Label>
+              <Select value={form.applicableTo} onValueChange={(v) => setForm({ ...form, applicableTo: v as "ticket" | "event" | "both" })}>
+                <SelectTrigger className="bg-black/40 border-white/10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="both">Both (Tickets & Events)</SelectItem>
+                  <SelectItem value="ticket">Ticket Bookings Only</SelectItem>
+                  <SelectItem value="event">Event/Table Bookings Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Max Uses (blank = unlimited)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={form.maxUses}
+                onChange={(e) => setForm({ ...form, maxUses: e.target.value })}
+                placeholder="Unlimited"
+                className="bg-black/40 border-white/10 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Expires On (blank = never)</Label>
+              <Input
+                type="date"
+                value={form.expiresAt}
+                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
+                className="bg-black/40 border-white/10 rounded-xl"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="rounded" />
+              Active
+            </label>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button onClick={save} disabled={saving} className="gap-2">
+              {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {editing ? "Save Changes" : "Create Coupon"}
+            </Button>
+            <Button variant="outline" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Coupon list */}
+      {loading ? (
+        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">Loading…</div>
+      ) : coupons.length === 0 ? (
+        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">No coupons yet. Create your first coupon above.</div>
+      ) : (
+        <div className="rounded-2xl glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead>
+                <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left">Code</th>
+                  <th className="px-4 py-3 text-left">Discount</th>
+                  <th className="px-4 py-3 text-left">Applies To</th>
+                  <th className="px-4 py-3 text-left">Uses</th>
+                  <th className="px-4 py-3 text-left">Expires</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {coupons.map((c) => (
+                  <tr key={c.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-sm font-semibold tracking-widest text-primary">{c.code}</span>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {c.discountType === "percent"
+                        ? <span className="flex items-center gap-1"><Percent className="h-3.5 w-3.5 text-emerald-400" />{Number(c.discountValue)}% off</span>
+                        : <span className="flex items-center gap-1"><IndianRupee className="h-3.5 w-3.5 text-emerald-400" />{Number(c.discountValue)} off</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 capitalize text-muted-foreground text-xs">{c.applicableTo === "both" ? "All bookings" : `${c.applicableTo}s`}</td>
+                    <td className="px-4 py-3 text-muted-foreground tabular-nums text-xs">
+                      {c.usedCount}{c.maxUses != null ? `/${c.maxUses}` : ""}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">
+                      {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" }) : "Never"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => toggleActive(c)}
+                        className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${c.active ? "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30" : "bg-white/5 text-muted-foreground hover:bg-white/10"}`}
+                      >
+                        {c.active ? "Active" : "Inactive"}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => deleteCoupon(c.id)} disabled={deleting === c.id} className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
+                          {deleting === c.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

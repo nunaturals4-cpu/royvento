@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, couponsTable, usersTable, vendorsTable } from "@workspace/db";
-import { eq, desc, and, isNull, or } from "drizzle-orm";
+import { db, couponsTable, usersTable, vendorsTable, vendorCouponsTable } from "@workspace/db";
+import { eq, desc, and, isNull, or, gt } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
@@ -10,6 +10,16 @@ const router: IRouter = Router();
 function genCode(prefix = "RV"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
+
+/** Generate a random 5-character alphanumeric code (uppercase). */
+function genVendorCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+// ─── User coupon routes ───────────────────────────────────────────────────────
 
 router.get("/coupons/me", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
@@ -37,6 +47,9 @@ router.post("/coupons/validate", requireAuth(), async (req, res) => {
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = z.object({ code: z.string(), vendorId: z.number().int().positive().optional() }).safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
+  const upperCode = parsed.data.code.trim().toUpperCase();
+
+  // 1. Check user-specific coupons first
   const rows = await db
     .select({
       id: couponsTable.id,
@@ -49,24 +62,218 @@ router.post("/coupons/validate", requireAuth(), async (req, res) => {
     .leftJoin(vendorsTable, eq(couponsTable.vendorId, vendorsTable.id))
     .where(
       and(
-        eq(couponsTable.code, parsed.data.code.trim().toUpperCase()),
+        eq(couponsTable.code, upperCode),
         eq(couponsTable.userId, user.id),
         eq(couponsTable.used, false),
       ),
     )
     .limit(1);
   const coupon = rows[0];
-  if (!coupon) return res.status(404).json({ error: "Invalid or used coupon" });
-  if (coupon.vendorId !== null && coupon.vendorId !== undefined) {
-    if (parsed.data.vendorId && coupon.vendorId !== parsed.data.vendorId) {
-      return res.status(400).json({
-        error: `This code is only valid for ${coupon.vendorName ?? "another pub"}. It cannot be used here.`,
-      });
+  if (coupon) {
+    if (coupon.vendorId !== null && coupon.vendorId !== undefined) {
+      if (parsed.data.vendorId && coupon.vendorId !== parsed.data.vendorId) {
+        return res.status(400).json({
+          error: `This code is only valid for ${coupon.vendorName ?? "another pub"}. It cannot be used here.`,
+        });
+      }
+      return res.json({ valid: true, discountPercent: coupon.discountPercent, vendorId: coupon.vendorId, vendorName: coupon.vendorName });
     }
-    return res.json({ valid: true, discountPercent: coupon.discountPercent, vendorId: coupon.vendorId, vendorName: coupon.vendorName });
+    return res.json({ valid: true, discountPercent: coupon.discountPercent });
   }
-  return res.json({ valid: true, discountPercent: coupon.discountPercent });
+
+  // 2. Check vendor public coupons
+  const vcRows = await db
+    .select({
+      id: vendorCouponsTable.id,
+      code: vendorCouponsTable.code,
+      discountType: vendorCouponsTable.discountType,
+      discountValue: vendorCouponsTable.discountValue,
+      applicableTo: vendorCouponsTable.applicableTo,
+      vendorId: vendorCouponsTable.vendorId,
+      maxUses: vendorCouponsTable.maxUses,
+      usedCount: vendorCouponsTable.usedCount,
+      expiresAt: vendorCouponsTable.expiresAt,
+      vendorName: vendorsTable.businessName,
+    })
+    .from(vendorCouponsTable)
+    .leftJoin(vendorsTable, eq(vendorCouponsTable.vendorId, vendorsTable.id))
+    .where(
+      and(
+        eq(vendorCouponsTable.code, upperCode),
+        eq(vendorCouponsTable.active, true),
+      ),
+    )
+    .limit(1);
+  const vc = vcRows[0];
+  if (!vc) return res.status(404).json({ error: "Invalid or used coupon" });
+
+  // Max-uses guard
+  if (vc.maxUses !== null && vc.usedCount >= vc.maxUses) {
+    return res.status(400).json({ error: "This coupon has reached its usage limit." });
+  }
+  // Expiry guard
+  if (vc.expiresAt && new Date(vc.expiresAt) < new Date()) {
+    return res.status(400).json({ error: "This coupon has expired." });
+  }
+  // Vendor-lock guard
+  if (parsed.data.vendorId && vc.vendorId !== parsed.data.vendorId) {
+    return res.status(400).json({
+      error: `This code is only valid for ${vc.vendorName ?? "another pub"}. It cannot be used here.`,
+    });
+  }
+
+  return res.json({
+    valid: true,
+    discountType: vc.discountType,
+    discountValue: Number(vc.discountValue),
+    applicableTo: vc.applicableTo,
+    vendorId: vc.vendorId,
+    vendorName: vc.vendorName,
+    isVendorCoupon: true,
+  });
 });
+
+// ─── Partner coupon management ────────────────────────────────────────────────
+
+const VendorCouponBody = z.object({
+  code: z.string().min(3).max(10).transform((v) => v.trim().toUpperCase()).optional(),
+  discountType: z.enum(["percent", "fixed"]).default("percent"),
+  discountValue: z.number().positive().max(100000),
+  applicableTo: z.enum(["ticket", "event", "both"]).default("both"),
+  active: z.boolean().default(true),
+  maxUses: z.number().int().positive().nullable().optional(),
+  expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+router.get("/partner/coupons", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const vRows = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  if (!vRows[0]) return res.status(403).json({ error: "No partner profile found." });
+  const rows = await db
+    .select()
+    .from(vendorCouponsTable)
+    .where(eq(vendorCouponsTable.vendorId, vRows[0].id))
+    .orderBy(desc(vendorCouponsTable.createdAt));
+  return res.json(rows);
+});
+
+router.post("/partner/coupons", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const vRows = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  if (!vRows[0]) return res.status(403).json({ error: "No partner profile found." });
+
+  const parsed = VendorCouponBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+
+  // Generate a unique 5-char code if not provided
+  let code = parsed.data.code ?? genVendorCode();
+  // Collision-retry up to 5 times
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const existing = await db.select({ id: vendorCouponsTable.id }).from(vendorCouponsTable).where(eq(vendorCouponsTable.code, code)).limit(1);
+    if (!existing[0]) break;
+    code = genVendorCode();
+  }
+
+  const [created] = await db
+    .insert(vendorCouponsTable)
+    .values({
+      vendorId: vRows[0].id,
+      code,
+      discountType: parsed.data.discountType,
+      discountValue: String(parsed.data.discountValue),
+      applicableTo: parsed.data.applicableTo,
+      active: parsed.data.active,
+      maxUses: parsed.data.maxUses ?? null,
+      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+    })
+    .returning();
+  return res.status(201).json(created);
+});
+
+router.patch("/partner/coupons/:id", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const vRows = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  if (!vRows[0]) return res.status(403).json({ error: "No partner profile found." });
+
+  const existing = await db.select().from(vendorCouponsTable).where(and(eq(vendorCouponsTable.id, id), eq(vendorCouponsTable.vendorId, vRows[0].id))).limit(1);
+  if (!existing[0]) return res.status(404).json({ error: "Coupon not found." });
+
+  const UpdateBody = VendorCouponBody.partial();
+  const parsed = UpdateBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+
+  const [updated] = await db
+    .update(vendorCouponsTable)
+    .set({
+      ...(parsed.data.discountType !== undefined && { discountType: parsed.data.discountType }),
+      ...(parsed.data.discountValue !== undefined && { discountValue: String(parsed.data.discountValue) }),
+      ...(parsed.data.applicableTo !== undefined && { applicableTo: parsed.data.applicableTo }),
+      ...(parsed.data.active !== undefined && { active: parsed.data.active }),
+      ...(parsed.data.maxUses !== undefined && { maxUses: parsed.data.maxUses }),
+      ...(parsed.data.expiresAt !== undefined && { expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }),
+    })
+    .where(and(eq(vendorCouponsTable.id, id), eq(vendorCouponsTable.vendorId, vRows[0].id)))
+    .returning();
+  return res.json(updated);
+});
+
+router.delete("/partner/coupons/:id", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const vRows = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  if (!vRows[0]) return res.status(403).json({ error: "No partner profile found." });
+
+  const [deleted] = await db
+    .delete(vendorCouponsTable)
+    .where(and(eq(vendorCouponsTable.id, id), eq(vendorCouponsTable.vendorId, vRows[0].id)))
+    .returning();
+  if (!deleted) return res.status(404).json({ error: "Coupon not found." });
+  return res.json({ ok: true });
+});
+
+// Public: list active vendor coupons for a vendor (for display on booking page)
+router.get("/vendor-coupons/vendor/:vendorId", async (req, res) => {
+  const vendorId = Number(req.params["vendorId"]);
+  if (!Number.isFinite(vendorId)) return res.status(400).json({ error: "Invalid vendorId" });
+  const now = new Date();
+  const rows = await db
+    .select({
+      id: vendorCouponsTable.id,
+      code: vendorCouponsTable.code,
+      discountType: vendorCouponsTable.discountType,
+      discountValue: vendorCouponsTable.discountValue,
+      applicableTo: vendorCouponsTable.applicableTo,
+      maxUses: vendorCouponsTable.maxUses,
+      usedCount: vendorCouponsTable.usedCount,
+      expiresAt: vendorCouponsTable.expiresAt,
+    })
+    .from(vendorCouponsTable)
+    .where(
+      and(
+        eq(vendorCouponsTable.vendorId, vendorId),
+        eq(vendorCouponsTable.active, true),
+      ),
+    )
+    .orderBy(desc(vendorCouponsTable.createdAt));
+  // Filter out expired and maxed-out coupons in application layer
+  const available = rows.filter((c) => {
+    if (c.expiresAt && new Date(c.expiresAt) < now) return false;
+    if (c.maxUses !== null && c.usedCount >= c.maxUses) return false;
+    return true;
+  });
+  return res.json(available);
+});
+
+// ─── Admin coupon routes ──────────────────────────────────────────────────────
 
 const AdminGrantBody = z.object({
   userId: z.number().int().positive(),

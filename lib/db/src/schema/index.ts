@@ -904,4 +904,64 @@ export const emailAttachmentsTable = pgTable(
   }),
 );
 
+// ─── Vendor-owned public coupons ─────────────────────────────────────────────
+// Partners create 5-char codes that any customer can apply at booking.
+// Distinct from `couponsTable` which is user-specific admin-granted coupons.
+export const vendorCouponsTable = pgTable(
+  "vendor_coupons",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id")
+      .notNull()
+      .references(() => vendorsTable.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 10 }).notNull(),
+    discountType: varchar("discount_type", { length: 10 }).notNull().default("percent"), // "percent" | "fixed"
+    discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull().default("10"),
+    applicableTo: varchar("applicable_to", { length: 20 }).notNull().default("both"), // "ticket" | "event" | "both"
+    active: boolean("active").notNull().default(true),
+    maxUses: integer("max_uses"),          // null = unlimited
+    usedCount: integer("used_count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("vendor_coupons_vendor_idx").on(t.vendorId),
+    codeIdx: uniqueIndex("vendor_coupons_code_idx").on(t.code),
+    activeIdx: index("vendor_coupons_active_idx").on(t.active),
+  }),
+);
+
+export type VendorCoupon = typeof vendorCouponsTable.$inferSelect;
+
+// ─── Loyalty points ledger ────────────────────────────────────────────────────
+// Append-only log of every points grant (positive) and redemption (negative).
+// Used to enforce the 30-day expiry window and send tiered reminder notifications.
+// usersTable.points remains the authoritative real-time balance.
+export const pointsLedgerTable = pgTable(
+  "points_ledger",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    points: integer("points").notNull(),             // >0 = earned, <0 = spent/expired
+    source: varchar("source", { length: 30 }).notNull(), // "scan_in"|"referral"|"admin"|"redemption"|"expiry"
+    bookingId: integer("booking_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }), // only set on earned (>0) rows
+    notifiedDay20: boolean("notified_day_20").notNull().default(false),
+    notifiedDay23: boolean("notified_day_23").notNull().default(false),
+    notifiedDay26: boolean("notified_day_26").notNull().default(false),
+    notifiedDay29: boolean("notified_day_29").notNull().default(false),
+    expired: boolean("expired").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("points_ledger_user_idx").on(t.userId),
+    expiresIdx: index("points_ledger_expires_idx").on(t.expiresAt),
+    expiredIdx: index("points_ledger_expired_idx").on(t.expired),
+  }),
+);
+
+export type PointsLedgerRow = typeof pointsLedgerTable.$inferSelect;
+
 export type EmailAttachment = typeof emailAttachmentsTable.$inferSelect;

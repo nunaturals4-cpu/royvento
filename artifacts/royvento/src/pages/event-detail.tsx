@@ -93,8 +93,14 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [budget, setBudget] = useState<string>("any");
   const [couponInput, setCouponInput] = useState("");
   const [couponState, setCouponState] = useState<{
-    valid: boolean; discountPercent: number; code: string;
+    valid: boolean;
+    discountPercent?: number;
+    discountType?: "percent" | "fixed";
+    discountValue?: number;
+    code: string;
+    isVendorCoupon?: boolean;
   } | null>(null);
+  const [vendorCoupons, setVendorCoupons] = useState<{ id: number; code: string; discountType: string; discountValue: string; applicableTo: string }[]>([]);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewImages, setReviewImages] = useState<string[]>([]);
@@ -200,6 +206,12 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     apiGet<Coupon[]>("/api/coupons/me").then(setMyCoupons).catch(() => {});
     apiGet<DiscountInfo>("/api/users/me/discounts").then(setDiscountInfo).catch(() => {});
   }, [me?.user]);
+
+  useEffect(() => {
+    const vendorId = (event as any)?.vendorId;
+    if (!vendorId) return;
+    apiGet<any[]>(`/api/vendor-coupons/vendor/${vendorId}`).then(setVendorCoupons).catch(() => {});
+  }, [(event as any)?.vendorId]);
 
   useEffect(() => {
     if (me?.user?.name && !personName) setPersonName(me.user.name);
@@ -345,12 +357,21 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     (ferDayActive && pubMode === "ticket" && _ticketsCount > 0 && subtotal === 0)
   );
 
-  const couponDiscount = couponState?.valid ? Math.round(subtotal * (couponState.discountPercent / 100)) : 0;
+  const couponDiscount = (() => {
+    if (!couponState?.valid) return 0;
+    if (couponState.isVendorCoupon) {
+      return couponState.discountType === "fixed"
+        ? Math.min(Math.round(couponState.discountValue ?? 0), subtotal)
+        : Math.round(subtotal * ((couponState.discountValue ?? 0) / 100));
+    }
+    return Math.round(subtotal * ((couponState.discountPercent ?? 0) / 100));
+  })();
   const newUserPercent = discountInfo?.isNewUser && !couponState?.valid ? (discountInfo.bookingDiscountPercent || 0) : 0;
   const newUserDiscount = newUserPercent > 0 ? Math.round(subtotal * (newUserPercent / 100)) : 0;
   const discount = Math.max(couponDiscount, newUserDiscount);
-  const POINTS_RUPEE_RATE = 0.10; // 100 pts = ₹10
-  const pointsCap = Math.max(0, subtotal - discount);
+  const POINTS_RUPEE_RATE = 0.05; // 100 pts = ₹5
+  const maxPointsDiscount = Math.floor(subtotal * 0.02); // 2% of booking value
+  const pointsCap = Math.min(Math.max(0, subtotal - discount), maxPointsDiscount);
   const pointsAvail = Math.min(discountInfo?.points ?? 0, Math.floor(pointsCap / POINTS_RUPEE_RATE));
   const pointsApplied = Math.min(pointsToUse, pointsAvail);
   const finalTotal = Math.max(0, subtotal - discount - pointsApplied * POINTS_RUPEE_RATE);
@@ -378,13 +399,20 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     }
     if (!couponInput.trim()) return;
     try {
-      const r = await apiPost<{ valid: boolean; discountPercent: number }>(
+      const vendorId = (event as any)?.vendorId;
+      const r = await apiPost<any>(
         "/api/coupons/validate",
-        { code: couponInput.trim().toUpperCase() },
+        { code: couponInput.trim().toUpperCase(), vendorId },
       );
       if (r.valid) {
-        setCouponState({ valid: true, discountPercent: r.discountPercent, code: couponInput.trim().toUpperCase() });
-        toast({ title: t("events.coupon_applied_title"), description: t("events.coupon_applied_pct", { pct: r.discountPercent }) });
+        if (r.isVendorCoupon) {
+          const discDisplay = r.discountType === "fixed" ? `₹${r.discountValue} off` : `${r.discountValue}% off`;
+          setCouponState({ valid: true, discountType: r.discountType, discountValue: r.discountValue, code: couponInput.trim().toUpperCase(), isVendorCoupon: true });
+          toast({ title: t("events.coupon_applied_title"), description: discDisplay });
+        } else {
+          setCouponState({ valid: true, discountPercent: r.discountPercent, code: couponInput.trim().toUpperCase() });
+          toast({ title: t("events.coupon_applied_title"), description: t("events.coupon_applied_pct", { pct: r.discountPercent }) });
+        }
       }
     } catch (e: any) {
       setCouponState(null);
@@ -1473,8 +1501,31 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     {!me?.user ? <p className="text-xs text-muted-foreground mt-2"><Link href="/login" className="text-primary hover:underline">{t("events.log_in_link")}</Link> {t("events.coupon_login_hint")}</p> : (
                       <>
                         <div className="flex gap-2 mt-2"><Input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="RV-XXXXXX" className="bg-black/40 border-white/10 h-11 rounded-xl" /><Button type="button" variant="outline" onClick={validateCoupon} className="border-white/15 rounded-xl px-5 shrink-0">{t("events.apply_coupon")}</Button></div>
-                        {couponState?.valid && <p className="text-xs text-emerald-400 mt-1.5">✓ {t("events.coupon_pct_off", { pct: couponState.discountPercent })}</p>}
+                        {couponState?.valid && (
+                          <p className="text-xs text-emerald-400 mt-1.5">
+                            ✓ {couponState.isVendorCoupon
+                              ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`)
+                              : t("events.coupon_pct_off", { pct: couponState.discountPercent })}
+                          </p>
+                        )}
                         {myCoupons.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{myCoupons.slice(0, 3).map((c) => <button key={c.id} type="button" onClick={() => setCouponInput(c.code)} className="text-[10px] px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-colors">{c.code} — {c.discountPercent}%</button>)}</div>}
+                        {vendorCoupons.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Available offers</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {vendorCoupons.map((vc) => (
+                                <button
+                                  key={vc.id}
+                                  type="button"
+                                  onClick={() => setCouponInput(vc.code)}
+                                  className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition-colors font-mono"
+                                >
+                                  {vc.code} — {vc.discountType === "fixed" ? `₹${Number(vc.discountValue)}` : `${Number(vc.discountValue)}%`} off
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>

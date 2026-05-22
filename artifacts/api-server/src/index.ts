@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { runCleanup } from "./jobs/cleanup";
 import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingReminders";
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
+import { runPointsExpiry } from "./jobs/pointsExpiry";
 import cron from "node-cron";
 import { db, usersTable, vendorsTable, eventsTable, wishlistsTable } from "@workspace/db";
 import { eq, or, sql, inArray } from "drizzle-orm";
@@ -267,6 +268,15 @@ app.listen(port, (err) => {
   cron.schedule("*/5 * * * *", () => {
     runPreArrivalReminders().catch((err) =>
       logger.error({ err }, "Pre-arrival reminder job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
+
+  // Points expiry — runs at 11:00 AM IST daily.
+  // Expires stale ledger entries and sends reminder notifications.
+  cron.schedule("0 11 * * *", () => {
+    logger.info("Running points expiry job (11 AM IST)");
+    runPointsExpiry().catch((err) =>
+      logger.error({ err }, "Points expiry job failed"),
     );
   }, { timezone: "Asia/Kolkata" });
 

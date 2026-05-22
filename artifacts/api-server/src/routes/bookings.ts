@@ -8,6 +8,8 @@ import {
   usersTable,
   availabilityTable,
   couponsTable,
+  vendorCouponsTable,
+  pointsLedgerTable,
   referralsTable,
   partnerBlockedDatesTable,
   paymentsTable,
@@ -351,20 +353,20 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     if (guestsCount === 0) guestsCount = 1;
   }
 
-  // Apply coupon — mark used immediately to prevent double-spend across concurrent pending bookings.
-  // Restored on payment failure. Skip entirely on free-entry days (totalPrice === 0):
-  // a coupon discount on ₹0 is ₹0, so consuming the user's one-shot coupon would
-  // be a pure regression. The web/mobile UIs hide the coupon input on free-entry
-  // days, but stale couponCode in the request payload is still possible.
+  // Apply coupon — skip on free-entry days (totalPrice === 0).
+  // Priority: user-specific coupons first, then vendor public coupons.
   let discountAmount = 0;
   let validCode = "";
   if (parsed.data.couponCode && totalPrice > 0) {
+    const upperCode = parsed.data.couponCode.trim().toUpperCase();
+
+    // 1. Check user-specific coupon
     const couponRows = await db
       .select()
       .from(couponsTable)
       .where(
         and(
-          eq(couponsTable.code, parsed.data.couponCode.trim().toUpperCase()),
+          eq(couponsTable.code, upperCode),
           eq(couponsTable.userId, user.id),
           eq(couponsTable.used, false),
         ),
@@ -380,10 +382,47 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       }
       discountAmount = Math.round(totalPrice * (coupon.discountPercent / 100));
       validCode = coupon.code;
-      await db
-        .update(couponsTable)
-        .set({ used: true })
-        .where(eq(couponsTable.id, coupon.id));
+      await db.update(couponsTable).set({ used: true }).where(eq(couponsTable.id, coupon.id));
+    } else {
+      // 2. Check vendor public coupon
+      const vcRows = await db
+        .select()
+        .from(vendorCouponsTable)
+        .where(
+          and(
+            eq(vendorCouponsTable.code, upperCode),
+            eq(vendorCouponsTable.active, true),
+            eq(vendorCouponsTable.vendorId, evt.vendorId),
+          ),
+        )
+        .limit(1);
+      const vc = vcRows[0];
+      if (vc) {
+        // Applicability check
+        const isTicketMode = parsed.data.pubMode === "ticket";
+        const bookingKind = isTicketMode ? "ticket" : "event";
+        if (vc.applicableTo !== "both" && vc.applicableTo !== bookingKind) {
+          res.status(400).json({ error: `This coupon is only valid for ${vc.applicableTo} bookings.` });
+          return;
+        }
+        if (vc.maxUses !== null && vc.usedCount >= vc.maxUses) {
+          res.status(400).json({ error: "This coupon has reached its usage limit." });
+          return;
+        }
+        if (vc.expiresAt && new Date(vc.expiresAt) < new Date()) {
+          res.status(400).json({ error: "This coupon has expired." });
+          return;
+        }
+        const vcValue = Number(vc.discountValue);
+        discountAmount = vc.discountType === "fixed"
+          ? Math.min(Math.round(vcValue), totalPrice)
+          : Math.round(totalPrice * (vcValue / 100));
+        validCode = vc.code;
+        // Increment usedCount (best-effort — concurrent over-use is acceptable)
+        await db.update(vendorCouponsTable)
+          .set({ usedCount: vc.usedCount + 1 })
+          .where(eq(vendorCouponsTable.id, vc.id));
+      }
     }
   }
 
@@ -394,10 +433,11 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
 
   // Deduct points immediately to prevent double-spend. Restored on payment failure.
-  // Rate: 100 pts = ₹10, i.e. 1 pt = ₹0.10
-  const POINTS_RUPEE_RATE = 0.10;
+  // Rate: 100 pts = ₹5 (1 pt = ₹0.05). Cap: points discount ≤ 2% of booking value.
+  const POINTS_RUPEE_RATE = 0.05;
   const pointsToUse = Math.min(parsed.data.pointsToUse || 0, user.points);
-  const pointsCap = Math.max(0, totalPrice - discountAmount); // max ₹ deductible via points
+  const maxPointsDiscount = Math.floor(totalPrice * 0.02); // 2% of booking value
+  const pointsCap = Math.min(Math.max(0, totalPrice - discountAmount), maxPointsDiscount);
   const maxPointsFromCap = Math.floor(pointsCap / POINTS_RUPEE_RATE);
   const pointsUsed = Math.min(pointsToUse, maxPointsFromCap); // points count consumed
   const pointsDeduction = pointsUsed * POINTS_RUPEE_RATE;     // ₹ value deducted
@@ -406,6 +446,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       .update(usersTable)
       .set({ points: user.points - pointsUsed })
       .where(eq(usersTable.id, user.id));
+    // Write spending entry to ledger (best-effort)
+    db.insert(pointsLedgerTable).values({
+      userId: user.id,
+      points: -pointsUsed,
+      source: "redemption",
+    }).catch(() => {});
   }
 
   const finalPrice = Math.max(0, totalPrice - discountAmount - pointsDeduction);
@@ -1648,11 +1694,14 @@ router.patch(
           if (ref) {
             const [referrer] = await db.select().from(usersTable).where(eq(usersTable.id, ref.referrerId)).limit(1);
             const [referred] = await db.select().from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+            const refExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
             if (referrer) {
               await db.update(usersTable).set({ points: (referrer.points || 0) + 50 }).where(eq(usersTable.id, referrer.id));
+              db.insert(pointsLedgerTable).values({ userId: referrer.id, points: 50, source: "referral", expiresAt: refExpiresAt }).catch(() => {});
             }
             if (referred) {
               await db.update(usersTable).set({ points: (referred.points || 0) + 50 }).where(eq(usersTable.id, referred.id));
+              db.insert(pointsLedgerTable).values({ userId: referred.id, points: 50, source: "referral", expiresAt: refExpiresAt }).catch(() => {});
             }
             await db.update(referralsTable).set({ status: "completed", pointsAwarded: 50, completedAt: new Date() }).where(eq(referralsTable.id, ref.id));
           }
@@ -2279,19 +2328,27 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     req.log.error({ err, bookingId: updatedActuals.id }, "Failed to credit commission on Save Actual Entry");
   }
 
-  // Award 100 loyalty points to the booking owner for attending the event
-  // (atomic increment). Errors are logged but don't fail the finalize —
-  // loyalty is a non-financial side effect.
+  // Award 100 loyalty points to the booking owner for attending the event.
+  // Points expire 30 days after being earned. Errors are logged but don't
+  // fail the finalize — loyalty is a non-financial side effect.
   try {
     const [scanEvt] = await db
       .select({ title: eventsTable.title })
       .from(eventsTable)
       .where(eq(eventsTable.id, updatedActuals.eventId))
       .limit(1);
+    const pointsExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await Promise.all([
       db.update(usersTable)
         .set({ points: sql`${usersTable.points} + 100` })
         .where(eq(usersTable.id, updatedActuals.userId)),
+      db.insert(pointsLedgerTable).values({
+        userId: updatedActuals.userId,
+        points: 100,
+        source: "scan_in",
+        bookingId: updatedActuals.id,
+        expiresAt: pointsExpiresAt,
+      }),
       createUserNotification({
         userId: updatedActuals.userId,
         title: "You earned 100 points!",

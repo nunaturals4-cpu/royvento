@@ -2794,6 +2794,7 @@ function BookingReport() {
                   <th className="px-4 py-3 text-left">#</th>
                   <th className="px-4 py-3 text-left">Partner · Event</th>
                   <th className="px-4 py-3 text-left">Customer</th>
+                  <th className="px-4 py-3 text-left">Mobile</th>
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Mode</th>
                   <th className="px-4 py-3 text-right">Tickets</th>
@@ -2823,6 +2824,9 @@ function BookingReport() {
                     <td className="px-4 py-3">
                       <p className="truncate max-w-[140px]">{b.userName}</p>
                       <p className="text-xs text-muted-foreground truncate max-w-[140px]">{b.userEmail}</p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
+                      {(b as any).phone || "—"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {b.bookingDate
