@@ -17,6 +17,7 @@
 
 import { Resend } from "resend";
 import { createHmac, timingSafeEqual } from "crypto";
+import { resolveTxt, resolveCname } from "node:dns/promises";
 import { sql, eq, desc, asc, inArray } from "drizzle-orm";
 import { db, emailThreadsTable, emailMessagesTable } from "@workspace/db";
 import { logger } from "./logger";
@@ -33,6 +34,94 @@ function getResendClient(): Resend | null {
   const key = process.env["RESEND_API_KEY"];
   if (!key) return null;
   return new Resend(key);
+}
+
+// ─── Deliverability diagnostics (live DNS lookups) ─────────────────────────────
+//
+// Honest, read-only checks against the sending domain's published DNS. These do
+// not change placement; they surface whether SPF/DKIM/DMARC are actually present
+// so misconfiguration is caught instead of silently hurting reputation.
+
+export interface DeliverabilityCheck {
+  id: "spf" | "dkim" | "dmarc" | "resend_key";
+  label: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+}
+
+export interface DeliverabilityReport {
+  domain: string;
+  fromAddress: string;
+  checks: DeliverabilityCheck[];
+}
+
+function sendingDomain(): string {
+  const m = INFO_EMAIL_ADDRESS.match(/@(.+)$/);
+  return m?.[1] ?? "royvento.com";
+}
+
+async function txtRecords(name: string): Promise<string[]> {
+  try {
+    const records = await resolveTxt(name);
+    return records.map((chunks) => chunks.join(""));
+  } catch {
+    return [];
+  }
+}
+
+export async function runDeliverabilityChecks(): Promise<DeliverabilityReport> {
+  const domain = sendingDomain();
+  const checks: DeliverabilityCheck[] = [];
+
+  // SPF — TXT on the root domain.
+  const root = await txtRecords(domain);
+  const spf = root.find((r) => /v=spf1/i.test(r));
+  if (!spf) {
+    checks.push({ id: "spf", label: "SPF", status: "fail", detail: `No "v=spf1" TXT record found on ${domain}.` });
+  } else if (/include:.*resend|amazonses|spf\.resend/i.test(spf)) {
+    checks.push({ id: "spf", label: "SPF", status: "pass", detail: "SPF present and authorises the sending provider." });
+  } else {
+    checks.push({ id: "spf", label: "SPF", status: "warn", detail: `SPF present but does not appear to include the Resend/SES sender: ${spf}` });
+  }
+
+  // DMARC — TXT at _dmarc.<domain>.
+  const dmarcRecs = await txtRecords(`_dmarc.${domain}`);
+  const dmarc = dmarcRecs.find((r) => /v=DMARC1/i.test(r));
+  if (!dmarc) {
+    checks.push({ id: "dmarc", label: "DMARC", status: "fail", detail: `No DMARC record at _dmarc.${domain}. Add at least "v=DMARC1; p=none".` });
+  } else {
+    const policy = dmarc.match(/p=(none|quarantine|reject)/i)?.[1]?.toLowerCase();
+    checks.push({
+      id: "dmarc",
+      label: "DMARC",
+      status: policy === "none" || !policy ? "warn" : "pass",
+      detail: policy ? `DMARC published with policy p=${policy}.` : "DMARC published.",
+    });
+  }
+
+  // DKIM — Resend publishes a selector under resend._domainkey.<domain> (CNAME or TXT).
+  let dkimFound = false;
+  try {
+    const cname = await resolveCname(`resend._domainkey.${domain}`);
+    dkimFound = cname.length > 0;
+  } catch {
+    const dk = await txtRecords(`resend._domainkey.${domain}`);
+    dkimFound = dk.some((r) => /v=DKIM1|k=rsa|p=/i.test(r));
+  }
+  checks.push(
+    dkimFound
+      ? { id: "dkim", label: "DKIM", status: "pass", detail: "Resend DKIM selector is published." }
+      : { id: "dkim", label: "DKIM", status: "warn", detail: `Could not resolve resend._domainkey.${domain}. If the domain is verified in Resend, DKIM may use a different selector — confirm in the Resend dashboard.` },
+  );
+
+  // Resend API key presence (sends are no-ops without it).
+  checks.push(
+    process.env["RESEND_API_KEY"]
+      ? { id: "resend_key", label: "Resend API key", status: "pass", detail: "RESEND_API_KEY is configured." }
+      : { id: "resend_key", label: "Resend API key", status: "fail", detail: "RESEND_API_KEY is missing — emails are logged, not delivered." },
+  );
+
+  return { domain, fromAddress: getInfoFromAddress(), checks };
 }
 
 // ─── Text helpers ─────────────────────────────────────────────────────────────

@@ -50,8 +50,10 @@ import {
   listInboundEmails,
   BUILT_IN_TEMPLATES,
   INFO_EMAIL_ADDRESS,
+  runDeliverabilityChecks,
   type SendAttachment,
 } from "../lib/emailService";
+import { analyzeEmail } from "../lib/emailQuality";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -95,6 +97,33 @@ const draftBodySchema = z.object({
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Suppression: addresses that previously hard-bounced or filed a spam complaint.
+ * Continuing to mail them damages sender reputation, so we block the send. Reuses
+ * webhook-tracked message status — no separate suppression table needed.
+ */
+async function getSuppressedRecipients(emails: string[]): Promise<string[]> {
+  const wanted = new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean));
+  if (wanted.size === 0) return [];
+  const rows = await db
+    .select({
+      to: emailMessagesTable.toEmails,
+      cc: emailMessagesTable.ccEmails,
+      bcc: emailMessagesTable.bccEmails,
+    })
+    .from(emailMessagesTable)
+    .where(inArray(emailMessagesTable.status, ["bounced", "complained"]))
+    .limit(5000);
+  const bad = new Set<string>();
+  for (const r of rows) {
+    for (const addr of [...(r.to ?? []), ...(r.cc ?? []), ...(r.bcc ?? [])]) {
+      const norm = (addr ?? "").trim().toLowerCase();
+      if (wanted.has(norm)) bad.add(norm);
+    }
+  }
+  return [...bad];
+}
 
 function approxBase64Bytes(b64: string): number {
   const len = b64.length;
@@ -343,6 +372,43 @@ router.get("/admin/emails/templates", requireAuth(["admin"]), (_req, res) => {
   res.json({ templates: BUILT_IN_TEMPLATES });
 });
 
+// ─── Deliverability: pre-send content analysis & DNS diagnostics ────────────────
+
+const analyzeBodySchema = z.object({
+  subject: z.string().max(2000).default(""),
+  isHtml: z.boolean().default(false),
+  bodyHtml: z.string().max(2_000_000).optional(),
+  bodyText: z.string().max(500_000).optional(),
+  recipientCount: z.number().int().min(0).max(100000).default(0),
+});
+
+router.post("/admin/emails/analyze", requireAuth(["admin"]), (req, res) => {
+  const parsed = analyzeBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    respondInvalid(res, parsed.error);
+    return;
+  }
+  const b = parsed.data;
+  res.json(
+    analyzeEmail({
+      subject: b.subject,
+      isHtml: b.isHtml,
+      html: b.bodyHtml,
+      text: b.bodyText,
+      recipientCount: b.recipientCount,
+    }),
+  );
+});
+
+router.get("/admin/emails/deliverability", requireAuth(["admin"]), async (_req, res) => {
+  try {
+    res.json(await runDeliverabilityChecks());
+  } catch (err) {
+    logger.error({ err }, "[email] deliverability check failed");
+    res.status(500).json({ error: "Deliverability check failed" });
+  }
+});
+
 // ─── Send (compose new or reply) ────────────────────────────────────────────────
 
 router.post("/admin/emails/send", requireAuth(["admin"]), async (req, res) => {
@@ -353,6 +419,17 @@ router.post("/admin/emails/send", requireAuth(["admin"]), async (req, res) => {
   }
   const body = parsed.data;
   const user = await loadUserFromRequest(req);
+
+  // Reputation guard: never re-send to addresses that bounced or complained.
+  const allRecipients = [...body.to, ...(body.cc ?? []), ...(body.bcc ?? [])];
+  const suppressed = await getSuppressedRecipients(allRecipients);
+  if (suppressed.length > 0) {
+    res.status(409).json({
+      error: `Blocked to protect sender reputation — these recipients previously bounced or marked mail as spam: ${suppressed.join(", ")}. Remove them and try again.`,
+      suppressed,
+    });
+    return;
+  }
 
   // Build text + (optionally wrapped) HTML payloads.
   const isHtml = body.isHtml && !!body.bodyHtml;

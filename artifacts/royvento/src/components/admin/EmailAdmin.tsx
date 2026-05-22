@@ -12,6 +12,7 @@ import {
   Inbox, Send, FileEdit, AlertTriangle, Paperclip, Reply, Search, RefreshCw,
   Trash2, X, Plus, Mail, Copy, Download, ChevronLeft, Bold, Italic, Underline,
   List, Link2, Code, Type, FileText, Loader2, CheckCheck, Eye, MousePointerClick,
+  ShieldCheck, CheckCircle2, Info, Gauge,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,6 +50,11 @@ interface ThreadDetail {
 
 
 interface ComposerAttachment { filename: string; contentType: string; contentBase64: string; sizeBytes: number }
+
+interface EmailIssue { severity: "error" | "warning" | "info"; code: string; message: string }
+interface EmailAnalysis { score: number; grade: "Excellent" | "Good" | "Fair" | "Poor"; issues: EmailIssue[] }
+interface DnsCheck { id: string; label: string; status: "pass" | "warn" | "fail"; detail: string }
+interface DeliverabilityReport { domain: string; fromAddress: string; checks: DnsCheck[] }
 
 interface ComposerState {
   open: boolean;
@@ -90,6 +96,13 @@ function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function scoreColor(s: number): string {
+  return s >= 90 ? "text-emerald-300" : s >= 75 ? "text-emerald-400" : s >= 55 ? "text-amber-300" : "text-red-400";
+}
+function scoreBar(s: number): string {
+  return s >= 75 ? "bg-emerald-400" : s >= 55 ? "bg-amber-400" : "bg-red-400";
 }
 
 function initials(name: string, email: string): string {
@@ -233,6 +246,9 @@ export default function EmailAdmin() {
   const [composer, setComposer] = useState<ComposerState>(EMPTY_COMPOSER);
   const [sending, setSending] = useState(false);
   const [htmlView, setHtmlView] = useState<"visual" | "code" | "preview">("visual");
+  const [analysis, setAnalysis] = useState<EmailAnalysis | null>(null);
+  const [deliverability, setDeliverability] = useState<DeliverabilityReport | null>(null);
+  const [showDeliverability, setShowDeliverability] = useState(false);
 
   const isFlatFolder = folder === "drafts" || folder === "failed";
 
@@ -241,6 +257,22 @@ export default function EmailAdmin() {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  // ── Live pre-send deliverability analysis (debounced) ──
+  useEffect(() => {
+    if (!composer.open) { setAnalysis(null); return; }
+    const recipientCount = composer.to.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean).length;
+    const t = setTimeout(() => {
+      apiPost<EmailAnalysis>("/api/admin/emails/analyze", {
+        subject: composer.subject,
+        isHtml: composer.isHtml,
+        bodyHtml: composer.isHtml ? composer.bodyHtml : undefined,
+        bodyText: composer.isHtml ? undefined : composer.bodyText,
+        recipientCount,
+      }).then(setAnalysis).catch(() => {});
+    }, 500);
+    return () => clearTimeout(t);
+  }, [composer.open, composer.subject, composer.isHtml, composer.bodyHtml, composer.bodyText, composer.to]);
 
   // ── Load stats ──
   const loadStats = useCallback(async () => {
@@ -323,7 +355,14 @@ export default function EmailAdmin() {
 
 
   // ── Composer actions ──
-  const openCompose = () => { setHtmlView("visual"); setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" }); };
+  const openCompose = () => { setHtmlView("visual"); setShowDeliverability(false); setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" }); };
+
+  const loadDeliverability = async () => {
+    setShowDeliverability((v) => !v);
+    if (!deliverability) {
+      try { setDeliverability(await apiGet<DeliverabilityReport>("/api/admin/emails/deliverability")); } catch {}
+    }
+  };
 
   const openReply = (d: ThreadDetail) => {
     setHtmlView("visual");
@@ -782,6 +821,68 @@ export default function EmailAdmin() {
                 <Paperclip className="h-3.5 w-3.5" /> Attach files
                 <input type="file" multiple className="hidden" onChange={(e) => { addAttachments(e.target.files); e.target.value = ""; }} />
               </label>
+            </div>
+
+            {/* Deliverability: pre-send content analysis + domain auth */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
+                  <Gauge className="h-3.5 w-3.5 text-primary" /> Deliverability
+                </div>
+                {analysis && (
+                  <span className={"text-xs font-semibold " + scoreColor(analysis.score)}>{analysis.score}/100 · {analysis.grade}</span>
+                )}
+              </div>
+
+              {analysis && (
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className={"h-full rounded-full transition-all " + scoreBar(analysis.score)} style={{ width: `${analysis.score}%` }} />
+                </div>
+              )}
+
+              {!analysis ? (
+                <p className="text-[11px] text-white/30">Analyzing…</p>
+              ) : analysis.issues.length === 0 ? (
+                <p className="flex items-center gap-1.5 text-[11px] text-emerald-300"><CheckCircle2 className="h-3 w-3" /> No content issues detected.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {analysis.issues.map((it, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[11px] leading-relaxed">
+                      {it.severity === "error"
+                        ? <AlertTriangle className="h-3 w-3 text-red-400 mt-0.5 shrink-0" />
+                        : it.severity === "warning"
+                          ? <AlertTriangle className="h-3 w-3 text-amber-400 mt-0.5 shrink-0" />
+                          : <Info className="h-3 w-3 text-sky-400 mt-0.5 shrink-0" />}
+                      <span className="text-white/60">{it.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="pt-1.5 border-t border-white/8">
+                <button type="button" onClick={loadDeliverability} className="inline-flex items-center gap-1.5 text-[11px] text-white/50 hover:text-white transition-colors">
+                  <ShieldCheck className="h-3 w-3" /> Domain authentication (SPF · DKIM · DMARC)
+                </button>
+                {showDeliverability && (
+                  <div className="mt-2 space-y-1.5">
+                    {!deliverability ? (
+                      <p className="text-[11px] text-white/30">Checking DNS…</p>
+                    ) : (
+                      <>
+                        <p className="text-[11px] text-white/40">{deliverability.fromAddress} · {deliverability.domain}</p>
+                        {deliverability.checks.map((c) => (
+                          <div key={c.id} className="flex items-start gap-1.5 text-[11px]">
+                            {c.status === "pass"
+                              ? <CheckCircle2 className="h-3 w-3 text-emerald-400 mt-0.5 shrink-0" />
+                              : <AlertTriangle className={"h-3 w-3 mt-0.5 shrink-0 " + (c.status === "warn" ? "text-amber-400" : "text-red-400")} />}
+                            <span className="text-white/60"><span className="font-semibold text-white/80">{c.label}:</span> {c.detail}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
