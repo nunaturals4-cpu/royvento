@@ -173,50 +173,43 @@ export function parseAddress(raw: string): { name: string; email: string } {
 
 // ─── Responsive, dark/light-compatible HTML email layout ──────────────────────
 
-/**
- * Wraps rich body HTML in a branded, responsive shell. `supports-color-schemes`
- * + the media query make it render cleanly in both light and dark mail clients.
- */
+/** Wraps rich body HTML in a branded transactional shell. */
 export function wrapHtmlEmail(bodyHtml: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="color-scheme" content="light dark"/>
-<meta name="supported-color-schemes" content="light dark"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
 <title>Royvento</title>
-<style>
-  @media (max-width:620px){ .rv-container{width:100%!important;} .rv-pad{padding:24px 20px!important;} }
-  @media (prefers-color-scheme:dark){
-    .rv-bg{background:#0b0b0b!important;}
-    .rv-card{background:#161616!important;}
-    .rv-text{color:#e7e7e7!important;}
-    .rv-muted{color:#9a9a9a!important;}
-    .rv-footer{background:#111!important;border-color:#222!important;}
-  }
-</style>
 </head>
-<body class="rv-bg" style="margin:0;padding:0;background:#f2f2f2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" class="rv-bg" style="background:#f2f2f2;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#f2f2f2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f2f2;padding:32px 16px;">
   <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" border="0" class="rv-container rv-card" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+    <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+      <!-- Header -->
       <tr>
-        <td style="background:#0f0f0f;padding:22px 32px;text-align:center;">
-          <span style="font-size:24px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">Roy</span><span style="font-size:24px;font-weight:800;letter-spacing:-0.5px;color:#e53e3e;">vento</span>
+        <td style="background:#0f0f0f;padding:24px 32px;text-align:center;">
+          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">Roy</span><span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#e53e3e;">vento</span>
         </td>
       </tr>
+
+      <!-- Body -->
       <tr>
-        <td class="rv-pad rv-text" style="padding:36px 32px;color:#1a1a1a;font-size:15px;line-height:1.7;">
+        <td style="padding:36px 32px;color:#1a1a1a;font-size:15px;line-height:1.7;">
           ${bodyHtml}
         </td>
       </tr>
+
+      <!-- Footer -->
       <tr>
-        <td class="rv-footer rv-muted" style="padding:20px 32px;background:#f9f9f9;border-top:1px solid #eeeeee;text-align:center;color:#888888;font-size:12px;line-height:1.6;">
+        <td style="padding:20px 32px;background:#f9f9f9;border-top:1px solid #eeeeee;text-align:center;color:#888888;font-size:12px;line-height:1.6;">
           &copy; ${new Date().getFullYear()} Royvento. All rights reserved.<br/>
-          Sent from <a href="mailto:${INFO_EMAIL_ADDRESS}" style="color:#e53e3e;text-decoration:none;">${INFO_EMAIL_ADDRESS}</a>
+          This is a transactional email. Please do not reply to this message.
         </td>
       </tr>
+
     </table>
   </td></tr>
 </table>
@@ -343,7 +336,6 @@ export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmail
       subject: args.subject,
       ...(args.html ? { html: args.html } : {}),
       ...(args.text ? { text: args.text } : {}),
-      replyTo: from,
       ...(Object.keys(headers).length ? { headers } : {}),
       ...(args.attachments && args.attachments.length
         ? { attachments: args.attachments.map((a) => ({ filename: a.filename, content: a.content })) }
