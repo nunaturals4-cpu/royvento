@@ -326,13 +326,13 @@ export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmail
     return { ok: true, id: `dev-${Date.now()}` };
   }
 
+  // Only threading headers. We deliberately do NOT send List-Unsubscribe: it is a
+  // bulk/mailing-list signal that pushes Gmail to route mail into Promotions/Updates.
+  // Admin-composed mail is 1:1/transactional (like the booking-confirmed email, which
+  // lands in Primary), so it should not look like list mail.
   const headers: Record<string, string> = {};
   if (args.inReplyTo) headers["In-Reply-To"] = args.inReplyTo;
   if (args.references && args.references.length > 0) headers["References"] = args.references.join(" ");
-  // List-Unsubscribe improves Primary-inbox placement; only on new sends, not threaded replies.
-  if (!args.inReplyTo) {
-    headers["List-Unsubscribe"] = `<mailto:${INFO_EMAIL_ADDRESS}?subject=Unsubscribe>`;
-  }
 
   try {
     const { data, error } = await client.emails.send({
