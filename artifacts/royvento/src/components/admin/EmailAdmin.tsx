@@ -232,6 +232,7 @@ export default function EmailAdmin() {
 
   const [composer, setComposer] = useState<ComposerState>(EMPTY_COMPOSER);
   const [sending, setSending] = useState(false);
+  const [htmlView, setHtmlView] = useState<"visual" | "code" | "preview">("visual");
 
   const isFlatFolder = folder === "drafts" || folder === "failed";
 
@@ -322,9 +323,10 @@ export default function EmailAdmin() {
 
 
   // ── Composer actions ──
-  const openCompose = () => setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" });
+  const openCompose = () => { setHtmlView("visual"); setComposer({ ...EMPTY_COMPOSER, open: true, mode: "new" }); };
 
   const openReply = (d: ThreadDetail) => {
+    setHtmlView("visual");
     const last = [...d.messages].reverse().find((m) => m.direction === "inbound") ?? d.messages[d.messages.length - 1];
     setComposer({
       ...EMPTY_COMPOSER,
@@ -337,6 +339,7 @@ export default function EmailAdmin() {
   };
 
   const openDraft = (dr: DraftListItem) => {
+    setHtmlView(dr.bodyHtml ? "code" : "visual");
     setComposer({
       ...EMPTY_COMPOSER,
       open: true,
@@ -713,7 +716,52 @@ export default function EmailAdmin() {
 
             {/* Body */}
             {composer.isHtml ? (
-              <RichEditor html={composer.bodyHtml} onChange={(html) => setComposer((c) => ({ ...c, bodyHtml: html }))} />
+              <div className="space-y-2">
+                {/* Visual / HTML source / Preview sub-tabs */}
+                <div className="flex rounded-lg border border-white/10 overflow-hidden text-xs w-fit">
+                  {([
+                    { id: "visual", label: "Visual", icon: Type },
+                    { id: "code", label: "HTML", icon: Code },
+                    { id: "preview", label: "Preview", icon: Eye },
+                  ] as const).map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setHtmlView(v.id)}
+                      className={"px-3 py-1.5 flex items-center gap-1.5 " + (htmlView === v.id ? "bg-primary text-white" : "text-white/60 hover:bg-white/5")}
+                    ><v.icon className="h-3 w-3" /> {v.label}</button>
+                  ))}
+                </div>
+
+                {htmlView === "visual" && (
+                  <RichEditor html={composer.bodyHtml} onChange={(html) => setComposer((c) => ({ ...c, bodyHtml: html }))} />
+                )}
+
+                {htmlView === "code" && (
+                  <div className="space-y-1.5">
+                    <Textarea
+                      value={composer.bodyHtml}
+                      onChange={(e) => setComposer((c) => ({ ...c, bodyHtml: e.target.value }))}
+                      placeholder="<h1>Hello</h1>&#10;<p>Paste or write raw HTML here — it's sent as a real rendered email.</p>"
+                      spellCheck={false}
+                      className="min-h-[260px] text-xs font-mono leading-relaxed"
+                    />
+                    <p className="text-[11px] text-white/40">Write or paste raw HTML. Tags render in the recipient's inbox — they are not shown as text.</p>
+                  </div>
+                )}
+
+                {htmlView === "preview" && (
+                  <div className="space-y-1.5">
+                    <iframe
+                      title="Email preview"
+                      sandbox=""
+                      srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body style="margin:0;background:#fff;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;padding:24px;">${composer.bodyHtml || '<p style="color:#999;">Nothing to preview yet.</p>'}</body></html>`}
+                      className="w-full min-h-[300px] rounded-xl border border-white/10 bg-white"
+                    />
+                    <p className="text-[11px] text-white/40">Body preview. The Royvento header &amp; footer are added automatically when the email is sent.</p>
+                  </div>
+                )}
+              </div>
             ) : (
               <Textarea value={composer.bodyText} onChange={(e) => setComposer((c) => ({ ...c, bodyText: e.target.value }))} placeholder="Write your message…" className="min-h-[220px] text-sm" />
             )}

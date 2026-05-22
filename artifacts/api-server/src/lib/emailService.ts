@@ -240,6 +240,10 @@ export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmail
   const headers: Record<string, string> = {};
   if (args.inReplyTo) headers["In-Reply-To"] = args.inReplyTo;
   if (args.references && args.references.length > 0) headers["References"] = args.references.join(" ");
+  // List-Unsubscribe improves Primary-inbox placement; only on new sends, not threaded replies.
+  if (!args.inReplyTo) {
+    headers["List-Unsubscribe"] = `<mailto:${INFO_EMAIL_ADDRESS}?subject=Unsubscribe>`;
+  }
 
   try {
     const { data, error } = await client.emails.send({
