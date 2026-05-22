@@ -4274,7 +4274,7 @@ function DrinkPlanPriorityAdmin() {
   async function load() {
     setLoading(true);
     try {
-      const data = await apiGet<DrinkPlanRow[]>("/admin/drink-plans");
+      const data = await apiGet<DrinkPlanRow[]>("/api/admin/drink-plans");
       setPlans(data);
       const prioritized = [...data]
         .filter((p) => p.globalPriority !== null)
@@ -4329,7 +4329,7 @@ function DrinkPlanPriorityAdmin() {
   async function save() {
     setSaving(true);
     try {
-      await apiPost("/admin/drink-plans/priorities", { orderedIds: featured.map((p) => p.id) });
+      await apiPost("/api/admin/drink-plans/priorities", { orderedIds: featured.map((p) => p.id) });
       toast({ title: "Priority order saved" });
       setDirty(false);
       await load();
