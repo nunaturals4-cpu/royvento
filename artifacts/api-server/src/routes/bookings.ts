@@ -1934,17 +1934,55 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   }
   // Legacy RV-* codes: always accepted for backwards compatibility (tickets issued before migration)
 
+  // Best-effort audit log for any scan rejected after the booking is loaded.
+  const logRejectedScan = async (rejectionCode: string, extra: Record<string, unknown> = {}) => {
+    try {
+      await db.insert(bookingAuditLogTable).values({
+        bookingId: b.id,
+        vendorId: b.vendorId,
+        actorUserId: user.id,
+        action: "scan_rejected",
+        beforeJson: { status: b.status, bookingDate: b.bookingDate },
+        afterJson: { rejectionCode, scanner: { userId: user.id, email: user.email }, ...extra },
+      });
+    } catch (_) { /* best-effort */ }
+  };
+
   // Status checks
   if (b.status === "pending") {
+    await logRejectedScan("NOT_CONFIRMED");
     res.status(422).json({ code: "NOT_CONFIRMED", message: "This booking has not been confirmed yet." });
     return;
   }
   if (b.status === "cancelled") {
+    await logRejectedScan("CANCELLED");
     res.status(422).json({ code: "CANCELLED", message: "This booking was cancelled and cannot be used for entry." });
     return;
   }
+  if (b.status === "refunded") {
+    await logRejectedScan("REFUNDED");
+    res.status(422).json({ code: "REFUNDED", message: "This booking has been refunded and cannot be used for entry." });
+    return;
+  }
   if (b.status !== "confirmed") {
+    await logRejectedScan("INVALID_STATUS");
     res.status(422).json({ code: "INVALID_STATUS", message: `Booking is in status "${b.status}" and cannot be used for entry.` });
+    return;
+  }
+
+  // Server-side date validation — never trust the scanner device's clock.
+  // b.bookingDate is "YYYY-MM-DD"; compare against today in UTC so the check
+  // is deterministic across timezones and DST boundaries.
+  const _scanNow = new Date();
+  const todayUTC = `${_scanNow.getUTCFullYear()}-${String(_scanNow.getUTCMonth() + 1).padStart(2, "0")}-${String(_scanNow.getUTCDate()).padStart(2, "0")}`;
+  if (b.bookingDate < todayUTC) {
+    await logRejectedScan("TICKET_EXPIRED", { serverDate: todayUTC });
+    res.status(422).json({ code: "TICKET_EXPIRED", message: "This ticket has expired and can no longer be used." });
+    return;
+  }
+  if (b.bookingDate > todayUTC) {
+    await logRejectedScan("TICKET_FUTURE", { serverDate: todayUTC });
+    res.status(422).json({ code: "TICKET_FUTURE", message: "This ticket is valid for a future date and cannot be used today." });
     return;
   }
 

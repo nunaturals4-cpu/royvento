@@ -826,7 +826,18 @@ export function TicketScanner() {
                 <XCircle className="h-8 w-8 text-red-400" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-red-300 font-bold text-lg">Invalid ticket</p>
+                <p className="text-red-300 font-bold text-lg">
+                  {({
+                    TICKET_EXPIRED: "Ticket Expired",
+                    TICKET_FUTURE: "Future Date",
+                    CANCELLED: "Booking Cancelled",
+                    REFUNDED: "Booking Refunded",
+                    NOT_CONFIRMED: "Not Confirmed",
+                    WRONG_VENDOR: "Wrong Venue",
+                    NOT_FOUND: "Ticket Not Found",
+                    INVALID_CODE: "Invalid Code",
+                  } as Record<string, string>)[result.code] ?? "Invalid Ticket"}
+                </p>
                 <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{result.message}</p>
               </div>
               <button
