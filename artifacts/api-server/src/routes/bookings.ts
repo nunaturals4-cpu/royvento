@@ -404,12 +404,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     totalPrice = w * pw + m * pm + c * pc;
     guestsCount = w + m + c * 2;
   } else if (evt.type === "pub" && parsed.data.pubMode === "event_booking") {
-    // Event bookings use the announcement's per-person ticket price × guests.
-    // Fall back to the pub's standard cover if the announcement has no price.
+    // Event bookings price strictly off the announcement's per-person ticket
+    // price. A price of 0 / null means the event is free entry — the pub's
+    // standard cover and the free-entry-rules do NOT apply here.
     if (guestsCount === 0) guestsCount = 1;
     const annPrice = Number(announcementRow?.price ?? 0);
-    const perPerson = annPrice > 0 ? annPrice : Number(evt.price);
-    totalPrice = perPerson * Math.max(1, guestsCount);
+    totalPrice = annPrice * Math.max(1, guestsCount);
   } else {
     // Table / event-mode: no per-gender concept, so only treat as free when
     // every gender is listed. Otherwise charge the regular cover.

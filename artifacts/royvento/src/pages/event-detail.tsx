@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link, useLocation, useSearch } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import { eventDetailSlug, pubDetailSlug } from "@/lib/seo-slug";
 import {
@@ -130,6 +130,20 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     setPubTab(tab);
     requestAnimationFrame(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
+  // Switch booking type and clear any data entered for the previous type so
+  // stale ticket counts / guests / occasion / event selection don't carry over.
+  const changePubMode = (v: "ticket" | "event" | "event_booking") => {
+    if (v === pubMode) return;
+    setPubMode(v);
+    setTicketWomen(0);
+    setTicketMen(0);
+    setTicketCouple(0);
+    setGuests(1);
+    setOccasion("");
+    setArrivalTime("");
+    setSelectedAnnouncementId("");
+    setFieldErrors({});
+  };
   const [confirmedAge, setConfirmedAge] = useState(false);
 
   const createReview = useCreateReview();
@@ -237,36 +251,45 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     return () => cancelAnimationFrame(raf);
   }, [isLoading, event]);
 
-  // Deep-link from pub-offers "Book Now": ?book=event&aid=<announcementId>
-  // auto-opens the Book a Table tab, selects Events Booking, picks the
-  // announcement, and pre-fills its date so the user skips manual selection.
-  const eventDeepLinkDone = useRef(false);
-  useEffect(() => {
-    if (eventDeepLinkDone.current) return;
-    if (isLoading || !event) return;
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const bookParam = params.get("book");
-    if (!bookParam) return;
+  // Deep-link params from pub-offers / drink-deal cards. Read via wouter's
+  // reactive useSearch() (not window.location.search) so client-side Link
+  // navigation reliably exposes the query string.
+  //   ?book=1                 → drink deal: open Book a Table form
+  //   ?book=event&aid=<id>    → announcement: open form + preselect event
+  const deepLinkSearch = useSearch();
+  const deepLinkBook = useMemo(() => new URLSearchParams(deepLinkSearch).get("book"), [deepLinkSearch]);
+  const deepLinkAid = useMemo(() => new URLSearchParams(deepLinkSearch).get("aid"), [deepLinkSearch]);
 
-    // Event-booking deep link (?book=event&aid=<id>) needs the announcements
-    // loaded so it can pre-select the event. The generic deep link (?book=1
-    // from a drink-deal "Claim Deal"/"Book Now") just opens the booking form.
-    if (bookParam === "event") {
-      const aid = params.get("aid");
-      if (!aid || announcements.length === 0) return;
-      const a = announcements.find((x: any) => String(x.id) === aid);
-      if (!a) return;
-      eventDeepLinkDone.current = true;
-      setPubMode("event_booking");
-      setSelectedAnnouncementId(aid);
-      if (a.announceDate) setDate(a.announceDate);
-    } else {
-      eventDeepLinkDone.current = true;
-    }
+  // Open the booking tab + scroll to the form as soon as the event loads.
+  // Independent of announcements so the form always opens, even before the
+  // announcement list has finished loading.
+  const eventDeepLinkOpened = useRef(false);
+  useEffect(() => {
+    if (eventDeepLinkOpened.current) return;
+    if (isLoading || !event) return;
+    if (!deepLinkBook) return;
+    eventDeepLinkOpened.current = true;
+    if (deepLinkBook === "event") setPubMode("event_booking");
     setPubTab("book");
-    requestAnimationFrame(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  }, [isLoading, event, announcements]);
+    const tid = window.setTimeout(() => {
+      pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(tid);
+  }, [isLoading, event, deepLinkBook]);
+
+  // Preselect the announcement for an event deep link once announcements load.
+  const eventDeepLinkPreselected = useRef(false);
+  useEffect(() => {
+    if (eventDeepLinkPreselected.current) return;
+    if (deepLinkBook !== "event" || !deepLinkAid) return;
+    if (announcements.length === 0) return;
+    const a = announcements.find((x: any) => String(x.id) === deepLinkAid);
+    if (!a) return;
+    eventDeepLinkPreselected.current = true;
+    setPubMode("event_booking");
+    setSelectedAnnouncementId(deepLinkAid);
+    if (a.announceDate) setDate(a.announceDate);
+  }, [deepLinkBook, deepLinkAid, announcements]);
 
   // Clear any applied coupon if the selected booking date becomes a
   // free-entry day (subtotal becomes ₹0 and the server refuses to consume
@@ -375,9 +398,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     .filter((a: any) => a.announceDate)
     .sort((a: any, b: any) => new Date(a.announceDate).getTime() - new Date(b.announceDate).getTime());
 
-  const eventBookingPerPerson = selectedAnnouncement?.price != null && Number(selectedAnnouncement.price) > 0
-    ? Number(selectedAnnouncement.price)
-    : Number(ev.price);
+  // Event bookings price strictly off the announcement's per-person ticket
+  // price. A price of 0 / null means the event is free entry — the pub's
+  // standard cover and the per-gender free-entry rules do NOT apply here.
+  const eventBookingPerPerson = Number(selectedAnnouncement?.price ?? 0);
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     const pw = isTierFree("women") ? 0 : effectiveWomen;
@@ -396,7 +420,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   // rules (or the legacy whole-day-free case).
   const _ticketsCount = ticketWomen + ticketMen + ticketCouple;
   const bookingIsFullyFree = isPub && (
-    isFreeEntryDay ||
+    (pubMode === "event_booking" && !!selectedAnnouncement && subtotal === 0) ||
+    (pubMode !== "event_booking" && isFreeEntryDay) ||
     (ferDayActive && pubMode === "ticket" && _ticketsCount > 0 && subtotal === 0)
   );
 
@@ -1447,7 +1472,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <>
                     <div>
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2"><Wine className="h-3.5 w-3.5 text-primary" />{t("events.booking_type")}</Label>
-                      <RadioGroup value={pubMode} onValueChange={(v) => { setPubMode(v as "ticket" | "event" | "event_booking"); setSelectedAnnouncementId(""); }} className="flex gap-2">
+                      <RadioGroup value={pubMode} onValueChange={(v) => changePubMode(v as "ticket" | "event" | "event_booking")} className="flex gap-2">
                         <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "ticket" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}><RadioGroupItem value="ticket" /><span className="text-sm font-medium">{t("events.buy_tickets")}</span></label>
                         <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "event" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
                           <RadioGroupItem value="event" />
