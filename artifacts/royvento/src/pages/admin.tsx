@@ -397,6 +397,7 @@ function Analytics() {
 
   const pendingActuals = (data as { pendingActualsCount?: number } | undefined)?.pendingActualsCount ?? 0;
   const totalCommission = (data as { totalCommission?: number } | undefined)?.totalCommission ?? 0;
+  const totalBaseFee = (data as { totalBaseFee?: number } | undefined)?.totalBaseFee ?? 0;
 
   return (
     <div className="space-y-6">
@@ -472,6 +473,7 @@ function Analytics() {
         <AdminKpi label="COD collected (actual)" value={formatINR(data.actualCodRevenue ?? 0)} hint={`${data.actualCodRecordedCount ?? 0} bookings scanned`} Icon={Banknote} accent="amber" warning={pendingActuals > 0 ? `${pendingActuals} bookings awaiting QR scan` : null} />
         <AdminKpi label="Online payments" value={formatINR(data.onlineRevenue)} hint="Paid via gateway" Icon={CreditCard} accent="emerald" />
         <AdminKpi label="Total commission" value={formatINR(totalCommission)} hint="Platform commission charged" Icon={Percent} accent="violet" />
+        <AdminKpi label="Total base fee" value={formatINR(totalBaseFee)} hint="Base fee (Incl. GST) collected" Icon={Banknote} accent="amber" />
       </div>
 
       {/* Secondary count tiles */}
@@ -836,6 +838,8 @@ interface AdminVendor {
   eventCount: number;
   userEmail: string;
   createdAt: string;
+  baseFeePercent?: string;
+  baseFeeEnabled?: boolean;
 }
 
 interface VendorManagerUser {
@@ -1283,6 +1287,25 @@ function AllVendorsAdmin() {
                 </div>
               </div>
             )}
+
+            {/* Base Fee toggle bar */}
+            <div className="flex items-center justify-between px-5 py-2.5 border-t border-white/[0.06] bg-black/10">
+              <div className="flex items-center gap-2">
+                <Percent className="h-3.5 w-3.5 text-amber-400/60" />
+                <span className="text-xs text-white/50 font-medium">Base Fee ({v.baseFeePercent ?? "3.50"}%) — {v.baseFeeEnabled !== false ? "Enabled" : "Disabled"}</span>
+              </div>
+              <Switch
+                checked={v.baseFeeEnabled !== false}
+                onCheckedChange={async (enabled) => {
+                  try {
+                    await apiPatch(`/api/admin/vendors/${v.id}/base-fee`, { baseFeeEnabled: enabled });
+                    load(page);
+                  } catch (e: any) {
+                    toast({ title: "Failed to update base fee", description: e?.message, variant: "destructive" });
+                  }
+                }}
+              />
+            </div>
 
             {/* Managers toggle bar */}
             <button
@@ -4430,6 +4453,7 @@ interface CommissionRates {
   freeEntryRate: string;
   ticketRate: string;
   tableBookingRate: string;
+  baseFeePercent: string;
 }
 
 interface CommissionBookingLine {
@@ -4449,27 +4473,33 @@ interface CommissionVendorRow {
   businessName: string;
   city: string;
   appliedRates: CommissionRates;
+  baseFeePercent: string;
+  baseFeeEnabled: boolean;
   totalBookings: number;
   totalRevenue: number;
   totalCommission: number;
+  totalBaseFee: number;
   freeEntryCount: number;
   freeEntryRevenue: number;
   freeEntryCommission: number;
   freeEntryPeople: number;
+  freeEntryBaseFee: number;
   ticketCount: number;
   ticketRevenue: number;
   ticketCommission: number;
   ticketPeople: number;
+  ticketBaseFee: number;
   tableCount: number;
   tableRevenue: number;
   tableCommission: number;
   tablePeople: number;
+  tableBaseFee: number;
   bookings: CommissionBookingLine[];
 }
 
 interface CommissionReport {
   rows: CommissionVendorRow[];
-  totals: { totalBookings: number; totalRevenue: number; totalCommission: number; collectedCommission: number; pendingCommission: number };
+  totals: { totalBookings: number; totalRevenue: number; totalCommission: number; totalBaseFee: number; collectedCommission: number; pendingCommission: number };
 }
 
 function CommissionsAdmin() {
@@ -4496,7 +4526,7 @@ function CommissionsAdmin() {
       setRatesReport(data);
       const edits: Record<number, CommissionRates> = {};
       for (const row of data.rows) {
-        edits[row.vendorId] = { ...row.appliedRates };
+        edits[row.vendorId] = { ...row.appliedRates, baseFeePercent: row.baseFeePercent ?? "3.50" };
       }
       setRateEdits(edits);
     } catch (e: any) {
@@ -4532,21 +4562,21 @@ function CommissionsAdmin() {
     const free = Number(rates.freeEntryRate);
     const ticket = Number(rates.ticketRate);
     const table = Number(rates.tableBookingRate);
-    if ([free, ticket, table].some((n) => !Number.isFinite(n) || n < 0)) {
+    const bfp = Number(rates.baseFeePercent);
+    if ([free, ticket, table, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
       toast({ title: "Fees must be valid non-negative numbers", variant: "destructive" });
       return;
     }
-    if (ticket > 100) {
-      toast({ title: "Ticket rate must be 0–100%", variant: "destructive" });
+    if (ticket > 100 || bfp > 100) {
+      toast({ title: "Rates must be 0–100%", variant: "destructive" });
       return;
     }
     setSavingId(vendorId);
     try {
-      await apiPut(`/api/admin/vendors/${vendorId}/commission`, {
-        freeEntryRate: free,
-        ticketRate: ticket,
-        tableBookingRate: table,
-      });
+      await Promise.all([
+        apiPut(`/api/admin/vendors/${vendorId}/commission`, { freeEntryRate: free, ticketRate: ticket, tableBookingRate: table }),
+        apiPatch(`/api/admin/vendors/${vendorId}/base-fee`, { baseFeePercent: bfp }),
+      ]);
       toast({ title: "Commission fees saved" });
       await Promise.all([loadRates(), loadReport()]);
     } catch (e: any) {
@@ -4606,6 +4636,7 @@ function CommissionsAdmin() {
                   <th className="text-right py-2 px-3">Free Entry ₹/person</th>
                   <th className="text-right py-2 px-3">Ticket %</th>
                   <th className="text-right py-2 px-3">Table ₹/person</th>
+                  <th className="text-right py-2 px-3">Base Fee %</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
               </thead>
@@ -4615,7 +4646,8 @@ function CommissionsAdmin() {
                   const dirty =
                     edits.freeEntryRate !== row.appliedRates.freeEntryRate ||
                     edits.ticketRate !== row.appliedRates.ticketRate ||
-                    edits.tableBookingRate !== row.appliedRates.tableBookingRate;
+                    edits.tableBookingRate !== row.appliedRates.tableBookingRate ||
+                    edits.baseFeePercent !== (row.baseFeePercent ?? "3.50");
                   return (
                     <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                       <td className="py-3 pr-4">
@@ -4652,6 +4684,17 @@ function CommissionsAdmin() {
                           step={0.01}
                           value={edits.tableBookingRate}
                           onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}
+                          className="w-20 text-right h-8 text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          value={edits.baseFeePercent ?? "3.50"}
+                          onChange={(e) => updateRate(row.vendorId, "baseFeePercent", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
                         />
                       </td>
@@ -4781,7 +4824,8 @@ function CommissionsAdmin() {
                                   <tr>
                                     <th className="text-left py-2 px-3 font-medium">Booking Type</th>
                                     <th className="text-right py-2 px-3 font-medium">No of People</th>
-                                    <th className="text-right py-2 px-3 font-medium">Commission Amount</th>
+                                    <th className="text-right py-2 px-3 font-medium">Commission</th>
+                                    <th className="text-right py-2 px-3 font-medium">Base Fee</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -4789,21 +4833,25 @@ function CommissionsAdmin() {
                                     <td className="py-2 px-3">Free Entry</td>
                                     <td className="text-right px-3 tabular-nums">{row.freeEntryPeople}</td>
                                     <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.freeEntryCommission)}</td>
+                                    <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.freeEntryBaseFee ?? 0)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-2 px-3">Ticket Booking</td>
                                     <td className="text-right px-3 tabular-nums">{row.ticketPeople}</td>
                                     <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.ticketCommission)}</td>
+                                    <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.ticketBaseFee ?? 0)}</td>
                                   </tr>
                                   <tr>
                                     <td className="py-2 px-3">Table Booking</td>
                                     <td className="text-right px-3 tabular-nums">{row.tablePeople}</td>
                                     <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.tableCommission)}</td>
+                                    <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.tableBaseFee ?? 0)}</td>
                                   </tr>
                                   <tr className="bg-white/[0.04] font-medium">
                                     <td className="py-2 px-3">Total</td>
                                     <td className="text-right px-3 tabular-nums">{row.freeEntryPeople + row.ticketPeople + row.tablePeople}</td>
                                     <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.totalCommission)}</td>
+                                    <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.totalBaseFee ?? 0)}</td>
                                   </tr>
                                 </tbody>
                               </table>

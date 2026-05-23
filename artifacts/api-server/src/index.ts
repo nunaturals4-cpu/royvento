@@ -221,7 +221,10 @@ async function applyPendingSchemaChanges() {
   try {
     await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "global_priority" integer`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "drink_plans_global_priority_idx" ON "drink_plans" ("global_priority")`);
-    logger.info("Schema: drink_plans.global_priority ensured");
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_percent" numeric(5,2) DEFAULT 3.50`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_enabled" boolean DEFAULT true`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "base_fee" integer DEFAULT 0`);
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning (drink_plans global_priority)");
   }

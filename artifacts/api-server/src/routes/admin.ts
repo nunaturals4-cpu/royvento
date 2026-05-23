@@ -137,6 +137,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       actualMen: bookingsTable.actualMen,
       actualCouple: bookingsTable.actualCouple,
       actualGuests: bookingsTable.actualGuests,
+      baseFee: bookingsTable.baseFee,
     })
     .from(bookingsTable)
     .where(
@@ -228,6 +229,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     (b as unknown as { _rev: number })._rev = bookingRevenue;
   }
   const totalRevenue = confirmedBookings.reduce((s, b) => s + ((b as unknown as { _rev: number })._rev ?? 0), 0);
+  const totalBaseFee = confirmedBookings.reduce((s, b) => s + (b.baseFee ?? 0), 0);
 
   // Monthly revenue: bucket in-memory using new revenue formula
   const monthlyMap = new Map<string, number>();
@@ -466,6 +468,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
     totalEvents: eventsCount[0]?.c ?? 0,
     totalBookings: bookingsCount[0]?.c ?? 0,
     totalRevenue: Math.round(totalRevenue),
+    totalBaseFee: Math.round(totalBaseFee),
     // Not Math.round'd: commission-report sums per-booking round2'd amounts
     // without additional integer rounding. We mirror that policy so the
     // two endpoints agree to the rupee.
@@ -2265,12 +2268,13 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         paymentMethod: bookingsTable.paymentMethod,
         createdAt: bookingsTable.createdAt,
         status: bookingsTable.status,
+        baseFee: bookingsTable.baseFee,
       })
       .from(bookingsTable)
       .where(and(...whereConditions)),
     db.select().from(vendorCommissionsTable),
     db
-      .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city })
+      .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, city: vendorsTable.city, baseFeePercent: vendorsTable.baseFeePercent, baseFeeEnabled: vendorsTable.baseFeeEnabled })
       .from(vendorsTable)
       .where(eq(vendorsTable.status, "approved")),
   ]);
@@ -2348,9 +2352,12 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     businessName: string;
     city: string;
     appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
+    baseFeePercent: string;
+    baseFeeEnabled: boolean;
     totalBookings: number;
     totalRevenue: number;
     totalCommission: number;
+    totalBaseFee: number;
     /** Sum of commission_ledger amounts for this vendor in the report window
      * (online_payment + cod_checkin + free_checkin). Source of truth for
      * "money realised by the platform". */
@@ -2365,14 +2372,17 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     freeEntryRevenue: number;
     freeEntryCommission: number;
     freeEntryPeople: number;
+    freeEntryBaseFee: number;
     ticketCount: number;
     ticketRevenue: number;
     ticketCommission: number;
     ticketPeople: number;
+    ticketBaseFee: number;
     tableCount: number;
     tableRevenue: number;
     tableCommission: number;
     tablePeople: number;
+    tableBaseFee: number;
     bookings: BookingLineItem[];
   };
 
@@ -2390,23 +2400,29 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         ticketRate: vendorRates?.ticketRate ?? "0",
         tableBookingRate: vendorRates?.tableBookingRate ?? "0",
       },
+      baseFeePercent: v.baseFeePercent ?? "3.50",
+      baseFeeEnabled: v.baseFeeEnabled ?? true,
       totalBookings: 0,
       totalRevenue: 0,
       totalCommission: 0,
+      totalBaseFee: 0,
       collectedCommission: 0,
       pendingCommission: 0,
       freeEntryCount: 0,
       freeEntryRevenue: 0,
       freeEntryCommission: 0,
       freeEntryPeople: 0,
+      freeEntryBaseFee: 0,
       ticketCount: 0,
       ticketRevenue: 0,
       ticketCommission: 0,
       ticketPeople: 0,
+      ticketBaseFee: 0,
       tableCount: 0,
       tableRevenue: 0,
       tableCommission: 0,
       tablePeople: 0,
+      tableBaseFee: 0,
       bookings: [],
     });
   }
@@ -2439,9 +2455,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     if (!summaryMap.has(b.vendorId)) continue;
 
     const s = summaryMap.get(b.vendorId)!;
+    const bkBaseFee = b.baseFee ?? 0;
     s.totalBookings += 1;
     s.totalRevenue += price;
     s.totalCommission += commissionAmount;
+    s.totalBaseFee += bkBaseFee;
     s.bookings.push({
       id: b.id,
       finalPrice: Number(b.finalPrice),
@@ -2466,16 +2484,19 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       s.freeEntryRevenue += price;
       s.freeEntryCommission += commissionAmount;
       s.freeEntryPeople += unitCount;
+      s.freeEntryBaseFee += bkBaseFee;
     } else if (bookingType === "ticket") {
       s.ticketCount += 1;
       s.ticketRevenue += price;
       s.ticketCommission += commissionAmount;
       s.ticketPeople += unitCount;
+      s.ticketBaseFee += bkBaseFee;
     } else {
       s.tableCount += 1;
       s.tableRevenue += price;
       s.tableCommission += commissionAmount;
       s.tablePeople += unitCount;
+      s.tableBaseFee += bkBaseFee;
     }
   }
 
@@ -2492,11 +2513,12 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       acc.totalBookings += r.totalBookings;
       acc.totalRevenue += r.totalRevenue;
       acc.totalCommission += r.totalCommission;
+      acc.totalBaseFee += r.totalBaseFee;
       acc.collectedCommission += r.collectedCommission;
       acc.pendingCommission += r.pendingCommission;
       return acc;
     },
-    { totalBookings: 0, totalRevenue: 0, totalCommission: 0, collectedCommission: 0, pendingCommission: 0 },
+    { totalBookings: 0, totalRevenue: 0, totalCommission: 0, totalBaseFee: 0, collectedCommission: 0, pendingCommission: 0 },
   );
 
   res.json({ rows, totals });
@@ -2596,6 +2618,21 @@ router.post("/admin/seed-demo-pubs", requireAuth(["admin"]), async (req, res) =>
     req.log.error({ err }, "demo-pubs seed failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
+});
+
+// ─── Vendor Base Fee Settings ─────────────────────────────────────────────────
+
+router.patch("/admin/vendors/:id/base-fee", requireAuth(["admin"]), async (req, res) => {
+  const vendorId = Number(req.params["id"]);
+  if (!Number.isFinite(vendorId)) { res.status(400).json({ error: "Invalid vendor id" }); return; }
+  const body = req.body as { baseFeePercent?: number; baseFeeEnabled?: boolean };
+  if (body.baseFeePercent !== undefined) {
+    await db.execute(sql`UPDATE vendors SET base_fee_percent = ${Number(body.baseFeePercent).toFixed(2)} WHERE id = ${vendorId}`);
+  }
+  if (body.baseFeeEnabled !== undefined) {
+    await db.execute(sql`UPDATE vendors SET base_fee_enabled = ${!!body.baseFeeEnabled} WHERE id = ${vendorId}`);
+  }
+  res.json({ ok: true });
 });
 
 // ─── Drink Plan Priority Management ──────────────────────────────────────────

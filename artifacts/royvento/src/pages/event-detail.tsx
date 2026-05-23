@@ -375,6 +375,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const pointsAvail = Math.min(discountInfo?.points ?? 0, Math.floor(pointsCap / POINTS_RUPEE_RATE));
   const pointsApplied = Math.min(pointsToUse, pointsAvail);
   const finalTotal = Math.max(0, subtotal - discount - pointsApplied * POINTS_RUPEE_RATE);
+  const bfEnabled = (ev?.vendor?.baseFeeEnabled ?? true) as boolean;
+  const bfPct = parseFloat(ev?.vendor?.baseFeePercent ?? "3.5");
+  const baseFee = (bfEnabled && finalTotal > 0 && !bookingIsFullyFree) ? Math.round(finalTotal * bfPct / 100) : 0;
+  const totalPayable = finalTotal + baseFee;
 
   const startingAt = (() => {
     if (isPub) {
@@ -1538,7 +1542,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     {couponDiscount > 0 && couponDiscount === discount && <div className="flex items-center justify-between text-emerald-400"><span>{t("events.coupon_label")}</span><span>– {formatINRExact(couponDiscount)}</span></div>}
                     {newUserDiscount > 0 && newUserDiscount === discount && couponDiscount < newUserDiscount && <div className="flex items-center justify-between text-emerald-400"><span>{t("events.new_member_pct_off", { pct: newUserPercent })}</span><span>– {formatINRExact(newUserDiscount)}</span></div>}
                     {pointsApplied > 0 && <div className="flex items-center justify-between text-primary"><span>{t("events.points_label")}</span><span>– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span></div>}
-                    <div className="flex items-center justify-between font-semibold text-lg pt-2 border-t border-white/8"><span>{t("events.total_label")}</span><span className="text-primary">{formatINRExact(finalTotal)}</span></div>
+                    {baseFee > 0 && <div className="flex items-center justify-between text-amber-400/80 text-xs pt-1"><span>Base Fee (Incl. GST)</span><span>+ {formatINRExact(baseFee)}</span></div>}
+                    <div className="flex items-center justify-between font-semibold text-lg pt-2 border-t border-white/8"><span>{t("events.total_label")}</span><span className="text-primary">{formatINRExact(totalPayable)}</span></div>
                   </div>
                 )}
                 {!bookingIsFullyFree && (

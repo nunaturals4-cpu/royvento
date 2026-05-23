@@ -117,6 +117,7 @@ interface BookingRow {
   couponCode: string;
   discountAmount: string;
   finalPrice: string;
+  baseFee?: number | null;
   budgetRange: string;
   notes: string;
   eventType: string;
@@ -205,6 +206,7 @@ async function serializeBookings(rows: BookingRow[]) {
       couponCode: b.couponCode,
       discountAmount: Number(b.discountAmount),
       finalPrice: Number(b.finalPrice),
+      baseFee: b.baseFee ?? 0,
       budgetRange: b.budgetRange,
       notes: b.notes,
       eventType: b.eventType,
@@ -456,6 +458,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
 
   const finalPrice = Math.max(0, totalPrice - discountAmount - pointsDeduction);
 
+  // Base fee: charged on top of finalPrice. Excluded for fully-free bookings (₹0).
+  // Excluded for free-entry / subscription / ₹0 payable scenarios.
+  const bfEnabled = vendorSchedule?.baseFeeEnabled ?? true;
+  const bfPct = parseFloat(vendorSchedule?.baseFeePercent ?? "3.5");
+  const baseFee = (bfEnabled && finalPrice > 0) ? Math.round(finalPrice * bfPct / 100) : 0;
+
   // Online payment / PhonePe disabled — all bookings are COD.
   const wantsOnline = false;
   const usePhonePe = false;
@@ -471,6 +479,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     couponCode: validCode,
     discountAmount: String(discountAmount),
     finalPrice: String(finalPrice),
+    baseFee,
     budgetRange: parsed.data.budgetRange ?? "",
     notes: parsed.data.notes ?? "",
     eventType: parsed.data.eventType ?? "other",

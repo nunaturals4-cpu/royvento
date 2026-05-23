@@ -84,6 +84,8 @@ export const vendorsTable = pgTable(
     crowdLevel: varchar("crowd_level", { length: 20 }),
     onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
     commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),
+    baseFeePercent: numeric("base_fee_percent", { precision: 5, scale: 2 }).notNull().default("3.50"),
+    baseFeeEnabled: boolean("base_fee_enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -190,6 +192,7 @@ export const bookingsTable = pgTable(
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
     checkedOut: boolean("checked_out").notNull().default(false),
     checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
+    baseFee: integer("base_fee").notNull().default(0),
     arrivalTime: varchar("arrival_time", { length: 8 }),
     paymentMethod: varchar("payment_method", { length: 10 }).notNull().default("online"),
     actualWomen: integer("actual_women"),
