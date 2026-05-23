@@ -1,33 +1,165 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Crown, Check, Sparkles, Calendar, Users, Sparkle, CheckCircle, XCircle } from "lucide-react";
+import {
+  Crown, Check, Sparkles, Star, Building2, TrendingUp,
+  CheckCircle, XCircle, Gift, Trophy, Users, BarChart3,
+  Mail, MessageSquare, Ticket, Heart,
+} from "lucide-react";
 import { apiGet, apiPost, formatINR } from "@/lib/api";
 
 interface Sub {
   id: number;
-  planType: "user" | "partner";
+  planType: string;
   planPeriod: "monthly" | "yearly";
   price: string;
   status: string;
   expiresAt: string;
 }
 
-interface PriceData {
-  user: { monthly: number; yearly: number; newUserDiscountPercent: number };
-  partner: { monthly: number; yearly: number; newUserDiscountPercent: number };
-  isNewUser: boolean;
-}
+const PLAN_DISPLAY_NAMES: Record<string, string> = {
+  free: "Free",
+  user: "Member (Legacy)",
+  user_plus: "RoyVento Plus",
+  user_vip: "RoyVento VIP",
+  partner: "Partner Premium (Legacy)",
+  partner_growth: "Growth Plan",
+  partner_premium: "Premium Partner",
+};
+
+const USER_PLANS = [
+  {
+    id: "free",
+    name: "Free",
+    tagline: "Get started for free",
+    monthly: 0,
+    yearly: 0,
+    icon: Star,
+    features: [
+      "Browse pubs and events",
+      "Standard ticket & table booking",
+      "Access to public offers",
+    ],
+    planType: null as string | null,
+  },
+  {
+    id: "user_plus",
+    name: "RoyVento Plus",
+    tagline: "For regular nightlifers",
+    monthly: 149,
+    yearly: 1490,
+    icon: Sparkles,
+    popular: true,
+    features: [
+      "Reduced or zero convenience fees",
+      "Exclusive member-only offers",
+      "Early access to tickets & events",
+      "Priority table reservations",
+      "Birthday rewards",
+      "Loyalty points on every booking",
+    ],
+    planType: "user_plus" as string | null,
+  },
+  {
+    id: "user_vip",
+    name: "RoyVento VIP",
+    tagline: "The ultimate nightlife pass",
+    monthly: 499,
+    yearly: 4990,
+    icon: Crown,
+    accent: true,
+    features: [
+      "All Plus benefits included",
+      "VIP event access",
+      "Complimentary venue offers",
+      "Priority support",
+      "Exclusive nightlife experiences",
+      "Higher loyalty rewards multiplier",
+    ],
+    planType: "user_vip" as string | null,
+  },
+];
+
+const PARTNER_PLANS = [
+  {
+    id: "basic",
+    name: "Basic Partner",
+    tagline: "Get your venue listed",
+    monthly: 0,
+    yearly: 0,
+    icon: Building2,
+    features: [
+      "Pub listing",
+      "Event management",
+      "Booking management",
+      "Basic reports",
+    ],
+    planType: null as string | null,
+  },
+  {
+    id: "partner_growth",
+    name: "Growth Plan",
+    tagline: "Grow your venue business",
+    monthly: 1999,
+    yearly: 19990,
+    icon: TrendingUp,
+    popular: true,
+    features: [
+      "Priority search ranking",
+      "Featured pub badge",
+      "Advanced booking & revenue reports",
+      "Customer database access",
+      "Email marketing tools",
+      "Excel exports",
+      "Promotional campaign management",
+    ],
+    planType: "partner_growth" as string | null,
+  },
+  {
+    id: "partner_premium",
+    name: "Premium Partner",
+    tagline: "Dominate your market",
+    monthly: 5999,
+    yearly: 59990,
+    icon: Crown,
+    accent: true,
+    features: [
+      "Homepage featured placement",
+      "Top search visibility",
+      "Dedicated account manager",
+      "WhatsApp/SMS marketing tools",
+      "Advanced customer analytics",
+      "AI-generated event content",
+      "Multi-location venue management",
+      "Premium audience insights",
+    ],
+    planType: "partner_premium" as string | null,
+  },
+];
+
+const LOYALTY_EARN = [
+  { icon: Ticket,       label: "Ticket bookings",    pts: "+10 pts / booking" },
+  { icon: Users,        label: "Table bookings",     pts: "+5 pts / booking"  },
+  { icon: Heart,        label: "Event participation", pts: "+15 pts / event"  },
+  { icon: Trophy,       label: "Membership renewal", pts: "+50 pts / renewal" },
+];
+
+const LOYALTY_REDEEM = [
+  { icon: Gift,         label: "Discount vouchers",  desc: "Redeem points for % off coupons" },
+  { icon: Ticket,       label: "Free tickets",        desc: "Convert points to event tickets" },
+  { icon: Crown,        label: "VIP upgrades",        desc: "Unlock VIP access with points"   },
+  { icon: Sparkles,     label: "Exclusive rewards",   desc: "Special partner rewards & perks" },
+];
 
 export function Subscription() {
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
   const user = me?.user as any;
   const [active, setActive] = useState<Sub | null>(null);
-  const [prices, setPrices] = useState<PriceData | null>(null);
+  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -36,8 +168,9 @@ export function Subscription() {
     : null;
 
   useEffect(() => {
-    apiGet<PriceData>("/api/subscriptions/prices").then(setPrices).catch(() => {});
-    if (user) apiGet<Sub | null>("/api/subscriptions/me").then(setActive).catch(() => {});
+    if (user) {
+      apiGet<Sub | null>("/api/subscriptions/me").then(setActive).catch(() => {});
+    }
   }, [user]);
 
   useEffect(() => {
@@ -47,33 +180,17 @@ export function Subscription() {
     }
   }, [paymentParam]);
 
-  const subscribe = async (planType: "user" | "partner", planPeriod: "monthly" | "yearly") => {
+  const subscribe = async (planType: string) => {
     if (!user) {
       toast({ title: "Please log in first", variant: "destructive" });
       return;
     }
-    if (planType === "partner" && user.role !== "vendor") {
-      toast({
-        title: "Partner plan requires partner account",
-        description: "Apply to become a partner first.",
-        variant: "destructive",
-      });
-      return;
-    }
     setLoading(true);
     try {
-      const result = await apiPost<{ id?: number; status?: string; requiresPayment?: boolean; redirectUrl?: string } & Partial<Sub>>("/api/subscriptions", { planType, planPeriod });
-      if (result?.requiresPayment && result?.redirectUrl) {
-        toast({ title: "Redirecting to payment…", description: "You will be taken to PhonePe to complete your payment." });
-        window.location.href = result.redirectUrl;
-        return;
-      }
-      setActive(result as Sub);
+      const result = await apiPost<Sub>("/api/subscriptions", { planType, planPeriod: billing });
+      setActive(result);
       refetch();
-      toast({
-        title: "Subscription activated",
-        description: "Welcome to Royvento Premium!",
-      });
+      toast({ title: "Subscription activated!", description: "Enjoy your RoyVento membership." });
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
     } finally {
@@ -81,199 +198,384 @@ export function Subscription() {
     }
   };
 
-  const userMonthly = prices?.user.monthly ?? 199;
-  const partnerMonthly = prices?.partner.monthly ?? 999;
-  const newUserDiscount = prices?.isNewUser ? prices.user.newUserDiscountPercent : 0;
-  const userPriceFinal = newUserDiscount > 0 ? Math.round(userMonthly * (1 - newUserDiscount / 100)) : userMonthly;
-  const partnerPriceFinal = newUserDiscount > 0 ? Math.round(partnerMonthly * (1 - newUserDiscount / 100)) : partnerMonthly;
+  const isActiveUserPlan = (planType: string | null) => {
+    const userPlanTypes = ["user", "user_plus", "user_vip"];
+    if (planType === null) {
+      return !active || !userPlanTypes.includes(active.planType);
+    }
+    return active?.planType === planType;
+  };
+
+  const isActivePartnerPlan = (planType: string | null) => {
+    const partnerPlanTypes = ["partner", "partner_growth", "partner_premium"];
+    if (planType === null) {
+      return !active || !partnerPlanTypes.includes(active.planType);
+    }
+    return active?.planType === planType;
+  };
+
+  const isVendor = user?.role === "vendor";
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-16">
+    <div className="min-h-screen pb-24">
       <SEO
-        title="Royvento Premium — Coupons, Perks & Partner Tools"
-        description="Unlock premium perks: priority booking, exclusive coupons, partner CRM tools and more. Pick a plan that fits your nightlife or your venue."
+        title="Membership & Partner Plans — Royvento"
+        description="Unlock exclusive nightlife perks with RoyVento Plus or VIP. Grow your pub or club with our Growth and Premium partner plans."
         canonical="/subscription"
       />
+
       {paymentParam === "success" && (
-        <div className="max-w-3xl mx-auto mb-8 rounded-2xl border border-green-500/40 bg-green-900/20 p-5 flex items-center gap-4">
-          <CheckCircle className="h-6 w-6 text-green-400 shrink-0" />
-          <div>
-            <p className="font-medium text-green-200">Payment successful!</p>
-            <p className="text-sm text-green-300/80">Your subscription is now active. Enjoy Royvento Premium.</p>
+        <div className="container mx-auto px-4 md:px-6 pt-8 max-w-5xl">
+          <div className="rounded-2xl border border-green-500/40 bg-green-900/20 p-5 flex items-center gap-4">
+            <CheckCircle className="h-6 w-6 text-green-400 shrink-0" />
+            <div>
+              <p className="font-medium text-green-200">Payment successful!</p>
+              <p className="text-sm text-green-300/80">Your subscription is now active. Enjoy RoyVento.</p>
+            </div>
           </div>
         </div>
       )}
       {paymentParam === "failed" && (
-        <div className="max-w-3xl mx-auto mb-8 rounded-2xl border border-red-500/40 bg-red-900/20 p-5 flex items-center gap-4">
-          <XCircle className="h-6 w-6 text-red-400 shrink-0" />
-          <div>
-            <p className="font-medium text-red-200">Payment failed</p>
-            <p className="text-sm text-red-300/80">Your payment could not be processed. No amount was charged. Please try again.</p>
+        <div className="container mx-auto px-4 md:px-6 pt-8 max-w-5xl">
+          <div className="rounded-2xl border border-red-500/40 bg-red-900/20 p-5 flex items-center gap-4">
+            <XCircle className="h-6 w-6 text-red-400 shrink-0" />
+            <div>
+              <p className="font-medium text-red-200">Payment failed</p>
+              <p className="text-sm text-red-300/80">No amount was charged. Please try again.</p>
+            </div>
           </div>
         </div>
       )}
 
-      <header className="max-w-3xl mx-auto text-center mb-14">
+      {/* Hero */}
+      <div className="container mx-auto px-4 md:px-6 pt-16 pb-10 text-center max-w-3xl">
         <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-5">
-          <Crown className="h-3.5 w-3.5" /> Royvento Premium
+          <Crown className="h-3.5 w-3.5" /> RoyVento Memberships
         </div>
-        <h1 className="font-serif text-4xl md:text-6xl tracking-tight">A members club for hosts &amp; partners</h1>
-        <p className="mt-5 text-white/60 leading-relaxed">
-          Unlock premium features and exclusive benefits for events and venues.
+        <h1 className="font-serif text-4xl md:text-5xl tracking-tight">
+          Plans for nightlifers<br className="hidden sm:block" /> &amp; venue partners
+        </h1>
+        <p className="mt-4 text-white/60 leading-relaxed max-w-xl mx-auto">
+          Join the RoyVento ecosystem — unlock exclusive perks, priority access, and premium tools for your venue.
         </p>
-        {prices?.isNewUser && (
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary/15 border border-primary/40 px-4 py-2 text-sm text-primary">
-            <Sparkle className="h-4 w-4" /> New-member offer: <strong>50% off</strong> any plan.
-          </div>
-        )}
-      </header>
-
-      {active && (
-        <div className="max-w-3xl mx-auto mb-10 rounded-2xl glass-card-strong red-ring p-6 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-primary">Active plan</p>
-            <p className="font-serif text-2xl mt-1">
-              {active.planType === "user" ? "Royvento Member" : "Royvento Partner Premium"}
-              <span className="text-sm text-muted-foreground ml-2">· {active.planPeriod}</span>
-            </p>
-            <p className="text-sm text-white/60 mt-1">
-              Renews on {new Date(active.expiresAt).toLocaleDateString()}
-            </p>
-          </div>
-          <Badge className="bg-primary border-0 text-primary-foreground">{formatINR(Number(active.price))}</Badge>
-        </div>
-      )}
-
-      <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-        <PlanCard
-          title="Royvento Member"
-          tagline="For hosts who plan ahead"
-          basePrice={userMonthly}
-          finalPrice={userPriceFinal}
-          discountPercent={newUserDiscount}
-          period="monthly"
-          icon={Sparkles}
-          features={[
-            "10% off coupon on every renewal",
-            "Early access to popular partners",
-            "Priority booking support",
-            "Members-only pubs &amp; lounges",
-            "Concierge add-ons (demo)",
-          ]}
-          cta={loading ? "Activating…" : `Subscribe — ${formatINR(userPriceFinal)}/mo`}
-          onSubscribe={() => subscribe("user", "monthly")}
-          disabled={loading}
-        />
-        <PlanCard
-          title="Partner Premium"
-          tagline="For studios &amp; venues"
-          basePrice={partnerMonthly}
-          finalPrice={partnerPriceFinal}
-          discountPercent={newUserDiscount}
-          period="monthly"
-          icon={Crown}
-          accent
-          features={[
-            "Unlock leads / CRM dashboard",
-            "Profile-view analytics",
-            "Run promoted ads (admin-approved)",
-            "Unlimited media uploads",
-            "Premium badge on your listings",
-          ]}
-          cta={loading ? "Activating…" : `Subscribe — ${formatINR(partnerPriceFinal)}/mo`}
-          onSubscribe={() => subscribe("partner", "monthly")}
-          disabled={loading || (user && user.role !== "vendor")}
-          footer={
-            user && user.role !== "vendor" ? (
-              <Link href="/dashboard/become-vendor" className="text-xs text-primary hover:underline">
-                Apply to become a partner →
-              </Link>
-            ) : null
-          }
-        />
       </div>
 
-      <div className="max-w-5xl mx-auto mt-12 grid md:grid-cols-3 gap-4">
-        {[
-          { icon: Calendar, t: "Cancel anytime", d: "Demo subscriptions can be cancelled from your profile." },
-          { icon: Users, t: "Upgrades welcome", d: "Move between member and partner plans without losing benefits." },
-          { icon: Sparkles, t: "Real reward", d: "Each plan automatically grants you a usable coupon code." },
-        ].map((x) => (
-          <div key={x.t} className="rounded-2xl glass-card p-5">
-            <x.icon className="h-5 w-5 text-primary mb-3" />
-            <p className="font-medium">{x.t}</p>
-            <p className="text-sm text-white/60 mt-1">{x.d}</p>
+      {/* Billing toggle */}
+      <div className="flex justify-center mb-10">
+        <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+          <button
+            onClick={() => setBilling("monthly")}
+            className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${billing === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Monthly
+          </button>
+          <button
+            onClick={() => setBilling("yearly")}
+            className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${billing === "yearly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Yearly <span className="text-xs text-emerald-400 ml-1">2 months free</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Active plan banner */}
+      {active && (
+        <div className="container mx-auto px-4 md:px-6 max-w-5xl mb-10">
+          <div className="rounded-2xl glass-card-strong red-ring p-5 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-primary">Active plan</p>
+              <p className="font-serif text-xl mt-1">
+                {PLAN_DISPLAY_NAMES[active.planType] ?? active.planType}
+                <span className="text-sm text-muted-foreground ml-2">· {active.planPeriod}</span>
+              </p>
+              <p className="text-sm text-white/60 mt-1">
+                Renews on {new Date(active.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            </div>
+            <Badge className="bg-primary border-0 text-primary-foreground shrink-0">
+              {formatINR(Number(active.price))}/{active.planPeriod === "monthly" ? "mo" : "yr"}
+            </Badge>
           </div>
-        ))}
+        </div>
+      )}
+
+      {/* ── Member Plans ── */}
+      <section className="container mx-auto px-4 md:px-6 pb-16 max-w-5xl">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="h-px flex-1 bg-white/8" />
+          <h2 className="font-serif text-2xl tracking-tight flex items-center gap-2 shrink-0">
+            <Sparkles className="h-5 w-5 text-primary" /> For Members
+          </h2>
+          <div className="h-px flex-1 bg-white/8" />
+        </div>
+        <div className="grid md:grid-cols-3 gap-5">
+          {USER_PLANS.map((plan) => (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              billing={billing}
+              isActive={isActiveUserPlan(plan.planType)}
+              onSubscribe={plan.planType ? () => subscribe(plan.planType!) : undefined}
+              loading={loading}
+              notLoggedIn={!user}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* ── Partner Plans — only for vendors ── */}
+      {isVendor ? (
+        <section className="container mx-auto px-4 md:px-6 pb-16 max-w-5xl">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="h-px flex-1 bg-white/8" />
+            <h2 className="font-serif text-2xl tracking-tight flex items-center gap-2 shrink-0">
+              <Building2 className="h-5 w-5 text-primary" /> For Partners
+            </h2>
+            <div className="h-px flex-1 bg-white/8" />
+          </div>
+          <div className="grid md:grid-cols-3 gap-5">
+            {PARTNER_PLANS.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                billing={billing}
+                isActive={isActivePartnerPlan(plan.planType)}
+                onSubscribe={plan.planType ? () => subscribe(plan.planType!) : undefined}
+                loading={loading}
+                notLoggedIn={!user}
+              />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="container mx-auto px-4 md:px-6 pb-16 max-w-5xl">
+          <div className="rounded-3xl glass-card border border-white/8 p-10 text-center">
+            <Building2 className="h-12 w-12 text-primary/60 mx-auto mb-4" />
+            <h3 className="font-serif text-2xl tracking-tight mb-2">Want partner features?</h3>
+            <p className="text-white/60 mb-6 max-w-md mx-auto">
+              Apply to list your pub or club on RoyVento and unlock Growth or Premium partner plans with advanced marketing and analytics tools.
+            </p>
+            <Link href="/dashboard/become-vendor">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground border-0 rounded-full px-7">
+                Apply to become a partner →
+              </Button>
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* ── Loyalty & Rewards ── */}
+      <section className="container mx-auto px-4 md:px-6 pb-16 max-w-5xl">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="h-px flex-1 bg-white/8" />
+          <h2 className="font-serif text-2xl tracking-tight flex items-center gap-2 shrink-0">
+            <Trophy className="h-5 w-5 text-primary" /> Loyalty &amp; Rewards
+          </h2>
+          <div className="h-px flex-1 bg-white/8" />
+        </div>
+
+        {user && (
+          <div className="rounded-2xl glass-card-strong red-ring p-6 mb-8 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-primary">Your points balance</p>
+              <p className="font-serif text-4xl tracking-tight mt-1">{user.points ?? 0} <span className="text-lg text-muted-foreground font-sans">pts</span></p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">RoyVento Plus/VIP members earn bonus points</p>
+              <p className="text-sm text-primary mt-1">on every booking &amp; event</p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="rounded-2xl glass-card p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <span className="h-6 w-6 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+              </span>
+              How to earn points
+            </h3>
+            <ul className="space-y-3">
+              {LOYALTY_EARN.map((item) => (
+                <li key={item.label} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <item.icon className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm text-white/80">{item.label}</span>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-400">{item.pts}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-2xl glass-card p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <span className="h-6 w-6 rounded-lg bg-primary/20 flex items-center justify-center">
+                <Gift className="h-3.5 w-3.5 text-primary" />
+              </span>
+              Redeem your points
+            </h3>
+            <ul className="space-y-3">
+              {LOYALTY_REDEEM.map((item) => (
+                <li key={item.label} className="flex items-start gap-2.5">
+                  <item.icon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-white/90">{item.label}</p>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Additional Revenue Features (partner-focused) ── */}
+      <section className="container mx-auto px-4 md:px-6 pb-16 max-w-5xl">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="h-px flex-1 bg-white/8" />
+          <h2 className="font-serif text-2xl tracking-tight shrink-0">Additional Features</h2>
+          <div className="h-px flex-1 bg-white/8" />
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { icon: Star,        label: "Featured Pub Listings",       desc: "Get top placement in search results and category pages." },
+            { icon: Sparkles,    label: "Sponsored Events",            desc: "Promote your events to a wider targeted audience." },
+            { icon: TrendingUp,  label: "Event Promotion Boosts",      desc: "Increase event visibility with algorithmic boosts." },
+            { icon: Mail,        label: "Marketing Credits",           desc: "Email, SMS and WhatsApp campaigns to your audience." },
+            { icon: BarChart3,   label: "Premium Analytics",          desc: "Deep customer insights, heatmaps and revenue reports." },
+            { icon: MessageSquare, label: "Priority Support",          desc: "Dedicated account manager for Premium partners." },
+          ].map((f) => (
+            <div key={f.label} className="rounded-2xl glass-card p-5">
+              <f.icon className="h-5 w-5 text-primary mb-3" />
+              <p className="font-semibold text-sm">{f.label}</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Trust strips ── */}
+      <div className="container mx-auto px-4 md:px-6 max-w-5xl">
+        <div className="grid md:grid-cols-3 gap-4">
+          {[
+            { icon: CheckCircle, t: "Cancel anytime",      d: "No lock-in. Downgrade or cancel from your profile at any time." },
+            { icon: Trophy,      t: "Auto-renewal",        d: "Subscriptions renew automatically. You'll receive a reminder before renewal." },
+            { icon: Gift,        t: "Billing history",     d: "View all invoices and payment history in your profile dashboard." },
+          ].map((x) => (
+            <div key={x.t} className="rounded-2xl glass-card p-5 flex items-start gap-3">
+              <x.icon className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-sm">{x.t}</p>
+                <p className="text-xs text-white/60 mt-1 leading-relaxed">{x.d}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function PlanCard({
-  title, tagline, basePrice, finalPrice, discountPercent, period, icon: Icon, features, cta, onSubscribe, disabled, accent, footer,
-}: {
-  title: string;
+interface PlanDef {
+  id: string;
+  name: string;
   tagline: string;
-  basePrice: number;
-  finalPrice: number;
-  discountPercent: number;
-  period: string;
-  icon: any;
-  features: string[];
-  cta: string;
-  onSubscribe: () => void;
-  disabled?: boolean;
+  monthly: number;
+  yearly: number;
+  icon: React.ComponentType<{ className?: string }>;
+  popular?: boolean;
   accent?: boolean;
-  footer?: React.ReactNode;
+  features: readonly string[];
+  planType: string | null;
+}
+
+function PlanCard({
+  plan, billing, isActive, onSubscribe, loading, notLoggedIn,
+}: {
+  plan: PlanDef;
+  billing: "monthly" | "yearly";
+  isActive: boolean;
+  onSubscribe?: () => void;
+  loading: boolean;
+  notLoggedIn: boolean;
 }) {
-  const hasDiscount = discountPercent > 0 && finalPrice < basePrice;
+  const price = billing === "monthly" ? plan.monthly : plan.yearly;
+  const isFree = price === 0;
+
   return (
-    <div className={`relative rounded-3xl ${accent ? "glass-card-strong red-glow" : "glass-card"} p-8 lift-3d`}>
-      {accent && (
-        <div className="absolute -top-3 left-8">
-          <Badge className="bg-primary border-0 text-primary-foreground">Most popular</Badge>
+    <div className={`relative rounded-3xl ${plan.accent ? "glass-card-strong red-glow" : "glass-card"} p-7 lift-3d ${isActive ? "ring-2 ring-primary/60" : ""}`}>
+      {isActive && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+          <Badge className="bg-green-600 border-0 text-white text-xs">✓ Current plan</Badge>
         </div>
       )}
-      {hasDiscount && (
-        <div className="absolute -top-3 right-8">
-          <Badge className="bg-primary/90 border-0">New-member {discountPercent}% off</Badge>
+      {!isActive && plan.popular && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+          <Badge className="bg-primary border-0 text-primary-foreground text-xs">Most popular</Badge>
         </div>
       )}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-11 h-11 rounded-xl bg-primary/20 text-primary flex items-center justify-center red-ring">
-          <Icon className="h-5 w-5" />
+
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center red-ring shrink-0">
+          <plan.icon className="h-5 w-5" />
         </div>
-        <div>
-          <p className="font-serif text-2xl tracking-tight">{title}</p>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">{tagline}</p>
+        <div className="min-w-0">
+          <p className="font-serif text-lg tracking-tight leading-snug">{plan.name}</p>
+          <p className="text-xs text-muted-foreground">{plan.tagline}</p>
         </div>
       </div>
-      <div className="mt-6">
-        {hasDiscount && (
-          <p className="text-base text-muted-foreground line-through">{formatINR(basePrice)}</p>
+
+      <div className="mb-6">
+        {isFree ? (
+          <p className="font-serif text-4xl tracking-tight">Free</p>
+        ) : (
+          <>
+            <p className="font-serif text-4xl tracking-tight">
+              {formatINR(price)}
+              <span className="text-sm text-muted-foreground font-sans ml-1">/{billing === "monthly" ? "mo" : "yr"}</span>
+            </p>
+            {billing === "yearly" && (
+              <p className="text-xs text-emerald-400 mt-1">
+                ≈ {formatINR(Math.round(price / 12))}/mo · 2 months free
+              </p>
+            )}
+          </>
         )}
-        <p className="font-serif text-5xl tracking-tight">
-          {formatINR(finalPrice)}
-          <span className="text-sm text-muted-foreground font-sans"> /{period === "monthly" ? "mo" : "yr"}</span>
-        </p>
       </div>
-      <ul className="mt-6 space-y-2 text-sm">
-        {features.map((f) => (
+
+      <ul className="space-y-2 text-sm mb-7">
+        {plan.features.map((f) => (
           <li key={f} className="flex items-start gap-2">
             <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <span dangerouslySetInnerHTML={{ __html: f }} />
+            <span className="text-white/80 leading-snug">{f}</span>
           </li>
         ))}
       </ul>
-      <Button
-        onClick={onSubscribe}
-        disabled={disabled}
-        className={`w-full mt-7 h-12 ${accent ? "bg-primary hover:bg-primary/90 text-primary-foreground border-0" : ""}`}
-      >
-        {cta}
-      </Button>
-      {footer && <div className="mt-3 text-center">{footer}</div>}
+
+      {isActive ? (
+        <Button disabled className="w-full h-11 bg-green-600/20 border border-green-500/40 text-green-400 cursor-default">
+          <CheckCircle className="h-4 w-4 mr-2" /> Active
+        </Button>
+      ) : isFree ? (
+        <Button disabled variant="outline" className="w-full h-11 opacity-60">
+          Included
+        </Button>
+      ) : notLoggedIn ? (
+        <Link href="/login" className="block">
+          <Button className={`w-full h-11 ${plan.accent ? "bg-primary hover:bg-primary/90 text-primary-foreground border-0" : ""}`}>
+            Log in to subscribe
+          </Button>
+        </Link>
+      ) : (
+        <Button
+          onClick={onSubscribe}
+          disabled={loading}
+          className={`w-full h-11 ${plan.accent ? "bg-primary hover:bg-primary/90 text-primary-foreground border-0" : ""}`}
+        >
+          {loading ? "Activating…" : `Get ${plan.name}`}
+        </Button>
+      )}
     </div>
   );
 }

@@ -49,6 +49,7 @@ export function Footer() {
           <ul className="space-y-2.5 text-sm text-muted-foreground">
             <li><Link href="/pubs" className="hover:text-foreground transition-colors">Browse Pubs</Link></li>
             <li><Link href="/pub-offers" className="hover:text-foreground transition-colors">Hot Deals</Link></li>
+            <li><Link href="/subscription" className="hover:text-foreground transition-colors flex items-center gap-1.5"><Crown className="h-3.5 w-3.5 text-primary" />Membership</Link></li>
             <li><Link href="/blogs" className="hover:text-foreground transition-colors">Blog</Link></li>
             <li><Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link></li>
           </ul>

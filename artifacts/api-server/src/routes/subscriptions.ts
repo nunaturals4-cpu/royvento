@@ -1,31 +1,36 @@
 import { Router, type IRouter } from "express";
-import crypto from "crypto";
 import {
   db,
   subscriptionsTable,
   usersTable,
   vendorsTable,
-  paymentsTable,
 } from "@workspace/db";
 import { eq, desc, and, gt } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
-import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
 
-const PLAN_PRICES = {
-  user: { monthly: 199, yearly: 1999 },
-  partner: { monthly: 999, yearly: 9999 },
-} as const;
+const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = {
+  user_plus:       { monthly: 149,   yearly: 1490  },
+  user_vip:        { monthly: 499,   yearly: 4990  },
+  partner_growth:  { monthly: 1999,  yearly: 19990 },
+  partner_premium: { monthly: 5999,  yearly: 59990 },
+  // Legacy aliases kept for backwards-compatibility
+  user:    { monthly: 149,  yearly: 1490  },
+  partner: { monthly: 1999, yearly: 19990 },
+};
 
-const ALLOWED_CALLBACK_SCHEMES = ["royvento"] as const;
+const PARTNER_PLAN_TYPES = new Set(["partner", "partner_growth", "partner_premium"]);
 
 const SubscribeBody = z.object({
-  planType: z.enum(["user", "partner"]),
+  planType: z.enum([
+    "user_plus", "user_vip",
+    "partner_growth", "partner_premium",
+    "user", "partner",
+  ]),
   planPeriod: z.enum(["monthly", "yearly"]),
-  callbackScheme: z.enum(ALLOWED_CALLBACK_SCHEMES).optional(),
 });
 
 function expiresFor(period: "monthly" | "yearly"): Date {
@@ -35,21 +40,12 @@ function expiresFor(period: "monthly" | "yearly"): Date {
   return d;
 }
 
-router.get("/subscriptions/prices", async (req, res) => {
-  const user = await loadUserFromRequest(req);
-  const newUser = user ? isNewUser(user.createdAt) : false;
+router.get("/subscriptions/prices", async (_req, res) => {
   res.json({
-    user: {
-      monthly: PLAN_PRICES.user.monthly,
-      yearly: PLAN_PRICES.user.yearly,
-      newUserDiscountPercent: newUser ? 50 : 0,
-    },
-    partner: {
-      monthly: PLAN_PRICES.partner.monthly,
-      yearly: PLAN_PRICES.partner.yearly,
-      newUserDiscountPercent: newUser ? 50 : 0,
-    },
-    isNewUser: newUser,
+    user_plus:       PLAN_PRICES.user_plus,
+    user_vip:        PLAN_PRICES.user_vip,
+    partner_growth:  PLAN_PRICES.partner_growth,
+    partner_premium: PLAN_PRICES.partner_premium,
   });
 });
 
@@ -58,13 +54,13 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const parsed = SubscribeBody.safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
-  const { planType, planPeriod, callbackScheme } = parsed.data;
-  let price = PLAN_PRICES[planType][planPeriod];
-  if (isNewUser(user.createdAt)) {
-    price = Math.round(price * 0.5);
-  }
+  const { planType, planPeriod } = parsed.data;
 
-  // Online payment disabled — subscriptions are activated immediately.
+  const prices = PLAN_PRICES[planType];
+  if (!prices) return res.status(400).json({ error: "Invalid plan" });
+  const price = planPeriod === "monthly" ? prices.monthly : prices.yearly;
+
+  // Expire any existing active subscription
   await db
     .update(subscriptionsTable)
     .set({ status: "expired" })
@@ -89,7 +85,7 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
 
   if (!sub) return res.status(500).json({ error: "Failed to create subscription" });
 
-  if (planType === "partner") {
+  if (PARTNER_PLAN_TYPES.has(planType)) {
     await db
       .update(vendorsTable)
       .set({ isPremium: true })
@@ -134,6 +130,13 @@ router.get("/admin/subscriptions", requireAuth(["admin"]), async (_req, res) => 
       };
     }),
   );
+});
+
+router.delete("/admin/subscriptions/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  await db.update(subscriptionsTable).set({ status: "expired" }).where(eq(subscriptionsTable.id, id));
+  return res.json({ success: true });
 });
 
 export default router;

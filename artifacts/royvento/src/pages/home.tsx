@@ -466,7 +466,7 @@ export function Home() {
             seeAllHref="/pubs"
             seeAllLabel={t("home.view_all_pubs")}
           />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
           </div>
         </section>
@@ -481,7 +481,7 @@ export function Home() {
           seeAllHref="/explore"
           seeAllLabel={t("home.view_all")}
         />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {featured.map((e) => <EventCard key={e.id} event={e as any} directBooking={(e as any).type === "pub"} />)}
         </div>
       </section>

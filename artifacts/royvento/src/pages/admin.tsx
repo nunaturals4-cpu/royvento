@@ -1760,6 +1760,22 @@ function EventsAdmin() {
   );
 }
 
+const SUB_PLAN_LABELS: Record<string, string> = {
+  user:            "Member (Legacy)",
+  user_plus:       "RoyVento Plus",
+  user_vip:        "RoyVento VIP",
+  partner:         "Partner Premium (Legacy)",
+  partner_growth:  "Growth Plan",
+  partner_premium: "Premium Partner",
+};
+
+const SUB_PLAN_COLORS: Record<string, string> = {
+  user_plus:       "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  user_vip:        "bg-primary/20 text-primary border-primary/30",
+  partner_growth:  "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  partner_premium: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+};
+
 interface AdminSub {
   id: number; userId: number; planType: string; planPeriod: string;
   price: string; status: string; expiresAt: string; userName: string; userEmail: string;
@@ -1769,51 +1785,91 @@ function SubscriptionsAdmin() {
   const { toast } = useToast();
   const load = () => apiGet<AdminSub[]>("/api/admin/subscriptions").then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  const active = items.filter((s) => s.status === "active");
+  const totalRevenue = active.reduce((sum, s) => sum + Number(s.price), 0);
+  const userSubs = active.filter((s) => ["user", "user_plus", "user_vip"].includes(s.planType));
+  const partnerSubs = active.filter((s) => ["partner", "partner_growth", "partner_premium"].includes(s.planType));
+
   return (
-    <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
-      {items.length === 0 ? (
-        <p className="p-6 text-muted-foreground">No subscriptions yet.</p>
-      ) : (
-        <table className="w-full text-sm min-w-[640px]">
-          <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="text-left p-3">User</th>
-              <th className="text-left p-3">Plan</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-right p-3">Price</th>
-              <th className="text-right p-3">Expires</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((s) => (
-              <tr key={s.id} className="border-t border-white/5">
-                <td className="p-3">
-                  <p className="font-medium">{s.userName}</p>
-                  <p className="text-xs text-muted-foreground">{s.userEmail}</p>
-                </td>
-                <td className="p-3">
-                  <Badge variant={s.planType === "partner" ? "default" : "secondary"}>{s.planType}</Badge>
-                  <span className="text-xs text-muted-foreground ml-1">{s.planPeriod}</span>
-                </td>
-                <td className="p-3"><Badge variant={s.status === "active" ? "default" : "outline"}>{s.status}</Badge></td>
-                <td className="p-3 text-right">{formatINR(Number(s.price))}</td>
-                <td className="p-3 text-right text-muted-foreground">{new Date(s.expiresAt).toLocaleDateString()}</td>
-                <td className="p-3 text-right">
-                  <Button size="sm" variant="ghost" onClick={async () => {
-                    if (!confirm("Cancel this subscription?")) return;
-                    await apiDelete(`/api/admin/subscriptions/${s.id}`).catch(() => {});
-                    toast({ title: "Cancelled" });
-                    load();
-                  }}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </td>
+    <div className="space-y-5">
+      {/* Revenue stats */}
+      <div className="grid sm:grid-cols-4 gap-4">
+        {[
+          { label: "Total Active", value: active.length, suffix: "subscribers" },
+          { label: "Active Revenue", value: formatINR(totalRevenue), suffix: "/period" },
+          { label: "User Plans", value: userSubs.length, suffix: "active" },
+          { label: "Partner Plans", value: partnerSubs.length, suffix: "active" },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-2xl glass-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+            <p className="font-serif text-2xl mt-1">{stat.value}</p>
+            <p className="text-xs text-muted-foreground">{stat.suffix}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Plan breakdown */}
+      <div className="grid sm:grid-cols-3 gap-3">
+        {(["user_plus", "user_vip", "partner_growth", "partner_premium"] as const).map((pt) => {
+          const count = active.filter((s) => s.planType === pt).length;
+          return (
+            <div key={pt} className={`rounded-xl border px-4 py-3 ${SUB_PLAN_COLORS[pt] ?? "bg-white/5 border-white/10"}`}>
+              <p className="text-xs font-semibold">{SUB_PLAN_LABELS[pt] ?? pt}</p>
+              <p className="text-lg font-serif mt-0.5">{count} <span className="text-xs opacity-70">active</span></p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Subscriber table */}
+      <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[55vh]">
+        {items.length === 0 ? (
+          <p className="p-6 text-muted-foreground">No subscriptions yet.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">User</th>
+                <th className="text-left p-3">Plan</th>
+                <th className="text-left p-3">Status</th>
+                <th className="text-right p-3">Price</th>
+                <th className="text-right p-3">Expires</th>
+                <th className="p-3"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {items.map((s) => (
+                <tr key={s.id} className="border-t border-white/5">
+                  <td className="p-3">
+                    <p className="font-medium">{s.userName}</p>
+                    <p className="text-xs text-muted-foreground">{s.userEmail}</p>
+                  </td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${SUB_PLAN_COLORS[s.planType] ?? "bg-white/10 border-white/20 text-white/70"}`}>
+                      {SUB_PLAN_LABELS[s.planType] ?? s.planType}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-1.5">{s.planPeriod}</span>
+                  </td>
+                  <td className="p-3"><Badge variant={s.status === "active" ? "default" : "outline"}>{s.status}</Badge></td>
+                  <td className="p-3 text-right tabular-nums">{formatINR(Number(s.price))}</td>
+                  <td className="p-3 text-right text-muted-foreground">{new Date(s.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                  <td className="p-3 text-right">
+                    <Button size="sm" variant="ghost" onClick={async () => {
+                      if (!confirm("Cancel this subscription?")) return;
+                      await apiDelete(`/api/admin/subscriptions/${s.id}`).catch(() => {});
+                      toast({ title: "Cancelled" });
+                      load();
+                    }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

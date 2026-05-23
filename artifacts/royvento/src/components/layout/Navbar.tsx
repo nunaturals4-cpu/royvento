@@ -173,6 +173,7 @@ export function Navbar() {
               <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pubs")}</Link>
               <Link href="/pub-offers" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pub_offers")}</Link>
               <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.blog")}</Link>
+              <Link href="/subscription" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.subscription")}</Link>
             </nav>
           </div>
 
@@ -469,6 +470,7 @@ export function Navbar() {
                   { href: "/pubs", label: t("nav.pubs") },
                   { href: "/pub-offers", label: t("nav.pub_offers") },
                   { href: "/blogs", label: t("nav.blog") },
+                  { href: "/subscription", label: t("nav.subscription") },
                 ].map(({ href, label }) => (
                   <Link
                     key={href}
