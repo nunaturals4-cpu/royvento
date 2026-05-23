@@ -1172,7 +1172,22 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
     create.mutate(
       { data: body },
       {
-        onSuccess: () => { formErrors.reset(); toast({ title: "Submitted for review! An admin will approve your listing shortly." }); onSaved(); },
+        onSuccess: async () => {
+          formErrors.reset();
+          toast({ title: "Submitted for review! An admin will approve your listing shortly." });
+          // Sync free entry to drink plans after listing created
+          if (type === "pub" && freeEntryEnabled && freeEntryDays.length > 0 && freeEntryGenders.length > 0) {
+            try {
+              const dpGender = (freeEntryGenders.length === 1 && freeEntryGenders[0] === "women") ? "female" : "all";
+              await apiPost("/api/vendors/me/drink-plans", {
+                type: "welcome", productName: "Free Entry Drink", gender: dpGender, price: 0,
+                days: freeEntryDays, timeFrom: "", timeTo: freeEntryBeforeTime.trim(),
+                description: "",
+              });
+            } catch { /* non-fatal */ }
+          }
+          onSaved();
+        },
         onError: (e: any) => {
           formErrors.setFromError(e);
           const serverMsg = e?.data?.error ?? (e instanceof Error ? e.message : undefined);
@@ -1828,6 +1843,24 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
   const isPub = event.type === "pub";
   const [videoCompressing, setVideoCompressing] = useState(false);
 
+  // Sync free entry state from drink plans on mount (drink plans = source of truth)
+  useEffect(() => {
+    if (!isPub || !vendor?.id) return;
+    apiGet<DrinkPlan[]>(`/api/vendors/${vendor.id}/drink-plans`).then((plans) => {
+      const welcomePlan = plans.find((p) => p.type === "welcome" || p.type === "unlimited");
+      if (welcomePlan) {
+        setFreeEntryEnabled(true);
+        const genders: string[] = welcomePlan.gender === "female" ? ["women"] : ["women", "men", "couple"];
+        setFreeEntryGenders(genders);
+        if (welcomePlan.days?.length) setFreeEntryDays(welcomePlan.days);
+        if (welcomePlan.timeTo) setFreeEntryBeforeTime(welcomePlan.timeTo);
+      } else if (!event.freeEntryRules?.enabled) {
+        setFreeEntryEnabled(false);
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendor?.id]);
+
   // ── Venue details state (pub-only, mirrors EventForm) ──
   const [venueDanceFloor, setVenueDanceFloor] = useState<string>(vendor?.danceFloor ?? "");
   const [venueDanceFloorPhotos, setVenueDanceFloorPhotos] = useState<string[]>(
@@ -2033,6 +2066,24 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
           freeEntryForTableBeforeTime: freeEntryForTable ? (freeEntryForTableBeforeTime || null) : null,
         } : {}),
       });
+
+      // Sync free entry to drink plans (drink plans tab mirrors listing free entry)
+      if (isPub && vendor?.id) {
+        try {
+          const existingPlans = await apiGet<DrinkPlan[]>(`/api/vendors/${vendor.id}/drink-plans`);
+          const welcomePlans = existingPlans.filter((p) => p.type === "welcome" || p.type === "unlimited");
+          for (const p of welcomePlans) { await apiDelete(`/api/vendors/me/drink-plans/${p.id}`); }
+          if (freeEntryEnabled && freeEntryDays.length > 0 && freeEntryGenders.length > 0) {
+            const dpGender = (freeEntryGenders.length === 1 && freeEntryGenders[0] === "women") ? "female" : "all";
+            await apiPost("/api/vendors/me/drink-plans", {
+              type: "welcome", productName: "Free Entry Drink", gender: dpGender, price: 0,
+              days: freeEntryDays, timeFrom: "", timeTo: freeEntryBeforeTime.trim(),
+              description: "",
+            });
+          }
+        } catch { /* non-fatal */ }
+      }
+
       formErrors.reset();
       toast({ title: "Updated" });
       onSaved();

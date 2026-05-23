@@ -336,7 +336,8 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const parsed = CreateEventBody.safeParse(req.body);
+  const { freeEntryForTable: rawFET, freeEntryForTableDays: rawFETD, freeEntryForTableBeforeTime: rawFETBT, ...createCleanBody } = req.body as Record<string, unknown>;
+  const parsed = CreateEventBody.safeParse(createCleanBody);
   if (!parsed.success) {
     respondInvalid(res, parsed.error);
     return;
@@ -424,6 +425,9 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       pubEventTypes: data.pubEventTypes ?? [],
       dayPricing: data.dayPricing ?? null,
       freeEntryRules: data.freeEntryRules ?? null,
+      freeEntryForTable: rawFET !== undefined ? Boolean(rawFET) : false,
+      freeEntryForTableDays: Array.isArray(rawFETD) ? rawFETD : null,
+      freeEntryForTableBeforeTime: rawFETBT ? String(rawFETBT) : null,
       galleryImages: data.galleryImages ?? null,
       galleryVideos: data.galleryVideos ?? null,
       approvalStatus: "pending",
@@ -469,7 +473,8 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const parsed = UpdateEventBody.safeParse(req.body);
+  const { freeEntryForTable: rawFET, freeEntryForTableDays: rawFETD, freeEntryForTableBeforeTime: rawFETBT, ...patchCleanBody } = req.body as Record<string, unknown>;
+  const parsed = UpdateEventBody.safeParse(patchCleanBody);
   if (!parsed.success) {
     respondInvalid(res, parsed.error);
     return;
@@ -502,16 +507,9 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   }
   if (data.galleryImages !== undefined) updates["galleryImages"] = data.galleryImages;
   if (data.galleryVideos !== undefined) updates["galleryVideos"] = data.galleryVideos;
-  if ((data as Record<string, unknown>)["freeEntryForTable"] !== undefined) {
-    updates["freeEntryForTable"] = Boolean((data as Record<string, unknown>)["freeEntryForTable"]);
-  }
-  if ((data as Record<string, unknown>)["freeEntryForTableDays"] !== undefined) {
-    updates["freeEntryForTableDays"] = (data as Record<string, unknown>)["freeEntryForTableDays"] ?? null;
-  }
-  if ((data as Record<string, unknown>)["freeEntryForTableBeforeTime"] !== undefined) {
-    const t = (data as Record<string, unknown>)["freeEntryForTableBeforeTime"];
-    updates["freeEntryForTableBeforeTime"] = t ? String(t) : null;
-  }
+  if (rawFET !== undefined) updates["freeEntryForTable"] = Boolean(rawFET);
+  if (rawFETD !== undefined) updates["freeEntryForTableDays"] = rawFETD ?? null;
+  if (rawFETBT !== undefined) updates["freeEntryForTableBeforeTime"] = rawFETBT ? String(rawFETBT) : null;
 
   const [updated] = await db
     .update(eventsTable)

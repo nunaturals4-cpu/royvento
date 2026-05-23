@@ -562,7 +562,7 @@ async function checkDrinkPlanConflict(
     .from(drinkPlansTable)
     .where(and(
       eq(drinkPlansTable.vendorId, vendorId),
-      inArray(drinkPlansTable.type, ["welcome", "ticket"]),
+      eq(drinkPlansTable.type, type),
     ));
   for (const plan of existing) {
     if (excludePlanId && plan.id === excludePlanId) continue;
