@@ -119,6 +119,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [ticketCouple, setTicketCouple] = useState(0);
   const [occasion, setOccasion] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
   const [pointsToUse, setPointsToUse] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("online");
   const [hoursExpanded, setHoursExpanded] = useState(false);
@@ -337,6 +338,12 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
   const venueName = ev.vendor?.businessName ?? "This venue";
 
+  const selectedAnnouncement = announcements.find((a: any) => String(a.id) === selectedAnnouncementId);
+  const eventDateMismatch = !!(selectedAnnouncement?.announceDate && date && date !== selectedAnnouncement.announceDate);
+  const sortedAnnouncements: any[] = [...announcements]
+    .filter((a: any) => a.announceDate)
+    .sort((a: any, b: any) => new Date(a.announceDate).getTime() - new Date(b.announceDate).getTime());
+
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     const pw = isTierFree("women") ? 0 : effectiveWomen;
@@ -464,6 +471,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" });
       return;
     }
+    if (eventDateMismatch) {
+      toast({ title: "Date mismatch", description: "Selected booking date does not match the chosen event date. Please select the event date to continue.", variant: "destructive" });
+      return;
+    }
     if (isClosedDay) {
       toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" });
       return;
@@ -494,7 +505,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           ? {
               pubMode,
               ticketWomen, ticketMen, ticketCouple,
-              selectedPubEvent: "",
+              selectedPubEvent: selectedAnnouncement?.title ?? "",
               notes: pubMode === "event" ? occasion : notes,
               arrivalTime: isPub && (pubMode === "ticket" || pubMode === "event") ? arrivalTime : undefined,
             }
@@ -983,6 +994,19 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       {a.announceDate && <p className="text-xs text-primary mt-0.5">{new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}{a.announceTime && ` · ${a.announceTime}`}</p>}
                       {a.body && <p className="text-sm text-white/65 mt-1 leading-relaxed">{a.body}</p>}
                     </div>
+                    {a.announceDate && (
+                      <button
+                        type="button"
+                        className="shrink-0 self-center px-4 py-2 rounded-xl bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all"
+                        onClick={() => {
+                          setSelectedAnnouncementId(String(a.id));
+                          setDate(a.announceDate);
+                          switchPubTab("book");
+                        }}
+                      >
+                        Book Now
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1148,91 +1172,24 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   </div>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {drinkPlans.map((plan: any) => {
-                    const hasItems = plan.lineItems && plan.lineItems.length > 0;
                     const typeLabel = plan.type === "unlimited" ? "Unlimited Drinks" : plan.type === "ticket" ? "Entry + Drinks" : plan.type === "welcome" ? "Welcome Drink" : "Drink Package";
-                    const isAvailableToday = isDrinkPlanAvailableToday(plan);
+                    const hasItems = plan.lineItems && plan.lineItems.length > 0;
                     return (
-                      <div key={plan.id} className="group rounded-3xl glass-card border border-white/8 hover:border-primary/20 overflow-hidden transition-all duration-300 hover:shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
-                        <div className="p-7 md:p-8">
-
-                          {/* Header row: icon + title + badges */}
-                          <div className="flex items-start justify-between gap-4 mb-5">
-                            <div className="flex items-start gap-4 min-w-0">
-                              <div className="h-12 w-12 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                                <Wine className="h-5 w-5 text-primary" />
-                              </div>
-                              <div className="min-w-0 pt-0.5">
-                                <p className="text-[10px] font-bold text-primary/70 uppercase tracking-[0.18em] mb-1.5">{typeLabel}</p>
-                                <h4 className="font-serif text-xl md:text-2xl text-white leading-snug">{getPlanSummary(plan, t)}</h4>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2 shrink-0">
-                              {isAvailableToday && (
-                                <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
-                                  Available Today
-                                </span>
-                              )}
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${
-                                plan.gender === "female"
-                                  ? "bg-rose-500/10 border-rose-500/20 text-rose-300"
-                                  : "bg-primary/10 border-primary/20 text-primary"
-                              }`}>
-                                {plan.gender === "female" ? "Ladies" : "All Guests"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Description */}
-                          {plan.description && (
-                            <p className="text-white/50 text-sm leading-relaxed mb-5 pl-16">{plan.description}</p>
-                          )}
-
-                          {/* Days + Timing pills */}
-                          {(plan.days?.length > 0 || plan.timeFrom || plan.timeTo) && (
-                            <div className="flex flex-wrap items-center gap-2 mb-6 pl-16">
-                              {plan.days?.map((d: string) => (
-                                <span key={d} className="inline-flex items-center px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-medium text-white/60 hover:border-white/18 transition-colors">
-                                  {d}
-                                </span>
-                              ))}
-                              {(plan.timeFrom || plan.timeTo) && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  {plan.timeFrom || ""}{plan.timeTo ? ` – ${plan.timeTo}` : ""}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Included Offers */}
+                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex items-start gap-4">
+                        <div className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                          <Wine className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-primary/70 uppercase tracking-[0.15em] mb-1">{typeLabel}</p>
                           {hasItems && (
-                            <div className="rounded-2xl bg-white/3 border border-white/8 p-5 mb-6">
-                              <p className="text-[10px] text-white/30 uppercase tracking-[0.15em] font-semibold mb-4">What's Included</p>
-                              <ul className="space-y-3">
-                                {plan.lineItems.map((item: any, i: number) => (
-                                  <li key={i} className="flex items-center gap-3">
-                                    <div className="h-7 w-7 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
-                                      <span className="text-primary text-[11px] font-bold">{item.qty}×</span>
-                                    </div>
-                                    <span className="text-sm text-white/80 font-medium">{item.name}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
+                            <ul className="space-y-0.5">
+                              {plan.lineItems.map((item: any, i: number) => (
+                                <li key={i} className="text-sm text-white/80">{item.name}</li>
+                              ))}
+                            </ul>
                           )}
-
-                          {/* CTA */}
-                          <button
-                            type="button"
-                            onClick={() => switchPubTab("book")}
-                            className="w-full h-12 rounded-2xl border border-primary/30 bg-primary/8 hover:bg-primary hover:border-primary text-primary hover:text-white font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2"
-                          >
-                            <CalIcon className="h-4 w-4" />
-                            {plan.type === "ticket" ? "Get Entry" : "Claim Deal"}
-                          </button>
-
                         </div>
                       </div>
                     );
@@ -1430,10 +1387,41 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               }
               {!bookingIsFullyFree && discountInfo?.isNewUser && <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm flex items-center gap-2 text-primary"><Sparkle className="h-4 w-4 shrink-0" />{t("events.new_member_discount", { pct: discountInfo.bookingDiscountPercent })}</div>}
               <div className="space-y-5">
+                {isPub && sortedAnnouncements.length > 0 && (
+                  <div>
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Event (optional)</Label>
+                    <Select
+                      value={selectedAnnouncementId || "none"}
+                      onValueChange={(v) => {
+                        const aid = v === "none" ? "" : v;
+                        setSelectedAnnouncementId(aid);
+                        if (aid) {
+                          const a = sortedAnnouncements.find((x: any) => String(x.id) === aid);
+                          if (a?.announceDate) setDate(a.announceDate);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl">
+                        <SelectValue placeholder="— select an event —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— no specific event —</SelectItem>
+                        {sortedAnnouncements.map((a: any) => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.title} — {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="bdate" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.date_label")}</Label>
                   <Input id="bdate" type="date" value={date} min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()} onChange={(e) => setDate(e.target.value)} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" />
                   {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && <p className="text-xs text-muted-foreground mt-1.5">Open: {vendorOpenDays.join(", ")}</p>}
+                  {eventDateMismatch && (
+                    <p className="text-xs text-amber-400 mt-1.5">Selected booking date does not match the chosen event date. Please select the event date to continue.</p>
+                  )}
                 </div>
                 {bookingIsFullyFree && <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3"><span className="text-emerald-400">✓</span><p className="text-sm font-medium text-emerald-300">{t("events.free_entry_form_notice")}</p></div>}
                 {isPub ? (

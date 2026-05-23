@@ -450,17 +450,21 @@ export function Subscription() {
           <h2 className="font-serif text-2xl tracking-tight shrink-0">Additional Features</h2>
           <div className="h-px flex-1 bg-white/8" />
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           {[
             { icon: Star,          label: "Featured Pub Listings", desc: "Get top placement in search results and category pages." },
             { icon: Sparkles,      label: "Sponsored Events",      desc: "Promote your events to a wider targeted audience." },
             { icon: BarChart3,     label: "Premium Analytics",     desc: "Deep customer insights, heatmaps and revenue reports." },
             { icon: MessageSquare, label: "Priority Support",      desc: "Dedicated account manager for Premium partners." },
           ].map((f) => (
-            <div key={f.label} className="rounded-2xl glass-card p-5">
-              <f.icon className="h-5 w-5 text-primary mb-3" />
-              <p className="font-semibold text-sm">{f.label}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.desc}</p>
+            <div key={f.label} className="rounded-2xl glass-card p-5 flex items-start gap-4">
+              <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                <f.icon className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{f.label}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.desc}</p>
+              </div>
             </div>
           ))}
         </div>
