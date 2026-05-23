@@ -3232,13 +3232,14 @@ interface Announcement {
   imageUrl: string;
   genre: string;
   eventType: string;
+  price: string;
   createdAt: string;
 }
 
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
 
-const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "" };
+const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "", price: "" };
 
 function AnnouncementsPanel() {
   const { toast } = useToast();
@@ -3275,7 +3276,7 @@ function AnnouncementsPanel() {
     setEditing(a);
     setImageFile(null);
     setImagePreview(a.imageUrl || "");
-    setForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl, genre: a.genre ?? "", eventType: a.eventType ?? "" });
+    setForm({ title: a.title, body: a.body, announceDate: a.announceDate, announceTime: a.announceTime, imageUrl: a.imageUrl, genre: a.genre ?? "", eventType: a.eventType ?? "", price: a.price != null && Number(a.price) > 0 ? String(a.price) : "" });
   };
 
   const applyFile = (file: File) => {
@@ -3400,6 +3401,13 @@ function AnnouncementsPanel() {
             <Input id="ann-time" type="time" value={form.announceTime} onChange={(e) => { setForm((f) => ({ ...f, announceTime: e.target.value })); annFormErrors.clearField("announceTime"); }} aria-invalid={!!annFormErrors.fieldError("announceTime")} className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("announceTime"))} />
             {annFormErrors.fieldError("announceTime") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("announceTime")}</p>}
           </div>
+        </div>
+
+        <div>
+          <Label htmlFor="ann-price">Ticket Price Per Person (₹)</Label>
+          <Input id="ann-price" type="number" min={0} step={1} value={form.price} onChange={(e) => { setForm((f) => ({ ...f, price: e.target.value })); annFormErrors.clearField("price"); }} aria-invalid={!!annFormErrors.fieldError("price")} placeholder="0 — leave empty for free entry" className={fieldClass("bg-black/40 border-white/10 mt-1", annFormErrors.fieldError("price"))} />
+          <p className="text-xs text-muted-foreground mt-1">Charged per guest when customers book this event from your pub page.</p>
+          {annFormErrors.fieldError("price") && <p className="text-xs text-destructive mt-1">{annFormErrors.fieldError("price")}</p>}
         </div>
 
         {/* Genre picker */}
@@ -3539,6 +3547,9 @@ function AnnouncementsPanel() {
                         {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                         {a.announceTime && ` · ${a.announceTime}`}
                       </p>
+                    )}
+                    {a.price != null && Number(a.price) > 0 && (
+                      <p className="text-xs text-emerald-400 mt-0.5 font-medium">₹{Number(a.price).toLocaleString("en-IN")} / person</p>
                     )}
                     {a.body && <p className="text-white/60 mt-1 line-clamp-2">{a.body}</p>}
                   </div>

@@ -53,8 +53,10 @@ export interface CommissionRatesInput {
   /** Ticket commission as a percentage (0–100), e.g. 10 = 10% of ticket revenue. */
   ticketRate: string | number | null | undefined;
   tableBookingRate: string | number | null | undefined;
-  /** Flat ₹ per person for event bookings (pub announcements). */
+  /** Event booking commission as a percentage (0–100) of ticket revenue. */
   eventRate?: string | number | null | undefined;
+  /** When false, no event commission is charged (overrides eventRate). */
+  eventCommissionEnabled?: boolean | null | undefined;
 }
 
 export interface PlannedBookingShape {
@@ -68,6 +70,8 @@ export interface PlannedBookingShape {
   ticketMen: number;
   ticketCouple: number;
   bookingDate?: string | null;
+  /** Event commission percentage locked at booking time (historical rate). */
+  eventCommissionPct?: string | number | null;
 }
 
 export interface FreeEntryRulesShape {
@@ -119,6 +123,21 @@ export interface CommissionResult {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Resolve the effective event commission percentage for a booking.
+ * Prefers the rate locked on the booking at creation time (historical), so
+ * later changes to the partner's configured rate never re-price old bookings.
+ * Falls back to the current configured rate; returns 0 when commission is
+ * disabled and no historical rate was stored.
+ */
+function resolveEventPct(b: PlannedBookingShape, rates: CommissionRatesInput): number {
+  if (b.eventCommissionPct != null && b.eventCommissionPct !== "") {
+    return Math.max(0, Number(b.eventCommissionPct));
+  }
+  if (rates.eventCommissionEnabled === false) return 0;
+  return Math.max(0, Number(rates.eventRate ?? 0));
+}
+
 /** Classify a booking by its mode + price.
  *
  * `pubMode === "event"` is the legacy value the frontend Buy Tickets / Table
@@ -165,14 +184,15 @@ export function computeCommissionFromPlanned(
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketPct = Number(rates.ticketRate ?? 0); // stored as percentage (0–100)
   const tablePct = Number(rates.tableBookingRate ?? 0); // stored as flat ₹ per person
-  const eventRateAmt = Number(rates.eventRate ?? 0); // flat ₹ per person for event bookings
 
   const bookingType = classifyBookingType(b);
 
   if (bookingType === "event_booking") {
-    const unitCount = Math.max(0, b.guests);
-    const amount = round2(eventRateAmt * unitCount);
-    return { bookingType, ratePerUnit: eventRateAmt, unitCount, amount };
+    // Percentage of the final payable event revenue (ticket price × guests,
+    // already net of coupon / points discounts via finalPrice).
+    const pct = resolveEventPct(b, rates);
+    const amount = round2((pct / 100) * Number(b.finalPrice));
+    return { bookingType, ratePerUnit: pct, unitCount: Math.max(0, b.guests), amount };
   }
 
   if (bookingType === "table") {
@@ -255,12 +275,13 @@ export function computeCommissionFromActuals(
 ): CommissionResult {
   const bookingType = classifyBookingType(b);
 
-  // ── Event booking: flat ₹ per verified guest ────────────────────────────
+  // ── Event booking: percentage of event revenue ──────────────────────────
   if (bookingType === "event_booking") {
-    const eventRateAmt = Number(rates.eventRate ?? 0);
+    const pct = resolveEventPct(b, rates);
     const ag = b.actualGuests ?? b.guests;
     const units = Math.max(0, ag);
-    return { bookingType: "event_booking", ratePerUnit: eventRateAmt, unitCount: units, amount: round2(eventRateAmt * units) };
+    const amount = round2((pct / 100) * Number(b.finalPrice));
+    return { bookingType: "event_booking", ratePerUnit: pct, unitCount: units, amount };
   }
 
   // ── Table: flat ₹ per verified guest ────────────────────────────────────

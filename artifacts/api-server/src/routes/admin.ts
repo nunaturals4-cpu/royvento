@@ -138,6 +138,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       actualCouple: bookingsTable.actualCouple,
       actualGuests: bookingsTable.actualGuests,
       baseFee: bookingsTable.baseFee,
+      eventCommissionPct: bookingsTable.eventCommissionPct,
     })
     .from(bookingsTable)
     .where(
@@ -2248,7 +2249,7 @@ router.get("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
     .where(eq(vendorCommissionsTable.vendorId, vendorId))
     .limit(1);
   if (!row) {
-    res.json({ vendorId, freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0" });
+    res.json({ vendorId, freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0", eventCommissionEnabled: true });
     return;
   }
   res.json(row);
@@ -2271,7 +2272,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
     respondInvalid(res, parsed.error);
     return;
   }
-  const { freeEntryRate, ticketRate, tableBookingRate, eventRate = 0 } = parsed.data;
+  const { freeEntryRate, ticketRate, tableBookingRate, eventRate = 0, eventCommissionEnabled = true } = parsed.data;
   const [upserted] = await db
     .insert(vendorCommissionsTable)
     .values({
@@ -2280,6 +2281,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
       ticketRate: ticketRate.toFixed(2),
       tableBookingRate: tableBookingRate.toFixed(2),
       eventRate: eventRate.toFixed(2),
+      eventCommissionEnabled,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -2289,6 +2291,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
         ticketRate: ticketRate.toFixed(2),
         tableBookingRate: tableBookingRate.toFixed(2),
         eventRate: eventRate.toFixed(2),
+        eventCommissionEnabled,
         updatedAt: new Date(),
       },
     })
@@ -2348,6 +2351,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         createdAt: bookingsTable.createdAt,
         status: bookingsTable.status,
         baseFee: bookingsTable.baseFee,
+        eventCommissionPct: bookingsTable.eventCommissionPct,
       })
       .from(bookingsTable)
       .where(and(...whereConditions)),
@@ -2427,7 +2431,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     vendorId: number;
     businessName: string;
     city: string;
-    appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string; eventRate: string };
+    appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string; eventRate: string; eventCommissionEnabled: boolean };
     baseFeePercent: string;
     baseFeeEnabled: boolean;
     totalBookings: number;
@@ -2473,6 +2477,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         ticketRate: vendorRates?.ticketRate ?? "0",
         tableBookingRate: vendorRates?.tableBookingRate ?? "0",
         eventRate: vendorRates?.eventRate ?? "0",
+        eventCommissionEnabled: vendorRates?.eventCommissionEnabled ?? true,
       },
       baseFeePercent: v.baseFeePercent ?? "3.50",
       baseFeeEnabled: v.baseFeeEnabled ?? true,

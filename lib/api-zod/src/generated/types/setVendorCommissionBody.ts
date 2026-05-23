@@ -26,9 +26,11 @@ export interface SetVendorCommissionBody {
    */
   tableBookingRate: number;
   /**
-   * Flat fee in INR per person for event bookings
+   * Percentage of event ticket revenue charged as commission (0–100)
    * @minimum 0
-   * @maximum 99999.99
+   * @maximum 100
    */
   eventRate?: number;
+  /** Whether event booking commission is charged for this partner */
+  eventCommissionEnabled?: boolean;
 }

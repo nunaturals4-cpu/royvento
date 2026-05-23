@@ -228,6 +228,9 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "announcement_id" integer`);
     await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_rate" numeric(8,2) NOT NULL DEFAULT '0'`);
+    await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_commission_enabled" boolean NOT NULL DEFAULT true`);
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "price" numeric(10,2) NOT NULL DEFAULT '0'`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "event_commission_pct" numeric(5,2)`);
     logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking columns ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning (drink_plans global_priority)");

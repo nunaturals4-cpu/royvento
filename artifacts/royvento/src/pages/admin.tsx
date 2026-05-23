@@ -4531,6 +4531,7 @@ interface CommissionRates {
   ticketRate: string;
   tableBookingRate: string;
   eventRate: string;
+  eventCommissionEnabled: boolean;
   baseFeePercent: string;
 }
 
@@ -4675,14 +4676,14 @@ function CommissionsAdmin() {
       toast({ title: "Fees must be valid non-negative numbers", variant: "destructive" });
       return;
     }
-    if (ticket > 100 || bfp > 100) {
-      toast({ title: "Rates must be 0–100%", variant: "destructive" });
+    if (ticket > 100 || bfp > 100 || evtRate > 100) {
+      toast({ title: "Percentage rates must be 0–100%", variant: "destructive" });
       return;
     }
     setSavingId(vendorId);
     try {
       await Promise.all([
-        apiPut(`/api/admin/vendors/${vendorId}/commission`, { freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, eventRate: evtRate }),
+        apiPut(`/api/admin/vendors/${vendorId}/commission`, { freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, eventRate: evtRate, eventCommissionEnabled: rates.eventCommissionEnabled !== false }),
         apiPatch(`/api/admin/vendors/${vendorId}/base-fee`, { baseFeePercent: bfp }),
       ]);
       toast({ title: "Commission fees saved" });
@@ -4698,6 +4699,13 @@ function CommissionsAdmin() {
     setRateEdits((prev) => ({
       ...prev,
       [vendorId]: { ...prev[vendorId], [field]: value },
+    }));
+  };
+
+  const toggleEventCommission = (vendorId: number, enabled: boolean) => {
+    setRateEdits((prev) => ({
+      ...prev,
+      [vendorId]: { ...prev[vendorId], eventCommissionEnabled: enabled },
     }));
   };
 
@@ -4775,14 +4783,15 @@ function CommissionsAdmin() {
           <p className="text-muted-foreground text-sm">No approved partners found.</p>
         ) : (
           <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
-            <table className="w-full text-sm min-w-[680px]">
+            <table className="w-full text-sm min-w-[780px]">
               <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
                 <tr>
                   <th className="text-left py-2 pr-4">Partner</th>
                   <th className="text-right py-2 px-3">Free Entry ₹/person</th>
                   <th className="text-right py-2 px-3">Ticket %</th>
                   <th className="text-right py-2 px-3">Table ₹/person</th>
-                  <th className="text-right py-2 px-3">Events ₹/person</th>
+                  <th className="text-right py-2 px-3">Event %</th>
+                  <th className="text-center py-2 px-3">Event Comm.</th>
                   <th className="text-right py-2 px-3">Base Fee %</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
@@ -4795,6 +4804,7 @@ function CommissionsAdmin() {
                     edits.ticketRate !== row.appliedRates.ticketRate ||
                     edits.tableBookingRate !== row.appliedRates.tableBookingRate ||
                     edits.eventRate !== (row.appliedRates.eventRate ?? "0") ||
+                    (edits.eventCommissionEnabled !== false) !== (row.appliedRates.eventCommissionEnabled !== false) ||
                     edits.baseFeePercent !== (row.baseFeePercent ?? "3.50");
                   return (
                     <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
@@ -4839,12 +4849,24 @@ function CommissionsAdmin() {
                         <Input
                           type="number"
                           min={0}
-                          max={99999.99}
+                          max={100}
                           step={0.01}
                           value={edits.eventRate ?? "0"}
+                          disabled={edits.eventCommissionEnabled === false}
                           onChange={(e) => updateRate(row.vendorId, "eventRate", e.target.value)}
-                          className="w-20 text-right h-8 text-sm ml-auto"
+                          className="w-20 text-right h-8 text-sm ml-auto disabled:opacity-40"
                         />
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={edits.eventCommissionEnabled !== false}
+                          onClick={() => toggleEventCommission(row.vendorId, edits.eventCommissionEnabled === false)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${edits.eventCommissionEnabled !== false ? "bg-primary" : "bg-white/15"}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${edits.eventCommissionEnabled !== false ? "translate-x-[18px]" : "translate-x-1"}`} />
+                        </button>
                       </td>
                       <td className="py-2 px-3">
                         <Input

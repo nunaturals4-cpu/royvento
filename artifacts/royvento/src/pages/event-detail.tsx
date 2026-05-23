@@ -246,15 +246,24 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (isLoading || !event) return;
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("book") !== "event") return;
-    const aid = params.get("aid");
-    if (!aid || announcements.length === 0) return;
-    const a = announcements.find((x: any) => String(x.id) === aid);
-    if (!a) return;
-    eventDeepLinkDone.current = true;
-    setPubMode("event_booking");
-    setSelectedAnnouncementId(aid);
-    if (a.announceDate) setDate(a.announceDate);
+    const bookParam = params.get("book");
+    if (!bookParam) return;
+
+    // Event-booking deep link (?book=event&aid=<id>) needs the announcements
+    // loaded so it can pre-select the event. The generic deep link (?book=1
+    // from a drink-deal "Claim Deal"/"Book Now") just opens the booking form.
+    if (bookParam === "event") {
+      const aid = params.get("aid");
+      if (!aid || announcements.length === 0) return;
+      const a = announcements.find((x: any) => String(x.id) === aid);
+      if (!a) return;
+      eventDeepLinkDone.current = true;
+      setPubMode("event_booking");
+      setSelectedAnnouncementId(aid);
+      if (a.announceDate) setDate(a.announceDate);
+    } else {
+      eventDeepLinkDone.current = true;
+    }
     setPubTab("book");
     requestAnimationFrame(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }, [isLoading, event, announcements]);
@@ -366,12 +375,17 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     .filter((a: any) => a.announceDate)
     .sort((a: any, b: any) => new Date(a.announceDate).getTime() - new Date(b.announceDate).getTime());
 
+  const eventBookingPerPerson = selectedAnnouncement?.price != null && Number(selectedAnnouncement.price) > 0
+    ? Number(selectedAnnouncement.price)
+    : Number(ev.price);
   let subtotal = 0;
   if (isPub && pubMode === "ticket") {
     const pw = isTierFree("women") ? 0 : effectiveWomen;
     const pm = isTierFree("men") ? 0 : effectiveMen;
     const pc = isTierFree("couple") ? 0 : effectiveCouple;
     subtotal = ticketWomen * pw + ticketMen * pm + ticketCouple * pc;
+  } else if (isPub && pubMode === "event_booking") {
+    subtotal = eventBookingPerPerson * Math.max(1, guests);
   } else if (isPub && ferAllGendersFree) {
     subtotal = 0;
   } else {
@@ -1508,9 +1522,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           <Label htmlFor="ev-guests" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.guests_field")}</Label>
                           <Input id="ev-guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" />
                         </div>
-                        {selectedAnnouncement?.announceTime && (
-                          <div className="rounded-xl border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary">
-                            Event time: {selectedAnnouncement.announceTime}
+                        {selectedAnnouncement && (
+                          <div className="rounded-xl border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary space-y-1">
+                            {selectedAnnouncement.announceTime && <p>Event time: {selectedAnnouncement.announceTime}</p>}
+                            <div className="flex items-center justify-between">
+                              <span>{formatINR(eventBookingPerPerson)} × {Math.max(1, guests)} {Math.max(1, guests) === 1 ? "guest" : "guests"}</span>
+                              <span className="font-semibold">{formatINR(eventBookingPerPerson * Math.max(1, guests))}</span>
+                            </div>
                           </div>
                         )}
                       </>

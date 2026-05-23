@@ -184,6 +184,7 @@ export const bookingsTable = pgTable(
       .notNull()
       .default(""),
     announcementId: integer("announcement_id"),
+    eventCommissionPct: numeric("event_commission_pct", { precision: 5, scale: 2 }),
     personName: varchar("person_name", { length: 255 }).notNull().default(""),
     phone: varchar("phone", { length: 20 }).notNull().default(""),
     pointsUsed: integer("points_used").notNull().default(0),
@@ -542,6 +543,7 @@ export const announcementsTable = pgTable(
     eventType: varchar("event_type", { length: 100 }).notNull().default(""),
     capacity: integer("capacity"),
     isActive: boolean("is_active").notNull().default(true),
+    price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -634,7 +636,9 @@ export const vendorCommissionsTable = pgTable(
     freeEntryRate: numeric("free_entry_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     ticketRate: numeric("ticket_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     tableBookingRate: numeric("table_booking_rate", { precision: 8, scale: 2 }).notNull().default("0"),
+    // Event booking commission as a percentage (0–100) of ticket revenue.
     eventRate: numeric("event_rate", { precision: 8, scale: 2 }).notNull().default("0"),
+    eventCommissionEnabled: boolean("event_commission_enabled").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

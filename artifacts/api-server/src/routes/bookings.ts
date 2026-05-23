@@ -304,10 +304,10 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
 
   // Validate announcement for event_booking mode
-  let announcementRow: { id: number; title: string; announceDate: string; capacity: number | null; isActive: boolean } | undefined;
+  let announcementRow: { id: number; title: string; announceDate: string; capacity: number | null; isActive: boolean; price: string } | undefined;
   if (parsed.data.pubMode === "event_booking" && parsed.data.announcementId) {
     const aRows = await db
-      .select({ id: announcementsTable.id, title: announcementsTable.title, announceDate: announcementsTable.announceDate, capacity: announcementsTable.capacity, isActive: announcementsTable.isActive })
+      .select({ id: announcementsTable.id, title: announcementsTable.title, announceDate: announcementsTable.announceDate, capacity: announcementsTable.capacity, isActive: announcementsTable.isActive, price: announcementsTable.price })
       .from(announcementsTable)
       .where(eq(announcementsTable.id, parsed.data.announcementId))
       .limit(1);
@@ -338,6 +338,19 @@ router.post("/bookings", requireAuth(), async (req, res) => {
         return;
       }
     }
+  }
+
+  // Lock the event commission percentage at booking time so later rate changes
+  // never re-price historical bookings (see lib/commission.ts → resolveEventPct).
+  let lockedEventPct: string | null = null;
+  if (parsed.data.pubMode === "event_booking") {
+    const [cr] = await db
+      .select({ eventRate: vendorCommissionsTable.eventRate, enabled: vendorCommissionsTable.eventCommissionEnabled })
+      .from(vendorCommissionsTable)
+      .where(eq(vendorCommissionsTable.vendorId, evt.vendorId))
+      .limit(1);
+    const pct = cr && cr.enabled !== false ? Number(cr.eventRate ?? 0) : 0;
+    lockedEventPct = pct.toFixed(2);
   }
   const rawDate = parsed.data.bookingDate as unknown;
   const dateStr =
@@ -391,9 +404,12 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     totalPrice = w * pw + m * pm + c * pc;
     guestsCount = w + m + c * 2;
   } else if (evt.type === "pub" && parsed.data.pubMode === "event_booking") {
-    // Event bookings use the pub's standard price × guest count
-    totalPrice = Number(evt.price) * Math.max(1, guestsCount);
+    // Event bookings use the announcement's per-person ticket price × guests.
+    // Fall back to the pub's standard cover if the announcement has no price.
     if (guestsCount === 0) guestsCount = 1;
+    const annPrice = Number(announcementRow?.price ?? 0);
+    const perPerson = annPrice > 0 ? annPrice : Number(evt.price);
+    totalPrice = perPerson * Math.max(1, guestsCount);
   } else {
     // Table / event-mode: no per-gender concept, so only treat as free when
     // every gender is listed. Otherwise charge the regular cover.
@@ -536,6 +552,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     ticketCouple: parsed.data.ticketCouple || 0,
     selectedPubEvent: parsed.data.pubMode === "event_booking" && announcementRow ? announcementRow.title : (parsed.data.selectedPubEvent || ""),
     announcementId: parsed.data.announcementId ?? null,
+    eventCommissionPct: lockedEventPct,
     personName: parsed.data.personName || user.name,
     phone: parsed.data.phone ?? "",
     pointsUsed,

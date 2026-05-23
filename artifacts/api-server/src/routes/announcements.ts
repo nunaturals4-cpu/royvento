@@ -29,6 +29,7 @@ const AnnouncementBody = z.object({
   imageUrl: z.string().optional().default(""),
   genre: z.string().optional().default(""),
   eventType: z.string().optional().default(""),
+  price: z.coerce.number().min(0).max(99999.99).optional().default(0),
 });
 
 router.get("/partner/announcements", requireAuth(["vendor"]), async (req, res) => {
@@ -62,6 +63,7 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
       imageUrl: parsed.data.imageUrl,
       genre: parsed.data.genre,
       eventType: parsed.data.eventType,
+      price: String(parsed.data.price ?? 0),
     })
     .returning();
 
@@ -130,9 +132,11 @@ router.patch("/partner/announcements/:id", requireAuth(["vendor"]), async (req, 
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const parsed = AnnouncementBody.partial().safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { price, ...rest } = parsed.data;
+  const updateValues = price != null ? { ...rest, price: String(price) } : rest;
   const [row] = await db
     .update(announcementsTable)
-    .set(parsed.data)
+    .set(updateValues)
     .where(and(eq(announcementsTable.id, id), eq(announcementsTable.vendorId, vendor.id)))
     .returning();
   if (!row) return res.status(404).json({ error: "Not found" });

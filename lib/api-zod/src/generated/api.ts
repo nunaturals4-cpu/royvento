@@ -4018,10 +4018,15 @@ export const SetVendorCommissionBody = zod
     eventRate: zod
       .number()
       .min(0)
-      .max(99999.99)
+      .max(100)
       .optional()
       .default(0)
-      .describe("Flat fee in INR per person for event bookings"),
+      .describe("Percentage of event ticket revenue charged as commission (0–100)"),
+    eventCommissionEnabled: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe("Whether event booking commission is charged for this partner"),
   })
   .strict();
 

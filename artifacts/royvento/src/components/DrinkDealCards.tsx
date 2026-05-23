@@ -19,7 +19,7 @@ export function FreeDrinkCard({ offer, plans }: VendorWithPlans) {
   const { t } = useTranslation();
   return (
     <Link
-      href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
+      href={offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`}
       className="snap-start flex-shrink-0 md:flex-shrink block group"
     >
       <div className="relative w-[300px] md:w-auto rounded-2xl overflow-hidden flex flex-col h-full
@@ -127,7 +127,7 @@ export function TicketCard({ offer, plans }: VendorWithPlans) {
   const { t } = useTranslation();
   return (
     <Link
-      href={offer.pubEventId ? `/events/${offer.pubEventId}` : `/vendors/${offer.vendorId}`}
+      href={offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`}
       className="snap-start flex-shrink-0 md:flex-shrink block group"
     >
       <div className="relative w-[300px] md:w-auto rounded-2xl overflow-hidden flex flex-col h-full
