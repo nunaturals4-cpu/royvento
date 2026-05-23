@@ -952,8 +952,11 @@ export interface AdminBookingRow {
   totalPrice: number;
   discountAmount: number;
   finalPrice: number;
+  baseFee?: number;
+  totalPayable?: number;
   effectiveRevenue: number;
   paymentMethod: string;
+  phone?: string;
   status: string;
   notes: string;
   ticketCode: string;

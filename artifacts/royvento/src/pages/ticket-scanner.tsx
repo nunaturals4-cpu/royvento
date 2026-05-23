@@ -52,6 +52,8 @@ interface BookingData {
   totalPrice?: number;
   // Post-discount amount the guest paid online or owes at the door.
   finalPrice: number;
+  // Service/platform fee charged on top of finalPrice. Fixed at booking time.
+  baseFee?: number | null;
   discountAmount?: number;
   pointsUsed?: number;
   couponCode?: string;
@@ -1250,6 +1252,9 @@ function FinalizeActualEntry({
   const grossLiveRounded = Math.round(grossLive * 100) / 100;
   const liveDiscountAmount = Math.round((grossLive - liveTotal) * 100) / 100;
 
+  const bookingBaseFee = b.baseFee ?? 0;
+  const totalWithBaseFee = Math.round((liveTotalRounded + bookingBaseFee) * 100) / 100;
+
   const subRows = isTicket
     ? [
         { label: "Women", qty: w, price: priceWomen, subtotal: w * priceWomen, free: ferState.isTierFree("women") },
@@ -1347,7 +1352,7 @@ function FinalizeActualEntry({
       {/* Live cash callout — only for COD, since prepaid bookings are
           already settled. The amount recalculates as the manager edits
           counts and matches what the server will write on Save. */}
-      {isCod && liveTotalRounded > 0 && (
+      {isCod && totalWithBaseFee > 0 && (
         <div className="rounded-2xl border border-amber-400/40 bg-gradient-to-br from-amber-500/10 to-amber-900/10 p-4 shadow-[0_0_24px_-8px_rgba(245,158,11,0.5)]">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-xl bg-amber-500/25 border border-amber-400/50 flex items-center justify-center shrink-0">
@@ -1369,40 +1374,52 @@ function FinalizeActualEntry({
               )}
               <div className="flex items-center justify-end gap-0.5 text-amber-200">
                 <IndianRupee className="h-5 w-5" />
-                <span className="text-3xl font-bold tabular-nums leading-none">{liveTotalRounded.toLocaleString("en-IN")}</span>
+                <span className="text-3xl font-bold tabular-nums leading-none">{totalWithBaseFee.toLocaleString("en-IN")}</span>
               </div>
             </div>
           </div>
-          {isTicket && subRows.length > 0 && (
-            <div className="mt-3 space-y-1 text-[11px] text-amber-100/80">
-              {subRows.map((r) => (
-                <div key={r.label} className="flex justify-between">
-                  <span>{r.label} · {r.qty}{r.free ? " · FREE" : ` × ₹${r.price.toLocaleString("en-IN")}`}</span>
-                  <span className="tabular-nums">{r.free ? "—" : `₹${r.subtotal.toLocaleString("en-IN")}`}</span>
+          <div className="mt-3 space-y-1 text-[11px] text-amber-100/80">
+            {isTicket && subRows.map((r) => (
+              <div key={r.label} className="flex justify-between">
+                <span>{r.label} · {r.qty}{r.free ? " · FREE" : ` × ₹${r.price.toLocaleString("en-IN")}`}</span>
+                <span className="tabular-nums">{r.free ? "—" : `₹${r.subtotal.toLocaleString("en-IN")}`}</span>
+              </div>
+            ))}
+            {isTicket && hasDiscount && liveDiscountAmount > 0 && (
+              <>
+                <div className="flex justify-between pt-1.5 border-t border-amber-500/20">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">₹{grossLiveRounded.toLocaleString("en-IN")}</span>
                 </div>
-              ))}
-              {hasDiscount && liveDiscountAmount > 0 && (
-                <>
-                  <div className="flex justify-between pt-1.5 border-t border-amber-500/20">
-                    <span>Subtotal</span>
-                    <span className="tabular-nums">₹{grossLiveRounded.toLocaleString("en-IN")}</span>
-                  </div>
-                  <div className="flex justify-between text-emerald-300/90">
-                    <span>
-                      Discount
-                      {b.couponCode ? ` (${b.couponCode})` : ""}
-                      {b.pointsUsed && b.pointsUsed > 0 ? ` · ${b.pointsUsed} pts` : ""}
-                    </span>
-                    <span className="tabular-nums">-₹{liveDiscountAmount.toLocaleString("en-IN")}</span>
-                  </div>
-                  <div className="flex justify-between text-amber-200 font-semibold pt-1.5 border-t border-amber-500/20">
-                    <span>Final payable</span>
-                    <span className="tabular-nums">₹{liveTotalRounded.toLocaleString("en-IN")}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                <div className="flex justify-between text-emerald-300/90">
+                  <span>
+                    Discount
+                    {b.couponCode ? ` (${b.couponCode})` : ""}
+                    {b.pointsUsed && b.pointsUsed > 0 ? ` · ${b.pointsUsed} pts` : ""}
+                  </span>
+                  <span className="tabular-nums">-₹{liveDiscountAmount.toLocaleString("en-IN")}</span>
+                </div>
+              </>
+            )}
+            {liveTotalRounded > 0 && (
+              <div className={`flex justify-between ${bookingBaseFee > 0 ? "" : "pt-1.5 border-t border-amber-500/20 text-amber-200 font-semibold"}`}>
+                <span>Ticket total</span>
+                <span className="tabular-nums">₹{liveTotalRounded.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {bookingBaseFee > 0 && (
+              <>
+                <div className="flex justify-between text-amber-300/80">
+                  <span>Base Fee (Incl. GST)</span>
+                  <span className="tabular-nums">₹{bookingBaseFee.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-amber-500/20 text-amber-200 font-semibold">
+                  <span>Total due</span>
+                  <span className="tabular-nums">₹{totalWithBaseFee.toLocaleString("en-IN")}</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
       {isCod && liveTotalRounded === 0 && (
@@ -1455,6 +1472,8 @@ function FinalizedSummary({ booking: b }: { booking: BookingData }) {
   const ac = b.actualCouple ?? 0;
   const ag = b.actualGuests ?? 0;
   const amountDue = b.actualAmountDue ?? 0;
+  const feeAmt = b.baseFee ?? 0;
+  const totalCollected = amountDue + feeAmt;
   const isCod = b.paymentMethod === "cod";
   const rows = isTicket
     ? [
@@ -1478,15 +1497,29 @@ function FinalizedSummary({ booking: b }: { booking: BookingData }) {
         ))}
       </div>
       {isCod && (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-500/5 p-3 flex items-center gap-3">
-          <Banknote className="h-5 w-5 text-amber-300 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-amber-200/80">Cash collected (COD)</p>
-            <div className="flex items-center gap-0.5 text-amber-200">
-              <IndianRupee className="h-4 w-4" />
-              <span className="text-xl font-bold tabular-nums">{Number(amountDue).toLocaleString("en-IN")}</span>
+        <div className="rounded-xl border border-amber-400/30 bg-amber-500/5 p-3 space-y-2">
+          <div className="flex items-center gap-3">
+            <Banknote className="h-5 w-5 text-amber-300 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-amber-200/80">Cash collected (COD)</p>
+              <div className="flex items-center gap-0.5 text-amber-200">
+                <IndianRupee className="h-4 w-4" />
+                <span className="text-xl font-bold tabular-nums">{totalCollected.toLocaleString("en-IN")}</span>
+              </div>
             </div>
           </div>
+          {feeAmt > 0 && (
+            <div className="text-[11px] text-amber-100/70 space-y-0.5 pt-1 border-t border-amber-400/20">
+              <div className="flex justify-between">
+                <span>Ticket amount</span>
+                <span className="tabular-nums">₹{Number(amountDue).toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Base Fee (Incl. GST)</span>
+                <span className="tabular-nums">₹{feeAmt.toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

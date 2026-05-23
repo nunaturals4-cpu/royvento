@@ -1197,6 +1197,8 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
       totalPrice: Number(b.totalPrice),
       discountAmount: Number(b.discountAmount),
       finalPrice: Number(b.finalPrice),
+      baseFee: b.baseFee ?? 0,
+      totalPayable: Number(b.finalPrice) + (b.baseFee ?? 0),
       /** Actual amount collected: for online = finalPrice; for COD checked-in =
        *  actual-count-based revenue; for pending COD = 0. */
       effectiveRevenue: effectiveByBookingId.get(b.id) ?? Number(b.finalPrice),
@@ -1878,6 +1880,81 @@ router.get("/admin/bookings/unique-customers/download", requireAuth(["admin"]), 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 
   const filename = `unique-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(buf);
+});
+
+// ── Bookings Excel export ─────────────────────────────────────────────────────
+
+router.get("/admin/bookings/report/download", requireAuth(["admin"]), async (req, res) => {
+  const vendorIdParam = req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const statusParam = req.query["status"] as string | undefined;
+  const startDateParam = req.query["startDate"] as string | undefined;
+  const endDateParam = req.query["endDate"] as string | undefined;
+
+  const conditions: ReturnType<typeof sql>[] = [sql`${bookingsTable.status} != ${"cancelled"}`];
+  if (vendorIdParam && Number.isFinite(vendorIdParam))
+    conditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
+  if (statusParam && statusParam !== "all")
+    conditions.push(sql`${bookingsTable.status} = ${statusParam}`);
+  if (startDateParam)
+    conditions.push(sql`${bookingsTable.bookingDate} >= ${startDateParam}`);
+  if (endDateParam)
+    conditions.push(sql`${bookingsTable.bookingDate} <= ${endDateParam}`);
+
+  const rows = await db
+    .select()
+    .from(bookingsTable)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(bookingsTable.createdAt))
+    .limit(5000);
+
+  const enriched = await enrichBookingRows(rows);
+
+  const header = [
+    "Booking ID", "Date", "Created At", "Vendor", "Guest Name", "Phone", "Email",
+    "Pub Mode", "Women", "Men", "Couples", "Guests",
+    "Ticket Price (₹)", "Discount (₹)", "Final Ticket (₹)", "Base Fee (₹)", "Total Payable (₹)",
+    "Payment Method", "Status", "Checked In", "Check-In Time", "Ticket Code",
+  ];
+
+  const dataRows = enriched.map((b) => [
+    b.id,
+    b.bookingDate,
+    b.createdAt ? new Date(b.createdAt).toLocaleString("en-IN") : "",
+    b.vendorName,
+    b.userName,
+    b.phone,
+    b.userEmail,
+    b.pubMode,
+    b.ticketWomen,
+    b.ticketMen,
+    b.ticketCouple,
+    b.guests,
+    b.totalPrice,
+    b.discountAmount,
+    b.finalPrice,
+    b.baseFee,
+    b.totalPayable,
+    b.paymentMethod,
+    b.status,
+    b.checkedIn ? "Yes" : "No",
+    b.checkedInAt ? new Date(b.checkedInAt).toLocaleString("en-IN") : "",
+    b.ticketCode,
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
+  ws["!cols"] = [
+    { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 28 },
+    { wch: 10 }, { wch: 7 }, { wch: 7 }, { wch: 8 }, { wch: 8 },
+    { wch: 16 }, { wch: 13 }, { wch: 16 }, { wch: 13 }, { wch: 16 },
+    { wch: 16 }, { wch: 12 }, { wch: 11 }, { wch: 18 }, { wch: 18 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Bookings");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const filename = `bookings-${new Date().toISOString().slice(0, 10)}.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(buf);

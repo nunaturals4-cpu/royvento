@@ -40,6 +40,7 @@ interface BookingRecord {
   guests: number;
   totalPrice: number;
   finalPrice?: number | null;
+  baseFee?: number | null;
   status: string;
   notes?: string | null;
   rejectionReason?: string | null;
@@ -215,8 +216,8 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
           <div className="text-right flex flex-col items-end gap-3">
             <div>
               <p className="text-xs text-muted-foreground">{t("bookings.total_label")}</p>
-              <p className="font-serif text-3xl">{formatINRExact(b.finalPrice ?? b.totalPrice)}</p>
-              {b.finalPrice != null && b.finalPrice !== b.totalPrice && (
+              <p className="font-serif text-3xl">{formatINRExact((b.finalPrice ?? b.totalPrice) + (b.baseFee ?? 0))}</p>
+              {b.totalPrice > 0 && (b.finalPrice != null && b.finalPrice !== b.totalPrice) && (
                 <p className="text-xs text-muted-foreground line-through">{formatINRExact(b.totalPrice)}</p>
               )}
             </div>
@@ -364,7 +365,9 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
   // For non-ticket pub modes (event/free/legacy) ticketWomen/Men/Couple are 0 — use b.guests instead.
   // Also fall back to b.guests for ticket mode if all counts are somehow 0.
   const total = ticketSum > 0 ? ticketSum : b.guests;
-  const hideAmountPaid = Number(b.finalPrice ?? b.totalPrice ?? 0) === 0;
+  const baseFee = b.baseFee ?? 0;
+  const totalPayable = (b.finalPrice ?? b.totalPrice ?? 0) + baseFee;
+  const hideAmountPaid = Number(totalPayable) === 0;
   const isCod = (b.paymentMethod ?? "").toLowerCase() === "cod";
   const amountLabel = isCod ? t("bookings.amount_due") : t("bookings.amount_paid");
 
@@ -512,7 +515,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
         <div class="footer-sec">
           ${hideAmountPaid ? "" : `<div>
             <div class="price-lbl">${esc(amountLabel)}</div>
-            <div class="price-val">${esc(formatINR(b.finalPrice ?? b.totalPrice))}</div>
+            <div class="price-val">${esc(formatINR(totalPayable))}</div>
           </div>`}
           <div class="disclaimer">${esc(t("bookings.present_at_entrance"))}<br/>${esc(t("bookings.non_transferable"))} &middot; Royvento</div>
         </div>
@@ -694,7 +697,7 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
           {hideAmountPaid ? <div /> : (
             <div>
               <p className="text-[9px] uppercase tracking-[0.28em] mb-1" style={{ color: "rgba(212,168,83,0.45)" }}>{amountLabel}</p>
-              <p className="font-serif text-xl sm:text-2xl" style={{ color: "#d4a853" }}>{formatINR(b.finalPrice ?? b.totalPrice)}</p>
+              <p className="font-serif text-xl sm:text-2xl" style={{ color: "#d4a853" }}>{formatINR(totalPayable)}</p>
             </div>
           )}
           <p className="text-[9px] text-right leading-relaxed" style={{ color: "rgba(255,255,255,0.25)", maxWidth: 140 }}>

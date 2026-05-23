@@ -2795,10 +2795,25 @@ function BookingReport() {
         </div>
       )}
 
-      {/* Results count */}
+      {/* Results count + Export */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{total > 0 ? `${total} booking${total !== 1 ? "s" : ""} found` : "No bookings found"}</span>
-        {totalPages > 1 && <span>Page {page} of {totalPages}</span>}
+        <div className="flex items-center gap-3">
+          {totalPages > 1 && <span>Page {page} of {totalPages}</span>}
+          <a
+            href={`/api/admin/bookings/report/download?${new URLSearchParams({
+              ...(vendorId !== "all" ? { vendorId } : {}),
+              ...(status !== "all" ? { status } : {}),
+              ...(startDate ? { startDate } : {}),
+              ...(endDate ? { endDate } : {}),
+            }).toString()}`}
+            download
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/5 transition-colors text-white/70 hover:text-white"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export Excel
+          </a>
+        </div>
       </div>
 
       {/* Table */}
@@ -2826,10 +2841,11 @@ function BookingReport() {
                       className="flex items-center gap-1 ml-auto hover:text-foreground transition-colors"
                       onClick={() => { setSortBy(sortBy === "price" ? "date" : "price"); setPage(1); }}
                     >
-                      Price
+                      Ticket
                       {sortBy === "price" ? <SortDesc className="h-3 w-3" /> : <SortAsc className="h-3 w-3" />}
                     </button>
                   </th>
+                  <th className="px-4 py-3 text-right text-amber-400/70">Base Fee</th>
                   <th className="px-4 py-3 text-left">Payment</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Ticket code</th>
@@ -2892,6 +2908,11 @@ function BookingReport() {
                           )}
                         </>;
                       })()}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {(b.baseFee ?? 0) > 0
+                        ? <span className="text-amber-400/80 text-xs tabular-nums">+{formatINR(b.baseFee ?? 0)}</span>
+                        : <span className="text-muted-foreground text-xs">—</span>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-xs text-muted-foreground">{b.paymentMethod}</span>
