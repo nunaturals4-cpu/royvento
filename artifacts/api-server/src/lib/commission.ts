@@ -40,7 +40,7 @@
  * a realised ledger entry.
  */
 
-export type BookingType = "free_entry" | "ticket" | "table";
+export type BookingType = "free_entry" | "ticket" | "table" | "event_booking";
 
 export type CommissionTrigger =
   | "online_payment"
@@ -53,6 +53,8 @@ export interface CommissionRatesInput {
   /** Ticket commission as a percentage (0–100), e.g. 10 = 10% of ticket revenue. */
   ticketRate: string | number | null | undefined;
   tableBookingRate: string | number | null | undefined;
+  /** Flat ₹ per person for event bookings (pub announcements). */
+  eventRate?: string | number | null | undefined;
 }
 
 export interface PlannedBookingShape {
@@ -128,6 +130,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  */
 export function classifyBookingType(b: { pubMode: string; finalPrice: string | number }): BookingType {
   const price = Number(b.finalPrice);
+  if (b.pubMode === "event_booking") return "event_booking";
   if (b.pubMode === "table" || b.pubMode === "event") return "table";
   if (price === 0 || b.pubMode === "free") return "free_entry";
   return "ticket";
@@ -162,8 +165,15 @@ export function computeCommissionFromPlanned(
   const freeEntryFee = Number(rates.freeEntryRate ?? 0);
   const ticketPct = Number(rates.ticketRate ?? 0); // stored as percentage (0–100)
   const tablePct = Number(rates.tableBookingRate ?? 0); // stored as flat ₹ per person
+  const eventRateAmt = Number(rates.eventRate ?? 0); // flat ₹ per person for event bookings
 
   const bookingType = classifyBookingType(b);
+
+  if (bookingType === "event_booking") {
+    const unitCount = Math.max(0, b.guests);
+    const amount = round2(eventRateAmt * unitCount);
+    return { bookingType, ratePerUnit: eventRateAmt, unitCount, amount };
+  }
 
   if (bookingType === "table") {
     const unitCount = Math.max(0, b.guests);
@@ -244,6 +254,14 @@ export function computeCommissionFromActuals(
   fer?: FreeEntryRulesShape | null,
 ): CommissionResult {
   const bookingType = classifyBookingType(b);
+
+  // ── Event booking: flat ₹ per verified guest ────────────────────────────
+  if (bookingType === "event_booking") {
+    const eventRateAmt = Number(rates.eventRate ?? 0);
+    const ag = b.actualGuests ?? b.guests;
+    const units = Math.max(0, ag);
+    return { bookingType: "event_booking", ratePerUnit: eventRateAmt, unitCount: units, amount: round2(eventRateAmt * units) };
+  }
 
   // ── Table: flat ₹ per verified guest ────────────────────────────────────
   if (bookingType === "table") {

@@ -4530,6 +4530,7 @@ interface CommissionRates {
   freeEntryRate: string;
   ticketRate: string;
   tableBookingRate: string;
+  eventRate: string;
   baseFeePercent: string;
 }
 
@@ -4537,7 +4538,7 @@ interface CommissionBookingLine {
   id: number;
   finalPrice: number;
   effectiveRevenue: number;
-  bookingType: "free_entry" | "ticket" | "table";
+  bookingType: "free_entry" | "ticket" | "table" | "event_booking";
   commissionRate: number;
   unitCount: number;
   commissionAmount: number;
@@ -4571,6 +4572,11 @@ interface CommissionVendorRow {
   tableCommission: number;
   tablePeople: number;
   tableBaseFee: number;
+  eventBookingCount: number;
+  eventBookingRevenue: number;
+  eventBookingCommission: number;
+  eventBookingPeople: number;
+  eventBookingBaseFee: number;
   bookings: CommissionBookingLine[];
 }
 
@@ -4663,8 +4669,9 @@ function CommissionsAdmin() {
     const free = Number(rates.freeEntryRate);
     const ticket = Number(rates.ticketRate);
     const table = Number(rates.tableBookingRate);
+    const evtRate = Number(rates.eventRate ?? 0);
     const bfp = Number(rates.baseFeePercent);
-    if ([free, ticket, table, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
+    if ([free, ticket, table, evtRate, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
       toast({ title: "Fees must be valid non-negative numbers", variant: "destructive" });
       return;
     }
@@ -4675,7 +4682,7 @@ function CommissionsAdmin() {
     setSavingId(vendorId);
     try {
       await Promise.all([
-        apiPut(`/api/admin/vendors/${vendorId}/commission`, { freeEntryRate: free, ticketRate: ticket, tableBookingRate: table }),
+        apiPut(`/api/admin/vendors/${vendorId}/commission`, { freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, eventRate: evtRate }),
         apiPatch(`/api/admin/vendors/${vendorId}/base-fee`, { baseFeePercent: bfp }),
       ]);
       toast({ title: "Commission fees saved" });
@@ -4703,9 +4710,10 @@ function CommissionsAdmin() {
     });
   };
 
-  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table") => {
+  const bookingTypeLabel = (t: "free_entry" | "ticket" | "table" | "event_booking") => {
     if (t === "free_entry") return "Free Entry";
     if (t === "ticket") return "Ticket";
+    if (t === "event_booking") return "Events";
     return "Table";
   };
 
@@ -4774,6 +4782,7 @@ function CommissionsAdmin() {
                   <th className="text-right py-2 px-3">Free Entry ₹/person</th>
                   <th className="text-right py-2 px-3">Ticket %</th>
                   <th className="text-right py-2 px-3">Table ₹/person</th>
+                  <th className="text-right py-2 px-3">Events ₹/person</th>
                   <th className="text-right py-2 px-3">Base Fee %</th>
                   <th className="text-right py-2 pl-3"></th>
                 </tr>
@@ -4785,6 +4794,7 @@ function CommissionsAdmin() {
                     edits.freeEntryRate !== row.appliedRates.freeEntryRate ||
                     edits.ticketRate !== row.appliedRates.ticketRate ||
                     edits.tableBookingRate !== row.appliedRates.tableBookingRate ||
+                    edits.eventRate !== (row.appliedRates.eventRate ?? "0") ||
                     edits.baseFeePercent !== (row.baseFeePercent ?? "3.50");
                   return (
                     <tr key={row.vendorId} className="border-t border-white/5 hover:bg-white/5 transition-colors">
@@ -4822,6 +4832,17 @@ function CommissionsAdmin() {
                           step={0.01}
                           value={edits.tableBookingRate}
                           onChange={(e) => updateRate(row.vendorId, "tableBookingRate", e.target.value)}
+                          className="w-20 text-right h-8 text-sm ml-auto"
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={99999.99}
+                          step={0.01}
+                          value={edits.eventRate ?? "0"}
+                          onChange={(e) => updateRate(row.vendorId, "eventRate", e.target.value)}
                           className="w-20 text-right h-8 text-sm ml-auto"
                         />
                       </td>
@@ -4985,9 +5006,17 @@ function CommissionsAdmin() {
                                     <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.tableCommission)}</td>
                                     <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.tableBaseFee ?? 0)}</td>
                                   </tr>
+                                  {(row.eventBookingCount ?? 0) > 0 && (
+                                    <tr>
+                                      <td className="py-2 px-3">Events Booking</td>
+                                      <td className="text-right px-3 tabular-nums">{row.eventBookingPeople ?? 0}</td>
+                                      <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.eventBookingCommission ?? 0)}</td>
+                                      <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.eventBookingBaseFee ?? 0)}</td>
+                                    </tr>
+                                  )}
                                   <tr className="bg-white/[0.04] font-medium">
                                     <td className="py-2 px-3">Total</td>
-                                    <td className="text-right px-3 tabular-nums">{row.freeEntryPeople + row.ticketPeople + row.tablePeople}</td>
+                                    <td className="text-right px-3 tabular-nums">{row.freeEntryPeople + row.ticketPeople + row.tablePeople + (row.eventBookingPeople ?? 0)}</td>
                                     <td className="text-right px-3 tabular-nums text-primary">{formatINR(row.totalCommission)}</td>
                                     <td className="text-right px-3 tabular-nums text-amber-400">{formatINR(row.totalBaseFee ?? 0)}</td>
                                   </tr>

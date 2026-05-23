@@ -25,4 +25,10 @@ export interface SetVendorCommissionBody {
    * @maximum 99999.99
    */
   tableBookingRate: number;
+  /**
+   * Flat fee in INR per person for event bookings
+   * @minimum 0
+   * @maximum 99999.99
+   */
+  eventRate?: number;
 }

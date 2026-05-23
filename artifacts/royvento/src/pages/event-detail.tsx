@@ -113,7 +113,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
   // Pub-specific state
   const isPub = (event as any)?.type === "pub";
-  const [pubMode, setPubMode] = useState<"ticket" | "event">("ticket");
+  const [pubMode, setPubMode] = useState<"ticket" | "event" | "event_booking">("ticket");
   const [ticketWomen, setTicketWomen] = useState(0);
   const [ticketMen, setTicketMen] = useState(0);
   const [ticketCouple, setTicketCouple] = useState(0);
@@ -466,6 +466,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       if (!eventType) errs.eventType = t("events.required_field");
       if (!budget) errs.budget = t("events.required_field");
     }
+    if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) {
+      errs.selectedPubEvent = "Please select an event to book";
+    }
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" });
@@ -506,6 +509,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               pubMode,
               ticketWomen, ticketMen, ticketCouple,
               selectedPubEvent: selectedAnnouncement?.title ?? "",
+              announcementId: pubMode === "event_booking" && selectedAnnouncementId ? Number(selectedAnnouncementId) : undefined,
               notes: pubMode === "event" ? occasion : notes,
               arrivalTime: isPub && (pubMode === "ticket" || pubMode === "event") ? arrivalTime : undefined,
             }
@@ -1177,11 +1181,11 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     const typeLabel = plan.type === "unlimited" ? "Unlimited Drinks" : plan.type === "ticket" ? "Entry + Drinks" : plan.type === "welcome" ? "Welcome Drink" : "Drink Package";
                     const hasItems = plan.lineItems && plan.lineItems.length > 0;
                     return (
-                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex items-start gap-4">
+                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex items-center gap-4">
                         <div className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
                           <Wine className="h-4 w-4 text-primary" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-[10px] font-bold text-primary/70 uppercase tracking-[0.15em] mb-1">{typeLabel}</p>
                           {hasItems && (
                             <ul className="space-y-0.5">
@@ -1191,6 +1195,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                             </ul>
                           )}
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => switchPubTab("book")}
+                          className="shrink-0 px-4 py-2 rounded-xl bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all"
+                        >
+                          Book Now
+                        </button>
                       </div>
                     );
                   })}
@@ -1428,7 +1439,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <>
                     <div>
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2"><Wine className="h-3.5 w-3.5 text-primary" />{t("events.booking_type")}</Label>
-                      <RadioGroup value={pubMode} onValueChange={(v) => setPubMode(v as "ticket" | "event")} className="grid grid-cols-2 gap-2">
+                      <RadioGroup value={pubMode} onValueChange={(v) => { setPubMode(v as "ticket" | "event" | "event_booking"); setSelectedAnnouncementId(""); }} className="grid gap-2">
                         <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "ticket" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}><RadioGroupItem value="ticket" /><span className="text-sm font-medium">{t("events.buy_tickets")}</span></label>
                         <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "event" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
                           <RadioGroupItem value="event" />
@@ -1437,6 +1448,12 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                             <span className="ml-auto text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">Free Entry</span>
                           )}
                         </label>
+                        {sortedAnnouncements.length > 0 && (
+                          <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "event_booking" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
+                            <RadioGroupItem value="event_booking" />
+                            <span className="text-sm font-medium">Events Booking</span>
+                          </label>
+                        )}
                       </RadioGroup>
                     </div>
                     {pubMode === "ticket" && (
@@ -1454,6 +1471,42 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                           <Select value={occasion} onValueChange={setOccasion}><SelectTrigger id="occasion" className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl"><SelectValue placeholder={t("events.select_occasion")} /></SelectTrigger><SelectContent><SelectItem value="farewell">{t("events.occ_farewell")}</SelectItem><SelectItem value="office-party">{t("events.occ_office_party")}</SelectItem><SelectItem value="casual-party">{t("events.occ_casual_party")}</SelectItem><SelectItem value="birthday">{t("events.occ_birthday")}</SelectItem><SelectItem value="others">{t("events.occ_others")}</SelectItem></SelectContent></Select>
                         </div>
                         <div><Label htmlFor="guests2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.guests_field")}</Label><Input id="guests2" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" /></div>
+                      </>
+                    )}
+                    {pubMode === "event_booking" && (
+                      <>
+                        <div>
+                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Select Event <span className="text-red-400">*</span></Label>
+                          <Select
+                            value={selectedAnnouncementId || ""}
+                            onValueChange={(v) => {
+                              setSelectedAnnouncementId(v);
+                              const a = sortedAnnouncements.find((x: any) => String(x.id) === v);
+                              if (a?.announceDate) setDate(a.announceDate);
+                            }}
+                          >
+                            <SelectTrigger className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl">
+                              <SelectValue placeholder="— choose an event —" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sortedAnnouncements.map((a: any) => (
+                                <SelectItem key={a.id} value={String(a.id)}>
+                                  {a.title} — {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                  {a.announceTime ? ` · ${a.announceTime}` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="ev-guests" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.guests_field")}</Label>
+                          <Input id="ev-guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" />
+                        </div>
+                        {selectedAnnouncement?.announceTime && (
+                          <div className="rounded-xl border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary">
+                            Event time: {selectedAnnouncement.announceTime}
+                          </div>
+                        )}
                       </>
                     )}
                     {(pubMode === "ticket" || pubMode === "event") && (

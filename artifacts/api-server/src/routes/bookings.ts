@@ -17,6 +17,7 @@ import {
   vendorCommissionsTable,
   commissionLedgerTable,
   bookingAuditLogTable,
+  announcementsTable,
 } from "@workspace/db";
 import {
   computeCommissionFromPlanned,
@@ -76,11 +77,12 @@ const CreateBookingBody = z.object({
   // Required.
   eventType: z.enum(EVENT_TYPES).default("other"),
   budgetRange: z.string().default(""),
-  pubMode: z.enum(["", "ticket", "event"]).default(""),
+  pubMode: z.enum(["", "ticket", "event", "event_booking"]).default(""),
   ticketWomen: z.number().int().nonnegative().default(0),
   ticketMen: z.number().int().nonnegative().default(0),
   ticketCouple: z.number().int().nonnegative().default(0),
   selectedPubEvent: z.string().default(""),
+  announcementId: z.number().int().positive().optional(),
   personName: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   paymentMethod: z.enum(["cod", "online"]).default("online"),
@@ -96,8 +98,11 @@ const CreateBookingBody = z.object({
     if (val.pubMode === "ticket" && val.ticketWomen + val.ticketMen + val.ticketCouple <= 0) {
       issue("ticketWomen", "Select at least one ticket");
     }
-    if (!val.arrivalTime.trim()) {
+    if (val.pubMode !== "event_booking" && !val.arrivalTime.trim()) {
       issue("arrivalTime", "Arrival time is required");
+    }
+    if (val.pubMode === "event_booking" && !val.announcementId) {
+      issue("announcementId", "Please select an event");
     }
   } else if (val.phone && !/^\d{10}$/.test(val.phone)) {
     issue("phone", "Phone must be 10 digits");
@@ -288,13 +293,50 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     if (parsed.data.pubMode === "ticket" && parsed.data.ticketWomen + parsed.data.ticketMen + parsed.data.ticketCouple <= 0) {
       issues.push({ path: "ticketWomen", message: "Select at least one ticket" });
     }
-    if (parsed.data.pubMode && !parsed.data.arrivalTime.trim()) {
+    if (parsed.data.pubMode && parsed.data.pubMode !== "event_booking" && !parsed.data.arrivalTime.trim()) {
       issues.push({ path: "arrivalTime", message: "Arrival time is required" });
     }
     if (issues.length > 0) {
       const summary = issues.map((i) => `${i.path}: ${i.message}`).join("; ");
       res.status(400).json({ error: summary, issues });
       return;
+    }
+  }
+
+  // Validate announcement for event_booking mode
+  let announcementRow: { id: number; title: string; announceDate: string; capacity: number | null; isActive: boolean } | undefined;
+  if (parsed.data.pubMode === "event_booking" && parsed.data.announcementId) {
+    const aRows = await db
+      .select({ id: announcementsTable.id, title: announcementsTable.title, announceDate: announcementsTable.announceDate, capacity: announcementsTable.capacity, isActive: announcementsTable.isActive })
+      .from(announcementsTable)
+      .where(eq(announcementsTable.id, parsed.data.announcementId))
+      .limit(1);
+    announcementRow = aRows[0];
+    if (!announcementRow) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+    if (!announcementRow.isActive) {
+      res.status(400).json({ error: "This event is no longer active" });
+      return;
+    }
+    // Capacity check
+    if (announcementRow.capacity != null && announcementRow.capacity > 0) {
+      const [{ cnt }] = await db
+        .select({ cnt: sql<number>`count(*)::int` })
+        .from(bookingsTable)
+        .where(
+          and(
+            eq(bookingsTable.announcementId, announcementRow.id),
+            inArray(bookingsTable.status, ["confirmed", "completed"]),
+          ),
+        );
+      const booked = Number(cnt ?? 0);
+      const requestedGuests = Math.max(1, parsed.data.guests || 0);
+      if (booked + requestedGuests > announcementRow.capacity) {
+        res.status(400).json({ error: `This event is at full capacity (${announcementRow.capacity} spots). Only ${Math.max(0, announcementRow.capacity - booked)} remaining.` });
+        return;
+      }
     }
   }
   const rawDate = parsed.data.bookingDate as unknown;
@@ -348,6 +390,10 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     const pc = isTierFree("couple") ? 0 : Number(evt.priceCouple);
     totalPrice = w * pw + m * pm + c * pc;
     guestsCount = w + m + c * 2;
+  } else if (evt.type === "pub" && parsed.data.pubMode === "event_booking") {
+    // Event bookings use the pub's standard price × guest count
+    totalPrice = Number(evt.price) * Math.max(1, guestsCount);
+    if (guestsCount === 0) guestsCount = 1;
   } else {
     // Table / event-mode: no per-gender concept, so only treat as free when
     // every gender is listed. Otherwise charge the regular cover.
@@ -488,7 +534,8 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     ticketWomen: parsed.data.ticketWomen || 0,
     ticketMen: parsed.data.ticketMen || 0,
     ticketCouple: parsed.data.ticketCouple || 0,
-    selectedPubEvent: parsed.data.selectedPubEvent || "",
+    selectedPubEvent: parsed.data.pubMode === "event_booking" && announcementRow ? announcementRow.title : (parsed.data.selectedPubEvent || ""),
+    announcementId: parsed.data.announcementId ?? null,
     personName: parsed.data.personName || user.name,
     phone: parsed.data.phone ?? "",
     pointsUsed,
@@ -624,10 +671,11 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     req.log.error({ err }, "Failed to create booking confirmation notification");
   }
 
-  // Award loyalty points for booking: +50 for ticket, +60 for table/event.
+  // Award loyalty points for booking: +50 for ticket, +60 for table/event/event_booking.
   try {
     const isTicket = b.pubMode === "ticket";
     const earnedPts = isTicket ? 50 : 60;
+    const ptSource = b.pubMode === "event_booking" ? "event_booking" : isTicket ? "ticket_booking" : "table_booking";
     const ptExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
     await Promise.all([
       db.update(usersTable)
@@ -636,7 +684,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
       db.insert(pointsLedgerTable).values({
         userId: user.id,
         points: earnedPts,
-        source: isTicket ? "ticket_booking" : "table_booking",
+        source: ptSource,
         bookingId: b.id,
         expiresAt: ptExpiresAt,
       }),
@@ -680,6 +728,7 @@ router.get("/partner/commission", requireAuth(["vendor"]), async (req, res) => {
     freeEntryRate: row?.freeEntryRate ?? "0",
     ticketRate: row?.ticketRate ?? "0",
     tableBookingRate: row?.tableBookingRate ?? "0",
+    eventRate: row?.eventRate ?? "0",
   });
 });
 
@@ -694,8 +743,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     res.json({
       totalEarnings: 0, monthEarnings: 0, codRevenue: 0, onlineRevenue: 0,
       grossEarnings: 0, netEarnings: 0, totalCommission: 0, codCommission: 0, onlineCommission: 0,
-      commissionRates: { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" },
-      commissionSummary: { freeEntry: emptyTypeSummary, ticket: emptyTypeSummary, table: emptyTypeSummary },
+      commissionRates: { freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0" },
+      commissionSummary: { freeEntry: emptyTypeSummary, ticket: emptyTypeSummary, table: emptyTypeSummary, eventBooking: emptyTypeSummary },
       perEvent: [], dailyRevenue: [], dailyCommission: [],
       totalWomen: 0, totalMen: 0, totalCouple: 0,
     });
@@ -753,19 +802,16 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   //   Table Booking = tableBookingRate × guests
   function calcCommSplit(b: typeof allBookings[number], grossRev: number) {
     const out = {
-      freeEntry: { count: 0, comm: 0, gross: 0, people: 0 },
-      ticket:    { count: 0, comm: 0, gross: 0, people: 0 },
-      table:     { count: 0, comm: 0, gross: 0, people: 0 },
+      freeEntry:    { count: 0, comm: 0, gross: 0, people: 0 },
+      ticket:       { count: 0, comm: 0, gross: 0, people: 0 },
+      table:        { count: 0, comm: 0, gross: 0, people: 0 },
+      eventBooking: { count: 0, comm: 0, gross: 0, people: 0 },
     };
     const evt = commEventMap.get(b.eventId);
     const fer = (evt as { freeEntryRules?: { enabled?: boolean; days?: string[]; genders?: string[] } | null } | undefined)?.freeEntryRules ?? null;
-    // Actuals-aware: commission scales with the headcount the manager
-    // verified at the door, not the booked counts. People-count in the
-    // breakdown table also reflects actuals so the partner sees
-    // "10 people walked in, ₹500 commission" (not the booked 15).
     const result = computeCommissionFromActuals(
       b,
-      commRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0 },
+      commRow ?? { freeEntryRate: 0, ticketRate: 0, tableBookingRate: 0, eventRate: 0 },
       { priceWomen: evt?.priceWomen, priceMen: evt?.priceMen, priceCouple: evt?.priceCouple },
       fer,
     );
@@ -773,7 +819,9 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       ? "freeEntry"
       : result.bookingType === "ticket"
         ? "ticket"
-        : "table";
+        : result.bookingType === "event_booking"
+          ? "eventBooking"
+          : "table";
     out[bucket].count = 1;
     out[bucket].comm = result.amount;
     out[bucket].gross = grossRev;
@@ -782,7 +830,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   }
 
   function commTotal(split: ReturnType<typeof calcCommSplit>) {
-    return split.freeEntry.comm + split.ticket.comm + split.table.comm;
+    return split.freeEntry.comm + split.ticket.comm + split.table.comm + split.eventBooking.comm;
   }
 
   // Summary figures
@@ -797,9 +845,10 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   let codCommission = 0;
   let onlineCommission = 0;
   const commSummary = {
-    freeEntry: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
-    ticket: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
-    table: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    freeEntry:    { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    ticket:       { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    table:        { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
+    eventBooking: { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 },
   };
 
   // Per-booking effective revenue: online → finalPrice; COD → actual cash
@@ -885,7 +934,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
     else pendingCommission += commissionAmount;
     if (isCod) codCommission += commissionAmount;
     else onlineCommission += commissionAmount;
-    for (const k of ["freeEntry", "ticket", "table"] as const) {
+    for (const k of ["freeEntry", "ticket", "table", "eventBooking"] as const) {
       commSummary[k].count += split[k].count;
       commSummary[k].grossRevenue += split[k].gross;
       commSummary[k].commissionAmount += rnd2(split[k].comm);
@@ -1016,11 +1065,13 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
       freeEntryRate: commRow?.freeEntryRate ?? "0",
       ticketRate: commRow?.ticketRate ?? "0",
       tableBookingRate: commRow?.tableBookingRate ?? "0",
+      eventRate: commRow?.eventRate ?? "0",
     },
     commissionSummary: {
-      freeEntry: { count: commSummary.freeEntry.count, grossRevenue: Math.round(commSummary.freeEntry.grossRevenue), commissionAmount: rnd2(commSummary.freeEntry.commissionAmount), netRevenue: Math.round(commSummary.freeEntry.netRevenue), peopleCount: commSummary.freeEntry.peopleCount },
-      ticket: { count: commSummary.ticket.count, grossRevenue: Math.round(commSummary.ticket.grossRevenue), commissionAmount: rnd2(commSummary.ticket.commissionAmount), netRevenue: Math.round(commSummary.ticket.netRevenue), peopleCount: commSummary.ticket.peopleCount },
-      table: { count: commSummary.table.count, grossRevenue: Math.round(commSummary.table.grossRevenue), commissionAmount: rnd2(commSummary.table.commissionAmount), netRevenue: Math.round(commSummary.table.netRevenue), peopleCount: commSummary.table.peopleCount },
+      freeEntry:    { count: commSummary.freeEntry.count,    grossRevenue: Math.round(commSummary.freeEntry.grossRevenue),    commissionAmount: rnd2(commSummary.freeEntry.commissionAmount),    netRevenue: Math.round(commSummary.freeEntry.netRevenue),    peopleCount: commSummary.freeEntry.peopleCount },
+      ticket:       { count: commSummary.ticket.count,       grossRevenue: Math.round(commSummary.ticket.grossRevenue),       commissionAmount: rnd2(commSummary.ticket.commissionAmount),       netRevenue: Math.round(commSummary.ticket.netRevenue),       peopleCount: commSummary.ticket.peopleCount },
+      table:        { count: commSummary.table.count,        grossRevenue: Math.round(commSummary.table.grossRevenue),        commissionAmount: rnd2(commSummary.table.commissionAmount),        netRevenue: Math.round(commSummary.table.netRevenue),        peopleCount: commSummary.table.peopleCount },
+      eventBooking: { count: commSummary.eventBooking.count, grossRevenue: Math.round(commSummary.eventBooking.grossRevenue), commissionAmount: rnd2(commSummary.eventBooking.commissionAmount), netRevenue: Math.round(commSummary.eventBooking.netRevenue), peopleCount: commSummary.eventBooking.peopleCount },
     },
     perEvent: perEventArr,
     dailyRevenue,

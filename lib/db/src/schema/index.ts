@@ -183,6 +183,7 @@ export const bookingsTable = pgTable(
     selectedPubEvent: varchar("selected_pub_event", { length: 100 })
       .notNull()
       .default(""),
+    announcementId: integer("announcement_id"),
     personName: varchar("person_name", { length: 255 }).notNull().default(""),
     phone: varchar("phone", { length: 20 }).notNull().default(""),
     pointsUsed: integer("points_used").notNull().default(0),
@@ -539,6 +540,8 @@ export const announcementsTable = pgTable(
     isFeaturedSlider: boolean("is_featured_slider").notNull().default(false),
     genre: varchar("genre", { length: 100 }).notNull().default(""),
     eventType: varchar("event_type", { length: 100 }).notNull().default(""),
+    capacity: integer("capacity"),
+    isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -631,6 +634,7 @@ export const vendorCommissionsTable = pgTable(
     freeEntryRate: numeric("free_entry_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     ticketRate: numeric("ticket_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     tableBookingRate: numeric("table_booking_rate", { precision: 8, scale: 2 }).notNull().default("0"),
+    eventRate: numeric("event_rate", { precision: 8, scale: 2 }).notNull().default("0"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

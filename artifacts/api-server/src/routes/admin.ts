@@ -2248,7 +2248,7 @@ router.get("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
     .where(eq(vendorCommissionsTable.vendorId, vendorId))
     .limit(1);
   if (!row) {
-    res.json({ vendorId, freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0" });
+    res.json({ vendorId, freeEntryRate: "0", ticketRate: "0", tableBookingRate: "0", eventRate: "0" });
     return;
   }
   res.json(row);
@@ -2271,7 +2271,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
     respondInvalid(res, parsed.error);
     return;
   }
-  const { freeEntryRate, ticketRate, tableBookingRate } = parsed.data;
+  const { freeEntryRate, ticketRate, tableBookingRate, eventRate = 0 } = parsed.data;
   const [upserted] = await db
     .insert(vendorCommissionsTable)
     .values({
@@ -2279,6 +2279,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
       freeEntryRate: freeEntryRate.toFixed(2),
       ticketRate: ticketRate.toFixed(2),
       tableBookingRate: tableBookingRate.toFixed(2),
+      eventRate: eventRate.toFixed(2),
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -2287,6 +2288,7 @@ router.put("/admin/vendors/:id/commission", requireAuth(["admin"]), async (req, 
         freeEntryRate: freeEntryRate.toFixed(2),
         ticketRate: ticketRate.toFixed(2),
         tableBookingRate: tableBookingRate.toFixed(2),
+        eventRate: eventRate.toFixed(2),
         updatedAt: new Date(),
       },
     })
@@ -2413,13 +2415,10 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     id: number;
     finalPrice: number;
     effectiveRevenue: number;
-    bookingType: "free_entry" | "ticket" | "table";
+    bookingType: "free_entry" | "ticket" | "table" | "event_booking";
     commissionRate: number;
     unitCount: number;
     commissionAmount: number;
-    /** True when this booking has a real commission_ledger entry (i.e. money
-     * has actually moved or been recorded). False = the report's computed
-     * commission is theoretical / pending realisation. */
     collected: boolean;
     createdAt: Date;
   };
@@ -2428,22 +2427,14 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     vendorId: number;
     businessName: string;
     city: string;
-    appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string };
+    appliedRates: { freeEntryRate: string; ticketRate: string; tableBookingRate: string; eventRate: string };
     baseFeePercent: string;
     baseFeeEnabled: boolean;
     totalBookings: number;
     totalRevenue: number;
     totalCommission: number;
     totalBaseFee: number;
-    /** Sum of commission_ledger amounts for this vendor in the report window
-     * (online_payment + cod_checkin + free_checkin). Source of truth for
-     * "money realised by the platform". */
     collectedCommission: number;
-    /** Sum of computed commission for bookings in the report window that have
-     * NO ledger entry yet (i.e. eligible but not yet triggered — a COD booking
-     * that hasn't been checked in, or an online booking still pending payment).
-     * Computed per-booking, not as totalCommission − collectedCommission, so
-     * actuals diverging from planned counts can't distort the figure. */
     pendingCommission: number;
     freeEntryCount: number;
     freeEntryRevenue: number;
@@ -2460,6 +2451,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
     tableCommission: number;
     tablePeople: number;
     tableBaseFee: number;
+    eventBookingCount: number;
+    eventBookingRevenue: number;
+    eventBookingCommission: number;
+    eventBookingPeople: number;
+    eventBookingBaseFee: number;
     bookings: BookingLineItem[];
   };
 
@@ -2476,6 +2472,7 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
         freeEntryRate: vendorRates?.freeEntryRate ?? "0",
         ticketRate: vendorRates?.ticketRate ?? "0",
         tableBookingRate: vendorRates?.tableBookingRate ?? "0",
+        eventRate: vendorRates?.eventRate ?? "0",
       },
       baseFeePercent: v.baseFeePercent ?? "3.50",
       baseFeeEnabled: v.baseFeeEnabled ?? true,
@@ -2500,6 +2497,11 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       tableCommission: 0,
       tablePeople: 0,
       tableBaseFee: 0,
+      eventBookingCount: 0,
+      eventBookingRevenue: 0,
+      eventBookingCommission: 0,
+      eventBookingPeople: 0,
+      eventBookingBaseFee: 0,
       bookings: [],
     });
   }
@@ -2568,6 +2570,12 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
       s.ticketCommission += commissionAmount;
       s.ticketPeople += unitCount;
       s.ticketBaseFee += bkBaseFee;
+    } else if (bookingType === "event_booking") {
+      s.eventBookingCount += 1;
+      s.eventBookingRevenue += price;
+      s.eventBookingCommission += commissionAmount;
+      s.eventBookingPeople += unitCount;
+      s.eventBookingBaseFee += bkBaseFee;
     } else {
       s.tableCount += 1;
       s.tableRevenue += price;

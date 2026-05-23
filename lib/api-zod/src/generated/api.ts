@@ -4015,6 +4015,13 @@ export const SetVendorCommissionBody = zod
       .min(setVendorCommissionBodyTableBookingRateMin)
       .max(setVendorCommissionBodyTableBookingRateMax)
       .describe("Flat fee in INR per verified guest for table booking commission"),
+    eventRate: zod
+      .number()
+      .min(0)
+      .max(99999.99)
+      .optional()
+      .default(0)
+      .describe("Flat fee in INR per person for event bookings"),
   })
   .strict();
 
