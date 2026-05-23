@@ -456,6 +456,22 @@ export function Home() {
         );
       })()}
 
+      {/* Top Pubs & Clubs */}
+      {sortedPubs.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-12">
+          <SectionHeader
+            icon={<PartyPopper className="h-3.5 w-3.5" />}
+            eyebrow={t("home.pubs_label")}
+            title={t("home.pubs_title")}
+            seeAllHref="/pubs"
+            seeAllLabel={t("home.view_all_pubs")}
+          />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
+          </div>
+        </section>
+      )}
+
       {/* Featured events */}
       <section className="container mx-auto px-4 md:px-6 py-12">
         <SectionHeader
@@ -539,22 +555,6 @@ export function Home() {
                 );
               })}
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* Pubs — Top Pubs & Clubs */}
-      {sortedPubs.length > 0 && (
-        <section className="container mx-auto px-4 md:px-6 py-12">
-          <SectionHeader
-            icon={<PartyPopper className="h-3.5 w-3.5" />}
-            eyebrow={t("home.pubs_label")}
-            title={t("home.pubs_title")}
-            seeAllHref="/pubs"
-            seeAllLabel={t("home.view_all_pubs")}
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
           </div>
         </section>
       )}
