@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Crown, Check, Sparkles, Star, Building2, TrendingUp,
   CheckCircle, XCircle, Gift, Trophy, Users, BarChart3,
-  Mail, MessageSquare, Ticket, Heart,
+  MessageSquare, Ticket, Heart,
 } from "lucide-react";
 import { apiGet, apiPost, formatINR } from "@/lib/api";
 
@@ -104,8 +104,8 @@ const PARTNER_PLANS = [
     id: "partner_growth",
     name: "Growth Plan",
     tagline: "Grow your venue business",
-    monthly: 1999,
-    yearly: 19990,
+    monthly: 2999,
+    yearly: 32989,
     icon: TrendingUp,
     popular: true,
     features: [
@@ -123,8 +123,8 @@ const PARTNER_PLANS = [
     id: "partner_premium",
     name: "Premium Partner",
     tagline: "Dominate your market",
-    monthly: 5999,
-    yearly: 59990,
+    monthly: 7999,
+    yearly: 87989,
     icon: Crown,
     accent: true,
     features: [
@@ -161,11 +161,18 @@ export function Subscription() {
   const [active, setActive] = useState<Sub | null>(null);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(false);
+  const [planConfig, setPlanConfig] = useState({ showGrowthPlan: true, showPremiumPartner: true });
   const { toast } = useToast();
 
   const paymentParam = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("payment")
     : null;
+
+  useEffect(() => {
+    apiGet<{ showGrowthPlan: boolean; showPremiumPartner: boolean }>("/api/plan-config")
+      .then(setPlanConfig)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -215,6 +222,12 @@ export function Subscription() {
   };
 
   const isVendor = user?.role === "vendor";
+
+  const visiblePartnerPlans = PARTNER_PLANS.filter((p) => {
+    if (p.id === "partner_growth" && !planConfig.showGrowthPlan) return false;
+    if (p.id === "partner_premium" && !planConfig.showPremiumPartner) return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen pb-24">
@@ -273,7 +286,7 @@ export function Subscription() {
             onClick={() => setBilling("yearly")}
             className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${billing === "yearly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Yearly <span className="text-xs text-emerald-400 ml-1">2 months free</span>
+            Yearly <span className="text-xs text-emerald-400 ml-1">Save up to 2 months</span>
           </button>
         </div>
       </div>
@@ -334,7 +347,7 @@ export function Subscription() {
             <div className="h-px flex-1 bg-white/8" />
           </div>
           <div className="grid md:grid-cols-3 gap-5">
-            {PARTNER_PLANS.map((plan) => (
+            {visiblePartnerPlans.map((plan) => (
               <PlanCard
                 key={plan.id}
                 plan={plan}
@@ -439,12 +452,10 @@ export function Subscription() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
-            { icon: Star,        label: "Featured Pub Listings",       desc: "Get top placement in search results and category pages." },
-            { icon: Sparkles,    label: "Sponsored Events",            desc: "Promote your events to a wider targeted audience." },
-            { icon: TrendingUp,  label: "Event Promotion Boosts",      desc: "Increase event visibility with algorithmic boosts." },
-            { icon: Mail,        label: "Marketing Credits",           desc: "Email, SMS and WhatsApp campaigns to your audience." },
-            { icon: BarChart3,   label: "Premium Analytics",          desc: "Deep customer insights, heatmaps and revenue reports." },
-            { icon: MessageSquare, label: "Priority Support",          desc: "Dedicated account manager for Premium partners." },
+            { icon: Star,          label: "Featured Pub Listings", desc: "Get top placement in search results and category pages." },
+            { icon: Sparkles,      label: "Sponsored Events",      desc: "Promote your events to a wider targeted audience." },
+            { icon: BarChart3,     label: "Premium Analytics",     desc: "Deep customer insights, heatmaps and revenue reports." },
+            { icon: MessageSquare, label: "Priority Support",      desc: "Dedicated account manager for Premium partners." },
           ].map((f) => (
             <div key={f.label} className="rounded-2xl glass-card p-5">
               <f.icon className="h-5 w-5 text-primary mb-3" />
@@ -459,9 +470,8 @@ export function Subscription() {
       <div className="container mx-auto px-4 md:px-6 max-w-5xl">
         <div className="grid md:grid-cols-3 gap-4">
           {[
-            { icon: CheckCircle, t: "Cancel anytime",      d: "No lock-in. Downgrade or cancel from your profile at any time." },
-            { icon: Trophy,      t: "Auto-renewal",        d: "Subscriptions renew automatically. You'll receive a reminder before renewal." },
-            { icon: Gift,        t: "Billing history",     d: "View all invoices and payment history in your profile dashboard." },
+            { icon: CheckCircle, t: "Cancel anytime",  d: "No lock-in. Downgrade or cancel from your profile at any time." },
+            { icon: Gift,        t: "Billing history", d: "View all invoices and payment history in your profile dashboard." },
           ].map((x) => (
             <div key={x.t} className="rounded-2xl glass-card p-5 flex items-start gap-3">
               <x.icon className="h-5 w-5 text-primary mt-0.5 shrink-0" />
@@ -535,11 +545,15 @@ function PlanCard({
               {formatINR(price)}
               <span className="text-sm text-muted-foreground font-sans ml-1">/{billing === "monthly" ? "mo" : "yr"}</span>
             </p>
-            {billing === "yearly" && (
-              <p className="text-xs text-emerald-400 mt-1">
-                ≈ {formatINR(Math.round(price / 12))}/mo · 2 months free
-              </p>
-            )}
+            {billing === "yearly" && plan.monthly > 0 && (() => {
+              const savedMonths = Math.round(12 - Math.round(plan.yearly / plan.monthly));
+              return (
+                <p className="text-xs text-emerald-400 mt-1">
+                  ≈ {formatINR(Math.round(price / 12))}/mo
+                  {savedMonths > 0 && ` · ${savedMonths} month${savedMonths > 1 ? "s" : ""} free`}
+                </p>
+              );
+            })()}
           </>
         )}
       </div>

@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { Router, type IRouter } from "express";
 import {
   db,
@@ -8,7 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, gt, sql } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
+import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
 
 const router: IRouter = Router();
@@ -16,11 +18,11 @@ const router: IRouter = Router();
 const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = {
   user_plus:       { monthly: 149,   yearly: 1490  },
   user_vip:        { monthly: 499,   yearly: 4990  },
-  partner_growth:  { monthly: 1999,  yearly: 19990 },
-  partner_premium: { monthly: 5999,  yearly: 59990 },
+  partner_growth:  { monthly: 2999,  yearly: 32989 },
+  partner_premium: { monthly: 7999,  yearly: 87989 },
   // Legacy aliases kept for backwards-compatibility
   user:    { monthly: 149,  yearly: 1490  },
-  partner: { monthly: 1999, yearly: 19990 },
+  partner: { monthly: 2999, yearly: 32989 },
 };
 
 const PARTNER_PLAN_TYPES = new Set(["partner", "partner_growth", "partner_premium"]);
@@ -41,6 +43,43 @@ function expiresFor(period: "monthly" | "yearly"): Date {
   return d;
 }
 
+// ── Plan visibility config ────────────────────────────────────────────────────
+// Persisted to LOCAL_STORAGE_DIR/plan-config.json when available, otherwise
+// lives in memory and resets on restart (defaults: both plans visible).
+
+interface PlanVisibility { showGrowthPlan: boolean; showPremiumPartner: boolean }
+
+const CONFIG_FILE = path.join(process.env.LOCAL_STORAGE_DIR ?? "/data", "plan-config.json");
+let planVisibility: PlanVisibility = { showGrowthPlan: true, showPremiumPartner: true };
+try {
+  if (fs.existsSync(CONFIG_FILE)) {
+    planVisibility = { ...planVisibility, ...JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) };
+  }
+} catch { /* use defaults */ }
+
+function savePlanVisibility() {
+  try {
+    const dir = path.dirname(CONFIG_FILE);
+    if (fs.existsSync(dir)) fs.writeFileSync(CONFIG_FILE, JSON.stringify(planVisibility));
+  } catch { /* non-critical */ }
+}
+
+router.get("/plan-config", async (_req, res) => {
+  res.json(planVisibility);
+});
+
+router.post("/admin/plan-config", requireAuth(["admin"]), async (req, res) => {
+  const { showGrowthPlan, showPremiumPartner } = req.body;
+  planVisibility = {
+    showGrowthPlan:    Boolean(showGrowthPlan),
+    showPremiumPartner: Boolean(showPremiumPartner),
+  };
+  savePlanVisibility();
+  return res.json({ success: true, ...planVisibility });
+});
+
+// ── Public price list ─────────────────────────────────────────────────────────
+
 router.get("/subscriptions/prices", async (_req, res) => {
   res.json({
     user_plus:       PLAN_PRICES.user_plus,
@@ -49,6 +88,8 @@ router.get("/subscriptions/prices", async (_req, res) => {
     partner_premium: PLAN_PRICES.partner_premium,
   });
 });
+
+// ── Subscribe / activate ──────────────────────────────────────────────────────
 
 router.post("/subscriptions", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
@@ -112,6 +153,8 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
   return res.json(sub);
 });
 
+// ── Active subscription for current user ──────────────────────────────────────
+
 router.get("/subscriptions/me", requireAuth(), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
@@ -130,6 +173,8 @@ router.get("/subscriptions/me", requireAuth(), async (req, res) => {
   return res.json(rows[0] ?? null);
 });
 
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
 router.get("/admin/subscriptions", requireAuth(["admin"]), async (_req, res) => {
   const subs = await db
     .select()
@@ -141,11 +186,7 @@ router.get("/admin/subscriptions", requireAuth(["admin"]), async (_req, res) => 
   return res.json(
     subs.map((s) => {
       const u = uMap.get(s.userId);
-      return {
-        ...s,
-        userName: u?.name ?? "",
-        userEmail: u?.email ?? "",
-      };
+      return { ...s, userName: u?.name ?? "", userEmail: u?.email ?? "" };
     }),
   );
 });

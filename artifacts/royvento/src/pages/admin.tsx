@@ -4582,6 +4582,30 @@ interface CommissionReport {
 function CommissionsAdmin() {
   const { toast } = useToast();
 
+  // Partner plan visibility state
+  const [planConfig, setPlanConfig] = useState({ showGrowthPlan: true, showPremiumPartner: true });
+  const [planConfigSaving, setPlanConfigSaving] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ showGrowthPlan: boolean; showPremiumPartner: boolean }>("/api/plan-config")
+      .then(setPlanConfig)
+      .catch(() => {});
+  }, []);
+
+  const togglePlanVisibility = async (key: "showGrowthPlan" | "showPremiumPartner") => {
+    const next = { ...planConfig, [key]: !planConfig[key] };
+    setPlanConfigSaving(true);
+    try {
+      await apiPost("/api/admin/plan-config", next);
+      setPlanConfig(next);
+      toast({ title: "Plan visibility updated" });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setPlanConfigSaving(false);
+    }
+  };
+
   // Rate editor state
   const [ratesReport, setRatesReport] = useState<CommissionReport | null>(null);
   const [ratesLoading, setRatesLoading] = useState(true);
@@ -4687,6 +4711,43 @@ function CommissionsAdmin() {
 
   return (
     <div className="space-y-8">
+
+      {/* -- Partner subscription plan visibility -------------------------- */}
+      <div className="rounded-2xl glass-card p-6">
+        <div className="flex items-start gap-3 mb-5">
+          <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 red-ring">
+            <Crown className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-serif text-xl">Partner Subscription Plans Visibility</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Toggle which partner subscription plans are shown on the public subscription page.</p>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-5">
+          <div className="flex items-center justify-between flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 gap-4">
+            <div>
+              <p className="font-medium text-sm">Growth Plan</p>
+              <p className="text-xs text-muted-foreground">₹2,999/mo — featured badge, CRM, reports</p>
+            </div>
+            <Switch
+              checked={planConfig.showGrowthPlan}
+              onCheckedChange={() => togglePlanVisibility("showGrowthPlan")}
+              disabled={planConfigSaving}
+            />
+          </div>
+          <div className="flex items-center justify-between flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 gap-4">
+            <div>
+              <p className="font-medium text-sm">Premium Partner</p>
+              <p className="text-xs text-muted-foreground">₹7,999/mo — homepage placement, AI tools</p>
+            </div>
+            <Switch
+              checked={planConfig.showPremiumPartner}
+              onCheckedChange={() => togglePlanVisibility("showPremiumPartner")}
+              disabled={planConfigSaving}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* -- Fee management ----------------------------------------------- */}
       <div className="rounded-2xl glass-card p-6">
