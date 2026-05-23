@@ -142,10 +142,10 @@ const PARTNER_PLANS = [
 ];
 
 const LOYALTY_EARN = [
-  { icon: Ticket,       label: "Ticket bookings",    pts: "+10 pts / booking" },
-  { icon: Users,        label: "Table bookings",     pts: "+5 pts / booking"  },
-  { icon: Heart,        label: "Event participation", pts: "+15 pts / event"  },
-  { icon: Trophy,       label: "Membership renewal", pts: "+50 pts / renewal" },
+  { icon: Ticket,  label: "Ticket bookings",    pts: "+50 pts / booking" },
+  { icon: Users,   label: "Table bookings",     pts: "+60 pts / booking" },
+  { icon: Heart,   label: "Event participation", pts: "+50 pts / event"  },
+  { icon: Trophy,  label: "Membership renewal", pts: "+200 pts / renewal" },
 ];
 
 const LOYALTY_REDEEM = [

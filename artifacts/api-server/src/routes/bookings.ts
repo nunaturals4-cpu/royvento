@@ -624,6 +624,27 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     req.log.error({ err }, "Failed to create booking confirmation notification");
   }
 
+  // Award loyalty points for booking: +50 for ticket, +60 for table/event.
+  try {
+    const isTicket = b.pubMode === "ticket";
+    const earnedPts = isTicket ? 50 : 60;
+    const ptExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    await Promise.all([
+      db.update(usersTable)
+        .set({ points: sql`${usersTable.points} + ${earnedPts}` })
+        .where(eq(usersTable.id, user.id)),
+      db.insert(pointsLedgerTable).values({
+        userId: user.id,
+        points: earnedPts,
+        source: isTicket ? "ticket_booking" : "table_booking",
+        bookingId: b.id,
+        expiresAt: ptExpiresAt,
+      }),
+    ]);
+  } catch (err) {
+    req.log.error({ err, bookingId: b.id }, "Failed to award booking loyalty points");
+  }
+
   res.json(out);
 });
 
@@ -2337,7 +2358,7 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     req.log.error({ err, bookingId: updatedActuals.id }, "Failed to credit commission on Save Actual Entry");
   }
 
-  // Award 100 loyalty points to the booking owner for attending the event.
+  // Award 50 loyalty points to the booking owner for attending the event.
   // Points expire 30 days after being earned. Errors are logged but don't
   // fail the finalize — loyalty is a non-financial side effect.
   try {
@@ -2349,19 +2370,19 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
     const pointsExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await Promise.all([
       db.update(usersTable)
-        .set({ points: sql`${usersTable.points} + 100` })
+        .set({ points: sql`${usersTable.points} + 50` })
         .where(eq(usersTable.id, updatedActuals.userId)),
       db.insert(pointsLedgerTable).values({
         userId: updatedActuals.userId,
-        points: 100,
+        points: 50,
         source: "scan_in",
         bookingId: updatedActuals.id,
         expiresAt: pointsExpiresAt,
       }),
       createUserNotification({
         userId: updatedActuals.userId,
-        title: "You earned 100 points!",
-        message: `You earned 100 points for attending "${scanEvt?.title ?? "this event"}"!`,
+        title: "You earned 50 points!",
+        message: `You earned 50 points for attending "${scanEvt?.title ?? "this event"}"!`,
       }),
     ]);
   } catch (err) {

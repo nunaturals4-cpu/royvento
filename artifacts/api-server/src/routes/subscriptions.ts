@@ -4,8 +4,9 @@ import {
   subscriptionsTable,
   usersTable,
   vendorsTable,
+  pointsLedgerTable,
 } from "@workspace/db";
-import { eq, desc, and, gt } from "drizzle-orm";
+import { eq, desc, and, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest, isNewUser } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
@@ -91,6 +92,23 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
       .set({ isPremium: true })
       .where(eq(vendorsTable.userId, user.id));
   }
+
+  // Award 200 loyalty points for subscribing / renewing.
+  try {
+    const ptExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    await Promise.all([
+      db.update(usersTable)
+        .set({ points: sql`${usersTable.points} + 200` })
+        .where(eq(usersTable.id, user.id)),
+      db.insert(pointsLedgerTable).values({
+        userId: user.id,
+        points: 200,
+        source: "subscription",
+        expiresAt: ptExpiresAt,
+      }),
+    ]);
+  } catch { /* non-critical */ }
+
   return res.json(sub);
 });
 
