@@ -237,6 +237,28 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     return () => cancelAnimationFrame(raf);
   }, [isLoading, event]);
 
+  // Deep-link from pub-offers "Book Now": ?book=event&aid=<announcementId>
+  // auto-opens the Book a Table tab, selects Events Booking, picks the
+  // announcement, and pre-fills its date so the user skips manual selection.
+  const eventDeepLinkDone = useRef(false);
+  useEffect(() => {
+    if (eventDeepLinkDone.current) return;
+    if (isLoading || !event) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("book") !== "event") return;
+    const aid = params.get("aid");
+    if (!aid || announcements.length === 0) return;
+    const a = announcements.find((x: any) => String(x.id) === aid);
+    if (!a) return;
+    eventDeepLinkDone.current = true;
+    setPubMode("event_booking");
+    setSelectedAnnouncementId(aid);
+    if (a.announceDate) setDate(a.announceDate);
+    setPubTab("book");
+    requestAnimationFrame(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, [isLoading, event, announcements]);
+
   // Clear any applied coupon if the selected booking date becomes a
   // free-entry day (subtotal becomes ₹0 and the server refuses to consume
   // a coupon). Mirrors the isFreeEntryDay computation below but is hoisted
@@ -1398,34 +1420,6 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               }
               {!bookingIsFullyFree && discountInfo?.isNewUser && <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm flex items-center gap-2 text-primary"><Sparkle className="h-4 w-4 shrink-0" />{t("events.new_member_discount", { pct: discountInfo.bookingDiscountPercent })}</div>}
               <div className="space-y-5">
-                {isPub && sortedAnnouncements.length > 0 && (
-                  <div>
-                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Event (optional)</Label>
-                    <Select
-                      value={selectedAnnouncementId || "none"}
-                      onValueChange={(v) => {
-                        const aid = v === "none" ? "" : v;
-                        setSelectedAnnouncementId(aid);
-                        if (aid) {
-                          const a = sortedAnnouncements.find((x: any) => String(x.id) === aid);
-                          if (a?.announceDate) setDate(a.announceDate);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl">
-                        <SelectValue placeholder="— select an event —" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— no specific event —</SelectItem>
-                        {sortedAnnouncements.map((a: any) => (
-                          <SelectItem key={a.id} value={String(a.id)}>
-                            {a.title} — {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 <div>
                   <Label htmlFor="bdate" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.date_label")}</Label>
                   <Input id="bdate" type="date" value={date} min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()} onChange={(e) => setDate(e.target.value)} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" />
@@ -1439,17 +1433,17 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <>
                     <div>
                       <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2"><Wine className="h-3.5 w-3.5 text-primary" />{t("events.booking_type")}</Label>
-                      <RadioGroup value={pubMode} onValueChange={(v) => { setPubMode(v as "ticket" | "event" | "event_booking"); setSelectedAnnouncementId(""); }} className="grid gap-2">
-                        <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "ticket" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}><RadioGroupItem value="ticket" /><span className="text-sm font-medium">{t("events.buy_tickets")}</span></label>
-                        <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "event" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
+                      <RadioGroup value={pubMode} onValueChange={(v) => { setPubMode(v as "ticket" | "event" | "event_booking"); setSelectedAnnouncementId(""); }} className="flex gap-2">
+                        <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "ticket" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}><RadioGroupItem value="ticket" /><span className="text-sm font-medium">{t("events.buy_tickets")}</span></label>
+                        <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "event" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
                           <RadioGroupItem value="event" />
                           <span className="text-sm font-medium">{(event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")}</span>
                           {(event as any)?.freeEntryForTable && (
-                            <span className="ml-auto text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">Free Entry</span>
+                            <span className="text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">Free Entry</span>
                           )}
                         </label>
                         {sortedAnnouncements.length > 0 && (
-                          <label className={`flex items-center gap-2 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${pubMode === "event_booking" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
+                          <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "event_booking" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
                             <RadioGroupItem value="event_booking" />
                             <span className="text-sm font-medium">Events Booking</span>
                           </label>
@@ -1491,8 +1485,20 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                             <SelectContent>
                               {sortedAnnouncements.map((a: any) => (
                                 <SelectItem key={a.id} value={String(a.id)}>
-                                  {a.title} — {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                                  {a.announceTime ? ` · ${a.announceTime}` : ""}
+                                  <span className="flex items-center gap-2.5">
+                                    {a.imageUrl ? (
+                                      <img src={a.imageUrl} alt="" className="h-8 w-8 rounded-md object-cover shrink-0" />
+                                    ) : (
+                                      <span className="h-8 w-8 rounded-md bg-white/10 shrink-0" />
+                                    )}
+                                    <span className="flex flex-col items-start">
+                                      <span className="text-sm font-medium leading-tight">{a.title}</span>
+                                      <span className="text-xs text-muted-foreground leading-tight">
+                                        {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                        {a.announceTime ? ` · ${a.announceTime}` : ""}
+                                      </span>
+                                    </span>
+                                  </span>
                                 </SelectItem>
                               ))}
                             </SelectContent>

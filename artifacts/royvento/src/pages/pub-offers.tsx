@@ -94,7 +94,7 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
 
   const a = announcements[current];
   const lightGrad = SLIDE_LIGHT_GRADIENTS[current % SLIDE_LIGHT_GRADIENTS.length];
-  const href = a.eventId ? `/events/${a.eventId}` : `/vendors/${a.vendorId}`;
+  const href = a.eventId ? `/events/${a.eventId}?book=event&aid=${a.id}` : `/vendors/${a.vendorId}`;
   const hasImage = !!a.imageUrl;
 
   return (
@@ -515,7 +515,7 @@ export function PubOffers() {
                 return a.eventId ? (
                   <Link
                     key={a.id}
-                    href={`/events/${a.eventId}`}
+                    href={`/events/${a.eventId}?book=event&aid=${a.id}`}
                     className="snap-start flex-shrink-0 cursor-pointer"
                   >
                     {cardInner}
