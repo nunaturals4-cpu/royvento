@@ -14,6 +14,7 @@ import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
 import { useTranslation } from "react-i18next";
+import { setLanguage } from "@/i18n/index";
 import { useTheme } from "@/components/ThemeProvider";
 import { THEMES } from "@/components/ui/ThemeSwitcher";
 import { LANGUAGES } from "@/components/ui/LanguageSwitcher";
@@ -410,7 +411,7 @@ export function Navbar() {
                       {LANGUAGES.map((lang) => (
                         <DropdownMenuItem
                           key={lang.code}
-                          onClick={() => i18n.changeLanguage(lang.code)}
+                          onClick={() => setLanguage(lang.code)}
                           className="flex items-center justify-between cursor-pointer"
                         >
                           <span className={lang.code === i18n.language ? "text-primary font-semibold" : ""}>{lang.native}</span>

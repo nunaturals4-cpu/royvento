@@ -226,8 +226,10 @@ export function Home() {
       <section className="relative overflow-hidden min-h-[100svh] flex items-center">
         <div className="absolute inset-0 -z-10">
           <img
-            src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=2400&q=80"
+            src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=1600&q=70"
             alt=""
+            fetchPriority="high"
+            decoding="async"
             className="h-full w-full object-cover opacity-45"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/65 to-background" />
@@ -508,6 +510,8 @@ export function Home() {
                         <img
                           src={a.imageUrl}
                           alt={a.title}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (

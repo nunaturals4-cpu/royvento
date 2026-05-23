@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Globe } from "lucide-react";
+import { setLanguage } from "@/i18n/index";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +41,7 @@ export function LanguageSwitcher() {
         {LANGUAGES.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
-            onClick={() => i18n.changeLanguage(lang.code)}
+            onClick={() => setLanguage(lang.code)}
             className={`cursor-pointer flex items-start justify-between gap-3 py-2 ${lang.code === i18n.language ? "text-primary font-semibold" : ""}`}
           >
             <span className="whitespace-normal break-words leading-tight">{lang.native}</span>
