@@ -2,7 +2,9 @@ import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wo
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, Suspense } from "react";
+import { lazyWithRetry as lazy } from "@/lib/lazyWithRetry";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -127,12 +129,14 @@ function OAuthErrorHandler() {
 }
 
 function Router() {
+  const [location] = useLocation();
   return (
     <div className="flex flex-col min-h-[100dvh]">
       <ScrollToTop />
       <OAuthErrorHandler />
       <Navbar />
       <main className="flex-1">
+        <ErrorBoundary resetKey={location}>
         <Suspense fallback={<PageFallback />}>
         <Switch>
           <Route path="/" component={Home} />
@@ -210,6 +214,7 @@ function Router() {
           <Route component={NotFound} />
         </Switch>
         </Suspense>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>
