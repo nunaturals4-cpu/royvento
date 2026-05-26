@@ -94,13 +94,20 @@ async function main() {
 
   const publicDir = join(root, "public");
   const webAssets = [
-    ["favicon-16x16.png", () => filledIcon(16, 0.04)],
-    ["favicon-32x32.png", () => filledIcon(32, 0.04)],
-    ["favicon-48x48.png", () => filledIcon(48, 0.04)],
-    ["apple-touch-icon.png", () => filledIcon(180, 0.12)],
+    // Browser favicons — transparent so no black box appears in browser tabs
+    ["favicon-16x16.png", () => transparentSquare(16)],
+    ["favicon-32x32.png", () => transparentSquare(32)],
+    ["favicon-48x48.png", () => transparentSquare(48)],
+    ["favicon.png", () => transparentSquare(64)],
+    // Apple touch icons — solid dark bg required; iOS/iPadOS shows blank/black for transparent
+    ["apple-touch-icon.png", () => filledIcon(180, 0.12)],       // iPhone Retina (recommended)
+    ["apple-touch-icon-120x120.png", () => filledIcon(120, 0.12)], // iPhone
+    ["apple-touch-icon-152x152.png", () => filledIcon(152, 0.12)], // iPad
+    ["apple-touch-icon-167x167.png", () => filledIcon(167, 0.12)], // iPad Pro
+    // PWA icons — transparent for any, maskable variant with safe-zone padding
     ["pwa-192x192.png", () => transparentSquare(192)],
     ["pwa-512x512.png", () => transparentSquare(512)],
-    ["favicon.png", () => filledIcon(64, 0.04)],
+    ["pwa-maskable-192x192.png", () => filledIcon(192, 0.20)],    // Android adaptive icon (safe zone)
   ];
   for (const [name, make] of webAssets) {
     const pipeline = await make();
@@ -116,7 +123,7 @@ async function main() {
   const out2 = await sharp(join(imagesDir, "logo-icon.png")).metadata();
   console.log(`logo.png       ${out1.width}x${out1.height}`);
   console.log(`logo-icon.png  ${out2.width}x${out2.height}`);
-  console.log(`favicons + pwa + apple-touch-icon written to public/`);
+  console.log(`favicons (transparent) + pwa + apple-touch-icon (filled) written to public/`);
   console.log(`mobile icon.png (1024) + logo-icon.png (512) written`);
 }
 
