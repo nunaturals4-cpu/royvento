@@ -65,7 +65,7 @@ export function BlogDetail() {
       publisher: {
         "@type": "Organization",
         name: "Royvento",
-        logo: { "@type": "ImageObject", url: "https://royvento.com/favicon.svg" },
+        logo: { "@type": "ImageObject", url: "https://royvento.com/images/logo.png" },
       },
       mainEntityOfPage: { "@type": "WebPage", "@id": `https://royvento.com/blogs/${blog.slug}` },
     },

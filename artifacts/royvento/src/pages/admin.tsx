@@ -1,6 +1,7 @@
 // Trigger Railway deploy: API-only changes are skipped by watch-path filter
 // (bump) fix: inArray for thread header match — 2026-05-21f
 import { SEO } from "@/components/SEO";
+import { Logo } from "@/components/Logo";
 import {
   useGetAdminAnalytics,
   useListPendingVendors,
@@ -152,9 +153,7 @@ function AdminNav({ currentTab }: { currentTab: string }) {
     <div className="flex h-full flex-col gap-1 px-3 py-5">
       <div className="px-3 pb-5 mb-2 border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <span className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-          </span>
+          <Logo variant="icon" size={36} className="group-hover:scale-[1.04] transition-transform" />
           <div className="min-w-0">
             <p className="font-serif text-lg tracking-tight leading-none">Royvento</p>
             <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">Control Room</p>

@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Crown, Instagram, Facebook } from "lucide-react";
 import { useGetMe } from "@workspace/api-client-react";
+import { Logo } from "@/components/Logo";
 
 export function Footer() {
   const { data } = useGetMe();
@@ -12,12 +13,9 @@ export function Footer() {
       <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
         {/* Brand */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-br from-primary via-primary to-primary/70 rounded-lg flex items-center justify-center red-glow">
-              <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
-            </div>
-            <span className="font-serif font-bold text-xl tracking-tight text-primary">Royvento</span>
-          </div>
+          <Link href="/" className="inline-flex" aria-label="Royvento home">
+            <Logo size={40} />
+          </Link>
           <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
             Heirloom-quality events. From estate weddings to founder summits and harvest festivals — Royvento is where remarkable hosts find remarkable craft.
           </p>

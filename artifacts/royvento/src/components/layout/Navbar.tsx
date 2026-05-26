@@ -9,6 +9,7 @@ import {
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
+import { Logo } from "@/components/Logo";
 import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Palette, Globe, Check } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
@@ -161,13 +162,8 @@ export function Navbar() {
         />
         <div className="container mx-auto px-4 md:px-6 h-[68px] flex items-center justify-between relative gap-3">
           <div className="flex items-center gap-7 min-w-0">
-            <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-              <div className="relative">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center red-glow">
-                  <span className="text-primary-foreground font-bold font-serif text-lg">R</span>
-                </div>
-              </div>
-              <span className="font-serif font-bold text-xl tracking-tight">Royvento</span>
+            <Link href="/" className="flex items-center gap-2.5 group shrink-0" aria-label="Royvento home">
+              <Logo size={38} className="transition-transform group-hover:scale-[1.04]" />
             </Link>
             <nav className="hidden lg:flex items-center gap-7 text-sm font-medium">
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.home")}</Link>

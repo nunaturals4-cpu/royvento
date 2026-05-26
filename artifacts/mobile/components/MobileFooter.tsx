@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 
 export function MobileFooter() {
@@ -10,9 +10,12 @@ export function MobileFooter() {
     <View style={[styles.container, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
       {/* Brand */}
       <View style={styles.brand}>
-        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.logoText, { color: colors.primaryForeground }]}>R</Text>
-        </View>
+        <Image
+          source={require("@/assets/images/logo-icon.png")}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="Royvento"
+        />
         <Text style={[styles.brandName, { color: colors.primary }]}>Royvento</Text>
       </View>
       <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
@@ -86,13 +89,6 @@ const styles = StyleSheet.create({
   logo: {
     width: 32,
     height: 32,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
   },
   brandName: {
     fontSize: 20,

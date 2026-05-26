@@ -202,8 +202,8 @@ export function Home() {
             "@type": "Organization",
             name: "Royvento",
             url: "https://royvento.com",
-            logo: "https://royvento.com/favicon.svg",
-            image: "https://royvento.com/favicon.svg",
+            logo: "https://royvento.com/images/logo.png",
+            image: "https://royvento.com/images/logo.png",
             sameAs: [
               "https://www.instagram.com/royvento",
               "https://www.facebook.com/royvento",

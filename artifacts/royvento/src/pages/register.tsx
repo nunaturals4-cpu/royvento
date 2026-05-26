@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/SEO";
 import { Input } from "@/components/ui/input";
@@ -177,6 +178,9 @@ export function Register() {
     <div className="container mx-auto px-4 md:px-6 py-20">
       <SEO title="Create an account | Royvento" canonical="/register" noindex />
       <div className="max-w-md mx-auto rounded-3xl glass-card-strong p-10 red-ring">
+        <Link href="/" className="flex justify-center mb-8" aria-label="Royvento home">
+          <Logo variant="full" size={96} />
+        </Link>
         <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2 accent-underline inline-block">{t("auth.get_started")}</p>
         <h1 className="font-serif text-4xl tracking-tight mt-3 mb-8">{t("auth.create_your_account")}</h1>
 

@@ -190,8 +190,8 @@ export function wrapHtmlEmail(bodyHtml: string): string {
 
       <!-- Header -->
       <tr>
-        <td style="background:#0f0f0f;padding:24px 32px;text-align:center;">
-          <span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">Roy</span><span style="font-size:26px;font-weight:800;letter-spacing:-0.5px;color:#e53e3e;">vento</span>
+        <td style="background:#0f0f0f;padding:22px 32px;text-align:center;">
+          <img src="https://royvento.com/images/logo.png" alt="Royvento" width="190" height="auto" style="display:inline-block;width:190px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;" />
         </td>
       </tr>
 

@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { customFetch, useLogin } from "@workspace/api-client-react";
 import * as Google from "expo-auth-session/providers/google";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useRef, useState } from "react";
@@ -10,6 +9,7 @@ import { isValidEmail } from "@workspace/validators";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -214,14 +214,12 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <LinearGradient
-            colors={[colors.primary, colors.goldLight ?? "#e8c050"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <Image
+            source={require("@/assets/images/logo-icon.png")}
             style={styles.logoWrap}
-          >
-            <Ionicons name="wine" size={28} color={colors.primaryForeground} />
-          </LinearGradient>
+            resizeMode="contain"
+            accessibilityLabel="Royvento"
+          />
           <Text style={[styles.brand, { color: colors.primary }]}>Royvento</Text>
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
             {t("auth.premium_event_exp")}

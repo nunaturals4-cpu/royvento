@@ -54,7 +54,15 @@ const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ defau
 
 function PageFallback() {
   return (
-    <div className="flex items-center justify-center py-32">
+    <div className="flex flex-col items-center justify-center py-32 gap-6">
+      <img
+        src="/images/logo-icon.png"
+        alt="Royvento"
+        width={72}
+        height={72}
+        className="h-[72px] w-[72px] object-contain animate-pulse select-none"
+        draggable={false}
+      />
       <Spinner />
     </div>
   );

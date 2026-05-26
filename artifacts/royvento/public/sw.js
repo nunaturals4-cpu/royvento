@@ -5,8 +5,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title ?? "Royvento";
   const options = {
     body: payload.body ?? "",
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    icon: "/pwa-192x192.png",
+    badge: "/favicon-48x48.png",
     data: { url: payload.url ?? "/", ...(payload.data ?? {}) },
     tag: payload.tag ?? "royvento-push",
   };
