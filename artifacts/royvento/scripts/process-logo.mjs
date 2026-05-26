@@ -80,9 +80,12 @@ async function main() {
   // than transparent (transparent app icons show as black on iOS).
   const DARK = { r: 14, g: 13, b: 18, alpha: 1 }; // #0e0d12 — matches splash bg
   const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
-  const filledIcon = async (size, pad = 0.12) => {
+
+  // Favicons use the raw crest (natural portrait aspect) so it fills the full
+  // height of the icon frame rather than being squished inside a padded square.
+  const filledIcon = async (size, pad = 0.08) => {
     const inner = Math.round(size * (1 - pad * 2));
-    const innerBuf = await sharp(iconBuf)
+    const innerBuf = await sharp(crest)
       .resize(inner, inner, { fit: "contain", background: TRANSPARENT })
       .png()
       .toBuffer();
@@ -90,7 +93,7 @@ async function main() {
       .composite([{ input: innerBuf, gravity: "center" }]);
   };
   const transparentSquare = (size) =>
-    sharp(iconBuf).resize(size, size, { fit: "contain", background: TRANSPARENT });
+    sharp(crest).resize(size, size, { fit: "contain", background: TRANSPARENT });
 
   const publicDir = join(root, "public");
   const webAssets = [
@@ -98,7 +101,7 @@ async function main() {
     ["favicon-16x16.png", () => transparentSquare(16)],
     ["favicon-32x32.png", () => transparentSquare(32)],
     ["favicon-48x48.png", () => transparentSquare(48)],
-    ["favicon.png", () => transparentSquare(64)],
+    ["favicon.png", () => transparentSquare(96)],
     // Apple touch icons — solid dark bg required; iOS/iPadOS shows blank/black for transparent
     ["apple-touch-icon.png", () => filledIcon(180, 0.08)],       // iPhone Retina (recommended)
     ["apple-touch-icon-120x120.png", () => filledIcon(120, 0.08)], // iPhone
