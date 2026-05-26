@@ -8,52 +8,56 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
-const LAST_UPDATED = "1 May 2026";
+const LAST_UPDATED = "26 May 2026";
 
 const SECTIONS = [
   {
     title: "1. Who We Are",
-    body: 'Royvento ("we", "us", or "our") operates the Royvento platform \u2014 a marketplace connecting customers with event venues and pub partners across India. This Privacy Policy explains how we collect, use, and protect your personal information when you use our Service.',
+    body: 'Royvento ("we", "us", or "our") operates the Royvento platform \u2014 a marketplace connecting customers ("Users") with event venues and pub partners ("Pub Partners") across India. This Privacy Policy explains how we collect, use, and protect personal and business information when you use our Service, whether as a User or a Pub Partner.',
   },
   {
-    title: "2. Information We Collect",
+    title: "2. Information We Collect from Users",
     body: "Account information: Name, email address, phone number, and password when you register.\n\nBooking data: Event bookings, ticket types, number of guests, and payment method preferences.\n\nLocation data: City selected by you or, with your permission, your approximate location for personalisation.\n\nUsage data: Pages visited, search queries, filters used, and interactions with listings.\n\nDevice data: Device type, operating system, browser type, and IP address.\n\nCommunications: Messages you send to us via contact forms or support channels.",
   },
   {
-    title: "3. How We Use Your Information",
-    body: "To create and manage your account and process bookings.\n\nTo send booking confirmations, reminders, and updates via email or SMS.\n\nTo personalise your experience \u2014 for example, surfacing events in your city.\n\nTo improve the platform through analytics and user research.\n\nTo detect and prevent fraud, abuse, or security incidents.\n\nTo comply with applicable laws and legal obligations.",
+    title: "3. Information We Collect from Pub Partners",
+    body: "When you register as a Pub Partner, we additionally collect business and verification information needed to list your venue and pay you:\n\nBusiness details: Business or venue name, address, contact person, business phone and email, and operating hours.\n\nVerification & compliance: Licence and registration details (such as liquor licence, FSSAI, and GST number) where required to verify your venue.\n\nPayout details: Bank account or UPI details used to settle the amounts we collect on your behalf, net of commission.\n\nListing content: Venue and event descriptions, pricing, images, offers, and cancellation policies you publish.\n\nPerformance data: Bookings, ticket sales, ratings, and other metrics shown in your partner dashboard.",
   },
   {
-    title: "4. Sharing Your Information",
-    body: "We do not sell your personal data. We may share information in the following limited circumstances:\n\nVenue partners: Your name and contact details are shared with the venue partner when you make a booking, so they can manage attendance.\n\nPayment processors: Payment data is handled by third-party processors (e.g. PhonePe) and is governed by their own privacy policies.\n\nService providers: We use third-party services for hosting, analytics, and communications, all operating under data processing agreements.\n\nLegal requirements: We may disclose your data if required by law, court order, or to protect the rights and safety of Royvento or others.",
+    title: "4. How We Use Your Information",
+    body: "To create and manage accounts, process bookings, and settle Partner payouts.\n\nTo send booking confirmations, reminders, payout notices, and service updates via email or SMS.\n\nTo personalise the experience \u2014 for example, surfacing events in your city.\n\nTo verify Pub Partner eligibility and the accuracy of listings.\n\nTo improve the platform through analytics and user research.\n\nTo detect and prevent fraud, abuse, or security incidents.\n\nTo comply with applicable laws and legal obligations, including tax and record-keeping requirements.",
   },
   {
-    title: "5. Cookies & Tracking",
+    title: "5. Sharing Your Information",
+    body: "We do not sell your personal data. We may share information in the following limited circumstances:\n\nWith Pub Partners: When you make a booking, your name and contact details are shared with the relevant Pub Partner so they can manage attendance and provide the service.\n\nWith Users: A Pub Partner's public venue and event information is displayed to Users; payout and private business details are never shown publicly.\n\nPayment processors: Payment and payout data is handled by third-party processors (e.g. PhonePe) and is governed by their own privacy policies.\n\nService providers: We use third-party services for hosting, analytics, and communications, all operating under data processing agreements.\n\nLegal requirements: We may disclose data if required by law, court order, or to protect the rights and safety of Royvento, our Users, or our Partners.",
+  },
+  {
+    title: "6. Cookies & Tracking",
     body: "We use cookies and similar technologies to keep you logged in, remember your preferences, and understand how the platform is used. You can disable cookies in your browser settings, but some features may not work correctly as a result.",
   },
   {
-    title: "6. Data Retention",
-    body: "We retain your account and booking data for as long as your account is active or as required to fulfil the purposes described in this Policy. You may request deletion of your account at any time; we will delete your personal data within 30 days, except where retention is required by law.",
+    title: "7. Data Retention",
+    body: "We retain account, booking, and payout data for as long as your account is active or as required to fulfil the purposes described in this Policy. Transaction, invoice, and payout records may be retained for longer where tax or accounting law requires. You may request deletion of your account at any time; we will delete your personal data within 30 days, except where retention is required by law.",
   },
   {
-    title: "7. Your Rights",
+    title: "8. Your Rights",
     body: "You have the right to:\n\n\u2022 Access the personal data we hold about you.\n\u2022 Correct inaccurate or incomplete information.\n\u2022 Request deletion of your personal data.\n\u2022 Opt out of marketing communications at any time.\n\u2022 Withdraw consent for optional data processing.\n\nTo exercise any of these rights, contact us using the details below.",
   },
   {
-    title: "8. Security",
+    title: "9. Security",
     body: "We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.",
   },
   {
-    title: "9. Children's Privacy",
+    title: "10. Children's Privacy",
     body: "The Service is intended for users aged 18 and over. We do not knowingly collect personal data from anyone under 18. If we become aware that a minor has provided us with personal data, we will delete it promptly.",
   },
   {
-    title: "10. Changes to This Policy",
+    title: "11. Changes to This Policy",
     body: 'We may update this Privacy Policy from time to time. We will notify you of material changes by updating the "Last updated" date at the top of this page. Your continued use of the Service after any changes constitutes acceptance of the updated Policy.',
   },
   {
-    title: "11. Contact Us",
-    body: "If you have questions or concerns about this Privacy Policy, please contact us via our Contact page or email privacy@royvento.com.",
+    title: "12. Contact Us",
+    body: "If you have questions or concerns about this Privacy Policy, please contact us via our Contact page or email info@royvento.com.",
   },
 ];
 

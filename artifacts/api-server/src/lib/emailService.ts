@@ -191,7 +191,7 @@ export function wrapHtmlEmail(bodyHtml: string): string {
       <!-- Header -->
       <tr>
         <td style="background:#0f0f0f;padding:22px 32px;text-align:center;">
-          <img src="https://royvento.com/images/logo.png" alt="Royvento" width="190" height="auto" style="display:inline-block;width:190px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;" />
+          <img src="https://royvento.com/images/logo-icon.png" alt="Royvento" width="64" height="64" style="display:inline-block;width:64px;height:64px;border:0;outline:none;text-decoration:none;" />
         </td>
       </tr>
 

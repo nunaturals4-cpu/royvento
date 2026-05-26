@@ -1,15 +1,17 @@
 /**
  * Logo processing pipeline for the Royvento brand mark.
  *
- * Source: scripts/logo-source.png  (gold ROYVENTO crest + wordmark on black)
+ * Source: scripts/logo-source.png  (gold crown + shield "R" crest, transparent bg)
  *
- * Produces transparent-background, professionally trimmed variants:
- *   - public/images/logo.png        full crest + wordmark   (wide, hero/footer/email/auth)
- *   - public/images/logo-icon.png   crest-only square mark  (navbar, favicon, avatars)
+ * The source already has a transparent background, but carries a soft golden
+ * glow halo around the crest. We crop tightly to the *solid* crest (alpha
+ * above a cutoff) so the mark fills the frame and stays legible at small
+ * sizes — a loose trim would leave the crest tiny inside a haze of glow.
  *
- * The black background is removed with an edge flood-fill so that the dark
- * texture *inside* the shield is preserved (a naive global threshold would
- * punch holes through the emblem).
+ * Produces:
+ *   - public/images/logo.png        crest, natural aspect (auth, email, hero)
+ *   - public/images/logo-icon.png   crest padded to a square (navbar, favicons)
+ *   plus favicons, PWA icons, apple-touch-icon, and the Expo mobile app icon.
  *
  * Requires: sharp  (pnpm add -D sharp)
  * Run:      node scripts/process-logo.mjs
@@ -23,125 +25,95 @@ const root = join(__dirname, "..");
 const imagesDir = join(root, "public", "images");
 const input = join(__dirname, "logo-source.png");
 
-const NEAR_BLACK = 48; // px with all channels below this are background candidates
+const ALPHA_CUTOFF = 70; // pixels fainter than this (glow halo) are ignored when cropping
 
-/** Remove the connected black background reachable from the image border. */
-async function removeBackground(srcBuffer) {
-  const img = sharp(srcBuffer).ensureAlpha();
-  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+/** Tightly crop to the solid crest: bounding box of pixels with alpha > cutoff. */
+async function cropToCrest(srcPath) {
+  const { data, info } = await sharp(srcPath)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
-  const buf = Buffer.from(data);
 
-  const isDark = (i) => {
-    const b = i * channels;
-    return buf[b] < NEAR_BLACK && buf[b + 1] < NEAR_BLACK && buf[b + 2] < NEAR_BLACK;
-  };
-
-  const visited = new Uint8Array(width * height);
-  const stack = [];
-  // seed every border pixel
-  for (let x = 0; x < width; x++) {
-    stack.push(x, (height - 1) * width + x);
-  }
+  let minX = width, minY = height, maxX = -1, maxY = -1;
   for (let y = 0; y < height; y++) {
-    stack.push(y * width, y * width + (width - 1));
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * channels + 3] > ALPHA_CUTOFF) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
   }
+  if (maxX < 0) throw new Error("no opaque pixels found in source");
 
-  while (stack.length) {
-    const idx = stack.pop();
-    if (visited[idx]) continue;
-    visited[idx] = 1;
-    if (!isDark(idx)) continue;
-    buf[idx * channels + 3] = 0; // transparent
-    const x = idx % width;
-    const y = (idx - x) / width;
-    if (x > 0) stack.push(idx - 1);
-    if (x < width - 1) stack.push(idx + 1);
-    if (y > 0) stack.push(idx - width);
-    if (y < height - 1) stack.push(idx + width);
-  }
+  return sharp(srcPath)
+    .ensureAlpha()
+    .extract({ left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
 
-  return sharp(buf, { raw: { width, height, channels } }).png({ compressionLevel: 9 });
+/** Pad a crest buffer into a transparent square with uniform margin. */
+async function squarePadded(crestBuf, pad = 0.06) {
+  const m = await sharp(crestBuf).metadata();
+  const side = Math.round(Math.max(m.width, m.height) * (1 + pad * 2));
+  return sharp({
+    create: { width: side, height: side, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([{ input: crestBuf, gravity: "center" }])
+    .png({ compressionLevel: 9 })
+    .toBuffer();
 }
 
 async function main() {
-  const raw = await sharp(input).png().toBuffer();
+  const crest = await cropToCrest(input);
 
-  // --- Full logo: transparent bg, trimmed to content ---
-  const transparent = await (await removeBackground(raw)).toBuffer();
-  const fullLogoPath = join(imagesDir, "logo.png");
-  await sharp(transparent)
-    .trim({ threshold: 1 })
-    .png({ compressionLevel: 9 })
-    .toFile(fullLogoPath);
+  // Full logo (natural aspect) + square icon.
+  await sharp(crest).png({ compressionLevel: 9 }).toFile(join(imagesDir, "logo.png"));
+  const iconBuf = await squarePadded(crest, 0.06);
+  await sharp(iconBuf).png({ compressionLevel: 9 }).toFile(join(imagesDir, "logo-icon.png"));
 
-  // --- Crest-only icon: crop the emblem above the wordmark, then square it ---
-  // The "ROYVENTO" wordmark begins ~63% down; the crest sits in the top band.
-  const full = await sharp(fullLogoPath).metadata();
-  const crestHeight = Math.round(full.height * 0.62);
-  const crestCrop = await sharp(fullLogoPath)
-    .extract({ left: 0, top: 0, width: full.width, height: crestHeight })
-    .trim({ threshold: 1 })
-    .toBuffer();
-
-  const crestMeta = await sharp(crestCrop).metadata();
-  const side = Math.max(crestMeta.width, crestMeta.height);
-  const iconPath = join(imagesDir, "logo-icon.png");
-  await sharp({
-    create: {
-      width: side,
-      height: side,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
-    .composite([{ input: crestCrop, gravity: "center" }])
-    .png({ compressionLevel: 9 })
-    .toFile(iconPath);
-  const transparentIcon = await sharp(iconPath).toBuffer();
-
-  // --- Square crest padded onto the brand-dark background (favicons / app icon) ---
-  // iOS/Android app icons and small favicons render better with a solid fill
-  // than with transparency (transparent app icons show as black on iOS).
+  // --- Filled icons on the brand-dark background (favicons / app icon) ---
+  // iOS/Android app icons and small favicons render better on a solid fill
+  // than transparent (transparent app icons show as black on iOS).
   const DARK = { r: 14, g: 13, b: 18, alpha: 1 }; // #0e0d12 — matches splash bg
   const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
-  const filledIcon = async (size, pad = 0.1) => {
+  const filledIcon = async (size, pad = 0.12) => {
     const inner = Math.round(size * (1 - pad * 2));
-    const innerBuf = await sharp(transparentIcon)
+    const innerBuf = await sharp(iconBuf)
       .resize(inner, inner, { fit: "contain", background: TRANSPARENT })
       .png()
       .toBuffer();
-    return sharp({
-      create: { width: size, height: size, channels: 4, background: DARK },
-    }).composite([{ input: innerBuf, gravity: "center" }]);
+    return sharp({ create: { width: size, height: size, channels: 4, background: DARK } })
+      .composite([{ input: innerBuf, gravity: "center" }]);
   };
-  // Transparent crest resized square (for PWA/maskable & web favicons that allow alpha)
   const transparentSquare = (size) =>
-    sharp(transparentIcon).resize(size, size, { fit: "contain", background: TRANSPARENT });
+    sharp(iconBuf).resize(size, size, { fit: "contain", background: TRANSPARENT });
 
   const publicDir = join(root, "public");
   const webAssets = [
-    ["favicon-16x16.png", () => filledIcon(16, 0.06)],
-    ["favicon-32x32.png", () => filledIcon(32, 0.06)],
-    ["favicon-48x48.png", () => filledIcon(48, 0.06)],
+    ["favicon-16x16.png", () => filledIcon(16, 0.04)],
+    ["favicon-32x32.png", () => filledIcon(32, 0.04)],
+    ["favicon-48x48.png", () => filledIcon(48, 0.04)],
     ["apple-touch-icon.png", () => filledIcon(180, 0.12)],
     ["pwa-192x192.png", () => transparentSquare(192)],
     ["pwa-512x512.png", () => transparentSquare(512)],
-    ["favicon.png", () => filledIcon(64, 0.06)],
+    ["favicon.png", () => filledIcon(64, 0.04)],
   ];
   for (const [name, make] of webAssets) {
     const pipeline = await make();
     await pipeline.png({ compressionLevel: 9 }).toFile(join(publicDir, name));
   }
 
-  // --- Mobile (Expo) app icon: crest on solid dark, 1024 square ---
+  // --- Mobile (Expo) ---
   const mobileImages = join(root, "..", "mobile", "assets", "images");
-  await (await filledIcon(1024, 0.14)).png({ compressionLevel: 9 }).toFile(join(mobileImages, "icon.png"));
-  // Transparent crest for in-app mobile UI (footer, headers)
+  await (await filledIcon(1024, 0.16)).png({ compressionLevel: 9 }).toFile(join(mobileImages, "icon.png"));
   await transparentSquare(512).png({ compressionLevel: 9 }).toFile(join(mobileImages, "logo-icon.png"));
 
   const out1 = await sharp(join(imagesDir, "logo.png")).metadata();
-  const out2 = await sharp(iconPath).metadata();
+  const out2 = await sharp(join(imagesDir, "logo-icon.png")).metadata();
   console.log(`logo.png       ${out1.width}x${out1.height}`);
   console.log(`logo-icon.png  ${out2.width}x${out2.height}`);
   console.log(`favicons + pwa + apple-touch-icon written to public/`);

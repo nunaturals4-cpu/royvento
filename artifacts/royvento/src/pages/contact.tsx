@@ -81,7 +81,7 @@ export function Contact() {
           Facing an issue or planning something out of the ordinary? Send us a note and we'll respond within 24 hours.
         </p>
         <div className="mt-10 space-y-5 text-sm">
-          <div className="flex items-start gap-3"><Mail className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">hello@royvento.com</p><p className="text-muted-foreground">We respond within 24 hours.</p></div></div>
+          <div className="flex items-start gap-3"><Mail className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">info@royvento.com</p><p className="text-muted-foreground">We respond within 24 hours.</p></div></div>
           <div className="flex items-start gap-3"><Phone className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">+91 9875554165</p><p className="text-muted-foreground">Mon–Sat, 10am–7pm IST</p></div></div>
           <div className="flex items-start gap-3"><MapPin className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium">Kolkata, West Bengal</p><p className="text-muted-foreground">India</p></div></div>
         </div>
