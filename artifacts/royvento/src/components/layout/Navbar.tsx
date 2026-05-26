@@ -163,7 +163,7 @@ export function Navbar() {
         <div className="container mx-auto px-4 md:px-6 h-[68px] flex items-center justify-between relative gap-3">
           <div className="flex items-center gap-7 min-w-0">
             <Link href="/" className="flex items-center gap-2.5 group shrink-0" aria-label="Royvento home">
-              <Logo size={38} className="transition-transform group-hover:scale-[1.04]" />
+              <Logo size={46} className="transition-transform group-hover:scale-[1.04]" />
             </Link>
             <nav className="hidden lg:flex items-center gap-7 text-sm font-medium">
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.home")}</Link>

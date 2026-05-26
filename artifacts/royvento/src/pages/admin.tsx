@@ -153,7 +153,7 @@ function AdminNav({ currentTab }: { currentTab: string }) {
     <div className="flex h-full flex-col gap-1 px-3 py-5">
       <div className="px-3 pb-5 mb-2 border-b border-white/[0.06]">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <Logo variant="icon" size={36} className="group-hover:scale-[1.04] transition-transform" />
+          <Logo variant="icon" size={44} className="group-hover:scale-[1.04] transition-transform" />
           <div className="min-w-0">
             <p className="font-serif text-lg tracking-tight leading-none">Royvento</p>
             <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">Control Room</p>

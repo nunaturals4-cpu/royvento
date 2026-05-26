@@ -72,7 +72,7 @@ async function main() {
 
   // Full logo (natural aspect) + square icon.
   await sharp(crest).png({ compressionLevel: 9 }).toFile(join(imagesDir, "logo.png"));
-  const iconBuf = await squarePadded(crest, 0.06);
+  const iconBuf = await squarePadded(crest, 0.03);
   await sharp(iconBuf).png({ compressionLevel: 9 }).toFile(join(imagesDir, "logo-icon.png"));
 
   // --- Filled icons on the brand-dark background (favicons / app icon) ---
@@ -100,10 +100,10 @@ async function main() {
     ["favicon-48x48.png", () => transparentSquare(48)],
     ["favicon.png", () => transparentSquare(64)],
     // Apple touch icons — solid dark bg required; iOS/iPadOS shows blank/black for transparent
-    ["apple-touch-icon.png", () => filledIcon(180, 0.12)],       // iPhone Retina (recommended)
-    ["apple-touch-icon-120x120.png", () => filledIcon(120, 0.12)], // iPhone
-    ["apple-touch-icon-152x152.png", () => filledIcon(152, 0.12)], // iPad
-    ["apple-touch-icon-167x167.png", () => filledIcon(167, 0.12)], // iPad Pro
+    ["apple-touch-icon.png", () => filledIcon(180, 0.08)],       // iPhone Retina (recommended)
+    ["apple-touch-icon-120x120.png", () => filledIcon(120, 0.08)], // iPhone
+    ["apple-touch-icon-152x152.png", () => filledIcon(152, 0.08)], // iPad
+    ["apple-touch-icon-167x167.png", () => filledIcon(167, 0.08)], // iPad Pro
     // PWA icons — transparent for any, maskable variant with safe-zone padding
     ["pwa-192x192.png", () => transparentSquare(192)],
     ["pwa-512x512.png", () => transparentSquare(512)],

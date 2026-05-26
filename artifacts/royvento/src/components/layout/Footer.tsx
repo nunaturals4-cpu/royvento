@@ -14,7 +14,7 @@ export function Footer() {
         {/* Brand */}
         <div className="space-y-4">
           <Link href="/" className="inline-flex" aria-label="Royvento home">
-            <Logo size={40} />
+            <Logo size={48} />
           </Link>
           <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
             Heirloom-quality events. From estate weddings to founder summits and harvest festivals — Royvento is where remarkable hosts find remarkable craft.
