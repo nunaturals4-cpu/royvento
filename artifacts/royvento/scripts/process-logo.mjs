@@ -85,6 +85,27 @@ async function cropToShield(crestBuf) {
     .toBuffer();
 }
 
+/**
+ * Remove the dark shield fill so only the gold R and outline remain.
+ * Gold pixels have high R+G values; the black interior is near (0,0,0).
+ * Threshold: any opaque pixel with R<80, G<80, B<80 becomes transparent.
+ */
+async function removeShieldFill(buf) {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const out = Buffer.from(data);
+  for (let i = 0; i < width * height; i++) {
+    const r = data[i * channels];
+    const g = data[i * channels + 1];
+    const b = data[i * channels + 2];
+    const a = data[i * channels + 3];
+    if (a > 80 && r < 80 && g < 80 && b < 80) {
+      out[i * channels + 3] = 0;
+    }
+  }
+  return sharp(out, { raw: { width, height, channels } }).png({ compressionLevel: 9 }).toBuffer();
+}
+
 /** Pad a buffer into a transparent square with uniform margin. */
 async function squarePadded(buf, pad = 0.03) {
   const m = await sharp(buf).metadata();
@@ -98,8 +119,9 @@ async function squarePadded(buf, pad = 0.03) {
 }
 
 async function main() {
-  const crest = await cropToCrest(input);   // full crown + shield
-  const shield = await cropToShield(crest); // shield + R only (no crown)
+  const crest = await cropToCrest(input);         // full crown + shield
+  const shield = await cropToShield(crest);       // shield + R only (no crown)
+  const shieldClean = await removeShieldFill(shield); // black interior removed
 
   // Navbar / footer / auth card — full crest with crown
   await sharp(crest).png({ compressionLevel: 9 }).toFile(join(imagesDir, "logo.png"));
@@ -109,10 +131,10 @@ async function main() {
   const DARK = { r: 14, g: 13, b: 18, alpha: 1 }; // #0e0d12
   const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 
-  // All icon/favicon assets use the crown-stripped shield so the R is prominent
+  // All icon/favicon assets use the crown-stripped, fill-removed shield
   const filledIcon = async (size, pad = 0.08) => {
     const inner = Math.round(size * (1 - pad * 2));
-    const innerBuf = await sharp(shield)
+    const innerBuf = await sharp(shieldClean)
       .resize(inner, inner, { fit: "contain", background: TRANSPARENT })
       .png()
       .toBuffer();
@@ -120,7 +142,7 @@ async function main() {
       .composite([{ input: innerBuf, gravity: "center" }]);
   };
   const transparentSquare = (size) =>
-    sharp(shield).resize(size, size, { fit: "contain", background: TRANSPARENT });
+    sharp(shieldClean).resize(size, size, { fit: "contain", background: TRANSPARENT });
 
   const publicDir = join(root, "public");
   const webAssets = [
@@ -151,10 +173,10 @@ async function main() {
 
   const out1 = await sharp(join(imagesDir, "logo.png")).metadata();
   const out2 = await sharp(join(imagesDir, "logo-icon.png")).metadata();
-  const shieldMeta = await sharp(shield).metadata();
+  const shieldMeta = await sharp(shieldClean).metadata();
   console.log(`logo.png       ${out1.width}x${out1.height}  (full crest)`);
   console.log(`logo-icon.png  ${out2.width}x${out2.height}  (full crest square)`);
-  console.log(`shield crop    ${shieldMeta.width}x${shieldMeta.height}  (crown removed)`);
+  console.log(`shield clean   ${shieldMeta.width}x${shieldMeta.height}  (crown + black fill removed)`);
   console.log(`favicons + pwa + apple-touch-icon written to public/`);
   console.log(`mobile icon.png (1024) + logo-icon.png (512) written`);
 }
