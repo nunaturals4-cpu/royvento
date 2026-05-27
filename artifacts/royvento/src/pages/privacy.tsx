@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { SEO } from "@/components/SEO";
 
-const LAST_UPDATED = "26 May 2026";
+const LAST_UPDATED = "27 May 2026";
 
 export function Privacy() {
   return (
@@ -110,6 +110,10 @@ export function Privacy() {
           <h2 className="text-lg font-semibold text-foreground mb-2">9. Security</h2>
           <p>
             We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.
+          </p>
+          <p className="mt-3">
+            Royvento will never ask for your password, OTP, card CVV, PIN, or full card number by phone, email, or SMS. If you receive such a request, do not respond and report it to{" "}
+            <a href="mailto:info@royvento.com" className="text-primary hover:underline">info@royvento.com</a>.
           </p>
         </section>
 

@@ -8,7 +8,7 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
-const LAST_UPDATED = "26 May 2026";
+const LAST_UPDATED = "27 May 2026";
 
 const SECTIONS = [
   {
@@ -45,7 +45,7 @@ const SECTIONS = [
   },
   {
     title: "9. Security",
-    body: "We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.",
+    body: "We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.\n\nRoyvento will never ask for your password, OTP, card CVV, PIN, or full card number by phone, email, or SMS. If you receive such a request, do not respond and report it to info@royvento.com.",
   },
   {
     title: "10. Children's Privacy",

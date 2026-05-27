@@ -8,7 +8,7 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useColors } from "@/hooks/useColors";
 
-const LAST_UPDATED = "26 May 2026";
+const LAST_UPDATED = "27 May 2026";
 
 const SECTIONS = [
   {
@@ -29,30 +29,46 @@ const SECTIONS = [
   },
   {
     title: "5. Terms for Users",
-    body: "Bookings made through Royvento are subject to availability and confirmation by the Pub Partner, and are only confirmed once you receive a confirmation notification from us.\n\nPayment methods vary by event: some venues accept payment at the door (Cash on Delivery), while others require online payment at the time of booking. All stated prices are inclusive of applicable taxes unless noted otherwise.\n\nCancellation and refund policies are set by individual Pub Partners and shown on the event detail page before you book. Where a refund is due, it is processed to your original payment method, less any non-refundable fees disclosed at checkout.\n\nYou are responsible for carrying valid ID and any required ticket or booking reference, complying with local laws and venue rules, and drinking responsibly. Entry may be refused for intoxication, underage attendance, or breach of venue policy without a refund.",
+    body: "Bookings made through Royvento are subject to availability and confirmation by the Pub Partner, and are only confirmed once you receive a confirmation notification from us.\n\nPayment methods vary by event: some venues accept payment at the door (Cash on Delivery), while others require online payment at the time of booking. All stated prices are inclusive of applicable taxes unless noted otherwise.\n\nRoyvento may charge a convenience or booking fee on certain bookings or ticket purchases. Where applicable, this fee is shown to you clearly at checkout before you confirm and pay, and is collected by Royvento for the booking service it provides, separately from any amount payable to the Pub Partner. Unless stated otherwise at checkout or required by law, convenience and booking fees are non-refundable, including where a booking is later cancelled.\n\nCancellation and refund policies are set by individual Pub Partners and shown on the event detail page before you book. Where a refund is due, it is processed to your original payment method, less any non-refundable fees disclosed at checkout.\n\nYou are responsible for carrying valid ID and any required ticket or booking reference, complying with local laws and venue rules, and drinking responsibly. Entry may be refused for intoxication, underage attendance, or breach of venue policy without a refund.",
   },
   {
     title: "6. Terms for Pub Partners",
     body: "Listings & accuracy: You are solely responsible for your listings \u2014 venue details, event descriptions, pricing, capacity, ticket types, offers, images, and cancellation policies \u2014 and warrant they are accurate, lawful, and current. You must honour every confirmed booking at the price and terms displayed at the time of booking.\n\nLicences & compliance: You warrant that you hold all licences, permits, and registrations required to operate your venue and serve food and alcohol (including any liquor licence and FSSAI registration), and comply with all applicable laws including fire-safety, occupancy, taxation (GST), and local excise regulations. Royvento may request proof and may suspend or remove non-compliant listings.\n\nCommissions & payouts: Royvento charges a commission on bookings and ticket sales at the rate agreed in your partner dashboard or partner agreement. Commission is deducted from amounts collected on your behalf, and the net balance is paid out to your nominated bank account per the payout schedule then in effect. You are responsible for any tax invoices required by law and for your own tax obligations.\n\nCancellations & service quality: You set your own cancellation and refund policy but must apply it fairly and honour valid refund requests promptly. Repeated cancellations, no-shows, misleading listings, or poor service quality may result in reduced visibility, suspension, or removal.\n\nSuspension & delisting: Royvento may suspend, restrict, or delist a Partner account where there is suspected fraud, a breach of these Terms, a regulatory issue, or a risk to Users. Outstanding confirmed bookings must still be honoured, and verified payouts due for completed bookings will be settled in the ordinary course.",
   },
   {
-    title: "7. Intellectual Property",
+    title: "7. Fraud Prevention & Payment Safety",
+    body: "Royvento communicates with you only through its official website, mobile application, and the contact channels published on this site. Royvento and its staff will never ask for your one-time password (OTP), card CVV, PIN, full card number, UPI PIN, or account password by phone, email, SMS, or chat. All payments must be made only through the official payment options presented within the Service; never transfer money to a personal account or pay outside the platform at the request of any person claiming to represent Royvento or a Pub Partner. If you receive a suspicious request or believe you have been targeted by a fraudulent or phishing attempt, do not share any details and report it to us at info@royvento.com. Royvento is not responsible for losses arising from payments made, or information shared, outside its official channels.",
+  },
+  {
+    title: "8. Intellectual Property",
     body: "All content on the Royvento platform \u2014 including logos, design, text, and software \u2014 is owned by or licensed to Royvento and may not be copied, reproduced, or distributed without prior written consent. Pub Partners grant Royvento a non-exclusive, royalty-free licence to display their venue name, logo, images, and listing content for the purpose of operating and promoting the Service.",
   },
   {
-    title: "8. Limitation of Liability",
+    title: "9. Disclaimer of Warranties",
+    body: 'The Service is provided on an "as is" and "as available" basis, without warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, accuracy, or non-infringement. Royvento does not warrant that the Service will be uninterrupted, timely, secure, or error-free, or that listings, pricing, availability, or other information provided by Pub Partners are accurate, complete, or current. The quality, safety, and legality of venues, events, food, and beverages are the sole responsibility of the relevant Pub Partner, and any reliance you place on the Service or on Pub Partner content is at your own risk.',
+  },
+  {
+    title: "10. Limitation of Liability",
     body: "To the fullest extent permitted by law, Royvento and its officers, directors, employees, and agents shall not be liable for any indirect, incidental, special, or consequential damages arising out of your use of the Service, including loss of profits, data, goodwill, or other intangible losses, or for the acts or omissions of any Pub Partner or User.\n\nOur total liability to you for any claim arising from or related to the Service shall not exceed the amount of commission or fees you paid to Royvento in the twelve months preceding the claim.",
   },
   {
-    title: "9. Changes to These Terms",
+    title: "11. Indemnification",
+    body: "You agree to indemnify, defend, and hold harmless Royvento and its officers, directors, employees, and agents from and against any claims, demands, liabilities, damages, losses, costs, and expenses (including reasonable legal fees) arising out of or related to: (a) your use or misuse of the Service; (b) your breach of these Terms or of any applicable law; (c) any content you submit or listing you publish; or (d) your violation of the rights of any third party, including any Pub Partner or User. Royvento may, at your expense, assume the exclusive defence and control of any matter subject to indemnification, and you agree to cooperate with that defence.",
+  },
+  {
+    title: "12. Termination & Suspension",
+    body: "You may stop using the Service and close your account at any time. Royvento may suspend, restrict, or terminate your access to the Service, in whole or in part, with or without prior notice, where we reasonably believe you have breached these Terms or any applicable law, engaged in fraudulent, abusive, or harmful conduct, or where action is needed to protect the Service, other Users, or Pub Partners. On termination your right to use the Service ends immediately; confirmed bookings and any payment, payout, refund, or tax obligations accrued beforehand survive, as do the provisions that by their nature should continue (including Intellectual Property, Disclaimer of Warranties, Limitation of Liability, Indemnification, and Governing Law).",
+  },
+  {
+    title: "13. Changes to These Terms",
     body: 'We may update these Terms from time to time. We will notify you of significant changes by updating the "Last updated" date at the top of this page. Your continued use of the Service after any changes constitutes acceptance of the new Terms.',
   },
   {
-    title: "10. Governing Law",
+    title: "14. Governing Law",
     body: "These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts of Kolkata, West Bengal.",
   },
   {
-    title: "11. Contact Us",
+    title: "15. Contact Us",
     body: "If you have questions about these Terms, please reach out via our Contact page or email us at info@royvento.com.",
   },
 ];
