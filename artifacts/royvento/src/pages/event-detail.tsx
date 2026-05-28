@@ -1775,8 +1775,9 @@ function offerDaysLabel(days: string[]): string {
   return days.map((d) => OFFER_DAY_LABEL[d] ?? d).join(" · ");
 }
 
-function offerWindowLabel(from: string, to: string): string {
-  if (!from || !to) return "All day";
+/** Return the formatted window, or null if no time was set — caller hides the row. */
+function offerWindowLabel(from: string, to: string): string | null {
+  if (!from || !to) return null;
   return `${from} – ${to}`;
 }
 
@@ -1793,47 +1794,46 @@ function FoodDrinkOffersSection({ vendorId, onBookClick }: { vendorId: number | 
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="text-center mb-10">
-        <p className="text-xs uppercase tracking-[0.25em] text-amber-300/80 font-semibold mb-3">Live now</p>
-        <h2 className="font-serif text-4xl md:text-5xl mb-3">Food &amp; Drink Offers</h2>
-        <p className="text-white/50 max-w-xl mx-auto">Curated deals from the venue — valid right now. Tap any offer to head straight to booking.</p>
+      {/* ─── Classy section header ─── */}
+      <div className="text-center mb-12 md:mb-14">
+        <div className="flex items-center justify-center gap-2 mb-5">
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          <span className="text-[11px] uppercase tracking-[0.3em] text-amber-300/90 font-medium">Live tonight</span>
+        </div>
+        <h2 className="font-serif italic text-4xl md:text-5xl text-white mb-4 leading-tight">
+          Food &amp; Drink Offers
+        </h2>
+        <div className="flex items-center justify-center gap-4 max-w-xs mx-auto mb-5">
+          <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-400/40 to-amber-400/40" />
+          <span className="text-amber-300/70 text-sm">✦</span>
+          <span className="h-px flex-1 bg-gradient-to-l from-transparent via-amber-400/40 to-amber-400/40" />
+        </div>
+        <p className="text-white/55 max-w-md mx-auto text-[15px] leading-relaxed">
+          A curated selection from the venue — valid right now. Reserve a table to enjoy them tonight.
+        </p>
       </div>
 
       {isLoading ? (
-        <div className="grid sm:grid-cols-2 gap-6">
+        <div className="grid sm:grid-cols-2 gap-5">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="aspect-[5/4] rounded-3xl glass-card animate-pulse" />
+            <div key={i} className="aspect-[4/3] rounded-2xl bg-white/[0.025] border border-white/[0.06] animate-pulse" />
           ))}
         </div>
       ) : offers.length === 0 ? (
-        <div className="rounded-3xl glass-card-strong p-14 text-center max-w-xl mx-auto">
-          <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 mx-auto mb-4 flex items-center justify-center">
-            <Tag className="h-5 w-5 text-amber-300" />
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-14 text-center max-w-xl mx-auto">
+          <div className="h-12 w-12 rounded-full border border-amber-500/30 bg-amber-500/[0.05] mx-auto mb-5 flex items-center justify-center">
+            <Tag className="h-4 w-4 text-amber-300/80" />
           </div>
-          <h3 className="font-serif text-2xl mb-2">No live offers right now</h3>
-          <p className="text-white/50 text-sm">Check back later — the venue posts food and drink deals through the day.</p>
+          <h3 className="font-serif italic text-2xl text-white/85 mb-2">No offers tonight</h3>
+          <p className="text-white/45 text-sm">The venue posts new food and drink deals through the evening. Check back shortly.</p>
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-12">
           {food.length > 0 && (
-            <OfferGroup
-              icon={Utensils}
-              accent="emerald"
-              label="Food"
-              count={food.length}
-              offers={food}
-              onBookClick={onBookClick}
-            />
+            <OfferGroup icon={Utensils} label="Food" count={food.length} offers={food} onBookClick={onBookClick} />
           )}
           {drink.length > 0 && (
-            <OfferGroup
-              icon={Wine}
-              accent="rose"
-              label="Drinks"
-              count={drink.length}
-              offers={drink}
-              onBookClick={onBookClick}
-            />
+            <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} />
           )}
         </div>
       )}
@@ -1843,36 +1843,32 @@ function FoodDrinkOffersSection({ vendorId, onBookClick }: { vendorId: number | 
 
 function OfferGroup({
   icon: Icon,
-  accent,
   label,
   count,
   offers,
   onBookClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
-  accent: "emerald" | "rose";
   label: string;
   count: number;
   offers: VendorOfferDto[];
   onBookClick: () => void;
 }) {
-  const accentTint =
-    accent === "emerald"
-      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-      : "bg-rose-500/15 text-rose-300 border-rose-500/30";
-
   return (
     <section>
-      <div className="flex items-center gap-3 mb-5">
-        <div className={`h-9 w-9 rounded-xl flex items-center justify-center border ${accentTint}`}>
-          <Icon className="h-4 w-4" />
+      {/* Group sub-header: thin gold rule with serif label */}
+      <div className="flex items-center gap-4 mb-6">
+        <span className="h-px flex-1 bg-amber-500/15" />
+        <div className="flex items-center gap-2.5 text-amber-300/90">
+          <Icon className="h-3.5 w-3.5" />
+          <span className="font-serif italic text-[15px] tracking-wide">{label}</span>
+          <span className="text-[11px] uppercase tracking-widest text-white/35">· {count}</span>
         </div>
-        <h3 className="font-serif text-2xl">{label}</h3>
-        <span className="text-xs uppercase tracking-widest text-white/40">{count} live</span>
+        <span className="h-px flex-1 bg-amber-500/15" />
       </div>
       <div className="grid sm:grid-cols-2 gap-5">
         {offers.map((o) => (
-          <PremiumOfferCard key={o.id} offer={o} accent={accent} onBookClick={onBookClick} />
+          <PremiumOfferCard key={o.id} offer={o} onBookClick={onBookClick} />
         ))}
       </div>
     </section>
@@ -1881,84 +1877,90 @@ function OfferGroup({
 
 function PremiumOfferCard({
   offer,
-  accent,
   onBookClick,
 }: {
   offer: VendorOfferDto;
-  accent: "emerald" | "rose";
   onBookClick: () => void;
 }) {
   const Icon = offer.category === "drink" ? Wine : Utensils;
-  const iconTint =
-    accent === "emerald"
-      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
-      : "bg-rose-500/15 text-rose-300 border-rose-500/25";
+  const window = offerWindowLabel(offer.timeFrom, offer.timeTo);
 
   return (
     <article
       className="
-        group relative overflow-hidden rounded-3xl
-        border border-amber-500/20 hover:border-amber-400/45
-        bg-gradient-to-br from-amber-500/[0.05] via-black/40 to-black/70
-        backdrop-blur-sm
-        shadow-[0_8px_32px_-12px_rgba(0,0,0,0.6)]
-        transition-all duration-300
-        hover:-translate-y-0.5 hover:shadow-[0_18px_46px_-16px_rgba(251,191,36,0.25)]
+        group relative overflow-hidden rounded-2xl
+        border border-white/[0.08] hover:border-amber-400/30
+        bg-[#0d0c12]
+        shadow-[0_2px_24px_-8px_rgba(0,0,0,0.6)]
+        transition-all duration-500
+        hover:shadow-[0_18px_44px_-20px_rgba(212,175,55,0.35)]
       "
     >
-      {/* gold corner glow */}
-      <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-amber-500/15 blur-3xl opacity-60 group-hover:opacity-90 transition-opacity" />
+      {/* Subtle inner gold hairline */}
+      <div className="pointer-events-none absolute inset-px rounded-[15px] border border-amber-400/[0.04] group-hover:border-amber-400/15 transition-colors" />
+      {/* Top accent rule */}
+      <div className="pointer-events-none absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-amber-400/30 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
 
-      <div className="relative p-6 sm:p-7 flex flex-col gap-5 h-full">
-        {/* Header row: icon + discount badge */}
-        <div className="flex items-start justify-between gap-3">
-          <div className={`h-11 w-11 rounded-2xl flex items-center justify-center border ${iconTint}`}>
-            <Icon className="h-5 w-5" />
+      <div className="relative p-6 sm:p-7 flex flex-col h-full">
+        {/* Discount badge — refined serif gold pill, top-right */}
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="h-10 w-10 rounded-full border border-amber-400/25 bg-amber-400/[0.04] flex items-center justify-center">
+            <Icon className="h-4 w-4 text-amber-300/90" />
           </div>
-          <span className="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.12em] uppercase bg-amber-500/15 text-amber-200 border border-amber-400/45 shadow-[0_0_24px_-6px_rgba(251,191,36,0.6)]">
+          <span className="
+            shrink-0 inline-flex items-center
+            font-serif italic text-[13px] tracking-wide
+            text-amber-200
+            border-y border-amber-400/35
+            px-3 py-1
+          ">
             {offerDiscountBadge(offer)}
           </span>
         </div>
 
         {/* Title + description */}
-        <div className="min-h-[64px]">
-          <h4 className="font-serif text-xl sm:text-[22px] leading-snug text-white mb-1.5 line-clamp-2">
+        <div>
+          <h4 className="font-serif text-[22px] sm:text-2xl leading-snug text-white mb-2 line-clamp-2">
             {offer.title}
           </h4>
           {offer.description && (
-            <p className="text-sm text-white/55 leading-relaxed line-clamp-2">{offer.description}</p>
+            <p className="text-[13.5px] text-white/55 leading-relaxed italic line-clamp-3">
+              {offer.description}
+            </p>
           )}
         </div>
 
-        {/* Timing row */}
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[12px] text-white/60 border-t border-white/8 pt-4">
-          <span className="inline-flex items-center gap-1.5">
-            <CalIcon className="h-3.5 w-3.5 text-amber-300/80" />
+        {/* Timing — small caps */}
+        <div className="mt-6 mb-7 flex flex-wrap gap-x-6 gap-y-2 text-[10.5px] uppercase tracking-[0.18em] text-white/45">
+          <span className="inline-flex items-center gap-2">
+            <CalIcon className="h-3 w-3 text-amber-400/70" />
             <span>{offerDaysLabel(offer.days)}</span>
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-amber-300/80" />
-            <span>{offerWindowLabel(offer.timeFrom, offer.timeTo)}</span>
-          </span>
+          {window && (
+            <span className="inline-flex items-center gap-2">
+              <Clock className="h-3 w-3 text-amber-400/70" />
+              <span>{window}</span>
+            </span>
+          )}
         </div>
 
-        {/* CTA */}
+        {/* CTA — refined outlined gold button */}
         <button
           type="button"
           onClick={onBookClick}
           className="
-            mt-auto inline-flex items-center justify-center gap-2
-            w-full h-11 rounded-2xl
-            bg-gradient-to-r from-amber-500 to-amber-400
-            text-black text-sm font-semibold tracking-wide
-            shadow-[0_8px_28px_-8px_rgba(251,191,36,0.6)]
-            hover:from-amber-400 hover:to-amber-300
-            transition-all
-            focus:outline-none focus:ring-2 focus:ring-amber-300/60 focus:ring-offset-2 focus:ring-offset-black
+            mt-auto group/btn inline-flex items-center justify-center gap-2
+            w-full h-11 rounded-full
+            border border-amber-400/45 hover:border-amber-300
+            bg-transparent hover:bg-amber-400/[0.06]
+            text-amber-200 hover:text-amber-100
+            text-[13px] font-medium tracking-[0.15em] uppercase
+            transition-all duration-300
+            focus:outline-none focus:ring-1 focus:ring-amber-300/50
           "
         >
-          Claim &amp; Book Now
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          Book Now
+          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover/btn:translate-x-1" />
         </button>
       </div>
     </article>
