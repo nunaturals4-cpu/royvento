@@ -949,6 +949,48 @@ export const vendorCouponsTable = pgTable(
 
 export type VendorCoupon = typeof vendorCouponsTable.$inferSelect;
 
+// ─── Vendor food & drink discount offers ─────────────────────────────────────
+// Venue-pushed promotions (not redeemable codes). Displayed automatically on the
+// pub detail/booking page when "active right now" — i.e. inside the validity
+// window, on a matching day-of-week, and within the time-of-day band.
+// Conversions are computed impression-style by joining bookings made while an
+// offer was active on the same venue (no offerId stored on bookings).
+export const vendorOffersTable = pgTable(
+  "vendor_offers",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id")
+      .notNull()
+      .references(() => vendorsTable.id, { onDelete: "cascade" }),
+    category: varchar("category", { length: 10 }).notNull(), // "food" | "drink"
+    title: varchar("title", { length: 120 }).notNull(),
+    description: text("description").notNull().default(""),
+    // "percent" | "fixed" | "bogo" | "free_item"
+    discountType: varchar("discount_type", { length: 16 }).notNull(),
+    // 0 for bogo / free_item
+    discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull().default("0"),
+    // Free-item label, e.g. "Free dessert with any main course"
+    freeItemName: varchar("free_item_name", { length: 120 }).notNull().default(""),
+    // ISO weekday abbreviations: "mon","tue","wed","thu","fri","sat","sun" — empty = every day
+    days: text("days").array().notNull().default(sql`'{}'::text[]`),
+    // "HH:MM" 24-hour, empty = all-day
+    timeFrom: varchar("time_from", { length: 5 }).notNull().default(""),
+    timeTo: varchar("time_to", { length: 5 }).notNull().default(""),
+    // Validity window. Both nullable: null = open-ended on that side.
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("vendor_offers_vendor_idx").on(t.vendorId),
+    activeIdx: index("vendor_offers_vendor_active_idx").on(t.vendorId, t.active),
+  }),
+);
+
+export type VendorOffer = typeof vendorOffersTable.$inferSelect;
+
 // ─── Loyalty points ledger ────────────────────────────────────────────────────
 // Append-only log of every points grant (positive) and redemption (negative).
 // Used to enforce the 30-day expiry window and send tiered reminder notifications.

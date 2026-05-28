@@ -29,7 +29,7 @@ import {
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck, Check,
   Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent, RefreshCw,
-  FileText, Star, Menu, X, Sparkles, ArrowUpRight, Bell,
+  FileText, Star, Menu, X, Sparkles, ArrowUpRight, Bell, Utensils, Gift,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -526,7 +526,10 @@ export function VendorDashboard() {
                 <TabsContent value="ads" className="mt-0"><AdsPanel /></TabsContent>
                 <TabsContent value="announcements" className="mt-0"><AnnouncementsPanel /></TabsContent>
                 <TabsContent value="leads" className="mt-0"><LeadsPanel /></TabsContent>
-                <TabsContent value="coupons" className="mt-0"><CouponsPanel /></TabsContent>
+                <TabsContent value="coupons" className="mt-0 space-y-10">
+                  <CouponsPanel />
+                  <FoodDrinkOffersPanel vendorId={vendor.id} />
+                </TabsContent>
                 <TabsContent value="drinkplans" className="mt-0"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
                 <TabsContent value="attendance" className="mt-0"><AttendancePanel /></TabsContent>
                 <TabsContent value="managers" className="mt-0"><ManagersPanel /></TabsContent>
@@ -617,6 +620,7 @@ function ProfileEditor({ vendor, onSaved }: { vendor: any; onSaved: () => void }
 
   return (
     <div className="space-y-6">
+    <OffersOverviewSummary />
     <form onSubmit={submit} className="rounded-3xl glass-card-strong p-8 space-y-4">
         <div>
           <Label>Business name</Label>
@@ -3797,6 +3801,8 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
         )}
       </div>
 
+      <OffersAnalyticsBlock />
+
       {/* ─── KPI cards ─── */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard
@@ -5192,6 +5198,608 @@ function CouponsPanel() {
                           {deleting === c.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                         </button>
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Food & Drink discount offers ────────────────────────────────────────────
+
+type OfferCategory = "food" | "drink";
+type OfferDiscountType = "percent" | "fixed" | "bogo" | "free_item";
+type OfferDay = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+
+interface VendorOffer {
+  id: number;
+  vendorId: number;
+  category: OfferCategory;
+  title: string;
+  description: string;
+  discountType: OfferDiscountType;
+  discountValue: string;
+  freeItemName: string;
+  days: OfferDay[];
+  timeFrom: string;
+  timeTo: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const DAY_ORDER: { key: OfferDay; label: string }[] = [
+  { key: "mon", label: "Mon" }, { key: "tue", label: "Tue" }, { key: "wed", label: "Wed" },
+  { key: "thu", label: "Thu" }, { key: "fri", label: "Fri" }, { key: "sat", label: "Sat" }, { key: "sun", label: "Sun" },
+];
+
+interface OfferFormState {
+  category: OfferCategory;
+  title: string;
+  description: string;
+  discountType: OfferDiscountType;
+  discountValue: string;
+  freeItemName: string;
+  days: OfferDay[];
+  timeFrom: string;
+  timeTo: string;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+}
+
+const BLANK_OFFER: OfferFormState = {
+  category: "food",
+  title: "",
+  description: "",
+  discountType: "percent",
+  discountValue: "20",
+  freeItemName: "",
+  days: [],
+  timeFrom: "",
+  timeTo: "",
+  startsAt: "",
+  endsAt: "",
+  active: true,
+};
+
+function offerBadge(o: Pick<VendorOffer, "discountType" | "discountValue" | "freeItemName">): string {
+  const v = Number(o.discountValue) || 0;
+  if (o.discountType === "percent") return `${v}% OFF`;
+  if (o.discountType === "fixed") return `₹${v} OFF`;
+  if (o.discountType === "bogo") return "BUY 1 GET 1";
+  if (o.discountType === "free_item") return o.freeItemName ? `FREE: ${o.freeItemName}` : "FREE ITEM";
+  return "OFFER";
+}
+
+function summariseDays(days: OfferDay[]): string {
+  if (!days.length || days.length === 7) return "Every day";
+  return DAY_ORDER.filter((d) => days.includes(d.key)).map((d) => d.label).join(", ");
+}
+
+function summariseWindow(from: string, to: string): string {
+  if (!from || !to) return "All day";
+  return `${from}–${to}`;
+}
+
+function FoodDrinkOffersPanel({ vendorId: _vendorId }: { vendorId: number }) {
+  const { toast } = useToast();
+  const [offers, setOffers] = useState<VendorOffer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<OfferCategory>("food");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<VendorOffer | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [form, setForm] = useState<OfferFormState>(BLANK_OFFER);
+
+  const load = async () => {
+    try {
+      const rows = await apiGet<VendorOffer[]>("/api/partner/offers");
+      setOffers(rows);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => { void load(); }, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const openCreate = () => {
+    setForm({ ...BLANK_OFFER, category: tab });
+    setEditing(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (o: VendorOffer) => {
+    setForm({
+      category: o.category,
+      title: o.title,
+      description: o.description,
+      discountType: o.discountType,
+      discountValue: String(Number(o.discountValue)),
+      freeItemName: o.freeItemName,
+      days: o.days,
+      timeFrom: o.timeFrom,
+      timeTo: o.timeTo,
+      startsAt: o.startsAt ? o.startsAt.slice(0, 10) : "",
+      endsAt: o.endsAt ? o.endsAt.slice(0, 10) : "",
+      active: o.active,
+    });
+    setEditing(o);
+    setShowForm(true);
+  };
+
+  const toggleDay = (d: OfferDay) => {
+    setForm((f) => ({
+      ...f,
+      days: f.days.includes(d) ? f.days.filter((x) => x !== d) : [...f.days, d],
+    }));
+  };
+
+  const save = async () => {
+    if (!form.title.trim()) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    if (form.discountType === "free_item" && !form.freeItemName.trim()) {
+      toast({ title: "Free-item offers need a free item name", variant: "destructive" });
+      return;
+    }
+    if (form.timeFrom && !form.timeTo) {
+      toast({ title: "Set both start and end time, or leave both blank", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        category: form.category,
+        title: form.title.trim(),
+        description: form.description,
+        discountType: form.discountType,
+        discountValue: ["bogo", "free_item"].includes(form.discountType) ? 0 : Number(form.discountValue) || 0,
+        freeItemName: form.freeItemName,
+        days: form.days,
+        timeFrom: form.timeFrom,
+        timeTo: form.timeTo,
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+        endsAt: form.endsAt ? new Date(`${form.endsAt}T23:59:59`).toISOString() : null,
+        active: form.active,
+      };
+      if (editing) {
+        await apiPatch(`/api/partner/offers/${editing.id}`, payload);
+        toast({ title: "Offer updated" });
+      } else {
+        await apiPost("/api/partner/offers", payload);
+        toast({ title: "Offer created" });
+      }
+      setShowForm(false);
+      void load();
+    } catch (e: unknown) {
+      toast({ title: "Error", description: (e as Error)?.message ?? "Failed to save offer", variant: "destructive" });
+    }
+    setSaving(false);
+  };
+
+  const remove = async (id: number) => {
+    setDeleting(id);
+    try {
+      await apiDelete(`/api/partner/offers/${id}`);
+      toast({ title: "Offer deleted" });
+      setOffers((prev) => prev.filter((o) => o.id !== id));
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
+    setDeleting(null);
+  };
+
+  const toggleActive = async (o: VendorOffer) => {
+    try {
+      await apiPatch(`/api/partner/offers/${o.id}`, { active: !o.active });
+      setOffers((prev) => prev.map((x) => (x.id === o.id ? { ...x, active: !x.active } : x)));
+    } catch {
+      toast({ title: "Failed to update", variant: "destructive" });
+    }
+  };
+
+  const filtered = offers.filter((o) => o.category === tab);
+  const isExpired = (o: VendorOffer) => !!o.endsAt && new Date(o.endsAt) < new Date();
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="font-serif text-2xl font-semibold">Food &amp; Drink Discounts</h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Push live discounts on your menu &mdash; shown to customers on the booking page during the days and times you set.
+          </p>
+        </div>
+        <Button size="sm" className="gap-2" onClick={openCreate}>
+          <Plus className="h-4 w-4" /> New Offer
+        </Button>
+      </div>
+
+      <div className="inline-flex rounded-xl bg-black/40 p-1 border border-white/10">
+        <button
+          onClick={() => setTab("food")}
+          className={`px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors ${tab === "food" ? "bg-amber-500/15 text-amber-300" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <Utensils className="h-4 w-4" /> Food
+          <span className="text-xs opacity-70">({offers.filter((o) => o.category === "food").length})</span>
+        </button>
+        <button
+          onClick={() => setTab("drink")}
+          className={`px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-colors ${tab === "drink" ? "bg-amber-500/15 text-amber-300" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <Wine className="h-4 w-4" /> Drink
+          <span className="text-xs opacity-70">({offers.filter((o) => o.category === "drink").length})</span>
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="rounded-2xl glass-card p-6 space-y-5 border border-primary/20">
+          <h3 className="font-semibold text-lg">{editing ? "Edit Offer" : "New Offer"}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Category</Label>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v as OfferCategory })}>
+                <SelectTrigger className="bg-black/40 border-white/10 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="food">Food</SelectItem>
+                  <SelectItem value="drink">Drink</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Title</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder={form.category === "food" ? "e.g. 30% off all starters" : "e.g. BOGO on cocktails"}
+                className="bg-black/40 border-white/10 rounded-xl"
+                maxLength={120}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Description (optional)</Label>
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Short detail customers will see on the offer card"
+                className="bg-black/40 border-white/10 rounded-xl min-h-[60px]"
+                maxLength={500}
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Discount Type</Label>
+              <Select value={form.discountType} onValueChange={(v) => setForm({ ...form, discountType: v as OfferDiscountType })}>
+                <SelectTrigger className="bg-black/40 border-white/10 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percent">Percentage (%)</SelectItem>
+                  <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                  <SelectItem value="bogo">Buy 1 Get 1</SelectItem>
+                  <SelectItem value="free_item">Free Item</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {(form.discountType === "percent" || form.discountType === "fixed") && (
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">
+                  {form.discountType === "percent" ? "Discount %" : "Discount ₹"}
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={form.discountType === "percent" ? 100 : undefined}
+                  value={form.discountValue}
+                  onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
+                  className="bg-black/40 border-white/10 rounded-xl"
+                />
+              </div>
+            )}
+            {form.discountType === "free_item" && (
+              <div className="sm:col-span-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Free item name</Label>
+                <Input
+                  value={form.freeItemName}
+                  onChange={(e) => setForm({ ...form, freeItemName: e.target.value })}
+                  placeholder="e.g. Free dessert with any main course"
+                  className="bg-black/40 border-white/10 rounded-xl"
+                  maxLength={120}
+                />
+              </div>
+            )}
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Time from</Label>
+              <Input
+                type="time"
+                value={form.timeFrom}
+                onChange={(e) => setForm({ ...form, timeFrom: e.target.value })}
+                className="bg-black/40 border-white/10 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Time to</Label>
+              <Input
+                type="time"
+                value={form.timeTo}
+                onChange={(e) => setForm({ ...form, timeTo: e.target.value })}
+                className="bg-black/40 border-white/10 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Valid from</Label>
+              <Input
+                type="date"
+                value={form.startsAt}
+                onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                className="bg-black/40 border-white/10 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Valid until</Label>
+              <Input
+                type="date"
+                value={form.endsAt}
+                onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+                className="bg-black/40 border-white/10 rounded-xl"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Active days (leave all unselected = every day)</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAY_ORDER.map((d) => (
+                  <button
+                    key={d.key}
+                    type="button"
+                    onClick={() => toggleDay(d.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${form.days.includes(d.key) ? "bg-amber-500/20 text-amber-300 border-amber-500/40" : "bg-black/40 text-muted-foreground border-white/10 hover:text-foreground"}`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="rounded" />
+              Active
+            </label>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button onClick={save} disabled={saving} className="gap-2">
+              {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {editing ? "Save Changes" : "Create Offer"}
+            </Button>
+            <Button variant="outline" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl glass-card p-10 text-center text-muted-foreground text-sm">
+          No {tab} offers yet. Create your first {tab} offer above.
+        </div>
+      ) : (
+        <div className="rounded-2xl glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead>
+                <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left">Title</th>
+                  <th className="px-4 py-3 text-left">Discount</th>
+                  <th className="px-4 py-3 text-left">Days</th>
+                  <th className="px-4 py-3 text-left">Time</th>
+                  <th className="px-4 py-3 text-left">Validity</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filtered.map((o) => {
+                  const expired = isExpired(o);
+                  return (
+                    <tr key={o.id} className={`hover:bg-white/[0.02] transition-colors ${expired ? "opacity-50" : ""}`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-start gap-2">
+                          {o.category === "drink" ? <Wine className="h-4 w-4 text-rose-300 mt-0.5 shrink-0" /> : <Utensils className="h-4 w-4 text-emerald-300 mt-0.5 shrink-0" />}
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{o.title}</div>
+                            {o.description && <div className="text-xs text-muted-foreground line-clamp-1">{o.description}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-bold tracking-wider px-2 py-1 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/40">
+                          {offerBadge(o)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{summariseDays(o.days)}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{summariseWindow(o.timeFrom, o.timeTo)}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {o.startsAt || o.endsAt
+                          ? `${o.startsAt ? new Date(o.startsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Any"} – ${o.endsAt ? new Date(o.endsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Open"}`
+                          : "Open"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => toggleActive(o)}
+                          className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${o.active ? "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30" : "bg-white/5 text-muted-foreground hover:bg-white/10"}`}
+                        >
+                          {expired ? "Expired" : o.active ? "Active" : "Inactive"}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openEdit(o)} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => remove(o.id)} disabled={deleting === o.id} className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
+                            {deleting === o.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface OfferAnalytics {
+  windowDays: number;
+  activeCount: number;
+  bookingsDuringOffers: number;
+  totalRevenue: number;
+  top: { id: number; title: string; category: OfferCategory; bookings: number; revenue: number } | null;
+  perOffer: Array<{
+    id: number;
+    title: string;
+    category: OfferCategory;
+    discountType: OfferDiscountType;
+    discountValue: number;
+    active: boolean;
+    bookings: number;
+    revenue: number;
+  }>;
+}
+
+function useOfferAnalytics(windowDays: number) {
+  const [data, setData] = useState<OfferAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      apiGet<OfferAnalytics>(`/api/partner/offers/analytics?window=${windowDays}`)
+        .then((d) => { if (alive) { setData(d); setLoading(false); } })
+        .catch(() => { if (alive) setLoading(false); });
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, [windowDays]);
+  return { data, loading };
+}
+
+function OffersOverviewSummary() {
+  const { data, loading } = useOfferAnalytics(30);
+  if (loading || !data) return null;
+  return (
+    <div className="rounded-2xl glass-card p-5 border border-amber-500/20">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">
+          <Gift className="h-4 w-4 text-amber-300" /> Food &amp; Drink Offers
+        </h3>
+        <Link href="?tab=coupons" className="text-xs text-amber-300 hover:underline">Manage →</Link>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-black/40 border border-white/10 p-3">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Active offers</p>
+          <p className="text-2xl font-semibold tabular-nums">{data.activeCount}</p>
+        </div>
+        <div className="rounded-xl bg-black/40 border border-white/10 p-3">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Bookings · last 30 d</p>
+          <p className="text-2xl font-semibold tabular-nums">{data.bookingsDuringOffers}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OffersAnalyticsBlock() {
+  const { data, loading } = useOfferAnalytics(30);
+  if (loading) {
+    return (
+      <div className="rounded-2xl glass-card p-5 animate-pulse">
+        <div className="h-3 w-32 rounded bg-white/[0.06] mb-3" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[0,1,2,3].map((i) => <div key={i} className="h-24 rounded-xl bg-white/[0.04]" />)}
+        </div>
+      </div>
+    );
+  }
+  if (!data) return null;
+  return (
+    <div className="rounded-2xl glass-card p-5 border border-amber-500/20 space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">
+          <Gift className="h-4 w-4 text-amber-300" /> Food &amp; Drink Offers
+          <span className="text-xs text-muted-foreground font-normal">· last {data.windowDays} days</span>
+        </h3>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-xl bg-black/40 border border-white/10 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Active offers</p>
+          <p className="text-2xl font-semibold tabular-nums">{data.activeCount}</p>
+        </div>
+        <div className="rounded-xl bg-black/40 border border-white/10 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Bookings during offers</p>
+          <p className="text-2xl font-semibold tabular-nums">{data.bookingsDuringOffers}</p>
+        </div>
+        <div className="rounded-xl bg-black/40 border border-white/10 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Est. offer revenue</p>
+          <p className="text-2xl font-semibold tabular-nums">{formatINR(data.totalRevenue)}</p>
+        </div>
+        <div className="rounded-xl bg-black/40 border border-white/10 p-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Top-performing</p>
+          <p className="text-sm font-semibold truncate" title={data.top?.title ?? ""}>
+            {data.top?.title ?? "—"}
+          </p>
+          {data.top && (
+            <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">
+              {data.top.category} · {data.top.bookings} bookings
+            </p>
+          )}
+        </div>
+      </div>
+      {data.perOffer.length > 0 && (
+        <div className="rounded-xl bg-black/30 border border-white/5 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[500px]">
+              <thead>
+                <tr className="border-b border-white/10 text-[10px] text-muted-foreground uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left">Offer</th>
+                  <th className="px-4 py-2.5 text-left">Category</th>
+                  <th className="px-4 py-2.5 text-right">Bookings</th>
+                  <th className="px-4 py-2.5 text-right">Est. revenue</th>
+                  <th className="px-4 py-2.5 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {data.perOffer.map((o) => (
+                  <tr key={o.id}>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        {o.category === "drink"
+                          ? <Wine className="h-3.5 w-3.5 text-rose-300" />
+                          : <Utensils className="h-3.5 w-3.5 text-emerald-300" />}
+                        <span className="text-xs">{o.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 capitalize text-xs text-muted-foreground">{o.category}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs">{o.bookings}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs">{formatINR(o.revenue)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md ${o.active ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-muted-foreground"}`}>
+                        {o.active ? "Active" : "Inactive"}
+                      </span>
                     </td>
                   </tr>
                 ))}

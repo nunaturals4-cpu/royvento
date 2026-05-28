@@ -22,6 +22,59 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
+import { OfferCard, type VendorOffer as VendorOfferData } from "@/components/OfferCard";
+
+function TodaysOffers({ vendorId }: { vendorId: number }) {
+  const [offers, setOffers] = useState<VendorOfferData[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      apiGet<VendorOfferData[]>(`/api/vendors/${vendorId}/offers`)
+        .then((rows) => { if (alive) { setOffers(rows); setLoading(false); } })
+        .catch(() => { if (alive) setLoading(false); });
+    };
+    load();
+    const t = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, [vendorId]);
+
+  if (loading || offers.length === 0) return null;
+
+  const food = offers.filter((o) => o.category === "food");
+  const drink = offers.filter((o) => o.category === "drink");
+
+  const renderGroup = (label: string, items: VendorOfferData[], Icon: typeof Utensils) => {
+    if (items.length === 0) return null;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-amber-300" />
+          <h3 className="font-serif text-lg">{label}</h3>
+          <span className="text-xs text-muted-foreground">({items.length} live)</span>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {items.map((o) => (
+            <OfferCard key={o.id} offer={o} variant="customer" />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <section className="space-y-5">
+      <div>
+        <h2 className="font-serif text-2xl flex items-center gap-2">
+          <Tag className="h-5 w-5 text-amber-300" /> Today&apos;s Offers
+        </h2>
+        <p className="text-xs text-muted-foreground mt-1">Live deals at this venue — apply at the bar.</p>
+      </div>
+      {renderGroup("Food", food, Utensils)}
+      {renderGroup("Drinks", drink, GlassWater)}
+    </section>
+  );
+}
 
 interface Announcement {
   id: number;
@@ -639,6 +692,8 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                 </div>
               )}
             </section>
+
+            <TodaysOffers vendorId={vendor.id} />
 
             <section>
               <h2 className="font-serif text-2xl mb-6 flex items-center gap-2">
