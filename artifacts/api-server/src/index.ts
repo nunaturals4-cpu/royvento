@@ -231,9 +231,34 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "vendor_commissions" ADD COLUMN IF NOT EXISTS "event_commission_enabled" boolean NOT NULL DEFAULT true`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "price" numeric(10,2) NOT NULL DEFAULT '0'`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "event_commission_pct" numeric(5,2)`);
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking columns ensured");
+    // ── Food & Drink discount offers (vendor_offers) ───────────────────────
+    // Venue-pushed promotions shown on the customer booking page. Idempotent so
+    // a fresh deploy can ship the partner Coupons-tab UI without a separate
+    // drizzle-kit push step.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "vendor_offers" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "vendor_id" integer NOT NULL REFERENCES "vendors"("id") ON DELETE CASCADE,
+        "category" varchar(10) NOT NULL,
+        "title" varchar(120) NOT NULL,
+        "description" text NOT NULL DEFAULT '',
+        "discount_type" varchar(16) NOT NULL,
+        "discount_value" numeric(10,2) NOT NULL DEFAULT '0',
+        "free_item_name" varchar(120) NOT NULL DEFAULT '',
+        "days" text[] NOT NULL DEFAULT '{}'::text[],
+        "time_from" varchar(5) NOT NULL DEFAULT '',
+        "time_to" varchar(5) NOT NULL DEFAULT '',
+        "starts_at" timestamp with time zone,
+        "ends_at" timestamp with time zone,
+        "active" boolean NOT NULL DEFAULT true,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_offers_vendor_idx" ON "vendor_offers" ("vendor_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_offers_vendor_active_idx" ON "vendor_offers" ("vendor_id", "active")`);
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers ensured");
   } catch (err) {
-    logger.error({ err }, "Schema migration warning (drink_plans global_priority)");
+    logger.error({ err }, "Schema migration warning");
   }
 }
 
