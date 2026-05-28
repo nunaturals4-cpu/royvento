@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -125,7 +125,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const [hoursExpanded, setHoursExpanded] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const pubTabRef = useRef<HTMLDivElement>(null);
-  const [pubTab, setPubTab] = useState<"overview" | "happyHours" | "reviews" | "photos" | "book">("overview");
+  const [pubTab, setPubTab] = useState<"overview" | "happyHours" | "reviews" | "photos" | "offers" | "book">("overview");
   const switchPubTab = (tab: typeof pubTab) => {
     setPubTab(tab);
     requestAnimationFrame(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -834,6 +834,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               ...(isPub ? [{ id: "happyHours" as const, label: "Happy Hours" }] : []),
               { id: "reviews" as const, label: "Reviews" },
               { id: "photos" as const, label: "Photos & Videos" },
+              ...(isPub ? [{ id: "offers" as const, label: "Food & Drink Offers" }] : []),
               { id: "book" as const, label: "Book a Table" },
             ] as { id: typeof pubTab; label: string }[]).map((tab) => (
               <button
@@ -1445,6 +1446,14 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           </div>
         )}
 
+        {/* ─── FOOD & DRINK OFFERS TAB ─── */}
+        {pubTab === "offers" && isPub && (
+          <FoodDrinkOffersSection
+            vendorId={(event as any)?.vendorId ?? (event as any)?.vendor?.id}
+            onBookClick={() => switchPubTab("book")}
+          />
+        )}
+
         {/* ─── BOOK A TABLE TAB ─── */}
         {pubTab === "book" && (
           <div id="book" className="max-w-2xl mx-auto scroll-mt-20">
@@ -1730,6 +1739,229 @@ function TicketRow({ label, price, value, onChange, hidePrice, freeBadge }: { la
         >+</button>
       </div>
     </div>
+  );
+}
+
+// ─── Food & Drink Offers tab (premium card grid) ─────────────────────────────
+
+interface VendorOfferDto {
+  id: number;
+  category: "food" | "drink" | string;
+  title: string;
+  description: string;
+  discountType: "percent" | "fixed" | "bogo" | "free_item" | string;
+  discountValue: string | number;
+  freeItemName: string;
+  days: string[];
+  timeFrom: string;
+  timeTo: string;
+}
+
+const OFFER_DAY_LABEL: Record<string, string> = {
+  sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat",
+};
+
+function offerDiscountBadge(o: Pick<VendorOfferDto, "discountType" | "discountValue" | "freeItemName">): string {
+  const v = Number(o.discountValue) || 0;
+  if (o.discountType === "percent") return `${v}% OFF`;
+  if (o.discountType === "fixed") return `₹${v} OFF`;
+  if (o.discountType === "bogo") return "BUY 1 GET 1";
+  if (o.discountType === "free_item") return o.freeItemName ? `FREE: ${o.freeItemName}` : "FREE ITEM";
+  return "OFFER";
+}
+
+function offerDaysLabel(days: string[]): string {
+  if (!days || days.length === 0 || days.length === 7) return "Every day";
+  return days.map((d) => OFFER_DAY_LABEL[d] ?? d).join(" · ");
+}
+
+function offerWindowLabel(from: string, to: string): string {
+  if (!from || !to) return "All day";
+  return `${from} – ${to}`;
+}
+
+function FoodDrinkOffersSection({ vendorId, onBookClick }: { vendorId: number | undefined; onBookClick: () => void }) {
+  const { data: offers = [], isLoading } = useQuery({
+    queryKey: ["vendor-offers", vendorId],
+    queryFn: () => apiGet<VendorOfferDto[]>(`/api/vendors/${vendorId}/offers`),
+    enabled: !!vendorId,
+    refetchInterval: 60_000,
+  });
+
+  const food = offers.filter((o) => o.category === "food");
+  const drink = offers.filter((o) => o.category === "drink");
+
+  return (
+    <div className="max-w-5xl mx-auto">
+      <div className="text-center mb-10">
+        <p className="text-xs uppercase tracking-[0.25em] text-amber-300/80 font-semibold mb-3">Live now</p>
+        <h2 className="font-serif text-4xl md:text-5xl mb-3">Food &amp; Drink Offers</h2>
+        <p className="text-white/50 max-w-xl mx-auto">Curated deals from the venue — valid right now. Tap any offer to head straight to booking.</p>
+      </div>
+
+      {isLoading ? (
+        <div className="grid sm:grid-cols-2 gap-6">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="aspect-[5/4] rounded-3xl glass-card animate-pulse" />
+          ))}
+        </div>
+      ) : offers.length === 0 ? (
+        <div className="rounded-3xl glass-card-strong p-14 text-center max-w-xl mx-auto">
+          <div className="h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 mx-auto mb-4 flex items-center justify-center">
+            <Tag className="h-5 w-5 text-amber-300" />
+          </div>
+          <h3 className="font-serif text-2xl mb-2">No live offers right now</h3>
+          <p className="text-white/50 text-sm">Check back later — the venue posts food and drink deals through the day.</p>
+        </div>
+      ) : (
+        <div className="space-y-10">
+          {food.length > 0 && (
+            <OfferGroup
+              icon={Utensils}
+              accent="emerald"
+              label="Food"
+              count={food.length}
+              offers={food}
+              onBookClick={onBookClick}
+            />
+          )}
+          {drink.length > 0 && (
+            <OfferGroup
+              icon={Wine}
+              accent="rose"
+              label="Drinks"
+              count={drink.length}
+              offers={drink}
+              onBookClick={onBookClick}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OfferGroup({
+  icon: Icon,
+  accent,
+  label,
+  count,
+  offers,
+  onBookClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  accent: "emerald" | "rose";
+  label: string;
+  count: number;
+  offers: VendorOfferDto[];
+  onBookClick: () => void;
+}) {
+  const accentTint =
+    accent === "emerald"
+      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+      : "bg-rose-500/15 text-rose-300 border-rose-500/30";
+
+  return (
+    <section>
+      <div className="flex items-center gap-3 mb-5">
+        <div className={`h-9 w-9 rounded-xl flex items-center justify-center border ${accentTint}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <h3 className="font-serif text-2xl">{label}</h3>
+        <span className="text-xs uppercase tracking-widest text-white/40">{count} live</span>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-5">
+        {offers.map((o) => (
+          <PremiumOfferCard key={o.id} offer={o} accent={accent} onBookClick={onBookClick} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PremiumOfferCard({
+  offer,
+  accent,
+  onBookClick,
+}: {
+  offer: VendorOfferDto;
+  accent: "emerald" | "rose";
+  onBookClick: () => void;
+}) {
+  const Icon = offer.category === "drink" ? Wine : Utensils;
+  const iconTint =
+    accent === "emerald"
+      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
+      : "bg-rose-500/15 text-rose-300 border-rose-500/25";
+
+  return (
+    <article
+      className="
+        group relative overflow-hidden rounded-3xl
+        border border-amber-500/20 hover:border-amber-400/45
+        bg-gradient-to-br from-amber-500/[0.05] via-black/40 to-black/70
+        backdrop-blur-sm
+        shadow-[0_8px_32px_-12px_rgba(0,0,0,0.6)]
+        transition-all duration-300
+        hover:-translate-y-0.5 hover:shadow-[0_18px_46px_-16px_rgba(251,191,36,0.25)]
+      "
+    >
+      {/* gold corner glow */}
+      <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-amber-500/15 blur-3xl opacity-60 group-hover:opacity-90 transition-opacity" />
+
+      <div className="relative p-6 sm:p-7 flex flex-col gap-5 h-full">
+        {/* Header row: icon + discount badge */}
+        <div className="flex items-start justify-between gap-3">
+          <div className={`h-11 w-11 rounded-2xl flex items-center justify-center border ${iconTint}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.12em] uppercase bg-amber-500/15 text-amber-200 border border-amber-400/45 shadow-[0_0_24px_-6px_rgba(251,191,36,0.6)]">
+            {offerDiscountBadge(offer)}
+          </span>
+        </div>
+
+        {/* Title + description */}
+        <div className="min-h-[64px]">
+          <h4 className="font-serif text-xl sm:text-[22px] leading-snug text-white mb-1.5 line-clamp-2">
+            {offer.title}
+          </h4>
+          {offer.description && (
+            <p className="text-sm text-white/55 leading-relaxed line-clamp-2">{offer.description}</p>
+          )}
+        </div>
+
+        {/* Timing row */}
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[12px] text-white/60 border-t border-white/8 pt-4">
+          <span className="inline-flex items-center gap-1.5">
+            <CalIcon className="h-3.5 w-3.5 text-amber-300/80" />
+            <span>{offerDaysLabel(offer.days)}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-amber-300/80" />
+            <span>{offerWindowLabel(offer.timeFrom, offer.timeTo)}</span>
+          </span>
+        </div>
+
+        {/* CTA */}
+        <button
+          type="button"
+          onClick={onBookClick}
+          className="
+            mt-auto inline-flex items-center justify-center gap-2
+            w-full h-11 rounded-2xl
+            bg-gradient-to-r from-amber-500 to-amber-400
+            text-black text-sm font-semibold tracking-wide
+            shadow-[0_8px_28px_-8px_rgba(251,191,36,0.6)]
+            hover:from-amber-400 hover:to-amber-300
+            transition-all
+            focus:outline-none focus:ring-2 focus:ring-amber-300/60 focus:ring-offset-2 focus:ring-offset-black
+          "
+        >
+          Claim &amp; Book Now
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </button>
+      </div>
+    </article>
   );
 }
 
