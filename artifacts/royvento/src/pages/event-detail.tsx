@@ -1226,43 +1226,69 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               );
             })()}
             {isPub && drinkPlans.length > 0 && (
-              <div>
-                {/* Section header */}
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="h-12 w-12 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
-                    <Wine className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-serif text-3xl text-white">Drink Deals</h3>
-                    <p className="text-white/35 text-sm mt-0.5">Select a plan · Valid on listed days</p>
-                  </div>
+              <div className="rounded-3xl glass-card-strong p-5 md:p-7">
+                <div className="flex items-center gap-3 mb-1">
+                  <Wine className="h-4 w-4 text-primary" />
+                  <h3 className="text-base md:text-lg font-bold text-foreground tracking-tight">Drink Deals</h3>
                 </div>
+                <p className="text-xs text-muted-foreground mb-6">Tap on any deal to book a table</p>
 
-                <div className="space-y-3">
-                  {drinkPlans.map((plan: any) => {
-                    const typeLabel = plan.type === "unlimited" ? "Unlimited Drinks" : plan.type === "ticket" ? "Entry + Drinks" : plan.type === "welcome" ? "Welcome Drink" : "Drink Package";
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                  {drinkPlans.map((plan: any, i: number) => {
+                    const featured = i === 0;
+                    const typeLabel = plan.type === "unlimited" ? "UNLIMITED DRINKS"
+                      : plan.type === "ticket" ? "TICKET PACKAGE"
+                      : plan.type === "welcome" ? "WELCOME DRINK"
+                      : "DRINK PACKAGE";
                     const hasItems = plan.lineItems && plan.lineItems.length > 0;
-                    return (
-                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex items-center gap-4">
-                        <div className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
-                          <Wine className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-bold text-primary/70 uppercase tracking-[0.15em] mb-1">{typeLabel}</p>
-                          {hasItems && (
-                            <ul className="space-y-0.5">
-                              {plan.lineItems.map((item: any, i: number) => (
-                                <li key={i} className="text-sm text-white/80">{item.name}</li>
-                              ))}
-                            </ul>
+                    const headline = plan.productName
+                      || (hasItems ? plan.lineItems.map((li: any) => li.name).filter(Boolean).slice(0, 2).join(", ") : "")
+                      || typeLabel.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
+                    const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
+                    const showTime = !!(plan.timeFrom && plan.timeTo);
+                    const subtitleParts: string[] = [];
+                    if (showDays) subtitleParts.push(plan.days.map((d: string) => d.slice(0, 3)).join(", "));
+                    if (showTime) subtitleParts.push(`${plan.timeFrom}–${plan.timeTo}`);
+                    const subtitle = subtitleParts.join(" • ");
+
+                    if (featured) {
+                      return (
+                        <div key={plan.id} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/95 via-primary/80 to-primary/60 text-white p-5 flex flex-col min-h-[200px] red-glow border border-white/[0.10]">
+                          <Wine className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
+                          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/95 mb-3">{typeLabel}</p>
+                          <p className="text-base font-bold leading-snug line-clamp-2 mb-1">{headline}</p>
+                          {plan.description && (
+                            <p className="text-xs text-white/85 leading-snug line-clamp-2">{plan.description}</p>
                           )}
+                          {subtitle && (
+                            <p className="text-xs text-white/85 mt-2 line-clamp-1">{subtitle}</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => switchPubTab("book")}
+                            className="mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
+                          >
+                            Book Now <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
                         </div>
+                      );
+                    }
+                    return (
+                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex flex-col min-h-[200px]">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary mb-3">{typeLabel}</p>
+                        <p className="text-base font-bold text-foreground leading-snug line-clamp-2 mb-1">{headline}</p>
+                        {plan.description && (
+                          <p className="text-xs text-muted-foreground leading-snug line-clamp-2">{plan.description}</p>
+                        )}
+                        {subtitle && (
+                          <p className="text-xs text-muted-foreground/70 mt-2 line-clamp-1">{subtitle}</p>
+                        )}
                         <button
                           type="button"
                           onClick={() => switchPubTab("book")}
-                          className="shrink-0 px-4 py-2 rounded-xl bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all"
+                          className="mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-primary/15 hover:bg-primary border border-primary/30 hover:border-primary text-primary hover:text-primary-foreground text-xs font-bold uppercase tracking-wider transition-all"
                         >
-                          Book Now
+                          Book Now <ArrowRight className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     );
@@ -1830,10 +1856,10 @@ function FoodDrinkOffersSection({ vendorId, onBookClick }: { vendorId: number | 
       ) : (
         <div className="space-y-12">
           {food.length > 0 && (
-            <OfferGroup icon={Utensils} label="Food" count={food.length} offers={food} onBookClick={onBookClick} />
+            <OfferGroup icon={Utensils} label="Food" count={food.length} offers={food} onBookClick={onBookClick} accent="amber" />
           )}
           {drink.length > 0 && (
-            <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} />
+            <OfferGroup icon={Wine} label="Drinks" count={drink.length} offers={drink} onBookClick={onBookClick} accent="primary" />
           )}
         </div>
       )}
@@ -1844,126 +1870,108 @@ function FoodDrinkOffersSection({ vendorId, onBookClick }: { vendorId: number | 
 function OfferGroup({
   icon: Icon,
   label,
-  count,
   offers,
   onBookClick,
+  accent,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   count: number;
   offers: VendorOfferDto[];
   onBookClick: () => void;
+  accent: "primary" | "amber";
 }) {
+  const accentText = accent === "amber" ? "text-amber-400" : "text-primary";
   return (
-    <section>
-      {/* Group sub-header: thin gold rule with serif label */}
-      <div className="flex items-center gap-4 mb-6">
-        <span className="h-px flex-1 bg-amber-500/15" />
-        <div className="flex items-center gap-2.5 text-amber-300/90">
-          <Icon className="h-3.5 w-3.5" />
-          <span className="font-serif italic text-[15px] tracking-wide">{label}</span>
-          <span className="text-[11px] uppercase tracking-widest text-white/35">· {count}</span>
-        </div>
-        <span className="h-px flex-1 bg-amber-500/15" />
+    <div className="rounded-3xl glass-card-strong p-5 md:p-7">
+      <div className="flex items-center gap-3 mb-1">
+        <Icon className={`h-4 w-4 ${accentText}`} />
+        <h3 className="text-base md:text-lg font-bold text-foreground tracking-tight">{label}</h3>
       </div>
-      <div className="grid sm:grid-cols-2 gap-5">
-        {offers.map((o) => (
-          <PremiumOfferCard key={o.id} offer={o} onBookClick={onBookClick} />
+      <p className="text-xs text-muted-foreground mb-6">Tap on any deal to book a table</p>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        {offers.map((o, i) => (
+          <PremiumOfferCard key={o.id} offer={o} onBookClick={onBookClick} featured={i === 0} accent={accent} />
         ))}
       </div>
-    </section>
+    </div>
   );
 }
 
 function PremiumOfferCard({
   offer,
   onBookClick,
+  featured = false,
+  accent,
 }: {
   offer: VendorOfferDto;
   onBookClick: () => void;
+  featured?: boolean;
+  accent: "primary" | "amber";
 }) {
   const Icon = offer.category === "drink" ? Wine : Utensils;
   const window = offerWindowLabel(offer.timeFrom, offer.timeTo);
+  const category = offer.category === "drink" ? "DRINK DEAL" : "FOOD DEAL";
+  const badge = offerDiscountBadge(offer);
+  const daysLabel = offerDaysLabel(offer.days);
 
-  return (
-    <article
-      className="
-        group relative overflow-hidden rounded-2xl
-        border border-white/[0.08] hover:border-amber-400/30
-        bg-[#0d0c12]
-        shadow-[0_2px_24px_-8px_rgba(0,0,0,0.6)]
-        transition-all duration-500
-        hover:shadow-[0_18px_44px_-20px_rgba(212,175,55,0.35)]
-      "
-    >
-      {/* Subtle inner gold hairline */}
-      <div className="pointer-events-none absolute inset-px rounded-[15px] border border-amber-400/[0.04] group-hover:border-amber-400/15 transition-colors" />
-      {/* Top accent rule */}
-      <div className="pointer-events-none absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-amber-400/30 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
-
-      <div className="relative p-6 sm:p-7 flex flex-col h-full">
-        {/* Discount badge — refined serif gold pill, top-right */}
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="h-10 w-10 rounded-full border border-amber-400/25 bg-amber-400/[0.04] flex items-center justify-center">
-            <Icon className="h-4 w-4 text-amber-300/90" />
-          </div>
-          <span className="
-            shrink-0 inline-flex items-center
-            font-serif italic text-[13px] tracking-wide
-            text-amber-200
-            border-y border-amber-400/35
-            px-3 py-1
-          ">
-            {offerDiscountBadge(offer)}
-          </span>
+  if (featured) {
+    const gradient = accent === "amber"
+      ? "from-amber-500/95 via-amber-600/90 to-amber-700/85"
+      : "from-primary/95 via-primary/80 to-primary/60";
+    return (
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 flex flex-col min-h-[200px] red-glow border border-white/[0.10]`}>
+        <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/95">{category}</p>
+          <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/15 border border-white/25">{badge}</span>
         </div>
-
-        {/* Title + description */}
-        <div>
-          <h4 className="font-serif text-[22px] sm:text-2xl leading-snug text-white mb-2 line-clamp-2">
-            {offer.title}
-          </h4>
-          {offer.description && (
-            <p className="text-[13.5px] text-white/55 leading-relaxed italic line-clamp-3">
-              {offer.description}
-            </p>
-          )}
-        </div>
-
-        {/* Timing — small caps */}
-        <div className="mt-6 mb-7 flex flex-wrap gap-x-6 gap-y-2 text-[10.5px] uppercase tracking-[0.18em] text-white/45">
-          <span className="inline-flex items-center gap-2">
-            <CalIcon className="h-3 w-3 text-amber-400/70" />
-            <span>{offerDaysLabel(offer.days)}</span>
-          </span>
-          {window && (
-            <span className="inline-flex items-center gap-2">
-              <Clock className="h-3 w-3 text-amber-400/70" />
-              <span>{window}</span>
-            </span>
-          )}
-        </div>
-
-        {/* CTA — refined outlined gold button */}
+        <p className="text-base font-bold leading-snug line-clamp-2 mb-1">{offer.title}</p>
+        {offer.description && (
+          <p className="text-xs text-white/85 leading-snug line-clamp-2">{offer.description}</p>
+        )}
+        <p className="text-xs text-white/85 mt-2 line-clamp-1 flex items-center gap-1.5">
+          <CalIcon className="h-3 w-3" /> {daysLabel}{window ? ` • ${window}` : ""}
+        </p>
         <button
           type="button"
           onClick={onBookClick}
-          className="
-            mt-auto group/btn inline-flex items-center justify-center gap-2
-            w-full h-11 rounded-full
-            border border-amber-400/45 hover:border-amber-300
-            bg-transparent hover:bg-amber-400/[0.06]
-            text-amber-200 hover:text-amber-100
-            text-[13px] font-medium tracking-[0.15em] uppercase
-            transition-all duration-300
-            focus:outline-none focus:ring-1 focus:ring-amber-300/50
-          "
+          className="mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
         >
-          Book Now
-          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover/btn:translate-x-1" />
+          Book Now <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
-    </article>
+    );
+  }
+
+  const labelColor = accent === "amber" ? "text-amber-400" : "text-primary";
+  const ctaClass = accent === "amber"
+    ? "bg-amber-500/15 hover:bg-amber-500 border-amber-500/30 hover:border-amber-500 text-amber-400 hover:text-black"
+    : "bg-primary/15 hover:bg-primary border-primary/30 hover:border-primary text-primary hover:text-primary-foreground";
+
+  return (
+    <div className="rounded-2xl glass-card p-5 flex flex-col min-h-[200px]">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor}`}>{category}</p>
+        <span className={`shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${accent === "amber" ? "bg-amber-500/15 border border-amber-500/30 text-amber-400" : "bg-primary/15 border border-primary/30 text-primary"}`}>
+          {badge}
+        </span>
+      </div>
+      <p className="text-base font-bold text-foreground leading-snug line-clamp-2 mb-1">{offer.title}</p>
+      {offer.description && (
+        <p className="text-xs text-muted-foreground leading-snug line-clamp-2">{offer.description}</p>
+      )}
+      <p className="text-xs text-muted-foreground/70 mt-2 line-clamp-1 flex items-center gap-1.5">
+        <CalIcon className="h-3 w-3 flex-shrink-0" /> {daysLabel}{window ? ` • ${window}` : ""}
+      </p>
+      <button
+        type="button"
+        onClick={onBookClick}
+        className={`mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${ctaClass}`}
+      >
+        Book Now <ArrowRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 

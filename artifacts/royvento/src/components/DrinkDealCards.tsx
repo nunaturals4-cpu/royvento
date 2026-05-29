@@ -61,11 +61,11 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
 
   if (featured) {
     const gradient = accent === "amber"
-      ? "from-amber-500 via-amber-600 to-amber-700"
-      : "from-primary via-rose-700 to-rose-900";
+      ? "from-amber-500/95 via-amber-600/90 to-amber-700/85"
+      : "from-primary/95 via-primary/80 to-primary/60";
     return (
       <Link href={href} className="group block">
-        <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 h-full flex flex-col min-h-[180px] shadow-[0_10px_40px_rgba(220,38,38,0.25)]`}>
+        <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 h-full flex flex-col min-h-[180px] red-glow border border-white/[0.10]`}>
           <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/95 mb-3">
             {category}
@@ -73,10 +73,10 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
           <p className="text-base font-bold leading-snug line-clamp-2 mb-1">{offer.vendorName}</p>
           <p className="text-sm text-white/95 leading-snug line-clamp-2">{headline}</p>
           {subtitle && (
-            <p className="text-xs text-white/80 mt-auto pt-3 line-clamp-1">{subtitle}</p>
+            <p className="text-xs text-white/85 mt-auto pt-3 line-clamp-1">{subtitle}</p>
           )}
           {plans.length > 1 && (
-            <p className="text-[10px] uppercase tracking-wider text-white/70 mt-1">
+            <p className="text-[10px] uppercase tracking-wider text-white/75 mt-1">
               +{plans.length - 1} more
             </p>
           )}
@@ -89,22 +89,22 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
 
   return (
     <Link href={href} className="group block">
-      <div className="rounded-2xl bg-zinc-900/90 border border-white/[0.07] hover:border-white/[0.18] p-5 h-full flex flex-col min-h-[180px] transition-colors">
+      <div className="rounded-2xl glass-card p-5 h-full flex flex-col min-h-[180px] transition-colors hover:border-white/15">
         <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor} mb-3`}>
           {category}
         </p>
-        <p className="text-base font-bold text-white leading-snug line-clamp-2 mb-1">
+        <p className="text-base font-bold text-foreground leading-snug line-clamp-2 mb-1">
           {offer.vendorName}
         </p>
-        <p className="text-sm text-white/65 leading-snug line-clamp-2">{headline}</p>
+        <p className="text-sm text-muted-foreground leading-snug line-clamp-2">{headline}</p>
         {subtitle && (
-          <p className="text-xs text-white/40 mt-auto pt-3 line-clamp-1 flex items-center gap-1.5">
+          <p className="text-xs text-muted-foreground/70 mt-auto pt-3 line-clamp-1 flex items-center gap-1.5">
             {(primary.timeFrom && primary.timeTo) && <Clock className="h-3 w-3 flex-shrink-0" />}
             {subtitle}
           </p>
         )}
         {plans.length > 1 && (
-          <p className="text-[10px] uppercase tracking-wider text-white/30 mt-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mt-1">
             +{plans.length - 1} more
           </p>
         )}
@@ -125,12 +125,12 @@ function DealPanel({ vendors, accent, title, subtitle }: SectionProps) {
   const accentText = accent === "amber" ? "text-amber-400" : "text-primary";
 
   return (
-    <div className="rounded-3xl bg-zinc-950/60 border border-white/[0.06] p-5 md:p-7">
+    <div className="rounded-3xl glass-card-strong p-5 md:p-7">
       <div className="flex items-center gap-3 mb-1">
         <Icon className={`h-4 w-4 ${accentText}`} />
-        <h3 className="text-base md:text-lg font-bold text-white tracking-tight">{title}</h3>
+        <h3 className="text-base md:text-lg font-bold text-foreground tracking-tight">{title}</h3>
       </div>
-      <p className="text-xs text-white/45 mb-6">{subtitle}</p>
+      <p className="text-xs text-muted-foreground mb-6">{subtitle}</p>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         {vendors.map((v, i) => (

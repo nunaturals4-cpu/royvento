@@ -197,8 +197,16 @@ router.get("/vendors/:vendorId/offers", async (req, res) => {
       .from(vendorOffersTable)
       .where(and(eq(vendorOffersTable.vendorId, vendorId), eq(vendorOffersTable.active, true)))
       .orderBy(desc(vendorOffersTable.createdAt));
+    // Show every active offer that is within its lifetime window. Day-of-week /
+    // time-of-day are *displayed* on each card so customers browsing the venue
+    // can plan a future visit — filtering them out at "right now" hid valid
+    // offers from customers who weren't physically at the venue at that minute.
     const now = new Date();
-    const live = rows.filter((o) => isOfferActiveAt(o, now));
+    const live = rows.filter((o) => {
+      if (o.startsAt && now < new Date(o.startsAt)) return false;
+      if (o.endsAt && now > new Date(o.endsAt)) return false;
+      return true;
+    });
     return res.json(live);
   } catch (err) {
     // For the public endpoint, fall back silently to "no offers" if the table

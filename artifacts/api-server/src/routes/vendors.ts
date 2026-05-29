@@ -372,10 +372,15 @@ router.get("/vendors/drink-offers", async (_req, res) => {
     .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, coverImageUrl: vendorsTable.coverImageUrl })
     .from(vendorsTable)
     .where(and(eq(vendorsTable.status, "approved"), inArray(vendorsTable.id, ids)));
+  const today = new Date().toISOString().slice(0, 10);
   const plans = await db
     .select()
     .from(drinkPlansTable)
-    .where(inArray(drinkPlansTable.vendorId, ids))
+    .where(and(
+      inArray(drinkPlansTable.vendorId, ids),
+      sql`(${drinkPlansTable.validFrom} IS NULL OR ${drinkPlansTable.validFrom} <= ${today})`,
+      sql`(${drinkPlansTable.validUntil} IS NULL OR ${drinkPlansTable.validUntil} >= ${today})`,
+    ))
     .orderBy(drinkPlansTable.createdAt);
   const pubEvents = await db
     .select({ id: eventsTable.id, vendorId: eventsTable.vendorId })
@@ -586,10 +591,15 @@ function describeConflict(c: { type: string; days: string[]; timeFrom: string; t
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {
   const id = Number(req.params["vendorId"]);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const today = new Date().toISOString().slice(0, 10);
   const plans = await db
     .select()
     .from(drinkPlansTable)
-    .where(eq(drinkPlansTable.vendorId, id))
+    .where(and(
+      eq(drinkPlansTable.vendorId, id),
+      sql`(${drinkPlansTable.validFrom} IS NULL OR ${drinkPlansTable.validFrom} <= ${today})`,
+      sql`(${drinkPlansTable.validUntil} IS NULL OR ${drinkPlansTable.validUntil} >= ${today})`,
+    ))
     // Admin-prioritised plans (globalPriority 1–10) come first; all others follow by createdAt.
     .orderBy(sql`COALESCE(${drinkPlansTable.globalPriority}, 999)`, drinkPlansTable.createdAt);
   res.json(plans);
