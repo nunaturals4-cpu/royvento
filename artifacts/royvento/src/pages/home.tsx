@@ -12,8 +12,6 @@ import {
   Megaphone,
   Clock,
   GlassWater,
-  Wine,
-  Ticket,
   MapPin,
   ChevronDown,
 } from "lucide-react";
@@ -24,7 +22,7 @@ import { EventCard } from "@/components/EventCard";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { SEO } from "@/components/SEO";
-import { FreeDrinkCard, TicketCard, splitVendorsByPlanType } from "@/components/DrinkDealCards";
+import { FreeDrinkSection, TicketSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 import { COUNTRIES } from "@/lib/locations";
 
 interface PublicEvent {
@@ -400,58 +398,9 @@ export function Home() {
                 seeAllLabel={t("pub_offers.browse_pubs")}
               />
 
-              <div className="space-y-14">
-                {freeVendors.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                          <Wine className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-primary/50 uppercase tracking-[0.25em] font-bold leading-none">Section 01</p>
-                          <h3 className="text-sm font-bold text-white/90 tracking-tight leading-tight mt-0.5">Free Drinks</h3>
-                        </div>
-                      </div>
-                      <div className="flex-1 h-px bg-gradient-to-r from-primary/15 to-transparent" />
-                      <span className="text-[10px] text-white/20 font-mono tabular-nums">
-                        {freeVendors.length} {freeVendors.length === 1 ? "venue" : "venues"}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
-                      {freeVendors.map((v) => (
-                        <FreeDrinkCard key={v.offer.vendorId} offer={v.offer} plans={v.plans} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {ticketVendors.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                          <Ticket className="h-3.5 w-3.5 text-amber-400" />
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-amber-400/50 uppercase tracking-[0.25em] font-bold leading-none">Section 02</p>
-                          <h3 className="text-sm font-bold text-white/90 tracking-tight leading-tight mt-0.5">Included With Ticket</h3>
-                        </div>
-                      </div>
-                      <div className="flex-1 h-px bg-gradient-to-r from-amber-500/15 to-transparent" />
-                      <span className="text-[10px] text-white/20 font-mono tabular-nums">
-                        {ticketVendors.length} {ticketVendors.length === 1 ? "venue" : "venues"}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
-                      {ticketVendors.map((v) => (
-                        <TicketCard key={v.offer.vendorId} offer={v.offer} plans={v.plans} />
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className="space-y-6">
+                <FreeDrinkSection vendors={freeVendors} />
+                <TicketSection vendors={ticketVendors} />
               </div>
             </div>
           </section>
