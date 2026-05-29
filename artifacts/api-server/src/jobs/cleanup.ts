@@ -1,5 +1,5 @@
-import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable } from "@workspace/db";
-import { and, ne, sql, lt, gte, eq } from "drizzle-orm";
+import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable } from "@workspace/db";
+import { and, ne, sql, lt, gte, eq, isNotNull } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { sendUpcomingDeletionWarningEmail } from "../lib/notifications";
@@ -93,6 +93,31 @@ export async function deleteExpiredAnnouncements(): Promise<void> {
     );
   } catch (err) {
     logger.error({ err }, "Cleanup: failed to delete expired announcements");
+  }
+}
+
+// Delete drink plans whose explicit `validUntil` date has passed. Plans without
+// a validUntil (day-of-week recurring offers) are kept so they keep firing on
+// their selected weekdays.
+export async function deleteExpiredDrinkPlans(): Promise<void> {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const result = await db
+      .delete(drinkPlansTable)
+      .where(
+        and(
+          isNotNull(drinkPlansTable.validUntil),
+          sql`${drinkPlansTable.validUntil} < ${today}`,
+        ),
+      )
+      .returning({ id: drinkPlansTable.id });
+
+    if (result.length === 0) return;
+
+    logger.info({ count: result.length }, "Cleanup: deleted expired drink plans");
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to delete expired drink plans");
   }
 }
 
@@ -285,6 +310,7 @@ export async function runCleanup(): Promise<void> {
   await warnPartnersAboutUpcomingDeletion();
   await deletePastEvents();
   await deleteExpiredAnnouncements();
+  await deleteExpiredDrinkPlans();
   await deleteOldNotifications();
   await deleteOldEmailAttachments();
   await deleteOldEmails();

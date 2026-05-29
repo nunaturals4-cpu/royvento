@@ -1,245 +1,173 @@
 import { Link } from "wouter";
-import { ArrowRight, Clock, Wine, Ticket } from "lucide-react";
+import { Wine, Ticket, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 
 export type VendorWithPlans = { offer: VendorDrinkOffer; plans: DrinkPlanSummary[] };
 
-function getPlanLabel(plan: DrinkPlanSummary): string {
-  if (plan.type === "welcome") return "Free welcome drink";
-  if (plan.type === "unlimited") return "Unlimited drinks";
+function summarizePlan(plan: DrinkPlanSummary): { category: string; headline: string } {
+  if (plan.type === "welcome") {
+    return {
+      category: "WELCOME DRINK",
+      headline: plan.productName || "Free welcome drink",
+    };
+  }
+  if (plan.type === "unlimited") {
+    return {
+      category: "UNLIMITED DRINKS",
+      headline: plan.productName || "Unlimited drinks",
+    };
+  }
   if (plan.type === "ticket") {
     const count = (plan.lineItems ?? []).filter((i) => i.name).length;
-    return count > 0 ? `${count} item${count !== 1 ? "s" : ""} with ticket` : "Drinks with ticket";
+    return {
+      category: "TICKET PACKAGE",
+      headline: plan.productName || (count > 0 ? `${count} item${count !== 1 ? "s" : ""} with ticket` : "Drinks with ticket"),
+    };
   }
-  return plan.productName || "Drinks discount";
+  return { category: "DRINKS DEAL", headline: plan.productName || "Drinks discount" };
 }
 
-export function FreeDrinkCard({ offer, plans }: VendorWithPlans) {
+function buildSubtitle(plan: DrinkPlanSummary, t: (k: string) => string): string {
+  const parts: string[] = [];
+  if (plan.days && plan.days.length > 0 && plan.days.length < 7) {
+    parts.push(plan.days.map((d) => d.slice(0, 3)).join(", "));
+  }
+  if (plan.timeFrom && plan.timeTo) {
+    parts.push(`${plan.timeFrom}–${plan.timeTo}`);
+  }
+  if (plan.gender === "female") parts.push(t("pub_offers.filter_ladies"));
+  return parts.join(" • ");
+}
+
+function pickPrimaryPlan(plans: DrinkPlanSummary[]): DrinkPlanSummary {
+  return plans[0];
+}
+
+interface TileProps {
+  offer: VendorDrinkOffer;
+  plans: DrinkPlanSummary[];
+  featured?: boolean;
+  accent?: "primary" | "amber";
+}
+
+function DealTile({ offer, plans, featured = false, accent = "primary" }: TileProps) {
   const { t } = useTranslation();
-  return (
-    <Link
-      href={offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`}
-      className="snap-start flex-shrink-0 md:flex-shrink block group"
-    >
-      <div className="relative w-[300px] md:w-auto rounded-2xl overflow-hidden flex flex-col h-full
-        bg-gradient-to-b from-zinc-900 to-[#0c0c0e]
-        border border-white/[0.07]
-        transition-all duration-300
-        hover:border-primary/25
-        hover:shadow-[0_8px_40px_rgba(220,38,38,0.10)]">
+  const primary = pickPrimaryPlan(plans);
+  const { category, headline } = summarizePlan(primary);
+  const subtitle = buildSubtitle(primary, t);
+  const Icon = accent === "amber" ? Ticket : Wine;
+  const href = offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`;
 
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
-
-        <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mt-0.5">
-              <Wine className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-serif text-base leading-snug text-white line-clamp-2">
-                {offer.vendorName}
-              </h3>
-              <p className="text-[10px] text-white/40 uppercase tracking-[0.18em] mt-0.5">Free Drink Offers</p>
-            </div>
-          </div>
-          <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full bg-primary/15 text-primary border border-primary/25">
-            FREE
-          </span>
-        </div>
-
-        <div className="mx-5 h-px bg-white/[0.07]" />
-
-        <div className="px-5 pt-4 pb-4 flex flex-col gap-5 flex-1">
-          {plans.slice(0, 3).map((plan, i) => {
-            const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
-            const showTime = !!(plan.timeFrom && plan.timeTo);
-            return (
-              <div key={i} className={`flex flex-col gap-2.5 ${i > 0 ? "pt-4 border-t border-white/[0.07]" : ""}`}>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`flex-shrink-0 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg border ${
-                    plan.type === "welcome"
-                      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                      : "bg-primary/15 text-primary border-primary/30"
-                  }`}>
-                    {plan.type === "welcome" ? "Welcome" : "Unlimited"}
-                  </span>
-                </div>
-                <p className="text-sm font-semibold text-white leading-snug">
-                  {plan.productName || getPlanLabel(plan)}
-                </p>
-
-                <span className={`self-start inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg border ${
-                  plan.gender === "female"
-                    ? "bg-rose-500/15 text-rose-300 border-rose-500/25"
-                    : "bg-white/[0.08] text-white/75 border-white/[0.15]"
-                }`}>
-                  {plan.gender === "female" ? "👩 Ladies Only" : "👥 " + t("pub_offers.gender_all")}
-                </span>
-
-                {(showDays || showTime) && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {showDays && plan.days!.map((d) => (
-                      <span key={d} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85">
-                        {d.slice(0, 3)}
-                      </span>
-                    ))}
-                    {showTime && (
-                      <span className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85 flex items-center gap-1.5">
-                        <Clock className="h-3 w-3 text-white/60 flex-shrink-0" />
-                        {plan.timeFrom} – {plan.timeTo}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {plan.description && (
-                  <p className="text-xs text-white/50 italic leading-snug line-clamp-2">{plan.description}</p>
-                )}
-              </div>
-            );
-          })}
-          {plans.length > 3 && (
-            <p className="text-xs text-white/45 pt-1">
-              +{plans.length - 3} more offer{plans.length - 3 !== 1 ? "s" : ""}
+  if (featured) {
+    const gradient = accent === "amber"
+      ? "from-amber-500 via-amber-600 to-amber-700"
+      : "from-primary via-rose-700 to-rose-900";
+    return (
+      <Link href={href} className="group block">
+        <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 h-full flex flex-col min-h-[180px] shadow-[0_10px_40px_rgba(220,38,38,0.25)]`}>
+          <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/95 mb-3">
+            {category}
+          </p>
+          <p className="text-base font-bold leading-snug line-clamp-2 mb-1">{offer.vendorName}</p>
+          <p className="text-sm text-white/95 leading-snug line-clamp-2">{headline}</p>
+          {subtitle && (
+            <p className="text-xs text-white/80 mt-auto pt-3 line-clamp-1">{subtitle}</p>
+          )}
+          {plans.length > 1 && (
+            <p className="text-[10px] uppercase tracking-wider text-white/70 mt-1">
+              +{plans.length - 1} more
             </p>
           )}
         </div>
+      </Link>
+    );
+  }
 
-        <div className="px-5 pb-5">
-          <div className="flex items-center justify-between rounded-xl px-4 py-3
-            bg-primary/[0.09] border border-primary/[0.20]
-            group-hover:bg-primary/[0.16] group-hover:border-primary/35
-            transition-all duration-300">
-            <span className="text-sm font-semibold text-primary">
-              {offer.pubEventId ? "Claim Deal" : "View Venue"}
-            </span>
-            <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform duration-200" />
-          </div>
-        </div>
+  const labelColor = accent === "amber" ? "text-amber-400" : "text-primary";
+
+  return (
+    <Link href={href} className="group block">
+      <div className="rounded-2xl bg-zinc-900/90 border border-white/[0.07] hover:border-white/[0.18] p-5 h-full flex flex-col min-h-[180px] transition-colors">
+        <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor} mb-3`}>
+          {category}
+        </p>
+        <p className="text-base font-bold text-white leading-snug line-clamp-2 mb-1">
+          {offer.vendorName}
+        </p>
+        <p className="text-sm text-white/65 leading-snug line-clamp-2">{headline}</p>
+        {subtitle && (
+          <p className="text-xs text-white/40 mt-auto pt-3 line-clamp-1 flex items-center gap-1.5">
+            {(primary.timeFrom && primary.timeTo) && <Clock className="h-3 w-3 flex-shrink-0" />}
+            {subtitle}
+          </p>
+        )}
+        {plans.length > 1 && (
+          <p className="text-[10px] uppercase tracking-wider text-white/30 mt-1">
+            +{plans.length - 1} more
+          </p>
+        )}
       </div>
     </Link>
   );
 }
 
-export function TicketCard({ offer, plans }: VendorWithPlans) {
-  const { t } = useTranslation();
+interface SectionProps {
+  vendors: VendorWithPlans[];
+  accent: "primary" | "amber";
+  title: string;
+  subtitle: string;
+}
+
+function DealPanel({ vendors, accent, title, subtitle }: SectionProps) {
+  const Icon = accent === "amber" ? Ticket : Wine;
+  const accentText = accent === "amber" ? "text-amber-400" : "text-primary";
+
   return (
-    <Link
-      href={offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`}
-      className="snap-start flex-shrink-0 md:flex-shrink block group"
-    >
-      <div className="relative w-[300px] md:w-auto rounded-2xl overflow-hidden flex flex-col h-full
-        bg-gradient-to-b from-zinc-900 to-[#0c0c0e]
-        border border-white/[0.07]
-        transition-all duration-300
-        hover:border-amber-500/25
-        hover:shadow-[0_8px_40px_rgba(245,158,11,0.09)]">
-
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
-
-        <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mt-0.5">
-              <Ticket className="h-5 w-5 text-amber-400" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-serif text-base leading-snug text-white line-clamp-2">
-                {offer.vendorName}
-              </h3>
-              <p className="text-[10px] text-white/40 uppercase tracking-[0.18em] mt-0.5">Ticket Package</p>
-            </div>
-          </div>
-          <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
-            TICKET
-          </span>
-        </div>
-
-        <div className="mx-5 h-px bg-white/[0.07]" />
-
-        <div className="px-5 pt-4 pb-4 flex flex-col gap-5 flex-1">
-          {plans.slice(0, 2).map((plan, i) => {
-            const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
-            const showTime = !!(plan.timeFrom && plan.timeTo);
-            const lineItems = (plan.lineItems ?? []).filter((li) => li.name);
-            return (
-              <div key={i} className={`flex flex-col gap-3 ${i > 0 ? "pt-4 border-t border-white/[0.07]" : ""}`}>
-
-                <p className="text-sm font-semibold text-white leading-snug">
-                  {plan.productName || "Ticket Package"}
-                </p>
-
-                <span className={`self-start inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg border ${
-                  plan.gender === "female"
-                    ? "bg-rose-500/15 text-rose-300 border-rose-500/25"
-                    : "bg-white/[0.08] text-white/75 border-white/[0.15]"
-                }`}>
-                  {plan.gender === "female" ? "👩 Ladies Only" : "👥 " + t("pub_offers.gender_all")}
-                </span>
-
-                {lineItems.length > 0 && (
-                  <div className="rounded-xl bg-white/[0.05] border border-white/[0.09] px-4 py-3">
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-amber-400/80 font-bold mb-2.5">What's Included</p>
-                    <div className="flex flex-col gap-2">
-                      {lineItems.slice(0, 4).map((item, j) => (
-                        <div key={j} className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400/60 flex-shrink-0" />
-                            <span className="text-sm text-white/80 truncate">{item.name}</span>
-                          </div>
-                          <span className="text-sm font-bold text-amber-400 flex-shrink-0 tabular-nums">×{item.qty}</span>
-                        </div>
-                      ))}
-                      {lineItems.length > 4 && (
-                        <p className="text-xs text-white/45 mt-0.5">+{lineItems.length - 4} more included</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {(showDays || showTime) && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {showDays && plan.days!.map((d) => (
-                      <span key={d} className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85">
-                        {d.slice(0, 3)}
-                      </span>
-                    ))}
-                    {showTime && (
-                      <span className="px-3 py-1 rounded-lg text-xs font-bold bg-white/[0.09] border border-white/[0.16] text-white/85 flex items-center gap-1.5">
-                        <Clock className="h-3 w-3 text-white/60 flex-shrink-0" />
-                        {plan.timeFrom} – {plan.timeTo}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {plan.description && (
-                  <p className="text-xs text-white/50 italic leading-snug line-clamp-2">{plan.description}</p>
-                )}
-              </div>
-            );
-          })}
-          {plans.length > 2 && (
-            <p className="text-xs text-white/45 pt-1">
-              +{plans.length - 2} more package{plans.length - 2 !== 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-
-        <div className="px-5 pb-5">
-          <div className="flex items-center justify-between rounded-xl px-4 py-3
-            bg-amber-500/[0.09] border border-amber-500/[0.20]
-            group-hover:bg-amber-500/[0.16] group-hover:border-amber-500/35
-            transition-all duration-300">
-            <span className="text-sm font-semibold text-amber-400">
-              {offer.pubEventId ? "Book Now" : "View Venue"}
-            </span>
-            <ArrowRight className="h-4 w-4 text-amber-400 group-hover:translate-x-0.5 transition-transform duration-200" />
-          </div>
-        </div>
+    <div className="rounded-3xl bg-zinc-950/60 border border-white/[0.06] p-5 md:p-7">
+      <div className="flex items-center gap-3 mb-1">
+        <Icon className={`h-4 w-4 ${accentText}`} />
+        <h3 className="text-base md:text-lg font-bold text-white tracking-tight">{title}</h3>
       </div>
-    </Link>
+      <p className="text-xs text-white/45 mb-6">{subtitle}</p>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        {vendors.map((v, i) => (
+          <DealTile
+            key={v.offer.vendorId}
+            offer={v.offer}
+            plans={v.plans}
+            featured={i === 0}
+            accent={accent}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function FreeDrinkSection({ vendors }: { vendors: VendorWithPlans[] }) {
+  if (vendors.length === 0) return null;
+  return (
+    <DealPanel
+      vendors={vendors}
+      accent="primary"
+      title="Free Drinks"
+      subtitle="Tap on any deal to view venue & book"
+    />
+  );
+}
+
+export function TicketSection({ vendors }: { vendors: VendorWithPlans[] }) {
+  if (vendors.length === 0) return null;
+  return (
+    <DealPanel
+      vendors={vendors}
+      accent="amber"
+      title="Included With Ticket"
+      subtitle="Tap on any deal to view venue & book"
+    />
   );
 }
 
@@ -274,3 +202,4 @@ export function splitVendorsByPlanType(
 
   return { freeVendors, ticketVendors };
 }
+

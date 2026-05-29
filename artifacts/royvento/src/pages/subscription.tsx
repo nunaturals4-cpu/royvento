@@ -129,6 +129,7 @@ const PARTNER_PLANS = [
     icon: Crown,
     accent: true,
     features: [
+      "Growth Plan all features are included",
       "Event promotion",
       "Email marketing",
       "WhatsApp marketing",
