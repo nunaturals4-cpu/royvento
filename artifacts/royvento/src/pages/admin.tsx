@@ -1765,7 +1765,8 @@ const SUB_PLAN_LABELS: Record<string, string> = {
   user_vip:        "RoyVento VIP",
   partner:         "Partner Premium (Legacy)",
   partner_growth:  "Growth Plan",
-  partner_premium: "Premium Partner",
+  partner_premium: "Premium Partner Plan",
+  partner_royal:   "Royal Partner Plan",
 };
 
 const SUB_PLAN_COLORS: Record<string, string> = {
@@ -1773,6 +1774,7 @@ const SUB_PLAN_COLORS: Record<string, string> = {
   user_vip:        "bg-primary/20 text-primary border-primary/30",
   partner_growth:  "bg-amber-500/20 text-amber-300 border-amber-500/30",
   partner_premium: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+  partner_royal:   "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
 };
 
 interface AdminSub {
@@ -1788,7 +1790,7 @@ function SubscriptionsAdmin() {
   const active = items.filter((s) => s.status === "active");
   const totalRevenue = active.reduce((sum, s) => sum + Number(s.price), 0);
   const userSubs = active.filter((s) => ["user", "user_plus", "user_vip"].includes(s.planType));
-  const partnerSubs = active.filter((s) => ["partner", "partner_growth", "partner_premium"].includes(s.planType));
+  const partnerSubs = active.filter((s) => ["partner", "partner_growth", "partner_premium", "partner_royal"].includes(s.planType));
 
   return (
     <div className="space-y-5">
@@ -1810,7 +1812,7 @@ function SubscriptionsAdmin() {
 
       {/* Plan breakdown */}
       <div className="grid sm:grid-cols-3 gap-3">
-        {(["user_plus", "user_vip", "partner_growth", "partner_premium"] as const).map((pt) => {
+        {(["user_plus", "user_vip", "partner_growth", "partner_premium", "partner_royal"] as const).map((pt) => {
           const count = active.filter((s) => s.planType === pt).length;
           return (
             <div key={pt} className={`rounded-xl border px-4 py-3 ${SUB_PLAN_COLORS[pt] ?? "bg-white/5 border-white/10"}`}>
@@ -4589,16 +4591,16 @@ function CommissionsAdmin() {
   const { toast } = useToast();
 
   // Partner plan visibility state
-  const [planConfig, setPlanConfig] = useState({ showGrowthPlan: true, showPremiumPartner: true });
+  const [planConfig, setPlanConfig] = useState({ showGrowthPlan: true, showPremiumPartner: true, showRoyalPlan: true });
   const [planConfigSaving, setPlanConfigSaving] = useState(false);
 
   useEffect(() => {
-    apiGet<{ showGrowthPlan: boolean; showPremiumPartner: boolean }>("/api/plan-config")
+    apiGet<{ showGrowthPlan: boolean; showPremiumPartner: boolean; showRoyalPlan: boolean }>("/api/plan-config")
       .then(setPlanConfig)
       .catch(() => {});
   }, []);
 
-  const togglePlanVisibility = async (key: "showGrowthPlan" | "showPremiumPartner") => {
+  const togglePlanVisibility = async (key: "showGrowthPlan" | "showPremiumPartner" | "showRoyalPlan") => {
     const next = { ...planConfig, [key]: !planConfig[key] };
     setPlanConfigSaving(true);
     try {
@@ -4752,12 +4754,23 @@ function CommissionsAdmin() {
           </div>
           <div className="flex items-center justify-between flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 gap-4">
             <div>
-              <p className="font-medium text-sm">Premium Partner</p>
-              <p className="text-xs text-muted-foreground">₹7,999/mo — homepage placement, AI tools</p>
+              <p className="font-medium text-sm">Premium Partner Plan</p>
+              <p className="text-xs text-muted-foreground">₹5,999/mo — email, WhatsApp, dedicated manager</p>
             </div>
             <Switch
               checked={planConfig.showPremiumPartner}
               onCheckedChange={() => togglePlanVisibility("showPremiumPartner")}
+              disabled={planConfigSaving}
+            />
+          </div>
+          <div className="flex items-center justify-between flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 gap-4">
+            <div>
+              <p className="font-medium text-sm">Royal Partner Plan</p>
+              <p className="text-xs text-muted-foreground">₹9,999/mo — homepage, drinks, 16-day ads</p>
+            </div>
+            <Switch
+              checked={planConfig.showRoyalPlan}
+              onCheckedChange={() => togglePlanVisibility("showRoyalPlan")}
               disabled={planConfigSaving}
             />
           </div>

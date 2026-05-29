@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Crown, Check, Sparkles, Star, Building2, TrendingUp,
   CheckCircle, XCircle, Gift, Trophy, Users, BarChart3,
-  MessageSquare, Ticket, Heart,
+  MessageSquare, Ticket, Heart, Gem,
 } from "lucide-react";
 import { apiGet, apiPost, formatINR } from "@/lib/api";
 
@@ -28,7 +28,8 @@ const PLAN_DISPLAY_NAMES: Record<string, string> = {
   user_vip: "RoyVento VIP",
   partner: "Partner Premium (Legacy)",
   partner_growth: "Growth Plan",
-  partner_premium: "Premium Partner",
+  partner_premium: "Premium Partner Plan",
+  partner_royal: "Royal Partner Plan",
 };
 
 const USER_PLANS = [
@@ -109,35 +110,49 @@ const PARTNER_PLANS = [
     icon: TrendingUp,
     popular: true,
     features: [
+      "Profile visits boost",
+      "Pro event analytics",
       "Priority search ranking",
-      "Featured pub badge",
+      "Premium member badge",
       "Advanced booking & revenue reports",
-      "Customer database access",
-      "Email marketing tools",
-      "Excel exports",
-      "Promotional campaign management",
+      "Full customer database access",
+      "5 days free Facebook & Instagram marketing",
     ],
     planType: "partner_growth" as string | null,
   },
   {
     id: "partner_premium",
-    name: "Premium Partner",
+    name: "Premium Partner Plan",
     tagline: "Dominate your market",
-    monthly: 7999,
-    yearly: 87989,
+    monthly: 5999,
+    yearly: 65989,
     icon: Crown,
     accent: true,
     features: [
-      "Homepage featured placement",
-      "Top search visibility",
+      "Event promotion",
+      "Email marketing",
+      "WhatsApp marketing",
       "Dedicated account manager",
-      "WhatsApp/SMS marketing tools",
-      "Advanced customer analytics",
-      "AI-generated event content",
-      "Multi-location venue management",
-      "Premium audience insights",
+      "AI features (coming soon)",
+      "12 days free Facebook & Instagram marketing",
+      "Offline campaigns",
     ],
     planType: "partner_premium" as string | null,
+  },
+  {
+    id: "partner_royal",
+    name: "Royal Partner Plan",
+    tagline: "The ultimate venue experience",
+    monthly: 9999,
+    yearly: 109989,
+    icon: Gem,
+    features: [
+      "Homepage promotion",
+      "Drinks deal promotion",
+      "Event promotion",
+      "16 days Facebook & Instagram marketing",
+    ],
+    planType: "partner_royal" as string | null,
   },
 ];
 
@@ -161,7 +176,7 @@ export function Subscription() {
   const [active, setActive] = useState<Sub | null>(null);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(false);
-  const [planConfig, setPlanConfig] = useState({ showGrowthPlan: true, showPremiumPartner: true });
+  const [planConfig, setPlanConfig] = useState({ showGrowthPlan: true, showPremiumPartner: true, showRoyalPlan: true });
   const { toast } = useToast();
 
   const paymentParam = typeof window !== "undefined"
@@ -169,7 +184,7 @@ export function Subscription() {
     : null;
 
   useEffect(() => {
-    apiGet<{ showGrowthPlan: boolean; showPremiumPartner: boolean }>("/api/plan-config")
+    apiGet<{ showGrowthPlan: boolean; showPremiumPartner: boolean; showRoyalPlan: boolean }>("/api/plan-config")
       .then(setPlanConfig)
       .catch(() => {});
   }, []);
@@ -214,18 +229,19 @@ export function Subscription() {
   };
 
   const isActivePartnerPlan = (planType: string | null) => {
-    const partnerPlanTypes = ["partner", "partner_growth", "partner_premium"];
+    const partnerPlanTypes = ["partner", "partner_growth", "partner_premium", "partner_royal"];
     if (planType === null) {
       return !active || !partnerPlanTypes.includes(active.planType);
     }
     return active?.planType === planType;
   };
 
-  const isVendor = user?.role === "vendor";
+  const isVendor = user?.role === "vendor" || user?.role === "admin";
 
   const visiblePartnerPlans = PARTNER_PLANS.filter((p) => {
     if (p.id === "partner_growth" && !planConfig.showGrowthPlan) return false;
     if (p.id === "partner_premium" && !planConfig.showPremiumPartner) return false;
+    if (p.id === "partner_royal" && !planConfig.showRoyalPlan) return false;
     return true;
   });
 
