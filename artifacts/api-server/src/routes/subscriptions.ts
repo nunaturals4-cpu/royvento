@@ -16,21 +16,22 @@ import { respondInvalid } from "../lib/validationError";
 const router: IRouter = Router();
 
 const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = {
-  user_plus:       { monthly: 149,   yearly: 1490  },
-  user_vip:        { monthly: 499,   yearly: 4990  },
-  partner_growth:  { monthly: 2999,  yearly: 32989 },
-  partner_premium: { monthly: 7999,  yearly: 87989 },
+  user_plus:       { monthly: 149,   yearly: 1490   },
+  user_vip:        { monthly: 499,   yearly: 4990   },
+  partner_growth:  { monthly: 2999,  yearly: 32989  },
+  partner_premium: { monthly: 5999,  yearly: 65989  },
+  partner_royal:   { monthly: 9999,  yearly: 109989 },
   // Legacy aliases kept for backwards-compatibility
   user:    { monthly: 149,  yearly: 1490  },
   partner: { monthly: 2999, yearly: 32989 },
 };
 
-const PARTNER_PLAN_TYPES = new Set(["partner", "partner_growth", "partner_premium"]);
+const PARTNER_PLAN_TYPES = new Set(["partner", "partner_growth", "partner_premium", "partner_royal"]);
 
 const SubscribeBody = z.object({
   planType: z.enum([
     "user_plus", "user_vip",
-    "partner_growth", "partner_premium",
+    "partner_growth", "partner_premium", "partner_royal",
     "user", "partner",
   ]),
   planPeriod: z.enum(["monthly", "yearly"]),
@@ -47,10 +48,10 @@ function expiresFor(period: "monthly" | "yearly"): Date {
 // Persisted to LOCAL_STORAGE_DIR/plan-config.json when available, otherwise
 // lives in memory and resets on restart (defaults: both plans visible).
 
-interface PlanVisibility { showGrowthPlan: boolean; showPremiumPartner: boolean }
+interface PlanVisibility { showGrowthPlan: boolean; showPremiumPartner: boolean; showRoyalPlan: boolean }
 
 const CONFIG_FILE = path.join(process.env.LOCAL_STORAGE_DIR ?? "/data", "plan-config.json");
-let planVisibility: PlanVisibility = { showGrowthPlan: true, showPremiumPartner: true };
+let planVisibility: PlanVisibility = { showGrowthPlan: true, showPremiumPartner: true, showRoyalPlan: true };
 try {
   if (fs.existsSync(CONFIG_FILE)) {
     planVisibility = { ...planVisibility, ...JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) };
@@ -69,10 +70,11 @@ router.get("/plan-config", async (_req, res) => {
 });
 
 router.post("/admin/plan-config", requireAuth(["admin"]), async (req, res) => {
-  const { showGrowthPlan, showPremiumPartner } = req.body;
+  const { showGrowthPlan, showPremiumPartner, showRoyalPlan } = req.body;
   planVisibility = {
-    showGrowthPlan:    Boolean(showGrowthPlan),
+    showGrowthPlan:     Boolean(showGrowthPlan),
     showPremiumPartner: Boolean(showPremiumPartner),
+    showRoyalPlan:      Boolean(showRoyalPlan),
   };
   savePlanVisibility();
   return res.json({ success: true, ...planVisibility });
