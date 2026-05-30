@@ -256,7 +256,16 @@ async function applyPendingSchemaChanges() {
       )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_offers_vendor_idx" ON "vendor_offers" ("vendor_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_offers_vendor_active_idx" ON "vendor_offers" ("vendor_id", "active")`);
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers ensured");
+    // ── Hot-path event listing indexes ────────────────────────────────────
+    // The public catalog endpoints (/events, /events/popular, /events/featured)
+    // all filter on approval_status + (type|popular|featured) and ORDER BY
+    // created_at DESC. Without these composite indexes Postgres falls back to a
+    // sequential scan + sort on every listing request. Idempotent and purely
+    // additive — query results are unchanged, only faster.
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "events_approval_popular_created_idx" ON "events" ("approval_status", "popular", "created_at" DESC)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "events_approval_featured_created_idx" ON "events" ("approval_status", "featured", "created_at" DESC)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "events_approval_type_created_idx" ON "events" ("approval_status", "type", "created_at" DESC)`);
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
   }

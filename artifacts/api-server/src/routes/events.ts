@@ -50,11 +50,23 @@ interface EventRow {
 async function serializeEvents(rows: EventRow[]) {
   if (rows.length === 0) return [];
   const vendorIds = Array.from(new Set(rows.map((r) => r.vendorId)));
+  // Only these four columns are ever read out of the vendor row below
+  // (businessName → vendorName/partnerName, category → vendorCategory,
+  // crowdLevel → vendorCrowdLevel, id → map key). Selecting just them avoids
+  // pulling heavy per-vendor text/array columns (description, bannerImage,
+  // portfolioImages, menuUrls, danceFloorPhotos, …) for every card in every
+  // list. The serialized API response is byte-for-byte identical; the detail
+  // endpoint loads the full vendor separately.
   const vendors =
     vendorIds.length === 0
       ? []
       : await db
-          .select()
+          .select({
+            id: vendorsTable.id,
+            businessName: vendorsTable.businessName,
+            category: vendorsTable.category,
+            crowdLevel: vendorsTable.crowdLevel,
+          })
           .from(vendorsTable)
           .where(sql`${vendorsTable.id} IN (${sql.join(vendorIds, sql`, `)})`);
   const vendorMap = new Map(vendors.map((v) => [v.id, v]));

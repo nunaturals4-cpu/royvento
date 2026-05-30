@@ -741,7 +741,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
         {/* Top bar */}
         <div className="absolute top-0 inset-x-0 px-4 md:px-8 py-5 flex items-center justify-between">
-          <Link href="/explore" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/50 border border-white/15 hover:bg-black/70 backdrop-blur-sm transition-all text-sm font-medium text-white">
+          <Link href="/pubs" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/50 border border-white/15 hover:bg-black/70 backdrop-blur-sm transition-all text-sm font-medium text-white">
             <ChevronLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Explore</span>
           </Link>
