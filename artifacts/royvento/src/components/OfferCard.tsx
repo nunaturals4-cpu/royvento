@@ -1,5 +1,6 @@
 import { Utensils, Wine, Clock, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDayRanges } from "@/lib/days";
 
 export interface VendorOffer {
   id: number;
@@ -36,14 +37,8 @@ function formatBadge(o: Pick<VendorOffer, "discountType" | "discountValue" | "fr
   }
 }
 
-const DAY_LABEL: Record<string, string> = {
-  sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat",
-};
-
 function formatDays(days: string[]): string {
-  if (!days || days.length === 0) return "Every day";
-  if (days.length === 7) return "Every day";
-  return days.map((d) => DAY_LABEL[d] ?? d).join(", ");
+  return formatDayRanges(days);
 }
 
 function formatWindow(timeFrom: string, timeTo: string): string {

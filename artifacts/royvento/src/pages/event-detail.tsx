@@ -29,6 +29,7 @@ import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatDayRanges } from "@/lib/days";
 
 interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
@@ -918,7 +919,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   <span className="text-xs text-emerald-400/60 group-hover:text-emerald-400 transition-colors">View offers →</span>
                 </div>
                 {fer.genders.length > 0 && fer.days.length > 0 && (
-                  <p className="text-sm text-white/60 mt-2">Free for {fer.genders.join(" & ")} on {fer.days.join(", ")}</p>
+                  <p className="text-sm text-white/60 mt-2">Free for {fer.genders.join(" & ")} on {formatDayRanges(fer.days)}</p>
                 )}
               </button>
             );
@@ -1216,7 +1217,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   </div>
                   <div className="grid sm:grid-cols-3 gap-3 mb-6">
                     {fer.genders.length > 0 && <div className="rounded-2xl bg-black/30 border border-emerald-500/15 p-4"><p className="text-[10px] text-emerald-400/70 uppercase tracking-wider mb-1">Free For</p><p className="font-semibold text-white capitalize">{fer.genders.join(" & ")}</p></div>}
-                    {fer.days.length > 0 && <div className="rounded-2xl bg-black/30 border border-emerald-500/15 p-4"><p className="text-[10px] text-emerald-400/70 uppercase tracking-wider mb-1">Available Days</p><p className="font-semibold text-white text-sm">{fer.days.join(", ")}</p></div>}
+                    {fer.days.length > 0 && <div className="rounded-2xl bg-black/30 border border-emerald-500/15 p-4"><p className="text-[10px] text-emerald-400/70 uppercase tracking-wider mb-1">Available Days</p><p className="font-semibold text-white text-sm">{formatDayRanges(fer.days)}</p></div>}
                     {fer.beforeTime && <div className="rounded-2xl bg-black/30 border border-emerald-500/15 p-4"><p className="text-[10px] text-emerald-400/70 uppercase tracking-wider mb-1">Entry Before</p><p className="font-semibold text-white">{fer.beforeTime}</p></div>}
                   </div>
                   <button onClick={() => switchPubTab("book")} className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-sm transition-all flex items-center justify-center gap-2">
@@ -1246,12 +1247,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     const headline = plan.productName
                       || typeLabel.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
                     const showTime = !!(plan.timeFrom && plan.timeTo);
-                    const subtitleParts: string[] = [];
-                    if (!plan.days || plan.days.length === 0 || plan.days.length === 7) {
-                      subtitleParts.push("Everyday");
-                    } else {
-                      subtitleParts.push(plan.days.map((d: string) => d.slice(0, 3)).join(", "));
-                    }
+                    const subtitleParts: string[] = [formatDayRanges(plan.days)];
                     if (showTime) subtitleParts.push(`${plan.timeFrom}–${plan.timeTo}`);
                     const subtitle = subtitleParts.join(" • ");
 
@@ -1944,8 +1940,7 @@ function offerDiscountBadge(o: Pick<VendorOfferDto, "discountType" | "discountVa
 }
 
 function offerDaysLabel(days: string[]): string {
-  if (!days || days.length === 0 || days.length === 7) return "Every day";
-  return days.map((d) => OFFER_DAY_LABEL[d] ?? d).join(" · ");
+  return formatDayRanges(days);
 }
 
 /** Return the formatted window, or null if no time was set — caller hides the row. */

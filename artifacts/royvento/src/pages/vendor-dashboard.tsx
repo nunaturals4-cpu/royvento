@@ -43,6 +43,7 @@ import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
 import { uploadImage as uploadImageToStorage, validateImageFile } from "@/lib/uploadImage";
 import { useFormErrors, fieldClass } from "@/lib/formErrors";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatDayRanges } from "@/lib/days";
 
 const CATEGORIES = [...EVENT_CATEGORIES];
 const EVENT_KIND = ["event", "pub"] as const;
@@ -4931,10 +4932,6 @@ function LineItemsEditor({
           </div>
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...items, emptyItem()])}
-        className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-1">
-        <Plus className="h-3.5 w-3.5" /> Add item
-      </button>
     </div>
   );
 }
@@ -5274,8 +5271,7 @@ function offerBadge(o: Pick<VendorOffer, "discountType" | "discountValue" | "fre
 }
 
 function summariseDays(days: OfferDay[]): string {
-  if (!days.length || days.length === 7) return "Every day";
-  return DAY_ORDER.filter((d) => days.includes(d.key)).map((d) => d.label).join(", ");
+  return formatDayRanges(days);
 }
 
 function summariseWindow(from: string, to: string): string {
@@ -6321,7 +6317,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                         </ul>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
-                        <span>{plan.days.length === 0 || plan.days.length === 7 ? "Everyday" : plan.days.join(", ")}</span>
+                        <span>{formatDayRanges(plan.days)}</span>
                         {plan.timeFrom && plan.timeTo && (
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />

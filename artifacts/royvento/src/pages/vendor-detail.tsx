@@ -23,6 +23,7 @@ import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
 import { OfferCard, type VendorOffer as VendorOfferData } from "@/components/OfferCard";
+import { formatDayRanges } from "@/lib/days";
 
 function TodaysOffers({ vendorId }: { vendorId: number }) {
   const [offers, setOffers] = useState<VendorOfferData[]>([]);
@@ -726,14 +727,9 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                       )}
                       {(plan.timeFrom || plan.timeTo || true) && (
                         <div className="flex flex-wrap gap-1.5">
-                          {(() => {
-                            const d = plan.days ?? [];
-                            return (d.length === 0 || d.length === 7)
-                              ? <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">Everyday</span>
-                              : d.map((day) => (
-                                  <span key={day} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">{day}</span>
-                                ));
-                          })()}
+                          {formatDayRanges(plan.days ?? []).split(", ").map((range) => (
+                            <span key={range} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">{range}</span>
+                          ))}
                           {(plan.timeFrom || plan.timeTo) && (
                             <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
                               <Clock className="h-2.5 w-2.5 shrink-0" />

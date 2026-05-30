@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Wine, Ticket, Clock, Calendar } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
+import { formatDayRanges } from "@/lib/days";
 
 // Server emits these date fields too — the generated DrinkPlanSummary type
 // hasn't been regenerated yet, so we widen locally rather than ship a stale
@@ -40,18 +41,12 @@ function summarizePlan(plan: DrinkPlanSummary): { category: string; headline: st
   return { category: "DRINKS DEAL", headline: plan.productName || "Drinks discount" };
 }
 
-function buildSubtitle(plan: DrinkPlanSummary, t: (k: string) => string): string {
-  const parts: string[] = [];
-  if (!plan.days || plan.days.length === 0 || plan.days.length === 7) {
-    parts.push("Everyday");
-  } else {
-    parts.push(plan.days.map((d) => d.slice(0, 3)).join(", "));
-  }
-  if (plan.timeFrom && plan.timeTo) {
-    parts.push(`${plan.timeFrom}–${plan.timeTo}`);
-  }
-  if (plan.gender === "female") parts.push(t("pub_offers.filter_ladies"));
-  return parts.join(" • ");
+function buildSubtitleParts(plan: DrinkPlanSummary, t: (k: string) => string): { days: string; time: string | null; gender: string | null } {
+  return {
+    days: formatDayRanges(plan.days),
+    time: (plan.timeFrom && plan.timeTo) ? `${plan.timeFrom}–${plan.timeTo}` : null,
+    gender: plan.gender === "female" ? t("pub_offers.filter_ladies") : null,
+  };
 }
 
 function pickPrimaryPlan(plans: DrinkPlanSummary[]): DrinkPlanSummary {
@@ -69,7 +64,7 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
   const { t } = useTranslation();
   const primary = pickPrimaryPlan(plans) as PlanWithDates;
   const { category, headline } = summarizePlan(primary);
-  const subtitle = buildSubtitle(primary, t);
+  const subtitleParts = buildSubtitleParts(primary, t);
   const Icon = accent === "amber" ? Ticket : Wine;
   const href = offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`;
   const untilLabel = formatUntil(primary.validUntil);
@@ -94,11 +89,11 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
             <p className="text-sm text-white leading-snug line-clamp-2">{headline}</p>
           )}
           {isTicket && items.length > 0 && (
-            <ul className="space-y-1 mt-1">
+            <ul className="space-y-1.5 mt-1">
               {items.slice(0, 3).map((it, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 text-sm text-white">
-                  <span className="truncate">{it.name}</span>
-                  <span className="shrink-0 text-xs font-bold text-white">
+                <li key={i} className="flex items-center justify-between gap-2 text-sm text-white">
+                  <span className="min-w-0 break-words leading-snug flex-1">{it.name}</span>
+                  <span className="shrink-0 text-sm font-bold text-white/90 ml-1">
                     {it.discountedPrice > 0 ? `₹${it.discountedPrice}` : "Free"}
                   </span>
                 </li>
@@ -110,19 +105,22 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
               )}
             </ul>
           )}
-          {subtitle && (
-            <p className="text-xs text-white/90 mt-auto pt-3 line-clamp-1">{subtitle}</p>
-          )}
-          {untilLabel && (
-            <p className="text-[10px] uppercase tracking-wider text-white/90 mt-1 flex items-center gap-1.5">
-              <Calendar className="h-3 w-3 flex-shrink-0" /> Until {untilLabel}
-            </p>
-          )}
-          {plans.length > 1 && (
-            <p className="text-[10px] uppercase tracking-wider text-white/80 mt-1">
-              +{plans.length - 1} more
-            </p>
-          )}
+          <div className="mt-auto pt-3 space-y-0.5">
+            <p className="text-xs text-white/90">{subtitleParts.days}{subtitleParts.gender ? ` • ${subtitleParts.gender}` : ""}</p>
+            {subtitleParts.time && (
+              <p className="text-xs text-white/90 flex items-center gap-1">
+                <Clock className="h-3 w-3 flex-shrink-0" />{subtitleParts.time}
+              </p>
+            )}
+            {untilLabel && (
+              <p className="text-[10px] uppercase tracking-wider text-white/85 flex items-center gap-1">
+                <Calendar className="h-3 w-3 flex-shrink-0" /> Until {untilLabel}
+              </p>
+            )}
+            {plans.length > 1 && (
+              <p className="text-[10px] uppercase tracking-wider text-white/75">+{plans.length - 1} more</p>
+            )}
+          </div>
         </div>
       </Link>
     );
@@ -143,11 +141,11 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
           <p className="text-sm text-foreground/90 leading-snug line-clamp-2">{headline}</p>
         )}
         {isTicket && items.length > 0 && (
-          <ul className="space-y-1 mt-1">
+          <ul className="space-y-1.5 mt-1">
             {items.slice(0, 3).map((it, i) => (
-              <li key={i} className="flex items-center justify-between gap-3 text-sm">
-                <span className="truncate text-foreground/90">{it.name}</span>
-                <span className="shrink-0 text-xs font-bold text-emerald-400">
+              <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 break-words leading-snug flex-1 text-foreground/90">{it.name}</span>
+                <span className="shrink-0 text-sm font-bold text-emerald-400 ml-1">
                   {it.discountedPrice > 0 ? `₹${it.discountedPrice}` : "Free"}
                 </span>
               </li>
@@ -159,22 +157,22 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
             )}
           </ul>
         )}
-        {subtitle && (
-          <p className="text-xs text-muted-foreground mt-auto pt-3 line-clamp-1 flex items-center gap-1.5">
-            {(primary.timeFrom && primary.timeTo) && <Clock className="h-3 w-3 flex-shrink-0" />}
-            {subtitle}
-          </p>
-        )}
-        {untilLabel && (
-          <p className="text-[10px] uppercase tracking-wider text-amber-400 mt-1 flex items-center gap-1.5">
-            <Calendar className="h-3 w-3 flex-shrink-0" /> Until {untilLabel}
-          </p>
-        )}
-        {plans.length > 1 && (
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
-            +{plans.length - 1} more
-          </p>
-        )}
+        <div className="mt-auto pt-3 space-y-0.5">
+          <p className="text-xs text-muted-foreground">{subtitleParts.days}{subtitleParts.gender ? ` • ${subtitleParts.gender}` : ""}</p>
+          {subtitleParts.time && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3 flex-shrink-0" />{subtitleParts.time}
+            </p>
+          )}
+          {untilLabel && (
+            <p className={`text-[10px] uppercase tracking-wider flex items-center gap-1 ${accent === "amber" ? "text-amber-400" : "text-primary"}`}>
+              <Calendar className="h-3 w-3 flex-shrink-0" /> Until {untilLabel}
+            </p>
+          )}
+          {plans.length > 1 && (
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">+{plans.length - 1} more</p>
+          )}
+        </div>
       </div>
     </Link>
   );
