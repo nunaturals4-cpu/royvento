@@ -418,6 +418,8 @@ router.get("/vendors/drink-offers", async (_req, res) => {
         timeFrom: p.timeFrom,
         timeTo: p.timeTo,
         description: p.description,
+        validFrom: p.validFrom,
+        validUntil: p.validUntil,
       })),
     }))
     .filter((v) => v.plans.length > 0);

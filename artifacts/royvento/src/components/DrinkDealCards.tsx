@@ -1,9 +1,21 @@
 import { Link } from "wouter";
-import { Wine, Ticket, Clock } from "lucide-react";
+import { Wine, Ticket, Clock, Calendar } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 
+// Server emits these date fields too — the generated DrinkPlanSummary type
+// hasn't been regenerated yet, so we widen locally rather than ship a stale
+// schema bundle.
+type PlanWithDates = DrinkPlanSummary & { validFrom?: string | null; validUntil?: string | null };
+
 export type VendorWithPlans = { offer: VendorDrinkOffer; plans: DrinkPlanSummary[] };
+
+function formatUntil(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
 
 function summarizePlan(plan: DrinkPlanSummary): { category: string; headline: string } {
   if (plan.type === "welcome") {
@@ -53,11 +65,14 @@ interface TileProps {
 
 function DealTile({ offer, plans, featured = false, accent = "primary" }: TileProps) {
   const { t } = useTranslation();
-  const primary = pickPrimaryPlan(plans);
+  const primary = pickPrimaryPlan(plans) as PlanWithDates;
   const { category, headline } = summarizePlan(primary);
   const subtitle = buildSubtitle(primary, t);
   const Icon = accent === "amber" ? Ticket : Wine;
   const href = offer.pubEventId ? `/events/${offer.pubEventId}?book=1` : `/vendors/${offer.vendorId}`;
+  const untilLabel = formatUntil(primary.validUntil);
+  const items = (primary.lineItems ?? []).filter((it) => it.name);
+  const isTicket = primary.type === "ticket";
 
   if (featured) {
     const gradient = accent === "amber"
@@ -70,12 +85,36 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85 mb-3">
             {category}
           </p>
-          <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+          <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.15)]">
             {offer.vendorName}
           </p>
-          <p className="text-sm text-white leading-snug line-clamp-2">{headline}</p>
+          {!isTicket && (
+            <p className="text-sm text-white leading-snug line-clamp-2">{headline}</p>
+          )}
+          {isTicket && items.length > 0 && (
+            <ul className="space-y-1 mt-1">
+              {items.slice(0, 3).map((it, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 text-sm text-white">
+                  <span className="truncate">{it.name}</span>
+                  <span className="shrink-0 text-xs font-bold text-white">
+                    {it.discountedPrice > 0 ? `₹${it.discountedPrice}` : "Free"}
+                  </span>
+                </li>
+              ))}
+              {items.length > 3 && (
+                <li className="text-[10px] uppercase tracking-wider text-white/85">
+                  +{items.length - 3} more
+                </li>
+              )}
+            </ul>
+          )}
           {subtitle && (
             <p className="text-xs text-white/90 mt-auto pt-3 line-clamp-1">{subtitle}</p>
+          )}
+          {untilLabel && (
+            <p className="text-[10px] uppercase tracking-wider text-white/90 mt-1 flex items-center gap-1.5">
+              <Calendar className="h-3 w-3 flex-shrink-0" /> Until {untilLabel}
+            </p>
           )}
           {plans.length > 1 && (
             <p className="text-[10px] uppercase tracking-wider text-white/80 mt-1">
@@ -88,7 +127,6 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
   }
 
   const labelColor = accent === "amber" ? "text-amber-400" : "text-primary";
-  const vendorColor = accent === "amber" ? "text-amber-300" : "text-primary";
 
   return (
     <Link href={href} className="group block">
@@ -96,14 +134,38 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
         <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor} mb-3`}>
           {category}
         </p>
-        <p className={`text-lg font-black leading-snug line-clamp-2 mb-1 ${vendorColor}`}>
+        <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-black bg-white/90 self-start rounded-md px-2 py-0.5">
           {offer.vendorName}
         </p>
-        <p className="text-sm text-foreground/90 leading-snug line-clamp-2">{headline}</p>
+        {!isTicket && (
+          <p className="text-sm text-foreground/90 leading-snug line-clamp-2">{headline}</p>
+        )}
+        {isTicket && items.length > 0 && (
+          <ul className="space-y-1 mt-1">
+            {items.slice(0, 3).map((it, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate text-foreground/90">{it.name}</span>
+                <span className="shrink-0 text-xs font-bold text-emerald-400">
+                  {it.discountedPrice > 0 ? `₹${it.discountedPrice}` : "Free"}
+                </span>
+              </li>
+            ))}
+            {items.length > 3 && (
+              <li className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                +{items.length - 3} more
+              </li>
+            )}
+          </ul>
+        )}
         {subtitle && (
           <p className="text-xs text-muted-foreground mt-auto pt-3 line-clamp-1 flex items-center gap-1.5">
             {(primary.timeFrom && primary.timeTo) && <Clock className="h-3 w-3 flex-shrink-0" />}
             {subtitle}
+          </p>
+        )}
+        {untilLabel && (
+          <p className="text-[10px] uppercase tracking-wider text-amber-400 mt-1 flex items-center gap-1.5">
+            <Calendar className="h-3 w-3 flex-shrink-0" /> Until {untilLabel}
           </p>
         )}
         {plans.length > 1 && (
