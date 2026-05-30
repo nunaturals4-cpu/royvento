@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -1240,9 +1240,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       : plan.type === "ticket" ? "TICKET PACKAGE"
                       : plan.type === "welcome" ? "WELCOME DRINK"
                       : "DRINK PACKAGE";
-                    const hasItems = plan.lineItems && plan.lineItems.length > 0;
+                    const isTicketPlan = plan.type === "ticket";
+                    const lineItems: Array<{ name: string; discountedPrice: number }> =
+                      isTicketPlan ? (plan.lineItems ?? []).filter((li: any) => li.name) : [];
                     const headline = plan.productName
-                      || (hasItems ? plan.lineItems.map((li: any) => li.name).filter(Boolean).slice(0, 2).join(", ") : "")
                       || typeLabel.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
                     const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
                     const showTime = !!(plan.timeFrom && plan.timeTo);
@@ -1256,9 +1257,24 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                         <div key={plan.id} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/95 via-primary/80 to-primary/60 text-white p-5 flex flex-col gap-2 red-glow border border-white/[0.10]">
                           <Wine className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
                           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85">{typeLabel}</p>
-                          <p className="text-lg font-black leading-snug line-clamp-2 text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{headline}</p>
-                          {plan.description && (
-                            <p className="text-xs text-white leading-snug line-clamp-2">{plan.description}</p>
+                          <p className="text-lg font-black leading-snug line-clamp-2 text-white">{headline}</p>
+                          {!isTicketPlan && plan.description && (
+                            <p className="text-xs text-white/90 leading-snug line-clamp-2">{plan.description}</p>
+                          )}
+                          {isTicketPlan && lineItems.length > 0 && (
+                            <ul className="space-y-1">
+                              {lineItems.slice(0, 3).map((li: any, j: number) => (
+                                <li key={j} className="flex items-center justify-between gap-2 text-sm text-white">
+                                  <span className="truncate">{li.name}</span>
+                                  <span className="shrink-0 text-xs font-bold">
+                                    {li.discountedPrice > 0 ? `₹${li.discountedPrice}` : "Free"}
+                                  </span>
+                                </li>
+                              ))}
+                              {lineItems.length > 3 && (
+                                <li className="text-[10px] text-white/75 uppercase tracking-wider">+{lineItems.length - 3} more</li>
+                              )}
+                            </ul>
                           )}
                           {subtitle && (
                             <p className="text-xs text-white/90 line-clamp-1">{subtitle}</p>
@@ -1276,9 +1292,24 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     return (
                       <div key={plan.id} className="rounded-2xl glass-card p-5 flex flex-col gap-2">
                         <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">{typeLabel}</p>
-                        <p className="text-lg font-black text-primary leading-snug line-clamp-2">{headline}</p>
-                        {plan.description && (
+                        <p className="text-lg font-black text-white leading-snug line-clamp-2">{headline}</p>
+                        {!isTicketPlan && plan.description && (
                           <p className="text-xs text-foreground/80 leading-snug line-clamp-2">{plan.description}</p>
+                        )}
+                        {isTicketPlan && lineItems.length > 0 && (
+                          <ul className="space-y-1">
+                            {lineItems.slice(0, 3).map((li: any, j: number) => (
+                              <li key={j} className="flex items-center justify-between gap-2 text-sm">
+                                <span className="truncate text-foreground/90">{li.name}</span>
+                                <span className="shrink-0 text-xs font-bold text-emerald-400">
+                                  {li.discountedPrice > 0 ? `₹${li.discountedPrice}` : "Free"}
+                                </span>
+                              </li>
+                            ))}
+                            {lineItems.length > 3 && (
+                              <li className="text-[10px] text-muted-foreground uppercase tracking-wider">+{lineItems.length - 3} more</li>
+                            )}
+                          </ul>
                         )}
                         {subtitle && (
                           <p className="text-xs text-muted-foreground line-clamp-1">{subtitle}</p>
@@ -1482,51 +1513,93 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
         {/* ─── BOOK A TABLE TAB ─── */}
         {pubTab === "book" && (
-          <div id="book" className="max-w-2xl mx-auto scroll-mt-20">
+          <div id="book" className="max-w-5xl mx-auto scroll-mt-20">
+            {/* ── Header ── */}
             <div className="text-center mb-10">
-              <h2 className="font-serif text-4xl md:text-5xl mb-3">Book a Table</h2>
-              <p className="text-white/50">Reserve your spot at {venueName}</p>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-primary text-xs font-semibold uppercase tracking-widest mb-4">
+                <CalIcon className="h-3.5 w-3.5" /> Reserve Your Spot
+              </div>
+              <h2 className="font-serif text-4xl md:text-5xl tracking-tight mb-2">Book a Table</h2>
+              <p className="text-muted-foreground">at <span className="text-foreground font-medium">{venueName}</span></p>
             </div>
-            <div className="rounded-3xl glass-card-strong p-7 md:p-10 red-ring space-y-6">
-              {ferDayActive
-                ? <p className="font-serif text-3xl text-emerald-400">{ferHeadline}</p>
-                : (<div className="flex items-baseline gap-3 pb-4 border-b border-white/8"><div><p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t("events.starting_at")}</p><p className="font-serif text-5xl text-gradient-red">{startingAt > 0 ? formatINR(startingAt) : "—"}</p></div><p className="text-xs text-muted-foreground">{isPub ? t("events.lowest_entry") : t("events.per_person_event")}</p></div>)
-              }
-              {!bookingIsFullyFree && discountInfo?.isNewUser && <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm flex items-center gap-2 text-primary"><Sparkle className="h-4 w-4 shrink-0" />{t("events.new_member_discount", { pct: discountInfo.bookingDiscountPercent })}</div>}
-              <div className="space-y-5">
-                <div>
-                  <Label htmlFor="bdate" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.date_label")}</Label>
-                  <Input id="bdate" type="date" value={date} min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()} onChange={(e) => setDate(e.target.value)} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" />
-                  {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && <p className="text-xs text-muted-foreground mt-1.5">Open: {vendorOpenDays.join(", ")}</p>}
-                  {eventDateMismatch && (
-                    <p className="text-xs text-amber-400 mt-1.5">Selected booking date does not match the chosen event date. Please select the event date to continue.</p>
+
+            <div className="grid lg:grid-cols-3 gap-6 items-start">
+
+              {/* ── Left: Form ── */}
+              <div className="lg:col-span-2 space-y-4">
+
+                {/* Price / free-entry banner */}
+                <div className="rounded-2xl glass-card-strong red-ring px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
+                  {ferDayActive ? (
+                    <p className="font-serif text-2xl text-emerald-400">{ferHeadline}</p>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">{t("events.starting_at")}</p>
+                        <p className="font-serif text-4xl text-gradient-red">{startingAt > 0 ? formatINR(startingAt) : "—"}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{isPub ? t("events.lowest_entry") : t("events.per_person_event")}</p>
+                    </>
+                  )}
+                  {!bookingIsFullyFree && discountInfo?.isNewUser && (
+                    <div className="w-full rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm flex items-center gap-2 text-primary">
+                      <Sparkle className="h-4 w-4 shrink-0" />{t("events.new_member_discount", { pct: discountInfo.bookingDiscountPercent })}
+                    </div>
                   )}
                 </div>
-                {bookingIsFullyFree && <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3"><span className="text-emerald-400">✓</span><p className="text-sm font-medium text-emerald-300">{t("events.free_entry_form_notice")}</p></div>}
-                {isPub ? (
-                  <>
-                    <div>
-                      <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2"><Wine className="h-3.5 w-3.5 text-primary" />{t("events.booking_type")}</Label>
-                      <RadioGroup value={pubMode} onValueChange={(v) => changePubMode(v as "ticket" | "event" | "event_booking")} className="flex gap-2">
-                        <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "ticket" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}><RadioGroupItem value="ticket" /><span className="text-sm font-medium">{t("events.buy_tickets")}</span></label>
-                        <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "event" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
-                          <RadioGroupItem value="event" />
-                          <span className="text-sm font-medium">{(event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")}</span>
-                          {(event as any)?.freeEntryForTable && (
-                            <span className="text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">Free Entry</span>
-                          )}
-                        </label>
-                        {sortedAnnouncements.length > 0 && (
-                          <label className={`flex-1 flex items-center justify-center gap-2 rounded-xl border px-3 py-3 cursor-pointer transition-colors text-center ${pubMode === "event_booking" ? "border-primary bg-primary/10 text-primary" : "border-white/10 hover:border-white/20"}`}>
-                            <RadioGroupItem value="event_booking" />
-                            <span className="text-sm font-medium">Events Booking</span>
-                          </label>
-                        )}
-                      </RadioGroup>
+
+                {/* ── Section: Date ── */}
+                <div className="rounded-2xl glass-card p-5 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                      <CalIcon className="h-3.5 w-3.5 text-primary" />
                     </div>
+                    <p className="text-sm font-semibold text-foreground uppercase tracking-wider">Select Date</p>
+                  </div>
+                  <Input id="bdate" type="date" value={date}
+                    min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="bg-black/40 border-white/10 h-11 rounded-xl [color-scheme:dark]" />
+                  {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
+                    <p className="text-xs text-muted-foreground">Open: {vendorOpenDays.join(", ")}</p>
+                  )}
+                  {eventDateMismatch && (
+                    <p className="text-xs text-amber-400">Selected date doesn't match the event date. Please select the event date.</p>
+                  )}
+                  {bookingIsFullyFree && (
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3">
+                      <span className="text-emerald-400">✓</span>
+                      <p className="text-sm font-medium text-emerald-300">{t("events.free_entry_form_notice")}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Section: Booking Type + Tickets ── */}
+                {isPub ? (
+                  <div className="rounded-2xl glass-card p-5 space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                        <Ticket className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground uppercase tracking-wider">{t("events.booking_type")}</p>
+                    </div>
+                    <RadioGroup value={pubMode} onValueChange={(v) => changePubMode(v as "ticket" | "event" | "event_booking")} className="grid gap-2">
+                      {[
+                        { value: "ticket", label: t("events.buy_tickets") },
+                        { value: "event", label: (event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking"), badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
+                        ...(sortedAnnouncements.length > 0 ? [{ value: "event_booking", label: "Events Booking" }] : []),
+                      ].map((opt: any) => (
+                        <label key={opt.value} className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 cursor-pointer transition-all ${pubMode === opt.value ? "border-primary bg-primary/10 text-primary" : "border-white/8 bg-black/20 text-muted-foreground hover:border-white/15 hover:text-foreground"}`}>
+                          <RadioGroupItem value={opt.value} />
+                          <span className="text-sm font-medium flex-1">{opt.label}</span>
+                          {opt.badge && <span className="text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">{opt.badge}</span>}
+                        </label>
+                      ))}
+                    </RadioGroup>
+
                     {pubMode === "ticket" && (
-                      <div className="space-y-2 rounded-2xl border border-white/10 p-5 bg-white/2">
-                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">{t("events.ticket_counts")} <span className="text-red-400 normal-case">*</span></p>
+                      <div className="rounded-xl border border-white/8 bg-black/20 p-4 space-y-2 mt-2">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">{t("events.ticket_counts")} <span className="text-primary normal-case">*</span></p>
                         {fieldErrors.ticketWomen && <p className="text-xs text-destructive">{fieldErrors.ticketWomen}</p>}
                         <TicketRow label={t("events.women")} price={isTierFree("women") ? 0 : effectiveWomen} value={ticketWomen} onChange={setTicketWomen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("women") && !isFreeEntryDay} />
                         <TicketRow label={t("events.men")} price={isTierFree("men") ? 0 : effectiveMen} value={ticketMen} onChange={setTicketMen} hidePrice={isFreeEntryDay} freeBadge={isTierFree("men") && !isFreeEntryDay} />
@@ -1534,199 +1607,270 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       </div>
                     )}
                     {pubMode === "event" && (
-                      <>
-                        <div><Label htmlFor="occasion" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.occasion_label")}</Label>
-                          <Select value={occasion} onValueChange={setOccasion}><SelectTrigger id="occasion" className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl"><SelectValue placeholder={t("events.select_occasion")} /></SelectTrigger><SelectContent><SelectItem value="farewell">{t("events.occ_farewell")}</SelectItem><SelectItem value="office-party">{t("events.occ_office_party")}</SelectItem><SelectItem value="casual-party">{t("events.occ_casual_party")}</SelectItem><SelectItem value="birthday">{t("events.occ_birthday")}</SelectItem><SelectItem value="others">{t("events.occ_others")}</SelectItem></SelectContent></Select>
-                        </div>
-                        <div><Label htmlFor="guests2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.guests_field")}</Label><Input id="guests2" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" /></div>
-                      </>
-                    )}
-                    {pubMode === "event_booking" && (
-                      <>
+                      <div className="grid sm:grid-cols-2 gap-3 mt-2">
                         <div>
-                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Select Event <span className="text-red-400">*</span></Label>
-                          <Select
-                            value={selectedAnnouncementId || ""}
-                            onValueChange={(v) => {
-                              setSelectedAnnouncementId(v);
-                              const a = sortedAnnouncements.find((x: any) => String(x.id) === v);
-                              if (a?.announceDate) setDate(a.announceDate);
-                            }}
-                          >
-                            <SelectTrigger className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl">
-                              <SelectValue placeholder="— choose an event —" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {sortedAnnouncements.map((a: any) => (
-                                <SelectItem key={a.id} value={String(a.id)}>
-                                  <span className="flex items-center gap-2.5">
-                                    {a.imageUrl ? (
-                                      <img src={a.imageUrl} alt="" className="h-8 w-8 rounded-md object-cover shrink-0" />
-                                    ) : (
-                                      <span className="h-8 w-8 rounded-md bg-white/10 shrink-0" />
-                                    )}
-                                    <span className="flex flex-col items-start">
-                                      <span className="text-sm font-medium leading-tight">{a.title}</span>
-                                      <span className="text-xs text-muted-foreground leading-tight">
-                                        {new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                                        {a.announceTime ? ` · ${a.announceTime}` : ""}
-                                      </span>
-                                    </span>
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
+                          <Label htmlFor="occasion" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.occasion_label")}</Label>
+                          <Select value={occasion} onValueChange={setOccasion}>
+                            <SelectTrigger id="occasion" className="bg-black/40 border-white/10 h-11 rounded-xl w-full"><SelectValue placeholder={t("events.select_occasion")} /></SelectTrigger>
+                            <SelectContent><SelectItem value="farewell">{t("events.occ_farewell")}</SelectItem><SelectItem value="office-party">{t("events.occ_office_party")}</SelectItem><SelectItem value="casual-party">{t("events.occ_casual_party")}</SelectItem><SelectItem value="birthday">{t("events.occ_birthday")}</SelectItem><SelectItem value="others">{t("events.occ_others")}</SelectItem></SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor="ev-guests" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.guests_field")}</Label>
-                          <Input id="ev-guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" />
+                          <Label htmlFor="guests2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.guests_field")}</Label>
+                          <Input id="guests2" type="number" min={10} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 h-11 rounded-xl" />
+                        </div>
+                      </div>
+                    )}
+                    {pubMode === "event_booking" && (
+                      <div className="space-y-3 mt-2">
+                        <div>
+                          <Label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Select Event <span className="text-primary">*</span></Label>
+                          <Select value={selectedAnnouncementId || ""} onValueChange={(v) => { setSelectedAnnouncementId(v); const a = sortedAnnouncements.find((x: any) => String(x.id) === v); if (a?.announceDate) setDate(a.announceDate); }}>
+                            <SelectTrigger className="bg-black/40 border-white/10 h-11 rounded-xl w-full"><SelectValue placeholder="— choose an event —" /></SelectTrigger>
+                            <SelectContent>{sortedAnnouncements.map((a: any) => (<SelectItem key={a.id} value={String(a.id)}><span className="flex items-center gap-2.5">{a.imageUrl ? <img src={a.imageUrl} alt="" className="h-8 w-8 rounded-md object-cover shrink-0" /> : <span className="h-8 w-8 rounded-md bg-white/10 shrink-0" />}<span className="flex flex-col items-start"><span className="text-sm font-medium leading-tight">{a.title}</span><span className="text-xs text-muted-foreground leading-tight">{new Date(a.announceDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}{a.announceTime ? ` · ${a.announceTime}` : ""}</span></span></span></SelectItem>))}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="ev-guests" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.guests_field")}</Label>
+                          <Input id="ev-guests" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 h-11 rounded-xl" />
                         </div>
                         {selectedAnnouncement && (
                           <div className="rounded-xl border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-primary space-y-1">
                             {selectedAnnouncement.announceTime && <p>Event time: {selectedAnnouncement.announceTime}</p>}
-                            <div className="flex items-center justify-between">
-                              <span>{formatINR(eventBookingPerPerson)} × {Math.max(1, guests)} {Math.max(1, guests) === 1 ? "guest" : "guests"}</span>
-                              <span className="font-semibold">{formatINR(eventBookingPerPerson * Math.max(1, guests))}</span>
-                            </div>
+                            <div className="flex items-center justify-between"><span>{formatINR(eventBookingPerPerson)} × {Math.max(1, guests)} {Math.max(1, guests) === 1 ? "guest" : "guests"}</span><span className="font-semibold">{formatINR(eventBookingPerPerson * Math.max(1, guests))}</span></div>
                           </div>
                         )}
-                      </>
-                    )}
-                    {(pubMode === "ticket" || pubMode === "event") && (
-                      <div>
-                        <Label htmlFor="arrival-time2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.arrival_time")} <span className="text-red-400 text-xs ml-1">*</span></Label>
-                        <input
-                          id="arrival-time2"
-                          type="time"
-                          value={arrivalTime}
-                          min={(() => { const todayStr = new Date().toISOString().slice(0, 10); if (date !== todayStr) return undefined; const now = new Date(); return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`; })()}
-                          onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
-                          required
-                          aria-invalid={!!fieldErrors.arrivalTime}
-                          className={`w-full rounded-xl border px-3 py-2.5 text-sm mt-2 text-foreground bg-black/40 h-11 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
-                        />
-                        {fieldErrors.arrivalTime && <p className="text-xs text-destructive mt-1">{fieldErrors.arrivalTime}</p>}
                       </div>
                     )}
-                    <div><Label htmlFor="pname2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.booking_name")} <span className="text-red-400 text-xs ml-1">*</span></Label><Input id="pname2" value={personName} onChange={(e) => { setPersonName(e.target.value); clearFieldError("personName"); }} placeholder={t("events.name_on_booking")} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" aria-invalid={!!fieldErrors.personName} />{fieldErrors.personName && <p className="text-xs text-destructive mt-1">{fieldErrors.personName}</p>}</div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl glass-card p-5 space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                        <Ticket className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground uppercase tracking-wider">Event Details</p>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div><Label htmlFor="etype2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.event_type_label")}</Label><Select value={eventType} onValueChange={setEventType}><SelectTrigger id="etype2" className="bg-black/40 border-white/10 h-11 rounded-xl w-full"><SelectValue /></SelectTrigger><SelectContent>{EVENT_TYPES.map((evT) => <SelectItem key={evT.value} value={evT.value}>{evT.label}</SelectItem>)}</SelectContent></Select></div>
+                      <div><Label htmlFor="budget2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.budget_range")}</Label><Select value={budget} onValueChange={setBudget}><SelectTrigger id="budget2" className="bg-black/40 border-white/10 h-11 rounded-xl w-full"><SelectValue placeholder={t("events.optional_label")} /></SelectTrigger><SelectContent><SelectItem value="any">— select —</SelectItem>{BUDGET_RANGES.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent></Select></div>
+                      <div className="sm:col-span-2"><Label htmlFor="guests3" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.guests_field")}</Label><Input id="guests3" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 h-11 rounded-xl" /></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Section: Contact ── */}
+                <div className="rounded-2xl glass-card p-5 space-y-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                      <Users className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <p className="text-sm font-semibold text-foreground uppercase tracking-wider">Contact Details</p>
+                  </div>
+                  {isPub && (pubMode === "ticket" || pubMode === "event") && (
                     <div>
-                      <Label htmlFor="pphone2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.phone_number")} <span className="text-red-400 text-xs ml-1">*</span></Label>
-                      <Input id="pphone2" type="tel" inputMode="numeric" maxLength={10} value={phone} onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); clearFieldError("phone"); }} placeholder={t("events.phone_placeholder")} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" aria-invalid={!!fieldErrors.phone} />
+                      <Label htmlFor="arrival-time2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.arrival_time")} <span className="text-primary text-xs">*</span></Label>
+                      <input id="arrival-time2" type="time" value={arrivalTime}
+                        min={(() => { const todayStr = new Date().toISOString().slice(0, 10); if (date !== todayStr) return undefined; const now = new Date(); return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`; })()}
+                        onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
+                        required aria-invalid={!!fieldErrors.arrivalTime}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-sm text-foreground bg-black/40 h-11 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
+                      />
+                      {fieldErrors.arrivalTime && <p className="text-xs text-destructive mt-1">{fieldErrors.arrivalTime}</p>}
+                    </div>
+                  )}
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="pname2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.booking_name")} <span className="text-primary text-xs">*</span></Label>
+                      <Input id="pname2" value={personName} onChange={(e) => { setPersonName(e.target.value); clearFieldError("personName"); }} placeholder={t("events.name_on_booking")} className="bg-black/40 border-white/10 h-11 rounded-xl" aria-invalid={!!fieldErrors.personName} />
+                      {fieldErrors.personName && <p className="text-xs text-destructive mt-1">{fieldErrors.personName}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="pphone2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.phone_number")} <span className="text-primary text-xs">*</span></Label>
+                      <Input id="pphone2" type="tel" inputMode="numeric" maxLength={10} value={phone} onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 10)); clearFieldError("phone"); }} placeholder={t("events.phone_placeholder")} className="bg-black/40 border-white/10 h-11 rounded-xl" aria-invalid={!!fieldErrors.phone} />
                       {fieldErrors.phone ? <p className="text-xs text-destructive mt-1">{fieldErrors.phone}</p> : phone.length > 0 && phone.length < 10 ? <p className="text-xs text-destructive mt-1">{t("events.phone_validation")}</p> : null}
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <div><Label htmlFor="etype2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.event_type_label")}</Label><Select value={eventType} onValueChange={setEventType}><SelectTrigger id="etype2" className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent>{EVENT_TYPES.map((evT) => <SelectItem key={evT.value} value={evT.value}>{evT.label}</SelectItem>)}</SelectContent></Select></div>
-                    <div><Label htmlFor="budget2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.budget_range")}</Label><Select value={budget} onValueChange={setBudget}><SelectTrigger id="budget2" className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl"><SelectValue placeholder={t("events.optional_label")} /></SelectTrigger><SelectContent><SelectItem value="any">— select —</SelectItem>{BUDGET_RANGES.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent></Select></div>
-                    <div><Label htmlFor="guests3" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.guests_field")}</Label><Input id="guests3" type="number" min={1} max={event.capacity} value={guests} onChange={(e) => setGuests(Number(e.target.value))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" /></div>
-                  </>
-                )}
-                {!bookingIsFullyFree && pointsAvail > 0 && <div><Label htmlFor="ppoints2" className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Coins className="h-3.5 w-3.5 text-primary" />{t("events.use_points_avail", { n: discountInfo?.points ?? 0 })}</Label><Input id="ppoints2" type="number" min={0} max={pointsAvail} placeholder="0" value={pointsToUse === 0 ? "" : pointsToUse} onChange={(e) => setPointsToUse(Math.min(pointsAvail, Math.max(0, Number(e.target.value) || 0)))} className="bg-black/40 border-white/10 mt-2 h-11 rounded-xl" /></div>}
+                  </div>
+                </div>
+
+                {/* ── Section: Offers & Notes ── */}
                 {!bookingIsFullyFree && (
-                  <div>
-                    <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Tag className="h-3.5 w-3.5 text-primary" />{t("events.coupon_code_label")}{!me?.user && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}</Label>
-                    {!me?.user ? <p className="text-xs text-muted-foreground mt-2"><Link href="/login" className="text-primary hover:underline">{t("events.log_in_link")}</Link> {t("events.coupon_login_hint")}</p> : (
-                      <>
-                        <div className="flex gap-2 mt-2"><Input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="RV-XXXXXX" className="bg-black/40 border-white/10 h-11 rounded-xl" /><Button type="button" variant="outline" onClick={validateCoupon} className="border-white/15 rounded-xl px-5 shrink-0">{t("events.apply_coupon")}</Button></div>
-                        {couponState?.valid && (
-                          <p className="text-xs text-emerald-400 mt-1.5">
-                            ✓ {couponState.isVendorCoupon
-                              ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`)
-                              : t("events.coupon_pct_off", { pct: couponState.discountPercent })}
-                          </p>
-                        )}
-                        {myCoupons.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{myCoupons.slice(0, 3).map((c) => <button key={c.id} type="button" onClick={() => setCouponInput(c.code)} className="text-[10px] px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-colors">{c.code} — {c.discountPercent}%</button>)}</div>}
-                        {vendorCoupons.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Available offers</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {vendorCoupons.map((vc) => (
-                                <button
-                                  key={vc.id}
-                                  type="button"
-                                  onClick={() => setCouponInput(vc.code)}
-                                  className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition-colors font-mono"
-                                >
-                                  {vc.code} — {vc.discountType === "fixed" ? `₹${Number(vc.discountValue)}` : `${Number(vc.discountValue)}%`} off
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
+                  <div className="rounded-2xl glass-card p-5 space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                        <Tag className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground uppercase tracking-wider">Offers & Notes</p>
+                    </div>
+                    {pointsAvail > 0 && (
+                      <div className="rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <Coins className="h-4 w-4 text-primary" />
+                          <span className="text-sm text-foreground font-medium">{t("events.use_points_avail", { n: discountInfo?.points ?? 0 })}</span>
+                        </div>
+                        <Input id="ppoints2" type="number" min={0} max={pointsAvail} placeholder="0" value={pointsToUse === 0 ? "" : pointsToUse} onChange={(e) => setPointsToUse(Math.min(pointsAvail, Math.max(0, Number(e.target.value) || 0)))} className="bg-black/40 border-white/10 h-9 rounded-lg w-24 text-center" />
+                      </div>
                     )}
+                    <div>
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1 mb-2">
+                        <Tag className="h-3.5 w-3.5 text-primary" />{t("events.coupon_code_label")}{!me?.user && <Lock className="h-3 w-3 text-muted-foreground ml-1" />}
+                      </Label>
+                      {!me?.user ? (
+                        <p className="text-xs text-muted-foreground"><Link href="/login" className="text-primary hover:underline">{t("events.log_in_link")}</Link> {t("events.coupon_login_hint")}</p>
+                      ) : (
+                        <>
+                          <div className="flex gap-2">
+                            <Input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="RV-XXXXXX" className="bg-black/40 border-white/10 h-11 rounded-xl" />
+                            <Button type="button" variant="outline" onClick={validateCoupon} className="border-white/15 rounded-xl px-5 shrink-0 h-11">{t("events.apply_coupon")}</Button>
+                          </div>
+                          {couponState?.valid && <p className="text-xs text-emerald-400 mt-1.5">✓ {couponState.isVendorCoupon ? (couponState.discountType === "fixed" ? `₹${couponState.discountValue} off` : `${couponState.discountValue}% off`) : t("events.coupon_pct_off", { pct: couponState.discountPercent })}</p>}
+                          {myCoupons.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{myCoupons.slice(0, 3).map((c) => <button key={c.id} type="button" onClick={() => setCouponInput(c.code)} className="text-[10px] px-2.5 py-1 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-colors">{c.code} — {c.discountPercent}%</button>)}</div>}
+                          {vendorCoupons.length > 0 && <div className="mt-2"><p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Available offers</p><div className="flex flex-wrap gap-1.5">{vendorCoupons.map((vc) => <button key={vc.id} type="button" onClick={() => setCouponInput(vc.code)} className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition-colors font-mono">{vc.code} — {vc.discountType === "fixed" ? `₹${Number(vc.discountValue)}` : `${Number(vc.discountValue)}%`} off</button>)}</div></div>}
+                        </>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="notes2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.notes_label")}</Label>
+                      <Textarea id="notes2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("events.notes_placeholder")} className="bg-black/40 border-white/10 rounded-xl resize-none" />
+                    </div>
                   </div>
                 )}
-                {!bookingIsFullyFree && <div><Label htmlFor="notes2" className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.notes_label")}</Label><Textarea id="notes2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("events.notes_placeholder")} className="bg-black/40 border-white/10 mt-2 rounded-xl resize-none" /></div>}
+
+                {/* ── Section: Payment ── */}
                 {!bookingIsFullyFree && (
-                  <div className="space-y-2 border border-white/8 rounded-2xl px-5 py-4 bg-white/2 text-sm">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Order Summary</p>
-                    <div className="flex items-center justify-between text-white/60"><span>{t("events.subtotal_label")}</span><span>{formatINRExact(subtotal)}</span></div>
-                    {couponDiscount > 0 && couponDiscount === discount && <div className="flex items-center justify-between text-emerald-400"><span>{t("events.coupon_label")}</span><span>– {formatINRExact(couponDiscount)}</span></div>}
-                    {newUserDiscount > 0 && newUserDiscount === discount && couponDiscount < newUserDiscount && <div className="flex items-center justify-between text-emerald-400"><span>{t("events.new_member_pct_off", { pct: newUserPercent })}</span><span>– {formatINRExact(newUserDiscount)}</span></div>}
-                    {pointsApplied > 0 && <div className="flex items-center justify-between text-primary"><span>{t("events.points_label")}</span><span>– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span></div>}
-                    {baseFee > 0 && <div className="flex items-center justify-between text-amber-400/80 text-xs pt-1"><span>Base Fee (Incl. GST)</span><span>+ {formatINRExact(baseFee)}</span></div>}
-                    <div className="flex items-center justify-between font-semibold text-lg pt-2 border-t border-white/8"><span>{t("events.total_label")}</span><span className="text-primary">{formatINRExact(totalPayable)}</span></div>
-                  </div>
-                )}
-                {!bookingIsFullyFree && (
-                  <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">{t("events.payment_method")}</Label>
-                    <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cod" | "online")} className="grid grid-cols-2 gap-2 mt-2">
-                      <Label htmlFor="pay-cod2" className={`flex items-center gap-2 rounded-xl border px-4 py-3.5 cursor-pointer text-sm transition-colors ${paymentMethod === "cod" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}><RadioGroupItem id="pay-cod2" value="cod" className="sr-only" /><span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "cod" ? "border-primary bg-primary" : "border-muted-foreground"}`} /><span>{t("events.pay_cod")}</span></Label>
-                      <Label htmlFor="pay-online2" className={`flex items-center gap-2 rounded-xl border px-4 py-3.5 cursor-pointer text-sm transition-colors ${paymentMethod === "online" ? "border-primary bg-primary/10 text-primary" : "border-white/10 bg-black/20 text-muted-foreground hover:border-white/20"}`}><RadioGroupItem id="pay-online2" value="online" className="sr-only" /><span className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${paymentMethod === "online" ? "border-primary bg-primary" : "border-muted-foreground"}`} /><span>{t("events.pay_online_phonepe")}</span></Label>
+                  <div className="rounded-2xl glass-card p-5 space-y-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                        <CreditCard className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground uppercase tracking-wider">{t("events.payment_method")}</p>
+                    </div>
+                    <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cod" | "online")} className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: "pay-cod2", value: "cod", label: t("events.pay_cod") },
+                        { id: "pay-online2", value: "online", label: t("events.pay_online_phonepe") },
+                      ].map((opt) => (
+                        <label key={opt.value} htmlFor={opt.id} className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 cursor-pointer text-sm transition-all ${paymentMethod === opt.value ? "border-primary bg-primary/10 text-primary" : "border-white/8 bg-black/20 text-muted-foreground hover:border-white/15"}`}>
+                          <RadioGroupItem id={opt.id} value={opt.value} className="sr-only" />
+                          <span className={`h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${paymentMethod === opt.value ? "border-primary" : "border-muted-foreground"}`}>
+                            {paymentMethod === opt.value && <span className="h-2 w-2 rounded-full bg-primary block" />}
+                          </span>
+                          <span className="font-medium">{opt.label}</span>
+                        </label>
+                      ))}
                     </RadioGroup>
-                    {paymentMethod === "cod" && <p className="text-xs text-muted-foreground">{t("events.cod_hint")}</p>}
-                    {paymentMethod === "online" && <p className="text-xs text-muted-foreground">{t("events.online_hint")}</p>}
+                    {paymentMethod === "cod" && <p className="text-xs text-muted-foreground px-1">{t("events.cod_hint")}</p>}
+                    {paymentMethod === "online" && <p className="text-xs text-muted-foreground px-1">{t("events.online_hint")}</p>}
                   </div>
                 )}
-                <div className="space-y-3 pt-2 border-t border-white/8">
+
+                {/* ── Terms ── */}
+                <div className="rounded-2xl glass-card p-5 space-y-3">
                   <div className="flex items-start gap-3">
                     <Checkbox id="agree-terms" checked={agreedTerms} onCheckedChange={(v) => setAgreedTerms(!!v)} className="mt-0.5 shrink-0" />
-                  <Label htmlFor="agree-terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer font-normal">
-                    I agree to the{" "}
-                    <Link href="/terms" className="text-primary hover:underline underline-offset-2">Terms &amp; Conditions</Link>
-                    {" "}and{" "}
-                    <Link href="/privacy" className="text-primary hover:underline underline-offset-2">Privacy Policy</Link>
-                  </Label>
-                </div>
-                {isPub && (
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="confirm-age"
-                      checked={confirmedAge}
-                      onCheckedChange={(v) => setConfirmedAge(!!v)}
-                      className="mt-0.5 shrink-0"
-                    />
-                    <Label htmlFor="confirm-age" className="text-xs text-muted-foreground leading-relaxed cursor-pointer font-normal">
-                      I confirm I am 18 or older and understand that alcohol will be served at this venue
+                    <Label htmlFor="agree-terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer font-normal">
+                      I agree to the{" "}<Link href="/terms" className="text-primary hover:underline underline-offset-2">Terms &amp; Conditions</Link>{" "}and{" "}<Link href="/privacy" className="text-primary hover:underline underline-offset-2">Privacy Policy</Link>
                     </Label>
                   </div>
-                )}
-                {(!agreedTerms || (isPub && !confirmedAge)) && (
-                  <p className="text-[11px] text-muted-foreground/70 pl-7">
-                    Please tick {!agreedTerms && isPub && !confirmedAge ? "both boxes" : "the box above"} to proceed with your booking.
-                  </p>
-                )}
+                  {isPub && (
+                    <div className="flex items-start gap-3">
+                      <Checkbox id="confirm-age" checked={confirmedAge} onCheckedChange={(v) => setConfirmedAge(!!v)} className="mt-0.5 shrink-0" />
+                      <Label htmlFor="confirm-age" className="text-sm text-muted-foreground leading-relaxed cursor-pointer font-normal">
+                        I confirm I am 18 or older and understand that alcohol will be served at this venue
+                      </Label>
+                    </div>
+                  )}
+                  {(!agreedTerms || (isPub && !confirmedAge)) && (
+                    <p className="text-[11px] text-muted-foreground/60 pl-7">Please tick {!agreedTerms && isPub && !confirmedAge ? "both boxes" : "the box above"} to proceed.</p>
+                  )}
+                </div>
+
+                {/* ── CTA (mobile) ── */}
+                <div className="lg:hidden">
+                  <Button
+                    className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground border-0 text-base font-semibold tracking-wide red-glow disabled:opacity-40 transition-all"
+                    size="lg" onClick={handleBook}
+                    disabled={booking || !agreedTerms || (isPub && !confirmedAge)}
+                  >
+                    <CalIcon className="h-5 w-5 mr-2.5" />
+                    {booking ? t("events.booking_processing") : bookingIsFullyFree ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
+                  </Button>
+                </div>
               </div>
 
-              <Button
-                className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground border-0 text-base font-semibold tracking-wide red-glow disabled:opacity-50 disabled:red-glow-none transition-all"
-                size="lg"
-                onClick={handleBook}
-                disabled={booking || !agreedTerms || (isPub && !confirmedAge)}
-              >
-                <CalIcon className="h-5 w-5 mr-2.5" />
-                {booking ? t("events.booking_processing") : bookingIsFullyFree ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
-              </Button>
+              {/* ── Right: Sticky Summary ── */}
+              <div className="lg:col-span-1">
+                <div className="rounded-2xl glass-card-strong red-ring p-6 lg:sticky lg:top-24 space-y-5">
+                  <h3 className="font-serif text-xl tracking-tight">Order Summary</h3>
+
+                  {!bookingIsFullyFree && (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>{t("events.subtotal_label")}</span>
+                        <span className="tabular-nums">{formatINRExact(subtotal)}</span>
+                      </div>
+                      {couponDiscount > 0 && couponDiscount === discount && (
+                        <div className="flex items-center justify-between text-emerald-400">
+                          <span>{t("events.coupon_label")}</span>
+                          <span className="tabular-nums">– {formatINRExact(couponDiscount)}</span>
+                        </div>
+                      )}
+                      {newUserDiscount > 0 && newUserDiscount === discount && couponDiscount < newUserDiscount && (
+                        <div className="flex items-center justify-between text-emerald-400">
+                          <span>{t("events.new_member_pct_off", { pct: newUserPercent })}</span>
+                          <span className="tabular-nums">– {formatINRExact(newUserDiscount)}</span>
+                        </div>
+                      )}
+                      {pointsApplied > 0 && (
+                        <div className="flex items-center justify-between text-primary">
+                          <span>{t("events.points_label")}</span>
+                          <span className="tabular-nums">– {formatINRExact(pointsApplied * POINTS_RUPEE_RATE)}</span>
+                        </div>
+                      )}
+                      {baseFee > 0 && (
+                        <div className="flex items-center justify-between text-amber-400/80 text-xs pt-1">
+                          <span>Base Fee (Incl. GST)</span>
+                          <span className="tabular-nums">+ {formatINRExact(baseFee)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between font-semibold text-xl pt-3 border-t border-white/10">
+                        <span>{t("events.total_label")}</span>
+                        <span className="text-gradient-red tabular-nums">{formatINRExact(totalPayable)}</span>
+                      </div>
+                    </div>
+                  )}
+                  {bookingIsFullyFree && (
+                    <div className="flex items-center justify-between font-semibold text-xl">
+                      <span>{t("events.total_label")}</span>
+                      <span className="text-emerald-400">Free</span>
+                    </div>
+                  )}
+
+                  {/* Confirmation badge */}
+                  <div className="rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 flex items-start gap-3">
+                    <Sparkle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Instant Confirmation</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Your booking is confirmed immediately after submission</p>
+                    </div>
+                  </div>
+
+                  {/* CTA (desktop) */}
+                  <Button
+                    className="hidden lg:flex w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground border-0 text-base font-semibold tracking-wide red-glow disabled:opacity-40 transition-all"
+                    size="lg" onClick={handleBook}
+                    disabled={booking || !agreedTerms || (isPub && !confirmedAge)}
+                  >
+                    <CalIcon className="h-5 w-5 mr-2.5" />
+                    {booking ? t("events.booking_processing") : bookingIsFullyFree ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
+                  </Button>
+                </div>
+              </div>
+
             </div>
           </div>
-
-        </div>
-      )}
-    </div>
+        )}
+      </div>
   </div>
   );
 }

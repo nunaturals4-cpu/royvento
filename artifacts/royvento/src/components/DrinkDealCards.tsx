@@ -85,7 +85,7 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85 mb-3">
             {category}
           </p>
-          <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.15)]">
+          <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-white">
             {offer.vendorName}
           </p>
           {!isTicket && (
@@ -134,7 +134,7 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
         <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor} mb-3`}>
           {category}
         </p>
-        <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-black bg-white/90 self-start rounded-md px-2 py-0.5">
+        <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-white">
           {offer.vendorName}
         </p>
         {!isTicket && (
