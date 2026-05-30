@@ -321,8 +321,6 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
     );
   };
 
-  const todayDealCount = drinkPlans.filter((p) => (p.drinksOfferLabel || p.foodDiscountLabel) && (!p.validUntil || p.validUntil >= new Date().toISOString().slice(0, 10))).length;
-
   return (
     <div>
       <SEO
@@ -414,8 +412,8 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
         </div>
       </div>
 
-      {/* ── Deals Strip ── */}
-      {(todayDealCount > 0 || announcements.length > 0) && (
+      {/* ── Announcements Strip ── */}
+      {announcements.length > 0 && (
         <div className="border-y border-primary/10 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-4">
           <div className="container mx-auto px-4 md:px-6 flex items-center gap-4">
             <button
@@ -425,15 +423,6 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
               <GlassWater className="h-3.5 w-3.5" /> Today's Deals ↗
             </button>
             <div className="flex gap-3 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {drinkPlans
-                .filter((p) => (p.drinksOfferLabel || p.foodDiscountLabel) && (!p.validUntil || p.validUntil >= new Date().toISOString().slice(0, 10)))
-                .map((plan) => (
-                  <div key={plan.id} className="shrink-0 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 min-w-[160px] space-y-1">
-                    <span className="block text-[10px] font-semibold text-primary uppercase tracking-wider">{PLAN_TYPE_LABELS[plan.type] ?? plan.type}</span>
-                    {plan.drinksOfferLabel && <span className="flex items-center gap-1.5 text-sm font-medium text-foreground"><GlassWater className="h-3 w-3 text-primary shrink-0" />{plan.drinksOfferLabel}</span>}
-                    {plan.foodDiscountLabel && <span className="flex items-center gap-1.5 text-sm font-medium text-foreground"><Utensils className="h-3 w-3 text-amber-400 shrink-0" />{plan.foodDiscountLabel}</span>}
-                  </div>
-                ))}
               {announcements.map((a) => (
                 <div key={a.id} className="shrink-0 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 min-w-[160px] max-w-[220px] space-y-1">
                   <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-500 uppercase tracking-wider"><Bell className="h-3 w-3" /> Announcement</span>
@@ -730,7 +719,6 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                           {plan.lineItems.map((item, i) => (
                             <li key={i} className="flex items-center gap-3 text-sm">
                               <span className="font-medium">{item.name}</span>
-                              <span className="text-muted-foreground text-xs">×{item.qty}</span>
                               {item.discountedPrice > 0 ? <span className="text-xs text-emerald-400">₹{item.discountedPrice}</span> : <span className="text-xs text-emerald-400">Free</span>}
                             </li>
                           ))}
@@ -745,20 +733,6 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                             <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
                               <Clock className="h-2.5 w-2.5 shrink-0" />
                               {[plan.timeFrom ? fmtTime(plan.timeFrom) : null, plan.timeTo ? fmtTime(plan.timeTo) : null].filter(Boolean).join(" – ")}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {(plan.drinksOfferLabel || plan.foodDiscountLabel) && (!plan.validUntil || plan.validUntil >= new Date().toISOString().slice(0, 10)) && (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {plan.drinksOfferLabel && (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-primary/5 border border-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
-                              <GlassWater className="h-3 w-3 shrink-0" />{plan.drinksOfferLabel}
-                            </span>
-                          )}
-                          {plan.foodDiscountLabel && (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500/5 border border-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-400">
-                              <Utensils className="h-3 w-3 shrink-0" />{plan.foodDiscountLabel}
                             </span>
                           )}
                         </div>

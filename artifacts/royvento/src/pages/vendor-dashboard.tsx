@@ -4903,12 +4903,6 @@ function LineItemsEditor({
             className="bg-black/40 border-white/10 w-full sm:flex-1 sm:min-w-0"
           />
           <div className="flex gap-2 items-center">
-            <Input
-              type="number" min="1" placeholder="Qty"
-              value={item.qty}
-              onChange={(e) => { const next = [...items]; next[idx] = { ...item, qty: Math.max(1, parseInt(e.target.value) || 1) }; onChange(next); }}
-              className="bg-black/40 border-white/10 w-20 flex-shrink-0"
-            />
             <div className="relative w-32 flex-shrink-0">
               <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input
@@ -5937,8 +5931,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
             gender: feGender, price: 0,
             days: feDays, timeFrom: feTimeFrom.trim(), timeTo: feTimeTo.trim(),
             description: feDescription.trim(),
-            drinksOfferLabel: feDrinksOffer.trim(),
-            foodDiscountLabel: feFoodDiscount.trim(),
+            drinksOfferLabel: "",
+            foodDiscountLabel: "",
             validFrom: feValidFrom || null,
             validUntil: feValidUntil || null,
           });
@@ -5950,8 +5944,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
           lineItems: ticketItems.filter((i) => i.name.trim()).map(itemForWire),
           days: ticketDays, timeFrom: ticketTimeFrom.trim(), timeTo: ticketTimeTo.trim(),
           description: ticketDescription.trim(),
-          drinksOfferLabel: ticketDrinksOffer.trim(),
-          foodDiscountLabel: ticketFoodDiscount.trim(),
+          drinksOfferLabel: "",
+          foodDiscountLabel: "",
           validFrom: ticketValidFrom || null,
           validUntil: ticketValidUntil || null,
         });
@@ -5987,8 +5981,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         ...(isTicket ? { lineItems: filledTicketItems } : {}),
         days: editDays, timeFrom: editTimeFrom, timeTo: editTimeTo,
         description: editDescription.trim(),
-        drinksOfferLabel: editDrinksOffer.trim(),
-        foodDiscountLabel: editFoodDiscount.trim(),
+        drinksOfferLabel: "",
+        foodDiscountLabel: "",
         validFrom: editValidFrom || null,
         validUntil: editValidUntil || null,
       });
@@ -6046,7 +6040,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         <form onSubmit={handleAdd} className="space-y-5 border border-white/10 rounded-2xl p-5 bg-black/20">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Add new plan(s)</h3>
 
-          {/* Free Entry */}
+          {/* Free Drinks */}
           <div className={`rounded-xl border p-4 transition-colors ${freeEntryChecked ? "border-primary/40 bg-primary/5" : "border-white/10 bg-black/10"}`}>
             <label className="flex items-center gap-3 cursor-pointer select-none">
               <input
@@ -6055,7 +6049,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                 onChange={(e) => setFreeEntryChecked(e.target.checked)}
                 className="h-4 w-4 accent-primary"
               />
-              <span className="font-semibold text-sm">Free Entry</span>
+              <span className="font-semibold text-sm">Free Drinks</span>
+              <span className="text-xs text-muted-foreground font-normal">— welcome drink or unlimited drinks offer</span>
             </label>
             {freeEntryChecked && (
               <div className="mt-4 space-y-4 pl-7">
@@ -6063,7 +6058,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                   <div>
                     <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">Drink type <span className="normal-case text-muted-foreground/60">(select one or both)</span></Label>
                     <div className="flex gap-3">
-                      {([["welcome", "Free Drink"], ["unlimited", "Unlimited Drinks"]] as const).map(([val, label]) => (
+                      {([["welcome", "Free Welcome Drink"], ["unlimited", "Free Unlimited Drinks"]] as const).map(([val, label]) => (
                         <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
                           <input type="checkbox" value={val}
                             checked={feDrinkTypes.includes(val)}
@@ -6101,11 +6096,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Input type="time" value={feTimeTo} onChange={(e) => setFeTimeTo(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
                   </div>
                   <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid from <span className="normal-case text-muted-foreground/60">(optional — date deal starts)</span></Label>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid from <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input type="date" value={feValidFrom} onChange={(e) => setFeValidFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
                   </div>
                   <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after)</span></Label>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid until <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input type="date" value={feValidUntil} onChange={(e) => setFeValidUntil(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
                   </div>
                   <div className="sm:col-span-2">
@@ -6113,16 +6108,6 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Textarea value={feDescription} onChange={(e) => setFeDescription(e.target.value)}
                       placeholder="Any extra details customers should know…" rows={2}
                       className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
-                  </div>
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
-                    <Input value={feDrinksOffer} onChange={(e) => setFeDrinksOffer(e.target.value)}
-                      placeholder="e.g. 2+1 on cocktails" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
-                  </div>
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Food discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
-                    <Input value={feFoodDiscount} onChange={(e) => setFeFoodDiscount(e.target.value)}
-                      placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
                   </div>
                 </div>
               </div>
@@ -6144,7 +6129,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
               <div className="mt-4 pl-7 space-y-3">
                 <div>
                   <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
-                    Items included <span className="normal-case text-muted-foreground/60">(name, quantity, discounted price)</span>
+                    Items included <span className="normal-case text-muted-foreground/60">(name, discounted price)</span>
                   </Label>
                   <LineItemsEditor items={ticketItems} onChange={setTicketItems} />
                 </div>
@@ -6162,11 +6147,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Input type="time" value={ticketTimeTo} onChange={(e) => setTicketTimeTo(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
                   </div>
                   <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid from <span className="normal-case text-muted-foreground/60">(optional — date deal starts)</span></Label>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid from <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input type="date" value={ticketValidFrom} onChange={(e) => setTicketValidFrom(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
                   </div>
                   <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Deal valid until <span className="normal-case text-muted-foreground/60">(optional — auto-hides after)</span></Label>
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Valid until <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
                     <Input type="date" value={ticketValidUntil} onChange={(e) => setTicketValidUntil(e.target.value)} className="bg-black/40 border-white/10 text-sm" />
                   </div>
                   <div className="sm:col-span-2">
@@ -6174,16 +6159,6 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Textarea value={ticketDescription} onChange={(e) => setTicketDescription(e.target.value)}
                       placeholder="Any extra details customers should know…" rows={2}
                       className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
-                  </div>
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Drinks discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
-                    <Input value={ticketDrinksOffer} onChange={(e) => setTicketDrinksOffer(e.target.value)}
-                      placeholder="e.g. 1 beer included" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
-                  </div>
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">Food discount label <span className="normal-case text-muted-foreground/60">(optional)</span></Label>
-                    <Input value={ticketFoodDiscount} onChange={(e) => setTicketFoodDiscount(e.target.value)}
-                      placeholder="e.g. 15% off food" className="bg-black/40 border-white/10 text-sm" maxLength={255} />
                   </div>
                 </div>
               </div>
@@ -6250,7 +6225,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     {editType === "ticket" && (
                       <div>
                         <Label className="mb-2 block text-xs text-muted-foreground uppercase tracking-wider">
-                          Items included <span className="normal-case text-muted-foreground/60">(name, qty, discounted price)</span>
+                          Items included <span className="normal-case text-muted-foreground/60">(name, discounted price)</span>
                         </Label>
                         <LineItemsEditor items={editItems} onChange={setEditItems} />
                       </div>
@@ -6278,22 +6253,12 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                         <Input type="time" value={editTimeTo} onChange={(e) => setEditTimeTo(e.target.value)} className="bg-black/40 border-white/10" />
                       </div>
                       <div>
-                        <Label className="flex items-center gap-1">Drinks discount label <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-                        <Input value={editDrinksOffer} onChange={(e) => setEditDrinksOffer(e.target.value)}
-                          placeholder="e.g. 2+1 on cocktails" className="bg-black/40 border-white/10" maxLength={255} />
-                      </div>
-                      <div>
-                        <Label className="flex items-center gap-1">Food discount label <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-                        <Input value={editFoodDiscount} onChange={(e) => setEditFoodDiscount(e.target.value)}
-                          placeholder="e.g. 20% off starters" className="bg-black/40 border-white/10" maxLength={255} />
-                      </div>
-                      <div>
-                        <Label className="flex items-center gap-1">Deal valid from <span className="text-muted-foreground text-xs font-normal">(optional — date deal starts)</span></Label>
+                        <Label className="flex items-center gap-1">Valid from <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
                         <Input type="date" value={editValidFrom} onChange={(e) => setEditValidFrom(e.target.value)}
                           className="bg-black/40 border-white/10" />
                       </div>
                       <div>
-                        <Label className="flex items-center gap-1">Deal valid until <span className="text-muted-foreground text-xs font-normal">(optional — auto-hides after this date)</span></Label>
+                        <Label className="flex items-center gap-1">Valid until <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
                         <Input type="date" value={editValidUntil} onChange={(e) => setEditValidUntil(e.target.value)}
                           className="bg-black/40 border-white/10" />
                       </div>
@@ -6350,7 +6315,6 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                           {plan.lineItems.map((item, i) => (
                             <li key={i} className="text-xs text-muted-foreground flex gap-2">
                               <span className="font-medium text-foreground/80">{item.name}</span>
-                              <span>×{item.qty}</span>
                               {item.discountedPrice > 0 && <span>₹{item.discountedPrice}</span>}
                             </li>
                           ))}

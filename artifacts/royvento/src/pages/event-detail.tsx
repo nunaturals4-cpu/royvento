@@ -1253,20 +1253,20 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
                     if (featured) {
                       return (
-                        <div key={plan.id} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/95 via-primary/80 to-primary/60 text-white p-5 flex flex-col min-h-[200px] red-glow border border-white/[0.10]">
+                        <div key={plan.id} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/95 via-primary/80 to-primary/60 text-white p-5 flex flex-col gap-2 red-glow border border-white/[0.10]">
                           <Wine className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
-                          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/95 mb-3">{typeLabel}</p>
-                          <p className="text-base font-bold leading-snug line-clamp-2 mb-1">{headline}</p>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85">{typeLabel}</p>
+                          <p className="text-lg font-black leading-snug line-clamp-2 text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{headline}</p>
                           {plan.description && (
-                            <p className="text-xs text-white/85 leading-snug line-clamp-2">{plan.description}</p>
+                            <p className="text-xs text-white leading-snug line-clamp-2">{plan.description}</p>
                           )}
                           {subtitle && (
-                            <p className="text-xs text-white/85 mt-2 line-clamp-1">{subtitle}</p>
+                            <p className="text-xs text-white/90 line-clamp-1">{subtitle}</p>
                           )}
                           <button
                             type="button"
                             onClick={() => switchPubTab("book")}
-                            className="mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
+                            className="mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
                           >
                             Book Now <ArrowRight className="h-3.5 w-3.5" />
                           </button>
@@ -1274,19 +1274,19 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       );
                     }
                     return (
-                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex flex-col min-h-[200px]">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary mb-3">{typeLabel}</p>
-                        <p className="text-base font-bold text-foreground leading-snug line-clamp-2 mb-1">{headline}</p>
+                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex flex-col gap-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">{typeLabel}</p>
+                        <p className="text-lg font-black text-primary leading-snug line-clamp-2">{headline}</p>
                         {plan.description && (
-                          <p className="text-xs text-muted-foreground leading-snug line-clamp-2">{plan.description}</p>
+                          <p className="text-xs text-foreground/80 leading-snug line-clamp-2">{plan.description}</p>
                         )}
                         {subtitle && (
-                          <p className="text-xs text-muted-foreground/70 mt-2 line-clamp-1">{subtitle}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-1">{subtitle}</p>
                         )}
                         <button
                           type="button"
                           onClick={() => switchPubTab("book")}
-                          className="mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-primary/15 hover:bg-primary border border-primary/30 hover:border-primary text-primary hover:text-primary-foreground text-xs font-bold uppercase tracking-wider transition-all"
+                          className="mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-primary/15 hover:bg-primary border border-primary/30 hover:border-primary text-primary hover:text-primary-foreground text-xs font-bold uppercase tracking-wider transition-all"
                         >
                           Book Now <ArrowRight className="h-3.5 w-3.5" />
                         </button>
@@ -1920,23 +1920,23 @@ function PremiumOfferCard({
       ? "from-amber-500/95 via-amber-600/90 to-amber-700/85"
       : "from-primary/95 via-primary/80 to-primary/60";
     return (
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 flex flex-col min-h-[200px] red-glow border border-white/[0.10]`}>
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 flex flex-col gap-2 red-glow border border-white/[0.10]`}>
         <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/95">{category}</p>
-          <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/15 border border-white/25">{badge}</span>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85">{category}</p>
+          <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30">{badge}</span>
         </div>
-        <p className="text-base font-bold leading-snug line-clamp-2 mb-1">{offer.title}</p>
+        <p className="text-lg font-black leading-snug line-clamp-2 text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{offer.title}</p>
         {offer.description && (
-          <p className="text-xs text-white/85 leading-snug line-clamp-2">{offer.description}</p>
+          <p className="text-xs text-white leading-snug line-clamp-2">{offer.description}</p>
         )}
-        <p className="text-xs text-white/85 mt-2 line-clamp-1 flex items-center gap-1.5">
+        <p className="text-xs text-white/90 line-clamp-1 flex items-center gap-1.5">
           <CalIcon className="h-3 w-3" /> {daysLabel}{window ? ` • ${window}` : ""}
         </p>
         <button
           type="button"
           onClick={onBookClick}
-          className="mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
+          className="mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
         >
           Book Now <ArrowRight className="h-3.5 w-3.5" />
         </button>
@@ -1945,29 +1945,30 @@ function PremiumOfferCard({
   }
 
   const labelColor = accent === "amber" ? "text-amber-400" : "text-primary";
+  const vendorColor = accent === "amber" ? "text-amber-300" : "text-primary";
   const ctaClass = accent === "amber"
     ? "bg-amber-500/15 hover:bg-amber-500 border-amber-500/30 hover:border-amber-500 text-amber-400 hover:text-black"
     : "bg-primary/15 hover:bg-primary border-primary/30 hover:border-primary text-primary hover:text-primary-foreground";
 
   return (
-    <div className="rounded-2xl glass-card p-5 flex flex-col min-h-[200px]">
-      <div className="flex items-start justify-between gap-3 mb-3">
+    <div className="rounded-2xl glass-card p-5 flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-3">
         <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor}`}>{category}</p>
         <span className={`shrink-0 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${accent === "amber" ? "bg-amber-500/15 border border-amber-500/30 text-amber-400" : "bg-primary/15 border border-primary/30 text-primary"}`}>
           {badge}
         </span>
       </div>
-      <p className="text-base font-bold text-foreground leading-snug line-clamp-2 mb-1">{offer.title}</p>
+      <p className={`text-lg font-black ${vendorColor} leading-snug line-clamp-2`}>{offer.title}</p>
       {offer.description && (
-        <p className="text-xs text-muted-foreground leading-snug line-clamp-2">{offer.description}</p>
+        <p className="text-xs text-foreground/80 leading-snug line-clamp-2">{offer.description}</p>
       )}
-      <p className="text-xs text-muted-foreground/70 mt-2 line-clamp-1 flex items-center gap-1.5">
+      <p className="text-xs text-muted-foreground line-clamp-1 flex items-center gap-1.5">
         <CalIcon className="h-3 w-3 flex-shrink-0" /> {daysLabel}{window ? ` • ${window}` : ""}
       </p>
       <button
         type="button"
         onClick={onBookClick}
-        className={`mt-auto pt-4 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${ctaClass}`}
+        className={`mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${ctaClass}`}
       >
         Book Now <ArrowRight className="h-3.5 w-3.5" />
       </button>

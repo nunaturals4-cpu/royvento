@@ -67,16 +67,18 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
       <Link href={href} className="group block">
         <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} text-white p-5 h-full flex flex-col min-h-[180px] red-glow border border-white/[0.10]`}>
           <Icon className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/95 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85 mb-3">
             {category}
           </p>
-          <p className="text-base font-bold leading-snug line-clamp-2 mb-1">{offer.vendorName}</p>
-          <p className="text-sm text-white/95 leading-snug line-clamp-2">{headline}</p>
+          <p className="text-lg font-black leading-snug line-clamp-2 mb-1 text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+            {offer.vendorName}
+          </p>
+          <p className="text-sm text-white leading-snug line-clamp-2">{headline}</p>
           {subtitle && (
-            <p className="text-xs text-white/85 mt-auto pt-3 line-clamp-1">{subtitle}</p>
+            <p className="text-xs text-white/90 mt-auto pt-3 line-clamp-1">{subtitle}</p>
           )}
           {plans.length > 1 && (
-            <p className="text-[10px] uppercase tracking-wider text-white/75 mt-1">
+            <p className="text-[10px] uppercase tracking-wider text-white/80 mt-1">
               +{plans.length - 1} more
             </p>
           )}
@@ -86,6 +88,7 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
   }
 
   const labelColor = accent === "amber" ? "text-amber-400" : "text-primary";
+  const vendorColor = accent === "amber" ? "text-amber-300" : "text-primary";
 
   return (
     <Link href={href} className="group block">
@@ -93,18 +96,18 @@ function DealTile({ offer, plans, featured = false, accent = "primary" }: TilePr
         <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${labelColor} mb-3`}>
           {category}
         </p>
-        <p className="text-base font-bold text-foreground leading-snug line-clamp-2 mb-1">
+        <p className={`text-lg font-black leading-snug line-clamp-2 mb-1 ${vendorColor}`}>
           {offer.vendorName}
         </p>
-        <p className="text-sm text-muted-foreground leading-snug line-clamp-2">{headline}</p>
+        <p className="text-sm text-foreground/90 leading-snug line-clamp-2">{headline}</p>
         {subtitle && (
-          <p className="text-xs text-muted-foreground/70 mt-auto pt-3 line-clamp-1 flex items-center gap-1.5">
+          <p className="text-xs text-muted-foreground mt-auto pt-3 line-clamp-1 flex items-center gap-1.5">
             {(primary.timeFrom && primary.timeTo) && <Clock className="h-3 w-3 flex-shrink-0" />}
             {subtitle}
           </p>
         )}
         {plans.length > 1 && (
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mt-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
             +{plans.length - 1} more
           </p>
         )}
