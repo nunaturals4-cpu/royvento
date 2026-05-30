@@ -42,7 +42,9 @@ function summarizePlan(plan: DrinkPlanSummary): { category: string; headline: st
 
 function buildSubtitle(plan: DrinkPlanSummary, t: (k: string) => string): string {
   const parts: string[] = [];
-  if (plan.days && plan.days.length > 0 && plan.days.length < 7) {
+  if (!plan.days || plan.days.length === 0 || plan.days.length === 7) {
+    parts.push("Everyday");
+  } else {
     parts.push(plan.days.map((d) => d.slice(0, 3)).join(", "));
   }
   if (plan.timeFrom && plan.timeTo) {

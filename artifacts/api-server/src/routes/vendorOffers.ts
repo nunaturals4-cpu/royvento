@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, vendorOffersTable, vendorsTable, bookingsTable } from "@workspace/db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
@@ -95,6 +95,24 @@ router.post("/partner/offers", requireAuth(["vendor", "admin"]), async (req, res
     }
     if (d.discountType === "percent" && d.discountValue > 100) {
       return res.status(400).json({ error: "Percent discount cannot exceed 100." });
+    }
+
+    // Duplicate check: same vendor, same category, same title (case-insensitive), same days+time
+    const existing = await db
+      .select({ id: vendorOffersTable.id })
+      .from(vendorOffersTable)
+      .where(and(
+        eq(vendorOffersTable.vendorId, vendorId),
+        eq(vendorOffersTable.category, d.category),
+        sql`lower(${vendorOffersTable.title}) = lower(${d.title.trim()})`,
+        eq(vendorOffersTable.timeFrom, d.timeFrom),
+        eq(vendorOffersTable.timeTo, d.timeTo),
+      ))
+      .limit(1);
+    if (existing.length > 0) {
+      return res.status(409).json({
+        error: `A ${d.category} offer with this title already exists for the same time slot. Please edit the existing offer or use a different title.`,
+      });
     }
 
     const [created] = await db

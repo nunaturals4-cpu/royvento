@@ -724,11 +724,16 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                           ))}
                         </ul>
                       )}
-                      {((plan.days ?? []).length > 0 || plan.timeFrom || plan.timeTo) && (
+                      {(plan.timeFrom || plan.timeTo || true) && (
                         <div className="flex flex-wrap gap-1.5">
-                          {(plan.days ?? []).map((d) => (
-                            <span key={d} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">{d}</span>
-                          ))}
+                          {(() => {
+                            const d = plan.days ?? [];
+                            return (d.length === 0 || d.length === 7)
+                              ? <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">Everyday</span>
+                              : d.map((day) => (
+                                  <span key={day} className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">{day}</span>
+                                ));
+                          })()}
                           {(plan.timeFrom || plan.timeTo) && (
                             <span className="rounded-md bg-black/40 border border-white/15 px-2 py-0.5 text-[10px] font-semibold text-white flex items-center gap-1">
                               <Clock className="h-2.5 w-2.5 shrink-0" />

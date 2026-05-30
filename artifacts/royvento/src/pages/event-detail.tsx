@@ -1245,10 +1245,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       isTicketPlan ? (plan.lineItems ?? []).filter((li: any) => li.name) : [];
                     const headline = plan.productName
                       || typeLabel.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
-                    const showDays = plan.days && plan.days.length > 0 && plan.days.length < 7;
                     const showTime = !!(plan.timeFrom && plan.timeTo);
                     const subtitleParts: string[] = [];
-                    if (showDays) subtitleParts.push(plan.days.map((d: string) => d.slice(0, 3)).join(", "));
+                    if (!plan.days || plan.days.length === 0 || plan.days.length === 7) {
+                      subtitleParts.push("Everyday");
+                    } else {
+                      subtitleParts.push(plan.days.map((d: string) => d.slice(0, 3)).join(", "));
+                    }
                     if (showTime) subtitleParts.push(`${plan.timeFrom}–${plan.timeTo}`);
                     const subtitle = subtitleParts.join(" • ");
 

@@ -562,7 +562,7 @@ async function checkDrinkPlanConflict(
   timeTo: string,
   excludePlanId?: number,
 ): Promise<{ type: string; days: string[]; timeFrom: string; timeTo: string } | null> {
-  if (type !== "welcome" && type !== "ticket") return null;
+  if (type !== "welcome" && type !== "unlimited" && type !== "ticket") return null;
   const incomingDays = effectiveDays(days);
   const existing = await db
     .select()
@@ -584,8 +584,8 @@ async function checkDrinkPlanConflict(
 }
 
 function describeConflict(c: { type: string; days: string[]; timeFrom: string; timeTo: string }): string {
-  const label = c.type === "welcome" ? "Free Entry" : "Ticket";
-  const dayPart = c.days.length > 0 && c.days.length < 7 ? c.days.join(", ") : "every day";
+  const label = c.type === "welcome" ? "Free Welcome Drink" : c.type === "unlimited" ? "Free Unlimited Drinks" : "Ticket";
+  const dayPart = c.days.length === 0 || c.days.length === 7 ? "every day" : c.days.join(", ");
   const timePart = c.timeFrom && c.timeTo ? ` ${c.timeFrom}–${c.timeTo}` : "";
   return `A ${label} plan already exists on ${dayPart}${timePart}. Please choose a different day or time, or edit the existing plan.`;
 }

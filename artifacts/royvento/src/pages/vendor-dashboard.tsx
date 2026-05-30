@@ -6321,7 +6321,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                         </ul>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
-                        {plan.days.length > 0 && <span>{plan.days.join(", ")}</span>}
+                        <span>{plan.days.length === 0 || plan.days.length === 7 ? "Everyday" : plan.days.join(", ")}</span>
                         {plan.timeFrom && plan.timeTo && (
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
