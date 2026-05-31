@@ -580,6 +580,14 @@ router.post("/bookings", requireAuth(), async (req, res) => {
 
   const [out] = await serializeBookings([b]);
 
+  // Respond as soon as the booking is persisted. Everything below
+  // (confirmation emails, referral/loyalty points, in-app notification) is a
+  // best-effort side-effect that must NOT hold up the client — notably the
+  // SMTP send, which can take seconds. Each block already swallows its own
+  // errors, so running them after the response is safe.
+  res.json(out);
+
+  void (async () => {
   try {
     const vRows = await db
       .select()
@@ -709,8 +717,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   } catch (err) {
     req.log.error({ err, bookingId: b.id }, "Failed to award booking loyalty points");
   }
-
-  res.json(out);
+  })();
 });
 
 router.get("/bookings/me", requireAuth(), async (req, res) => {

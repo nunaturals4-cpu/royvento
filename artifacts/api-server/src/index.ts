@@ -274,7 +274,51 @@ async function applyPendingSchemaChanges() {
     // created_at as the approval proxy for historical approved rows.
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "approved_at" timestamp with time zone`);
     await db.execute(sql`UPDATE "events" SET "approved_at" = "created_at" WHERE "approval_status" = 'approved' AND "approved_at" IS NULL`);
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at ensured");
+    // ── points_ledger (migration 0039) ────────────────────────────────────
+    // Loyalty-points ledger. Inserted on EVERY booking, so if the table is
+    // missing in prod the points award throws on each booking. Idempotent.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "points_ledger" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "points" integer NOT NULL,
+        "source" varchar(30) NOT NULL,
+        "booking_id" integer,
+        "expires_at" timestamp with time zone,
+        "notified_day_20" boolean NOT NULL DEFAULT false,
+        "notified_day_23" boolean NOT NULL DEFAULT false,
+        "notified_day_26" boolean NOT NULL DEFAULT false,
+        "notified_day_29" boolean NOT NULL DEFAULT false,
+        "expired" boolean NOT NULL DEFAULT false,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "points_ledger_user_idx" ON "points_ledger" ("user_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "points_ledger_expires_idx" ON "points_ledger" ("expires_at")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "points_ledger_expired_idx" ON "points_ledger" ("expired")`);
+    // ── vendor_coupons (migration 0038) ────────────────────────────────────
+    // Vendor public discount codes, applied during booking. Idempotent.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "vendor_coupons" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "vendor_id" integer NOT NULL REFERENCES "vendors"("id") ON DELETE CASCADE,
+        "code" varchar(10) NOT NULL,
+        "discount_type" varchar(10) NOT NULL DEFAULT 'percent',
+        "discount_value" numeric(10,2) NOT NULL DEFAULT '10',
+        "applicable_to" varchar(20) NOT NULL DEFAULT 'both',
+        "active" boolean NOT NULL DEFAULT true,
+        "max_uses" integer,
+        "used_count" integer NOT NULL DEFAULT 0,
+        "expires_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "vendor_coupons_code_idx" ON "vendor_coupons" ("code")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_coupons_vendor_idx" ON "vendor_coupons" ("vendor_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "vendor_coupons_active_idx" ON "vendor_coupons" ("active")`);
+    // ── events free-entry-for-table columns (migrations 0034 / 0035) ───────
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table_days" jsonb`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table_before_time" text`);
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
   }

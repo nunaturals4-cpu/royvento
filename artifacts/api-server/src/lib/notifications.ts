@@ -22,6 +22,14 @@ function getSmtpTransport(): nodemailer.Transporter | null {
     secure: false,
     requireTLS: true,
     auth: { user, pass },
+    // Railway's container egress cannot route IPv6, so DNS resolving
+    // smtp.gmail.com to an AAAA record makes every connection hang with
+    // `ENETUNREACH ...:587` until the socket times out (~2 min). Force IPv4
+    // and add explicit timeouts so a send fails fast instead of blocking.
+    family: 4,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 }
 

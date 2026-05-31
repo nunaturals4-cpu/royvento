@@ -40,6 +40,12 @@ function getSmtpTransport(): nodemailer.Transporter | null {
     secure: false,
     requireTLS: true,
     auth: { user, pass },
+    // Force IPv4 + fail-fast timeouts: Railway egress can't route IPv6, so an
+    // AAAA resolution of smtp.gmail.com hangs every send until socket timeout.
+    family: 4,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 }
 

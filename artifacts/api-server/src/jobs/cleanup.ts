@@ -1,5 +1,5 @@
 import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable } from "@workspace/db";
-import { and, ne, sql, lt, gte, eq, isNotNull } from "drizzle-orm";
+import { and, ne, sql, lt, gte, eq, isNotNull, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { sendUpcomingDeletionWarningEmail } from "../lib/notifications";
@@ -50,7 +50,7 @@ export async function deletePastEvents(): Promise<void> {
     const imageFailCount = await deleteImages(imageUrls);
 
     const ids = rows.map((r) => r.id);
-    await db.delete(eventsTable).where(sql`${eventsTable.id} = ANY(${ids})`);
+    await db.delete(eventsTable).where(inArray(eventsTable.id, ids));
 
     logger.info(
       { count: rows.length, imageFailCount },
@@ -85,7 +85,7 @@ export async function deleteExpiredAnnouncements(): Promise<void> {
     const ids = rows.map((r) => r.id);
     await db
       .delete(announcementsTable)
-      .where(sql`${announcementsTable.id} = ANY(${ids})`);
+      .where(inArray(announcementsTable.id, ids));
 
     logger.info(
       { count: rows.length, imageFailCount },
@@ -262,7 +262,7 @@ export async function deleteOldEmailAttachments(): Promise<void> {
     const fileFailCount = await deleteImages(rows.map((r) => r.storageKey));
 
     const ids = rows.map((r) => r.id);
-    await db.delete(emailAttachmentsTable).where(sql`${emailAttachmentsTable.id} = ANY(${ids})`);
+    await db.delete(emailAttachmentsTable).where(inArray(emailAttachmentsTable.id, ids));
 
     logger.info({ count: rows.length, fileFailCount }, "Cleanup: deleted old email attachments");
   } catch (err) {
@@ -288,10 +288,10 @@ export async function deleteOldEmails(): Promise<void> {
       const atts = await db
         .select({ storageKey: emailAttachmentsTable.storageKey })
         .from(emailAttachmentsTable)
-        .where(sql`${emailAttachmentsTable.messageId} = ANY(${msgIds})`);
+        .where(inArray(emailAttachmentsTable.messageId, msgIds));
       await deleteImages(atts.map((a) => a.storageKey));
 
-      await db.delete(emailMessagesTable).where(sql`${emailMessagesTable.id} = ANY(${msgIds})`);
+      await db.delete(emailMessagesTable).where(inArray(emailMessagesTable.id, msgIds));
     }
 
     // Remove conversation shells that no longer have any messages.
