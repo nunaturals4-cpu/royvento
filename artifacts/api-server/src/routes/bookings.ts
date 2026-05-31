@@ -45,6 +45,7 @@ import {
   sendBookingCreatedEmails,
   sendBookingStatusEmail,
   sendCustomerCancelledBookingEmail,
+  sendTicketScannedEmail,
 } from "../lib/notifications";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
 import { computeEffectiveRevenues, bookingDiscountRatio } from "../lib/effectiveRevenue";
@@ -2528,6 +2529,18 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
       ? { ...out, ...finalComm, ...scanPriceInfo, actualAmountDue: finalAmountDue, actualEntry: buildActualEntry(updatedActuals) }
       : null,
   });
+
+  // Send ticket-scanned email after responding so it never delays the scanner UI.
+  if (out?.userEmail) {
+    sendTicketScannedEmail({
+      to: out.userEmail,
+      toName: out.userName,
+      bookingId: updatedActuals.id,
+      eventTitle: out.eventTitle,
+      vendorName: out.vendorName,
+      checkedInAt: finalizedAt,
+    }).catch((err) => req.log.error({ err, bookingId: updatedActuals.id }, "Failed to send ticket scanned email"));
+  }
 });
 
 router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) => {

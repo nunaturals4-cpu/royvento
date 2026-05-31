@@ -18,6 +18,7 @@ import { respondInvalid } from "../lib/validationError";
 import {
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
+  sendWelcomeEmail,
 } from "../lib/notifications";
 
 const router: IRouter = Router();
@@ -174,13 +175,20 @@ router.post("/auth/register", registerLimiter, async (req, res) => {
     }
   }
 
-  // Send verification email (fire-and-forget)
+  // Send verification + welcome emails (fire-and-forget)
   sendEmailVerificationEmail({
     to: created.email,
     toName: created.name,
     token: verifyToken,
   }).catch((err) => {
     req.log.error({ err }, "Failed to send verification email");
+  });
+
+  sendWelcomeEmail({
+    to: created.email,
+    toName: created.name,
+  }).catch((err) => {
+    req.log.error({ err }, "Failed to send welcome email");
   });
 
   res.json({
