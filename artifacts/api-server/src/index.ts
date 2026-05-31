@@ -265,7 +265,16 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "events_approval_popular_created_idx" ON "events" ("approval_status", "popular", "created_at" DESC)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "events_approval_featured_created_idx" ON "events" ("approval_status", "featured", "created_at" DESC)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "events_approval_type_created_idx" ON "events" ("approval_status", "type", "created_at" DESC)`);
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes ensured");
+    // ── events.approved_at ────────────────────────────────────────────────
+    // Set when an admin flips approvalStatus to "approved"; powers the
+    // storefront "New" badge (auto-hides 15 days later). The events route now
+    // selects this column via Drizzle's `.select()`, so it MUST exist or every
+    // events query (pubs catalog, admin panel, partner dashboard) fails with
+    // `column "approved_at" does not exist`. Idempotent; backfill uses
+    // created_at as the approval proxy for historical approved rows.
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "approved_at" timestamp with time zone`);
+    await db.execute(sql`UPDATE "events" SET "approved_at" = "created_at" WHERE "approval_status" = 'approved' AND "approved_at" IS NULL`);
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
   }
