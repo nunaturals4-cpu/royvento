@@ -465,7 +465,8 @@
     "present_at_entrance": "Present this ticket at the entrance.",
     "non_transferable": "Non-transferable",
     "partner": "partner",
-    "approved_by": "Approved by"
+    "approved_by": "Approved by",
+    "free_entry": "Free Entry"
   },
   "common": {
     "loading": "Loading…",
