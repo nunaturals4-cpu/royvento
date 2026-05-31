@@ -98,25 +98,47 @@ export function Blogs() {
   const [featuredBlog, ...restBlogs] = filtered;
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-14">
+    <div>
       <SEO
         title="Royvento Blog — Nightlife Stories & City Guides"
         description="City guides, pub crawls, occasion planning and behind-the-scenes stories from India's nightlife — fresh stories from the Royvento editorial team."
         canonical="/blogs"
       />
-      {/* Page header */}
-      <header className="max-w-2xl mb-12">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-3 flex items-center gap-2">
-          <BookOpen className="h-3.5 w-3.5" /> Royvento Blog
-        </p>
-        <h1 className="font-serif text-5xl md:text-7xl tracking-tight leading-none mb-4">
-          Nightlife<br />
-          <span className="italic text-gradient-red">Stories & Guides</span>
-        </h1>
-        <p className="text-muted-foreground text-base max-w-xl leading-relaxed">
-          Discover the best pubs, craft beers, and nightlife experiences across India — curated by the Royvento editorial team.
-        </p>
-      </header>
+
+      {/* ── Full-width hero — less height than homepage, image properly fitted ── */}
+      <section className="relative overflow-hidden h-[300px] md:h-[420px]">
+        <img
+          src="https://images.unsplash.com/photo-1501167786227-4cba60f6d58f?w=1600&q=70"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          fetchPriority="high"
+          decoding="async"
+        />
+        {/* Layered overlays */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+
+        {/* Content — anchored to bottom-left, matches homepage hero text layout */}
+        <div className="absolute inset-0 flex flex-col justify-end">
+          <div className="container mx-auto px-4 md:px-6 pb-10 md:pb-14">
+            <div className="max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.22em] text-primary mb-3 flex items-center gap-2">
+                <BookOpen className="h-3.5 w-3.5" /> Royvento Blog
+              </p>
+              <h1 className="font-serif text-4xl md:text-6xl tracking-tight text-white leading-tight">
+                Nightlife<br />
+                <span className="italic text-gradient-red">Stories & Guides</span>
+              </h1>
+              <p className="mt-3 text-white/60 leading-relaxed max-w-xl text-sm md:text-base">
+                Discover the best pubs, craft beers, and nightlife experiences across India — curated by the Royvento editorial team.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Page content ── */}
+      <div className="container mx-auto px-4 md:px-6 py-10">
 
       {/* Search + tag filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6 max-w-2xl">
@@ -185,6 +207,8 @@ export function Blogs() {
           )}
         </div>
       )}
+
+      </div>{/* end container */}
     </div>
   );
 }

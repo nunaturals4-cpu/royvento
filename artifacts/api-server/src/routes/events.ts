@@ -44,6 +44,7 @@ interface EventRow {
   galleryVideos: string[] | null;
   approvalStatus: string;
   rejectionReason: string | null;
+  approvedAt: Date | null;
   createdAt: Date;
 }
 
@@ -118,6 +119,7 @@ async function serializeEvents(rows: EventRow[]) {
       galleryVideos: e.galleryVideos ?? [],
       approvalStatus: e.approvalStatus,
       rejectionReason: e.rejectionReason ?? null,
+      approvedAt: e.approvedAt ? e.approvedAt.toISOString() : null,
       rating: r.rating,
       reviewCount: r.reviewCount,
       vendorName: v?.businessName ?? "",

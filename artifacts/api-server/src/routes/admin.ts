@@ -592,6 +592,10 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     updates["rejectionReason"] = typeof data.rejectionReason === "string"
       ? data.rejectionReason
       : null;
+    // Stamp the approval time so the storefront can show a "New" badge for a
+    // fixed window (15 days) after approval, then auto-hide it. Reset to null
+    // when the event leaves "approved" so a later re-approval restarts the window.
+    updates["approvedAt"] = data.approvalStatus === "approved" ? new Date() : null;
   }
 
   if (Object.keys(updates).length === 0) {

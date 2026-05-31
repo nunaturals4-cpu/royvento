@@ -261,13 +261,36 @@ export function PubOffers() {
       />
 
       {!hasSlider && (
-        <header className="container mx-auto px-4 md:px-6 py-14 max-w-3xl">
-          <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
-            <GlassWater className="h-3.5 w-3.5" /> Hot Deals
-          </p>
-          <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pub_offers.title")}</h1>
-          <p className="mt-4 text-white/60 leading-relaxed max-w-xl">{t("pub_offers.subtitle")}</p>
-        </header>
+        <section className="relative overflow-hidden h-[300px] md:h-[420px] mb-14">
+          {/* Background image — properly fitted, not squashed */}
+          <img
+            src="https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=1600&q=70"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-center"
+            fetchPriority="high"
+            decoding="async"
+          />
+          {/* Layered overlays for depth and text legibility */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+
+          {/* Content — anchored to bottom-left, matches homepage hero text layout */}
+          <div className="absolute inset-0 flex flex-col justify-end">
+            <div className="container mx-auto px-4 md:px-6 pb-10 md:pb-14">
+              <div className="max-w-3xl">
+                <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 flex items-center gap-2">
+                  <GlassWater className="h-3.5 w-3.5" /> Hot Deals
+                </p>
+                <h1 className="font-serif text-4xl md:text-6xl tracking-tight text-white leading-tight">
+                  {t("pub_offers.title")}
+                </h1>
+                <p className="mt-3 text-white/60 leading-relaxed max-w-xl text-sm md:text-base">
+                  {t("pub_offers.subtitle")}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
       {!hasDeals && !hasSlider && !hasAnnouncements && (

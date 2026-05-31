@@ -36,6 +36,7 @@ interface PublicEvent {
   rating: number;
   reviewCount: number;
   partnerName: string;
+  approvedAt?: string | null;
   popular: boolean;
   hasDrinkPlans?: boolean;
   freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
@@ -129,21 +130,46 @@ export function Pubs() {
   }
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-14">
+    <div>
       <SEO
         title="Pubs in India — Book a Table | Royvento"
         description="Find the best pubs, microbreweries, sports bars and rooftop lounges across India. Filter by city, vibe, dance floor and free entry — book a table instantly on Royvento."
         canonical="/pubs"
       />
-      <header className="max-w-3xl mb-10">
-        <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 accent-underline inline-flex items-center gap-2">
-          <Wine className="h-3.5 w-3.5" /> {t("pubs.nightlife_badge")}
-        </p>
-        <h1 className="font-serif text-4xl md:text-6xl tracking-tight mt-3">{t("pubs.title")}</h1>
-        <p className="mt-4 text-white/60 leading-relaxed">
-          {t("pubs.subtitle")}
-        </p>
-      </header>
+
+      {/* ── Full-width hero — less height than homepage, image properly fitted ── */}
+      <section className="relative overflow-hidden h-[300px] md:h-[420px]">
+        <img
+          src="https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=1600&q=70"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          fetchPriority="high"
+          decoding="async"
+        />
+        {/* Layered overlays for depth and text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+
+        {/* Content — anchored to bottom-left, matches homepage hero text layout */}
+        <div className="absolute inset-0 flex flex-col justify-end">
+          <div className="container mx-auto px-4 md:px-6 pb-10 md:pb-14">
+            <div className="max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 flex items-center gap-2">
+                <Wine className="h-3.5 w-3.5" /> {t("pubs.nightlife_badge")}
+              </p>
+              <h1 className="font-serif text-4xl md:text-6xl tracking-tight text-white leading-tight">
+                {t("pubs.title")}
+              </h1>
+              <p className="mt-3 text-white/60 leading-relaxed max-w-xl text-sm md:text-base">
+                {t("pubs.subtitle")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Page content ── */}
+      <div className="container mx-auto px-4 md:px-6 py-10">
 
       {/* Venue type tabs */}
       <div className="flex gap-2 mb-6">
@@ -318,6 +344,8 @@ export function Pubs() {
           {displayedPubs.map((p) => <EventCard key={p.id} event={p} hidePubBadge directBooking />)}
         </div>
       )}
+
+      </div>{/* end container */}
     </div>
   );
 }

@@ -138,6 +138,9 @@ export const eventsTable = pgTable(
       .notNull()
       .default("pending"),
     rejectionReason: text("rejection_reason"),
+    // Set the moment an admin flips approvalStatus to "approved". Powers the
+    // storefront "New" badge, which auto-hides 15 days after this timestamp.
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     popularSince: timestamp("popular_since", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
