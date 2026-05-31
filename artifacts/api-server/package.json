@@ -32,7 +32,6 @@
     "nodemailer": "^8.0.10",
     "pino": "^9",
     "pino-http": "^10",
-    "resend": "^6.12.2",
     "sharp": "^0.34.5",
     "web-push": "^3.6.7",
     "xlsx": "^0.18.5",

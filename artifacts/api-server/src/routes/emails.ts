@@ -15,10 +15,6 @@
  *     DELETE /admin/emails/threads/:id          delete a whole thread
  *     GET    /admin/emails/templates            built-in templates
  *     GET    /admin/emails/attachments/:id      download an attachment
- *
- *   Public webhooks (Svix-verified):
- *     POST   /webhooks/resend                   delivery/open/click/bounce + inbound
- *     POST   /webhooks/resend/inbound           inbound alias
  */
 
 import { Router, type IRouter, type Request, type Response } from "express";
@@ -38,16 +34,11 @@ import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage"
 import {
   sendEmailViaResend,
   recomputeThreadAggregates,
-  resolveInboundThread,
   normalizeSubject,
   makeSnippet,
   htmlToText,
   parseAddress,
-  verifyResendWebhook,
   wrapHtmlEmail,
-  fetchInboundEmail,
-  fetchInboundAttachment,
-  listInboundEmails,
   BUILT_IN_TEMPLATES,
   INFO_EMAIL_ADDRESS,
   runDeliverabilityChecks,
@@ -61,7 +52,7 @@ const objectStorage = new ObjectStorageService();
 
 const PAGE_SIZE = 25;
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20 MB per attachment
-const MAX_TOTAL_ATTACHMENT_BYTES = 40 * 1024 * 1024; // 40 MB per message (Resend limit)
+const MAX_TOTAL_ATTACHMENT_BYTES = 40 * 1024 * 1024;
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -767,247 +758,10 @@ router.get("/admin/emails/attachments/:id", requireAuth(["admin"]), async (req, 
     res.status(500).json({ error: "Failed to download attachment" });
   }
 });
-
-// ─── Resend webhooks (delivery tracking + inbound) ──────────────────────────────
-
-const OUTBOUND_STATUS_BY_EVENT: Record<string, string> = {
-  "email.sent": "sent",
-  "email.delivered": "delivered",
-  "email.delivery_delayed": "sent",
-  "email.opened": "opened",
-  "email.clicked": "clicked",
-  "email.bounced": "bounced",
-  "email.complained": "complained",
-  "email.failed": "failed",
-};
-
-async function handleResendWebhook(req: Request, res: Response): Promise<void> {
-  const verification = verifyResendWebhook({
-    rawBody: (req as unknown as { rawBody?: Buffer }).rawBody,
-    svixId: req.headers["svix-id"] as string | undefined,
-    svixTimestamp: req.headers["svix-timestamp"] as string | undefined,
-    svixSignature: req.headers["svix-signature"] as string | undefined,
-  });
-  if (!verification.ok) {
-    req.log.warn({ reason: verification.reason }, "[email] webhook signature rejected");
-    res.status(401).json({ error: "Invalid signature" });
-    return;
-  }
-  if (verification.reason === "no-secret-dev-mode") {
-    req.log.warn("[email] RESEND_WEBHOOK_SECRET not set — accepting webhook unverified (dev only)");
-  }
-
-  const payload = req.body as { type?: string; data?: Record<string, unknown> } | undefined;
-  const type = payload?.type ?? "";
-  const data = payload?.data ?? {};
-
-  try {
-    if (type.startsWith("inbound") || type === "email.received" || type === "email.inbound") {
-      await processInboundEmail(data, req);
-    } else if (OUTBOUND_STATUS_BY_EVENT[type]) {
-      await processDeliveryEvent(type, data);
-    } else {
-      req.log.info({ type }, "[email] unhandled webhook event type");
-    }
-  } catch (err) {
-    req.log.error({ err, type }, "[email] webhook processing failed");
-    // Still 200 so Resend doesn't hammer retries for a non-transient bug.
-  }
-  res.json({ ok: true });
-}
-
-async function processDeliveryEvent(type: string, data: Record<string, unknown>): Promise<void> {
-  const emailId = (data["email_id"] ?? data["id"]) as string | undefined;
-  if (!emailId) return;
-  const status = OUTBOUND_STATUS_BY_EVENT[type]!;
-  const now = new Date();
-  const set: Record<string, unknown> = { status };
-  if (type === "email.opened") set["openedAt"] = now;
-  if (type === "email.clicked") set["clickedAt"] = now;
-  if (type === "email.delivered") set["deliveredAt"] = now;
-  if (type === "email.bounced" || type === "email.failed") set["errorMessage"] = "Delivery failed (bounce)";
-
-  const updated = await db
-    .update(emailMessagesTable)
-    .set(set)
-    .where(eq(emailMessagesTable.resendId, emailId))
-    .returning({ threadId: emailMessagesTable.threadId });
-  for (const r of updated) {
-    if (r.threadId) await recomputeThreadAggregates(r.threadId);
-  }
-}
-
-function pickHeader(headers: unknown, name: string): string {
-  const lower = name.toLowerCase();
-  if (Array.isArray(headers)) {
-    for (const h of headers) {
-      const hn = (h?.name ?? h?.key ?? "") as string;
-      if (typeof hn === "string" && hn.toLowerCase() === lower) return String(h?.value ?? "");
-    }
-  } else if (headers && typeof headers === "object") {
-    for (const [k, v] of Object.entries(headers as Record<string, unknown>)) {
-      if (k.toLowerCase() === lower) return String(v ?? "");
-    }
-  }
-  return "";
-}
-
-function asEmailArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value
-      .map((v) => (typeof v === "string" ? v : (v as { email?: string })?.email ?? ""))
-      .map((s) => String(s).trim().toLowerCase())
-      .filter(Boolean);
-  }
-  if (typeof value === "string") {
-    return value.split(",").map((s) => parseAddress(s).email).filter(Boolean);
-  }
-  return [];
-}
-
-async function processInboundEmail(data: Record<string, unknown>, req: Request): Promise<void> {
-  const emailId = (data["email_id"] ?? data["id"]) as string | undefined;
-  if (!emailId) {
-    req.log.warn("[email] inbound webhook missing email_id — skipped");
-    return;
-  }
-  await ingestInboundEmailById(emailId);
-}
-
-/**
- * Fetch one received email from Resend by id and store it (idempotently).
- * Shared by the webhook handler and the sync/poll path. Dedupes on the Resend
- * email id stored in `resendId`, so re-running is safe. Returns the new
- * message id, or null when skipped (already stored / no content).
- */
-async function ingestInboundEmailById(emailId: string): Promise<number | null> {
-  const [existing] = await db
-    .select({ id: emailMessagesTable.id })
-    .from(emailMessagesTable)
-    .where(and(eq(emailMessagesTable.resendId, emailId), eq(emailMessagesTable.direction, "inbound")))
-    .limit(1);
-  if (existing) return null;
-
-  const full = await fetchInboundEmail(emailId);
-  if (!full) {
-    logger.warn({ emailId }, "[email] could not fetch inbound content");
-    return null;
-  }
-
-  const from = parseAddress(full.from);
-  if (!from.email) {
-    logger.warn({ emailId }, "[email] inbound email missing sender — skipped");
-    return null;
-  }
-  const subject = full.subject || "(no subject)";
-  const inReplyTo = pickHeader(full.headers, "In-Reply-To");
-  const refHeader = pickHeader(full.headers, "References");
-  const references = refHeader ? refHeader.split(/\s+/).filter(Boolean) : [];
-  const to = full.to.map((s) => s.toLowerCase());
-  const cc = full.cc.map((s) => s.toLowerCase());
-
-  const threadId = await resolveInboundThread({
-    fromEmail: from.email,
-    fromName: from.name,
-    subject,
-    inReplyTo,
-    references,
-  });
-
-  // Use the email's real received time so the inbox orders correctly. Resend
-  // returns e.g. "2026-05-20 06:54:50.068334+00" — normalise for Date().
-  const receivedAt = (() => {
-    if (!full.createdAt) return undefined;
-    const d = new Date(full.createdAt.replace(" ", "T"));
-    return Number.isNaN(d.getTime()) ? undefined : d;
-  })();
-
-  const snippet = makeSnippet(full.text, full.html);
-  const [msg] = await db
-    .insert(emailMessagesTable)
-    .values({
-      threadId,
-      direction: "inbound",
-      status: "received",
-      fromEmail: from.email,
-      fromName: from.name,
-      toEmails: to.length ? to : [INFO_EMAIL_ADDRESS],
-      ccEmails: cc,
-      bccEmails: [],
-      subject,
-      bodyText: full.text || htmlToText(full.html),
-      bodyHtml: full.html,
-      snippet,
-      resendId: emailId,
-      messageId: full.messageId.slice(0, 998),
-      inReplyTo: inReplyTo.slice(0, 998),
-      referencesIds: references,
-      isRead: false,
-      ...(receivedAt ? { createdAt: receivedAt } : {}),
-    })
-    .returning({ id: emailMessagesTable.id });
-
-  if (msg) {
-    for (const a of full.attachments) {
-      try {
-        const fetched = await fetchInboundAttachment(emailId, a.id);
-        if (fetched) {
-          const uuid = randomUUID();
-          await objectStorage.uploadBuffer(uuid, fetched.buffer, fetched.contentType);
-          await db.insert(emailAttachmentsTable).values({
-            messageId: msg.id,
-            filename: a.filename.slice(0, 500),
-            contentType: (fetched.contentType || a.contentType).slice(0, 200),
-            sizeBytes: fetched.buffer.length,
-            storageKey: `/objects/uploads/${uuid}`,
-          });
-        } else {
-          await db.insert(emailAttachmentsTable).values({
-            messageId: msg.id,
-            filename: a.filename.slice(0, 500),
-            contentType: a.contentType.slice(0, 200),
-            sizeBytes: 0,
-            storageKey: "",
-          });
-        }
-      } catch (err) {
-        logger.error({ err, emailId }, "[email] failed to store inbound attachment");
-      }
-    }
-  }
-
-  await recomputeThreadAggregates(threadId);
-  return msg?.id ?? null;
-}
-
-/**
- * Pull recent received emails from Resend and store any not already saved.
- * The dashboard's reliable receive path: works regardless of whether the
- * webhook is reaching us. Returns how many were found vs newly imported.
- */
 export async function runInboundSync(): Promise<{ found: number; synced: number }> {
-  const summaries = await listInboundEmails(100);
-  let synced = 0;
-  for (const s of summaries) {
-    try {
-      const id = await ingestInboundEmailById(s.id);
-      if (id) synced++;
-    } catch (err) {
-      logger.error({ err, emailId: s.id }, "[email] sync ingest failed");
-    }
-  }
-  if (summaries.length > 0) logger.info({ found: summaries.length, synced }, "[email] inbound sync complete");
-  return { found: summaries.length, synced };
+  // Inbound receiving via Resend has been removed. This function is a no-op
+  // kept so index.ts boot chain compiles without changes.
+  return { found: 0, synced: 0 };
 }
-
-router.post("/admin/emails/sync", requireAuth(["admin"]), async (_req, res) => {
-  const result = await runInboundSync();
-  res.json({ ok: true, ...result });
-});
-
-router.post("/webhooks/resend", handleResendWebhook);
-router.post("/webhooks/resend/inbound", handleResendWebhook);
-router.post("/webhooks/resend/events", handleResendWebhook);
-
 
 export default router;

@@ -353,8 +353,6 @@ app.listen(port, (err) => {
     .then(() => auditVendorManagerOverlap())
     .then(() => removeLegacyDemoVendor())
     .then(() => ensureEmailSchema())
-    // Backfill the inbox immediately on boot so a fresh deploy pulls any
-    // already-received emails without waiting for the 2-minute poll.
     .then(() => runInboundSync())
     .catch((err) => logger.error({ err }, "Startup admin/audit chain failed"));
   runCleanup();
@@ -397,10 +395,4 @@ app.listen(port, (err) => {
     );
   });
 
-  // Inbound email poll — pulls received emails from Resend every 2 minutes as
-  // a reliable fallback to the webhook (which can be misrouted, rejected, or
-  // not yet configured). Idempotent: already-stored emails are skipped.
-  cron.schedule("*/2 * * * *", () => {
-    runInboundSync().catch((err) => logger.error({ err }, "Inbound email sync failed"));
-  });
 });

@@ -95,8 +95,7 @@ app.use(cors(corsOptions));
 app.use(
   express.json({
     limit: "50mb",
-    // Stash the raw request body so webhook routes (Resend/Svix) can verify
-    // the HMAC signature, which must be computed over the exact bytes sent.
+    // Stash the raw request body for webhook signature verification.
     verify: (req, _res, buf) => {
       (req as unknown as { rawBody?: Buffer }).rawBody = buf;
     },

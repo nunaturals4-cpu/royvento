@@ -26,11 +26,9 @@ import { sendMail, isMailConfigured } from "./mailTransport";
 export const INFO_EMAIL_ADDRESS = "info@royvento.com";
 
 export function getInfoFromAddress(): string {
-  // Prefer an explicit From, then a Resend/SMTP sender on the verified domain.
   const user = process.env["SMTP_USER"];
   return (
     process.env["SMTP_FROM"] ??
-    process.env["RESEND_FROM_EMAIL"] ??
     (user ? `Royvento <${user}>` : `Royvento <${INFO_EMAIL_ADDRESS}>`)
   );
 }
@@ -110,14 +108,16 @@ export async function runDeliverabilityChecks(): Promise<DeliverabilityReport> {
       : { id: "dkim", label: "DKIM", status: "warn", detail: `Could not resolve google._domainkey.${domain}. Enable DKIM in Google Workspace Admin → Apps → Gmail → Authenticate email.` },
   );
 
-  // Sender config presence (sends are no-ops without a transport). Resend's
-  // HTTP API is the production path (Railway blocks SMTP); SMTP is local-only.
+  // Sender config check. Gmail REST API is the required production transport
+  // (Railway blocks SMTP ports 587/465 from containers; Gmail API uses HTTPS).
+  const hasGmailApi = Boolean(process.env["GMAIL_CLIENT_ID"] && process.env["GMAIL_CLIENT_SECRET"] && process.env["GMAIL_REFRESH_TOKEN"]);
+  const hasSmtp = Boolean(process.env["SMTP_USER"] && process.env["SMTP_PASS"]);
   checks.push(
-    process.env["RESEND_API_KEY"]
-      ? { id: "smtp_config", label: "Email sender", status: "pass", detail: "Sending via Resend HTTP API (works on Railway; royvento.com is a verified Resend domain)." }
-      : (process.env["SMTP_USER"] && process.env["SMTP_PASS"])
-        ? { id: "smtp_config", label: "Email sender", status: "warn", detail: `Only SMTP (${process.env["SMTP_USER"]}) is configured. SMTP is blocked on Railway — set RESEND_API_KEY for production delivery.` }
-        : { id: "smtp_config", label: "Email sender", status: "fail", detail: "No RESEND_API_KEY or SMTP creds — emails are logged, not delivered." },
+    hasGmailApi
+      ? { id: "smtp_config", label: "Email sender", status: "pass", detail: `Gmail REST API configured for ${process.env["SMTP_USER"] ?? "support@royvento.com"} (works on Railway).` }
+      : hasSmtp
+        ? { id: "smtp_config", label: "Email sender", status: "warn", detail: `Only SMTP (${process.env["SMTP_USER"]}) is configured — SMTP is blocked on Railway. Set GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN for production.` }
+        : { id: "smtp_config", label: "Email sender", status: "fail", detail: "No Gmail API credentials or SMTP config — emails are logged, not delivered." },
   );
 
   return { domain, fromAddress: getInfoFromAddress(), checks };
@@ -313,7 +313,7 @@ export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmail
   const from = getInfoFromAddress();
 
   if (!isMailConfigured()) {
-    logger.info({ to: args.to, subject: args.subject }, "[email] dev mode — not actually sent (no RESEND_API_KEY / SMTP creds)");
+    logger.info({ to: args.to, subject: args.subject }, "[email] dev mode — not actually sent (no Gmail API or SMTP creds configured)");
     return { ok: true, id: `dev-${Date.now()}` };
   }
 
