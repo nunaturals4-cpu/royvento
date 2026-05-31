@@ -50,10 +50,9 @@ import {
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
   Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
-  Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen, Inbox,
+  Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen,
   Download, Users2, ArrowUpDown, ChevronRight,
 } from "lucide-react";
-import EmailAdmin from "@/components/admin/EmailAdmin";
 import { Switch } from "@/components/ui/switch";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -69,7 +68,7 @@ import { cn } from "@/lib/utils";
 
 const ADMIN_TABS = [
   "analytics", "commissions", "vendors", "requests", "event-approvals",
-  "events", "subscriptions", "coupons", "ads", "messages", "email", "users", "blogs",
+  "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
   "booking-report", "attendance", "live-occupancy", "crm-leads",
   "create-pub", "announcement-slider", "settlements", "reviews",
 ] as const;
@@ -99,8 +98,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { value: "crm-leads",            label: "CRM & Leads",       icon: Crown,         group: "customers" },
   { value: "reviews",              label: "Reviews",           icon: Star,          group: "customers" },
   { value: "messages",             label: "Messages",          icon: Mail,          group: "customers" },
-  { value: "email",                label: "Send & Receive Email", icon: Inbox,       group: "customers" },
-  { value: "subscriptions",        label: "Subscriptions",     icon: Trophy,        group: "growth" },
+{ value: "subscriptions",        label: "Subscriptions",     icon: Trophy,        group: "growth" },
   { value: "coupons",              label: "Coupons",           icon: Gift,          group: "growth" },
   { value: "ads",                  label: "Ads",               icon: Sparkles,      group: "growth" },
   { value: "announcement-slider",  label: "Announcement Slider", icon: Megaphone,   group: "growth" },
@@ -296,8 +294,7 @@ export function AdminPanel() {
               <TabsContent value="coupons" className="mt-0"><CouponsAdmin /></TabsContent>
               <TabsContent value="ads" className="mt-0"><AdsAdmin /></TabsContent>
               <TabsContent value="messages" className="mt-0"><Messages /></TabsContent>
-              <TabsContent value="email" className="mt-0"><EmailAdmin /></TabsContent>
-              <TabsContent value="users" className="mt-0"><UsersPanel /></TabsContent>
+<TabsContent value="users" className="mt-0"><UsersPanel /></TabsContent>
               <TabsContent value="blogs" className="mt-0"><BlogsAdmin /></TabsContent>
               <TabsContent value="booking-report" className="mt-0"><BookingReport /></TabsContent>
               <TabsContent value="attendance" className="mt-0"><AttendanceReport /></TabsContent>
