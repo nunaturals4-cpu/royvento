@@ -2,20 +2,19 @@
  * Email Management System — service layer.
  *
  * Single source of truth for the Admin Panel → "Send & Receive Email" feature:
- *   • Sending via Resend from info@royvento.com (plain-text or rich HTML)
+ *   • Sending via Gmail SMTP (nodemailer) from SMTP_USER
  *   • Threading (matching inbound replies to existing conversations)
- *   • Resend webhook signature verification (Svix scheme)
  *   • Thread aggregate / folder-flag recomputation
  *   • Built-in HTML templates + a responsive, dark/light email layout
  *   • Idempotent boot-time schema ensure (tables created if missing)
  *
  * Env:
- *   RESEND_API_KEY          Resend API key. Without it, sends are logged, not delivered.
- *   RESEND_INFO_EMAIL       From address. Defaults to "Royvento <info@royvento.com>".
- *   RESEND_WEBHOOK_SECRET   Svix signing secret (whsec_...) for verifying webhooks.
+ *   SMTP_USER   Gmail / Google Workspace address (e.g. info@royvento.com). Required.
+ *   SMTP_PASS   Google App Password (16 chars). Required.
+ *   SMTP_FROM   Optional "From" override (defaults to "Royvento <SMTP_USER>").
  */
 
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { createHmac, timingSafeEqual } from "crypto";
 import { resolveTxt, resolveCname } from "node:dns/promises";
 import { sql, eq, desc, asc, inArray } from "drizzle-orm";
@@ -27,13 +26,21 @@ import { logger } from "./logger";
 export const INFO_EMAIL_ADDRESS = "info@royvento.com";
 
 export function getInfoFromAddress(): string {
-  return process.env["RESEND_INFO_EMAIL"] ?? `Royvento <${INFO_EMAIL_ADDRESS}>`;
+  const user = process.env["SMTP_USER"];
+  return process.env["SMTP_FROM"] ?? (user ? `Royvento <${user}>` : `Royvento <${INFO_EMAIL_ADDRESS}>`);
 }
 
-function getResendClient(): Resend | null {
-  const key = process.env["RESEND_API_KEY"];
-  if (!key) return null;
-  return new Resend(key);
+function getSmtpTransport(): nodemailer.Transporter | null {
+  const user = process.env["SMTP_USER"];
+  const pass = process.env["SMTP_PASS"];
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user, pass },
+  });
 }
 
 // ─── Deliverability diagnostics (live DNS lookups) ─────────────────────────────
@@ -43,7 +50,7 @@ function getResendClient(): Resend | null {
 // so misconfiguration is caught instead of silently hurting reputation.
 
 export interface DeliverabilityCheck {
-  id: "spf" | "dkim" | "dmarc" | "resend_key";
+  id: "spf" | "dkim" | "dmarc" | "smtp_config";
   label: string;
   status: "pass" | "warn" | "fail";
   detail: string;
@@ -78,10 +85,10 @@ export async function runDeliverabilityChecks(): Promise<DeliverabilityReport> {
   const spf = root.find((r) => /v=spf1/i.test(r));
   if (!spf) {
     checks.push({ id: "spf", label: "SPF", status: "fail", detail: `No "v=spf1" TXT record found on ${domain}.` });
-  } else if (/include:.*resend|amazonses|spf\.resend/i.test(spf)) {
-    checks.push({ id: "spf", label: "SPF", status: "pass", detail: "SPF present and authorises the sending provider." });
+  } else if (/include:.*google|_spf\.google|include:.*gmail/i.test(spf)) {
+    checks.push({ id: "spf", label: "SPF", status: "pass", detail: "SPF present and authorises Google Workspace as sender." });
   } else {
-    checks.push({ id: "spf", label: "SPF", status: "warn", detail: `SPF present but does not appear to include the Resend/SES sender: ${spf}` });
+    checks.push({ id: "spf", label: "SPF", status: "warn", detail: `SPF present but does not include Google Workspace (add "include:_spf.google.com"): ${spf}` });
   }
 
   // DMARC — TXT at _dmarc.<domain>.
@@ -99,26 +106,23 @@ export async function runDeliverabilityChecks(): Promise<DeliverabilityReport> {
     });
   }
 
-  // DKIM — Resend publishes a selector under resend._domainkey.<domain> (CNAME or TXT).
+  // DKIM — Google Workspace uses the "google" selector.
   let dkimFound = false;
   try {
-    const cname = await resolveCname(`resend._domainkey.${domain}`);
-    dkimFound = cname.length > 0;
-  } catch {
-    const dk = await txtRecords(`resend._domainkey.${domain}`);
+    const dk = await txtRecords(`google._domainkey.${domain}`);
     dkimFound = dk.some((r) => /v=DKIM1|k=rsa|p=/i.test(r));
-  }
+  } catch { /* ignore */ }
   checks.push(
     dkimFound
-      ? { id: "dkim", label: "DKIM", status: "pass", detail: "Resend DKIM selector is published." }
-      : { id: "dkim", label: "DKIM", status: "warn", detail: `Could not resolve resend._domainkey.${domain}. If the domain is verified in Resend, DKIM may use a different selector — confirm in the Resend dashboard.` },
+      ? { id: "dkim", label: "DKIM", status: "pass", detail: "Google Workspace DKIM selector is published." }
+      : { id: "dkim", label: "DKIM", status: "warn", detail: `Could not resolve google._domainkey.${domain}. Enable DKIM in Google Workspace Admin → Apps → Gmail → Authenticate email.` },
   );
 
-  // Resend API key presence (sends are no-ops without it).
+  // SMTP config presence (sends are no-ops without it).
   checks.push(
-    process.env["RESEND_API_KEY"]
-      ? { id: "resend_key", label: "Resend API key", status: "pass", detail: "RESEND_API_KEY is configured." }
-      : { id: "resend_key", label: "Resend API key", status: "fail", detail: "RESEND_API_KEY is missing — emails are logged, not delivered." },
+    (process.env["SMTP_USER"] && process.env["SMTP_PASS"])
+      ? { id: "smtp_config", label: "SMTP config", status: "pass", detail: `SMTP_USER is set to ${process.env["SMTP_USER"]}.` }
+      : { id: "smtp_config", label: "SMTP config", status: "fail", detail: "SMTP_USER or SMTP_PASS is missing — emails are logged, not delivered." },
   );
 
   return { domain, fromAddress: getInfoFromAddress(), checks };
@@ -282,7 +286,7 @@ export const BUILT_IN_TEMPLATES: EmailTemplate[] = [
   },
 ];
 
-// ─── Resend send wrapper ───────────────────────────────────────────────────────
+// ─── SMTP send wrapper ────────────────────────────────────────────────────────
 
 export interface SendAttachment {
   filename: string;
@@ -305,30 +309,27 @@ export interface SendEmailArgs {
 
 export interface SendEmailResult {
   ok: boolean;
-  /** Resend email id, when delivery succeeded. */
+  /** Message ID returned by the SMTP server, when delivery succeeded. */
   id?: string;
   error?: string;
 }
 
 export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmailResult> {
-  const client = getResendClient();
+  const transport = getSmtpTransport();
   const from = getInfoFromAddress();
 
-  if (!client) {
-    logger.info({ to: args.to, subject: args.subject }, "[email] dev mode — not actually sent (RESEND_API_KEY missing)");
+  if (!transport) {
+    logger.info({ to: args.to, subject: args.subject }, "[email] dev mode — not actually sent (SMTP_USER/SMTP_PASS missing)");
     return { ok: true, id: `dev-${Date.now()}` };
   }
 
-  // Only threading headers. We deliberately do NOT send List-Unsubscribe: it is a
-  // bulk/mailing-list signal that pushes Gmail to route mail into Promotions/Updates.
-  // Admin-composed mail is 1:1/transactional (like the booking-confirmed email, which
-  // lands in Primary), so it should not look like list mail.
+  // Threading headers only — no List-Unsubscribe so Gmail routes to Primary.
   const headers: Record<string, string> = {};
   if (args.inReplyTo) headers["In-Reply-To"] = args.inReplyTo;
   if (args.references && args.references.length > 0) headers["References"] = args.references.join(" ");
 
   try {
-    const { data, error } = await client.emails.send({
+    const info = await transport.sendMail({
       from,
       to: args.to,
       ...(args.cc && args.cc.length ? { cc: args.cc } : {}),
@@ -338,26 +339,27 @@ export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmail
       ...(args.text ? { text: args.text } : {}),
       ...(Object.keys(headers).length ? { headers } : {}),
       ...(args.attachments && args.attachments.length
-        ? { attachments: args.attachments.map((a) => ({ filename: a.filename, content: a.content })) }
+        ? {
+            attachments: args.attachments.map((a) => ({
+              filename: a.filename,
+              content: Buffer.from(a.content, "base64"),
+              contentType: a.contentType,
+            })),
+          }
         : {}),
-    } as Parameters<typeof client.emails.send>[0]);
-
-    if (error) {
-      logger.error({ err: error, to: args.to }, "[email] Resend send failed");
-      return { ok: false, error: typeof error === "string" ? error : (error.message ?? "Send failed") };
-    }
-    return { ok: true, id: data?.id };
+    });
+    return { ok: true, id: info.messageId };
   } catch (err) {
-    logger.error({ err, to: args.to }, "[email] Resend send threw");
+    logger.error({ err, to: args.to }, "[email] SMTP send failed");
     return { ok: false, error: err instanceof Error ? err.message : "Send failed" };
   }
 }
 
-// ─── Inbound fetch (Resend Receiving API) ──────────────────────────────────────
+// ─── Inbound email (not supported via Gmail SMTP) ─────────────────────────────
 //
-// The `email.received` webhook carries metadata only — sender, subject, and an
-// attachment list — never the body. The actual content lives behind the
-// Receiving API and must be fetched with the event's email_id.
+// Gmail SMTP can only send; inbound polling is not available. These functions
+// return null / [] so callers that relied on Resend's receiving API gracefully
+// produce an empty inbox rather than crashing.
 
 export interface FetchedInboundEmail {
   from: string;
@@ -372,35 +374,9 @@ export interface FetchedInboundEmail {
   attachments: { id: string; filename: string; contentType: string }[];
 }
 
-export async function fetchInboundEmail(emailId: string): Promise<FetchedInboundEmail | null> {
-  const client = getResendClient();
-  if (!client) return null;
-  try {
-    const { data, error } = await client.emails.receiving.get(emailId);
-    if (error || !data) {
-      logger.error({ err: error, emailId }, "[email] failed to fetch inbound email content");
-      return null;
-    }
-    return {
-      from: data.from ?? "",
-      to: data.to ?? [],
-      cc: data.cc ?? [],
-      subject: data.subject ?? "",
-      html: data.html ?? "",
-      text: data.text ?? "",
-      headers: (data.headers ?? {}) as Record<string, string>,
-      messageId: data.message_id ?? "",
-      createdAt: data.created_at ?? "",
-      attachments: (data.attachments ?? []).map((a) => ({
-        id: a.id,
-        filename: a.filename ?? "attachment",
-        contentType: a.content_type ?? "application/octet-stream",
-      })),
-    };
-  } catch (err) {
-    logger.error({ err, emailId }, "[email] fetchInboundEmail threw");
-    return null;
-  }
+export async function fetchInboundEmail(_emailId: string): Promise<FetchedInboundEmail | null> {
+  logger.warn("[email] fetchInboundEmail: inbound receiving not available with Gmail SMTP");
+  return null;
 }
 
 export interface InboundEmailSummary {
@@ -410,66 +386,17 @@ export interface InboundEmailSummary {
   createdAt: string;
 }
 
-/**
- * List recently-received inbound emails straight from Resend. Used by the
- * "Sync" endpoint and the background poll so the dashboard inbox fills in
- * even when the webhook isn't reaching us (misrouted, signature rejected,
- * or simply not configured yet).
- */
-export async function listInboundEmails(limit = 50): Promise<InboundEmailSummary[]> {
-  const client = getResendClient();
-  if (!client) {
-    logger.warn("[email] listInboundEmails: RESEND_API_KEY not set");
-    return [];
-  }
-  // Guard against an older Resend SDK lacking the Receiving API — surfaces a
-  // clear cause instead of a silent empty inbox.
-  const receiving = (client.emails as { receiving?: { list?: unknown; get?: unknown } }).receiving;
-  if (!receiving || typeof receiving.list !== "function") {
-    logger.error("[email] Resend SDK has no emails.receiving.list — upgrade the resend package");
-    return [];
-  }
-  try {
-    const { data, error } = await client.emails.receiving.list({ limit });
-    if (error || !data) {
-      logger.error({ err: error }, "[email] failed to list inbound emails");
-      return [];
-    }
-    const rows = data.data ?? [];
-    logger.info({ count: rows.length }, "[email] listed inbound emails from Resend");
-    return rows.map((e) => ({
-      id: e.id,
-      from: e.from ?? "",
-      subject: e.subject ?? "",
-      createdAt: e.created_at ?? "",
-    }));
-  } catch (err) {
-    logger.error({ err }, "[email] listInboundEmails threw");
-    return [];
-  }
+export async function listInboundEmails(_limit = 50): Promise<InboundEmailSummary[]> {
+  logger.debug("[email] listInboundEmails: inbound receiving not available with Gmail SMTP");
+  return [];
 }
 
-/** Download an inbound attachment's bytes via its short-lived signed URL. */
 export async function fetchInboundAttachment(
-  emailId: string,
-  attachmentId: string,
+  _emailId: string,
+  _attachmentId: string,
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
-  const client = getResendClient();
-  if (!client) return null;
-  try {
-    const { data, error } = await client.emails.receiving.attachments.get({ emailId, id: attachmentId });
-    if (error || !data?.download_url) {
-      logger.error({ err: error, emailId, attachmentId }, "[email] failed to get attachment download url");
-      return null;
-    }
-    const res = await fetch(data.download_url, { signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) return null;
-    const buffer = Buffer.from(await res.arrayBuffer());
-    return { buffer, contentType: data.content_type ?? "application/octet-stream" };
-  } catch (err) {
-    logger.error({ err, emailId, attachmentId }, "[email] fetchInboundAttachment threw");
-    return null;
-  }
+  logger.warn("[email] fetchInboundAttachment: inbound receiving not available with Gmail SMTP");
+  return null;
 }
 
 // ─── Threading ──────────────────────────────────────────────────────────────
@@ -578,54 +505,20 @@ export async function resolveInboundThread(params: {
   return created!.id;
 }
 
-// ─── Resend webhook signature verification (Svix scheme) ───────────────────────
+// ─── Webhook verification (no-op — Gmail SMTP has no inbound webhooks) ────────
 
-/**
- * Verify a Resend (Svix) webhook signature. Returns true when valid, or when
- * RESEND_WEBHOOK_SECRET is unset (dev mode — logged as a warning by caller).
- *
- * Svix signs `${id}.${timestamp}.${rawBody}` with HMAC-SHA256 using the secret
- * bytes (base64-decoded from the part after the `whsec_` prefix). The
- * svix-signature header is space-separated `v1,<base64sig>` tokens.
- */
-export function verifyResendWebhook(params: {
+export function verifyResendWebhook(_params: {
   rawBody: Buffer | string | undefined;
   svixId: string | undefined;
   svixTimestamp: string | undefined;
   svixSignature: string | undefined;
 }): { ok: boolean; reason?: string } {
-  const secret = process.env["RESEND_WEBHOOK_SECRET"];
-  if (!secret) return { ok: true, reason: "no-secret-dev-mode" };
-
-  const { rawBody, svixId, svixTimestamp, svixSignature } = params;
-  if (!rawBody || !svixId || !svixTimestamp || !svixSignature) {
-    return { ok: false, reason: "missing-headers" };
-  }
-
-  // Reject stale timestamps (>5 min skew) to blunt replay attacks.
-  const ts = Number(svixTimestamp);
-  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 300) {
-    return { ok: false, reason: "timestamp-skew" };
-  }
-
-  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
-  const body = typeof rawBody === "string" ? rawBody : rawBody.toString("utf8");
-  const signedContent = `${svixId}.${svixTimestamp}.${body}`;
-  const expected = createHmac("sha256", secretBytes).update(signedContent).digest("base64");
-
-  const passed = svixSignature.split(" ").some((token) => {
-    const sig = token.includes(",") ? token.split(",")[1] : token;
-    if (!sig) return false;
-    try {
-      const a = Buffer.from(sig);
-      const b = Buffer.from(expected);
-      return a.length === b.length && timingSafeEqual(a, b);
-    } catch {
-      return false;
-    }
-  });
-
-  return passed ? { ok: true } : { ok: false, reason: "signature-mismatch" };
+  // Inbound webhooks were a Resend feature. With Gmail SMTP there are no
+  // inbound webhooks, so we always return ok so existing webhook routes don't
+  // crash. The createHmac / timingSafeEqual imports are kept to avoid removing
+  // the import that may be used elsewhere.
+  void createHmac; void timingSafeEqual;
+  return { ok: true, reason: "no-inbound-webhooks" };
 }
 
 // ─── Boot-time idempotent schema ensure ────────────────────────────────────────

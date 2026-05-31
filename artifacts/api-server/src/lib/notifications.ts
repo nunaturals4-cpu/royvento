@@ -1,27 +1,33 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { logger } from "./logger";
 
 // ─── Required / optional environment variables ───────────────────────────────
 //
-//  RESEND_API_KEY                      (secret)  Resend API key for sending emails.
-//                                                If absent, emails are printed to console (dev mode).
-//  RESEND_FROM_EMAIL                   (optional) "From" address, e.g. "Royvento <hello@example.com>".
-//                                                Defaults to "Royvento <onboarding@resend.dev>".
-//  RESEND_FORGOT_PASSWORD_TEMPLATE_ID  (optional) Resend template ID for the password-reset email.
-//                                                When set, the template is used with variables:
-//                                                  firstname, reset_link.
-//                                                When absent, a plain-text + HTML fallback is sent.
+//  SMTP_USER   Gmail / Google Workspace address used to send (e.g. info@royvento.com).
+//              If absent, emails are printed to the console (dev mode).
+//  SMTP_PASS   Google App Password (16 chars, no spaces). Generate in:
+//              Google Account → Security → 2-Step Verification → App passwords.
+//  SMTP_FROM   Optional display-name override, e.g. "Royvento <info@royvento.com>".
+//              Defaults to  "Royvento <SMTP_USER>".
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getResendClient(): Resend | null {
-  const key = process.env["RESEND_API_KEY"];
-  if (!key) return null;
-  return new Resend(key);
+function getSmtpTransport(): nodemailer.Transporter | null {
+  const user = process.env["SMTP_USER"];
+  const pass = process.env["SMTP_PASS"];
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user, pass },
+  });
 }
 
 function getFromAddress(): string {
-  return process.env["RESEND_FROM_EMAIL"] ?? "Royvento <onboarding@resend.dev>";
+  const user = process.env["SMTP_USER"];
+  return process.env["SMTP_FROM"] ?? (user ? `Royvento <${user}>` : "Royvento <noreply@royvento.com>");
 }
 
 const PRODUCTION_APP_URL = "https://royvento.com";
@@ -172,9 +178,9 @@ function formatEmailConsole(label: string, payload: EmailPayload): string {
 }
 
 async function deliver(label: string, payload: EmailPayload): Promise<void> {
-  const client = getResendClient();
+  const transport = getSmtpTransport();
 
-  if (!client) {
+  if (!transport) {
     logger.info({ label, to: payload.to, subject: payload.subject }, "Email (dev mode, not sent)");
     logger.debug(formatEmailConsole(label, payload));
     return;
@@ -184,18 +190,17 @@ async function deliver(label: string, payload: EmailPayload): Promise<void> {
     ? `${payload.toName} <${payload.to}>`
     : payload.to;
 
-  const { error } = await client.emails.send({
-    from: getFromAddress(),
-    to: [toAddress],
-    subject: payload.subject,
-    text: payload.text,
-    html: payload.html,
-  });
-
-  if (error) {
-    logger.error({ err: error, label, to: payload.to }, "[notifications] Failed to send email");
-  } else {
+  try {
+    await transport.sendMail({
+      from: getFromAddress(),
+      to: toAddress,
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html,
+    });
     logger.info({ label, to: payload.to }, "[notifications] Sent email");
+  } catch (err) {
+    logger.error({ err, label, to: payload.to }, "[notifications] Failed to send email");
   }
 }
 
@@ -273,37 +278,6 @@ export async function sendPasswordResetEmail(params: {
 }): Promise<void> {
   const resetUrl = `${getAppUrl()}/reset-password?token=${params.token}`;
   const firstName = params.toName.split(" ")[0];
-  const templateId = process.env["RESEND_FORGOT_PASSWORD_TEMPLATE_ID"];
-
-  if (templateId) {
-    const client = getResendClient();
-    if (!client) {
-      logger.warn(
-        "[notifications] RESEND_FORGOT_PASSWORD_TEMPLATE_ID is set but RESEND_API_KEY is missing — " +
-          "falling back to plain-text email. Set RESEND_API_KEY to use the template.",
-      );
-    }
-    if (client) {
-      const toAddress = `${params.toName} <${params.to}>`;
-      const { error } = await client.emails.send({
-        from: getFromAddress(),
-        to: [toAddress],
-        template: {
-          id: templateId,
-          variables: {
-            firstname: firstName,
-            reset_link: resetUrl,
-          },
-        },
-      });
-      if (error) {
-        logger.error({ err: error }, "[notifications] Failed to send templated password reset email");
-      } else {
-        logger.info({ to: params.to }, "[notifications] Sent templated Password Reset");
-      }
-      return;
-    }
-  }
 
   const html = layout(`
     ${greeting(firstName)}
