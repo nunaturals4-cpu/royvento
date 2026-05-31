@@ -1,5 +1,5 @@
-import nodemailer from "nodemailer";
 import { logger } from "./logger";
+import { sendMail } from "./mailTransport";
 
 // ─── Required / optional environment variables ───────────────────────────────
 //
@@ -11,27 +11,6 @@ import { logger } from "./logger";
 //              Defaults to  "Royvento <SMTP_USER>".
 //
 // ─────────────────────────────────────────────────────────────────────────────
-
-function getSmtpTransport(): nodemailer.Transporter | null {
-  const user = process.env["SMTP_USER"];
-  const pass = process.env["SMTP_PASS"];
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: { user, pass },
-    // Railway's container egress cannot route IPv6, so DNS resolving
-    // smtp.gmail.com to an AAAA record makes every connection hang with
-    // `ENETUNREACH ...:587` until the socket times out (~2 min). Force IPv4
-    // and add explicit timeouts so a send fails fast instead of blocking.
-    family: 4,
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 20_000,
-  });
-}
 
 function getFromAddress(): string {
   const user = process.env["SMTP_USER"];
@@ -186,29 +165,24 @@ function formatEmailConsole(label: string, payload: EmailPayload): string {
 }
 
 async function deliver(label: string, payload: EmailPayload): Promise<void> {
-  const transport = getSmtpTransport();
-
-  if (!transport) {
-    logger.info({ label, to: payload.to, subject: payload.subject }, "Email (dev mode, not sent)");
-    logger.debug(formatEmailConsole(label, payload));
-    return;
-  }
-
   const toAddress = payload.toName
     ? `${payload.toName} <${payload.to}>`
     : payload.to;
 
-  try {
-    await transport.sendMail({
-      from: getFromAddress(),
-      to: toAddress,
-      subject: payload.subject,
-      text: payload.text,
-      html: payload.html,
-    });
-    logger.info({ label, to: payload.to }, "[notifications] Sent email");
-  } catch (err) {
-    logger.error({ err, label, to: payload.to }, "[notifications] Failed to send email");
+  const result = await sendMail({
+    from: getFromAddress(),
+    to: toAddress,
+    subject: payload.subject,
+    text: payload.text,
+    html: payload.html,
+  });
+
+  if (result.via === "dev") {
+    logger.debug(formatEmailConsole(label, payload));
+  } else if (result.ok) {
+    logger.info({ label, to: payload.to, via: result.via }, "[notifications] Sent email");
+  } else {
+    logger.error({ label, to: payload.to, via: result.via, error: result.error }, "[notifications] Failed to send email");
   }
 }
 

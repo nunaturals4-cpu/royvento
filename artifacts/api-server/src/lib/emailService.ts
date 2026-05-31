@@ -14,39 +14,25 @@
  *   SMTP_FROM   Optional "From" override (defaults to "Royvento <SMTP_USER>").
  */
 
-import nodemailer from "nodemailer";
 import { createHmac, timingSafeEqual } from "crypto";
 import { resolveTxt, resolveCname } from "node:dns/promises";
 import { sql, eq, desc, asc, inArray } from "drizzle-orm";
 import { db, emailThreadsTable, emailMessagesTable } from "@workspace/db";
 import { logger } from "./logger";
+import { sendMail, isMailConfigured } from "./mailTransport";
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 export const INFO_EMAIL_ADDRESS = "info@royvento.com";
 
 export function getInfoFromAddress(): string {
+  // Prefer an explicit From, then a Resend/SMTP sender on the verified domain.
   const user = process.env["SMTP_USER"];
-  return process.env["SMTP_FROM"] ?? (user ? `Royvento <${user}>` : `Royvento <${INFO_EMAIL_ADDRESS}>`);
-}
-
-function getSmtpTransport(): nodemailer.Transporter | null {
-  const user = process.env["SMTP_USER"];
-  const pass = process.env["SMTP_PASS"];
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: { user, pass },
-    // Force IPv4 + fail-fast timeouts: Railway egress can't route IPv6, so an
-    // AAAA resolution of smtp.gmail.com hangs every send until socket timeout.
-    family: 4,
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 20_000,
-  });
+  return (
+    process.env["SMTP_FROM"] ??
+    process.env["RESEND_FROM_EMAIL"] ??
+    (user ? `Royvento <${user}>` : `Royvento <${INFO_EMAIL_ADDRESS}>`)
+  );
 }
 
 // ─── Deliverability diagnostics (live DNS lookups) ─────────────────────────────
@@ -124,11 +110,14 @@ export async function runDeliverabilityChecks(): Promise<DeliverabilityReport> {
       : { id: "dkim", label: "DKIM", status: "warn", detail: `Could not resolve google._domainkey.${domain}. Enable DKIM in Google Workspace Admin → Apps → Gmail → Authenticate email.` },
   );
 
-  // SMTP config presence (sends are no-ops without it).
+  // Sender config presence (sends are no-ops without a transport). Resend's
+  // HTTP API is the production path (Railway blocks SMTP); SMTP is local-only.
   checks.push(
-    (process.env["SMTP_USER"] && process.env["SMTP_PASS"])
-      ? { id: "smtp_config", label: "SMTP config", status: "pass", detail: `SMTP_USER is set to ${process.env["SMTP_USER"]}.` }
-      : { id: "smtp_config", label: "SMTP config", status: "fail", detail: "SMTP_USER or SMTP_PASS is missing — emails are logged, not delivered." },
+    process.env["RESEND_API_KEY"]
+      ? { id: "smtp_config", label: "Email sender", status: "pass", detail: "Sending via Resend HTTP API (works on Railway; royvento.com is a verified Resend domain)." }
+      : (process.env["SMTP_USER"] && process.env["SMTP_PASS"])
+        ? { id: "smtp_config", label: "Email sender", status: "warn", detail: `Only SMTP (${process.env["SMTP_USER"]}) is configured. SMTP is blocked on Railway — set RESEND_API_KEY for production delivery.` }
+        : { id: "smtp_config", label: "Email sender", status: "fail", detail: "No RESEND_API_KEY or SMTP creds — emails are logged, not delivered." },
   );
 
   return { domain, fromAddress: getInfoFromAddress(), checks };
@@ -321,44 +310,33 @@ export interface SendEmailResult {
 }
 
 export async function sendEmailViaResend(args: SendEmailArgs): Promise<SendEmailResult> {
-  const transport = getSmtpTransport();
   const from = getInfoFromAddress();
 
-  if (!transport) {
-    logger.info({ to: args.to, subject: args.subject }, "[email] dev mode — not actually sent (SMTP_USER/SMTP_PASS missing)");
+  if (!isMailConfigured()) {
+    logger.info({ to: args.to, subject: args.subject }, "[email] dev mode — not actually sent (no RESEND_API_KEY / SMTP creds)");
     return { ok: true, id: `dev-${Date.now()}` };
   }
 
-  // Threading headers only — no List-Unsubscribe so Gmail routes to Primary.
+  // Threading headers only — no List-Unsubscribe so the reply lands in Primary.
   const headers: Record<string, string> = {};
   if (args.inReplyTo) headers["In-Reply-To"] = args.inReplyTo;
   if (args.references && args.references.length > 0) headers["References"] = args.references.join(" ");
 
-  try {
-    const info = await transport.sendMail({
-      from,
-      to: args.to,
-      ...(args.cc && args.cc.length ? { cc: args.cc } : {}),
-      ...(args.bcc && args.bcc.length ? { bcc: args.bcc } : {}),
-      subject: args.subject,
-      ...(args.html ? { html: args.html } : {}),
-      ...(args.text ? { text: args.text } : {}),
-      ...(Object.keys(headers).length ? { headers } : {}),
-      ...(args.attachments && args.attachments.length
-        ? {
-            attachments: args.attachments.map((a) => ({
-              filename: a.filename,
-              content: Buffer.from(a.content, "base64"),
-              contentType: a.contentType,
-            })),
-          }
-        : {}),
-    });
-    return { ok: true, id: info.messageId };
-  } catch (err) {
-    logger.error({ err, to: args.to }, "[email] SMTP send failed");
-    return { ok: false, error: err instanceof Error ? err.message : "Send failed" };
-  }
+  const result = await sendMail({
+    from,
+    to: args.to,
+    ...(args.cc && args.cc.length ? { cc: args.cc } : {}),
+    ...(args.bcc && args.bcc.length ? { bcc: args.bcc } : {}),
+    subject: args.subject,
+    ...(args.html ? { html: args.html } : {}),
+    ...(args.text ? { text: args.text } : {}),
+    ...(Object.keys(headers).length ? { headers } : {}),
+    ...(args.attachments && args.attachments.length ? { attachments: args.attachments } : {}),
+  });
+
+  return result.ok
+    ? { ok: true, ...(result.id ? { id: result.id } : {}) }
+    : { ok: false, error: result.error ?? "Send failed" };
 }
 
 // ─── Inbound email (not supported via Gmail SMTP) ─────────────────────────────
