@@ -35,7 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "import-pub" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews" | "plans";
 
 interface ContactMessage {
   id: number;
@@ -84,6 +84,16 @@ interface AdminVendor {
   location: string;
   isPremium: boolean;
   createdAt: string;
+  baseFeeEnabled?: boolean;
+  baseFeePercent?: string;
+  crowdLevel?: string | null;
+}
+
+interface VendorManagerRow {
+  id: number;
+  invitedEmail: string;
+  status: string;
+  manager?: { name?: string; email?: string } | null;
 }
 
 interface VendorRequest {
@@ -1000,143 +1010,109 @@ function AdminCrmLeadsTab({ colors }: { colors: ReturnType<typeof useColors> }) 
   );
 }
 
-// ─── AdminImportPubTab ────────────────────────────────────────────────────────
-type ImportStep = "form" | "previewing" | "preview" | "importing" | "success";
+// ─── Admin Plans Tab: plan visibility + featured drink-plan priority ─────────
+interface PlanConfig { showGrowthPlan: boolean; showPremiumPartner: boolean; showRoyalPlan: boolean }
+interface DrinkPlanRow { id: number; vendorId: number; vendorName: string | null; type: string; productName: string | null; price: number | null; gender: string | null; globalPriority: number | null }
 
-interface GooglePubPreview {
-  place: { placeId: string; name: string; address: string; phone?: string; website?: string; rating?: number; photos?: string[] };
-  suggestedTitle: string;
-  suggestedDescription: string;
-}
+function AdminPlansTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const [planConfig, setPlanConfig] = useState<PlanConfig>({ showGrowthPlan: true, showPremiumPartner: true, showRoyalPlan: true });
+  const [plans, setPlans] = useState<DrinkPlanRow[]>([]);
+  const [featured, setFeatured] = useState<DrinkPlanRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingPriority, setSavingPriority] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-function AdminImportPubTab({ colors }: { colors: ReturnType<typeof useColors> }) {
-  const [step, setStep] = useState<ImportStep>("form");
-  const [googleUrl, setGoogleUrl] = useState("");
-  const [partnerEmail, setPartnerEmail] = useState("");
-  const [preview, setPreview] = useState<GooglePubPreview | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    customFetch<PlanConfig>("/api/plan-config").then(setPlanConfig).catch(() => {});
+    customFetch<DrinkPlanRow[]>("/api/admin/drink-plans")
+      .then((data) => {
+        setPlans(data);
+        setFeatured([...data].filter((p) => p.globalPriority !== null).sort((a, b) => (a.globalPriority ?? 999) - (b.globalPriority ?? 999)));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
-  async function handlePreview() {
-    setError(null);
-    setStep("previewing");
+  async function togglePlan(key: keyof PlanConfig) {
+    const next = { ...planConfig, [key]: !planConfig[key] };
+    setPlanConfig(next);
     try {
-      const data = await customFetch<GooglePubPreview>("/api/admin/pubs/preview-google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ googleUrl: googleUrl.trim(), partnerEmail: partnerEmail.trim() }),
-      });
-      setPreview(data);
-      setStep("preview");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Preview failed. Check the URL and partner email.");
-      setStep("form");
-    }
+      await customFetch("/api/admin/plan-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
+    } catch { setPlanConfig(planConfig); Alert.alert("Error", "Failed to update plan visibility."); }
   }
 
-  async function handleConfirm() {
-    if (!preview) return;
-    setError(null);
-    setStep("importing");
+  const featuredIds = new Set(featured.map((p) => p.id));
+  const available = plans.filter((p) => !featuredIds.has(p.id));
+  const planLabel = (p: DrinkPlanRow) => [p.productName || p.type, p.vendorName || "Unknown pub", p.gender && p.gender !== "all" ? `(${p.gender})` : null, p.price ? `₹${p.price}` : null].filter(Boolean).join(" — ");
+
+  function move(idx: number, dir: -1 | 1) {
+    setFeatured((prev) => {
+      const j = idx + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+    setDirty(true);
+  }
+  function addPlan(p: DrinkPlanRow) {
+    if (featured.length >= 10) { Alert.alert("Limit reached", "Maximum 10 plans can be featured."); return; }
+    setFeatured((prev) => [...prev, p]); setDirty(true);
+  }
+  function removePlan(id: number) { setFeatured((prev) => prev.filter((p) => p.id !== id)); setDirty(true); }
+
+  async function savePriorities() {
+    setSavingPriority(true);
     try {
-      await customFetch("/api/admin/pubs/import-google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ googleUrl: googleUrl.trim(), partnerEmail: partnerEmail.trim(), placeId: preview.place.placeId }),
-      });
-      setStep("success");
-      Alert.alert("Pub Imported", `"${preview.suggestedTitle}" has been created and approved.`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Import failed. Please try again.");
-      setStep("preview");
-    }
+      await customFetch("/api/admin/drink-plans/priorities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderedIds: featured.map((p) => p.id) }) });
+      setDirty(false);
+      Alert.alert("Saved", "Featured priority order saved.");
+    } catch { Alert.alert("Error", "Failed to save priorities."); }
+    finally { setSavingPriority(false); }
   }
 
-  function reset() { setStep("form"); setPreview(null); setError(null); setGoogleUrl(""); setPartnerEmail(""); }
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 100 }}>
-      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>IMPORT PUB FROM GOOGLE MAPS</Text>
-
-      {step === "success" ? (
-        <View style={{ alignItems: "center", padding: 32, gap: 16 }}>
-          <Ionicons name="checkmark-circle" size={56} color="#22c55e" />
-          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground, textAlign: "center" }}>Pub Imported!</Text>
-          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" }}>"{preview?.suggestedTitle}" has been created and approved.</Text>
-          <TouchableOpacity onPress={reset} style={{ borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28, backgroundColor: colors.primary }}>
-            <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Import Another</Text>
-          </TouchableOpacity>
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 120 }}>
+      {/* Subscription plan visibility */}
+      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>SUBSCRIPTION PLAN VISIBILITY</Text>
+      {([["showGrowthPlan", "Growth Plan"], ["showPremiumPartner", "Premium Partner"], ["showRoyalPlan", "Royal Plan"]] as const).map(([key, label]) => (
+        <View key={key} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 14, paddingVertical: 12 }}>
+          <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: colors.foreground }}>{label}</Text>
+          <Switch value={planConfig[key]} onValueChange={() => togglePlan(key)} trackColor={{ true: colors.primary, false: colors.border }} />
         </View>
-      ) : (
+      ))}
+
+      {/* Featured drink plans */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+        <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground }}>FEATURED DRINK PLANS ({featured.length}/10)</Text>
+        {dirty && (
+          <TouchableOpacity onPress={savePriorities} disabled={savingPriority} style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 }}>
+            {savingPriority ? <ActivityIndicator color={colors.primaryForeground} size="small" /> : <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>Save order</Text>}
+          </TouchableOpacity>
+        )}
+      </View>
+      {featured.length === 0 && <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>No featured plans. Add from the list below.</Text>}
+      {featured.map((p, idx) => (
+        <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + "40", backgroundColor: colors.card, paddingHorizontal: 12, paddingVertical: 10 }}>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.primary, width: 20 }}>{idx + 1}</Text>
+          <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground }} numberOfLines={2}>{planLabel(p)}</Text>
+          <TouchableOpacity onPress={() => move(idx, -1)} disabled={idx === 0}><Ionicons name="chevron-up" size={18} color={idx === 0 ? colors.border : colors.foreground} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => move(idx, 1)} disabled={idx === featured.length - 1}><Ionicons name="chevron-down" size={18} color={idx === featured.length - 1 ? colors.border : colors.foreground} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => removePlan(p.id)}><Ionicons name="close-circle" size={18} color="#ef4444" /></TouchableOpacity>
+        </View>
+      ))}
+
+      {available.length > 0 && (
         <>
-          <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 10 }}>
-            <View style={{ gap: 4 }}>
-              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>GOOGLE MAPS URL</Text>
-              <TextInput
-                value={googleUrl}
-                onChangeText={setGoogleUrl}
-                placeholder="https://maps.google.com/..."
-                placeholderTextColor={colors.mutedForeground}
-                style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14 }}
-                autoCapitalize="none"
-                editable={step === "form" || step === "preview"}
-              />
-            </View>
-            <View style={{ gap: 4 }}>
-              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PARTNER EMAIL</Text>
-              <TextInput
-                value={partnerEmail}
-                onChangeText={setPartnerEmail}
-                placeholder="partner@example.com"
-                placeholderTextColor={colors.mutedForeground}
-                style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14 }}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={step === "form" || step === "preview"}
-              />
-            </View>
-          </View>
-
-          {error && (
-            <View style={{ borderRadius: 12, borderWidth: 1, borderColor: "#ef4444", backgroundColor: "#ef444410", padding: 12 }}>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#ef4444" }}>{error}</Text>
-            </View>
-          )}
-
-          {preview && step === "preview" && (
-            <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.card, padding: 14, gap: 8 }}>
-              <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>{preview.place.name}</Text>
-              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{preview.place.address}</Text>
-              {preview.place.phone && <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{preview.place.phone}</Text>}
-              <View style={{ borderRadius: 8, backgroundColor: colors.muted, padding: 10 }}>
-                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{preview.suggestedTitle}</Text>
-                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 4 }} numberOfLines={3}>{preview.suggestedDescription}</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            {(step === "form" || step === "preview") && (
-              <TouchableOpacity
-                onPress={step === "preview" ? handleConfirm : handlePreview}
-                disabled={!googleUrl.trim() || !partnerEmail.trim()}
-                style={{ flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", backgroundColor: colors.primary, opacity: (!googleUrl.trim() || !partnerEmail.trim()) ? 0.5 : 1 }}
-              >
-                <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
-                  {step === "preview" ? "Confirm & Import" : "Preview"}
-                </Text>
-              </TouchableOpacity>
-            )}
-            {(step === "previewing" || step === "importing") && (
-              <View style={{ flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", backgroundColor: colors.primary, opacity: 0.6 }}>
-                <ActivityIndicator color={colors.primaryForeground} size="small" />
-              </View>
-            )}
-            {step === "preview" && (
-              <TouchableOpacity onPress={reset} style={{ borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
-                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 14 }}>Reset</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, color: colors.mutedForeground, marginTop: 8 }}>AVAILABLE PLANS</Text>
+          {available.map((p) => (
+            <TouchableOpacity key={p.id} onPress={() => addPlan(p)} style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 12, paddingVertical: 10 }}>
+              <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+              <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground }} numberOfLines={2}>{planLabel(p)}</Text>
+            </TouchableOpacity>
+          ))}
         </>
       )}
     </ScrollView>
@@ -1187,6 +1163,60 @@ export default function AdminPanelScreen() {
     } catch {
       Alert.alert("Error", "Failed to reject application.");
     }
+  }
+
+  // Per-vendor admin controls: base-fee, crowd-level, managers
+  async function toggleBaseFee(v: AdminVendor) {
+    const next = v.baseFeeEnabled === false;
+    try {
+      await customFetch(`/api/admin/vendors/${v.id}/base-fee`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseFeeEnabled: next }),
+      });
+      setVendors((prev) => prev.map((x) => x.id === v.id ? { ...x, baseFeeEnabled: next } : x));
+    } catch { Alert.alert("Error", "Failed to update base fee."); }
+  }
+
+  async function setVendorCrowdLevel(vendorId: number, level: string | null) {
+    try {
+      await customFetch(`/api/admin/vendors/${vendorId}/crowd-level`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crowdLevel: level }),
+      });
+      setVendors((prev) => prev.map((x) => x.id === vendorId ? { ...x, crowdLevel: level } : x));
+    } catch { Alert.alert("Error", "Failed to update crowd level."); }
+  }
+
+  const [expandedMgrVendor, setExpandedMgrVendor] = useState<number | null>(null);
+  const [managersByVendor, setManagersByVendor] = useState<Record<number, VendorManagerRow[]>>({});
+  const [mgrLoading, setMgrLoading] = useState(false);
+
+  async function toggleManagers(vendorId: number) {
+    if (expandedMgrVendor === vendorId) { setExpandedMgrVendor(null); return; }
+    setExpandedMgrVendor(vendorId);
+    if (!managersByVendor[vendorId]) {
+      setMgrLoading(true);
+      try {
+        const rows = await customFetch<VendorManagerRow[]>(`/api/admin/vendors/${vendorId}/managers`);
+        setManagersByVendor((prev) => ({ ...prev, [vendorId]: rows }));
+      } catch { Alert.alert("Error", "Failed to load managers."); }
+      finally { setMgrLoading(false); }
+    }
+  }
+
+  async function removeManager(vendorId: number, mgr: VendorManagerRow) {
+    const label = mgr.manager?.name || mgr.invitedEmail;
+    Alert.alert("Remove manager?", `Remove "${label}"?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: async () => {
+        try {
+          await customFetch(`/api/admin/vendors/${vendorId}/managers/${mgr.id}`, { method: "DELETE" });
+          setManagersByVendor((prev) => ({ ...prev, [vendorId]: (prev[vendorId] ?? []).filter((m) => m.id !== mgr.id) }));
+        } catch { Alert.alert("Error", "Failed to remove manager."); }
+      }},
+    ]);
   }
 
   // ─── USERS ──────────────────────────────────────────────────────────────────
@@ -2002,6 +2032,65 @@ export default function AdminPanelScreen() {
                   <Ionicons name="trash-outline" size={14} color={colors.destructive} />
                 </TouchableOpacity>
               </View>
+
+              {v.status === "approved" && (
+                <>
+                  {/* Base fee toggle */}
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
+                      Base Fee ({v.baseFeePercent ?? "3.50"}%) — {v.baseFeeEnabled !== false ? "Enabled" : "Disabled"}
+                    </Text>
+                    <Switch
+                      value={v.baseFeeEnabled !== false}
+                      onValueChange={() => toggleBaseFee(v)}
+                      trackColor={{ true: colors.primary, false: colors.border }}
+                    />
+                  </View>
+
+                  {/* Crowd level */}
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>LIVE CROWD LEVEL</Text>
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      {([["low", "Low", "#22c55e"], ["moderate", "Moderate", "#f59e0b"], ["party", "High", "#ef4444"]] as const).map(([val, label, c]) => {
+                        const active = v.crowdLevel === val;
+                        return (
+                          <TouchableOpacity key={val} onPress={() => setVendorCrowdLevel(v.id, active ? null : val)}
+                            style={{ flex: 1, paddingVertical: 7, borderRadius: 10, borderWidth: 1, alignItems: "center", backgroundColor: active ? c + "22" : colors.muted, borderColor: active ? c : colors.border }}>
+                            <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: active ? c : colors.mutedForeground }}>{label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* Managers expand */}
+                  <TouchableOpacity onPress={() => toggleManagers(v.id)} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary }}>
+                      {expandedMgrVendor === v.id ? "Hide" : "View"} Managers{managersByVendor[v.id] ? ` (${managersByVendor[v.id].length})` : ""}
+                    </Text>
+                    <Ionicons name={expandedMgrVendor === v.id ? "chevron-up" : "chevron-down"} size={14} color={colors.primary} />
+                  </TouchableOpacity>
+                  {expandedMgrVendor === v.id && (
+                    <View style={{ gap: 6 }}>
+                      {mgrLoading && !managersByVendor[v.id] ? (
+                        <ActivityIndicator color={colors.primary} size="small" />
+                      ) : (managersByVendor[v.id] ?? []).length === 0 ? (
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>No managers assigned.</Text>
+                      ) : (managersByVendor[v.id] ?? []).map((mgr) => (
+                        <View key={mgr.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.muted, paddingHorizontal: 10, paddingVertical: 8 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground }}>{mgr.manager?.name || mgr.invitedEmail}</Text>
+                            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{mgr.invitedEmail} · {mgr.status}</Text>
+                          </View>
+                          <TouchableOpacity onPress={() => removeManager(v.id, mgr)}>
+                            <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
             </View>
           );
         })}
@@ -2840,11 +2929,6 @@ export default function AdminPanelScreen() {
     return <AdminCrmLeadsTab colors={colors} />;
   }
 
-  // ─── Import Pub tab ───────────────────────────────────────────────────────────
-  function renderImportPub() {
-    return <AdminImportPubTab colors={colors} />;
-  }
-
   const TABS = [
     { key: "analytics" as AdminTab, icon: "bar-chart-outline" as const, label: "Analytics" },
     { key: "commissions" as AdminTab, icon: "cash-outline" as const, label: "Commissions" },
@@ -2860,9 +2944,9 @@ export default function AdminPanelScreen() {
     { key: "messages" as AdminTab, icon: "mail-outline" as const, label: "Messages" },
     { key: "booking-report" as AdminTab, icon: "stats-chart-outline" as const, label: "Report" },
     { key: "crm-leads" as AdminTab, icon: "person-add-outline" as const, label: "CRM" },
-    { key: "import-pub" as AdminTab, icon: "cloud-download-outline" as const, label: "Import" },
     { key: "settlements" as AdminTab, icon: "card-outline" as const, label: "Settlements" },
     { key: "live-occupancy" as AdminTab, icon: "pulse-outline" as const, label: "Live Occ" },
+    { key: "plans" as AdminTab, icon: "options-outline" as const, label: "Plans" },
     { key: "reviews" as AdminTab, icon: "star-outline" as const, label: "Reviews" },
   ];
 
@@ -2928,11 +3012,11 @@ export default function AdminPanelScreen() {
       {activeTab === "messages" && renderMessages()}
       {activeTab === "booking-report" && renderBookingReport()}
       {activeTab === "crm-leads" && renderCrmLeads()}
-      {activeTab === "import-pub" && renderImportPub()}
       {activeTab === "commissions" && <AdminCommissionsTab colors={colors} />}
       {activeTab === "settlements" && <AdminSettlementsTab colors={colors} />}
       {activeTab === "live-occupancy" && <AdminLiveOccupancyTab colors={colors} />}
       {activeTab === "reviews" && <AdminReviewsTab colors={colors} />}
+      {activeTab === "plans" && <AdminPlansTab colors={colors} />}
 
       {/* Blog editor sheet — full-screen modal so the long content textarea
           has room. Renders at the page root so it overlays the active tab. */}

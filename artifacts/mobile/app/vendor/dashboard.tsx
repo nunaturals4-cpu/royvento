@@ -50,7 +50,7 @@ import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "ads" | "attendance" | "banking" | "reviews";
+type DashTab = "bookings" | "events" | "profile" | "calendar" | "managers" | "analytics" | "announcements" | "leads" | "drinkplans" | "coupons" | "offers" | "ads" | "attendance" | "banking" | "reviews";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   pending:   { bg: "#f59e0b20", text: "#f59e0b" },
@@ -925,6 +925,613 @@ function DrinkPlansTab({ vendorId, colors }: { vendorId: number | null; colors: 
   );
 }
 
+// ─── Coupons Tab (mirrors web CouponsPanel) ──────────────────────────────────
+interface VendorCoupon {
+  id: number;
+  code: string;
+  discountType: "percent" | "fixed";
+  discountValue: string;
+  applicableTo: "ticket" | "event" | "both";
+  active: boolean;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+interface CouponFormState {
+  code: string;
+  discountType: "percent" | "fixed";
+  discountValue: string;
+  applicableTo: "ticket" | "event" | "both";
+  active: boolean;
+  maxUses: string;
+  expiresAt: string;
+}
+const BLANK_COUPON: CouponFormState = { code: "", discountType: "percent", discountValue: "10", applicableTo: "both", active: true, maxUses: "", expiresAt: "" };
+
+function CouponsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<VendorCoupon | null>(null);
+  const [form, setForm] = useState<CouponFormState>({ ...BLANK_COUPON });
+  const [saving, setSaving] = useState(false);
+
+  const { data: coupons, isLoading } = useQuery<VendorCoupon[]>({
+    queryKey: ["myPartnerCoupons"],
+    queryFn: () => customFetch<VendorCoupon[]>("/api/partner/coupons"),
+  });
+
+  const openCreate = () => { setForm({ ...BLANK_COUPON }); setEditing(null); setShowForm(true); };
+  const openEdit = (c: VendorCoupon) => {
+    setForm({
+      code: c.code,
+      discountType: c.discountType,
+      discountValue: String(c.discountValue),
+      applicableTo: c.applicableTo,
+      active: c.active,
+      maxUses: c.maxUses != null ? String(c.maxUses) : "",
+      expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "",
+    });
+    setEditing(c);
+    setShowForm(true);
+  };
+
+  async function save() {
+    if (form.discountType === "percent" && (Number(form.discountValue) <= 0 || Number(form.discountValue) > 100)) {
+      Alert.alert("Invalid discount", "Percentage must be between 1 and 100.");
+      return;
+    }
+    if (!Number(form.discountValue)) {
+      Alert.alert("Invalid discount", "Enter a discount value.");
+      return;
+    }
+    if (form.expiresAt && !/^\d{4}-\d{2}-\d{2}$/.test(form.expiresAt)) {
+      Alert.alert("Invalid date", "Use the format YYYY-MM-DD for the expiry date.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        discountType: form.discountType,
+        discountValue: Number(form.discountValue),
+        applicableTo: form.applicableTo,
+        active: form.active,
+        maxUses: form.maxUses ? Number(form.maxUses) : null,
+        expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+      };
+      if (!editing) payload.code = form.code.trim().toUpperCase() || undefined;
+      if (editing) {
+        await customFetch(`/api/partner/coupons/${editing.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await customFetch("/api/partner/coupons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["myPartnerCoupons"] });
+      setShowForm(false);
+      setEditing(null);
+      setForm({ ...BLANK_COUPON });
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "";
+      const msg = raw.replace(/^HTTP\s+\d+\s+[^:]+:\s*/i, "").trim() || "Failed to save coupon.";
+      Alert.alert("Couldn't save coupon", msg);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function deleteCoupon(id: number) {
+    Alert.alert("Delete coupon?", "This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          await customFetch(`/api/partner/coupons/${id}`, { method: "DELETE" });
+          qc.invalidateQueries({ queryKey: ["myPartnerCoupons"] });
+        } catch { Alert.alert("Delete failed"); }
+      }},
+    ]);
+  }
+
+  async function toggleActive(c: VendorCoupon) {
+    try {
+      await customFetch(`/api/partner/coupons/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !c.active }),
+      });
+      qc.invalidateQueries({ queryKey: ["myPartnerCoupons"] });
+    } catch { Alert.alert("Failed to update"); }
+  }
+
+  const APPLIES_LABEL: Record<string, string> = { both: "All bookings", ticket: "Tickets only", event: "Events/Tables only" };
+
+  if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 120 }}>
+      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginBottom: 2 }}>
+        Create discount codes customers can apply at booking.
+      </Text>
+      <TouchableOpacity
+        onPress={openCreate}
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, backgroundColor: colors.primary + "10" }}
+      >
+        <Ionicons name="add" size={18} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>New Coupon</Text>
+      </TouchableOpacity>
+
+      {(coupons ?? []).length === 0 && (
+        <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
+          <Ionicons name="pricetag-outline" size={40} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
+            No coupons yet. Create your first coupon above.
+          </Text>
+        </View>
+      )}
+
+      {(coupons ?? []).map((c) => (
+        <View key={c.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: 2, color: colors.primary }}>{c.code}</Text>
+            <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+              <TouchableOpacity onPress={() => openEdit(c)}><Ionicons name="pencil-outline" size={18} color={colors.primary} /></TouchableOpacity>
+              <TouchableOpacity onPress={() => deleteCoupon(c.id)}><Ionicons name="trash-outline" size={18} color="#ef4444" /></TouchableOpacity>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            <View style={{ backgroundColor: "#22c55e20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#22c55e" }}>
+                {c.discountType === "percent" ? `${Number(c.discountValue)}% off` : `₹${Number(c.discountValue)} off`}
+              </Text>
+            </View>
+            <View style={{ backgroundColor: colors.muted, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{APPLIES_LABEL[c.applicableTo]}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+              Used {c.usedCount}{c.maxUses != null ? `/${c.maxUses}` : ""}
+              {c.expiresAt ? `  ·  Expires ${new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}` : "  ·  No expiry"}
+            </Text>
+            <TouchableOpacity
+              onPress={() => toggleActive(c)}
+              style={{ borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: c.active ? "#22c55e20" : colors.muted }}
+            >
+              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: c.active ? "#22c55e" : colors.mutedForeground }}>{c.active ? "Active" : "Inactive"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+
+      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card }}>
+            <TouchableOpacity onPress={() => { setShowForm(false); setEditing(null); }}>
+              <Ionicons name="close" size={22} color={colors.foreground} />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground }}>{editing ? "Edit Coupon" : "New Coupon"}</Text>
+            <TouchableOpacity onPress={save} disabled={saving}>
+              {saving ? <ActivityIndicator color={colors.primary} size="small" /> : <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 80 }}>
+              {!editing && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>CODE (LEAVE BLANK TO AUTO-GENERATE)</Text>
+                  <TextInput
+                    value={form.code}
+                    onChangeText={(v) => setForm((p) => ({ ...p, code: v.toUpperCase().slice(0, 10) }))}
+                    placeholder="e.g. SAVE5"
+                    placeholderTextColor={colors.mutedForeground}
+                    autoCapitalize="characters"
+                    maxLength={10}
+                    style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15, letterSpacing: 2 }}
+                  />
+                </View>
+              )}
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DISCOUNT TYPE</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {([["percent", "Percentage (%)"], ["fixed", "Fixed (₹)"]] as const).map(([val, label]) => (
+                    <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, discountType: val }))}
+                      style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.discountType === val ? colors.primary : colors.muted, borderColor: form.discountType === val ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.discountType === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{form.discountType === "percent" ? "DISCOUNT %" : "DISCOUNT ₹"}</Text>
+                <TextInput
+                  value={form.discountValue}
+                  onChangeText={(v) => setForm((p) => ({ ...p, discountValue: v.replace(/[^0-9]/g, "") }))}
+                  keyboardType="number-pad"
+                  placeholder="10"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                />
+              </View>
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>APPLICABLE TO</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {([["both", "All bookings"], ["ticket", "Tickets only"], ["event", "Events/Tables"]] as const).map(([val, label]) => (
+                    <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, applicableTo: val }))}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.applicableTo === val ? colors.primary : colors.muted, borderColor: form.applicableTo === val ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.applicableTo === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>MAX USES (BLANK = UNLIMITED)</Text>
+                <TextInput
+                  value={form.maxUses}
+                  onChangeText={(v) => setForm((p) => ({ ...p, maxUses: v.replace(/[^0-9]/g, "") }))}
+                  keyboardType="number-pad"
+                  placeholder="Unlimited"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                />
+              </View>
+
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>EXPIRES ON — YYYY-MM-DD (BLANK = NEVER)</Text>
+                <TextInput
+                  value={form.expiresAt}
+                  onChangeText={(v) => setForm((p) => ({ ...p, expiresAt: v.replace(/[^0-9-]/g, "").slice(0, 10) }))}
+                  keyboardType="numbers-and-punctuation"
+                  placeholder="2026-12-31"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}
+                />
+              </View>
+
+              <TouchableOpacity onPress={() => setForm((p) => ({ ...p, active: !p.active }))} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: form.active ? colors.primary : colors.border, backgroundColor: form.active ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>
+                  {form.active && <Ionicons name="checkmark" size={14} color={colors.primaryForeground} />}
+                </View>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: colors.foreground }}>Active (customers can use this code)</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+// ─── Food & Drink Offers Tab (mirrors web FoodDrinkOffersPanel + analytics) ──
+type OfferCategory = "food" | "drink";
+type OfferDiscountType = "percent" | "fixed" | "bogo" | "free_item";
+type OfferDay = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+interface VendorOffer {
+  id: number;
+  category: OfferCategory;
+  title: string;
+  description: string;
+  discountType: OfferDiscountType;
+  discountValue: string;
+  freeItemName: string;
+  days: OfferDay[];
+  timeFrom: string;
+  timeTo: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  active: boolean;
+}
+interface OfferFormState {
+  category: OfferCategory;
+  title: string;
+  description: string;
+  discountType: OfferDiscountType;
+  discountValue: string;
+  freeItemName: string;
+  days: OfferDay[];
+  timeFrom: string;
+  timeTo: string;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+}
+const BLANK_OFFER: OfferFormState = { category: "food", title: "", description: "", discountType: "percent", discountValue: "20", freeItemName: "", days: [], timeFrom: "", timeTo: "", startsAt: "", endsAt: "", active: true };
+const OFFER_DAY_ORDER: { key: OfferDay; label: string }[] = [
+  { key: "mon", label: "Mon" }, { key: "tue", label: "Tue" }, { key: "wed", label: "Wed" },
+  { key: "thu", label: "Thu" }, { key: "fri", label: "Fri" }, { key: "sat", label: "Sat" }, { key: "sun", label: "Sun" },
+];
+interface OfferAnalytics {
+  windowDays: number;
+  activeCount: number;
+  bookingsDuringOffers: number;
+  totalRevenue: number;
+  top: { id: number; title: string } | null;
+}
+function offerBadgeText(o: Pick<VendorOffer, "discountType" | "discountValue" | "freeItemName">): string {
+  const v = Number(o.discountValue) || 0;
+  if (o.discountType === "percent") return `${v}% OFF`;
+  if (o.discountType === "fixed") return `₹${v} OFF`;
+  if (o.discountType === "bogo") return "BUY 1 GET 1";
+  if (o.discountType === "free_item") return o.freeItemName ? `FREE: ${o.freeItemName}` : "FREE ITEM";
+  return "OFFER";
+}
+
+function OffersTab({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<OfferCategory>("food");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<VendorOffer | null>(null);
+  const [form, setForm] = useState<OfferFormState>({ ...BLANK_OFFER });
+  const [saving, setSaving] = useState(false);
+
+  const { data: offers, isLoading } = useQuery<VendorOffer[]>({
+    queryKey: ["myPartnerOffers"],
+    queryFn: () => customFetch<VendorOffer[]>("/api/partner/offers"),
+    refetchInterval: 30000,
+  });
+  const { data: analytics } = useQuery<OfferAnalytics>({
+    queryKey: ["myPartnerOffersAnalytics"],
+    queryFn: () => customFetch<OfferAnalytics>("/api/partner/offers/analytics?window=30"),
+    refetchInterval: 30000,
+  });
+
+  const openCreate = () => { setForm({ ...BLANK_OFFER, category: tab }); setEditing(null); setShowForm(true); };
+  const openEdit = (o: VendorOffer) => {
+    setForm({
+      category: o.category, title: o.title, description: o.description,
+      discountType: o.discountType, discountValue: String(Number(o.discountValue)), freeItemName: o.freeItemName,
+      days: o.days, timeFrom: o.timeFrom, timeTo: o.timeTo,
+      startsAt: o.startsAt ? o.startsAt.slice(0, 10) : "", endsAt: o.endsAt ? o.endsAt.slice(0, 10) : "", active: o.active,
+    });
+    setEditing(o);
+    setShowForm(true);
+  };
+  const toggleDay = (d: OfferDay) => setForm((f) => ({ ...f, days: f.days.includes(d) ? f.days.filter((x) => x !== d) : [...f.days, d] }));
+
+  async function save() {
+    if (!form.title.trim()) { Alert.alert("Title is required"); return; }
+    if (form.discountType === "free_item" && !form.freeItemName.trim()) { Alert.alert("Free-item offers need a free item name"); return; }
+    if (form.timeFrom && !form.timeTo) { Alert.alert("Set both start and end time, or leave both blank"); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        category: form.category,
+        title: form.title.trim(),
+        description: form.description,
+        discountType: form.discountType,
+        discountValue: ["bogo", "free_item"].includes(form.discountType) ? 0 : Number(form.discountValue) || 0,
+        freeItemName: form.freeItemName,
+        days: form.days,
+        timeFrom: form.timeFrom,
+        timeTo: form.timeTo,
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+        endsAt: form.endsAt ? new Date(`${form.endsAt}T23:59:59`).toISOString() : null,
+        active: form.active,
+      };
+      if (editing) {
+        await customFetch(`/api/partner/offers/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      } else {
+        await customFetch("/api/partner/offers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      }
+      qc.invalidateQueries({ queryKey: ["myPartnerOffers"] });
+      qc.invalidateQueries({ queryKey: ["myPartnerOffersAnalytics"] });
+      setShowForm(false);
+      setEditing(null);
+      setForm({ ...BLANK_OFFER });
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "";
+      Alert.alert("Couldn't save offer", raw.replace(/^HTTP\s+\d+\s+[^:]+:\s*/i, "").trim() || "Failed to save offer.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  function remove(id: number) {
+    Alert.alert("Delete offer?", "This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try { await customFetch(`/api/partner/offers/${id}`, { method: "DELETE" }); qc.invalidateQueries({ queryKey: ["myPartnerOffers"] }); }
+        catch { Alert.alert("Delete failed"); }
+      }},
+    ]);
+  }
+  async function toggleActive(o: VendorOffer) {
+    try {
+      await customFetch(`/api/partner/offers/${o.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: !o.active }) });
+      qc.invalidateQueries({ queryKey: ["myPartnerOffers"] });
+    } catch { Alert.alert("Failed to update"); }
+  }
+
+  const filtered = (offers ?? []).filter((o) => o.category === tab);
+  const foodCount = (offers ?? []).filter((o) => o.category === "food").length;
+  const drinkCount = (offers ?? []).filter((o) => o.category === "drink").length;
+  const AMBER = "#f59e0b";
+
+  if (isLoading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 120 }}>
+      {/* Analytics summary */}
+      {analytics && (
+        <View style={{ borderRadius: 14, borderWidth: 1, borderColor: AMBER + "33", backgroundColor: colors.card, padding: 14, gap: 10 }}>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>🎁 Offer performance · last {analytics.windowDays} days</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {[
+              { label: "Active offers", value: String(analytics.activeCount) },
+              { label: "Bookings during offers", value: String(analytics.bookingsDuringOffers) },
+              { label: "Est. offer revenue", value: `₹${(analytics.totalRevenue || 0).toLocaleString("en-IN")}` },
+              { label: "Top offer", value: analytics.top?.title ?? "—" },
+            ].map((s) => (
+              <View key={s.label} style={{ flexGrow: 1, minWidth: "45%", borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.muted, padding: 10 }}>
+                <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.5 }}>{s.label}</Text>
+                <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground }} numberOfLines={1}>{s.value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+        Live menu discounts shown to customers on the booking page during the days &amp; times you set.
+      </Text>
+
+      {/* Food / Drink switch */}
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {([["food", `Food (${foodCount})`], ["drink", `Drinks (${drinkCount})`]] as const).map(([val, label]) => (
+          <TouchableOpacity key={val} onPress={() => setTab(val)}
+            style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: tab === val ? AMBER + "22" : colors.muted, borderColor: tab === val ? AMBER : colors.border }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: tab === val ? AMBER : colors.mutedForeground }}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity onPress={openCreate}
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, backgroundColor: colors.primary + "10" }}>
+        <Ionicons name="add" size={18} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>New {tab === "food" ? "Food" : "Drink"} Offer</Text>
+      </TouchableOpacity>
+
+      {filtered.length === 0 && (
+        <View style={{ alignItems: "center", padding: 32, gap: 10 }}>
+          <Ionicons name={tab === "food" ? "restaurant-outline" : "wine-outline"} size={40} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>No {tab} offers yet.</Text>
+        </View>
+      )}
+
+      {filtered.map((o) => {
+        const expired = !!o.endsAt && new Date(o.endsAt) < new Date();
+        return (
+          <View key={o.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 8, opacity: o.active && !expired ? 1 : 0.6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ backgroundColor: AMBER + "22", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: AMBER }}>{offerBadgeText(o)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+                <TouchableOpacity onPress={() => openEdit(o)}><Ionicons name="pencil-outline" size={18} color={colors.primary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => remove(o.id)}><Ionicons name="trash-outline" size={18} color="#ef4444" /></TouchableOpacity>
+              </View>
+            </View>
+            <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{o.title}</Text>
+            {o.description ? <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 18 }}>{o.description}</Text> : null}
+            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+              {o.days.length > 0 ? OFFER_DAY_ORDER.filter((d) => o.days.includes(d.key)).map((d) => d.label).join(", ") : "Every day"}
+              {o.timeFrom && o.timeTo ? `  ·  ${o.timeFrom}–${o.timeTo}` : "  ·  All day"}
+            </Text>
+            <TouchableOpacity onPress={() => toggleActive(o)} style={{ alignSelf: "flex-start", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: o.active ? "#22c55e20" : colors.muted }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: o.active ? "#22c55e" : colors.mutedForeground }}>{expired ? "Expired" : o.active ? "Active" : "Inactive"}</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+
+      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card }}>
+            <TouchableOpacity onPress={() => { setShowForm(false); setEditing(null); }}><Ionicons name="close" size={22} color={colors.foreground} /></TouchableOpacity>
+            <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground }}>{editing ? "Edit Offer" : "New Offer"}</Text>
+            <TouchableOpacity onPress={save} disabled={saving}>{saving ? <ActivityIndicator color={colors.primary} size="small" /> : <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Save</Text>}</TouchableOpacity>
+          </View>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 80 }}>
+              {/* Category */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>CATEGORY</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {([["food", "Food"], ["drink", "Drink"]] as const).map(([val, label]) => (
+                    <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, category: val }))}
+                      style={{ flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: "center", backgroundColor: form.category === val ? colors.primary : colors.muted, borderColor: form.category === val ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.category === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {/* Title */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>TITLE</Text>
+                <TextInput value={form.title} onChangeText={(v) => setForm((p) => ({ ...p, title: v }))} placeholder="e.g. 20% off all starters" placeholderTextColor={colors.mutedForeground} style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }} />
+              </View>
+              {/* Description */}
+              <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DESCRIPTION (OPTIONAL)</Text>
+                <TextInput value={form.description} onChangeText={(v) => setForm((p) => ({ ...p, description: v }))} placeholder="Details shown to customers" placeholderTextColor={colors.mutedForeground} multiline style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15, minHeight: 44 }} />
+              </View>
+              {/* Discount type */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DISCOUNT TYPE</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {([["percent", "Percentage"], ["fixed", "Fixed ₹"], ["bogo", "Buy 1 Get 1"], ["free_item", "Free Item"]] as const).map(([val, label]) => (
+                    <TouchableOpacity key={val} onPress={() => setForm((p) => ({ ...p, discountType: val }))}
+                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, backgroundColor: form.discountType === val ? colors.primary : colors.muted, borderColor: form.discountType === val ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: form.discountType === val ? colors.primaryForeground : colors.mutedForeground }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {(form.discountType === "percent" || form.discountType === "fixed") && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{form.discountType === "percent" ? "DISCOUNT %" : "DISCOUNT ₹"}</Text>
+                  <TextInput value={form.discountValue} onChangeText={(v) => setForm((p) => ({ ...p, discountValue: v.replace(/[^0-9]/g, "") }))} keyboardType="number-pad" placeholder="20" placeholderTextColor={colors.mutedForeground} style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }} />
+                </View>
+              )}
+              {form.discountType === "free_item" && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>FREE ITEM NAME</Text>
+                  <TextInput value={form.freeItemName} onChangeText={(v) => setForm((p) => ({ ...p, freeItemName: v }))} placeholder="e.g. Welcome shot" placeholderTextColor={colors.mutedForeground} style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }} />
+                </View>
+              )}
+              {/* Days */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>DAYS (BLANK = EVERY DAY)</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {OFFER_DAY_ORDER.map((d) => (
+                    <TouchableOpacity key={d.key} onPress={() => toggleDay(d.key)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 18, borderWidth: 1, backgroundColor: form.days.includes(d.key) ? colors.primary : colors.muted, borderColor: form.days.includes(d.key) ? colors.primary : colors.border }}>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: form.days.includes(d.key) ? colors.primaryForeground : colors.mutedForeground }}>{d.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              {/* Time window */}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {([["timeFrom", "FROM (HH:MM)"], ["timeTo", "TO (HH:MM)"]] as const).map(([key, label]) => (
+                  <View key={key} style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{label}</Text>
+                    <TextInput value={form[key]} onChangeText={(v) => setForm((p) => ({ ...p, [key]: v.replace(/[^0-9:]/g, "").slice(0, 5) }))} keyboardType="numbers-and-punctuation" placeholder="20:00" placeholderTextColor={colors.mutedForeground} style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }} />
+                  </View>
+                ))}
+              </View>
+              {/* Date range */}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {([["startsAt", "STARTS (YYYY-MM-DD)"], ["endsAt", "ENDS (YYYY-MM-DD)"]] as const).map(([key, label]) => (
+                  <View key={key} style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 12, gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{label}</Text>
+                    <TextInput value={form[key]} onChangeText={(v) => setForm((p) => ({ ...p, [key]: v.replace(/[^0-9-]/g, "").slice(0, 10) }))} keyboardType="numbers-and-punctuation" placeholder="2026-12-31" placeholderTextColor={colors.mutedForeground} style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }} />
+                  </View>
+                ))}
+              </View>
+              {/* Active */}
+              <TouchableOpacity onPress={() => setForm((p) => ({ ...p, active: !p.active }))} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: form.active ? colors.primary : colors.border, backgroundColor: form.active ? colors.primary : "transparent", alignItems: "center", justifyContent: "center" }}>
+                  {form.active && <Ionicons name="checkmark" size={14} color={colors.primaryForeground} />}
+                </View>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: colors.foreground }}>Active (visible to customers)</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
+
 // ─── Partner Reviews Tab ──────────────────────────────────────────────────────
 function PartnerReviewsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
   const [page, setPage] = useState(1);
@@ -1452,8 +2059,6 @@ export default function VendorDashboardScreen() {
   const [profSaving, setProfSaving] = useState(false);
   const [listingSaving, setListingSaving] = useState(false);
   const [showVenueDetailsModal, setShowVenueDetailsModal] = useState(false);
-  const [profCrowdLevel, setProfCrowdLevel] = useState<string | null>(null);
-  const [savingCrowdLevel, setSavingCrowdLevel] = useState(false);
 
   const updateVendorMut = useUpdateMyVendor({
     mutation: { onSuccess: () => vendorQuery.refetch() },
@@ -1495,7 +2100,6 @@ export default function VendorDashboardScreen() {
       setProfAddress(vendor.address ?? "");
       setProfAddressQuery(vendor.address ?? "");
       setProfDanceFloor(vendor.danceFloor ?? "");
-      setProfCrowdLevel((vendor as unknown as { crowdLevel?: string | null }).crowdLevel ?? null);
       setProfDanceFloorPhotos(Array.isArray(vendor.danceFloorPhotos) ? vendor.danceFloorPhotos : []);
       const raw = (vendor as unknown as Record<string, unknown>)["menuUrls"];
       const existingUrls: string[] = Array.isArray(raw) ? (raw as string[]) : [];
@@ -1556,23 +2160,6 @@ export default function VendorDashboardScreen() {
       handleMutationError(err, "Failed to save profile. Please try again.");
     } finally {
       setProfSaving(false);
-    }
-  }
-
-  async function saveCrowdLevel(level: string | null) {
-    setSavingCrowdLevel(true);
-    try {
-      await customFetch("/api/partner/crowd-level", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ crowdLevel: level }),
-      });
-      setProfCrowdLevel(level);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert("Error", "Failed to update crowd level.");
-    } finally {
-      setSavingCrowdLevel(false);
     }
   }
 
@@ -2612,45 +3199,6 @@ export default function VendorDashboardScreen() {
               {profSaving ? "Saving…" : "Save Profile"}
             </Text>
           </TouchableOpacity>
-
-          {/* Live Crowd Level */}
-          <Text style={[styles.sectionHeader, { color: colors.mutedForeground, marginTop: 20 }]}>LIVE CROWD LEVEL</Text>
-          <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.mutedForeground, marginBottom: 10 }}>
-            Let guests know how busy your venue is right now.
-          </Text>
-          {[
-            { value: "low", label: "Low Crowd", desc: "Quiet, easy to get in", color: "#22c55e" },
-            { value: "moderate", label: "Moderate Crowd", desc: "Getting busy, some wait", color: "#f59e0b" },
-            { value: "party", label: "🔥 High Crowd", desc: "Packed, full energy", color: "#ef4444" },
-          ].map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              onPress={() => saveCrowdLevel(profCrowdLevel === opt.value ? null : opt.value)}
-              disabled={savingCrowdLevel}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                backgroundColor: profCrowdLevel === opt.value ? opt.color + "22" : colors.card,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: profCrowdLevel === opt.value ? opt.color : colors.border,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                marginBottom: 8,
-                opacity: savingCrowdLevel ? 0.6 : 1,
-              }}
-            >
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: opt.color }} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: profCrowdLevel === opt.value ? opt.color : colors.foreground }}>{opt.label}</Text>
-                <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: colors.mutedForeground }}>{opt.desc}</Text>
-              </View>
-              {profCrowdLevel === opt.value && (
-                <Ionicons name="checkmark-circle" size={18} color={opt.color} />
-              )}
-            </TouchableOpacity>
-          ))}
 
           {hasPubListing && (
             <>
@@ -3707,6 +4255,8 @@ export default function VendorDashboardScreen() {
             { key: "events",        icon: "calendar-outline",         label: "My Listings" },
             { key: "bookings",      icon: "ticket-outline",          label: `Bookings${pending.length > 0 ? ` (${pending.length})` : ""}` },
             { key: "drinkplans",    icon: "wine-outline",             label: "Drink Plans" },
+            { key: "coupons",       icon: "pricetag-outline",         label: "Coupons" },
+            { key: "offers",        icon: "fast-food-outline",        label: "Food & Drink" },
             { key: "ads",           icon: "megaphone-outline",        label: "Ads" },
             { key: "analytics",     icon: "bar-chart-outline",        label: "Analytics" },
             { key: "attendance",    icon: "checkmark-circle-outline", label: "Attendance" },
@@ -3735,6 +4285,8 @@ export default function VendorDashboardScreen() {
       {activeTab === "bookings"       && renderBookings()}
       {activeTab === "events"         && renderEvents()}
       {activeTab === "drinkplans"     && renderDrinkPlans()}
+      {activeTab === "coupons"        && <CouponsTab colors={colors} />}
+      {activeTab === "offers"         && <OffersTab colors={colors} />}
       {activeTab === "ads"            && renderAds()}
       {activeTab === "analytics"      && renderAnalytics()}
       {activeTab === "attendance"     && renderAttendance()}
