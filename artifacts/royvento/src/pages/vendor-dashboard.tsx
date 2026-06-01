@@ -4522,14 +4522,14 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
           <CalendarCheck className="h-5 w-5 text-primary" />
           Booking Report
         </p>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search by name, event or ticket code…"
-            className="pl-8 pr-3 py-1.5 text-sm rounded-lg bg-black/40 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 w-64"
+            className="pl-8 pr-3 py-1.5 text-sm rounded-lg bg-black/40 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/40 w-full sm:w-64"
           />
         </div>
       </div>

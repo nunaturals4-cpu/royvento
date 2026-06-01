@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDayRanges } from "@/lib/days";
@@ -144,8 +144,11 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     setArrivalTime("");
     setSelectedAnnouncementId("");
     setFieldErrors({});
+    setBookStep(1);
   };
   const [confirmedAge, setConfirmedAge] = useState(false);
+  // Multi-step "Book a Table" wizard (1: Booking · 2: Guests · 3: Payment · 4: Review)
+  const [bookStep, setBookStep] = useState(1);
 
   const createReview = useCreateReview();
   const updateReview = useUpdateReview();
@@ -599,6 +602,63 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       setBooking(false);
     }
   };
+
+  // ── Book-a-Table wizard navigation ──────────────────────────────────────
+  const bookSteps = [
+    { label: "Booking Details", caption: "Type, date & time", icon: Ticket },
+    { label: "Guests Details", caption: "Who's coming", icon: Users },
+    { label: "Payment & Offers", caption: "Pay & save", icon: CreditCard },
+    { label: "Review & Confirm", caption: "Final check", icon: BadgeCheck },
+  ];
+
+  // Validate the fields that belong to a given step before allowing advance.
+  const validateBookStep = (step: number): boolean => {
+    if (step === 1) {
+      if (!date) { toast({ title: t("events.select_date"), variant: "destructive" }); return false; }
+      const errs: Record<string, string> = {};
+      if (isPub && pubMode === "ticket" && ticketWomen + ticketMen + ticketCouple === 0) errs.ticketWomen = t("events.add_tickets");
+      if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) errs.selectedPubEvent = "Please select an event to book";
+      if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime) errs.arrivalTime = t("events.required_field");
+      else if (isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && date) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (date === todayStr) {
+          const now = new Date();
+          const [h, m] = arrivalTime.split(":").map(Number);
+          if ((h ?? 0) * 60 + (m ?? 0) <= now.getHours() * 60 + now.getMinutes()) errs.arrivalTime = "Please select a future arrival time for today's booking";
+        }
+      }
+      setFieldErrors(errs);
+      if (Object.keys(errs).length > 0) { toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" }); return false; }
+      if (eventDateMismatch) { toast({ title: "Date mismatch", description: "Selected booking date does not match the chosen event date. Please select the event date to continue.", variant: "destructive" }); return false; }
+      if (isClosedDay) { toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" }); return false; }
+      return true;
+    }
+    if (step === 2) {
+      const errs: Record<string, string> = {};
+      if (isPub && !personName.trim()) errs.personName = t("events.required_field");
+      if (isPub && !phone.trim()) errs.phone = t("events.required_field");
+      else if (isPub && !/^\d{10}$/.test(phone.replace(/\D/g, ""))) errs.phone = t("events.phone_validation");
+      if (isPub && pubMode === "event") {
+        if (!eventType) errs.eventType = t("events.required_field");
+        if (!budget) errs.budget = t("events.required_field");
+      }
+      setFieldErrors(errs);
+      if (Object.keys(errs).length > 0) { toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" }); return false; }
+      return true;
+    }
+    return true;
+  };
+
+  const goToBookStep = (target: number) => {
+    const scroll = () => requestAnimationFrame(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    if (target <= bookStep) { setBookStep(target); scroll(); return; }
+    // Moving forward — validate every step between current and target.
+    for (let s = bookStep; s < target; s++) { if (!validateBookStep(s)) return; }
+    setBookStep(target);
+    scroll();
+  };
+
+  const handleStepCta = () => { if (bookStep < 4) goToBookStep(bookStep + 1); else handleBook(); };
 
   const handleReview = () => {
     if (!me?.user) { setLocation("/login"); return; }
@@ -1514,19 +1574,24 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         {pubTab === "book" && (
           <div id="book" className="max-w-5xl mx-auto scroll-mt-20">
             {/* ── Header ── */}
-            <div className="text-center mb-10">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-primary text-xs font-semibold uppercase tracking-widest mb-4">
+            <div className="text-center mb-8 md:mb-10">
+              <div className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-primary text-[10px] sm:text-xs font-semibold uppercase tracking-widest mb-4">
                 <CalIcon className="h-3.5 w-3.5" /> Reserve Your Spot
               </div>
-              <h2 className="font-serif text-4xl md:text-5xl tracking-tight mb-2">Book a Table</h2>
-              <p className="text-muted-foreground">at <span className="text-foreground font-medium">{venueName}</span></p>
+              <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl tracking-tight mb-2">Book a Table</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">at <span className="text-foreground font-medium">{venueName}</span></p>
             </div>
+
+            {/* ── Multi-step progress indicator ── */}
+            <StepProgress current={bookStep} steps={bookSteps} onStepClick={goToBookStep} />
 
             <div className="grid lg:grid-cols-3 gap-6 items-start">
 
               {/* ── Left: Form ── */}
               <div className="lg:col-span-2 space-y-4">
 
+                {/* ═══ STEP 1 · Booking Details ═══ */}
+                {bookStep === 1 && (<>
                 {/* Price / free-entry banner */}
                 <div className="rounded-2xl glass-card-strong red-ring px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
                   {ferDayActive ? (
@@ -1547,54 +1612,42 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   )}
                 </div>
 
-                {/* ── Section: Date ── */}
-                <div className="rounded-2xl glass-card p-5 space-y-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
-                      <CalIcon className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <p className="text-sm font-semibold text-foreground uppercase tracking-wider">Select Date</p>
-                  </div>
-                  <Input id="bdate" type="date" value={date}
-                    min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="bg-black/40 border-white/10 h-11 rounded-xl [color-scheme:dark]" />
-                  {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
-                    <p className="text-xs text-muted-foreground">Open: {vendorOpenDays.join(", ")}</p>
-                  )}
-                  {eventDateMismatch && (
-                    <p className="text-xs text-amber-400">Selected date doesn't match the event date. Please select the event date.</p>
-                  )}
-                  {bookingIsFullyFree && (
-                    <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3">
-                      <span className="text-emerald-400">✓</span>
-                      <p className="text-sm font-medium text-emerald-300">{t("events.free_entry_form_notice")}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Section: Booking Type + Tickets ── */}
+                {/* ── Section 1: Booking Type (premium cards) ── */}
                 {isPub ? (
-                  <div className="rounded-2xl glass-card p-5 space-y-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
-                        <Ticket className="h-3.5 w-3.5 text-primary" />
+                  <div className="rounded-2xl glass-card p-5 sm:p-6 space-y-4">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <span className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                        <Ticket className="h-4 w-4 text-primary" />
+                      </span>
+                      <div>
+                        <p className="text-sm sm:text-base font-bold text-foreground leading-tight">Select Booking Type</p>
+                        <p className="text-xs text-muted-foreground leading-tight mt-0.5">Choose what you'd like to book</p>
                       </div>
-                      <p className="text-sm font-semibold text-foreground uppercase tracking-wider">{t("events.booking_type")}</p>
                     </div>
-                    <RadioGroup value={pubMode} onValueChange={(v) => changePubMode(v as "ticket" | "event" | "event_booking")} className="grid gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {[
-                        { value: "ticket", label: t("events.buy_tickets") },
-                        { value: "event", label: (event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking"), badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
-                        ...(sortedAnnouncements.length > 0 ? [{ value: "event_booking", label: "Events Booking" }] : []),
-                      ].map((opt: any) => (
-                        <label key={opt.value} className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 cursor-pointer transition-all ${pubMode === opt.value ? "border-primary bg-primary/10 text-primary" : "border-white/8 bg-black/20 text-muted-foreground hover:border-white/15 hover:text-foreground"}`}>
-                          <RadioGroupItem value={opt.value} />
-                          <span className="text-sm font-medium flex-1">{opt.label}</span>
-                          {opt.badge && <span className="text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">{opt.badge}</span>}
-                        </label>
-                      ))}
-                    </RadioGroup>
+                        { value: "ticket", label: "Ticket Booking", desc: "Book your entry tickets for the night", icon: Ticket, badge: null },
+                        { value: "event", label: (event as any)?.vendorCategory === "Club" ? "VIP Table Booking" : "Table Booking", desc: (event as any)?.vendorCategory === "Club" ? "Premium tables & bottle service" : "Reserve a table for your group", icon: Crown, badge: (event as any)?.freeEntryForTable ? "Free Entry" : null },
+                        ...(sortedAnnouncements.length > 0 ? [{ value: "event_booking", label: "Event Ticket", desc: "Special events & party tickets", icon: CalIcon, badge: null }] : []),
+                      ].map((opt: any) => {
+                        const active = pubMode === opt.value;
+                        const Icon = opt.icon;
+                        return (
+                          <button key={opt.value} type="button" onClick={() => changePubMode(opt.value)}
+                            className={`group relative text-left rounded-2xl border p-4 transition-all duration-300 ${active ? "border-primary bg-primary/10 shadow-[0_0_28px_-10px_hsl(var(--primary))]" : "border-white/10 bg-black/20 hover:border-white/25 hover:bg-black/30"}`}>
+                            <span className={`absolute top-3.5 right-3.5 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${active ? "border-primary" : "border-muted-foreground/40"}`}>
+                              {active && <span className="h-2 w-2 rounded-full bg-primary" />}
+                            </span>
+                            <span className={`h-9 w-9 rounded-lg flex items-center justify-center mb-2.5 transition-all ${active ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-[0_0_16px_-4px_hsl(var(--primary))]" : "bg-white/[0.04] border border-white/10 text-muted-foreground group-hover:text-foreground"}`}>
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            <p className={`font-semibold text-sm leading-tight ${active ? "text-foreground" : "text-foreground/90"}`}>{opt.label}</p>
+                            <p className="text-xs text-muted-foreground mt-1 leading-snug">{opt.desc}</p>
+                            {opt.badge && <span className="mt-2 inline-block text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">{opt.badge}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
 
                     {pubMode === "ticket" && (
                       <div className="rounded-xl border border-white/8 bg-black/20 p-4 space-y-2 mt-2">
@@ -1658,7 +1711,66 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                   </div>
                 )}
 
-                {/* ── Section: Contact ── */}
+                {/* ── Section 2: Select Date (date-picker widget) ── */}
+                <div className="rounded-2xl glass-card p-5 sm:p-6 space-y-3">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <span className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                      <CalIcon className="h-3.5 w-3.5 text-primary" />
+                    </span>
+                    <div>
+                      <p className="text-sm sm:text-base font-bold text-foreground leading-tight">Select Date</p>
+                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">Pick a date for your booking</p>
+                    </div>
+                  </div>
+                  <Input id="bdate" type="date" value={date}
+                    min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })()}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="bg-black/40 border-white/10 h-11 rounded-xl [color-scheme:dark]" />
+                  {date && (
+                    <p className="text-xs text-muted-foreground">{new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+                  )}
+                  {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
+                    <p className="text-xs text-muted-foreground">Open: {vendorOpenDays.join(", ")}</p>
+                  )}
+                  {isClosedDay && (
+                    <p className="text-xs text-destructive">{venueName} is closed on {selectedDayName}. Please pick an open day.</p>
+                  )}
+                  {eventDateMismatch && (
+                    <p className="text-xs text-amber-400">Selected date doesn't match the event date. Please select the event date.</p>
+                  )}
+                  {bookingIsFullyFree && (
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3">
+                      <span className="text-emerald-400">✓</span>
+                      <p className="text-sm font-medium text-emerald-300">{t("events.free_entry_form_notice")}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Section 3: Arrival Time (time-picker widget) ── */}
+                {isPub && (pubMode === "ticket" || pubMode === "event") && (
+                  <div className="rounded-2xl glass-card p-5 sm:p-6 space-y-3">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <span className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                        <Clock className="h-3.5 w-3.5 text-primary" />
+                      </span>
+                      <div>
+                        <p className="text-sm sm:text-base font-bold text-foreground leading-tight">Arrival Time <span className="text-primary">*</span></p>
+                        <p className="text-xs text-muted-foreground leading-tight mt-0.5">When will you arrive?</p>
+                      </div>
+                    </div>
+                    <input id="arrival-time2" type="time" value={arrivalTime}
+                      min={(() => { const todayStr = new Date().toISOString().slice(0, 10); if (date !== todayStr) return undefined; const now = new Date(); return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`; })()}
+                      onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
+                      required aria-invalid={!!fieldErrors.arrivalTime}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-sm text-foreground bg-black/40 h-11 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
+                    />
+                    {fieldErrors.arrivalTime && <p className="text-xs text-destructive">{fieldErrors.arrivalTime}</p>}
+                  </div>
+                )}
+                </>)}
+
+                {/* ═══ STEP 2 · Guests Details ═══ */}
+                {bookStep === 2 && (
                 <div className="rounded-2xl glass-card p-5 space-y-4">
                   <div className="flex items-center gap-2 mb-1">
                     <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
@@ -1666,18 +1778,6 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </div>
                     <p className="text-sm font-semibold text-foreground uppercase tracking-wider">Contact Details</p>
                   </div>
-                  {isPub && (pubMode === "ticket" || pubMode === "event") && (
-                    <div>
-                      <Label htmlFor="arrival-time2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.arrival_time")} <span className="text-primary text-xs">*</span></Label>
-                      <input id="arrival-time2" type="time" value={arrivalTime}
-                        min={(() => { const todayStr = new Date().toISOString().slice(0, 10); if (date !== todayStr) return undefined; const now = new Date(); return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`; })()}
-                        onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
-                        required aria-invalid={!!fieldErrors.arrivalTime}
-                        className={`w-full rounded-xl border px-3 py-2.5 text-sm text-foreground bg-black/40 h-11 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
-                      />
-                      {fieldErrors.arrivalTime && <p className="text-xs text-destructive mt-1">{fieldErrors.arrivalTime}</p>}
-                    </div>
-                  )}
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="pname2" className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">{t("events.booking_name")} <span className="text-primary text-xs">*</span></Label>
@@ -1691,6 +1791,21 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </div>
                   </div>
                 </div>
+                )}
+
+                {/* ═══ STEP 3 · Payment & Offers ═══ */}
+                {bookStep === 3 && (<>
+                {bookingIsFullyFree && (
+                  <div className="rounded-2xl glass-card p-6 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                      <span className="text-emerald-400 text-lg">✓</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-300">No payment required</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t("events.free_entry_form_notice")}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Section: Offers & Notes ── */}
                 {!bookingIsFullyFree && (
@@ -1762,6 +1877,59 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     {paymentMethod === "online" && <p className="text-xs text-muted-foreground px-1">{t("events.online_hint")}</p>}
                   </div>
                 )}
+                </>)}
+
+                {/* ═══ STEP 4 · Review & Confirm ═══ */}
+                {bookStep === 4 && (<>
+                <div className="rounded-2xl glass-card p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                        <BadgeCheck className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground uppercase tracking-wider">Review Your Booking</p>
+                    </div>
+                    <button type="button" onClick={() => goToBookStep(1)} className="text-xs text-primary hover:underline underline-offset-2">Edit</button>
+                  </div>
+                  <dl className="text-sm divide-y divide-white/8">
+                    <div className="flex items-center justify-between gap-4 py-2.5">
+                      <dt className="text-muted-foreground">Booking Type</dt>
+                      <dd className="font-medium text-right">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : "Events Booking"}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 py-2.5">
+                      <dt className="text-muted-foreground">Date</dt>
+                      <dd className="font-medium text-right">{date ? new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}</dd>
+                    </div>
+                    {isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && (
+                      <div className="flex items-center justify-between gap-4 py-2.5">
+                        <dt className="text-muted-foreground">{t("events.arrival_time")}</dt>
+                        <dd className="font-medium text-right">{arrivalTime}</dd>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-4 py-2.5">
+                      <dt className="text-muted-foreground">{t("events.guests_field")}</dt>
+                      <dd className="font-medium text-right">{isPub && pubMode === "ticket" ? `${ticketWomen + ticketMen + ticketCouple} ticket${ticketWomen + ticketMen + ticketCouple === 1 ? "" : "s"}` : `${guests} guest${guests === 1 ? "" : "s"}`}</dd>
+                    </div>
+                    {isPub && (
+                      <>
+                        <div className="flex items-center justify-between gap-4 py-2.5">
+                          <dt className="text-muted-foreground">{t("events.booking_name")}</dt>
+                          <dd className="font-medium text-right">{personName || "—"}</dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 py-2.5">
+                          <dt className="text-muted-foreground">{t("events.phone_number")}</dt>
+                          <dd className="font-medium text-right">{phone || "—"}</dd>
+                        </div>
+                      </>
+                    )}
+                    {!bookingIsFullyFree && (
+                      <div className="flex items-center justify-between gap-4 py-2.5">
+                        <dt className="text-muted-foreground">{t("events.payment_method")}</dt>
+                        <dd className="font-medium text-right">{paymentMethod === "cod" ? t("events.pay_cod") : t("events.pay_online_phonepe")}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
 
                 {/* ── Terms ── */}
                 <div className="rounded-2xl glass-card p-5 space-y-3">
@@ -1783,24 +1951,84 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     <p className="text-[11px] text-muted-foreground/60 pl-7">Please tick {!agreedTerms && isPub && !confirmedAge ? "both boxes" : "the box above"} to proceed.</p>
                   )}
                 </div>
+                </>)}
 
-                {/* ── CTA (mobile) ── */}
-                <div className="lg:hidden">
+                {/* ── Wizard navigation ── */}
+                <div className="flex items-center gap-2.5 sm:gap-3 pt-1">
+                  {bookStep > 1 && (
+                    <Button
+                      type="button" variant="outline" onClick={() => goToBookStep(bookStep - 1)}
+                      className="h-12 sm:h-14 px-4 sm:px-5 rounded-2xl border-white/15 text-foreground hover:bg-white/5 shrink-0"
+                    >
+                      <ChevronLeft className="h-5 w-5 sm:mr-1" /> <span className="hidden sm:inline">Back</span>
+                    </Button>
+                  )}
                   <Button
-                    className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground border-0 text-base font-semibold tracking-wide red-glow disabled:opacity-40 transition-all"
-                    size="lg" onClick={handleBook}
-                    disabled={booking || !agreedTerms || (isPub && !confirmedAge)}
+                    type="button" onClick={handleStepCta}
+                    disabled={bookStep === 4 && (booking || !agreedTerms || (isPub && !confirmedAge))}
+                    className="flex-1 h-12 sm:h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground border-0 text-sm sm:text-base font-semibold tracking-wide red-glow disabled:opacity-40 transition-all"
                   >
-                    <CalIcon className="h-5 w-5 mr-2.5" />
-                    {booking ? t("events.booking_processing") : bookingIsFullyFree ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
+                    {bookStep < 4 ? (
+                      <>Continue <ArrowRight className="h-5 w-5 ml-1.5" /></>
+                    ) : (
+                      <><CalIcon className="h-5 w-5 mr-2.5" />{booking ? t("events.booking_processing") : bookingIsFullyFree ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}</>
+                    )}
                   </Button>
                 </div>
               </div>
 
               {/* ── Right: Sticky Summary ── */}
               <div className="lg:col-span-1">
-                <div className="rounded-2xl glass-card-strong red-ring p-6 lg:sticky lg:top-24 space-y-5">
-                  <h3 className="font-serif text-xl tracking-tight">Order Summary</h3>
+                <div className="rounded-2xl glass-card-strong red-ring p-5 sm:p-6 lg:sticky lg:top-24 space-y-5">
+                  <h3 className="font-serif text-xl tracking-tight flex items-center gap-2">Your Booking Summary <Sparkle className="h-4 w-4 text-primary" /></h3>
+
+                  {/* Venue image header */}
+                  <div className="relative rounded-2xl overflow-hidden border border-white/10">
+                    {(event.imageUrl || vendorCover) ? (
+                      <img src={event.imageUrl || vendorCover} alt={venueName} className="h-32 w-full object-cover" />
+                    ) : (
+                      <div className="h-32 w-full bg-gradient-to-br from-primary/30 to-black/40 flex items-center justify-center"><Wine className="h-8 w-8 text-white/40" /></div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-3.5">
+                      <p className="font-serif text-lg leading-tight text-white drop-shadow truncate">{venueName}</p>
+                      {cityState && <p className="text-xs text-white/75 flex items-center gap-1 mt-0.5"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{cityState}</span></p>}
+                    </div>
+                  </div>
+
+                  {/* Selected details */}
+                  <div className="space-y-3 pb-4 border-b border-white/10 text-sm">
+                    <div className="flex items-center gap-3">
+                      <Ticket className="h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-muted-foreground leading-tight">Booking Type</p>
+                        <p className="font-medium leading-tight truncate">{!isPub ? "Event Booking" : pubMode === "ticket" ? t("events.buy_tickets") : pubMode === "event" ? ((event as any)?.vendorCategory === "Club" ? "VIP Table" : t("events.table_booking")) : "Events Booking"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <CalIcon className="h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-muted-foreground leading-tight">Date</p>
+                        <p className="font-medium leading-tight truncate">{date ? new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
+                      </div>
+                    </div>
+                    {isPub && (pubMode === "ticket" || pubMode === "event") && (
+                      <div className="flex items-center gap-3">
+                        <Clock className="h-4 w-4 text-primary shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-muted-foreground leading-tight">{t("events.arrival_time")}</p>
+                          <p className="font-medium leading-tight truncate">{arrivalTime || "—"}</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <Users className="h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-muted-foreground leading-tight">{t("events.guests_field")}</p>
+                        <p className="font-medium leading-tight truncate">{isPub && pubMode === "ticket" ? (ticketWomen + ticketMen + ticketCouple > 0 ? `${ticketWomen + ticketMen + ticketCouple} ticket${ticketWomen + ticketMen + ticketCouple === 1 ? "" : "s"}` : "—") : `${guests} guest${guests === 1 ? "" : "s"}`}</p>
+                      </div>
+                    </div>
+                  </div>
 
                   {!bookingIsFullyFree && (
                     <div className="space-y-2 text-sm">
@@ -1845,25 +2073,54 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </div>
                   )}
 
-                  {/* Confirmation badge */}
-                  <div className="rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 flex items-start gap-3">
-                    <Sparkle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Instant Confirmation</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Your booking is confirmed immediately after submission</p>
-                    </div>
+                  {/* Why book with Royvento? */}
+                  <div className="rounded-xl bg-primary/[0.06] border border-primary/20 p-4 space-y-2.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-primary">Why book with Royvento?</p>
+                    {[
+                      { icon: Check, label: "Instant Confirmation" },
+                      { icon: Sparkle, label: "Best Nightlife Experiences" },
+                      { icon: ShieldCheck, label: "Secure & Safe Payments" },
+                    ].map((r) => (
+                      <div key={r.label} className="flex items-center gap-2.5 text-sm">
+                        <span className="h-5 w-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                          <r.icon className="h-3 w-3 text-emerald-400" />
+                        </span>
+                        <span className="text-foreground/90">{r.label}</span>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* CTA (desktop) */}
-                  <Button
-                    className="hidden lg:flex w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground border-0 text-base font-semibold tracking-wide red-glow disabled:opacity-40 transition-all"
-                    size="lg" onClick={handleBook}
-                    disabled={booking || !agreedTerms || (isPub && !confirmedAge)}
-                  >
-                    <CalIcon className="h-5 w-5 mr-2.5" />
-                    {booking ? t("events.booking_processing") : bookingIsFullyFree ? t("events.confirm_booking") : paymentMethod === "cod" ? t("events.confirm_booking") : t("events.pay_and_book")}
-                  </Button>
+                  {/* Need help? */}
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-4 flex items-center gap-3">
+                    <span className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                      <Headphones className="h-4 w-4 text-primary" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground leading-tight">Need Help?</p>
+                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">Our team is here for you</p>
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              {/* ── Trust badges footer (spans full width) ── */}
+              <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-4 gap-3 mt-1">
+                {[
+                  { icon: null, big: "18+", title: "Only for 18+", sub: "Guests Only" },
+                  { icon: ShieldCheck, title: "Secure Payment", sub: "SSL Encrypted" },
+                  { icon: Zap, title: "Instant Confirmation", sub: "Get Ticket Instantly" },
+                  { icon: Headphones, title: "24/7 Support", sub: "We are here" },
+                ].map((b) => (
+                  <div key={b.title} className="rounded-2xl glass-card px-4 py-3.5 flex items-center gap-3">
+                    <span className="h-9 w-9 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 text-primary">
+                      {b.icon ? <b.icon className="h-4 w-4" /> : <span className="text-xs font-bold">{b.big}</span>}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-semibold text-foreground leading-tight truncate">{b.title}</p>
+                      <p className="text-[11px] text-muted-foreground leading-tight truncate">{b.sub}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
 
             </div>
@@ -1871,6 +2128,77 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         )}
       </div>
   </div>
+  );
+}
+
+// ─── Multi-step progress indicator for the Book-a-Table wizard ────────────────
+interface BookStep { label: string; caption: string; icon: React.ComponentType<{ className?: string }>; }
+function StepProgress({ current, steps, onStepClick }: { current: number; steps: BookStep[]; onStepClick: (n: number) => void }) {
+  const pct = ((current - 1) / (steps.length - 1)) * 100;
+  const activeStep = steps[current - 1];
+  return (
+    <div className="mb-8 md:mb-12">
+      {/* Compact header — phones only */}
+      <div className="flex items-center justify-between gap-3 mb-4 sm:hidden">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-[0_0_18px_-2px_hsl(var(--primary))]">
+            {activeStep && <activeStep.icon className="h-4 w-4 text-primary-foreground" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold leading-tight">Step {current} of {steps.length}</p>
+            <p className="text-sm font-semibold text-foreground leading-tight truncate">{activeStep?.label}</p>
+          </div>
+        </div>
+        <span className="text-xs font-bold text-muted-foreground tabular-nums shrink-0">{Math.round(pct)}%</span>
+      </div>
+      {/* Mobile progress bar */}
+      <div className="h-1.5 rounded-full bg-white/8 overflow-hidden sm:hidden">
+        <div className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+
+      {/* Full stepper — tablet and up */}
+      <div className="hidden sm:flex items-start">
+        {steps.map((step, i) => {
+          const Icon = step.icon;
+          const n = i + 1;
+          const done = n < current;
+          const active = n === current;
+          const reachable = n <= current;
+          return (
+            <div key={step.label} className="flex-1 flex flex-col items-center relative min-w-0">
+              {/* connector to the previous node */}
+              {i > 0 && (
+                <span aria-hidden className="absolute top-[18px] md:top-[22px] right-1/2 w-full h-[3px] rounded-full bg-white/8 overflow-hidden">
+                  <span className={`block h-full rounded-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-500 ${current >= n ? "w-full" : "w-0"}`} />
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => reachable && onStepClick(n)}
+                disabled={!reachable}
+                aria-current={active ? "step" : undefined}
+                className={`group relative z-10 h-9 w-9 md:h-11 md:w-11 rounded-xl border flex items-center justify-center transition-all duration-300
+                  ${done
+                    ? "bg-primary/15 border-primary/40 text-primary"
+                    : active
+                      ? "bg-gradient-to-br from-primary to-primary/70 border-primary text-primary-foreground shadow-[0_0_24px_-4px_hsl(var(--primary))] scale-105"
+                      : "bg-white/[0.03] border-white/10 text-muted-foreground"}
+                  ${reachable ? "cursor-pointer hover:border-primary/50" : "cursor-not-allowed"}`}
+              >
+                {done ? <Check className="h-4 w-4 md:h-5 md:w-5" /> : <Icon className="h-4 w-4 md:h-5 md:w-5" />}
+                {active && <span className="absolute -inset-1 rounded-xl border border-primary/30 animate-pulse pointer-events-none" />}
+              </button>
+              <span className={`mt-3 text-center text-xs md:text-sm font-semibold leading-tight px-1 transition-colors ${active ? "text-foreground" : done ? "text-foreground/70" : "text-muted-foreground"}`}>
+                {step.label}
+              </span>
+              <span className="mt-0.5 hidden md:block text-center text-[11px] text-muted-foreground/70 leading-tight px-1">
+                {step.caption}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

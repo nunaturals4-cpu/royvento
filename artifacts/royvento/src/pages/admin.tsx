@@ -5648,11 +5648,11 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
               {s === "all" ? "All" : s === "notArrived" ? "Not arrived" : s === "inside" ? "Inside" : "Checked out"}
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-black/40 border-white/10 w-36" title="From" />
             <span className="text-xs text-muted-foreground">â†’</span>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-black/40 border-white/10 w-36" title="To" />
-            <Input value={drillQ} onChange={(e) => setDrillQ(e.target.value)} placeholder="Search name / phone / ticket #" className="bg-black/40 border-white/10 w-64" />
+            <Input value={drillQ} onChange={(e) => setDrillQ(e.target.value)} placeholder="Search name / phone / ticket #" className="bg-black/40 border-white/10 w-full sm:w-64" />
           </div>
         </div>
         <div className="flex-1 overflow-auto">

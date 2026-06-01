@@ -1011,9 +1011,9 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
     <section className="mt-8 rounded-3xl glass-card-strong p-6">
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <h2 className="font-serif text-2xl flex items-center gap-2"><TicketIcon className="h-5 w-5 text-primary" />Bookings</h2>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / phone / ticket #" className="pl-9 bg-black/40 border-white/10 w-64" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / phone / ticket #" className="pl-9 bg-black/40 border-white/10 w-full sm:w-64" />
         </div>
       </div>
       <div className="flex flex-wrap items-end gap-3 mb-4">
