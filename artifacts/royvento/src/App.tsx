@@ -19,7 +19,6 @@ import { SEO } from "@/components/SEO";
 // keeps the initial JS bundle small and the site fast to first interaction.
 import { Home } from "@/pages/home";
 
-const Explore = lazy(() => import("@/pages/explore").then((m) => ({ default: m.Explore })));
 const Pubs = lazy(() => import("@/pages/pubs").then((m) => ({ default: m.Pubs })));
 const PubOffers = lazy(() => import("@/pages/pub-offers").then((m) => ({ default: m.PubOffers })));
 const Vendors = lazy(() => import("@/pages/vendors").then((m) => ({ default: m.Vendors })));
@@ -148,7 +147,8 @@ function Router() {
         <Suspense fallback={<PageFallback />}>
         <Switch>
           <Route path="/" component={Home} />
-          <Route path="/explore" component={Explore} />
+          {/* Explore page removed — redirect legacy/external links to Pubs */}
+          <Route path="/explore"><Redirect to="/pubs" /></Route>
           <Route path="/pubs" component={Pubs} />
           <Route path="/pub-offers" component={PubOffers} />
           <Route path="/vendors" component={Vendors} />

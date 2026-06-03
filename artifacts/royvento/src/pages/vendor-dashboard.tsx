@@ -29,7 +29,7 @@ import {
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck, Check,
   Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent, RefreshCw,
-  FileText, Star, Menu, X, Sparkles, ArrowUpRight, Bell, Utensils, Gift,
+  FileText, Star, Menu, X, Sparkles, ArrowUpRight, Bell, Utensils, Gift, Loader2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -236,25 +236,30 @@ function SidebarTabsTrigger({
     <TabsTrigger
       value={value}
       className={
-        "group relative w-full justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-medium " +
+        "group relative w-full justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-medium overflow-hidden " +
         "transition-all duration-200 border border-transparent " +
-        "data-[state=active]:bg-white/[0.07] data-[state=active]:border-white/[0.10] " +
-        "data-[state=active]:text-white data-[state=active]:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_-12px_rgba(0,0,0,0.8)] " +
+        "data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/[0.18] data-[state=active]:to-primary/[0.02] " +
+        "data-[state=active]:border-primary/25 data-[state=active]:text-white " +
+        "data-[state=active]:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-12px_rgba(232,41,28,0.45)] " +
         "data-[state=inactive]:text-white/55 hover:text-white hover:bg-white/[0.04] " +
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       }
     >
+      {/* Vertical accent bar on the active item */}
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-primary shadow-[0_0_12px_rgba(232,41,28,0.9)]" />
+      )}
       <span className={
-        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-colors " +
+        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-all " +
         (active
-          ? "bg-primary/15 text-primary border border-primary/30"
+          ? "bg-gradient-to-br from-primary/30 to-primary/10 text-primary border border-primary/40 shadow-[0_0_14px_-4px_rgba(232,41,28,0.7)]"
           : "bg-white/[0.04] text-white/50 border border-white/[0.06] group-hover:bg-white/[0.08] group-hover:text-white/80")
       }>
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
       {active && (
-        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 shadow-[0_0_10px_rgba(232,41,28,0.8)] animate-pulse" />
       )}
     </TabsTrigger>
   );
@@ -318,7 +323,7 @@ function PartnerNav({
 
       <div className="mt-auto px-3 pt-3 border-t border-white/[0.06]">
         <Link href="/dashboard/vendor/scanner">
-          <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-[0_4px_20px_-6px_rgba(220,38,38,0.4)] hover:shadow-[0_6px_24px_-6px_rgba(220,38,38,0.55)]">
+          <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-[0_4px_20px_-6px_rgba(232,41,28,0.4)] hover:shadow-[0_6px_24px_-6px_rgba(232,41,28,0.55)]">
             <ScanLine className="h-4 w-4" />
             <span>Ticket scanner</span>
           </button>
@@ -356,11 +361,12 @@ function PartnerHeader({
           <Menu className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 font-semibold leading-none">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-primary/70 font-semibold leading-none flex items-center gap-1.5">
+            <span className="h-1 w-1 rounded-full bg-primary shadow-[0_0_8px_rgba(232,41,28,0.8)]" />
             {currentTabLabel}
           </p>
           <h1 className="font-serif text-lg sm:text-xl md:text-2xl tracking-tight mt-1.5 leading-tight truncate">
-            <span className="whitespace-nowrap">Hello, {greetingName}</span>
+            <span className="whitespace-nowrap">Hello, <span className="text-gradient-red">{greetingName}</span></span>
             <span className="text-white/30 font-normal hidden sm:inline"> — welcome back</span>
           </h1>
         </div>
@@ -371,9 +377,9 @@ function PartnerHeader({
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
           </button>
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/25 flex items-center justify-center text-xs font-semibold text-white">
+          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/40 to-primary/10 border border-primary/30 flex items-center justify-center text-xs font-semibold text-white shadow-[0_0_18px_-4px_rgba(232,41,28,0.5),inset_0_1px_0_rgba(255,255,255,0.12)]">
             {greetingName.slice(0, 2).toUpperCase()}
           </div>
         </div>
@@ -447,7 +453,7 @@ export function VendorDashboard() {
       <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="block">
         <div className="md:grid md:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)] min-h-[calc(100vh-68px)]">
           {/* Desktop sidebar */}
-          <aside className="hidden md:block sticky top-[68px] h-[calc(100vh-68px)] overflow-y-auto border-r border-white/[0.06] bg-sidebar/40 backdrop-blur-xl">
+          <aside className="hidden md:block sticky top-[68px] h-[calc(100vh-68px)] overflow-y-auto border-r border-white/[0.06] bg-gradient-to-b from-[#140405]/70 via-sidebar/40 to-black/50 backdrop-blur-xl">
             <PartnerNav
               currentTab={tab}
               vendor={vendor}
@@ -482,7 +488,9 @@ export function VendorDashboard() {
           )}
 
           {/* Main content */}
-          <main className="min-w-0">
+          <main className="relative min-w-0">
+            {/* Ambient premium glow */}
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] -z-10 bg-[radial-gradient(800px_420px_at_82%_-8%,rgba(232,41,28,0.10),transparent_62%)]" />
             <PartnerHeader
               vendor={vendor}
               currentTabLabel={currentTabLabel}
@@ -2543,8 +2551,9 @@ export function VendorListingEditPage() {
 
 type ReportPreset = "30d" | "90d" | "12m";
 
+const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 function toReportDateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return _istFmt.format(d);
 }
 
 function Stat({ icon: Icon, label, value, hint, tooltip }: { icon: any; label: string; value: string; hint?: string; tooltip?: string }) {
@@ -2723,7 +2732,7 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
                     }}
                     formatter={(v: number, name: string) => [v, name === "confirmed" ? "Confirmed / completed" : "Cancelled"]}
                   />
-                  <Bar dataKey="confirmed" name="confirmed" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="confirmed" name="confirmed" fill="#E8291C" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="cancelled" name="cancelled" fill="#ef4444" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -2966,7 +2975,7 @@ function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-3">
-        <p className="font-serif text-xl flex items-center gap-2"><CalIcon className="h-5 w-5 text-primary" />Block a date</p>
+        <p className="font-serif text-xl flex items-center gap-2"><CalIcon className="h-5 w-5 text-white" />Block a date</p>
         <div>
           <Label>Date</Label>
           <Input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="bg-black/40 border-white/10" />
@@ -3010,7 +3019,7 @@ function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
 }
 
 function AttendancePanel() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = _istFmt.format(new Date());
   const [date, setDate] = useState<string>(today);
   const [statusFilter, setStatusFilter] = useState<"all" | "checkedIn" | "notArrived">("all");
   const [page, setPage] = useState<number>(1);
@@ -3341,6 +3350,9 @@ function AnnouncementsPanel() {
       annFormErrors.setFieldError("title", "Title is required.");
       toast({ title: "Title is required", variant: "destructive" }); return;
     }
+    if (!imageFile && !imagePreview) {
+      toast({ title: "Image required", description: "Upload an image for this announcement.", variant: "destructive" }); return;
+    }
     setSaving(true);
     try {
       let imageUrl = form.imageUrl;
@@ -3450,7 +3462,7 @@ function AnnouncementsPanel() {
         </div>
 
         <div>
-          <Label>Image (optional)</Label>
+          <Label>Image <span className="text-destructive">*</span></Label>
           {imagePreview ? (
             <div className="mt-1 relative rounded-xl overflow-hidden group">
               <img src={imagePreview} alt="Preview" className="w-full h-36 object-cover rounded-xl" />
@@ -3627,7 +3639,7 @@ interface AnalyticsData {
 type AnalyticsPreset = "today" | "7d" | "30d" | "3m" | "6m" | "custom";
 
 function toAnalyticsDateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return _istFmt.format(d);
 }
 
 function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
@@ -4156,26 +4168,30 @@ function KpiCard({
   warning?: string | null;
 }) {
   const accents = {
-    primary: { chip: "bg-primary/15 border-primary/25 text-primary", text: "" },
-    amber:   { chip: "bg-amber-500/15 border-amber-500/25 text-amber-400", text: "text-amber-300" },
-    emerald: { chip: "bg-emerald-500/15 border-emerald-500/25 text-emerald-400", text: "text-emerald-300" },
+    primary: { chip: "bg-gradient-to-br from-primary/25 to-primary/5 border-primary/30 text-primary", text: "", bar: "from-primary/70", glow: "group-hover:shadow-[0_16px_50px_-12px_rgba(232,41,28,0.30)]" },
+    amber:   { chip: "bg-gradient-to-br from-amber-500/25 to-amber-500/5 border-amber-500/30 text-amber-400", text: "text-amber-300", bar: "from-amber-400/70", glow: "group-hover:shadow-[0_16px_50px_-12px_rgba(245,158,11,0.28)]" },
+    emerald: { chip: "bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border-emerald-500/30 text-emerald-400", text: "text-emerald-300", bar: "from-emerald-400/70", glow: "group-hover:shadow-[0_16px_50px_-12px_rgba(16,185,129,0.28)]" },
   }[accent];
   return (
-    <div className="group relative rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-white/[0.01] backdrop-blur-xl p-5 transition-all duration-300 hover:border-white/[0.12] hover:shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]">
-      <div className="flex items-start gap-3 mb-4">
-        <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${accents.chip} shrink-0`}>
+    <div className={`group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.01] backdrop-blur-xl p-5 transition-all duration-300 hover:border-white/[0.14] hover:-translate-y-0.5 ${accents.glow}`}>
+      {/* Top accent bar — fades in on hover */}
+      <div className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${accents.bar} via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity`} />
+      {/* Soft corner glow */}
+      <div className="pointer-events-none absolute -top-12 -right-12 h-28 w-28 rounded-full bg-white/[0.04] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="relative flex items-start gap-3 mb-4">
+        <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${accents.chip} shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]`}>
           <Icon className="h-4.5 w-4.5" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold leading-none">{label}</p>
         </div>
-        <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white/40 transition-colors" />
+        <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white/50 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
       </div>
-      <p className={`stat-number text-3xl md:text-[2rem] leading-none tabular-nums ${accents.text}`}>{value}</p>
-      {hint && <p className="text-xs text-white/45 mt-2">{hint}</p>}
+      <p className={`relative stat-number text-3xl md:text-[2rem] leading-none tabular-nums ${accents.text}`}>{value}</p>
+      {hint && <p className="relative text-xs text-white/45 mt-2">{hint}</p>}
       {warning && (
-        <p className="text-[11px] text-amber-300/90 mt-2 flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        <p className="relative text-[11px] text-amber-300/90 mt-2 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
           {warning}
         </p>
       )}
@@ -4875,6 +4891,7 @@ interface DrinkPlan {
   foodDiscountLabel?: string;
   validUntil?: string | null;
   validFrom?: string | null;
+  imageUrl?: string | null;
 }
 
 const emptyItem = (): DrinkPlanLineItem => ({ name: "", qty: 1, discountedPrice: "" });
@@ -5823,6 +5840,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [feDescription, setFeDescription] = useState("");
   const [feValidFrom, setFeValidFrom] = useState("");
   const [feValidUntil, setFeValidUntil] = useState("");
+  const [feImageFile, setFeImageFile] = useState<File | null>(null);
+  const [feImagePreview, setFeImagePreview] = useState("");
 
   // Add form — Included with Ticket section
   const [ticketChecked, setTicketChecked] = useState(false);
@@ -5836,6 +5855,8 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [ticketDescription, setTicketDescription] = useState("");
   const [ticketValidFrom, setTicketValidFrom] = useState("");
   const [ticketValidUntil, setTicketValidUntil] = useState("");
+  const [ticketImageFile, setTicketImageFile] = useState<File | null>(null);
+  const [ticketImagePreview, setTicketImagePreview] = useState("");
 
   // Edit form state
   const [editType, setEditType] = useState<"welcome" | "unlimited" | "ticket" | "custom">("welcome");
@@ -5850,6 +5871,9 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const [editFoodDiscount, setEditFoodDiscount] = useState("");
   const [editValidFrom, setEditValidFrom] = useState("");
   const [editValidUntil, setEditValidUntil] = useState("");
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState("");
 
   const errMsg = (err: unknown): string =>
     err instanceof Error ? err.message : typeof err === "string" ? err : "Please try again.";
@@ -5882,9 +5906,11 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setFreeEntryChecked(false); setFeDrinkTypes(["welcome"]); setFeGender("all");
     setFeDrinksOffer(""); setFeFoodDiscount(""); setFeValidUntil(""); setFeValidFrom("");
     setFeDays([]); setFeTimeFrom(""); setFeTimeTo(""); setFeDescription("");
+    setFeImageFile(null); setFeImagePreview("");
     setTicketChecked(false); setTicketItems([emptyItem()]);
     setTicketDrinksOffer(""); setTicketFoodDiscount(""); setTicketValidUntil(""); setTicketValidFrom("");
     setTicketDays([]); setTicketTimeFrom(""); setTicketTimeTo(""); setTicketDescription("");
+    setTicketImageFile(null); setTicketImagePreview("");
   };
 
   const startEdit = (plan: DrinkPlan) => {
@@ -5901,6 +5927,9 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     setEditFoodDiscount(plan.foodDiscountLabel ?? "");
     setEditValidFrom(plan.validFrom ?? "");
     setEditValidUntil(plan.validUntil ?? "");
+    setEditImageUrl(plan.imageUrl ?? "");
+    setEditImageFile(null);
+    setEditImagePreview(plan.imageUrl ?? "");
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -5914,11 +5943,27 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
     if (freeEntryChecked && feDrinkTypes.length === 0) {
       toast({ title: "Select at least one drink type for free entry", variant: "destructive" }); return;
     }
+    if (freeEntryChecked && !feImageFile && !feImagePreview) {
+      setAddError("A deal image is required for Free Drinks.");
+      toast({ title: "Image required", description: "Upload a deal image for Free Drinks.", variant: "destructive" }); return;
+    }
     if (ticketChecked && ticketItems.some((i) => !i.name.trim())) {
       toast({ title: "Each ticket item must have a name", variant: "destructive" }); return;
     }
+    if (ticketChecked && !ticketImageFile && !ticketImagePreview) {
+      setAddError("A deal image is required for Included with Ticket.");
+      toast({ title: "Image required", description: "Upload a deal image for Included with Ticket.", variant: "destructive" }); return;
+    }
     setSaving(true);
     try {
+      let feUploadedUrl: string | null = null;
+      if (freeEntryChecked && feImageFile) {
+        feUploadedUrl = await uploadImageToStorage(feImageFile);
+      }
+      let ticketUploadedUrl: string | null = null;
+      if (ticketChecked && ticketImageFile) {
+        ticketUploadedUrl = await uploadImageToStorage(ticketImageFile);
+      }
       if (freeEntryChecked) {
         for (const drinkType of feDrinkTypes) {
           await apiPost("/api/vendors/me/drink-plans", {
@@ -5931,6 +5976,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
             foodDiscountLabel: "",
             validFrom: feValidFrom || null,
             validUntil: feValidUntil || null,
+            imageUrl: feUploadedUrl,
           });
         }
       }
@@ -5944,6 +5990,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
           foodDiscountLabel: "",
           validFrom: ticketValidFrom || null,
           validUntil: ticketValidUntil || null,
+          imageUrl: ticketUploadedUrl,
         });
       }
       toast({ title: "Drink plan(s) added" });
@@ -5969,6 +6016,10 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       const isTicket = editType === "ticket";
       const isFreeEntry = editType === "welcome" || editType === "unlimited";
       const editingPlan = plans.find((p) => p.id === editingId);
+      let finalEditImageUrl = editImageUrl || null;
+      if (editImageFile) {
+        finalEditImageUrl = await uploadImageToStorage(editImageFile);
+      }
       const updated: DrinkPlan = await apiPatch(`/api/vendors/me/drink-plans/${editingId}`, {
         type: editType,
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
@@ -5981,6 +6032,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         foodDiscountLabel: "",
         validFrom: editValidFrom || null,
         validUntil: editValidUntil || null,
+        imageUrl: finalEditImageUrl,
       });
       setPlans((prev) => prev.map((p) => p.id === editingId ? updated : p));
       setEditingId(null);
@@ -6105,6 +6157,37 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                       placeholder="Any extra details customers should know…" rows={2}
                       className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
                   </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
+                      Deal image <span className="text-destructive">*</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card (required)</span>
+                    </Label>
+                    {feImagePreview ? (
+                      <div className="relative mt-1 rounded-xl overflow-hidden group">
+                        <img src={feImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
+                            <Upload className="h-3 w-3" /> Change
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                          </label>
+                          <button type="button" onClick={() => { setFeImageFile(null); setFeImagePreview(""); }}
+                            className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label
+                        className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); }}
+                      >
+                        <ImageIcon className="h-7 w-7 text-white/25" />
+                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setFeImageFile(f); setFeImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -6155,6 +6238,37 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                     <Textarea value={ticketDescription} onChange={(e) => setTicketDescription(e.target.value)}
                       placeholder="Any extra details customers should know…" rows={2}
                       className="bg-black/40 border-white/10 resize-none text-sm" maxLength={500} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
+                      Deal image <span className="text-destructive">*</span>
+                      <span className="normal-case text-muted-foreground/60 font-normal ml-1">— shown on the deal card (required)</span>
+                    </Label>
+                    {ticketImagePreview ? (
+                      <div className="relative mt-1 rounded-xl overflow-hidden group">
+                        <img src={ticketImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
+                            <Upload className="h-3 w-3" /> Change
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                          </label>
+                          <button type="button" onClick={() => { setTicketImageFile(null); setTicketImagePreview(""); }}
+                            className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label
+                        className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); }}
+                      >
+                        <ImageIcon className="h-7 w-7 text-white/25" />
+                        <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setTicketImageFile(f); setTicketImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>
@@ -6262,6 +6376,36 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                         <Label>Description</Label>
                         <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className="bg-black/40 border-white/10 resize-none" maxLength={500} />
                       </div>
+                      <div className="sm:col-span-2">
+                        <Label className="mb-1 block text-xs text-muted-foreground uppercase tracking-wider">
+                          Deal image <span className="text-destructive">*</span>
+                        </Label>
+                        {editImagePreview ? (
+                          <div className="relative mt-1 rounded-xl overflow-hidden group">
+                            <img src={editImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white border border-white/20 flex items-center gap-1">
+                                <Upload className="h-3 w-3" /> Change
+                                <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                                  onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                              </label>
+                              <button type="button" onClick={() => { setEditImageUrl(""); setEditImageFile(null); setEditImagePreview(""); }}
+                                className="px-3 py-1.5 rounded-lg bg-destructive/80 hover:bg-destructive text-xs text-white">Remove</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label
+                            className="mt-1 flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed cursor-pointer transition-colors border-white/20 bg-black/20 hover:border-primary/50 hover:bg-primary/5"
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); }}
+                          >
+                            <ImageIcon className="h-7 w-7 text-white/25" />
+                            <span className="text-xs text-white/40 text-center leading-snug">Click or drag &amp; drop<br />JPG, PNG or WebP · max 8 MB</span>
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const err = validateImageFile(f); if (err) { toast({ title: err, variant: "destructive" }); return; } setEditImageFile(f); setEditImageUrl(""); setEditImagePreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+                          </label>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <Button type="submit" disabled={editSaving} size="sm">{editSaving ? "Saving…" : "Save changes"}</Button>
@@ -6291,7 +6435,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                           </span>
                         )}
                         {plan.validUntil && (
-                          plan.validUntil < new Date().toISOString().slice(0, 10) ? (
+                          plan.validUntil < _istFmt.format(new Date()) ? (
                             <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-[10px] text-red-400 font-medium">
                               Expired {plan.validUntil}
                             </span>
@@ -6328,6 +6472,9 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {plan.imageUrl && (
+                        <img src={plan.imageUrl} alt="deal" className="h-12 w-16 rounded-lg object-cover border border-white/10 shrink-0" />
+                      )}
                       <button type="button" onClick={() => startEdit(plan)}
                         className="rounded-lg border border-white/15 p-2 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors" title="Edit plan">
                         <Pencil className="h-4 w-4" />

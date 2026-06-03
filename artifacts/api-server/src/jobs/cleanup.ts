@@ -1,5 +1,8 @@
 import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable } from "@workspace/db";
 import { and, ne, sql, lt, gte, eq, isNotNull, inArray } from "drizzle-orm";
+
+const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+function todayIstDate() { return _istFmt.format(new Date()); }
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { sendUpcomingDeletionWarningEmail } from "../lib/notifications";
@@ -63,7 +66,7 @@ export async function deletePastEvents(): Promise<void> {
 
 export async function deleteExpiredAnnouncements(): Promise<void> {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIstDate();
 
     const rows = await db
       .select({
@@ -101,7 +104,7 @@ export async function deleteExpiredAnnouncements(): Promise<void> {
 // their selected weekdays.
 export async function deleteExpiredDrinkPlans(): Promise<void> {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIstDate();
 
     const result = await db
       .delete(drinkPlansTable)

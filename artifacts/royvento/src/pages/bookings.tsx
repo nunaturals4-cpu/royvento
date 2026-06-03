@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useState } from "react";
+import { todayIst } from "@/lib/utils";
 import QRCode from "qrcode";
 import { useTranslation } from "react-i18next";
 import { useListMyBookings } from "@workspace/api-client-react";
@@ -74,21 +75,20 @@ export function Bookings() {
   const { data: bookings = [], isLoading, refetch } = useListMyBookings();
   const [view, setView] = useState<"upcoming" | "past">("upcoming");
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = todayIst();
 
   const filtered = (bookings as BookingRecord[]).filter((b) => {
     const terminalStatus = b.status === "cancelled" || b.status === "completed";
-    if (view === "past") return terminalStatus || (!!b.bookingDate && new Date(b.bookingDate) < today);
-    return !terminalStatus && (!b.bookingDate || new Date(b.bookingDate) >= today);
+    if (view === "past") return terminalStatus || (!!b.bookingDate && b.bookingDate < today);
+    return !terminalStatus && (!b.bookingDate || b.bookingDate >= today);
   });
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-14">
+    <div className="container mx-auto px-4 md:px-6 py-8 md:py-14">
       <SEO title="My Bookings | Royvento" canonical="/dashboard/bookings" noindex />
-      <header className="mb-8">
+      <header className="mb-6 md:mb-8">
         <p className="text-xs uppercase tracking-[0.25em] text-primary mb-2 accent-underline inline-block">{t("bookings.your_account")}</p>
-        <h1 className="font-serif text-4xl md:text-5xl tracking-tight mt-3">{t("bookings.title")}</h1>
+        <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight mt-2 md:mt-3">{t("bookings.title")}</h1>
         <p className="mt-2 text-muted-foreground">{t("bookings.subtitle")}</p>
       </header>
 
@@ -127,7 +127,7 @@ export function Bookings() {
             {view === "upcoming" ? t("bookings.no_bookings_sub") : "Your completed bookings will appear here."}
           </p>
           {view === "upcoming" && (
-            <Link href="/explore"><Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">{t("bookings.explore")}</Button></Link>
+            <Link href="/pubs"><Button className="bg-primary text-primary-foreground border-0">{t("bookings.explore")}</Button></Link>
           )}
         </div>
       ) : (

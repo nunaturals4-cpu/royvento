@@ -617,6 +617,7 @@ export const drinkPlansTable = pgTable(
     foodDiscountLabel: varchar("food_discount_label", { length: 255 }).notNull().default(""),
     validUntil: date("valid_until"),
     validFrom: date("valid_from"),
+    imageUrl: text("image_url"),
     // Admin-set global priority (1–10). Plans with a value appear first in the
     // Drinks Deals section of every pub page, in ascending priority order.
     // NULL = not prioritised.

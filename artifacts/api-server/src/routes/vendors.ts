@@ -1,6 +1,16 @@
 import { Router, type IRouter } from "express";
 import { db, vendorsTable, usersTable, eventsTable, drinkPlansTable } from "@workspace/db";
 import { eq, desc, and, ilike, inArray, or, sql } from "drizzle-orm";
+
+/** Returns today's date in IST (Asia/Kolkata) as "YYYY-MM-DD". */
+function todayIstDate(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 import {
   CreateMyVendorBody,
   UpdateMyVendorBody,
@@ -372,7 +382,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
     .select({ id: vendorsTable.id, businessName: vendorsTable.businessName, coverImageUrl: vendorsTable.coverImageUrl })
     .from(vendorsTable)
     .where(and(eq(vendorsTable.status, "approved"), inArray(vendorsTable.id, ids)));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIstDate();
   const plans = await db
     .select()
     .from(drinkPlansTable)
@@ -407,7 +417,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
     .map((v) => ({
       vendorId: v.id,
       vendorName: v.businessName,
-      coverImageUrl: v.coverImageUrl,
+      coverImageUrl: v.coverImageUrl || null,   // null instead of "" so JS || fallback works
       pubEventId: pubEventByVendor.get(v.id) ?? null,
       plans: (plansByVendor.get(v.id) ?? []).map((p) => ({
         type: p.type,
@@ -420,6 +430,7 @@ router.get("/vendors/drink-offers", async (_req, res) => {
         description: p.description,
         validFrom: p.validFrom,
         validUntil: p.validUntil,
+        imageUrl: p.imageUrl || null,   // plan-level image; null when not yet uploaded
       })),
     }))
     .filter((v) => v.plans.length > 0);
@@ -527,6 +538,17 @@ const DrinkPlanBody = z.object({
   foodDiscountLabel: z.string().max(255).optional().default(""),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  // Only accept a same-origin relative path (the HMAC-signed upload flow emits
+  // "/api/storage/…") or an explicit http(s) URL. This rejects dangerous URI
+  // schemes such as javascript:, data:, vbscript: and file: as defense-in-depth
+  // against any consumer that might treat the stored value as a navigable URL.
+  imageUrl: z.string().max(1024)
+    .refine(
+      (v) => v === "" || v.startsWith("/") || /^https:\/\//i.test(v) || /^http:\/\//i.test(v),
+      { message: "imageUrl must be a relative path or an http(s) URL" },
+    )
+    .nullable()
+    .optional(),
 });
 
 // Convert HH:MM to minutes since midnight (empty string = 0 / 24*60 = open window)
@@ -593,7 +615,7 @@ function describeConflict(c: { type: string; days: string[]; timeFrom: string; t
 router.get("/vendors/:vendorId/drink-plans", async (req, res) => {
   const id = Number(req.params["vendorId"]);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIstDate();
   const plans = await db
     .select()
     .from(drinkPlansTable)

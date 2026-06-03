@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { Star, MapPin, GlassWater } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/lib/api";
 import { pubDetailSlug, eventDetailSlug } from "@/lib/seo-slug";
 
@@ -39,7 +38,6 @@ const CROWD_BADGE: Record<string, { label: string; color: string }> = {
 };
 
 export function EventCard({ event, hidePubBadge, directBooking }: Props) {
-  const partner = event.partnerName ?? event.vendorName ?? "";
   const loc = event.city
     ? `${event.city}${event.state ? ", " + event.state : ""}`
     : event.location;
@@ -72,14 +70,19 @@ export function EventCard({ event, hidePubBadge, directBooking }: Props) {
       ? pubDetailSlug({ id: pubLinkId, name: event.title, city: event.city })
       : eventHref;
 
-  const hasBadges = crowd || hasFreeEntry || event.hasDrinkPlans || (!hasFreeEntry && event.type !== "pub" && event.category);
+  // Primary badge on the photo (Popular wins, else New)
+  const topBadge = event.popular
+    ? { label: "★ Popular", cls: "text-primary" }
+    : isNew
+      ? { label: "New", cls: "text-white/90" }
+      : null;
 
   return (
     <Link href={href}>
-      <div className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl lift-3d border border-white/8 bg-card/40 backdrop-blur-sm">
+      <div className="reveal group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl lift-3d border border-white/[0.06] bg-card shadow-card">
 
-        {/* ── IMAGE — cinematic, melts into the card ── */}
-        <div className="relative aspect-video overflow-hidden bg-black/40 shrink-0">
+        {/* ── IMAGE ── */}
+        <div className="sheen relative aspect-[16/10] overflow-hidden bg-black/40 shrink-0">
           {event.imageUrl ? (
             <img
               src={event.imageUrl}
@@ -91,94 +94,72 @@ export function EventCard({ event, hidePubBadge, directBooking }: Props) {
             <div className="h-full w-full bg-gradient-to-br from-card to-muted" />
           )}
 
-          {/* Cinematic gradient so the photo dissolves into the card body */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/35 via-transparent to-transparent opacity-70" />
-          {/* Subtle inner ring for a crafted edge */}
+          {/* Gradients for badge legibility (top + bottom) */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/55" />
           <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
 
-          {/* Popular — glassy, glowing pill */}
-          {event.popular && (
+          {/* Primary badge — top-left */}
+          {topBadge && (
             <div className="absolute top-3 left-3">
-              <Badge className="border border-white/15 bg-primary/85 text-primary-foreground red-glow backdrop-blur-md text-[10px] px-2.5 py-1 font-semibold tracking-wide shadow-lg">
-                ★ Popular
-              </Badge>
+              <span className={`inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/55 px-2.5 py-1 text-[10px] font-semibold tracking-wide backdrop-blur-md ${topBadge.cls}`}>
+                {topBadge.label}
+              </span>
             </div>
           )}
 
-          {/* Rating / New — frosted glass pill */}
-          <div className="absolute top-3 right-3">
-            <div className="flex items-center gap-1 rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-[11px] shadow-lg backdrop-blur-md">
-              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              {ratingLabel ? (
-                <span className="font-semibold text-white">{ratingLabel}</span>
-              ) : isNew ? (
-                <span className="font-medium text-white/80">New</span>
-              ) : (
-                <span className="font-medium text-white/40">—</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── CARD BODY ── */}
-        <div className="flex flex-1 flex-col gap-2.5 px-4 pb-4 pt-3.5">
-
-          {/* Title */}
-          <h3 className="font-serif text-[16px] leading-snug tracking-tight text-white line-clamp-2 transition-colors duration-300 group-hover:text-primary">
-            {event.title}
-          </h3>
-
-          {/* Partner eyebrow */}
-          {partner && (
-            <p className="-mt-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">
-              {partner}
-            </p>
-          )}
-
-          {/* Status badges */}
-          {hasBadges && (
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* Status pills — bottom-left over the photo (like the reference) */}
+          {(crowd || hasFreeEntry || event.hasDrinkPlans) && (
+            <div className="absolute bottom-3 left-3 flex flex-wrap items-center gap-1.5">
               {crowd && (
-                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm border border-white/10 ${crowd.color}`}>
+                <span className="inline-flex items-center rounded-full border border-white/15 bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-md">
                   {crowd.label}
                 </span>
               )}
               {hasFreeEntry && (
-                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-sm border ${
-                  isFreeToday
-                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                    : "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
-                }`}>
-                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${isFreeToday ? "bg-emerald-400 animate-pulse" : "bg-emerald-500"}`} />
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-black/55 px-2 py-0.5 text-[10px] font-medium text-emerald-300 backdrop-blur-md">
+                  <span className={`inline-block h-1 w-1 rounded-full ${isFreeToday ? "bg-emerald-400 animate-pulse" : "bg-emerald-500"}`} />
                   {freeLabel}
                 </span>
               )}
               {event.hasDrinkPlans && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-primary shadow-sm">
-                  <GlassWater className="h-3 w-3" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-black/55 px-2 py-0.5 text-[10px] font-medium text-primary backdrop-blur-md">
+                  <GlassWater className="h-2.5 w-2.5" />
                   Deal
-                </span>
-              )}
-              {!hasFreeEntry && event.type !== "pub" && event.category && (
-                <span className="inline-flex items-center rounded-full border border-white/8 bg-white/8 px-2.5 py-1 text-[10px] font-medium text-white/65 shadow-sm">
-                  {event.category}
                 </span>
               )}
             </div>
           )}
+        </div>
 
-          {/* Footer — location + price, pinned to bottom */}
-          <div className="mt-auto flex items-center justify-between border-t border-white/6 pt-3">
-            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
-              <span className="truncate">{loc}</span>
+        {/* ── BODY ── */}
+        <div className="flex flex-1 flex-col p-3">
+
+          {/* NAME */}
+          <h3 className="text-[13px] font-semibold leading-snug tracking-tight text-white line-clamp-1 transition-colors duration-300 group-hover:text-primary">
+            {event.title}
+          </h3>
+
+          {/* AREA / location — quiet subtitle */}
+          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+            <MapPin className="h-2.5 w-2.5 shrink-0 text-primary/70" />
+            <span className="truncate">{loc}</span>
+          </div>
+
+          {/* RATING · PRICE — clean bottom row */}
+          <div className="mt-2 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-xs">
+              {ratingLabel && (
+                <>
+                  <Star className="h-3 w-3 fill-primary text-primary" />
+                  <span className="font-semibold text-white">{ratingLabel}</span>
+                </>
+              )}
             </div>
-            <span className="ml-2 shrink-0 text-sm font-bold tracking-tight text-white">{formatINR(event.price)}</span>
+            <span className="text-xs font-bold tracking-tight text-white">{formatINR(event.price)}</span>
           </div>
         </div>
 
-        {/* Red hairline glow accent on hover */}
+        {/* Hover hairline glow accent */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
       </div>
     </Link>

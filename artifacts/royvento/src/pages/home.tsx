@@ -1,12 +1,12 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelectedCity } from "@/components/LocationContext";
+import { CityPickerModal } from "@/components/CityPickerModal";
 import {
   ArrowRight,
   Calendar,
   Sparkles,
   ShieldCheck,
-  Crown,
   Flame,
   PartyPopper,
   Megaphone,
@@ -14,6 +14,14 @@ import {
   GlassWater,
   MapPin,
   ChevronDown,
+  Search,
+  Ticket,
+  Users,
+  Store,
+  Music,
+  Mic2,
+  Gamepad2,
+  Drama,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents, useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
@@ -132,6 +140,17 @@ function useUserLocation() {
   return { country, state, setCountry, setState };
 }
 
+// Presentational category tiles — each links to an existing route (no new
+// backend / functionality). Mirrors the reference design's "Popular Categories".
+const CATEGORIES = [
+  { label: "Pubs & Bars",    sub: "Find nearby pubs",        icon: GlassWater, href: "/pubs",       img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&q=70" },
+  { label: "Nightclubs",     sub: "Dance the night away",    icon: Music,      href: "/pubs",       img: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=600&q=70" },
+  { label: "Exciting Games", sub: "Play & compete",          icon: Gamepad2,   href: "/pubs",       img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=70" },
+  { label: "Live Events",    sub: "Concerts & gigs",         icon: Mic2,       href: "/pubs",       img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70" },
+  { label: "Ladies Nights",  sub: "Special offers & events", icon: Sparkles,   href: "/pub-offers", img: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&q=70" },
+  { label: "Standup Shows",  sub: "Laugh out loud",          icon: Drama,      href: "/pubs",       img: "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=600&q=70" },
+] as const;
+
 export function Home() {
   const { t } = useTranslation();
   const { data: me } = useGetMe();
@@ -143,6 +162,22 @@ export function Home() {
   const [pubs, setPubs] = useState<PublicEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const { selectedCity: userCity } = useSelectedCity();
+
+  // Hero search bar (functional): location → global city context + picker,
+  // search term → /pubs?search=… which the Pubs page reads on load.
+  const [, navigate] = useLocation();
+  const [cityModalOpen, setCityModalOpen] = useState(false);
+  const [heroSearch, setHeroSearch] = useState("");
+  const [heroWhen, setHeroWhen] = useState("weekend");
+
+  const submitHeroSearch = useCallback(() => {
+    const params = new URLSearchParams();
+    if (heroSearch.trim()) params.set("search", heroSearch.trim());
+    if (userCity) params.set("city", userCity);
+    if (heroWhen) params.set("when", heroWhen);
+    const qs = params.toString();
+    navigate(`/pubs${qs ? `?${qs}` : ""}`);
+  }, [heroSearch, heroWhen, userCity, navigate]);
 
   const { country: detectedCountry, state: detectedState, setCountry: setDetectedCountry, setState: setDetectedState } = useUserLocation();
   const [filterCountry, setFilterCountry] = useState("");
@@ -214,85 +249,227 @@ export function Home() {
             url: "https://royvento.com",
             potentialAction: {
               "@type": "SearchAction",
-              target: "https://royvento.com/explore?search={search_term_string}",
+              target: "https://royvento.com/pubs?search={search_term_string}",
               "query-input": "required name=search_term_string",
             },
           },
         ]}
       />
-      {/* Hero — full viewport */}
-      <section className="relative overflow-hidden min-h-[100svh] flex items-center">
-        <div className="absolute inset-0 -z-10">
+      {/* Hero — two-column: copy left, cinematic image right */}
+      <section className="relative overflow-hidden">
+        {/* Right-side cinematic image — bleeds to the top-right, dissolves into the background.
+            Constrained to the headline area so the search bar below sits on pure black. */}
+        <div className="pointer-events-none absolute top-0 right-0 -z-10 h-[58vh] md:h-[66vh] w-full lg:w-[58%]">
           <img
-            src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=1600&q=70"
+            src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1600&q=80"
             alt=""
             fetchPriority="high"
             decoding="async"
-            className="h-full w-full object-cover opacity-45"
+            className="h-full w-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/65 to-background" />
-          <div className="absolute inset-0 hero-grid opacity-30" />
+          {/* Blood-red stage-light wash — matches the luxury nightlife reference */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/35 via-primary/12 to-transparent mix-blend-screen" />
+          {/* Vignette for depth */}
+          <div className="absolute inset-0 bg-black/25" />
+          {/* Fade into the background on the left & bottom so copy stays legible */}
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+          <div className="absolute inset-0 lg:hidden bg-background/60" />
         </div>
-        <div className="container mx-auto px-4 md:px-6 py-32 md:py-0 relative">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full glass-card px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-white/80 mb-8">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              {t("home.hero_eyebrow")}
-            </div>
-            <h1 className="font-serif text-6xl md:text-8xl leading-[1.02] tracking-tight">
-              {t("home.hero_title_1")}<br />
-              <span className="italic text-gradient-red">{t("home.hero_title_2")}</span>
-            </h1>
-            <p className="mt-6 text-lg md:text-xl text-white/65 max-w-2xl leading-relaxed">
-              {t("home.hero_subtitle")}
-            </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/pubs">
-                <Button
-                  size="lg"
-                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground red-glow border-0 h-12 px-8 rounded-full text-base font-semibold transition-all hover:scale-[1.02]"
-                >
-                  {t("home.browse_pubs")} <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              {!isLoggedIn && (
-                <Link href="/register">
+        <div className="container mx-auto px-4 md:px-6">
+          {/* Copy + image area */}
+          <div className="grid lg:grid-cols-2 gap-8 items-center pt-14 md:pt-20 pb-8 min-h-[58vh] md:min-h-[66vh]">
+            <div className="max-w-xl">
+              <p className="reveal text-xs font-semibold uppercase tracking-[0.28em] text-primary mb-5">
+                {t("home.hero_eyebrow")}
+              </p>
+              <h1 className="reveal font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.04] tracking-tight">
+                <span className="text-white">{t("home.hero_title_1")}</span>
+                <br />
+                <span className="text-gradient-red">{t("home.hero_title_2")}</span>
+              </h1>
+              <p className="reveal mt-4 md:mt-5 text-sm md:text-base lg:text-lg text-muted-foreground max-w-xs sm:max-w-sm md:max-w-md leading-relaxed">
+                {t("home.hero_subtitle")}
+              </p>
+
+              <div className="reveal mt-5 md:mt-7 flex flex-wrap gap-3">
+                <Link href="/pubs">
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-primary text-primary-foreground red-glow border-0 h-12 px-7 rounded-xl text-base font-semibold"
+                  >
+                    {t("home.explore_events")} <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/pub-offers">
                   <Button
                     size="lg"
                     variant="outline"
-                    className="h-12 px-8 border-white/25 hover:bg-white/8 rounded-full text-base font-semibold transition-all"
+                    className="gap-2 h-12 px-7 border-white/20 hover:bg-white/8 rounded-xl text-base font-semibold"
                   >
-                    {t("home.join_free")}
+                    <GlassWater className="h-4 w-4" /> {t("home.happy_hours")}
                   </Button>
                 </Link>
-              )}
+              </div>
+
+              {/* Social proof */}
+              <div className="reveal mt-5 md:mt-7 flex items-center gap-3">
+                <div className="flex -space-x-2.5">
+                  {[12, 32, 45, 5].map((n) => (
+                    <img
+                      key={n}
+                      src={`https://i.pravatar.cc/72?img=${n}`}
+                      alt=""
+                      loading="lazy"
+                      className="h-9 w-9 rounded-full border-2 border-background object-cover"
+                    />
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Join <span className="font-semibold text-primary">50K+</span> {t("home.join_enthusiasts")}
+                </p>
+              </div>
             </div>
 
-            {/* Stats */}
-            <div className="mt-16 flex gap-10 flex-wrap">
-              <div>
-                <p className="stat-number text-4xl">200+</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mt-1.5">{t("home.verified_pubs")}</p>
+            {/* Right column reserved for the bleeding background image */}
+            <div className="hidden lg:block" aria-hidden />
+          </div>
+
+          {/* Search bar */}
+          <div className="reveal relative z-10">
+            <div className="glass-card-strong rounded-2xl p-2 md:p-2.5 flex flex-col sm:flex-row items-stretch gap-1">
+              {/* Location → opens the shared city picker, updates global city context */}
+              <button
+                type="button"
+                onClick={() => setCityModalOpen(true)}
+                className="flex flex-1 items-center gap-3 rounded-xl px-3 md:px-4 py-2 md:py-2.5 text-left hover:bg-white/5 transition-colors"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                  <MapPin className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">{t("home.search_location_label")}</span>
+                  <span className="block truncate text-sm font-semibold text-white">
+                    {userCity || t("home.search_location_placeholder")}
+                  </span>
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+
+              <div className="hidden sm:block w-px self-stretch bg-white/10" />
+
+              {/* Date */}
+              <label className="flex flex-1 items-center gap-3 rounded-xl px-3 md:px-4 py-2 md:py-2.5 cursor-pointer hover:bg-white/5 transition-colors">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                  <Calendar className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">{t("home.search_date_label")}</span>
+                  <select
+                    value={heroWhen}
+                    onChange={(e) => setHeroWhen(e.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold text-white focus:outline-none cursor-pointer [&>option]:bg-card [&>option]:text-white"
+                  >
+                    <option value="weekend">This Weekend</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="any">Any time</option>
+                  </select>
+                </span>
+              </label>
+
+              <div className="hidden sm:block w-px self-stretch bg-white/10" />
+
+              {/* What are you looking for → search term */}
+              <div className="flex flex-[1.4] items-center gap-3 rounded-xl px-3 md:px-4 py-2 md:py-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                  <Ticket className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">{t("home.search_what_label")}</span>
+                  <input
+                    value={heroSearch}
+                    onChange={(e) => setHeroSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") submitHeroSearch(); }}
+                    placeholder={t("home.search_what_placeholder")}
+                    className="w-full bg-transparent text-sm font-semibold text-white placeholder:font-normal placeholder:text-muted-foreground focus:outline-none"
+                  />
+                </span>
               </div>
-              <div className="w-px bg-white/10 self-stretch" />
-              <div>
-                <p className="stat-number text-4xl">15K</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mt-1.5">{t("home.tickets_booked")}</p>
-              </div>
-              <div className="w-px bg-white/10 self-stretch" />
-              <div>
-                <p className="stat-number text-4xl">4.9★</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mt-1.5">{t("home.avg_rating")}</p>
-              </div>
+
+              {/* Search */}
+              <button
+                type="button"
+                onClick={submitHeroSearch}
+                aria-label="Search"
+                className="flex h-12 w-12 shrink-0 items-center justify-center self-center rounded-full bg-primary text-primary-foreground red-glow transition-transform hover:scale-105 active:scale-95"
+              >
+                <Search className="h-5 w-5" />
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 opacity-40">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-white/60">Scroll</span>
-          <div className="w-px h-8 bg-gradient-to-b from-white/40 to-transparent" />
+          {/* Stats row */}
+          <div className="reveal grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6 md:gap-x-6 md:gap-y-8 border-t border-white/10 mt-8 md:mt-10 pt-8 md:pt-10 pb-10 md:pb-14">
+            {[
+              { icon: Users, value: "50K+", label: t("home.stat_happy_users") },
+              { icon: Store, value: "1,200+", label: t("home.stat_venues_listed") },
+              { icon: Ticket, value: "3,500+", label: t("home.stat_events_hosted") },
+              { icon: MapPin, value: "25+", label: t("home.stat_cities") },
+            ].map(({ icon: Icon, value, label }) => (
+              <div key={label} className="flex items-center gap-3 justify-center md:justify-start">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-xl md:text-2xl font-bold tracking-tight text-white leading-none">{value}</p>
+                  <p className="text-[11px] md:text-xs text-muted-foreground mt-1 leading-tight">{label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <CityPickerModal open={cityModalOpen} onOpenChange={setCityModalOpen} />
+
+      {/* Popular Categories */}
+      <section className="container mx-auto px-4 md:px-6 pt-4 pb-10">
+        <div className="flex items-end justify-between mb-6">
+          <h2 className="font-serif text-2xl md:text-4xl tracking-tight">{t("home.categories_title")}</h2>
+          <Link
+            href="/pubs"
+            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary-hover transition-colors group"
+          >
+            {t("home.categories_view_all")}
+            <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+          {CATEGORIES.map(({ label, sub, icon: Icon, href, img }) => (
+            <Link
+              key={label}
+              href={href}
+              className="reveal sheen group relative overflow-hidden rounded-2xl border border-white/8 lift-3d aspect-[4/5]"
+            >
+              <img
+                src={img}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/15" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary/25 via-transparent to-transparent mix-blend-screen opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 flex flex-col items-center justify-end text-center p-3 md:p-4">
+                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-black/40 text-primary backdrop-blur-sm">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-semibold text-white leading-tight">{label}</span>
+                <span className="text-[11px] text-white/55 mt-0.5">{sub}</span>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
@@ -305,10 +482,10 @@ export function Home() {
                 <Flame className="h-3.5 w-3.5" />
                 {t("home.trending_label")}
               </p>
-              <h2 className="font-serif text-3xl md:text-5xl tracking-tight">{t("home.trending_title")}</h2>
+              <h2 className="font-serif text-2xl sm:text-3xl md:text-5xl tracking-tight">{t("home.trending_title")}</h2>
             </div>
             <Link
-              href="/explore"
+              href="/pubs"
               className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
             >
               {t("home.view_all_events")}
@@ -383,12 +560,12 @@ export function Home() {
         )}
       </section>
 
-      {/* Drink Deals — same two-section design as /pub-offers */}
+      {/* Drink Deals */}
       {drinkOffers.length > 0 && (() => {
         const { freeVendors, ticketVendors } = splitVendorsByPlanType(drinkOffers as VendorDrinkOffer[]);
         if (freeVendors.length === 0 && ticketVendors.length === 0) return null;
         return (
-          <section className="py-16 md:py-24">
+          <section className="py-16 md:py-20">
             <div className="container mx-auto px-4 md:px-6">
               <SectionHeader
                 icon={<GlassWater className="h-3.5 w-3.5" />}
@@ -397,8 +574,7 @@ export function Home() {
                 seeAllHref="/pub-offers"
                 seeAllLabel={t("pub_offers.browse_pubs")}
               />
-
-              <div className="space-y-6">
+              <div className="space-y-10">
                 <FreeDrinkSection vendors={freeVendors} />
                 <TicketSection vendors={ticketVendors} />
               </div>
@@ -423,13 +599,42 @@ export function Home() {
         </section>
       )}
 
+      {/* Promo banner */}
+      <section className="container mx-auto px-4 md:px-6 py-8">
+        <Link
+          href="/pub-offers"
+          className="reveal sheen group relative block overflow-hidden rounded-2xl border border-primary/20 lift-3d"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1600&q=70"
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover opacity-30 transition-transform duration-700 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-transparent to-primary/10 mix-blend-screen" />
+          <div className="relative flex items-center gap-4 md:gap-6 p-6 md:p-8">
+            <span className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground red-glow">
+              <Megaphone className="h-6 w-6" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-serif text-xl md:text-3xl tracking-tight text-white">{t("home.promo_title")}</h3>
+              <p className="text-sm text-white/60 mt-1">{t("home.promo_sub")}</p>
+            </div>
+            <span className="hidden md:inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shrink-0">
+              {t("home.promo_cta")} <ArrowRight className="h-4 w-4" />
+            </span>
+          </div>
+        </Link>
+      </section>
+
       {/* Featured events */}
       <section className="container mx-auto px-4 md:px-6 py-12">
         <SectionHeader
           icon={<Sparkles className="h-3.5 w-3.5" />}
           eyebrow={t("home.featured_label")}
           title={t("home.featured_title")}
-          seeAllHref="/explore"
+          seeAllHref="/pubs"
           seeAllLabel={t("home.view_all")}
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -527,21 +732,44 @@ export function Home() {
         </div>
       </section>
 
-      {/* CTA — Premium */}
-      <section className="container mx-auto px-4 md:px-6 py-24">
-        <div className="relative rounded-[2rem] overflow-hidden glass-card-strong red-glow p-10 md:p-16 border border-primary/20 text-center">
-          <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-80 w-[32rem] max-w-full rounded-full bg-primary/20 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 h-72 w-[28rem] max-w-full rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-          <div className="relative mx-auto max-w-3xl flex flex-col items-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 border border-primary/40 px-3 py-1 text-xs uppercase tracking-wider text-primary mb-6">
-              <Crown className="h-3.5 w-3.5" /> {t("home.premium_badge")}
-            </div>
-            <h2 className="font-serif text-3xl md:text-5xl tracking-tight italic leading-tight">
-              {t("home.premium_heading")}
+      {/* CTA — Ready for your next night out */}
+      <section className="container mx-auto px-4 md:px-6 py-16 md:py-24">
+        <div className="reveal sheen relative overflow-hidden rounded-[2rem] border border-primary/20 lift-3d">
+          <img
+            src="https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?w=1600&q=70"
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/40" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/25 via-transparent to-primary/10 mix-blend-screen" />
+          <div className="absolute -top-24 left-1/3 h-72 w-[28rem] max-w-full rounded-full bg-primary/15 blur-3xl pointer-events-none" />
+          <div className="relative p-10 md:p-16 max-w-2xl">
+            <h2 className="font-serif text-3xl md:text-5xl tracking-tight text-white leading-tight">
+              {t("home.nightout_title")}
             </h2>
-            <p className="mt-5 text-white/70 leading-relaxed md:text-lg">
-              {t("home.premium_sub")}
+            <p className="mt-4 text-white/70 leading-relaxed md:text-lg">
+              {t("home.nightout_sub")}
             </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link href="/register">
+                <Button
+                  size="lg"
+                  className="gap-2 bg-primary text-primary-foreground red-glow border-0 h-12 px-7 rounded-xl text-base font-semibold"
+                >
+                  {t("home.nightout_cta")} <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Link href="/pubs">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-12 px-7 border-white/20 hover:bg-white/8 rounded-xl text-base font-semibold"
+                >
+                  {t("home.browse_pubs")}
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

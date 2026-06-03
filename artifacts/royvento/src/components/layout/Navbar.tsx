@@ -10,14 +10,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Logo } from "@/components/Logo";
-import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Palette, Globe, Check } from "lucide-react";
+import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
 import { useTranslation } from "react-i18next";
 import { setLanguage } from "@/i18n/index";
-import { useTheme } from "@/components/ThemeProvider";
-import { THEMES } from "@/components/ui/ThemeSwitcher";
 import { LANGUAGES } from "@/components/ui/LanguageSwitcher";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -31,9 +29,7 @@ interface Notification {
 
 export function Navbar() {
   const { t, i18n } = useTranslation();
-  const { theme, setTheme } = useTheme();
   const currentLang = LANGUAGES.find((l) => l.code === i18n.language) ?? LANGUAGES[0]!;
-  const currentTheme = THEMES.find((th) => th.id === theme) ?? THEMES[0]!;
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
   const logout = useLogout();
   const [, setLocation] = useLocation();
@@ -372,32 +368,6 @@ export function Navbar() {
                     {t("nav.log_out")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="cursor-pointer">
-                      <span
-                        className="h-3.5 w-3.5 rounded-full shrink-0 mr-1"
-                        style={{ background: currentTheme.color }}
-                      />
-                      <Palette className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                      <span>Theme</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent alignOffset={-4} collisionPadding={8} className="bg-card border border-border shadow-xl w-44 max-w-[calc(100vw-1rem)]">
-                      {THEMES.map((th) => (
-                        <DropdownMenuItem
-                          key={th.id}
-                          onClick={() => setTheme(th.id)}
-                          className="flex items-center gap-2.5 cursor-pointer"
-                        >
-                          <span
-                            className="h-3.5 w-3.5 rounded-full shrink-0"
-                            style={{ background: th.color }}
-                          />
-                          <span className="flex-1">{th.label}</span>
-                          {theme === th.id && <Check className="h-3.5 w-3.5 text-primary" />}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="cursor-pointer">
                       <Globe className="h-3.5 w-3.5 mr-2 text-muted-foreground" />

@@ -588,7 +588,7 @@ router.post("/auth/forgot-password", forgotPasswordLimiter, async (req, res) => 
 
 const ResetPasswordBody = z.object({
   token: z.string().min(1),
-  newPassword: z.string().min(6),
+  newPassword: strongPassword,
 });
 
 router.post("/auth/reset-password", async (req, res) => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { todayIst } from "@/lib/utils";
 import { useParams, Link, useLocation } from "wouter";
 import { SEO, buildBreadcrumbList } from "@/components/SEO";
 import { pubDetailSlug } from "@/lib/seo-slug";
@@ -1007,7 +1008,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
                       <input
                         type="date"
                         value={bookDate}
-                        min={new Date().toISOString().split("T")[0]}
+                        min={todayIst()}
                         onChange={(e) => setBookDate(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                       />

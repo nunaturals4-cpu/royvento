@@ -25,6 +25,8 @@ import type { ImportGooglePubResponse } from "@workspace/api-client-react";
 import {
   useGetAdminLiveOccupancy,
   useGetAdminLiveOccupancyBookings,
+  getGetAdminLiveOccupancyQueryKey,
+  getGetAdminLiveOccupancyBookingsQueryKey,
 } from "@workspace/api-client-react";
 import type {
   OccupancyRow as ApiOccupancyRow,
@@ -121,25 +123,29 @@ function AdminSidebarTrigger({
     <TabsTrigger
       value={value}
       className={
-        "group relative w-full justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-medium " +
+        "group relative w-full justify-start gap-3 px-3 py-2.5 rounded-xl text-sm font-medium overflow-hidden " +
         "transition-all duration-200 border border-transparent " +
-        "data-[state=active]:bg-white/[0.07] data-[state=active]:border-white/[0.10] " +
-        "data-[state=active]:text-white data-[state=active]:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_-12px_rgba(0,0,0,0.8)] " +
+        "data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/[0.18] data-[state=active]:to-primary/[0.02] " +
+        "data-[state=active]:border-primary/25 data-[state=active]:text-white " +
+        "data-[state=active]:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-12px_rgba(232,41,28,0.45)] " +
         "data-[state=inactive]:text-white/55 hover:text-white hover:bg-white/[0.04] " +
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       }
     >
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-primary shadow-[0_0_12px_rgba(232,41,28,0.9)]" />
+      )}
       <span className={
-        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-colors " +
+        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-all " +
         (active
-          ? "bg-primary/15 text-primary border border-primary/30"
+          ? "bg-gradient-to-br from-primary/30 to-primary/10 text-primary border border-primary/40 shadow-[0_0_14px_-4px_rgba(232,41,28,0.7)]"
           : "bg-white/[0.04] text-white/50 border border-white/[0.06] group-hover:bg-white/[0.08] group-hover:text-white/80")
       }>
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
       {active && (
-        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 shadow-[0_0_10px_rgba(232,41,28,0.8)] animate-pulse" />
       )}
     </TabsTrigger>
   );
@@ -206,11 +212,12 @@ function AdminHeader({
           <Menu className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 font-semibold leading-none">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-primary/70 font-semibold leading-none flex items-center gap-1.5">
+            <span className="h-1 w-1 rounded-full bg-primary shadow-[0_0_8px_rgba(232,41,28,0.8)]" />
             {currentTabLabel}
           </p>
           <h1 className="font-serif text-lg sm:text-xl md:text-2xl tracking-tight mt-1.5 leading-tight truncate">
-            <span className="whitespace-nowrap">Royvento</span>
+            <span className="whitespace-nowrap text-gradient-red">Royvento</span>
             <span className="text-white/30 font-normal hidden sm:inline"> Control Room</span>
           </h1>
         </div>
@@ -252,7 +259,7 @@ export function AdminPanel() {
       <Tabs value={activeTab} onValueChange={handleTabChange} orientation="vertical" className="block">
         <div className="md:grid md:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)] min-h-[calc(100vh-68px)]">
           {/* Desktop sidebar */}
-          <aside className="hidden md:block sticky top-[68px] h-[calc(100vh-68px)] overflow-y-auto border-r border-white/[0.06] bg-sidebar/40 backdrop-blur-xl">
+          <aside className="hidden md:block sticky top-[68px] h-[calc(100vh-68px)] overflow-y-auto border-r border-white/[0.06] bg-gradient-to-b from-[#140405]/70 via-sidebar/40 to-black/50 backdrop-blur-xl">
             <AdminNav currentTab={activeTab} />
           </aside>
 
@@ -279,7 +286,9 @@ export function AdminPanel() {
           )}
 
           {/* Main */}
-          <main className="min-w-0">
+          <main className="relative min-w-0">
+            {/* Ambient premium glow */}
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] -z-10 bg-[radial-gradient(800px_420px_at_82%_-8%,rgba(232,41,28,0.10),transparent_62%)]" />
             <AdminHeader
               currentTabLabel={currentTabLabel}
               onMenu={() => setDrawerOpen(true)}
@@ -315,16 +324,18 @@ export function AdminPanel() {
 
 function Stat({ icon: Icon, label, value, valueClassName, subLabel, subValue, subHint }: { icon: any; label: string; value: string; valueClassName?: string; subLabel?: string; subValue?: string; subHint?: string }) {
   return (
-    <div className="rounded-2xl glass-card p-5 lift-3d">
-      <div className="flex items-center justify-between mb-3">
+    <div className="group relative overflow-hidden rounded-2xl glass-card p-5 lift-3d">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-primary/70 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
+      <div className="pointer-events-none absolute -top-12 -right-12 h-28 w-28 rounded-full bg-primary/[0.07] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="relative flex items-center justify-between mb-3">
         <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
-        <div className="w-9 h-9 rounded-lg bg-red-600/15 text-primary flex items-center justify-center red-ring">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-600/25 to-red-600/5 border border-primary/25 text-primary flex items-center justify-center red-ring shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className={`stat-number text-3xl ${valueClassName ?? ""}`}>{value}</p>
+      <p className={`relative stat-number text-3xl ${valueClassName ?? ""}`}>{value}</p>
       {subValue !== undefined && (
-        <div className="mt-2 pt-2 border-t border-amber-500/20">
+        <div className="relative mt-2 pt-2 border-t border-amber-500/20">
           {subLabel && <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{subLabel}</p>}
           <p className="text-base font-semibold text-amber-200 tabular-nums">{subValue}</p>
           {subHint && <p className="text-[10px] text-muted-foreground">{subHint}</p>}
@@ -336,8 +347,9 @@ function Stat({ icon: Icon, label, value, valueClassName, subLabel, subValue, su
 
 type AnalyticsPreset = "today" | "7d" | "30d" | "3m" | "6m" | "custom";
 
+const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 function toDateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return _istFmt.format(d);
 }
 
 const ADMIN_VENDOR_PAGE_SIZE = 10;
@@ -755,27 +767,29 @@ function AdminKpi({
   warning?: string | null;
 }) {
   const accents = {
-    primary: { chip: "bg-primary/15 border-primary/25 text-primary", text: "" },
-    amber:   { chip: "bg-amber-500/15 border-amber-500/25 text-amber-400", text: "text-amber-300" },
-    emerald: { chip: "bg-emerald-500/15 border-emerald-500/25 text-emerald-400", text: "text-emerald-300" },
-    violet:  { chip: "bg-violet-500/15 border-violet-500/25 text-violet-400", text: "text-violet-300" },
+    primary: { chip: "bg-gradient-to-br from-primary/25 to-primary/5 border-primary/30 text-primary", text: "", bar: "from-primary/70", glow: "group-hover:shadow-[0_16px_50px_-12px_rgba(232,41,28,0.30)]" },
+    amber:   { chip: "bg-gradient-to-br from-amber-500/25 to-amber-500/5 border-amber-500/30 text-amber-400", text: "text-amber-300", bar: "from-amber-400/70", glow: "group-hover:shadow-[0_16px_50px_-12px_rgba(245,158,11,0.28)]" },
+    emerald: { chip: "bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border-emerald-500/30 text-emerald-400", text: "text-emerald-300", bar: "from-emerald-400/70", glow: "group-hover:shadow-[0_16px_50px_-12px_rgba(16,185,129,0.28)]" },
+    violet:  { chip: "bg-gradient-to-br from-violet-500/25 to-violet-500/5 border-violet-500/30 text-violet-400", text: "text-violet-300", bar: "from-violet-400/70", glow: "group-hover:shadow-[0_16px_50px_-12px_rgba(139,92,246,0.28)]" },
   }[accent];
   return (
-    <div className="group relative rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-white/[0.01] backdrop-blur-xl p-5 transition-all duration-300 hover:border-white/[0.12] hover:shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]">
-      <div className="flex items-start gap-3 mb-4">
-        <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${accents.chip} shrink-0`}>
+    <div className={`group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.01] backdrop-blur-xl p-5 transition-all duration-300 hover:border-white/[0.14] hover:-translate-y-0.5 ${accents.glow}`}>
+      <div className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${accents.bar} via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity`} />
+      <div className="pointer-events-none absolute -top-12 -right-12 h-28 w-28 rounded-full bg-white/[0.04] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="relative flex items-start gap-3 mb-4">
+        <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${accents.chip} shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]`}>
           <Icon className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[10px] uppercase tracking-[0.22em] text-white/40 font-semibold leading-none">{label}</p>
         </div>
-        <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white/40 transition-colors" />
+        <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-white/50 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
       </div>
-      <p className={`stat-number text-3xl md:text-[2rem] leading-none tabular-nums ${accents.text}`}>{value}</p>
-      {hint && <p className="text-xs text-white/45 mt-2">{hint}</p>}
+      <p className={`relative stat-number text-3xl md:text-[2rem] leading-none tabular-nums ${accents.text}`}>{value}</p>
+      {hint && <p className="relative text-xs text-white/45 mt-2">{hint}</p>}
       {warning && (
-        <p className="text-[11px] text-amber-300/90 mt-2 flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        <p className="relative text-[11px] text-amber-300/90 mt-2 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
           {warning}
         </p>
       )}
@@ -3113,7 +3127,7 @@ function UniqueCustomerReport() {
       const blob = await resp.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `unique-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `unique-customers-${_istFmt.format(new Date())}.xlsx`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
@@ -3279,7 +3293,7 @@ function AttendanceReport() {
   const { data: allVendors } = useListVendors({ limit: 500 } as Parameters<typeof useListVendors>[0]);
   const vendors = allVendors ?? [];
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = _istFmt.format(new Date());
 
   const params = {
     ...(vendorId !== "all" ? { vendorId: Number(vendorId) } : {}),
@@ -5514,7 +5528,7 @@ function LiveOccupancyAdmin() {
     ...(q.trim() ? { q: q.trim() } : {}),
   };
   const { data, isLoading, error } = useGetAdminLiveOccupancy(params, {
-    query: { refetchInterval: 15000 },
+    query: { queryKey: getGetAdminLiveOccupancyQueryKey(params), refetchInterval: 15000 },
   });
   const loading = isLoading;
   const err = error ? (error instanceof Error ? error.message : "Failed to load") : null;
@@ -5625,7 +5639,7 @@ function LiveOccupancyDrill({ vendor, onClose }: { vendor: ApiOccupancyRow; onCl
   if (from && to) { params.from = from; params.to = to; }
 
   const { data, isLoading } = useGetAdminLiveOccupancyBookings(vendor.vendorId, params, {
-    query: { refetchInterval: 20000 },
+    query: { queryKey: getGetAdminLiveOccupancyBookingsQueryKey(vendor.vendorId, params), refetchInterval: 20000 },
   });
   const rows = data?.rows ?? [];
   const loading = isLoading;

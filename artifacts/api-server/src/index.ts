@@ -177,8 +177,12 @@ async function removeLegacyDemoVendor() {
   }
 }
 
-const ADMIN_EMAIL = "royvento56@gmail.com";
-const ADMIN_PASSWORD = "admin123@";
+// Admin bootstrap credentials. Overridable via env so production can use a
+// strong secret that never lives in source/the bundle. Falls back to the
+// historical defaults when the env vars are absent, so existing deployments
+// keep working with no behavioural change until they set ADMIN_PASSWORD.
+const ADMIN_EMAIL = process.env["ADMIN_EMAIL"] || "royvento56@gmail.com";
+const ADMIN_PASSWORD = process.env["ADMIN_PASSWORD"] || "admin123@";
 
 async function ensureAdminAccount() {
   try {
@@ -318,7 +322,9 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table" boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table_days" jsonb`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table_before_time" text`);
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table ensured");
+    // ── drink_plans.image_url ──────────────────────────────────────────────
+    await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "image_url" text`);
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
   }

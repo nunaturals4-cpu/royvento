@@ -939,15 +939,24 @@ export interface AdminBookingRow {
   userId: number;
   userName: string;
   userEmail: string;
+  phone: string;
   bookingDate: string;
   guests: number;
   pubMode: string;
   ticketWomen: number;
   ticketMen: number;
   ticketCouple: number;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
   totalPrice: number;
   discountAmount: number;
   finalPrice: number;
+  baseFee: number;
+  totalPayable: number;
+  /** Actual amount collected — online = finalPrice; COD checked-in = actual-count-based revenue; pending COD = 0. */
+  effectiveRevenue: number;
   paymentMethod: string;
   status: string;
   notes: string;
@@ -1287,6 +1296,14 @@ export interface SetVendorCommissionBody {
      * @maximum 99999.99
      */
   tableBookingRate: number;
+  /**
+     * Percentage of event-booking revenue charged as platform commission (0–100)
+     * @minimum 0
+     * @maximum 100
+     */
+  eventRate?: number;
+  /** Whether event-booking commission is charged for this vendor */
+  eventCommissionEnabled?: boolean;
 }
 
 export type CommissionReportBookingLineBookingType = typeof CommissionReportBookingLineBookingType[keyof typeof CommissionReportBookingLineBookingType];

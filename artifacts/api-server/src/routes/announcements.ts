@@ -2,6 +2,15 @@ import { Router, type IRouter } from "express";
 import { db, announcementsTable, vendorsTable, eventsTable, bookingsTable, usersTable } from "@workspace/db";
 import { createUserNotification } from "../lib/notify";
 import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
+
+function todayIstDate(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 import { sendExpoPushWithToken } from "../lib/expoPush";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
@@ -164,7 +173,7 @@ router.delete("/partner/announcements/:id", requireAuth(["vendor"]), async (req,
 });
 
 router.get("/announcements/recent", async (_req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIstDate();
   const rows = await db.execute(sql`
     SELECT
       a.id,
@@ -197,7 +206,7 @@ router.get("/announcements/recent", async (_req, res) => {
 });
 
 router.get("/announcements/slider", async (_req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIstDate();
 
   const featured = await db.execute(sql`
     SELECT
@@ -340,7 +349,7 @@ router.patch("/admin/announcements/:id/slider", requireAuth(["admin"]), async (r
 router.get("/vendors/:vendorId/announcements", async (req, res) => {
   const vendorId = Number(req.params["vendorId"]);
   if (!Number.isFinite(vendorId)) return res.status(400).json({ error: "Invalid id" });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIstDate();
   const rows = await db
     .select()
     .from(announcementsTable)
@@ -368,7 +377,7 @@ router.get("/events/:eventId/announcements", async (req, res) => {
     .limit(1);
   const ev = evRows[0];
   if (!ev) return res.status(404).json({ error: "Event not found" });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIstDate();
   const rows = await db
     .select()
     .from(announcementsTable)

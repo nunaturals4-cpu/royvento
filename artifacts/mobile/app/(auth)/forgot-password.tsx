@@ -70,7 +70,7 @@ export default function ForgotPasswordScreen() {
 
         <View style={styles.header}>
           <LinearGradient
-            colors={[colors.primary, colors.goldLight ?? "#e8c050"]}
+            colors={[colors.primary, colors.greenHover ?? "#4ade80"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.iconWrap}

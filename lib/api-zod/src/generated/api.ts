@@ -2789,15 +2789,23 @@ export const GetAdminBookingsReportResponse = zod.object({
   "userId": zod.number(),
   "userName": zod.string(),
   "userEmail": zod.string(),
+  "phone": zod.string(),
   "bookingDate": zod.string(),
   "guests": zod.number(),
   "pubMode": zod.string(),
   "ticketWomen": zod.number(),
   "ticketMen": zod.number(),
   "ticketCouple": zod.number(),
+  "actualWomen": zod.number().nullish(),
+  "actualMen": zod.number().nullish(),
+  "actualCouple": zod.number().nullish(),
+  "actualGuests": zod.number().nullish(),
   "totalPrice": zod.number(),
   "discountAmount": zod.number(),
   "finalPrice": zod.number(),
+  "baseFee": zod.number(),
+  "totalPayable": zod.number(),
+  "effectiveRevenue": zod.number().describe('Actual amount collected — online = finalPrice; COD checked-in = actual-count-based revenue; pending COD = 0.'),
   "paymentMethod": zod.string(),
   "status": zod.string(),
   "notes": zod.string(),
@@ -2970,12 +2978,17 @@ export const setVendorCommissionBodyTicketRateMax = 100;
 export const setVendorCommissionBodyTableBookingRateMin = 0;
 export const setVendorCommissionBodyTableBookingRateMax = 99999.99;
 
+export const setVendorCommissionBodyEventRateMin = 0;
+export const setVendorCommissionBodyEventRateMax = 100;
+
 
 
 export const SetVendorCommissionBody = zod.object({
   "freeEntryRate": zod.number().min(setVendorCommissionBodyFreeEntryRateMin).max(setVendorCommissionBodyFreeEntryRateMax).describe('Flat fee in INR per person'),
   "ticketRate": zod.number().min(setVendorCommissionBodyTicketRateMin).max(setVendorCommissionBodyTicketRateMax).describe('Percentage of ticket revenue charged as platform commission (0–100)'),
-  "tableBookingRate": zod.number().min(setVendorCommissionBodyTableBookingRateMin).max(setVendorCommissionBodyTableBookingRateMax).describe('Flat fee in INR per verified guest for table booking commission')
+  "tableBookingRate": zod.number().min(setVendorCommissionBodyTableBookingRateMin).max(setVendorCommissionBodyTableBookingRateMax).describe('Flat fee in INR per verified guest for table booking commission'),
+  "eventRate": zod.number().min(setVendorCommissionBodyEventRateMin).max(setVendorCommissionBodyEventRateMax).optional().describe('Percentage of event-booking revenue charged as platform commission (0–100)'),
+  "eventCommissionEnabled": zod.boolean().optional().describe('Whether event-booking commission is charged for this vendor')
 }).strict()
 
 export const SetVendorCommissionResponse = zod.object({

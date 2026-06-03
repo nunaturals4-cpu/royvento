@@ -4,11 +4,10 @@ import { logger } from "../lib/logger";
 import { createUserNotification } from "../lib/notify";
 import { sendExpoPushWithToken } from "../lib/expoPush";
 
-/** Returns today's date string (YYYY-MM-DD) in IST (UTC+5:30). */
+const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+/** Returns today's date string (YYYY-MM-DD) in IST (Asia/Kolkata). */
 function getTodayIST(): string {
-  const now = new Date();
-  const istMs = now.getTime() + 5.5 * 60 * 60 * 1000;
-  return new Date(istMs).toISOString().slice(0, 10);
+  return _istFmt.format(new Date());
 }
 
 /** Returns the start of today in IST as a UTC Date (for dedup queries). */

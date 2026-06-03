@@ -3808,6 +3808,8 @@ components:
           type: string
         userEmail:
           type: string
+        phone:
+          type: string
         bookingDate:
           type: string
         guests:
@@ -3820,12 +3822,31 @@ components:
           type: integer
         ticketCouple:
           type: integer
+        actualWomen:
+          type: integer
+          nullable: true
+        actualMen:
+          type: integer
+          nullable: true
+        actualCouple:
+          type: integer
+          nullable: true
+        actualGuests:
+          type: integer
+          nullable: true
         totalPrice:
           type: number
         discountAmount:
           type: number
         finalPrice:
           type: number
+        baseFee:
+          type: number
+        totalPayable:
+          type: number
+        effectiveRevenue:
+          type: number
+          description: Actual amount collected — online = finalPrice; COD checked-in = actual-count-based revenue; pending COD = 0.
         paymentMethod:
           type: string
         status:
@@ -3841,7 +3862,7 @@ components:
           nullable: true
         createdAt:
           type: string
-      required: [id, vendorId, vendorName, eventId, eventTitle, userId, userName, userEmail, bookingDate, guests, pubMode, ticketWomen, ticketMen, ticketCouple, totalPrice, discountAmount, finalPrice, paymentMethod, status, notes, ticketCode, checkedIn, createdAt]
+      required: [id, vendorId, vendorName, eventId, eventTitle, userId, userName, userEmail, phone, bookingDate, guests, pubMode, ticketWomen, ticketMen, ticketCouple, totalPrice, discountAmount, finalPrice, baseFee, totalPayable, effectiveRevenue, paymentMethod, status, notes, ticketCode, checkedIn, createdAt]
 
     AdminBookingReportResponse:
       type: object
@@ -4376,6 +4397,14 @@ components:
           minimum: 0
           maximum: 99999.99
           description: Flat fee in INR per verified guest for table booking commission
+        eventRate:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Percentage of event-booking revenue charged as platform commission (0–100)
+        eventCommissionEnabled:
+          type: boolean
+          description: Whether event-booking commission is charged for this vendor
       required: [freeEntryRate, ticketRate, tableBookingRate]
 
     CommissionReportBookingLine:

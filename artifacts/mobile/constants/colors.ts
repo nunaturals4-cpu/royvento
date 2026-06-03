@@ -1,44 +1,57 @@
 /**
- * Royvento Mobile — Royal Gold theme
- * Derived from sibling web artifact's [data-theme="gold"] palette.
+ * Royvento Mobile — Midnight Noir (Blood Red)
+ * Background #000000 · Secondary BG #0D0D0D · Cards #111111
+ * Primary Red #E8291C · Hover Red   #F54040 · Dark Red #991B1B
+ * Text #FFFFFF · Secondary Text #A0A0A0 · Border #1F1F1F
+ * Mirrors the web artifact's default :root palette.
  * The app uses a dark-only theme; both light and dark return the same tokens.
  */
 
 const palette = {
-  text: "#f5f3ee",
-  tint: "#d4a017",
+  text: "#ffffff",
+  tint: "#dc2626",
 
-  background: "#0e0d12",
-  foreground: "#f5f3ee",
+  /* #000000 — primary background */
+  background: "#000000",
+  foreground: "#ffffff",
 
-  card: "#16151a",
-  cardForeground: "#f5f3ee",
+  /* #111111 — cards */
+  card: "#111111",
+  cardForeground: "#ffffff",
 
-  primary: "#d4a017",
-  primaryForeground: "#0d0d0d",
+  /* #E8291C — Blood Red primary; white text for contrast */
+  primary: "#e8291c",
+  primaryForeground: "#ffffff",
+  primaryHover: "#f54040",
 
-  secondary: "#232229",
-  secondaryForeground: "#f5f3ee",
+  /* White secondary — matches the outline button style */
+  secondary: "#ffffff",
+  secondaryForeground: "#0a0a0a",
 
-  muted: "#232229",
-  mutedForeground: "#9c9ba5",
+  /* Muted surfaces */
+  muted: "#0d0d0d",
+  mutedForeground: "#a0a0a0",
 
-  accent: "#1e1c24",
-  accentForeground: "#f5f3ee",
+  accent: "#1a1a1a",
+  accentForeground: "#ffffff",
 
-  destructive: "#e53935",
+  destructive: "#dc2626",
   destructiveForeground: "#ffffff",
 
-  border: "#2c2b32",
-  input: "#2c2b32",
+  /* #1F1F1F — border */
+  border: "#1f1f1f",
+  /* #0D0D0D — secondary bg / inputs */
+  input: "#0d0d0d",
 
-  gold: "#d4a017",
-  goldLight: "#e8c050",
+  red: "#dc2626",
+  redHover: "#f54040",
+  redDark: "#991b1b",
+  redLight: "#fca5a5",
   overlay: "rgba(0,0,0,0.7)",
-  success: "#4caf50",
+  success: "#16a34a",
 
-  tabIconDefault: "#9c9ba5",
-  tabIconSelected: "#d4a017",
+  tabIconDefault: "#a0a0a0",
+  tabIconSelected: "#dc2626",
 };
 
 const colors = {

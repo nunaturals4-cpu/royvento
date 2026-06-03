@@ -25,4 +25,12 @@ export interface SetVendorCommissionBody {
      * @maximum 99999.99
      */
   tableBookingRate: number;
+  /**
+     * Percentage of event-booking revenue charged as platform commission (0–100)
+     * @minimum 0
+     * @maximum 100
+     */
+  eventRate?: number;
+  /** Whether event-booking commission is charged for this vendor */
+  eventCommissionEnabled?: boolean;
 }

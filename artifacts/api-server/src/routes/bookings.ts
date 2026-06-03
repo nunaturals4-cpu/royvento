@@ -69,7 +69,9 @@ const EVENT_TYPES = [
 // fields which the client only sends when relevant).
 const CreateBookingBody = z.object({
   eventId: z.number().int().positive(),
-  bookingDate: z.string().min(1, "Booking date is required"),
+  bookingDate: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Booking date must be in YYYY-MM-DD format")
+    .refine((v) => !isNaN(new Date(v + "T00:00:00").getTime()), "Booking date is not a valid calendar date"),
   guests: z.number().int().nonnegative().optional().default(0),
   // Optional per task spec.
   notes: z.string().optional().default(""),
@@ -84,8 +86,8 @@ const CreateBookingBody = z.object({
   ticketCouple: z.number().int().nonnegative().default(0),
   selectedPubEvent: z.string().default(""),
   announcementId: z.number().int().positive().optional(),
-  personName: z.string().optional().default(""),
-  phone: z.string().optional().default(""),
+  personName: z.string().transform((s) => s.trim()).optional().default(""),
+  phone: z.string().transform((s) => s.trim()).optional().default(""),
   paymentMethod: z.enum(["cod", "online"]).default("online"),
   callbackScheme: z.enum(["royvento"]).optional(),
   arrivalTime: z.string().default(""),
@@ -778,8 +780,8 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
 
   const fromStr = req.query["from"] as string | undefined;
   const toStr = req.query["to"] as string | undefined;
-  const rangeStart = fromStr ? new Date(`${fromStr}T00:00:00Z`) : undefined;
-  const rangeEnd = toStr ? new Date(`${toStr}T23:59:59Z`) : undefined;
+  const rangeStart = fromStr ? new Date(`${fromStr}T00:00:00+05:30`) : undefined;
+  const rangeEnd = toStr ? new Date(`${toStr}T23:59:59+05:30`) : undefined;
 
   // Revenue / commission / earnings KPIs are gated on `checkedIn = true`.
   // After the QR-scan refactor, that flag flips ONLY when the manager taps
@@ -1028,11 +1030,11 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   effectiveStart.setUTCHours(0, 0, 0, 0);
   for (let i = 0; i < cappedDays; i++) {
     const d = new Date(effectiveStart.getTime() + i * dayMs);
-    dailyMap.set(d.toISOString().slice(0, 10), 0);
-    dailyCommissionMap.set(d.toISOString().slice(0, 10), 0);
+    dailyMap.set(toIstDateStr(d), 0);
+    dailyCommissionMap.set(toIstDateStr(d), 0);
   }
   for (const b of allBookings) {
-    const day = new Date(b.createdAt).toISOString().slice(0, 10);
+    const day = toIstDateStr(b.createdAt);
     // Daily revenue chart uses realised per-booking revenue (actuals-aware
     // for COD, finalPrice for online) so the column total reconciles with
     // Total Earnings / Gross Earnings tiles above.
@@ -2126,17 +2128,17 @@ router.post("/partner/scan-ticket", requireAuth(), async (req, res) => {
   }
 
   // Server-side date validation — never trust the scanner device's clock.
-  // b.bookingDate is "YYYY-MM-DD"; compare against today in UTC so the check
-  // is deterministic across timezones and DST boundaries.
-  const _scanNow = new Date();
-  const todayUTC = `${_scanNow.getUTCFullYear()}-${String(_scanNow.getUTCMonth() + 1).padStart(2, "0")}-${String(_scanNow.getUTCDate()).padStart(2, "0")}`;
-  if (b.bookingDate < todayUTC) {
-    await logRejectedScan("TICKET_EXPIRED", { serverDate: todayUTC });
+  // bookingDate is stored as the customer's IST (Asia/Kolkata) local date.
+  // todayIstDate() is hoisted from below and returns today's IST date via
+  // Intl.DateTimeFormat so the comparison is always in the correct timezone.
+  const todayIST = todayIstDate();
+  if (b.bookingDate < todayIST) {
+    await logRejectedScan("TICKET_EXPIRED", { serverDate: todayIST });
     res.status(422).json({ code: "TICKET_EXPIRED", message: "This ticket has expired and can no longer be used." });
     return;
   }
-  if (b.bookingDate > todayUTC) {
-    await logRejectedScan("TICKET_FUTURE", { serverDate: todayUTC });
+  if (b.bookingDate > todayIST) {
+    await logRejectedScan("TICKET_FUTURE", { serverDate: todayIST });
     res.status(422).json({ code: "TICKET_FUTURE", message: "This ticket is valid for a future date and cannot be used today." });
     return;
   }
@@ -2591,14 +2593,14 @@ router.get("/admin/bookings", requireAuth(["admin"]), async (_req, res) => {
  * a single calendar date in Asia/Kolkata is the natural business-day window
  * for occupancy / scanner filtering.
  */
-function todayIstDate(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+const _istFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+function todayIstDate(): string { return _istFmt.format(new Date()); }
+function toIstDateStr(d: Date | string): string { return _istFmt.format(typeof d === "string" ? new Date(d) : d); }
 
 /**
  * Resolves all vendor IDs the user is allowed to scan/manage tickets for:

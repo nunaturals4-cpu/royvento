@@ -30,6 +30,8 @@ import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coi
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDayRanges } from "@/lib/days";
+import { todayIst } from "@/lib/utils";
+import { DrinkDealCard } from "@/components/DrinkDealCards";
 
 interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
@@ -80,10 +82,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     enabled: (event as any)?.type === "pub" && !!vendorId,
   });
 
-  const [date, setDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
+  const [date, setDate] = useState(() =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
+  );
   const [guests, setGuests] = useState(1);
   const [notes, setNotes] = useState("");
   const [personName, setPersonName] = useState("");
@@ -325,6 +326,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const blockedDates = new Set(
     availability.filter((a) => a.status !== "available").map((a) => a.date),
   );
+  const partnerBlockedDatesSet = new Set(partnerBlockedDates.map((d) => d.date));
+  const isSelectedDateBlocked = date ? partnerBlockedDatesSet.has(date) : false;
 
   const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const vendorOpenDays: string[] = (ev.vendor?.openDays ?? []) as string[];
@@ -515,8 +518,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime) {
       errs.arrivalTime = t("events.required_field");
     } else if (isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && date) {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      if (date === todayStr) {
+      if (date === todayIst()) {
         const now = new Date();
         const [h, m] = arrivalTime.split(":").map(Number);
         if ((h ?? 0) * 60 + (m ?? 0) <= now.getHours() * 60 + now.getMinutes()) {
@@ -537,6 +539,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" });
+      return;
+    }
+    if (isSelectedDateBlocked) {
+      toast({ title: "Date not available", description: `${venueName} has blocked this date. Please select another date.`, variant: "destructive" });
       return;
     }
     if (eventDateMismatch) {
@@ -620,8 +626,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       if (isPub && pubMode === "event_booking" && !selectedAnnouncementId) errs.selectedPubEvent = "Please select an event to book";
       if (isPub && (pubMode === "ticket" || pubMode === "event") && !arrivalTime) errs.arrivalTime = t("events.required_field");
       else if (isPub && (pubMode === "ticket" || pubMode === "event") && arrivalTime && date) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        if (date === todayStr) {
+        if (date === todayIst()) {
           const now = new Date();
           const [h, m] = arrivalTime.split(":").map(Number);
           if ((h ?? 0) * 60 + (m ?? 0) <= now.getHours() * 60 + now.getMinutes()) errs.arrivalTime = "Please select a future arrival time for today's booking";
@@ -629,6 +634,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       }
       setFieldErrors(errs);
       if (Object.keys(errs).length > 0) { toast({ title: t("events.required_field"), description: Object.values(errs)[0], variant: "destructive" }); return false; }
+      if (isSelectedDateBlocked) { toast({ title: "Date not available", description: `${venueName} has blocked this date. Please select another date.`, variant: "destructive" }); return false; }
       if (eventDateMismatch) { toast({ title: "Date mismatch", description: "Selected booking date does not match the chosen event date. Please select the event date to continue.", variant: "destructive" }); return false; }
       if (isClosedDay) { toast({ title: t("events.venue_closed", { venue: venueName, day: selectedDayName }), description: t("events.pick_open_day"), variant: "destructive" }); return false; }
       return true;
@@ -766,10 +772,26 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     },
     buildBreadcrumbList([
       { name: "Home", url: "/" },
-      { name: "Explore", url: "/explore" },
+      { name: "Pubs", url: "/pubs" },
       { name: event.title, url: `/events/${event.id}` },
     ]),
   ];
+
+  // ── Compute open/closed status for sidebar ──────────────────────────────
+  const todayKeyForSidebar = DAY_ABBRS[new Date().getDay()];
+  const todayHours = vendorDayHours?.[todayKeyForSidebar] ?? null;
+  const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+  const toMins = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+  const isOpenNowSidebar = todayHours
+    ? (() => {
+        const o = toMins(todayHours.open), c = toMins(todayHours.close);
+        return c < o ? nowMins >= o || nowMins <= c : nowMins >= o && nowMins <= c;
+      })()
+    : false;
+  const closesAtLabel = todayHours ? formatHour(todayHours.close) : null;
+
+  // Gallery images array (main + vendor cover)
+  const galleryImgs = [event.imageUrl, vendorCover].filter(Boolean) as string[];
 
   return (
     <div className="min-h-screen bg-background">
@@ -782,99 +804,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         jsonLd={eventJsonLd}
       />
 
-      {/* ═══════════════════════════════════════
-          CINEMATIC HERO
-      ═══════════════════════════════════════ */}
-      <div className="relative h-[75vh] min-h-[560px] w-full overflow-hidden">
-        {/* Cover image */}
-        {(event.imageUrl || (isPub && vendorCover)) ? (
-          <div className="absolute inset-0">
-            <img src={event.imageUrl || vendorCover} alt={event.title} className="h-full w-full object-cover" style={{ transform: "scale(1.04)", transformOrigin: "center center" }} />
-          </div>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-black to-red-950/20" />
-        )}
-        {/* Cinematic overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/15 to-transparent" />
-        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/75 to-transparent" />
-
-        {/* Top bar */}
-        <div className="absolute top-0 inset-x-0 px-4 md:px-8 py-5 flex items-center justify-between">
-          <Link href="/pubs" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/50 border border-white/15 hover:bg-black/70 backdrop-blur-sm transition-all text-sm font-medium text-white">
-            <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Explore</span>
-          </Link>
-          {me?.user && (
-            <button onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()} disabled={addToWishlist.isPending || removeFromWishlist.isPending} aria-label={inWishlist ? t("events.remove_wishlist") : t("events.add_wishlist")} className="p-3 rounded-full bg-black/50 border border-white/15 hover:bg-black/70 backdrop-blur-sm transition-all">
-              <Heart className={`h-5 w-5 transition-colors ${inWishlist ? "fill-red-500 text-red-500" : "text-white"}`} />
-            </button>
-          )}
-        </div>
-
-        {/* Hero bottom content */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 md:px-10 lg:px-16 pb-12 md:pb-16">
-          {/* Badges */}
-          <div className="flex items-center gap-2 mb-5 flex-wrap">
-            {isPub && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-xs font-semibold text-white tracking-widest uppercase">Pub & Club</span>
-            )}
-            {ev.popular && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 text-white text-xs font-bold tracking-wider uppercase shadow-lg shadow-red-900/50">
-                <Sparkle className="h-3 w-3" /> Popular
-              </span>
-            )}
-            {event.rating > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-amber-500/30 backdrop-blur-sm">
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                <span className="font-bold text-white text-sm">{event.rating.toFixed(1)}</span>
-                <span className="text-white/50 text-xs">({event.reviewCount} reviews)</span>
-              </div>
-            )}
-          </div>
-          {/* Title */}
-          <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl tracking-tight max-w-4xl leading-[1.05] text-white drop-shadow-2xl">{event.title}</h1>
-          <p className="mt-3 text-white/60 text-sm md:text-base">
-            by{" "}
-            <Link href={event.vendor ? pubDetailSlug({ id: event.vendor.id, name: event.vendorName, city: event.vendor.city }) : "#"} className="text-white/85 hover:text-white underline underline-offset-4 transition-colors font-medium">{event.vendorName}</Link>
-          </p>
-          {/* Meta row */}
-          <div className="flex items-center gap-5 mt-4 flex-wrap">
-            {loc && (
-              <div className="flex items-center gap-2 text-white/65 text-sm">
-                <MapPin className="h-4 w-4 text-primary shrink-0" />
-                <span>{loc}</span>
-                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${venueName} ${loc}`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs text-primary/70 hover:text-primary ml-1 transition-colors">
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
-            )}
-            {event.capacity > 0 && (
-              <div className="flex items-center gap-2 text-white/60 text-sm">
-                <Users className="h-4 w-4 text-primary shrink-0" />
-                <span>Up to {event.capacity} guests</span>
-              </div>
-            )}
-          </div>
-          {/* CTA Buttons */}
-          <div className="flex items-center gap-3 mt-7 flex-wrap">
-            <button onClick={() => switchPubTab("book")} className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-primary hover:bg-primary/90 text-white font-semibold rounded-full text-sm transition-all shadow-xl shadow-primary/30 red-glow border border-primary/50">
-              <CalIcon className="h-4 w-4" /> Book Now
-            </button>
-            {isPub && ev.freeEntryRules?.enabled && (
-              <button onClick={() => switchPubTab("happyHours")} className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-transparent border border-amber-500/50 hover:border-amber-400 text-amber-400 hover:text-amber-300 font-semibold rounded-full text-sm transition-all backdrop-blur-sm hover:bg-amber-500/10">
-                <Sparkle className="h-4 w-4" /> Get Free Entry Pass
-              </button>
-            )}
-            <button onClick={() => switchPubTab("reviews")} className="inline-flex items-center gap-2.5 px-6 py-3.5 bg-white/10 hover:bg-white/15 border border-white/20 text-white font-medium rounded-full text-sm transition-all backdrop-blur-sm">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              {event.rating > 0 ? `${event.rating.toFixed(1)} Rating` : "Reviews"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Lightbox */}
+      {/* Lightbox — stays full-screen over everything */}
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-lg" onClick={() => setLightbox(null)}>
           <img src={lightbox} alt="" className="max-w-[95vw] max-h-[90vh] rounded-2xl object-contain shadow-2xl" />
@@ -883,6 +813,207 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           </button>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════
+          TWO-COLUMN LAYOUT
+      ═══════════════════════════════════════ */}
+      <div className="flex min-h-screen items-start">
+
+        {/* ════ LEFT SIDEBAR ════ */}
+        <aside className="hidden lg:flex flex-col w-[280px] xl:w-[300px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-white/[0.06] bg-[#0a0a0a] p-5 gap-5 scrollbar-none">
+
+          {/* Back link */}
+          <Link href="/pubs" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-white transition-colors -ml-0.5">
+            <ChevronLeft className="h-4 w-4" /> Back to all venues
+          </Link>
+
+          {/* Open status */}
+          {isPub && todayHours && (
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isOpenNowSidebar ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/[0.06] text-white/50 border border-white/10"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isOpenNowSidebar ? "bg-primary animate-pulse" : "bg-white/30"}`} />
+                {isOpenNowSidebar ? "Open Now" : "Closed"}
+              </span>
+              {closesAtLabel && <span className="text-xs text-muted-foreground">Closes at {closesAtLabel}</span>}
+            </div>
+          )}
+
+          {/* Venue name + verified */}
+          <div>
+            <h1 className="text-2xl font-bold text-white leading-tight flex items-center gap-2 flex-wrap">
+              {event.title}
+              {ev.vendor?.approvalStatus === "approved" && (
+                <BadgeCheck className="h-5 w-5 text-primary shrink-0" />
+              )}
+            </h1>
+            {event.rating > 0 && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <div className="flex items-center gap-0.5">
+                  {[1,2,3,4,5].map((s) => (
+                    <Star key={s} className={`h-3.5 w-3.5 ${s <= Math.round(event.rating) ? "fill-amber-400 text-amber-400" : "fill-white/10 text-white/10"}`} />
+                  ))}
+                </div>
+                <span className="text-sm font-semibold text-white">{event.rating.toFixed(1)}</span>
+                <span className="text-xs text-muted-foreground">({event.reviewCount} Reviews)</span>
+              </div>
+            )}
+            {/* Category tags */}
+            {(() => {
+              const tags = [event.category, ev.vendor?.category]
+                .filter((v, i, a) => Boolean(v) && a.indexOf(v) === i) as string[];
+              if (!tags.length) return null;
+              return (
+                <p className="text-xs text-white/55 mt-1.5">
+                  {tags.slice(0, 3).join(" • ")}
+                </p>
+              );
+            })()}
+          </div>
+
+          {/* Location + Get Directions */}
+          {loc && (
+            <div className="flex items-start gap-2">
+              <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-white">{loc}</p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueName + " " + loc)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline mt-0.5 inline-flex items-center gap-1"
+                >
+                  <Navigation className="h-3 w-3" /> Get Directions
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* CTA buttons */}
+          <div className="flex flex-col gap-2.5">
+            <button
+              onClick={() => switchPubTab("book")}
+              className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm transition-all hover:bg-primary-hover"
+            >
+              <CalIcon className="h-4 w-4" /> Book a Table
+            </button>
+            <button
+              onClick={() => { switchPubTab("reviews"); setTimeout(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); }}
+              className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.04] text-white font-semibold text-sm transition-all hover:bg-white/[0.08]"
+            >
+              <Headphones className="h-4 w-4" /> Contact Venue
+            </button>
+          </div>
+
+          {/* Wishlist */}
+          {me?.user && (
+            <button
+              onClick={() => inWishlist ? removeFromWishlist.mutate() : addToWishlist.mutate()}
+              disabled={addToWishlist.isPending || removeFromWishlist.isPending}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors"
+            >
+              <Heart className={`h-4 w-4 transition-colors ${inWishlist ? "fill-red-500 text-red-500" : ""}`} />
+              {inWishlist ? "Saved to wishlist" : "Save venue"}
+            </button>
+          )}
+
+          {/* About section — details grid */}
+          <div className="rounded-xl border border-white/[0.06] bg-[#111] p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">About {isPub ? "Venue" : "Event"}</h3>
+
+            {/* Description (short) */}
+            {event.description && (
+              <p className="text-[12px] text-white/60 leading-relaxed line-clamp-4">{event.description}</p>
+            )}
+
+            {/* Details grid */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pt-1">
+              {isPub && todayHours && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Open Today</p>
+                  <p className="text-[12px] text-white font-medium">{formatHour(todayHours.open)} – {formatHour(todayHours.close)}</p>
+                </div>
+              )}
+              {event.price > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Entry</p>
+                  <p className="text-[12px] text-white font-medium">{formatINR(event.price)} Onwards</p>
+                </div>
+              )}
+              {event.capacity > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Capacity</p>
+                  <p className="text-[12px] text-white font-medium">Up to {event.capacity}</p>
+                </div>
+              )}
+              {event.category && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Category</p>
+                  <p className="text-[12px] text-white font-medium">{event.category}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </aside>
+
+        {/* ════ RIGHT MAIN AREA ════ */}
+        <div className="flex-1 min-w-0">
+
+          {/* Mobile back button */}
+          <div className="lg:hidden px-4 py-3 border-b border-white/[0.06]">
+            <Link href="/pubs" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-white transition-colors">
+              <ChevronLeft className="h-4 w-4" /> Back to all venues
+            </Link>
+          </div>
+
+          {/* ── Hero image ── */}
+          <div className="relative h-[38vw] min-h-[200px] max-h-[500px] md:h-[54vh] overflow-hidden bg-black/40">
+            {(event.imageUrl || (isPub && vendorCover)) ? (
+              <img
+                src={event.imageUrl || vendorCover}
+                alt={event.title}
+                className="h-full w-full object-cover"
+                style={{ transform: "scale(1.02)", transformOrigin: "center center" }}
+              />
+            ) : (
+              <div className="h-full w-full bg-gradient-to-br from-zinc-900 via-black to-primary/10" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            {/* Photo counter */}
+            {galleryImgs.length > 0 && (
+              <div className="absolute top-3 right-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 border border-white/15 px-2.5 py-1 text-xs text-white backdrop-blur-md">
+                  <Users className="h-3 w-3" /> 1 / {galleryImgs.length}
+                </span>
+              </div>
+            )}
+            {/* Mobile: wishlist + title at bottom */}
+            <div className="lg:hidden absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+              <h1 className="font-bold text-xl text-white">{event.title}</h1>
+              {event.rating > 0 && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                  <span className="text-sm font-semibold text-white">{event.rating.toFixed(1)}</span>
+                  <span className="text-xs text-white/60">({event.reviewCount} reviews)</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Gallery thumbnail row ── */}
+          {galleryImgs.length > 1 && (
+            <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-none border-b border-white/[0.06]">
+              {galleryImgs.map((src, i) => (
+                <button
+                  key={i}
+                  onClick={() => setLightbox(src)}
+                  className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] hover:border-primary/40 transition-colors"
+                >
+                  <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  {i === 0 && <div className="absolute inset-0 ring-2 ring-inset ring-primary/50 rounded-lg pointer-events-none" />}
+                </button>
+              ))}
+            </div>
+          )}
 
       {/* ═══════════════════════════════════════
           STICKY TAB NAVIGATION
@@ -920,10 +1051,10 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       {/* ═══════════════════════════════════════
           TAB CONTENT
       ═══════════════════════════════════════ */}
-      <div className="container mx-auto px-4 md:px-8 py-12 md:py-16">
+      <div className="container mx-auto px-4 md:px-8 py-8 md:py-12 lg:py-16">
         {/* ─── OVERVIEW TAB ─── */}
         {pubTab === "overview" && (
-        <div className="grid lg:grid-cols-[1fr_320px] gap-12 xl:gap-16">
+        <div className="grid lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-8 lg:gap-12 xl:gap-16">
           {/* Left col */}
           <div className="space-y-12 min-w-0">
             {/* About */}
@@ -1286,106 +1417,45 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 </div>
               );
             })()}
-            {isPub && drinkPlans.length > 0 && (
-              <div className="rounded-3xl glass-card-strong p-5 md:p-7">
-                <div className="flex items-center gap-3 mb-1">
-                  <Wine className="h-4 w-4 text-primary" />
-                  <h3 className="text-base md:text-lg font-bold text-foreground tracking-tight">Drink Deals</h3>
-                </div>
-                <p className="text-xs text-muted-foreground mb-6">Tap on any deal to book a table</p>
+            {isPub && drinkPlans.length > 0 && (() => {
+              const freePlans = drinkPlans.filter((p: any) => p.type === "welcome" || p.type === "unlimited");
+              const ticketPlans = drinkPlans.filter((p: any) => p.type === "ticket");
+              const otherPlans = drinkPlans.filter((p: any) => p.type !== "welcome" && p.type !== "unlimited" && p.type !== "ticket");
+              const coverFallback = event.imageUrl || vendorCover || null;
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                  {drinkPlans.map((plan: any, i: number) => {
-                    const featured = i === 0;
-                    const typeLabel = plan.type === "unlimited" ? "UNLIMITED DRINKS"
-                      : plan.type === "ticket" ? "TICKET PACKAGE"
-                      : plan.type === "welcome" ? "WELCOME DRINK"
-                      : "DRINK PACKAGE";
-                    const isTicketPlan = plan.type === "ticket";
-                    const lineItems: Array<{ name: string; discountedPrice: number }> =
-                      isTicketPlan ? (plan.lineItems ?? []).filter((li: any) => li.name) : [];
-                    const headline = plan.productName
-                      || typeLabel.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
-                    const showTime = !!(plan.timeFrom && plan.timeTo);
-                    const subtitleParts: string[] = [formatDayRanges(plan.days)];
-                    if (showTime) subtitleParts.push(`${plan.timeFrom}–${plan.timeTo}`);
-                    const subtitle = subtitleParts.join(" • ");
-
-                    if (featured) {
-                      return (
-                        <div key={plan.id} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/95 via-primary/80 to-primary/60 text-white p-5 flex flex-col gap-2 red-glow border border-white/[0.10]">
-                          <Wine className="absolute -right-6 -bottom-6 h-32 w-32 text-white/10 rotate-12 pointer-events-none" />
-                          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/85">{typeLabel}</p>
-                          <p className="text-lg font-black leading-snug line-clamp-2 text-white">{headline}</p>
-                          {!isTicketPlan && plan.description && (
-                            <p className="text-xs text-white/90 leading-snug line-clamp-2">{plan.description}</p>
-                          )}
-                          {isTicketPlan && lineItems.length > 0 && (
-                            <ul className="space-y-1">
-                              {lineItems.slice(0, 3).map((li: any, j: number) => (
-                                <li key={j} className="flex items-center justify-between gap-2 text-sm text-white">
-                                  <span className="truncate">{li.name}</span>
-                                  <span className="shrink-0 text-xs font-bold">
-                                    {li.discountedPrice > 0 ? `₹${li.discountedPrice}` : "Free"}
-                                  </span>
-                                </li>
-                              ))}
-                              {lineItems.length > 3 && (
-                                <li className="text-[10px] text-white/75 uppercase tracking-wider">+{lineItems.length - 3} more</li>
-                              )}
-                            </ul>
-                          )}
-                          {subtitle && (
-                            <p className="text-xs text-white/90 line-clamp-1">{subtitle}</p>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => switchPubTab("book")}
-                            className="mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold uppercase tracking-wider transition-all"
-                          >
-                            Book Now <ArrowRight className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div key={plan.id} className="rounded-2xl glass-card p-5 flex flex-col gap-2">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">{typeLabel}</p>
-                        <p className="text-lg font-black text-white leading-snug line-clamp-2">{headline}</p>
-                        {!isTicketPlan && plan.description && (
-                          <p className="text-xs text-foreground/80 leading-snug line-clamp-2">{plan.description}</p>
-                        )}
-                        {isTicketPlan && lineItems.length > 0 && (
-                          <ul className="space-y-1">
-                            {lineItems.slice(0, 3).map((li: any, j: number) => (
-                              <li key={j} className="flex items-center justify-between gap-2 text-sm">
-                                <span className="truncate text-foreground/90">{li.name}</span>
-                                <span className="shrink-0 text-xs font-bold text-emerald-400">
-                                  {li.discountedPrice > 0 ? `₹${li.discountedPrice}` : "Free"}
-                                </span>
-                              </li>
-                            ))}
-                            {lineItems.length > 3 && (
-                              <li className="text-[10px] text-muted-foreground uppercase tracking-wider">+{lineItems.length - 3} more</li>
-                            )}
-                          </ul>
-                        )}
-                        {subtitle && (
-                          <p className="text-xs text-muted-foreground line-clamp-1">{subtitle}</p>
-                        )}
-                        <button
-                          type="button"
+              const Section = ({ icon: Icon, label, plans, accent }: { icon: typeof Wine; label: string; plans: any[]; accent: "primary" | "amber" }) => {
+                if (plans.length === 0) return null;
+                return (
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-5">
+                      <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${accent === "amber" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-primary/30 bg-primary/10 text-primary"}`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <h3 className="text-base md:text-lg font-bold tracking-tight">{label}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4">
+                      {plans.map((plan: any) => (
+                        <DrinkDealCard
+                          key={plan.id}
+                          plan={plan}
+                          fallbackImage={coverFallback}
+                          accent={accent}
                           onClick={() => switchPubTab("book")}
-                          className="mt-3 inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-primary/15 hover:bg-primary border border-primary/30 hover:border-primary text-primary hover:text-primary-foreground text-xs font-bold uppercase tracking-wider transition-all"
-                        >
-                          Book Now <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="space-y-10 text-left">
+                  <Section icon={Wine} label="Free Drinks" plans={freePlans} accent="primary" />
+                  <Section icon={Ticket} label="Included With Ticket" plans={ticketPlans} accent="amber" />
+                  <Section icon={Wine} label="Drink Deals" plans={otherPlans} accent="primary" />
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {!isPub || (!ev.freeEntryRules?.enabled && drinkPlans.length === 0) ? (
               <div className="text-center py-20 text-muted-foreground"><Wine className="h-12 w-12 mx-auto mb-4 opacity-20" /><p>No happy hours offers at this time.</p></div>
             ) : null}
@@ -1714,8 +1784,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 {/* ── Section 2: Select Date (date-picker widget) ── */}
                 <div className="rounded-2xl glass-card p-5 sm:p-6 space-y-3">
                   <div className="flex items-center gap-2.5 mb-1">
-                    <span className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
-                      <CalIcon className="h-3.5 w-3.5 text-primary" />
+                    <span className="h-7 w-7 rounded-lg bg-white/15 border border-white/25 flex items-center justify-center shrink-0">
+                      <CalIcon className="h-3.5 w-3.5 text-white" />
                     </span>
                     <div>
                       <p className="text-sm sm:text-base font-bold text-foreground leading-tight">Select Date</p>
@@ -1723,10 +1793,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     </div>
                   </div>
                   <Input id="bdate" type="date" value={date}
-                    min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })()}
+                    min={todayIst()}
                     onChange={(e) => setDate(e.target.value)}
-                    className="bg-black/40 border-white/10 h-11 rounded-xl [color-scheme:dark]" />
-                  {date && (
+                    className={`bg-black/40 h-11 rounded-xl [color-scheme:dark] ${isSelectedDateBlocked ? "border-destructive" : "border-white/10"}`} />
+                  {isSelectedDateBlocked && (
+                    <p className="text-xs text-destructive">{venueName} has blocked this date. Please select another date.</p>
+                  )}
+                  {date && !isSelectedDateBlocked && (
                     <p className="text-xs text-muted-foreground">{new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
                   )}
                   {vendorOpenDays.length > 0 && vendorOpenDays.length < 7 && (
@@ -1759,7 +1832,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                       </div>
                     </div>
                     <input id="arrival-time2" type="time" value={arrivalTime}
-                      min={(() => { const todayStr = new Date().toISOString().slice(0, 10); if (date !== todayStr) return undefined; const now = new Date(); return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`; })()}
+                      min={date !== todayIst() ? undefined : (() => { const now = new Date(); return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`; })()}
                       onChange={(e) => { setArrivalTime(e.target.value); clearFieldError("arrivalTime"); }}
                       required aria-invalid={!!fieldErrors.arrivalTime}
                       className={`w-full rounded-xl border px-3 py-2.5 text-sm text-foreground bg-black/40 h-11 [color-scheme:dark] ${fieldErrors.arrivalTime ? "border-destructive" : "border-white/10"}`}
@@ -2127,7 +2200,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
           </div>
         )}
       </div>
-  </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

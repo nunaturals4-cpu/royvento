@@ -3451,7 +3451,8 @@ export default function VendorDashboardScreen() {
 
   function buildAnalyticsParams(p: AnalyticsPresetMobile) {
     const now = new Date();
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const _fmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+    const fmt = (d: Date) => _fmt.format(d);
     const today = fmt(now);
     if (p === "today") return `from=${today}&to=${today}`;
     if (p === "7d") return `from=${fmt(new Date(now.getTime() - 6 * 86400000))}&to=${today}`;
@@ -4057,7 +4058,7 @@ export default function VendorDashboardScreen() {
   }
 
   // ─── Attendance tab ───────────────────────────────────────────────────────────
-  const [attendanceDate, setAttendanceDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [attendanceDate, setAttendanceDate] = useState<string>(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
   const [attendanceStatus, setAttendanceStatus] = useState<"all" | "checkedIn" | "notArrived">("all");
   const [attendancePage, setAttendancePage] = useState<number>(1);
   const [showAttendanceDatePicker, setShowAttendanceDatePicker] = useState(false);
@@ -4110,7 +4111,7 @@ export default function VendorDashboardScreen() {
             maximumDate={new Date()}
             onChange={(_event, d) => {
               setShowAttendanceDatePicker(false);
-              if (d) { setAttendanceDate(d.toISOString().slice(0, 10)); setAttendancePage(1); }
+              if (d) { setAttendanceDate(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(d)); setAttendancePage(1); }
             }}
           />
         )}

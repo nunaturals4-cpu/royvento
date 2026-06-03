@@ -91,6 +91,29 @@ app.use(
   }),
 );
 app.set("trust proxy", 1);
+
+// ─── Security response headers ────────────────────────────────────────────────
+//
+// Dependency-free hardening applied to every response. Deliberately omits CSP /
+// COEP / CORP / COOP so cross-origin images, fonts, Google-OAuth popups and the
+// SPA's inline styles keep working unchanged — these headers only add defense
+// against MIME-sniffing, clickjacking and referrer leakage, and enforce HTTPS
+// in production. No behavioural / UI impact.
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+  if (process.env["NODE_ENV"] === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=15552000; includeSubDomains",
+    );
+  }
+  next();
+});
+
 app.use(cors(corsOptions));
 app.use(
   express.json({
@@ -171,5 +194,22 @@ if (frontendDist) {
 } else {
   logger.warn({ tried: frontendCandidates }, "No frontend dist found — only API routes will respond");
 }
+
+// ─── Terminal error handler ───────────────────────────────────────────────────
+//
+// Catches CORS rejections and any error propagated via next(err). Returns a
+// generic, body-only message so internal details / stack traces are never
+// leaked to clients (Express's default handler echoes the message + stack in
+// non-production). Behaviour for normal requests is unchanged — this only runs
+// on errors that previously fell through to Express's default 500.
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err && err.message && err.message.includes("is not allowed by CORS")) {
+    res.status(403).json({ error: "Origin not allowed" });
+    return;
+  }
+  req.log?.error({ err }, "Unhandled error");
+  if (res.headersSent) return;
+  res.status(500).json({ error: "Internal server error" });
+});
 
 export default app;

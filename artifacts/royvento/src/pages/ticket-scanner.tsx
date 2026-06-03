@@ -253,6 +253,9 @@ function CameraScanner({
   // Edge). ~5× faster than jsQR because it runs in C++/GPU. We fall back to
   // jsQR on Firefox/Safari/older browsers transparently.
   const nativeDetectorRef = useRef<{ detect: (s: CanvasImageSource) => Promise<Array<{ rawValue: string }>> } | null>(null);
+  // Counts consecutive native-detector failures so we can permanently fall
+  // back to jsQR on devices that ship a broken BarcodeDetector.
+  const nativeFailRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -299,16 +302,23 @@ function CameraScanner({
     if (nativeDetectorRef.current) {
       try {
         const codes = await nativeDetectorRef.current.detect(video);
+        nativeFailRef.current = 0;
         if (codes.length > 0 && codes[0]?.rawValue) {
           if (handleHit(codes[0].rawValue)) return;
         }
+        rafRef.current = requestAnimationFrame(() => { void scanFrame(); });
+        return;
       } catch {
-        // If native detector throws for any reason, fall through to jsQR for
-        // this frame (and silently keep using native on the next one — most
-        // failures are transient).
+        // BarcodeDetector exists but threw — some Android WebViews/older
+        // Chromium builds ship a non-functional implementation. After a few
+        // consecutive failures, disable it permanently and fall through to the
+        // jsQR software path below so scanning keeps working on that device.
+        nativeFailRef.current += 1;
+        if (nativeFailRef.current >= 3) {
+          nativeDetectorRef.current = null;
+        }
+        // fall through to jsQR for this frame
       }
-      rafRef.current = requestAnimationFrame(() => { void scanFrame(); });
-      return;
     }
     // Fallback: jsQR via offscreen canvas, downscaled to 640px wide. Slightly
     // wider than the previous 480-wide path so dense-modules QR codes from
@@ -333,6 +343,7 @@ function CameraScanner({
     setError(null);
     lastCodeRef.current = "";
     lastCodeTimeRef.current = 0;
+    nativeFailRef.current = 0;
     // Wire up native detector if the browser supports it.
     nativeDetectorRef.current = null;
     const BD = (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => { detect: (s: CanvasImageSource) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
@@ -882,7 +893,7 @@ function ScannerPanels() {
 
 function ScannerOccupancyPanel({ refetchKey }: { refetchKey?: number }) {
   const { data, refetch } = useGetPartnerScannerOccupancy({
-    query: { refetchInterval: 15000 },
+    query: { queryKey: getGetPartnerScannerOccupancyQueryKey(), refetchInterval: 15000 },
   });
 
   // External tick (e.g. after a successful check-out) forces an immediate
@@ -947,7 +958,7 @@ function ScannerBookingsPanel({ onMutated }: { onMutated: () => void }) {
   }
 
   const { data, isLoading, refetch } = useGetPartnerScannerBookings(params, {
-    query: { refetchInterval: 20000 },
+    query: { queryKey: getGetPartnerScannerBookingsQueryKey(params), refetchInterval: 20000 },
   });
 
   // Authoritative vendor scope — fetched from the server, not derived from

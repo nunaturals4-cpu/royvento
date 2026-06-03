@@ -10,9 +10,9 @@ export function Footer() {
 
   return (
     <footer className="border-t border-border/60 bg-black/40 backdrop-blur mt-24">
-      <div className="container mx-auto px-4 md:px-6 py-14 grid gap-10 md:grid-cols-[2fr_1fr_1fr_1fr]">
+      <div className="container mx-auto px-4 md:px-6 py-10 md:py-14 grid grid-cols-2 gap-8 md:grid-cols-[2fr_1fr_1fr_1fr]">
         {/* Brand */}
-        <div className="space-y-4">
+        <div className="col-span-2 md:col-span-1 space-y-4">
           <Link href="/" className="inline-flex" aria-label="Royvento home">
             <Logo size={48} />
           </Link>
@@ -84,12 +84,6 @@ export function Footer() {
           <ul className="space-y-2.5 text-sm text-muted-foreground">
             <li><Link href="/register" className="hover:text-foreground transition-colors">Become a Partner</Link></li>
             <li><Link href="/login" className="hover:text-foreground transition-colors">Partner Login</Link></li>
-            <li>
-              <Link href="/subscription" className="hover:text-foreground transition-colors flex items-center gap-1.5">
-                <Crown className="h-3.5 w-3.5 text-primary" />
-                Premium
-              </Link>
-            </li>
           </ul>
         </div>
         )}

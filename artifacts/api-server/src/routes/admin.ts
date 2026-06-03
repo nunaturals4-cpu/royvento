@@ -40,6 +40,16 @@ import {
 
 const router: IRouter = Router();
 
+const _istFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+function toIstDateStr(d: Date | string): string {
+  return _istFmt.format(typeof d === "string" ? new Date(d) : d);
+}
+
 router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   // Parse optional date range; defaults: last 12 months
   const now = new Date();
@@ -50,8 +60,8 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
 
   const startDateStr = req.query["startDate"] as string | undefined;
   const endDateStr = req.query["endDate"] as string | undefined;
-  const rangeStart: Date = startDateStr ? new Date(`${startDateStr}T00:00:00Z`) : defaultStart;
-  const rangeEnd: Date = endDateStr ? new Date(`${endDateStr}T23:59:59Z`) : now;
+  const rangeStart: Date = startDateStr ? new Date(`${startDateStr}T00:00:00+05:30`) : defaultStart;
+  const rangeEnd: Date = endDateStr ? new Date(`${endDateStr}T23:59:59+05:30`) : now;
 
   const [usersCount, vendorsCount, pendingCount, eventsCount, bookingsCount] =
     await Promise.all([
@@ -272,7 +282,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
   const dailyStart = new Date(Math.max(rangeStart.getTime(), rangeEnd.getTime() - 29 * dayMs));
   const dCursor = new Date(dailyStart);
   while (dCursor <= rangeEnd) {
-    dailyMap.set(dCursor.toISOString().slice(0, 10), 0);
+    dailyMap.set(toIstDateStr(dCursor), 0);
     dCursor.setTime(dCursor.getTime() + dayMs);
   }
   const perVendorMap = new Map<number, {
@@ -301,7 +311,7 @@ router.get("/admin/analytics", requireAuth(["admin"]), async (req, res) => {
       actualsRecordedCount += 1;
     }
     const rev = (b as unknown as { _rev: number })._rev ?? 0;
-    const day = new Date(b.createdAt).toISOString().slice(0, 10);
+    const day = toIstDateStr(b.createdAt);
     if (new Date(b.createdAt) >= dailyStart && dailyMap.has(day)) {
       dailyMap.set(day, (dailyMap.get(day) ?? 0) + rev);
     }
@@ -1471,8 +1481,8 @@ router.get("/admin/leads", requireAuth(["admin"]), async (req, res) => {
   if (vendorIdParam) conditions.push(eq(profileViewsTable.vendorId, vendorIdParam));
   if (knownOnly) conditions.push(isNotNull(profileViewsTable.viewerUserId));
   if (anonymousOnly) conditions.push(isNull(profileViewsTable.viewerUserId));
-  if (startDateStr) conditions.push(gte(profileViewsTable.viewedAt, new Date(`${startDateStr}T00:00:00Z`)));
-  if (endDateStr) conditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59Z`)));
+  if (startDateStr) conditions.push(gte(profileViewsTable.viewedAt, new Date(`${startDateStr}T00:00:00+05:30`)));
+  if (endDateStr) conditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59+05:30`)));
 
   const where = conditions.length ? and(...conditions) : undefined;
 
@@ -1556,8 +1566,8 @@ router.get("/admin/leads/summary", requireAuth(["admin"]), async (req, res) => {
   const endDateStr = req.query["endDate"] as string | undefined;
 
   const dateConditions: ReturnType<typeof and>[] = [];
-  if (startDateStr) dateConditions.push(gte(profileViewsTable.viewedAt, new Date(`${startDateStr}T00:00:00Z`)));
-  if (endDateStr) dateConditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59Z`)));
+  if (startDateStr) dateConditions.push(gte(profileViewsTable.viewedAt, new Date(`${startDateStr}T00:00:00+05:30`)));
+  if (endDateStr) dateConditions.push(lte(profileViewsTable.viewedAt, new Date(`${endDateStr}T23:59:59+05:30`)));
   const where = dateConditions.length ? and(...dateConditions) : undefined;
 
   const [allViewsResult, allTimeTotalRow, perVendorRows] = await Promise.all([
@@ -1884,7 +1894,7 @@ router.get("/admin/bookings/unique-customers/download", requireAuth(["admin"]), 
   XLSX.utils.book_append_sheet(wb, ws, "Unique Customers");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 
-  const filename = `unique-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `unique-customers-${toIstDateStr(new Date())}.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(buf);
@@ -1959,7 +1969,7 @@ router.get("/admin/bookings/report/download", requireAuth(["admin"]), async (req
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Bookings");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  const filename = `bookings-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `bookings-${toIstDateStr(new Date())}.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(buf);
@@ -2319,8 +2329,8 @@ router.get("/admin/commission-report", requireAuth(["admin"]), async (req, res) 
 
   const fromStr = req.query["from"] as string | undefined;
   const toStr = req.query["to"] as string | undefined;
-  const from = fromStr ? new Date(`${fromStr}T00:00:00Z`) : defaultStart;
-  const to = toStr ? new Date(`${toStr}T23:59:59Z`) : now;
+  const from = fromStr ? new Date(`${fromStr}T00:00:00+05:30`) : defaultStart;
+  const to = toStr ? new Date(`${toStr}T23:59:59+05:30`) : now;
 
   // Gated on `checkedIn = true` (Save Actual Entry is the sole trigger).
   // The Commission Report only counts revenue / commission for bookings

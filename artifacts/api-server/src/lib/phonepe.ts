@@ -251,7 +251,14 @@ export async function checkPaymentStatus(merchantTransactionId: string): Promise
 export function verifyWebhookSignature(base64Response: string, receivedChecksum: string): boolean {
   const { saltKey, saltIndex } = getConfig();
   const expected = sha256(base64Response + saltKey) + "###" + saltIndex;
-  return expected === receivedChecksum;
+  // Constant-time comparison to avoid leaking the expected checksum byte-by-byte
+  // via response-timing. Same boolean result as `===`, just timing-safe. The
+  // length pre-check is required because timingSafeEqual throws on length
+  // mismatch; differing lengths are unequal anyway.
+  const a = Buffer.from(expected);
+  const b = Buffer.from(receivedChecksum ?? "");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 interface PhonePeWebhookPayload {

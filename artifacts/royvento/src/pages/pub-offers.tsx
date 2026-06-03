@@ -1,16 +1,18 @@
-import { Link } from "wouter";
+﻿import { Link, useLocation } from "wouter";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { SEO } from "@/components/SEO";
 import {
-  ArrowRight, Calendar, Clock, GlassWater, Megaphone,
-  ChevronLeft, ChevronRight,
+  ArrowRight, Bell, Calendar, ChevronLeft, ChevronRight,
+  Clock, GlassWater, Megaphone,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
-import { useListVendorDrinkOffers } from "@workspace/api-client-react";
+import { useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
 import type { VendorDrinkOffer } from "@workspace/api-client-react";
 import { FreeDrinkSection, TicketSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
+import { useToast } from "@/hooks/use-toast";
 
+/* â”€â”€â”€ types (all unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface Announcement {
   id: number;
   title: string;
@@ -25,27 +27,23 @@ interface Announcement {
   eventType: string;
 }
 
-const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
+const ANN_GENRES      = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
-
-const SLIDE_LIGHT_GRADIENTS = [
-  "from-rose-50 via-slate-50 to-gray-50",
-  "from-violet-50 via-slate-50 to-gray-50",
-  "from-amber-50 via-slate-50 to-gray-50",
-  "from-teal-50 via-slate-50 to-gray-50",
-  "from-indigo-50 via-slate-50 to-gray-50",
-];
-
-const BADGE_COLORS_LIGHT = [
-  "bg-rose-500/15 text-rose-600 border-rose-400/40",
-  "bg-violet-500/15 text-violet-600 border-violet-400/40",
-  "bg-amber-500/15 text-amber-600 border-amber-400/40",
-  "bg-teal-500/15 text-teal-600 border-teal-400/40",
-  "bg-indigo-500/15 text-indigo-600 border-indigo-400/40",
-];
 
 const AUTOPLAY_MS = 5000;
 
+const DAYS_OF_WEEK = [
+  { key: "",    label: "All Days"   },
+  { key: "Mon", label: "Monday"    },
+  { key: "Tue", label: "Tuesday"   },
+  { key: "Wed", label: "Wednesday" },
+  { key: "Thu", label: "Thursday"  },
+  { key: "Fri", label: "Friday"    },
+  { key: "Sat", label: "Saturday"  },
+  { key: "Sun", label: "Sunday"    },
+] as const;
+
+/* â”€â”€â”€ Announcement slider (functionality unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function AnnouncementSlider({ announcements }: { announcements: Announcement[] }) {
   const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
@@ -53,183 +51,111 @@ function AnnouncementSlider({ announcements }: { announcements: Announcement[] }
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPausedRef = useRef(isPaused);
 
-  useEffect(() => {
-    isPausedRef.current = isPaused;
-  }, [isPaused]);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
   const startTimer = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (announcements.length <= 1) return;
     intervalRef.current = setInterval(() => {
-      if (!isPausedRef.current) {
-        setCurrent((i) => (i + 1) % announcements.length);
-      }
+      if (!isPausedRef.current) setCurrent((i) => (i + 1) % announcements.length);
     }, AUTOPLAY_MS);
   }, [announcements.length]);
 
   useEffect(() => {
     startTimer();
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [startTimer]);
 
-  const goTo = useCallback(
-    (idx: number) => {
-      setCurrent(idx);
-      startTimer();
-    },
-    [startTimer],
-  );
-
-  const prev = useCallback(
-    () => goTo((current - 1 + announcements.length) % announcements.length),
-    [current, announcements.length, goTo],
-  );
-
-  const next = useCallback(
-    () => goTo((current + 1) % announcements.length),
-    [current, announcements.length, goTo],
-  );
+  const goTo = useCallback((idx: number) => { setCurrent(idx); startTimer(); }, [startTimer]);
+  const prev = useCallback(() => goTo((current - 1 + announcements.length) % announcements.length), [current, announcements.length, goTo]);
+  const next = useCallback(() => goTo((current + 1) % announcements.length), [current, announcements.length, goTo]);
 
   const a = announcements[current];
-  const lightGrad = SLIDE_LIGHT_GRADIENTS[current % SLIDE_LIGHT_GRADIENTS.length];
   const href = a.eventId ? `/events/${a.eventId}?book=event&aid=${a.id}` : `/vendors/${a.vendorId}`;
-  const hasImage = !!a.imageUrl;
 
   return (
-    <section
-      className="mb-12 bg-muted"
+    <div
+      className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111] mb-8"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      <div className="relative w-full overflow-hidden mt-4" style={{ minHeight: 400 }}>
-        <div className="absolute inset-0">
-          <div className={`h-full w-full bg-gradient-to-br ${lightGrad}`} />
-          {hasImage && (
-            <img
-              src={a.imageUrl}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 h-full w-full object-cover scale-110 blur-xl opacity-10"
-            />
-          )}
-        </div>
-
-        <div className="relative z-10 container mx-auto px-4 md:px-6 flex items-center gap-8 md:gap-16 py-14 md:py-20 min-h-[400px]">
-          <div className="flex-1 flex flex-col justify-center gap-4 min-w-0">
-            <div
-              className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1 ${BADGE_COLORS_LIGHT[current % BADGE_COLORS_LIGHT.length]}`}
-            >
-              <Megaphone className="h-3 w-3 flex-shrink-0" />
-              <span className="text-xs font-semibold uppercase tracking-wider truncate max-w-[220px]">
-                {a.vendorName}
-              </span>
-            </div>
-
-            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-tight text-zinc-900">
-              {a.title}
-            </h2>
-
-            <p className="text-sm md:text-base leading-relaxed line-clamp-3 max-w-xl text-zinc-700">
-              {a.body}
-            </p>
-
-            {(a.announceDate || a.announceTime) && (
-              <div className="flex items-center gap-5 text-xs text-zinc-600">
-                {a.announceDate && (
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {new Date(a.announceDate).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                )}
-                {a.announceTime && (
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" />
-                    {a.announceTime}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div className="mt-1">
-              <Link
-                href={href}
-                className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm px-5 py-2.5 rounded-xl transition-all red-glow"
-              >
-                {t("pub_offers.book_now")}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
+      <div className="relative flex flex-col md:flex-row items-stretch min-h-[200px]">
+        {a.imageUrl && (
+          <div className="relative md:w-72 h-48 md:h-auto shrink-0 overflow-hidden">
+            <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#111] hidden md:block" />
           </div>
-
-          <div className="hidden md:flex flex-shrink-0 w-52 lg:w-64 xl:w-72 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg ring-1 ring-black/5">
-            {hasImage ? (
-              <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover" />
-            ) : (
-              <div className="h-full w-full flex flex-col items-center justify-center bg-white/80 gap-3">
-                <Megaphone className="h-10 w-10 text-muted-foreground/40" />
-                <span className="text-muted-foreground/60 text-xs font-medium text-center px-4 leading-snug">
-                  {a.vendorName}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {announcements.length > 1 && (
-          <>
-            <button
-              onClick={prev}
-              aria-label={t("pub_offers.prev_slide")}
-              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-background/75 hover:bg-background border border-border flex items-center justify-center transition-all backdrop-blur-sm"
-            >
-              <ChevronLeft className="h-4 w-4 text-foreground" />
-            </button>
-            <button
-              onClick={next}
-              aria-label={t("pub_offers.next_slide")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-background/75 hover:bg-background border border-border flex items-center justify-center transition-all backdrop-blur-sm"
-            >
-              <ChevronRight className="h-4 w-4 text-foreground" />
-            </button>
-
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-              {announcements.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => goTo(i)}
-                  aria-label={t("pub_offers.go_to_slide", { n: i + 1 })}
-                  className={`rounded-full transition-all duration-300 ${
-                    i === current
-                      ? "w-6 h-2 bg-primary"
-                      : "w-2 h-2 bg-foreground/20 hover:bg-foreground/40"
-                  }`}
-                />
-              ))}
-            </div>
-          </>
         )}
+        <div className="flex flex-col justify-center gap-3 p-6 flex-1">
+          <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+            <Megaphone className="h-3 w-3" />{a.vendorName}
+          </span>
+          <h2 className="font-serif text-2xl md:text-3xl tracking-tight text-white leading-tight">{a.title}</h2>
+          {a.body && <p className="text-sm text-white/60 line-clamp-2">{a.body}</p>}
+          {(a.announceDate || a.announceTime) && (
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              {a.announceDate && (
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                  {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              )}
+              {a.announceTime && (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-primary" />{a.announceTime}
+                </span>
+              )}
+            </div>
+          )}
+          <Link href={href} className="inline-flex items-center gap-2 self-start bg-primary text-primary-foreground font-semibold text-sm px-5 py-2 rounded-xl transition-all hover:bg-primary-hover">
+            {t("pub_offers.book_now")} <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
-    </section>
+      {announcements.length > 1 && (
+        <>
+          <button onClick={prev} aria-label={t("pub_offers.prev_slide")} className="absolute left-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-black/60 border border-white/15 flex items-center justify-center hover:bg-black/80 transition-colors">
+            <ChevronLeft className="h-4 w-4 text-white" />
+          </button>
+          <button onClick={next} aria-label={t("pub_offers.next_slide")} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-black/60 border border-white/15 flex items-center justify-center hover:bg-black/80 transition-colors">
+            <ChevronRight className="h-4 w-4 text-white" />
+          </button>
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+            {announcements.map((_, i) => (
+              <button key={i} onClick={() => goTo(i)} className={`rounded-full transition-all duration-300 ${i === current ? "w-5 h-1.5 bg-primary" : "w-1.5 h-1.5 bg-white/25 hover:bg-white/50"}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
+/* â”€â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 export function PubOffers() {
   const { t } = useTranslation();
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+
+  // â”€â”€ data (all hooks unchanged) â”€â”€
+  const { data: me } = useGetMe({ query: { retry: false } as any });
+  const user = me?.user as any;
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
+  const [sliderAnnouncements, setSliderAnnouncements] = useState<Announcement[]>([]);
 
-  const [annGenreFilter, setAnnGenreFilter] = useState("");
+  // â”€â”€ all filter state (unchanged) â”€â”€
+  const [annGenreFilter, setAnnGenreFilter]       = useState("");
   const [annEventTypeFilter, setAnnEventTypeFilter] = useState("");
-  const [dealGenderFilter, setDealGenderFilter] = useState("");
+  const [dealGenderFilter, setDealGenderFilter]   = useState("");
+  const [dayFilter, setDayFilter]                 = useState("");
 
   useEffect(() => {
     apiGet<Announcement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    apiGet<Announcement[]>("/api/announcements/slider").then(setSliderAnnouncements).catch(() => {});
   }, []);
 
   const filteredAnnouncements = announcements.filter((a) => {
@@ -238,268 +164,318 @@ export function PubOffers() {
     return true;
   });
 
-  const { freeVendors, ticketVendors } = splitVendorsByPlanType(
+  // â”€â”€ split deals, then filter by selected day â”€â”€
+  const { freeVendors: allFreeVendors, ticketVendors: allTicketVendors } = splitVendorsByPlanType(
     drinkOffers as VendorDrinkOffer[],
     dealGenderFilter as "" | "female" | "other",
   );
 
-  const [sliderAnnouncements, setSliderAnnouncements] = useState<Announcement[]>([]);
-  useEffect(() => {
-    apiGet<Announcement[]>("/api/announcements/slider").then(setSliderAnnouncements).catch(() => {});
-  }, []);
+  // Task 4: wire day filter â€” keep only vendors that have at least one plan
+  // whose `days` array includes the selected day abbreviation.
+  const freeVendors = dayFilter
+    ? allFreeVendors.filter((v) =>
+        v.plans.some((p) => Array.isArray(p.days) && p.days.includes(dayFilter))
+      )
+    : allFreeVendors;
 
-  const hasDeals = (drinkOffers as VendorDrinkOffer[]).length > 0;
-  const hasSlider = sliderAnnouncements.length > 0;
+  const ticketVendors = dayFilter
+    ? allTicketVendors.filter((v) =>
+        v.plans.some((p) => Array.isArray(p.days) && p.days.includes(dayFilter))
+      )
+    : allTicketVendors;
+
+  const hasDeals        = (drinkOffers as VendorDrinkOffer[]).length > 0;
+  const hasSlider       = sliderAnnouncements.length > 0;
   const hasAnnouncements = announcements.length > 0;
 
+  // â”€â”€ Task 3: Notify Me â€” goes to /subscription; if already subscribed show sweet toast â”€â”€
+  const handleNotifyMe = useCallback(async () => {
+    if (user) {
+      try {
+        const sub = await apiGet<{ planType: string; status: string } | null>("/api/subscriptions/me");
+        if (sub && sub.status === "active") {
+          toast({
+            title: "ðŸŽ‰ You're all set!",
+            description: "We'll send you exclusive coupons and happy-hour alerts straight to your inbox. Watch out for something special! ðŸ¸",
+          });
+          return;
+        }
+      } catch {}
+    }
+    navigate("/subscription");
+  }, [user, navigate, toast]);
+
   return (
-    <div className="pb-14">
+    <div className="min-h-screen bg-background pb-16">
       <SEO
         title="Hot Pub Offers in India — Free Entry, Happy Hours & More | Royvento"
         description="Live pub offers from across India: ladies' nights, happy hours, free entry, unlimited drinks and weekend deals. Updated daily on Royvento."
         canonical="/pub-offers"
       />
 
-      {!hasSlider && (
-        <section className="relative overflow-hidden h-[300px] md:h-[420px] mb-14">
-          {/* Background image — properly fitted, not squashed */}
+      {/* â•â•â• HERO â€” Premium full-bleed with split layout â•â•â• */}
+      <div className="relative overflow-hidden border-b border-white/[0.06] bg-black">
+
+        {/* Full-bleed background image â€” hidden on mobile, visible md+ */}
+        <div className="pointer-events-none absolute inset-0 hidden md:block">
           <img
-            src="https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=1600&q=70"
+            src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=1400&q=85"
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-center"
             fetchPriority="high"
             decoding="async"
+            className="h-full w-full object-cover object-center"
+            style={{ transform: "scale(1.06)", transformOrigin: "center center" }}
           />
-          {/* Layered overlays for depth and text legibility */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+          {/* Light dark base — keeps the image clearly visible */}
+          <div className="absolute inset-0 bg-black/30" />
+          {/* Left-side gradient so text stays legible, fading to clear image on the right */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/45 to-transparent" />
+          {/* Soft bottom fade to background */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+          {/* Brand accent glow â€” bottom-left */}
+          <div className="absolute bottom-0 left-0 w-[400px] h-[200px] bg-primary/15 blur-[80px] pointer-events-none" />
+        </div>
 
-          {/* Content — anchored to bottom-left, matches homepage hero text layout */}
-          <div className="absolute inset-0 flex flex-col justify-end">
-            <div className="container mx-auto px-4 md:px-6 pb-10 md:pb-14">
-              <div className="max-w-3xl">
-                <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3 flex items-center gap-2">
-                  <GlassWater className="h-3.5 w-3.5" /> Hot Deals
-                </p>
-                <h1 className="font-serif text-4xl md:text-6xl tracking-tight text-white leading-tight">
-                  {t("pub_offers.title")}
-                </h1>
-                <p className="mt-3 text-white/60 leading-relaxed max-w-xl text-sm md:text-base">
-                  {t("pub_offers.subtitle")}
-                </p>
-              </div>
+        {/* Mobile: subtle dark gradient background */}
+        <div className="pointer-events-none absolute inset-0 md:hidden bg-gradient-to-br from-black via-[#0d0205] to-black" />
+        <div className="pointer-events-none absolute bottom-0 left-0 w-64 h-48 bg-primary/10 blur-[60px] md:hidden" />
+
+        {/* Bottom accent line */}
+        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
+
+        <div className="relative container mx-auto px-4 md:px-6 pt-6 md:pt-8 pb-8 md:pb-10">
+          {/* Back link */}
+          <Link href="/pubs" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-white transition-colors mb-6 md:mb-8">
+            <ChevronLeft className="h-4 w-4" /> Back to Venues
+          </Link>
+
+          {/* Title block */}
+          <div className="flex items-start gap-4 md:gap-5 max-w-xl">
+            <div className="flex h-12 w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-2xl border border-primary/40 bg-primary/15 text-primary shadow-[0_0_20px_rgba(232,41,28,0.45)]">
+              <Clock className="h-6 w-6 md:h-7 md:w-7" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight">Happy Hours</h1>
+              <p className="mt-1.5 text-sm md:text-base font-semibold text-white/75">Great Drinks. Great Prices. Good Times!</p>
+              <p className="mt-1 text-xs md:text-sm text-muted-foreground max-w-xs md:max-w-sm">Explore the best happy hours and offers near you.</p>
             </div>
           </div>
-        </section>
-      )}
 
-      {!hasDeals && !hasSlider && !hasAnnouncements && (
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="rounded-3xl glass-card p-16 text-center">
-            <p className="font-serif text-2xl mb-2 text-muted-foreground">{t("common.loading")}</p>
+          {/* Day-of-week filter pills â€” scrollable on mobile */}
+          <div className="mt-6 md:mt-8">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+              {DAYS_OF_WEEK.map(({ key, label }) => (
+                <button
+                  key={key || "all"}
+                  onClick={() => setDayFilter(key === dayFilter ? "" : key)}
+                  className={`flex-shrink-0 px-3.5 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-medium border transition-all ${
+                    dayFilter === key
+                      ? "bg-primary border-primary text-primary-foreground shadow-[0_0_14px_rgba(232,41,28,0.5)]"
+                      : "border-white/[0.12] text-white/70 hover:border-primary/40 hover:text-white bg-transparent"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {hasSlider && <AnnouncementSlider announcements={sliderAnnouncements} />}
+      <div className="container mx-auto px-4 md:px-6 py-8">
 
-      {/* ════════════════════════════════════════
-          DRINK DEAL SECTION — Premium Redesign
-          ════════════════════════════════════════ */}
-      {hasDeals && (
-        <div className="container mx-auto px-4 md:px-6">
-          <section>
+        {/* â”€â”€ SLIDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {hasSlider && <AnnouncementSlider announcements={sliderAnnouncements} />}
 
+        {/* Loading state */}
+        {!hasDeals && !hasSlider && !hasAnnouncements && (
+          <div className="rounded-2xl border border-white/[0.06] bg-[#111] p-16 text-center">
+            <GlassWater className="h-10 w-10 text-primary/30 mx-auto mb-3" />
+            <p className="text-lg font-semibold text-white/60">{t("common.loading")}</p>
+          </div>
+        )}
+
+        {/* â”€â”€ DRINK DEALS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {hasDeals && (
+          <section className="mb-12">
             {/* Section header */}
-            <div className="flex items-center gap-3 mb-7">
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 <GlassWater className="h-4 w-4 text-primary" />
                 <span className="text-xs uppercase tracking-[0.22em] text-primary font-semibold">
                   {t("pub_offers.drink_deals")}
                 </span>
+                {dayFilter && (
+                  <span className="text-xs text-white/50 ml-1">— {DAYS_OF_WEEK.find(d => d.key === dayFilter)?.label}</span>
+                )}
               </div>
-              <div className="flex-1 h-px bg-gradient-to-r from-primary/20 to-transparent" />
-              <Link href="/pubs">
-                <span className="text-xs text-white/30 hover:text-white/60 flex items-center gap-1 transition-colors">
-                  {t("pub_offers.browse_pubs")} <ArrowRight className="h-3 w-3" />
-                </span>
+              <Link href="/pubs" className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 transition-colors">
+                {t("pub_offers.browse_pubs")} <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
 
             {/* Gender filter */}
-            <div className="flex items-center gap-3 mb-9 flex-wrap">
-              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider whitespace-nowrap">
-                {t("pub_offers.filter_for")}
-              </p>
+            <div className="flex items-center gap-3 mb-7 flex-wrap">
+              <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">{t("pub_offers.filter_for")}</p>
               <div className="flex gap-2 flex-wrap">
                 {[
-                  { key: "", label: t("pub_offers.filter_everyone") },
-                  { key: "female", label: t("pub_offers.filter_ladies") },
-                  { key: "other", label: t("pub_offers.filter_mixed_all") },
+                  { key: "",       label: t("pub_offers.filter_everyone")  },
+                  { key: "female", label: t("pub_offers.filter_ladies")    },
+                  { key: "other",  label: t("pub_offers.filter_mixed_all") },
                 ].map((opt) => (
                   <button
                     key={opt.key || "all"}
-                    type="button"
                     onClick={() => setDealGenderFilter(opt.key === dealGenderFilter ? "" : opt.key)}
-                    className={`px-4 py-1.5 rounded-full text-[11px] font-semibold border transition-all duration-200 ${
+                    className={`px-4 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
                       dealGenderFilter === opt.key
-                        ? "bg-primary/15 border-primary/50 text-primary shadow-[0_0_16px_rgba(220,38,38,0.15)]"
-                        : "border-white/[0.08] text-white/35 hover:border-white/20 hover:text-white/55"
+                        ? "bg-primary/15 border-primary/50 text-primary"
+                        : "border-white/[0.08] text-white/40 hover:border-white/20 hover:text-white/60"
                     }`}
-                  >
-                    {opt.label}
-                  </button>
+                  >{opt.label}</button>
                 ))}
               </div>
             </div>
 
             {freeVendors.length === 0 && ticketVendors.length === 0 ? (
-              <p className="text-sm text-white/30 py-4">No deals match these filters.</p>
+              <div className="rounded-2xl border border-white/[0.06] bg-[#111] p-10 text-center">
+                <GlassWater className="h-8 w-8 text-primary/30 mx-auto mb-3" />
+                <p className="text-white/60">
+                  {dayFilter
+                    ? `No deals available on ${DAYS_OF_WEEK.find(d => d.key === dayFilter)?.label}. Try another day.`
+                    : "No deals match these filters."}
+                </p>
+              </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-10">
                 <FreeDrinkSection vendors={freeVendors} />
+                {freeVendors.length > 0 && ticketVendors.length > 0 && (
+                  <div className="premium-divider" />
+                )}
                 <TicketSection vendors={ticketVendors} />
               </div>
             )}
           </section>
-        </div>
-      )}
+        )}
 
-      {/* What's On */}
-      {hasAnnouncements && (
-        <div className="container mx-auto px-4 md:px-6 mt-12">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <Megaphone className="h-4 w-4 text-amber-400" />
-              <span className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold">
-                {t("pub_offers.whats_on")}
-              </span>
+        {/* â”€â”€ WHAT'S ON â€” announcements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {hasAnnouncements && (
+          <section>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-4 w-4 text-amber-400" />
+                <span className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold">{t("pub_offers.whats_on")}</span>
+              </div>
+              <div className="flex-1 h-px bg-white/[0.06]" />
             </div>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
 
-          <div className="mb-4 space-y-3">
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Genre</p>
-              <div className="flex flex-wrap gap-2">
-                {["", ...ANN_GENRES].map((g) => (
-                  <button
-                    key={g || "all"}
-                    type="button"
-                    onClick={() => setAnnGenreFilter(g === annGenreFilter ? "" : g)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      annGenreFilter === g
-                        ? "bg-amber-400/20 border-amber-400 text-amber-400"
-                        : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
-                    }`}
-                  >
-                    {g || t("pub_offers.filter_all")}
-                  </button>
-                ))}
+            {/* Genre + event type filters */}
+            <div className="mb-5 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Genre</p>
+                <div className="flex flex-wrap gap-2">
+                  {["", ...ANN_GENRES].map((g) => (
+                    <button key={g || "all"} onClick={() => setAnnGenreFilter(g === annGenreFilter ? "" : g)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        annGenreFilter === g ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
+                      }`}>{g || t("pub_offers.filter_all")}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Event Type</p>
+                <div className="flex flex-wrap gap-2">
+                  {["", ...ANN_EVENT_TYPES].map((et) => (
+                    <button key={et || "all"} onClick={() => setAnnEventTypeFilter(et === annEventTypeFilter ? "" : et)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        annEventTypeFilter === et ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
+                      }`}>{et || t("pub_offers.filter_all")}</button>
+                  ))}
+                </div>
               </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Event Type
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {["", ...ANN_EVENT_TYPES].map((et) => (
-                  <button
-                    key={et || "all"}
-                    type="button"
-                    onClick={() => setAnnEventTypeFilter(et === annEventTypeFilter ? "" : et)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      annEventTypeFilter === et
-                        ? "bg-amber-400/20 border-amber-400 text-amber-400"
-                        : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
-                    }`}
-                  >
-                    {et || t("pub_offers.filter_all")}
-                  </button>
-                ))}
+
+            {filteredAnnouncements.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No announcements match these filters.</p>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
+                {filteredAnnouncements.map((a) => {
+                  const inner = (
+                    <div className="group w-[260px] sm:w-[280px] flex-shrink-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111] hover:border-primary/25 transition-colors">
+                      <div className="relative h-36 bg-black/40 overflow-hidden">
+                        {a.imageUrl ? (
+                          <img src={a.imageUrl} alt={a.title} loading="lazy" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-black">
+                            <Megaphone className="h-8 w-8 text-primary/30" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 rounded-full border border-primary/30 bg-black/60 backdrop-blur-md px-2.5 py-1">
+                          <Megaphone className="h-2.5 w-2.5 text-primary" />
+                          <span className="text-[9px] font-semibold text-primary uppercase tracking-wider truncate max-w-[100px]">{a.vendorName}</span>
+                        </div>
+                      </div>
+                      <div className="p-4 flex flex-col gap-2">
+                        <h3 className="font-serif text-base leading-snug tracking-tight text-white line-clamp-2">{a.title}</h3>
+                        {a.body && <p className="text-xs text-white/50 line-clamp-2">{a.body}</p>}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1.5 border-t border-white/[0.06]">
+                          {a.announceDate && (
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-primary" />
+                              {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                            </span>
+                          )}
+                          {a.announceTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-primary" />{a.announceTime}</span>}
+                        </div>
+                        {a.eventId && (
+                          <div className="mt-1 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 flex items-center justify-between group-hover:bg-primary/15 transition-colors">
+                            <span className="text-xs font-semibold text-primary">{t("pub_offers.book_now")}</span>
+                            <ArrowRight className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                  return a.eventId ? (
+                    <Link key={a.id} href={`/events/${a.eventId}?book=event&aid=${a.id}`} className="snap-start flex-shrink-0 cursor-pointer">{inner}</Link>
+                  ) : (
+                    <div key={a.id} className="snap-start flex-shrink-0">{inner}</div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* â”€â”€ NOTIFY ME BANNER â€” Task 3 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        <div className="mt-14 relative overflow-hidden rounded-2xl border border-primary/20">
+          <img
+            src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=1200&q=70"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-20"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/50" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-primary/5 mix-blend-screen" />
+          <div className="relative flex flex-col md:flex-row items-center justify-between gap-6 p-8">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/15 text-primary">
+                <Bell className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-primary">Discover exclusive offers &amp; deals every day.</p>
+                <p className="text-sm text-muted-foreground">Subscribe to never miss a happy hour!</p>
               </div>
             </div>
+            <button
+              onClick={handleNotifyMe}
+              className="inline-flex items-center gap-2 shrink-0 rounded-xl border border-primary text-primary font-semibold text-sm px-6 py-2.5 hover:bg-primary hover:text-primary-foreground transition-all"
+            >
+              <Bell className="h-4 w-4" /> Notify Me
+            </button>
           </div>
-
-          {filteredAnnouncements.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No announcements match these filters.</p>
-          ) : (
-            <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
-              {filteredAnnouncements.map((a) => {
-                const cardInner = (
-                  <div className="rounded-2xl border border-amber-400/15 bg-zinc-900/90 hover:bg-zinc-800/80 transition-colors w-[300px] sm:w-[320px] flex flex-col overflow-hidden h-full group">
-                    <div className="relative h-40 flex-shrink-0 bg-zinc-800 overflow-hidden">
-                      {a.imageUrl ? (
-                        <img
-                          src={a.imageUrl}
-                          alt={a.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400/8 to-zinc-900">
-                          <Megaphone className="h-10 w-10 text-amber-400/25" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                      <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm border border-amber-400/30 rounded-full px-2.5 py-1">
-                        <Megaphone className="h-3 w-3 text-amber-400 flex-shrink-0" />
-                        <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider truncate max-w-[110px]">
-                          {a.vendorName}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-5 flex flex-col gap-2.5 flex-1">
-                      <h3 className="font-serif text-xl leading-snug tracking-tight text-white">{a.title}</h3>
-                      {a.body && (
-                        <p className="text-sm text-white/50 leading-relaxed line-clamp-2 flex-1">{a.body}</p>
-                      )}
-                      <div className="flex items-center gap-4 text-xs text-amber-400/80 pt-2 border-t border-white/8">
-                        {a.announceDate && (
-                          <span className="flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5 text-amber-400" />
-                            {new Date(a.announceDate).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                        )}
-                        {a.announceTime && (
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5 text-amber-400" />
-                            {a.announceTime}
-                          </span>
-                        )}
-                      </div>
-                      {a.eventId && (
-                        <div className="mt-auto rounded-lg bg-primary/10 border border-primary/25 px-4 py-2 flex items-center justify-between group-hover:bg-primary/20 transition-colors">
-                          <span className="text-sm font-semibold text-primary">{t("pub_offers.book_now")}</span>
-                          <ArrowRight className="h-4 w-4 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-                return a.eventId ? (
-                  <Link
-                    key={a.id}
-                    href={`/events/${a.eventId}?book=event&aid=${a.id}`}
-                    className="snap-start flex-shrink-0 cursor-pointer"
-                  >
-                    {cardInner}
-                  </Link>
-                ) : (
-                  <div key={a.id} className="snap-start flex-shrink-0">
-                    {cardInner}
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
-      )}
+
+      </div>
     </div>
   );
 }
+

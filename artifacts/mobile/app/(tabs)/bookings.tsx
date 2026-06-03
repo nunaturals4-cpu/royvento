@@ -283,7 +283,7 @@ body{background:#0c0810;font-family:Arial,sans-serif;display:flex;align-items:ce
     );
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const upcoming = (data ?? []).filter(
     (b) => b.bookingDate >= today && b.status !== "cancelled"
   );

@@ -61,9 +61,9 @@ export function PaymentResult() {
                       View my bookings
                     </Button>
                   </Link>
-                  <Link href="/explore">
+                  <Link href="/pubs">
                     <Button variant="outline" className="w-full">
-                      Explore more events
+                      Explore more pubs
                     </Button>
                   </Link>
                 </>
@@ -91,7 +91,7 @@ export function PaymentResult() {
               If your account was debited, it will be automatically refunded within 5-7 business days.
             </p>
             <div className="pt-2 flex flex-col gap-3">
-              <Link href="/explore">
+              <Link href="/pubs">
                 <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0">
                   Try again
                 </Button>

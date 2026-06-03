@@ -209,7 +209,7 @@ export default function EventDetailScreen() {
   const [personName, setPersonName] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
 
-  const bookingDate = bookingDateObj.toISOString().slice(0, 10);
+  const bookingDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(bookingDateObj);
 
   const wishlistQuery = useGetWishlist({ query: { queryKey: getGetWishlistQueryKey(), enabled: !!user } });
   const isWishlisted = wishlistQuery.data?.some((w) => w.id === eventId) ?? false;
@@ -427,7 +427,7 @@ export default function EventDetailScreen() {
 
   const handleBook = () => {
     if (!user) { router.push("/(auth)/login"); return; }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     if (bookingDate < today) { Alert.alert(t("events.invalid_date"), t("events.date_future")); return; }
     // Collect per-field validation issues (every booking-request field is
     // required except couponCode / pointsToUse / notes).

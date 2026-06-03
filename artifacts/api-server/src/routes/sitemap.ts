@@ -354,9 +354,7 @@ router.get("/sitemap-offers.xml", async (req, res) => {
     // listing page once, then deep-link to each pub that has at least one
     // active drink plan, deduped. When per-offer detail pages exist (future
     // task) this shard expands to include them.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     const rows = await db
       .select({
         vendorId: drinkPlansTable.vendorId,

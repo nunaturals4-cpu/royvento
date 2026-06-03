@@ -253,7 +253,7 @@ export default function ProfileScreen() {
         <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topPadding + 12 }}>
           <View style={styles.signInContainer}>
             <LinearGradient
-              colors={[colors.primary, colors.goldLight ?? "#e8c050"]}
+              colors={[colors.primary, colors.greenHover ?? "#4ade80"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.avatarPlaceholder}

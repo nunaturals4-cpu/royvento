@@ -77,7 +77,7 @@ function OffersStrip({ vendorId }: { vendorId: number }) {
     enabled: !!vendorId,
   });
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const planCards = (plans ?? []).filter((p) => (p.drinksOfferLabel || p.foodDiscountLabel) && (!p.validUntil || p.validUntil >= today));
   const annoCards = announcements ?? [];
   if (planCards.length === 0 && annoCards.length === 0) return null;
@@ -135,7 +135,7 @@ function DrinkPlansSection({ vendorId }: { vendorId: number }) {
 
   if (!plans || plans.length === 0) return null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
   const TYPE_LABEL: Record<string, string> = {
     welcome: "Welcome Drink",

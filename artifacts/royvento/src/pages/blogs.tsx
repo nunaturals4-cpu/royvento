@@ -105,32 +105,49 @@ export function Blogs() {
         canonical="/blogs"
       />
 
-      {/* ── Full-width hero — less height than homepage, image properly fitted ── */}
-      <section className="relative overflow-hidden h-[300px] md:h-[420px]">
+      {/* ── Premium full-width hero ── */}
+      <section className="relative overflow-hidden bg-black h-[300px] sm:h-[330px] md:h-[360px]">
+        {/* Atmospheric bar/nightlife image */}
         <img
-          src="https://images.unsplash.com/photo-1501167786227-4cba60f6d58f?w=1600&q=70"
+          src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1600&q=85"
           alt=""
           className="absolute inset-0 h-full w-full object-cover object-center"
+          style={{ transform: "scale(1.05)", transformOrigin: "center 40%" }}
           fetchPriority="high"
           decoding="async"
         />
-        {/* Layered overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+        {/* Light dark base — keeps the image clearly visible */}
+        <div className="absolute inset-0 bg-black/25" />
+        {/* Depth gradients — stronger at the bottom where the text sits */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/15 to-transparent" />
+        {/* Subtle brand-color accent — bottom-left glow */}
+        <div className="absolute bottom-0 left-0 w-[480px] h-[240px] bg-primary/18 blur-[90px] pointer-events-none" />
+        {/* Tight top vignette */}
+        <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/40 to-transparent" />
+        {/* Premium horizontal rule accent */}
+        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
 
-        {/* Content — anchored to bottom-left, matches homepage hero text layout */}
+        {/* Content — anchored bottom-left */}
         <div className="absolute inset-0 flex flex-col justify-end">
-          <div className="container mx-auto px-4 md:px-6 pb-10 md:pb-14">
-            <div className="max-w-3xl">
-              <p className="text-xs uppercase tracking-[0.22em] text-primary mb-3 flex items-center gap-2">
-                <BookOpen className="h-3.5 w-3.5" /> Royvento Blog
-              </p>
-              <h1 className="font-serif text-4xl md:text-6xl tracking-tight text-white leading-tight">
-                Nightlife<br />
-                <span className="italic text-gradient-red">Stories & Guides</span>
+          <div className="container mx-auto px-4 md:px-6 pb-8 sm:pb-10 md:pb-14 lg:pb-16">
+            <div className="max-w-2xl">
+              {/* Eyebrow with decorative line */}
+              <div className="flex items-center gap-3 mb-3 md:mb-4">
+                <span className="h-px w-6 md:w-10 bg-primary/70 shrink-0" />
+                <p className="text-[10px] md:text-xs uppercase tracking-[0.26em] text-primary font-semibold flex items-center gap-1.5">
+                  <BookOpen className="h-3 w-3 md:h-3.5 md:w-3.5" /> Royvento Blog
+                </p>
+              </div>
+              {/* Title */}
+              <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight text-white leading-[1.06]">
+                Nightlife
+                <br />
+                <span className="italic text-gradient-red">Stories &amp; Guides</span>
               </h1>
-              <p className="mt-3 text-white/60 leading-relaxed max-w-xl text-sm md:text-base">
-                Discover the best pubs, craft beers, and nightlife experiences across India — curated by the Royvento editorial team.
+              {/* Subtitle */}
+              <p className="mt-3 md:mt-4 text-white/55 leading-relaxed max-w-xs sm:max-w-sm md:max-w-md text-sm md:text-base">
+                Discover the best pubs, craft beers, and nightlife experiences across India — curated by our editorial team.
               </p>
             </div>
           </div>

@@ -15,15 +15,24 @@ export interface AdminBookingRow {
   userId: number;
   userName: string;
   userEmail: string;
+  phone: string;
   bookingDate: string;
   guests: number;
   pubMode: string;
   ticketWomen: number;
   ticketMen: number;
   ticketCouple: number;
+  actualWomen?: number | null;
+  actualMen?: number | null;
+  actualCouple?: number | null;
+  actualGuests?: number | null;
   totalPrice: number;
   discountAmount: number;
   finalPrice: number;
+  baseFee: number;
+  totalPayable: number;
+  /** Actual amount collected — online = finalPrice; COD checked-in = actual-count-based revenue; pending COD = 0. */
+  effectiveRevenue: number;
   paymentMethod: string;
   status: string;
   notes: string;
