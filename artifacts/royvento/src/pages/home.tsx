@@ -65,12 +65,36 @@ function cityMatch(eventCity: string, userCity: string): boolean {
   return eventCity.toLowerCase().includes(userCity.toLowerCase());
 }
 
-function sortCityFirst<T extends { city: string }>(items: T[], userCity: string): T[] {
-  if (!userCity) return items;
-  return [
-    ...items.filter((e) => cityMatch(e.city, userCity)),
-    ...items.filter((e) => !cityMatch(e.city, userCity)),
-  ];
+// Requested local-first discovery order: Pubs → Clubs → Events → Gaming
+// Venues → Stand-Up Shows, then everything else. Ranked by keyword match on
+// the event's category/type so it works without any backend change.
+const CATEGORY_PRIORITY: { rank: number; keywords: string[] }[] = [
+  { rank: 0, keywords: ["pub", "bar", "brewery"] },
+  { rank: 1, keywords: ["club", "night", "lounge", "disco"] },
+  { rank: 2, keywords: ["event", "concert", "gig", "live", "music", "festival"] },
+  { rank: 3, keywords: ["game", "gaming", "arcade", "play", "esport"] },
+  { rank: 4, keywords: ["standup", "stand-up", "stand up", "comedy", "drama"] },
+];
+function categoryRank(e: { category?: string; type?: string }): number {
+  const hay = `${e.category ?? ""} ${e.type ?? ""}`.toLowerCase();
+  for (const { rank, keywords } of CATEGORY_PRIORITY) {
+    if (keywords.some((k) => hay.includes(k))) return rank;
+  }
+  return 5;
+}
+
+// Prioritise nearby experiences first: local-city items (ordered by the
+// category priority above), then items from other cities (same ordering).
+// Array.sort is stable, so equal-rank items keep their original order.
+function sortCityFirst<T extends { city: string; category?: string; type?: string }>(
+  items: T[],
+  userCity: string,
+): T[] {
+  const ranked = (group: T[]) => [...group].sort((a, b) => categoryRank(a) - categoryRank(b));
+  if (!userCity) return ranked(items);
+  const local = items.filter((e) => cityMatch(e.city, userCity));
+  const rest = items.filter((e) => !cityMatch(e.city, userCity));
+  return [...ranked(local), ...ranked(rest)];
 }
 
 function SectionHeader({
@@ -115,27 +139,37 @@ function useUserLocation() {
 
   useEffect(() => {
     if (!navigator.geolocation || detected) return;
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const r = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-          );
-          if (!r.ok) return;
-          const data = await r.json();
-          const addr = data?.address ?? {};
-          const detectedCountry: string = addr.country ?? "";
-          const detectedState: string = addr.state ?? "";
-          if (detectedCountry) setCountry(detectedCountry);
-          if (detectedState) setState(detectedState);
-          setDetected(true);
-        } catch {}
-      },
-      () => { setDetected(true); },
-      { timeout: 5000 },
-    );
-  }, []);
+    // Only auto-read GPS when the browser ALREADY granted permission — never
+    // trigger an unprompted permission popup on page load ("ask only when
+    // required"). First-time users set country/state via the manual filters.
+    const run = () => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            const r = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+            );
+            if (!r.ok) return;
+            const data = await r.json();
+            const addr = data?.address ?? {};
+            const detectedCountry: string = addr.country ?? "";
+            const detectedState: string = addr.state ?? "";
+            if (detectedCountry) setCountry(detectedCountry);
+            if (detectedState) setState(detectedState);
+            setDetected(true);
+          } catch {}
+        },
+        () => { setDetected(true); },
+        { timeout: 5000 },
+      );
+    };
+    if (!navigator.permissions?.query) return;
+    navigator.permissions
+      .query({ name: "geolocation" as PermissionName })
+      .then((status) => { if (status.state === "granted") run(); })
+      .catch(() => {});
+  }, [detected]);
 
   return { country, state, setCountry, setState };
 }

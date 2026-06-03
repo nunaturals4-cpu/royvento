@@ -103,12 +103,12 @@ function PubCard({ pub }: { pub: PublicEvent }) {
     ? eventDetailSlug({ id: pub.id, title: pub.title, city: pub.city })
     : `${eventDetailSlug({ id: pub.id, title: pub.title, city: pub.city })}#book`;
 
-  // tag chips shown on card
-  const tags: string[] = [];
-  if (pub.vendorCategory) tags.push(pub.vendorCategory);
-  if (pub.category && pub.category !== pub.vendorCategory) tags.push(pub.category);
-  if (pub.hasDrinkPlans) tags.push("Drink Deal");
-  if (hasFreeEntry) tags.push(isFreeToday ? "Free Today" : "Free Entry");
+  // Body chips: venue category / vibe only. Free-entry & drink-deal now render
+  // as prominent colour-coded badges on the photo (see above), so they're not
+  // repeated here.
+  const bodyTags: string[] = [];
+  if (pub.vendorCategory) bodyTags.push(pub.vendorCategory);
+  if (pub.category && pub.category !== pub.vendorCategory) bodyTags.push(pub.category);
 
   return (
     <Link href={href}>
@@ -129,19 +129,34 @@ function PubCard({ pub }: { pub: PublicEvent }) {
           {/* darkening overlay for text legibility */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
           <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5" />
-
-          {/* Popular / New badge â€” top-left */}
-          {(pub.popular || isNew) && (
-            <div className="absolute top-2.5 left-2.5">
-              <span className="inline-flex items-center rounded-md bg-primary/90 px-2 py-0.5 text-[11px] font-semibold text-primary-foreground shadow">
-                {pub.popular ? "Popular" : "New"}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* â”€â”€ Body â”€â”€ */}
         <div className="p-3.5">
+          {/* Prominent highlight badges — shown in the body (not over the image),
+              colour-coded for hierarchy: Popular (red) · Free Entry (green) ·
+              Drink Deal (amber). High contrast, easy to notice on all screens. */}
+          {(pub.popular || isNew || hasFreeEntry || pub.hasDrinkPlans) && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {(pub.popular || isNew) && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                  {pub.popular ? "★ Popular" : "New"}
+                </span>
+              )}
+              {hasFreeEntry && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full bg-white ${isFreeToday ? "animate-pulse" : ""}`} />
+                  {isFreeToday ? "Free Today" : "Free Entry"}
+                </span>
+              )}
+              {pub.hasDrinkPlans && (
+                <span className="inline-flex items-center rounded-md bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">
+                  Drink Deal
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Name */}
           <h3 className="text-[15px] font-bold leading-tight text-white line-clamp-1 group-hover:text-primary transition-colors duration-200">
             {pub.title}
@@ -163,13 +178,15 @@ function PubCard({ pub }: { pub: PublicEvent }) {
             </div>
           )}
 
-          {/* Tag chips */}
-          {tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {tags.slice(0, 3).map((tag) => (
+          {/* Tag chips — colour-coded for hierarchy & contrast. Free/Deal are
+              already shown as prominent badges on the photo, so here we show the
+              venue category/vibe chips with a stronger, readable treatment. */}
+          {bodyTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {bodyTags.slice(0, 3).map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/65"
+                  className="inline-flex items-center rounded-md border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/85"
                 >
                   {tag}
                 </span>

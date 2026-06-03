@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
 import { Logo } from "@/components/Logo";
-import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe } from "lucide-react";
+import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe, Palette, Check, Gift } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
@@ -18,6 +18,8 @@ import { useTranslation } from "react-i18next";
 import { setLanguage } from "@/i18n/index";
 import { LANGUAGES } from "@/components/ui/LanguageSwitcher";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "@/components/ThemeProvider";
+import { THEMES } from "@/components/ui/ThemeSwitcher";
 
 interface Notification {
   id: number;
@@ -30,6 +32,8 @@ interface Notification {
 export function Navbar() {
   const { t, i18n } = useTranslation();
   const currentLang = LANGUAGES.find((l) => l.code === i18n.language) ?? LANGUAGES[0]!;
+  const { theme, setTheme } = useTheme();
+  const currentTheme = THEMES.find((th) => th.id === theme) ?? THEMES[0]!;
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
   const logout = useLogout();
   const [, setLocation] = useLocation();
@@ -43,7 +47,10 @@ export function Navbar() {
   const searchRef = useRef<HTMLDivElement | null>(null);
   const qc = useQueryClient();
 
-  const { selectedCity } = useSelectedCity();
+  const { selectedCity, selectedLocality } = useSelectedCity();
+  // Show the precise locality (e.g. "Tarulia") when we have it, falling back to
+  // the city (e.g. "Bidhannagar"). Matches Zomato/Swiggy's "area-first" label.
+  const locationLabel = selectedLocality || selectedCity;
 
   const user = me?.user as any;
 
@@ -223,7 +230,7 @@ export function Navbar() {
             >
               <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="truncate text-xs font-medium text-foreground/80">
-                {selectedCity || t("nav.select_city")}
+                {locationLabel || t("nav.select_city")}
               </span>
               <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
             </button>
@@ -318,9 +325,30 @@ export function Navbar() {
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{user.name}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                      <p className="text-[10px] uppercase tracking-wider text-primary mt-1">{user.role} · {user.points ?? 0} pts</p>
+                      <p className="text-[10px] uppercase tracking-wider text-primary mt-1">{user.role} · {user.points ?? 0} PTS</p>
                     </div>
                   </DropdownMenuLabel>
+                  {/* Rewards: surface the ₹ value of the user's points + a redeem CTA so
+                      they instantly see how much discount they can claim. ₹ value uses the
+                      real checkout rate (POINTS_RUPEE_RATE = 0.05 → 100 pts = ₹5). */}
+                  {(() => {
+                    const pts = user.points ?? 0;
+                    const rupee = Math.floor(pts * 0.05);
+                    return (
+                      <div className="mx-1 my-1.5 rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Reward Points</span>
+                          <span className="text-sm font-bold text-foreground tabular-nums">{pts} PTS</span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <Gift className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="text-xs font-semibold text-primary">
+                            {rupee > 0 ? `₹${rupee} discount available` : "Earn points to unlock discounts"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard/profile" className="cursor-pointer w-full">{t("nav.my_profile")}</Link>
@@ -372,6 +400,26 @@ export function Navbar() {
                     {t("nav.log_out")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer">
+                      <span className="h-3.5 w-3.5 rounded-full shrink-0 mr-1" style={{ background: currentTheme.color }} />
+                      <Palette className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                      <span>Theme</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent alignOffset={-4} collisionPadding={8} className="bg-card border border-border shadow-xl w-44 max-w-[calc(100vw-1rem)]">
+                      {THEMES.map((th) => (
+                        <DropdownMenuItem
+                          key={th.id}
+                          onClick={() => setTheme(th.id)}
+                          className="flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <span className="h-3.5 w-3.5 rounded-full shrink-0" style={{ background: th.color }} />
+                          <span className="flex-1">{th.label}</span>
+                          {theme === th.id && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="cursor-pointer">
                       <Globe className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
@@ -428,8 +476,8 @@ export function Navbar() {
                 className="flex items-center gap-2 w-full px-3 py-2.5 rounded-full border border-border bg-card/40 hover:border-primary/40 transition-colors text-sm"
               >
                 <MapPin className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-foreground/80 font-medium">
-                  {selectedCity ? selectedCity : t("nav.select_city")}
+                <span className="text-foreground/80 font-medium truncate">
+                  {locationLabel ? locationLabel : t("nav.select_city")}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
               </button>

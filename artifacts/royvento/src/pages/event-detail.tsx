@@ -887,7 +887,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             </div>
           )}
 
-          {/* CTA buttons */}
+          {/* CTA button */}
           <div className="flex flex-col gap-2.5">
             <button
               onClick={() => switchPubTab("book")}
@@ -895,13 +895,15 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
             >
               <CalIcon className="h-4 w-4" /> Book a Table
             </button>
-            <button
-              onClick={() => { switchPubTab("reviews"); setTimeout(() => pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); }}
-              className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.04] text-white font-semibold text-sm transition-all hover:bg-white/[0.08]"
-            >
-              <Headphones className="h-4 w-4" /> Contact Venue
-            </button>
           </div>
+
+          {/* About Venue — shown right below the Book a Table button */}
+          {event.description && (
+            <div className="rounded-xl border border-white/[0.06] bg-[#111] p-4 space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">About Venue</h3>
+              <p className="text-[13px] text-white/70 leading-relaxed whitespace-pre-line">{event.description}</p>
+            </div>
+          )}
 
           {/* Wishlist */}
           {me?.user && (
@@ -914,44 +916,6 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               {inWishlist ? "Saved to wishlist" : "Save venue"}
             </button>
           )}
-
-          {/* About section — details grid */}
-          <div className="rounded-xl border border-white/[0.06] bg-[#111] p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">About {isPub ? "Venue" : "Event"}</h3>
-
-            {/* Description (short) */}
-            {event.description && (
-              <p className="text-[12px] text-white/60 leading-relaxed line-clamp-4">{event.description}</p>
-            )}
-
-            {/* Details grid */}
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pt-1">
-              {isPub && todayHours && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Open Today</p>
-                  <p className="text-[12px] text-white font-medium">{formatHour(todayHours.open)} – {formatHour(todayHours.close)}</p>
-                </div>
-              )}
-              {event.price > 0 && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Entry</p>
-                  <p className="text-[12px] text-white font-medium">{formatINR(event.price)} Onwards</p>
-                </div>
-              )}
-              {event.capacity > 0 && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Capacity</p>
-                  <p className="text-[12px] text-white font-medium">Up to {event.capacity}</p>
-                </div>
-              )}
-              {event.category && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Category</p>
-                  <p className="text-[12px] text-white font-medium">{event.category}</p>
-                </div>
-              )}
-            </div>
-          </div>
 
         </aside>
 
@@ -1057,11 +1021,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         <div className="grid lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] gap-8 lg:gap-12 xl:gap-16">
           {/* Left col */}
           <div className="space-y-12 min-w-0">
-            {/* About */}
-            <section>
-              <h2 className="font-serif text-3xl mb-5 accent-underline inline-block">{t("events.about_section")}</h2>
-              <p className="text-white/70 leading-relaxed whitespace-pre-line mt-5 text-[15px]">{event.description}</p>
-            </section>
+            {/* "About this event" section removed for a cleaner, more focused
+                event profile (less scrolling). */}
 
             {/* Quick info pills */}
             <div className="flex flex-wrap gap-3">

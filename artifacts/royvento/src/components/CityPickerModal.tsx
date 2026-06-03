@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { COUNTRIES } from "@/lib/locations";
 import { useSelectedCity } from "@/components/LocationContext";
-import { reverseGeocode } from "@/components/LocationContext";
 
 interface Props {
   open: boolean;
@@ -54,9 +53,8 @@ const ALL_CITIES: string[] = Array.from(
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export function CityPickerModal({ open, onOpenChange }: Props) {
-  const { selectedCity, setSelectedCity } = useSelectedCity();
+  const { selectedCity, selectedLocality, setSelectedCity, detectLocation, detecting, locationError } = useSelectedCity();
   const [query, setQuery] = useState("");
-  const [gpsLoading, setGpsLoading] = useState(false);
   const letterRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const filteredCities = useMemo(() => {
@@ -78,23 +76,27 @@ export function CityPickerModal({ open, onOpenChange }: Props) {
   const availableLetters = new Set(Object.keys(groupedByLetter));
 
   const handleSelect = (city: string) => {
-    setSelectedCity(city);
+    // Manual pick → flag it so GPS auto-detect won't override the user's choice.
+    setSelectedCity(city, "", true);
     onOpenChange(false);
     setQuery("");
   };
 
-  const handleUseLocation = () => {
-    setGpsLoading(true);
-    navigator.geolocation?.getCurrentPosition(
-      async (pos) => {
-        try {
-          const city = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-          if (city) handleSelect(city);
-        } catch {}
-        setGpsLoading(false);
-      },
-      () => setGpsLoading(false)
-    );
+  // Lets the user set their EXACT area/locality as free text (e.g. "Tarulia 2nd
+  // Lane") when GPS / the city list can't pin it — works on any device with no
+  // API needed. The typed text becomes the displayed locality; the city is kept
+  // (or set to the text) for content matching.
+  const handleUseTypedArea = () => {
+    const q = query.trim();
+    if (!q) return;
+    setSelectedCity(selectedCity || q, q, true);
+    onOpenChange(false);
+    setQuery("");
+  };
+
+  const handleUseLocation = async () => {
+    const ok = await detectLocation();
+    if (ok) { onOpenChange(false); setQuery(""); }
   };
 
   const scrollToLetter = (letter: string) => {
@@ -111,7 +113,11 @@ export function CityPickerModal({ open, onOpenChange }: Props) {
           <DialogTitle className="text-base font-semibold mb-3">
             {selectedCity ? (
               <span>
-                City: <span className="text-primary">{selectedCity}</span>
+                {selectedLocality ? (
+                  <><span className="text-primary">{selectedLocality}</span><span className="text-muted-foreground">, {selectedCity}</span></>
+                ) : (
+                  <>City: <span className="text-primary">{selectedCity}</span></>
+                )}
               </span>
             ) : (
               "Select your city"
@@ -131,20 +137,32 @@ export function CityPickerModal({ open, onOpenChange }: Props) {
 
           <button
             onClick={handleUseLocation}
-            disabled={gpsLoading}
+            disabled={detecting}
             className="mt-3 flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors font-medium disabled:opacity-50"
           >
-            <Navigation className="h-4 w-4 shrink-0" />
-            {gpsLoading ? "Detecting location…" : "Use Current Location"}
+            <Navigation className={`h-4 w-4 shrink-0 ${detecting ? "animate-pulse" : ""}`} />
+            {detecting ? "Detecting precise location…" : "Use Current Location"}
           </button>
+          {locationError && (
+            <p className="mt-2 text-xs text-amber-400">{locationError}</p>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">
           {showingSearch ? (
             <div className="px-5 py-4">
+              {/* Always offer the exact typed text as a precise area — this is
+                  the reliable "set my exact location" path on any device. */}
+              <button
+                onClick={handleUseTypedArea}
+                className="mb-3 flex w-full items-center gap-2.5 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2.5 text-left text-sm hover:bg-primary/10 transition-colors"
+              >
+                <MapPin className="h-4 w-4 text-primary shrink-0" />
+                <span>Use <span className="font-semibold text-primary">"{query.trim()}"</span> as my area</span>
+              </button>
               {filteredCities.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No cities match "{query}"
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No saved cities match — tap the option above to use your exact area.
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-1">

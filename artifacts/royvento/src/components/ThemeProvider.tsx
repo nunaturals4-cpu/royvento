@@ -1,19 +1,39 @@
-import { useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
-/**
- * Royvento uses a single premium identity — Noir Green:
- * bg #000000 · secondary bg #101010 · cards #1A1A1A
- * green #4CAF50 (hover #66BB6A) · dark green #1B5E20
- * text #FFFFFF · secondary text #BDBDBD · border #2A2A2A
- * The previous multi-theme switcher has been removed in favour of one cohesive
- * brand look. This provider simply applies the theme on mount.
- */
+export type Theme = "noir" | "gold" | "dusk";
+const STORAGE_KEY = "royvento_theme";
+
+interface Ctx { theme: Theme; setTheme: (t: Theme) => void; }
+const ThemeContext = createContext<Ctx | null>(null);
+
+function applyTheme(t: Theme) {
+  const root = document.documentElement;
+  root.dataset["theme"] = t;
+  root.classList.add("dark");
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset["theme"] = "noir";
-    root.classList.add("dark");
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "noir";
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+      if (stored === "noir" || stored === "gold" || stored === "dusk") return stored;
+    } catch {}
+    return "noir";
+  });
 
-  return <>{children}</>;
+  useEffect(() => {
+    applyTheme(theme);
+    try { localStorage.setItem(STORAGE_KEY, theme); } catch {}
+  }, [theme]);
+
+  const setTheme = (t: Theme) => setThemeState(t);
+
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
+}
+
+export function useTheme() {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error("useTheme must be used inside ThemeProvider");
+  return ctx;
 }

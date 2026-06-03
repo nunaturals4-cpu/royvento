@@ -470,12 +470,8 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
         {/* ══ OVERVIEW ══ */}
         {activeTab === "overview" && (
           <div className="space-y-12">
-            {vendor.description && (
-              <section>
-                <h2 className="font-serif text-2xl mb-3">About</h2>
-                <p className="text-muted-foreground leading-relaxed max-w-3xl">{vendor.description}</p>
-              </section>
-            )}
+            {/* "About"/description section removed to keep the pub listing page
+                concise and scannable (clutter reduction). */}
 
             <section>
               <h2 className="font-serif text-2xl mb-4">Venue Info</h2>

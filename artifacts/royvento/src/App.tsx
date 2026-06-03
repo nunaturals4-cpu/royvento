@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import NotFound from "@/pages/not-found";
 
 import { Navbar } from "@/components/layout/Navbar";
+import { PromoMarquee } from "@/components/layout/PromoMarquee";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/SEO";
 
@@ -142,6 +143,7 @@ function Router() {
       <ScrollToTop />
       <OAuthErrorHandler />
       <Navbar />
+      {location === "/" && <PromoMarquee />}
       <main className="flex-1">
         <ErrorBoundary resetKey={location}>
         <Suspense fallback={<PageFallback />}>
