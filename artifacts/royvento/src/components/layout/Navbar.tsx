@@ -157,7 +157,17 @@ export function Navbar() {
           }`}
         />
         <div className="container mx-auto px-4 md:px-6 h-[68px] flex items-center justify-between relative gap-3">
-          <div className="flex items-center gap-7 min-w-0">
+          <div className="flex items-center gap-3 lg:gap-7 min-w-0">
+            {/* Hamburger — mobile/tablet only, kept on the LEFT of the logo */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden h-9 w-9 rounded-full hover:bg-foreground/8 shrink-0 -ml-1.5"
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileOpen ? <XIcon className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
             <Link href="/" className="flex items-center gap-2.5 group shrink-0" aria-label="Royvento home">
               <Logo size={46} className="transition-transform group-hover:scale-[1.04]" />
             </Link>
@@ -166,7 +176,6 @@ export function Navbar() {
               <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pubs")}</Link>
               <Link href="/pub-offers" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pub_offers")}</Link>
               <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.blog")}</Link>
-              <Link href="/subscription" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.subscription")}</Link>
             </nav>
           </div>
 
@@ -292,17 +301,6 @@ export function Navbar() {
               </div>
             )}
 
-            {/* Hamburger — mobile/tablet only */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden h-9 w-9 rounded-full hover:bg-foreground/8"
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            >
-              {mobileOpen ? <XIcon className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -333,10 +331,10 @@ export function Navbar() {
                         <Link href="/dashboard/bookings" className="cursor-pointer w-full">{t("nav.my_bookings")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/wishlist" className="cursor-pointer w-full">{t("nav.wishlist")}</Link>
+                        <Link href="/subscription" className="cursor-pointer w-full">{t("nav.subscription")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/subscription" className="cursor-pointer w-full">{t("nav.subscription")}</Link>
+                        <Link href="/wishlist" className="cursor-pointer w-full">{t("nav.wishlist")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/dashboard/become-vendor" className="cursor-pointer w-full">{t("nav.become_partner")}</Link>
@@ -349,6 +347,9 @@ export function Navbar() {
                         <Link href="/dashboard/bookings" className="cursor-pointer w-full">{t("nav.my_bookings")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <Link href="/subscription" className="cursor-pointer w-full">{t("nav.subscription")}</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <Link href="/dashboard/partner" className="cursor-pointer w-full">{t("nav.partner_dashboard")}</Link>
                       </DropdownMenuItem>
                     </>
@@ -357,6 +358,9 @@ export function Navbar() {
                     <>
                       <DropdownMenuItem asChild>
                         <Link href="/dashboard/bookings" className="cursor-pointer w-full">{t("nav.my_bookings")}</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/subscription" className="cursor-pointer w-full">{t("nav.subscription")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/admin" className="cursor-pointer w-full">{t("nav.admin_panel")}</Link>
@@ -437,7 +441,6 @@ export function Navbar() {
                   { href: "/pubs", label: t("nav.pubs") },
                   { href: "/pub-offers", label: t("nav.pub_offers") },
                   { href: "/blogs", label: t("nav.blog") },
-                  { href: "/subscription", label: t("nav.subscription") },
                 ].map(({ href, label }) => (
                   <Link
                     key={href}

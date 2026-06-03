@@ -29,7 +29,7 @@ import {
   Megaphone, Crown, Users, Eye, MapPin, Building2, Wine, Pencil, Upload, Ticket as TicketIcon, ScanLine,
   TrendingUp, IndianRupee, Clock, Navigation, Tag, ChevronDown, GlassWater, Plus, CalendarCheck, Check,
   Banknote, CreditCard, CheckCircle, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Percent, RefreshCw,
-  FileText, Star, Menu, X, Sparkles, ArrowUpRight, Bell, Utensils, Gift, Loader2,
+  FileText, Star, Menu, X, Sparkles, ArrowUpRight, Utensils, Gift, Loader2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -369,19 +369,6 @@ function PartnerHeader({
             <span className="whitespace-nowrap">Hello, <span className="text-gradient-red">{greetingName}</span></span>
             <span className="text-white/30 font-normal hidden sm:inline"> — welcome back</span>
           </h1>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            className="h-9 w-9 rounded-lg flex items-center justify-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/60 transition-colors relative"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          </button>
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/40 to-primary/10 border border-primary/30 flex items-center justify-center text-xs font-semibold text-white shadow-[0_0_18px_-4px_rgba(232,41,28,0.5),inset_0_1px_0_rgba(255,255,255,0.12)]">
-            {greetingName.slice(0, 2).toUpperCase()}
-          </div>
         </div>
       </div>
     </header>
