@@ -40,6 +40,7 @@ import {
   EVENT_CATEGORIES, PUB_EVENT_TYPES, formatINR,
 } from "@/lib/api";
 import { COUNTRY_NAMES, getStates, getCities } from "@/lib/locations";
+import { EVENT_CATEGORIES as ANNOUNCEMENT_CATEGORIES } from "@/lib/eventCategories";
 import { uploadImage as uploadImageToStorage, validateImageFile } from "@/lib/uploadImage";
 import { useFormErrors, fieldClass } from "@/lib/formErrors";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -3238,7 +3239,7 @@ interface Announcement {
 }
 
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
-const ANN_EVENT_TYPES = ["Ladies Night", "DJ Night", "Live Music", "Karaoke", "Open Bar", "Theme Party", "Open Mic", "Brunch", "Pool Party", "Sufi Night"];
+const ANN_EVENT_TYPES = [...ANNOUNCEMENT_CATEGORIES];
 
 const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "", price: "" };
 

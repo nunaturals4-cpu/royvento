@@ -4317,7 +4317,7 @@ function AnnouncementSliderAdmin() {
           <div>
             <h2 className="font-serif text-2xl">Announcement Slider</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Toggle which announcements appear in the hero image slider on the Hot Deals page.
+              Toggle which announcements appear in the hero image slider on the Events page.
               When none are selected, the slider falls back to the most recent announcements automatically.
             </p>
           </div>

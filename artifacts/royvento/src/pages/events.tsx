@@ -1,0 +1,236 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
+import { SEO } from "@/components/SEO";
+import { apiGet } from "@/lib/api";
+import { AnnouncementSlider, type SliderAnnouncement } from "@/components/AnnouncementSlider";
+import { EVENT_CATEGORIES, EVENT_CATEGORY_IMAGES, EVENT_CATEGORY_SUBTITLES } from "@/lib/eventCategories";
+import {
+  Calendar, Clock, Megaphone, ArrowRight,
+  Sparkles, Disc3, Music2, Mic, PartyPopper, Waves, Mic2, Drama,
+} from "lucide-react";
+
+interface EventAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  vendorName: string;
+  eventId: number;
+  vendorId: number;
+  imageUrl?: string;
+  genre: string;
+  eventType: string;
+}
+
+const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
+
+// Icon per category — mirrors the home page "Popular Categories" tile design.
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  "Ladies Night": Sparkles,
+  "DJ Night": Disc3,
+  "Live Music": Music2,
+  "Karaoke": Mic,
+  "Theme Party": PartyPopper,
+  "Pool Party": Waves,
+  "Open Mics": Mic2,
+  "Standup Shows": Drama,
+};
+
+export function Events() {
+  const { t } = useTranslation();
+  const [slider, setSlider] = useState<SliderAnnouncement[]>([]);
+  const [announcements, setAnnouncements] = useState<EventAnnouncement[]>([]);
+  const [genreFilter, setGenreFilter] = useState("");
+  const [eventTypeFilter, setEventTypeFilter] = useState("");
+  const whatsOnRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Slider respects the admin's "Announcement Slider rules" (featured first,
+    // recent fallback) — same source as the home/Events slider.
+    apiGet<SliderAnnouncement[]>("/api/announcements/slider").then(setSlider).catch(() => {});
+    apiGet<EventAnnouncement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
+  }, []);
+
+  // Count upcoming announcements per category (the eventType partners pick in
+  // the dashboard announcement tab maps 1:1 to these category tiles).
+  const countByCat = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const a of announcements) if (a.eventType) m[a.eventType] = (m[a.eventType] ?? 0) + 1;
+    return m;
+  }, [announcements]);
+
+  const filteredAnnouncements = announcements.filter((a) => {
+    if (genreFilter && a.genre !== genreFilter) return false;
+    if (eventTypeFilter && a.eventType !== eventTypeFilter) return false;
+    return true;
+  });
+
+  const hasAnnouncements = announcements.length > 0;
+
+  // Clicking a category tile drives the same event-type filter the What's On
+  // section uses, then scrolls down to the filtered result.
+  const selectCategory = (cat: string) => {
+    setEventTypeFilter((prev) => (prev === cat ? "" : cat));
+    setTimeout(() => whatsOnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <SEO
+        title="Events in India — Ladies Nights, DJ Nights & Live Music | Royvento"
+        description="Discover the hottest nightlife events near you: ladies' nights, DJ nights, live music, karaoke, theme & pool parties, open mics and standup shows. Updated daily on Royvento."
+        canonical="/events"
+      />
+
+      <div className="container mx-auto px-4 md:px-6 py-8">
+        {/* ── Announcement slider (admin-controlled featured first) ── */}
+        {slider.length > 0 && <AnnouncementSlider announcements={slider} />}
+
+        {/* ── Event Categories — home-style "Popular Categories" tiles ── */}
+        <section className="py-6 md:py-8">
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-primary mb-2">Browse by vibe</p>
+              <h2 className="font-serif text-2xl md:text-4xl tracking-tight">Event Categories</h2>
+            </div>
+            {eventTypeFilter && (
+              <button
+                onClick={() => setEventTypeFilter("")}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+            {EVENT_CATEGORIES.map((cat) => {
+              const Icon = CATEGORY_ICONS[cat] ?? Megaphone;
+              const count = countByCat[cat] ?? 0;
+              const active = eventTypeFilter === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => selectCategory(cat)}
+                  className={`sheen group relative overflow-hidden rounded-2xl border lift-3d aspect-[4/5] text-left transition-colors ${active ? "border-primary" : "border-white/8"}`}
+                >
+                  <img
+                    src={EVENT_CATEGORY_IMAGES[cat]}
+                    alt=""
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/15" />
+                  {active && <div className="absolute inset-0 ring-2 ring-inset ring-primary rounded-2xl" />}
+                  {count > 0 && (
+                    <span className="absolute top-2 right-2 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground">
+                      {count}
+                    </span>
+                  )}
+                  <div className="absolute inset-0 flex flex-col items-center justify-end text-center p-3 md:p-4">
+                    <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl border border-primary/40 bg-black/40 text-primary backdrop-blur-sm">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="text-sm font-semibold text-white leading-tight">{cat}</span>
+                    <span className="text-[11px] text-white/55 mt-0.5">{EVENT_CATEGORY_SUBTITLES[cat]}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── What's On — announcements (pub-offers style) ── */}
+        {hasAnnouncements && (
+          <section ref={whatsOnRef} className="py-6 md:py-8 scroll-mt-20">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-4 w-4 text-amber-400" />
+                <span className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold">{t("pub_offers.whats_on")}</span>
+              </div>
+              <div className="flex-1 h-px bg-white/[0.06]" />
+            </div>
+
+            {/* Genre + event type filters */}
+            <div className="mb-5 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Genre</p>
+                <div className="flex flex-wrap gap-2">
+                  {["", ...ANN_GENRES].map((g) => (
+                    <button key={g || "all"} onClick={() => setGenreFilter(g === genreFilter ? "" : g)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        genreFilter === g ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
+                      }`}>{g || t("pub_offers.filter_all")}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Event Type</p>
+                <div className="flex flex-wrap gap-2">
+                  {["", ...EVENT_CATEGORIES].map((et) => (
+                    <button key={et || "all"} onClick={() => setEventTypeFilter(et === eventTypeFilter ? "" : et)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        eventTypeFilter === et ? "bg-amber-400/20 border-amber-400 text-amber-400" : "border-white/10 text-white/40 hover:border-white/25 hover:text-white/60"
+                      }`}>{et || t("pub_offers.filter_all")}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {filteredAnnouncements.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No announcements match these filters.</p>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
+                {filteredAnnouncements.map((a) => {
+                  const inner = (
+                    <div className="group w-[260px] sm:w-[280px] flex-shrink-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111] hover:border-primary/25 transition-colors">
+                      <div className="relative h-36 bg-black/40 overflow-hidden">
+                        {a.imageUrl ? (
+                          <img src={a.imageUrl} alt={a.title} loading="lazy" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-black">
+                            <Megaphone className="h-8 w-8 text-primary/30" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 rounded-full border border-primary/30 bg-black/60 backdrop-blur-md px-2.5 py-1">
+                          <Megaphone className="h-2.5 w-2.5 text-primary" />
+                          <span className="text-[9px] font-semibold text-primary uppercase tracking-wider truncate max-w-[100px]">{a.vendorName}</span>
+                        </div>
+                      </div>
+                      <div className="p-4 flex flex-col gap-2">
+                        <h3 className="font-serif text-base leading-snug tracking-tight text-white line-clamp-2">{a.title}</h3>
+                        {a.body && <p className="text-xs text-white/50 line-clamp-2">{a.body}</p>}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1.5 border-t border-white/[0.06]">
+                          {a.announceDate && (
+                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-primary" />
+                              {new Date(a.announceDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                            </span>
+                          )}
+                          {a.announceTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-primary" />{a.announceTime}</span>}
+                        </div>
+                        {a.eventId && (
+                          <div className="mt-1 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 flex items-center justify-between group-hover:bg-primary/15 transition-colors">
+                            <span className="text-xs font-semibold text-primary">{t("pub_offers.book_now")}</span>
+                            <ArrowRight className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                  return a.eventId ? (
+                    <Link key={a.id} href={`/events/${a.eventId}?book=event&aid=${a.id}`} className="snap-start flex-shrink-0 cursor-pointer">{inner}</Link>
+                  ) : (
+                    <div key={a.id} className="snap-start flex-shrink-0">{inner}</div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -179,10 +179,11 @@ export function Navbar() {
               <Logo size={46} className="transition-transform group-hover:scale-[1.04]" />
             </Link>
             <nav className="hidden lg:flex items-center gap-7 text-sm font-medium">
-              <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.home")}</Link>
-              <Link href="/pubs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pubs")}</Link>
-              <Link href="/pub-offers" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.pub_offers")}</Link>
-              <Link href="/blogs" className="text-muted-foreground hover:text-foreground transition-colors">{t("nav.blog")}</Link>
+              <Link href="/" className="text-white hover:text-primary transition-colors">{t("nav.home")}</Link>
+              <Link href="/pubs" className="text-white hover:text-primary transition-colors">{t("nav.pubs")}</Link>
+              <Link href="/events" className="text-white hover:text-primary transition-colors">{t("nav.events", "Events")}</Link>
+              <Link href="/pub-offers" className="text-white hover:text-primary transition-colors">{t("nav.pub_offers")}</Link>
+              <Link href="/blogs" className="text-white hover:text-primary transition-colors">{t("nav.blog")}</Link>
             </nav>
           </div>
 
@@ -487,6 +488,7 @@ export function Navbar() {
                 {[
                   { href: "/", label: t("nav.home") },
                   { href: "/pubs", label: t("nav.pubs") },
+                  { href: "/events", label: t("nav.events", "Events") },
                   { href: "/pub-offers", label: t("nav.pub_offers") },
                   { href: "/blogs", label: t("nav.blog") },
                 ].map(({ href, label }) => (
@@ -494,7 +496,7 @@ export function Navbar() {
                     key={href}
                     href={href}
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center py-3 text-base font-medium text-muted-foreground hover:text-foreground transition-colors border-b border-border/40 last:border-0"
+                    className="flex items-center py-3 text-base font-medium text-white hover:text-primary transition-colors border-b border-border/40 last:border-0"
                   >
                     {label}
                   </Link>

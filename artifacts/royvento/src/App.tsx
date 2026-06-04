@@ -22,6 +22,7 @@ import { Home } from "@/pages/home";
 
 const Pubs = lazy(() => import("@/pages/pubs").then((m) => ({ default: m.Pubs })));
 const PubOffers = lazy(() => import("@/pages/pub-offers").then((m) => ({ default: m.PubOffers })));
+const Events = lazy(() => import("@/pages/events").then((m) => ({ default: m.Events })));
 const Vendors = lazy(() => import("@/pages/vendors").then((m) => ({ default: m.Vendors })));
 const Login = lazy(() => import("@/pages/login").then((m) => ({ default: m.Login })));
 const Register = lazy(() => import("@/pages/register").then((m) => ({ default: m.Register })));
@@ -153,6 +154,7 @@ function Router() {
           <Route path="/explore"><Redirect to="/pubs" /></Route>
           <Route path="/pubs" component={Pubs} />
           <Route path="/pub-offers" component={PubOffers} />
+          <Route path="/events" component={Events} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/partners" component={Vendors} />
           {/* Legacy ID URLs auto-redirect to the slugged canonical URL.

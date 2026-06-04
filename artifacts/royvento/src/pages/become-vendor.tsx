@@ -22,6 +22,9 @@ interface VendorRequest {
 const VENUE_CATEGORIES = [
   "Pub",
   "Club",
+  "Pub & Club",
+  "Event Organizer",
+  "Game Organizer",
 ] as const;
 
 export function BecomeVendor() {
