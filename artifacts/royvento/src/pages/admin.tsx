@@ -297,7 +297,18 @@ export function AdminPanel() {
               <TabsContent value="analytics" className="mt-0"><Analytics /></TabsContent>
               <TabsContent value="vendors" className="mt-0"><AllVendorsAdmin /></TabsContent>
               <TabsContent value="requests" className="mt-0"><VendorRequests /></TabsContent>
-              <TabsContent value="event-approvals" className="mt-0"><EventApprovalsAdmin /></TabsContent>
+              <TabsContent value="event-approvals" className="mt-0">
+                <div className="space-y-10">
+                  <div>
+                    <h2 className="font-serif text-xl mb-4">Event Approvals</h2>
+                    <EventApprovalsAdmin />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-xl mb-4">Announcement Approvals</h2>
+                    <AnnouncementApprovalsAdmin />
+                  </div>
+                </div>
+              </TabsContent>
               <TabsContent value="events" className="mt-0"><EventsAdmin /></TabsContent>
               <TabsContent value="subscriptions" className="mt-0"><SubscriptionsAdmin /></TabsContent>
               <TabsContent value="coupons" className="mt-0"><CouponsAdmin /></TabsContent>
@@ -1374,6 +1385,141 @@ interface AdminEvent {
   vendorCrowdLevel: string | null;
 }
 
+interface PendingAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  announceDate: string;
+  announceTime: string;
+  imageUrl: string;
+  price: string;
+  genre: string;
+  eventType: string;
+  vendorId: number;
+  vendorName: string;
+  createdAt: string;
+}
+
+function AnnouncementApprovalsAdmin() {
+  const [items, setItems] = useState<PendingAnnouncement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    setLoadError(null);
+    apiGet<PendingAnnouncement[]>("/api/admin/announcements/pending")
+      .then((data) => { setItems(data); setLoadError(null); })
+      .catch((e) => { setLoadError(e?.message ?? "Failed to load"); toast({ title: "Failed to load announcements", description: e?.message, variant: "destructive" }); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id: number) => {
+    try {
+      await apiPatch(`/api/admin/announcements/${id}/approve`, {});
+      toast({ title: "Announcement approved — users will be notified." });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const reject = async (id: number) => {
+    try {
+      await apiPatch(`/api/admin/announcements/${id}/reject`, { rejectionReason: reason.trim() });
+      toast({ title: "Announcement rejected" });
+      setRejecting(null);
+      setReason("");
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading announcements...</p>;
+  if (loadError) return (
+    <div className="rounded-2xl glass-card p-6 text-center space-y-3">
+      <XCircle className="h-8 w-8 text-red-400 mx-auto" />
+      <p className="text-sm text-muted-foreground">{loadError}</p>
+      <Button size="sm" variant="outline" onClick={load}>Retry</Button>
+    </div>
+  );
+  if (items.length === 0) return (
+    <div className="rounded-2xl glass-card p-6 text-center">
+      <CheckCircle className="h-8 w-8 text-green-400 mx-auto mb-2" />
+      <p className="text-sm text-muted-foreground">No pending announcements</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">{items.length} announcement{items.length !== 1 ? "s" : ""} awaiting review</p>
+      {items.map((a) => (
+        <div key={a.id} className="rounded-2xl glass-card overflow-hidden">
+          <div className="flex gap-4 p-4">
+            {a.imageUrl ? (
+              <img src={a.imageUrl} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+            ) : (
+              <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                <Megaphone className="h-7 w-7 text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="font-serif text-base">{a.title}</p>
+                  <p className="text-xs text-muted-foreground">{a.vendorName}</p>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {a.genre && <Badge variant="outline">{a.genre}</Badge>}
+                  {a.eventType && <Badge variant="secondary" className="bg-white/10">{a.eventType}</Badge>}
+                </div>
+              </div>
+              {a.body && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{a.body}</p>}
+              <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                {a.announceDate && <span>{a.announceDate}{a.announceTime ? ` at ${a.announceTime}` : ""}</span>}
+                {a.price && Number(a.price) > 0 && <span>₹{Number(a.price).toLocaleString("en-IN")}</span>}
+              </div>
+            </div>
+          </div>
+          {rejecting === a.id ? (
+            <div className="border-t border-white/10 p-4 space-y-3 bg-red-900/10">
+              <p className="text-sm font-medium text-red-300">Reason for rejection (optional)</p>
+              <Textarea
+                value={reason}
+                onChange={(ev) => setReason(ev.target.value)}
+                rows={2}
+                placeholder="E.g. Inappropriate content, missing details..."
+                className="bg-black/40 border-white/10"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => reject(a.id)} className="bg-red-700 hover:bg-red-600 border-0">
+                  <XCircle className="h-4 w-4 mr-1" /> Confirm rejection
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setRejecting(null); setReason(""); }}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="border-t border-white/10 p-4 flex gap-2 justify-end">
+              <Button size="sm" onClick={() => approve(a.id)} className="bg-green-700 hover:bg-green-600 border-0">
+                <CheckCircle className="h-4 w-4 mr-1" /> Approve
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setRejecting(a.id); setReason(""); }}
+                className="border-red-500/40 text-red-300 hover:bg-red-900/20">
+                <XCircle className="h-4 w-4 mr-1" /> Reject
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface PendingEvent {
   id: number;
   title: string;
@@ -2021,14 +2167,15 @@ function AdsAdmin() {
 
 const ROLES = ["user", "vendor", "admin"] as const;
 
-function UsersPanel() {
-  const { data: users = [], refetch } = useListUsers();
+function UserTable({ users, refetch }: { users: any[]; refetch: () => void }) {
   const updateRole = useUpdateUserRole();
   const del = useDeleteUser();
   const { toast } = useToast();
 
+  if (users.length === 0) return <p className="text-sm text-muted-foreground">No records found.</p>;
+
   return (
-    <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
+    <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[60vh]">
       <table className="w-full text-sm min-w-[760px]">
         <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
@@ -2079,6 +2226,56 @@ function UsersPanel() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function UsersPanel() {
+  const { data: users = [], refetch } = useListUsers();
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+
+  const filtered = (users as any[]).filter((u) => {
+    const matchRole = roleFilter === "all" || u.role === roleFilter;
+    const q = search.trim().toLowerCase();
+    const matchSearch = !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.phone?.toLowerCase().includes(q);
+    return matchRole && matchSearch;
+  });
+
+  const partners = filtered.filter((u) => u.role === "vendor");
+  const regularUsers = filtered.filter((u) => u.role !== "vendor");
+
+  return (
+    <div className="space-y-8">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search by name, email or phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-black/40 border-white/10"
+          />
+        </div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-36 bg-black/40 border-white/10"><SelectValue placeholder="All roles" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All roles</SelectItem>
+            {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">{filtered.length} of {(users as any[]).length} users</span>
+      </div>
+
+      <div>
+        <h2 className="font-serif text-xl mb-4">Partner Details <span className="text-sm font-sans text-muted-foreground ml-2">({partners.length})</span></h2>
+        <UserTable users={partners} refetch={refetch} />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">User Details <span className="text-sm font-sans text-muted-foreground ml-2">({regularUsers.length})</span></h2>
+        <UserTable users={regularUsers} refetch={refetch} />
+      </div>
     </div>
   );
 }

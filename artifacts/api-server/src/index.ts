@@ -324,7 +324,12 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "free_entry_for_table_before_time" text`);
     // ── drink_plans.image_url ──────────────────────────────────────────────
     await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "image_url" text`);
-    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url ensured");
+    // ── announcements approval workflow ────────────────────────────────────
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "approval_status" varchar(20) NOT NULL DEFAULT 'pending'`);
+    await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "rejection_reason" text NOT NULL DEFAULT ''`);
+    // Approve all existing announcements so they stay visible after deploy
+    await db.execute(sql`UPDATE "announcements" SET "approval_status" = 'approved' WHERE "approval_status" = 'pending'`);
+    logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
   }

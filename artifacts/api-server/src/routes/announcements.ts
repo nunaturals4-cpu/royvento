@@ -73,62 +73,11 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
       genre: parsed.data.genre,
       eventType: parsed.data.eventType,
       price: String(parsed.data.price ?? 0),
+      approvalStatus: "pending",
     })
     .returning();
 
-  // Broadcast to ALL users in throttled batches so the server is never overwhelmed
-  setImmediate(async () => {
-    try {
-      const notifTitle = `${vendor.businessName}: ${parsed.data.title}`;
-      const notifBody = parsed.data.body || parsed.data.title;
-      const tag = `announcement-${row?.id ?? Date.now()}`;
-
-      // Fetch all users including their Expo push tokens in one query
-      const allUsers = await db
-        .select({ id: usersTable.id, expoPushToken: usersTable.expoPushToken })
-        .from(usersTable);
-
-      const BATCH_SIZE = 20;
-      const BATCH_DELAY_MS = 150;
-
-      for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
-        const batch = allUsers.slice(i, i + BATCH_SIZE);
-
-        await Promise.all(
-          batch.map(async ({ id: userId, expoPushToken }) => {
-            try {
-              // In-app notification for every user (also fans out web push)
-              await createUserNotification({
-                userId,
-                title: notifTitle,
-                message: notifBody,
-                url: `/`,
-                tag,
-              });
-              // Expo push (only fires if the user has a registered mobile token)
-              if (expoPushToken) {
-                sendExpoPushWithToken(userId, expoPushToken, {
-                  title: notifTitle,
-                  body: notifBody,
-                  data: { screen: "home", tag },
-                }).catch(() => {});
-              }
-            } catch {
-              // non-critical per user — continue with next
-            }
-          }),
-        );
-
-        // Pause between batches to avoid overwhelming the event loop
-        if (i + BATCH_SIZE < allUsers.length) {
-          await new Promise<void>((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
-        }
-      }
-    } catch {
-      // non-critical — ignore errors
-    }
-  });
-
+  // Notifications are sent only after admin approves — no broadcast here
   return res.json(row);
 });
 
@@ -199,6 +148,7 @@ router.get("/announcements/recent", async (_req, res) => {
     FROM announcements a
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+      AND a.approval_status = 'approved'
     ORDER BY a.created_at DESC
     LIMIT 10
   `);
@@ -232,6 +182,7 @@ router.get("/announcements/slider", async (_req, res) => {
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
       AND a.is_featured_slider = true
+      AND a.approval_status = 'approved'
     ORDER BY a.created_at DESC
     LIMIT 10
   `);
@@ -240,7 +191,7 @@ router.get("/announcements/slider", async (_req, res) => {
     return res.json(featured.rows);
   }
 
-  // Fallback: return recent announcements so the slider is never empty
+  // Fallback: return recent approved announcements so the slider is never empty
   const recent = await db.execute(sql`
     SELECT
       a.id,
@@ -264,6 +215,7 @@ router.get("/announcements/slider", async (_req, res) => {
     FROM announcements a
     JOIN vendors v ON v.id = a.vendor_id
     WHERE (a.announce_date = '' OR a.announce_date >= ${today})
+      AND a.approval_status = 'approved'
     ORDER BY a.created_at DESC
     LIMIT 10
   `);
@@ -280,6 +232,8 @@ router.get("/admin/announcements", requireAuth(["admin"]), async (_req, res) => 
       a.announce_time      AS "announceTime",
       a.image_url          AS "imageUrl",
       a.is_featured_slider AS "isFeaturedSlider",
+      a.approval_status    AS "approvalStatus",
+      a.rejection_reason   AS "rejectionReason",
       a.vendor_id          AS "vendorId",
       a.created_at         AS "createdAt",
       v.business_name      AS "vendorName"
@@ -288,6 +242,107 @@ router.get("/admin/announcements", requireAuth(["admin"]), async (_req, res) => 
     ORDER BY a.created_at DESC
   `);
   return res.json(rows.rows);
+});
+
+router.get("/admin/announcements/pending", requireAuth(["admin"]), async (_req, res) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        a.id,
+        a.title,
+        a.body,
+        a.announce_date   AS "announceDate",
+        a.announce_time   AS "announceTime",
+        a.image_url       AS "imageUrl",
+        a.price           AS "price",
+        a.genre           AS "genre",
+        a.event_type      AS "eventType",
+        a.vendor_id       AS "vendorId",
+        a.created_at      AS "createdAt",
+        v.business_name   AS "vendorName"
+      FROM announcements a
+      JOIN vendors v ON v.id = a.vendor_id
+      WHERE a.approval_status = 'pending'
+      ORDER BY a.created_at ASC
+    `);
+    return res.json(rows.rows);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to load pending announcements" });
+  }
+});
+
+async function broadcastAnnouncementNotifications(ann: { id: number; vendorId: number; title: string; body: string }) {
+  try {
+    const vendorRows = await db
+      .select({ businessName: vendorsTable.businessName })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, ann.vendorId))
+      .limit(1);
+    const businessName = vendorRows[0]?.businessName ?? "Partner";
+    const notifTitle = `${businessName}: ${ann.title}`;
+    const notifBody = ann.body || ann.title;
+    const tag = `announcement-${ann.id}`;
+    const allUsers = await db
+      .select({ id: usersTable.id, expoPushToken: usersTable.expoPushToken })
+      .from(usersTable);
+    const BATCH_SIZE = 20;
+    const BATCH_DELAY_MS = 150;
+    for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
+      const batch = allUsers.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map(async ({ id: userId, expoPushToken }) => {
+          try {
+            await createUserNotification({ userId, title: notifTitle, message: notifBody, url: `/`, tag });
+            if (expoPushToken) {
+              sendExpoPushWithToken(userId, expoPushToken, {
+                title: notifTitle, body: notifBody, data: { screen: "home", tag },
+              }).catch(() => {});
+            }
+          } catch { /* non-critical per user */ }
+        }),
+      );
+      if (i + BATCH_SIZE < allUsers.length) {
+        await new Promise<void>((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+    }
+  } catch { /* non-critical */ }
+}
+
+router.patch("/admin/announcements/:id/approve", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  try {
+    const rows = await db
+      .update(announcementsTable)
+      .set({ approvalStatus: "approved", rejectionReason: "" })
+      .where(eq(announcementsTable.id, id))
+      .returning();
+    const row = rows[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    setImmediate(() => broadcastAnnouncementNotifications({
+      id: row.id, vendorId: row.vendorId, title: row.title, body: row.body,
+    }));
+    return res.json(row);
+  } catch {
+    return res.status(500).json({ error: "Failed to approve announcement" });
+  }
+});
+
+router.patch("/admin/announcements/:id/reject", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const { rejectionReason } = req.body as { rejectionReason?: string };
+  try {
+    const [row] = await db
+      .update(announcementsTable)
+      .set({ approvalStatus: "rejected", rejectionReason: rejectionReason ?? "" })
+      .where(eq(announcementsTable.id, id))
+      .returning();
+    if (!row) return res.status(404).json({ error: "Not found" });
+    return res.json(row);
+  } catch {
+    return res.status(500).json({ error: "Failed to reject announcement" });
+  }
 });
 
 // Admin: create announcement (linked to an existing vendor)
@@ -356,6 +411,7 @@ router.get("/vendors/:vendorId/announcements", async (req, res) => {
     .where(
       and(
         eq(announcementsTable.vendorId, vendorId),
+        eq(announcementsTable.approvalStatus, "approved"),
         or(
           eq(announcementsTable.announceDate, ""),
           sql`${announcementsTable.announceDate} >= ${today}`,

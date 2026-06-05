@@ -547,6 +547,8 @@ export const announcementsTable = pgTable(
     capacity: integer("capacity"),
     isActive: boolean("is_active").notNull().default(true),
     price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
+    approvalStatus: varchar("approval_status", { length: 20 }).notNull().default("pending"),
+    rejectionReason: text("rejection_reason").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

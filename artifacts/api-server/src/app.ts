@@ -187,12 +187,25 @@ if (frontendDist) {
       },
     }),
   );
+} else {
+  logger.warn({ tried: frontendCandidates }, "No frontend dist found — only API routes will respond");
+}
+
+// JSON 404 for unmatched /api/* routes — must come BEFORE the SPA catch-all
+// so unknown API paths always return JSON, never index.html. Applies in every
+// environment: production (where the SPA catch-all would otherwise serve HTML)
+// and local dev (where Express's default 404 is text/html).
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+// SPA catch-all: serve index.html for all non-API GET requests so client-side
+// routing (wouter) works on direct navigation / page refresh.
+if (frontendDist) {
   app.get(/.*/, (_req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(frontendDist, "index.html"));
   });
-} else {
-  logger.warn({ tried: frontendCandidates }, "No frontend dist found — only API routes will respond");
 }
 
 // ─── Terminal error handler ───────────────────────────────────────────────────

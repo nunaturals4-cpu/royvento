@@ -230,6 +230,13 @@ const GROUP_LABELS: Record<NavItem["group"], string> = {
 
 const LOCKED_TAB_VALUES = new Set(["overview", "events"]);
 
+// Tabs hidden for event/game organiser category partners
+const ORGANISER_HIDDEN_TABS = new Set(["events", "calendar", "drinkplans", "reviews"]);
+
+function isOrganiserCategory(category: string) {
+  return category === "Event Organizer" || category === "Game Organizer";
+}
+
 function SidebarTabsTrigger({
   value, label, Icon, active,
 }: { value: string; label: string; Icon: React.ComponentType<{ className?: string }>; active: boolean }) {
@@ -275,7 +282,11 @@ function PartnerNav({
   vendor: any;
   isApprovedAndListed: boolean;
 }) {
-  const items = NAV_ITEMS.filter((i) => isApprovedAndListed || LOCKED_TAB_VALUES.has(i.value));
+  const organiser = isOrganiserCategory(vendor?.category ?? "");
+  const items = NAV_ITEMS.filter((i) => {
+    if (organiser && ORGANISER_HIDDEN_TABS.has(i.value)) return false;
+    return isApprovedAndListed || LOCKED_TAB_VALUES.has(i.value);
+  });
   const groups: NavItem["group"][] = ["studio", "ops", "growth", "money"];
 
   return (
@@ -515,23 +526,30 @@ export function VendorDashboard() {
               )}
 
               <TabsContent value="overview" className="mt-0"><ProfileEditor vendor={vendor} onSaved={refetchVendor} /></TabsContent>
-              <TabsContent value="events" className="mt-0"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>
+              {!isOrganiserCategory(vendor?.category ?? "") && (
+                <TabsContent value="events" className="mt-0"><EventsManager vendor={vendor} events={events} refetchEvents={refetchEvents} onSaved={refetchVendor} /></TabsContent>
+              )}
               {isApprovedAndListed && <>
                 <TabsContent value="bookings" className="mt-0"><BookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} /></TabsContent>
                 <TabsContent value="analytics" className="mt-0"><AnalyticsPanel vendorCategory={vendor?.category ?? ""} /></TabsContent>
-                <TabsContent value="calendar" className="mt-0"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
+                {!isOrganiserCategory(vendor?.category ?? "") && (
+                  <TabsContent value="calendar" className="mt-0"><BlockedCalendar vendorId={vendor.id} /></TabsContent>
+                )}
                 <TabsContent value="ads" className="mt-0"><AdsPanel /></TabsContent>
                 <TabsContent value="announcements" className="mt-0"><AnnouncementsPanel /></TabsContent>
                 <TabsContent value="leads" className="mt-0"><LeadsPanel /></TabsContent>
-                <TabsContent value="coupons" className="mt-0 space-y-10">
+                <TabsContent value="coupons" className="mt-0">
                   <CouponsPanel />
-                  <FoodDrinkOffersPanel vendorId={vendor.id} />
                 </TabsContent>
-                <TabsContent value="drinkplans" className="mt-0"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
+                {!isOrganiserCategory(vendor?.category ?? "") && (
+                  <TabsContent value="drinkplans" className="mt-0"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
+                )}
                 <TabsContent value="attendance" className="mt-0"><AttendancePanel /></TabsContent>
                 <TabsContent value="managers" className="mt-0"><ManagersPanel /></TabsContent>
                 <TabsContent value="banking" className="mt-0"><BankingPanel /></TabsContent>
-                <TabsContent value="reviews" className="mt-0"><PartnerReviewsPanel /></TabsContent>
+                {!isOrganiserCategory(vendor?.category ?? "") && (
+                  <TabsContent value="reviews" className="mt-0"><PartnerReviewsPanel /></TabsContent>
+                )}
               </>}
             </div>
           </main>
