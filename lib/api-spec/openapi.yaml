@@ -2639,7 +2639,7 @@ components:
 
     Role:
       type: string
-      enum: [user, vendor, admin]
+      enum: [user, vendor, admin, organizer]
 
     User:
       type: object

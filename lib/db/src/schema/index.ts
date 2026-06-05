@@ -158,11 +158,23 @@ export const bookingsTable = pgTable(
   "bookings",
   {
     id: serial("id").primaryKey(),
+    // Polymorphic booking source. `kind = 'pub'` is the original vendor/event
+    // booking. `kind = 'organizer'` is an Event Organizer ticket booking
+    // (organizerId + organizerEventId + eventTicketId set; eventId/vendorId are
+    // NULL at the DB level for these rows). The TS columns stay `.notNull()`
+    // (type = number) so the large existing pub codebase keeps compiling against
+    // non-null ids; the DB columns are made nullable by an idempotent
+    // `ALTER COLUMN … DROP NOT NULL` in applyPendingSchemaChanges(). The single
+    // organizer insert casts its values to satisfy the stricter insert type.
+    kind: varchar("kind", { length: 12 }).notNull().default("pub"),
     eventId: integer("event_id")
       .notNull()
       .references(() => eventsTable.id, { onDelete: "restrict" }),
     userId: integer("user_id").notNull(),
     vendorId: integer("vendor_id").notNull(),
+    organizerId: integer("organizer_id"),
+    organizerEventId: integer("organizer_event_id"),
+    eventTicketId: integer("event_ticket_id"),
     bookingDate: date("booking_date").notNull(),
     guests: integer("guests").notNull().default(1),
     totalPrice: numeric("total_price", { precision: 12, scale: 2 })
@@ -1029,3 +1041,356 @@ export const pointsLedgerTable = pgTable(
 export type PointsLedgerRow = typeof pointsLedgerTable.$inferSelect;
 
 export type EmailAttachment = typeof emailAttachmentsTable.$inferSelect;
+
+// ─── Event Organizer vertical ──────────────────────────────────────────────
+//
+// A completely separate account type from Pub/Club partners (`vendors`). An
+// organizer hosts ticketed events (organizer_events) with multiple ticket tiers
+// (event_tickets). Intentionally independent of vendors/events/announcements so
+// the two systems never mix. See plan: Event Organizer Ecosystem.
+
+export const organizersTable = pgTable(
+  "organizers",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull().default(""),
+    description: text("description").notNull().default(""),
+    logoUrl: text("logo_url").notNull().default(""),
+    coverImageUrl: text("cover_image_url").notNull().default(""),
+    website: varchar("website", { length: 255 }).notNull().default(""),
+    instagram: varchar("instagram", { length: 255 }).notNull().default(""),
+    facebook: varchar("facebook", { length: 255 }).notNull().default(""),
+    youtube: varchar("youtube", { length: 255 }).notNull().default(""),
+    supportEmail: varchar("support_email", { length: 255 }).notNull().default(""),
+    supportPhone: varchar("support_phone", { length: 50 }).notNull().default(""),
+    city: varchar("city", { length: 100 }).notNull().default(""),
+    state: varchar("state", { length: 100 }).notNull().default(""),
+    verified: boolean("verified").notNull().default(false),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    // Per-organizer QR ticket signing material (mirrors vendorsTable). Populated
+    // on profile create + by a boot backfill for legacy rows.
+    ticketPrefix: varchar("ticket_prefix", { length: 8 }).notNull().default(""),
+    ticketSalt: varchar("ticket_salt", { length: 32 }).notNull().default(""),
+    // Settlement wallet (Phase C). Net ticket revenue accrues here.
+    onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
+    commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: uniqueIndex("organizers_user_idx").on(t.userId),
+    slugIdx: uniqueIndex("organizers_slug_idx").on(t.slug),
+    statusIdx: index("organizers_status_idx").on(t.status),
+  }),
+);
+
+export type Organizer = typeof organizersTable.$inferSelect;
+
+export interface OrganizerArtist {
+  name: string;
+  role: string;
+  imageUrl: string;
+  bio: string;
+  socials: string;
+}
+export interface OrganizerScheduleItem {
+  time: string;
+  title: string;
+  desc: string;
+}
+export interface OrganizerPolicies {
+  dressCode: string;
+  entryRules: string;
+  agePolicy: string;
+  refundPolicy: string;
+  cancellationPolicy: string;
+}
+export interface OrganizerFaq {
+  q: string;
+  a: string;
+}
+
+export const organizerEventsTable = pgTable(
+  "organizer_events",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    // Basic
+    title: varchar("title", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull().default(""),
+    category: varchar("category", { length: 100 }).notNull().default(""),
+    subcategory: varchar("subcategory", { length: 100 }).notNull().default(""),
+    shortDescription: varchar("short_description", { length: 500 }).notNull().default(""),
+    description: text("description").notNull().default(""),
+    tags: text("tags").array().notNull().default([]),
+    language: varchar("language", { length: 100 }).notNull().default(""),
+    ageRestriction: varchar("age_restriction", { length: 50 }).notNull().default(""),
+    // Media
+    coverImageUrl: text("cover_image_url").notNull().default(""),
+    bannerUrl: text("banner_url").notNull().default(""),
+    mobileBannerUrl: text("mobile_banner_url").notNull().default(""),
+    galleryImages: text("gallery_images").array().notNull().default([]),
+    promoVideos: text("promo_videos").array().notNull().default([]),
+    // Venue
+    venueName: varchar("venue_name", { length: 255 }).notNull().default(""),
+    address: text("address").notNull().default(""),
+    mapsUrl: text("maps_url").notNull().default(""),
+    capacity: integer("capacity").notNull().default(0),
+    city: varchar("city", { length: 100 }).notNull().default(""),
+    state: varchar("state", { length: 100 }).notNull().default(""),
+    // Date & time
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    startTime: varchar("start_time", { length: 8 }).notNull().default(""),
+    endTime: varchar("end_time", { length: 8 }).notNull().default(""),
+    isMultiDay: boolean("is_multi_day").notNull().default(false),
+    // Rich blocks
+    artists: jsonb("artists").$type<OrganizerArtist[]>(),
+    highlights: jsonb("highlights").$type<string[]>(),
+    schedule: jsonb("schedule").$type<OrganizerScheduleItem[]>(),
+    policies: jsonb("policies").$type<OrganizerPolicies>(),
+    faqs: jsonb("faqs").$type<OrganizerFaq[]>(),
+    // Commission (Phase C). Admin sets per-event; each booking locks its rate
+    // via bookings.eventCommissionPct so later changes don't re-price history.
+    commissionPct: numeric("commission_pct", { precision: 5, scale: 2 }).notNull().default("8"),
+    gatewayFeePercent: numeric("gateway_fee_percent", { precision: 5, scale: 2 }).notNull().default("2"),
+    // Workflow
+    approvalStatus: varchar("approval_status", { length: 20 }).notNull().default("pending"),
+    rejectionReason: text("rejection_reason").notNull().default(""),
+    isFeaturedSlider: boolean("is_featured_slider").notNull().default(false),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("organizer_events_organizer_idx").on(t.organizerId),
+    approvalIdx: index("organizer_events_approval_idx").on(t.approvalStatus),
+    slugIdx: index("organizer_events_slug_idx").on(t.slug),
+  }),
+);
+
+export type OrganizerEvent = typeof organizerEventsTable.$inferSelect;
+
+export const eventTicketsTable = pgTable(
+  "event_tickets",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => organizerEventsTable.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 20 }).notNull().default("paid"), // free|paid|early_bird|vip|couple|group|student
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description").notNull().default(""),
+    price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
+    quantity: integer("quantity").notNull().default(0),
+    soldCount: integer("sold_count").notNull().default(0),
+    bookingLimit: integer("booking_limit").notNull().default(0),
+    salesStartAt: timestamp("sales_start_at", { withTimezone: true }),
+    salesEndAt: timestamp("sales_end_at", { withTimezone: true }),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    eventIdx: index("event_tickets_event_idx").on(t.eventId),
+  }),
+);
+
+export type EventTicket = typeof eventTicketsTable.$inferSelect;
+
+export const organizerReviewsTable = pgTable(
+  "organizer_reviews",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    userId: integer("user_id").notNull(),
+    rating: integer("rating").notNull(),
+    comment: text("comment").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("organizer_reviews_organizer_idx").on(t.organizerId),
+    userOrganizerUniq: uniqueIndex("organizer_reviews_user_organizer_uniq").on(t.userId, t.organizerId),
+  }),
+);
+
+export type OrganizerReview = typeof organizerReviewsTable.$inferSelect;
+
+export const organizerTicketOrdersTable = pgTable(
+  "organizer_ticket_orders",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => organizerEventsTable.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => eventTicketsTable.id, { onDelete: "cascade" }),
+    bookingCode: varchar("booking_code", { length: 16 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull().default(""),
+    email: varchar("email", { length: 255 }).notNull().default(""),
+    phone: varchar("phone", { length: 50 }).notNull().default(""),
+    quantity: integer("quantity").notNull().default(1),
+    totalPrice: numeric("total_price", { precision: 10, scale: 2 }).notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    eventIdx: index("organizer_ticket_orders_event_idx").on(t.eventId),
+    codeIdx: uniqueIndex("organizer_ticket_orders_code_idx").on(t.bookingCode),
+  }),
+);
+
+export type OrganizerTicketOrder = typeof organizerTicketOrdersTable.$inferSelect;
+
+export interface OrganizerManagerPermissions {
+  scan: boolean;
+  attendance: boolean;
+  reports: boolean;
+}
+
+// Event Managers — mirrors vendor_managers. An organizer invites a person by
+// email; once accepted, that user can scan tickets / mark attendance / view
+// reports for the organizer, gated by the configurable `permissions` set.
+export const organizerManagersTable = pgTable(
+  "organizer_managers",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    invitedEmail: varchar("invited_email", { length: 255 }).notNull(),
+    invitedBy: integer("invited_by").notNull(),
+    managerId: integer("manager_id"),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    permissions: jsonb("permissions").$type<OrganizerManagerPermissions>(),
+    token: varchar("token", { length: 64 }).notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("organizer_managers_organizer_idx").on(t.organizerId),
+    managerIdx: index("organizer_managers_manager_idx").on(t.managerId),
+  }),
+);
+
+export type OrganizerManager = typeof organizerManagersTable.$inferSelect;
+
+// Per-booking commission split, realised when an attendee is checked in at the
+// door (COD model — revenue is only real once they show up and pay). One row
+// per checked-in organizer booking. Isolated from the vendor commission_ledger
+// so the heavily-used pub financial tables are never touched.
+export const organizerCommissionLedgerTable = pgTable(
+  "organizer_commission_ledger",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    organizerEventId: integer("organizer_event_id"),
+    bookingId: integer("booking_id").references(() => bookingsTable.id, { onDelete: "set null" }),
+    revenue: numeric("revenue", { precision: 12, scale: 2 }).notNull().default("0"),
+    commission: numeric("commission", { precision: 12, scale: 2 }).notNull().default("0"),
+    gatewayFee: numeric("gateway_fee", { precision: 12, scale: 2 }).notNull().default("0"),
+    net: numeric("net", { precision: 12, scale: 2 }).notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("ocl_organizer_idx").on(t.organizerId),
+    eventIdx: index("ocl_event_idx").on(t.organizerEventId),
+    bookingUniq: uniqueIndex("ocl_booking_uniq").on(t.bookingId),
+  }),
+);
+export type OrganizerCommissionLedger = typeof organizerCommissionLedgerTable.$inferSelect;
+
+export const organizerBankingDetailsTable = pgTable(
+  "organizer_banking_details",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    accountHolderName: varchar("account_holder_name", { length: 255 }).notNull().default(""),
+    bankName: varchar("bank_name", { length: 255 }).notNull().default(""),
+    accountNumber: varchar("account_number", { length: 50 }).notNull().default(""),
+    ifscCode: varchar("ifsc_code", { length: 20 }).notNull().default(""),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: uniqueIndex("obd_organizer_idx").on(t.organizerId),
+  }),
+);
+export type OrganizerBankingDetails = typeof organizerBankingDetailsTable.$inferSelect;
+
+// Settlement of dues between organizer and platform. For the COD model the
+// organizer holds the cash and owes the platform its commission, so a
+// settlement records the organizer remitting `amount` of owed commission.
+export const organizerSettlementsTable = pgTable(
+  "organizer_settlements",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+    status: varchar("status", { length: 20 }).notNull().default("settled"),
+    adminNote: text("admin_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("osr_organizer_idx").on(t.organizerId),
+  }),
+);
+export type OrganizerSettlement = typeof organizerSettlementsTable.$inferSelect;
+
+// Organizer discount codes, applied at ticket checkout. `eventId` null = valid
+// for all of the organizer's events.
+export const organizerCouponsTable = pgTable(
+  "organizer_coupons",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    eventId: integer("event_id"),
+    code: varchar("code", { length: 24 }).notNull(),
+    discountType: varchar("discount_type", { length: 10 }).notNull().default("percent"), // percent|fixed
+    discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull().default("0"),
+    active: boolean("active").notNull().default(true),
+    maxUses: integer("max_uses"),
+    usedCount: integer("used_count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("ocp_organizer_idx").on(t.organizerId),
+    codeUniq: uniqueIndex("ocp_org_code_uniq").on(t.organizerId, t.code),
+  }),
+);
+export type OrganizerCoupon = typeof organizerCouponsTable.$inferSelect;
+
+// "Promote my event" requests — an admin approval flips the event into the
+// Events-page hero slider (reuses organizer_events.is_featured_slider).
+export const organizerAdRequestsTable = pgTable(
+  "organizer_ad_requests",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    organizerEventId: integer("organizer_event_id").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    note: text("note").notNull().default(""),
+    adminNote: text("admin_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("oar_organizer_idx").on(t.organizerId),
+    statusIdx: index("oar_status_idx").on(t.status),
+  }),
+);
+export type OrganizerAdRequest = typeof organizerAdRequestsTable.$inferSelect;
+
+// Profile views on an organizer's public page / event pages — powers the
+// organizer Leads tab (mirrors profile_views for vendors, kept isolated).
+export const organizerProfileViewsTable = pgTable(
+  "organizer_profile_views",
+  {
+    id: serial("id").primaryKey(),
+    organizerId: integer("organizer_id").notNull(),
+    viewerUserId: integer("viewer_user_id"),
+    viewerName: varchar("viewer_name", { length: 255 }).notNull().default(""),
+    viewerEmail: varchar("viewer_email", { length: 255 }).notNull().default(""),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("opv_organizer_idx").on(t.organizerId),
+  }),
+);
+export type OrganizerProfileView = typeof organizerProfileViewsTable.$inferSelect;

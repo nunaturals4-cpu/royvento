@@ -57,7 +57,7 @@ export const RegisterBody = zod.object({
   "email": zod.string(),
   "password": zod.string().min(registerBodyPasswordMin),
   "name": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']).optional()
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer']).optional()
 }).strict()
 
 export const RegisterResponse = zod.object({
@@ -66,7 +66,7 @@ export const RegisterResponse = zod.object({
   "id": zod.number(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer']),
   "phone": zod.string(),
   "about": zod.string(),
   "profileImage": zod.string(),
@@ -92,7 +92,7 @@ export const LoginResponse = zod.object({
   "id": zod.number(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer']),
   "phone": zod.string(),
   "about": zod.string(),
   "profileImage": zod.string(),
@@ -120,7 +120,7 @@ export const GetMeResponse = zod.object({
   "id": zod.number(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer']),
   "phone": zod.string(),
   "about": zod.string(),
   "profileImage": zod.string(),
@@ -139,7 +139,7 @@ export const ListUsersResponseItem = zod.object({
   "id": zod.number(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer']),
   "phone": zod.string(),
   "about": zod.string(),
   "profileImage": zod.string(),
@@ -175,7 +175,7 @@ export const UpdateMeResponse = zod.object({
   "id": zod.number(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer']),
   "phone": zod.string(),
   "about": zod.string(),
   "profileImage": zod.string(),
@@ -194,14 +194,14 @@ export const UpdateUserRoleParams = zod.object({
 }).strict()
 
 export const UpdateUserRoleBody = zod.object({
-  "role": zod.enum(['user', 'vendor', 'admin'])
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer'])
 }).strict()
 
 export const UpdateUserRoleResponse = zod.object({
   "id": zod.number(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['user', 'vendor', 'admin']),
+  "role": zod.enum(['user', 'vendor', 'admin', 'organizer']),
   "phone": zod.string(),
   "about": zod.string(),
   "profileImage": zod.string(),

@@ -49,6 +49,10 @@ const VendorDashboard = lazy(() => import("@/pages/vendor-dashboard").then((m) =
 const VendorListingEditPage = lazy(() => import("@/pages/vendor-dashboard").then((m) => ({ default: m.VendorListingEditPage })));
 const TicketScanner = lazy(() => import("@/pages/ticket-scanner").then((m) => ({ default: m.TicketScanner })));
 const AdminPanel = lazy(() => import("@/pages/admin").then((m) => ({ default: m.AdminPanel })));
+const OrganizerDashboard = lazy(() => import("@/pages/organizer-dashboard").then((m) => ({ default: m.OrganizerDashboard })));
+const BecomeOrganizer = lazy(() => import("@/pages/organizer-dashboard").then((m) => ({ default: m.BecomeOrganizer })));
+const OrganizerProfile = lazy(() => import("@/pages/organizer-profile").then((m) => ({ default: m.OrganizerProfile })));
+const OrganizerEventDetail = lazy(() => import("@/pages/organizer-profile").then((m) => ({ default: m.OrganizerEventDetail })));
 const Subscription = lazy(() => import("@/pages/subscription").then((m) => ({ default: m.Subscription })));
 const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs })));
 const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ default: m.BlogDetail })));
@@ -97,6 +101,8 @@ function DashboardRedirect() {
       setLocation("/admin");
     } else if (data.user.role === "vendor") {
       setLocation("/dashboard/vendor");
+    } else if (data.user.role === "organizer") {
+      setLocation("/dashboard/organizer");
     } else {
       setLocation("/dashboard/profile");
     }
@@ -212,10 +218,22 @@ function Router() {
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}
           </Route>
 
+          {/* Event Organizer vertical — separate from Pub/Club partner. */}
+          <Route path="/dashboard/become-organizer">
+            {() => <RequireAuth><BecomeOrganizer /></RequireAuth>}
+          </Route>
+          <Route path="/dashboard/organizer">
+            {() => <RequireAuth role="organizer"><OrganizerDashboard /></RequireAuth>}
+          </Route>
+
           {/* SEO-friendly slugged detail URLs (canonical) — redirect to legacy
               detail components which set rel=canonical back to the slug URL. */}
           <Route path="/pubs/:city/:slug" component={VendorSlugRoute} />
           <Route path="/events/:city/:slug" component={EventSlugRoute} />
+
+          {/* Public organizer pages — must precede the greedy /:city patterns. */}
+          <Route path="/organizers/:slug" component={OrganizerProfile} />
+          <Route path="/organizer-events/:slug" component={OrganizerEventDetail} />
 
           {/* Programmatic city / locality / category landing pages.
               These greedy patterns must come AFTER all specific top-level

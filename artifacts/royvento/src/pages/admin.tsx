@@ -73,6 +73,7 @@ const ADMIN_TABS = [
   "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
   "booking-report", "attendance", "live-occupancy", "crm-leads",
   "create-pub", "announcement-slider", "settlements", "reviews",
+  "event-organizers",
 ] as const;
 const DEFAULT_ADMIN_TAB = "analytics";
 const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
@@ -94,6 +95,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { value: "event-approvals",      label: "Event Approvals",   icon: ShieldCheck,   group: "partners" },
   { value: "events",               label: "Events",            icon: Tag,           group: "partners" },
   { value: "create-pub",           label: "Create Pub/Club",   icon: Plus,          group: "partners" },
+  { value: "event-organizers",     label: "Event Organizers",  icon: CalendarCheck, group: "partners" },
   { value: "users",                label: "Users",             icon: Users,         group: "customers" },
   { value: "booking-report",       label: "Booking Report",    icon: FileText,      group: "customers" },
   { value: "attendance",           label: "Attendance",        icon: UserCheck,     group: "customers" },
@@ -321,10 +323,11 @@ export function AdminPanel() {
               <TabsContent value="live-occupancy" className="mt-0"><LiveOccupancyAdmin /></TabsContent>
               <TabsContent value="crm-leads" className="mt-0"><CrmLeads /></TabsContent>
               <TabsContent value="create-pub" className="mt-0"><CreatePubAdmin /></TabsContent>
-              <TabsContent value="announcement-slider" className="mt-0"><AnnouncementSliderAdmin /><DrinkPlanPriorityAdmin /></TabsContent>
+              <TabsContent value="announcement-slider" className="mt-0"><AnnouncementSliderAdmin /><OrganizerEventSliderAdmin /><DrinkPlanPriorityAdmin /></TabsContent>
               <TabsContent value="commissions" className="mt-0"><CommissionsAdmin /></TabsContent>
               <TabsContent value="settlements" className="mt-0"><SettlementsAdmin /></TabsContent>
               <TabsContent value="reviews" className="mt-0"><ReviewsAdmin /></TabsContent>
+              <TabsContent value="event-organizers" className="mt-0"><EventOrganizersAdmin /></TabsContent>
             </div>
           </main>
         </div>
@@ -2623,6 +2626,7 @@ function BookingReport() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [bookingType, setBookingType] = useState<string>("all");
+  const [kindTab, setKindTab] = useState<"pub" | "organizer">("pub");
   const [search, setSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [page, setPage] = useState<number>(1);
@@ -2701,6 +2705,7 @@ function BookingReport() {
     ...(endDate ? { endDate } : {}),
     ...(bookingType !== "all" ? { bookingType } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    kind: kindTab,
     page,
     sortBy,
   };
@@ -2769,6 +2774,17 @@ function BookingReport() {
           </button>
         </div>
       )}
+
+      {/* Source toggle — Pub/Club vs Event Organizer bookings */}
+      <div className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] p-1 mb-1">
+        {([["pub", "Pubs & Clubs"], ["organizer", "Event Organizers"]] as const).map(([val, label]) => (
+          <button key={val}
+            onClick={() => { setKindTab(val); setPage(1); setVendorId("all"); setBookingType("all"); }}
+            className={"px-4 py-1.5 rounded-lg text-sm font-medium transition-colors " + (kindTab === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white")}>
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* Filter bar */}
       <div className="rounded-2xl glass-card p-5 space-y-4">
@@ -3071,6 +3087,7 @@ function BookingReport() {
               ...(status !== "all" ? { status } : {}),
               ...(startDate ? { startDate } : {}),
               ...(endDate ? { endDate } : {}),
+              kind: kindTab,
             }).toString()}`}
             download
             className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/5 transition-colors text-white/70 hover:text-white"
@@ -6609,6 +6626,440 @@ function CreatePubAdmin() {
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EVENT ORGANIZERS — verify organizers + approve/reject their events
+// ════════════════════════════════════════════════════════════════════════════
+
+interface AdminOrganizer {
+  id: number; name: string; slug: string; city: string; state: string;
+  verified: boolean; status: string; ownerEmail: string | null; eventCount: number;
+}
+interface PendingOrganizerEvent {
+  id: number; title: string; slug: string; category: string; shortDescription: string;
+  coverImageUrl: string; city: string; startDate: string | null;
+  organizerId: number; organizerName: string; organizerVerified: boolean;
+}
+
+function EventOrganizersAdmin() {
+  return (
+    <div className="space-y-10">
+      <div>
+        <h2 className="font-serif text-xl mb-4">Organizer Accounts</h2>
+        <OrganizerAccountsAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Event Approvals (Organizers)</h2>
+        <OrganizerEventApprovalsAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Per-Event Commission</h2>
+        <OrganizerCommissionAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Organizer Settlements</h2>
+        <OrganizerSettlementsAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Promotion Requests</h2>
+        <OrganizerAdsAdmin />
+      </div>
+    </div>
+  );
+}
+
+interface AdminAdRequest {
+  id: number; status: string; note: string; adminNote: string; createdAt: string;
+  organizerName: string; eventTitle: string; eventId: number; featured: boolean;
+}
+function OrganizerAdsAdmin() {
+  const [items, setItems] = useState<AdminAdRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<AdminAdRequest[]>("/api/admin/organizer-ads")
+      .then(setItems).catch(() => toast({ title: "Failed to load requests", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const act = async (id: number, status: "approved" | "rejected") => {
+    setActing(id);
+    try { await apiPatch(`/api/admin/organizer-ads/${id}`, { status }); toast({ title: status === "approved" ? "Approved — event featured in slider" : "Rejected" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+    finally { setActing(null); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground text-sm">No promotion requests.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((a) => (
+        <div key={a.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate">{a.eventTitle} {a.featured && <Badge className="ml-1 bg-amber-500/20 border-amber-500/40 text-amber-300">Featured</Badge>}</p>
+            <p className="text-xs text-muted-foreground truncate">{a.organizerName}{a.note ? ` · "${a.note}"` : ""}</p>
+          </div>
+          {a.status === "pending" ? (
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" disabled={acting === a.id} onClick={() => act(a.id, "approved")}>Approve</Button>
+              <Button size="sm" variant="outline" disabled={acting === a.id} onClick={() => act(a.id, "rejected")}>Reject</Button>
+            </div>
+          ) : (
+            <Badge variant={a.status === "approved" ? "default" : "destructive"} className="shrink-0">{a.status}</Badge>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Per-event commission % — admin sets the platform's cut for each organizer
+// event. New bookings lock the rate; realised (checked-in) bookings keep theirs.
+interface CommissionEvent {
+  id: number; title: string; organizerName: string; commissionPct: string; gatewayFeePercent: string;
+}
+function OrganizerCommissionAdmin() {
+  const [items, setItems] = useState<CommissionEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [edits, setEdits] = useState<Record<number, string>>({});
+  const [saving, setSaving] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<CommissionEvent[]>("/api/admin/organizer-events")
+      .then((rows) => { setItems(rows); setEdits(Object.fromEntries(rows.map((r) => [r.id, String(Number(r.commissionPct))]))); })
+      .catch(() => toast({ title: "Failed to load events", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async (id: number) => {
+    setSaving(id);
+    try {
+      await apiPatch(`/api/admin/organizer-events/${id}/commission`, { commissionPct: Number(edits[id]) });
+      toast({ title: "Commission updated" });
+      load();
+    } catch (e: any) { toast({ title: "Update failed", description: e?.message, variant: "destructive" }); }
+    finally { setSaving(null); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground text-sm">No approved organizer events.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((e) => (
+        <div key={e.id} className="flex items-center gap-3 rounded-xl border border-white/10 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate">{e.title}</p>
+            <p className="text-xs text-muted-foreground truncate">{e.organizerName}</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input type="number" min={0} max={100} step={0.5} value={edits[e.id] ?? ""} onChange={(ev) => setEdits((p) => ({ ...p, [e.id]: ev.target.value }))} className="w-20 h-9 text-right" />
+            <span className="text-muted-foreground text-sm">%</span>
+            <Button size="sm" disabled={saving === e.id} onClick={() => save(e.id)}>Save</Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface SettlementOrganizer {
+  id: number; name: string; slug: string; commissionOwed: string;
+  accountHolderName: string | null; bankName: string | null; accountNumber: string | null; ifscCode: string | null;
+  lifetimeRevenue: string; lifetimeCommission: string;
+}
+function OrganizerSettlementsAdmin() {
+  const [items, setItems] = useState<SettlementOrganizer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [settling, setSettling] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<SettlementOrganizer[]>("/api/admin/organizer-settlements")
+      .then(setItems).catch(() => toast({ title: "Failed to load settlements", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const settle = async (o: SettlementOrganizer) => {
+    const owed = Number(o.commissionOwed);
+    const raw = window.prompt(`Settle commission for ${o.name}. Amount owed: ₹${owed.toLocaleString("en-IN")}.\nEnter amount to mark settled:`, String(owed));
+    if (raw == null) return;
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
+    setSettling(o.id);
+    try { await apiPost(`/api/admin/organizers/${o.id}/settle`, { amount }); toast({ title: "Settled" }); load(); }
+    catch (e: any) { toast({ title: "Settle failed", description: e?.message, variant: "destructive" }); }
+    finally { setSettling(null); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground text-sm">No organizers yet.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((o) => {
+        const owed = Number(o.commissionOwed);
+        return (
+          <div key={o.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium truncate">{o.name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                Revenue ₹{Number(o.lifetimeRevenue).toLocaleString("en-IN")} · Commission ₹{Number(o.lifetimeCommission).toLocaleString("en-IN")}
+                {o.accountNumber ? ` · ${o.bankName || "Bank"} ••${o.accountNumber.slice(-4)} (${o.ifscCode})` : " · no bank details"}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Owed</p>
+                <p className={"font-serif text-lg " + (owed > 0 ? "text-amber-400" : "text-muted-foreground")}>₹{owed.toLocaleString("en-IN")}</p>
+              </div>
+              <Button size="sm" disabled={owed <= 0 || settling === o.id} onClick={() => settle(o)}>Settle</Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Toggle which approved organizer events appear in the Events-page hero slider.
+interface SliderOrganizerEvent {
+  id: number; title: string; slug: string; category: string; imageUrl: string;
+  approvalStatus: string; isFeaturedSlider: boolean; startDate: string | null; organizerName: string;
+}
+function OrganizerEventSliderAdmin() {
+  const [items, setItems] = useState<SliderOrganizerEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<SliderOrganizerEvent[]>("/api/admin/organizer-events")
+      .then(setItems)
+      .catch(() => toast({ title: "Failed to load organizer events", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggle = async (item: SliderOrganizerEvent) => {
+    setToggling(item.id);
+    try {
+      const updated = await apiPatch<SliderOrganizerEvent>(`/api/admin/organizer-events/${item.id}/slider`, { isFeaturedSlider: !item.isFeaturedSlider });
+      setItems((prev) => prev.map((a) => (a.id === item.id ? { ...a, isFeaturedSlider: updated.isFeaturedSlider } : a)));
+      toast({ title: updated.isFeaturedSlider ? "Added to slider" : "Removed from slider" });
+    } catch {
+      toast({ title: "Failed to update", variant: "destructive" });
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const row = (a: SliderOrganizerEvent) => (
+    <div key={a.id} className="flex items-center gap-3 rounded-xl border border-white/10 p-3">
+      {a.imageUrl
+        ? <img src={a.imageUrl} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+        : <div className="w-14 h-14 rounded-lg bg-white/5 flex items-center justify-center shrink-0"><CalendarCheck className="h-5 w-5 text-muted-foreground" /></div>}
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate">{a.title}</p>
+        <p className="text-xs text-muted-foreground truncate">{a.organizerName} · {a.category || "—"}{a.startDate ? ` · ${a.startDate}` : ""}</p>
+      </div>
+      <Button size="sm" variant={a.isFeaturedSlider ? "default" : "outline"} disabled={toggling === a.id}
+        className={a.isFeaturedSlider ? "bg-amber-500 hover:bg-amber-600 text-black" : ""}
+        onClick={() => toggle(a)}>
+        {a.isFeaturedSlider ? "In slider" : "Add to slider"}
+      </Button>
+    </div>
+  );
+
+  const featured = items.filter((a) => a.isFeaturedSlider);
+  const rest = items.filter((a) => !a.isFeaturedSlider);
+
+  return (
+    <div className="rounded-2xl glass-card p-6 mt-6">
+      <div className="flex items-start gap-3 mb-6">
+        <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0"><CalendarCheck className="h-4 w-4 text-primary" /></div>
+        <div>
+          <h2 className="font-serif text-2xl">Organizer Events in Slider</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Feature approved Event-Organizer events in the Events-page hero slider. Featured organizer events appear before pub announcements.</p>
+        </div>
+      </div>
+      {loading ? (
+        <p className="text-muted-foreground text-sm">Loading...</p>
+      ) : items.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No approved organizer events yet.</p>
+      ) : (
+        <div className="space-y-8">
+          {featured.length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-amber-400 font-semibold mb-3 flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-amber-400" />Featured in slider ({featured.length})</p>
+              <div className="space-y-2">{featured.map(row)}</div>
+            </div>
+          )}
+          {rest.length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-3 flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-white/20" />Not in slider ({rest.length})</p>
+              <div className="space-y-2">{rest.map(row)}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrganizerAccountsAdmin() {
+  const [items, setItems] = useState<AdminOrganizer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true); setLoadError(null);
+    apiGet<AdminOrganizer[]>("/api/admin/organizers")
+      .then((d) => { setItems(d); setLoadError(null); })
+      .catch((e) => { setLoadError(e?.message ?? "Failed to load"); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const setStatus = async (id: number, status: string) => {
+    try { await apiPatch(`/api/admin/organizers/${id}/status`, { status }); toast({ title: `Organizer ${status}` }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+  const setVerified = async (id: number, verified: boolean) => {
+    try { await apiPatch(`/api/admin/organizers/${id}/verify`, { verified }); toast({ title: verified ? "Verified" : "Unverified" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading organizers...</p>;
+  if (loadError) return (
+    <div className="rounded-2xl glass-card p-6 text-center space-y-3">
+      <XCircle className="h-8 w-8 text-red-400 mx-auto" />
+      <p className="text-sm text-muted-foreground">{loadError}</p>
+      <Button size="sm" variant="outline" onClick={load}>Retry</Button>
+    </div>
+  );
+  if (items.length === 0) return (
+    <div className="rounded-2xl glass-card p-6 text-center">
+      <CalendarCheck className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+      <p className="text-sm text-muted-foreground">No organizers yet</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {items.map((o) => (
+        <div key={o.id} className="rounded-2xl glass-card p-4 flex flex-wrap items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-medium truncate">{o.name}</p>
+              {o.verified && <ShieldCheck className="h-4 w-4 text-amber-400" />}
+              <span className={
+                "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border " +
+                (o.status === "approved" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
+                  : o.status === "rejected" ? "text-red-300 border-red-500/30 bg-red-500/10"
+                  : "text-amber-300 border-amber-500/30 bg-amber-500/10")
+              }>{o.status}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">{o.ownerEmail ?? "—"} · {[o.city, o.state].filter(Boolean).join(", ") || "—"} · {o.eventCount} event{o.eventCount !== 1 ? "s" : ""}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {o.slug && <Button size="sm" variant="outline" asChild><a href={`/organizers/${o.slug}`} target="_blank" rel="noreferrer">View</a></Button>}
+            <Button size="sm" variant="outline" onClick={() => setVerified(o.id, !o.verified)}>{o.verified ? "Unverify" : "Verify"}</Button>
+            {o.status !== "approved" && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStatus(o.id, "approved")}>Approve</Button>}
+            {o.status !== "rejected" && <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => setStatus(o.id, "rejected")}>Reject</Button>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OrganizerEventApprovalsAdmin() {
+  const [items, setItems] = useState<PendingOrganizerEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true); setLoadError(null);
+    apiGet<PendingOrganizerEvent[]>("/api/admin/organizer-events/pending")
+      .then((d) => { setItems(d); setLoadError(null); })
+      .catch((e) => { setLoadError(e?.message ?? "Failed to load"); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id: number) => {
+    try { await apiPatch(`/api/admin/organizer-events/${id}/approve`, {}); toast({ title: "Event approved" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+  const reject = async (id: number) => {
+    try { await apiPatch(`/api/admin/organizer-events/${id}/reject`, { rejectionReason: reason.trim() }); toast({ title: "Event rejected" }); setRejecting(null); setReason(""); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading events...</p>;
+  if (loadError) return (
+    <div className="rounded-2xl glass-card p-6 text-center space-y-3">
+      <XCircle className="h-8 w-8 text-red-400 mx-auto" />
+      <p className="text-sm text-muted-foreground">{loadError}</p>
+      <Button size="sm" variant="outline" onClick={load}>Retry</Button>
+    </div>
+  );
+  if (items.length === 0) return (
+    <div className="rounded-2xl glass-card p-6 text-center">
+      <CheckCircle className="h-8 w-8 text-green-400 mx-auto mb-2" />
+      <p className="text-sm text-muted-foreground">No pending event submissions</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">{items.length} event{items.length !== 1 ? "s" : ""} awaiting review</p>
+      {items.map((e) => (
+        <div key={e.id} className="rounded-2xl glass-card overflow-hidden">
+          <div className="flex gap-4 p-4">
+            {e.coverImageUrl
+              ? <img src={e.coverImageUrl} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+              : <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center shrink-0"><CalendarCheck className="h-7 w-7 text-muted-foreground" /></div>}
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{e.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {e.organizerName}{e.organizerVerified ? " ✓" : ""} · {e.category || "—"} · {e.city || "—"}{e.startDate ? ` · ${e.startDate}` : ""}
+              </p>
+              {e.shortDescription && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{e.shortDescription}</p>}
+              {rejecting === e.id ? (
+                <div className="mt-3 space-y-2">
+                  <Textarea value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="Reason for rejection (optional)" rows={2} />
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => reject(e.id)}>Confirm reject</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setRejecting(null); setReason(""); }}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2 mt-3">
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approve(e.id)}>Approve</Button>
+                  <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => setRejecting(e.id)}>Reject</Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

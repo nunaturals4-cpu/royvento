@@ -18,6 +18,9 @@ import {
   commissionLedgerTable,
   bookingAuditLogTable,
   announcementsTable,
+  organizersTable,
+  organizerEventsTable,
+  eventTicketsTable,
 } from "@workspace/db";
 import {
   computeCommissionFromPlanned,
@@ -119,6 +122,13 @@ interface BookingRow {
   eventId: number;
   userId: number;
   vendorId: number;
+  // Polymorphic source — organizer ticket bookings (kind='organizer') carry
+  // these instead of eventId/vendorId (which are NULL in the DB for those rows
+  // but typed non-null here because the pub codebase relies on that).
+  kind?: string;
+  organizerId?: number | null;
+  organizerEventId?: number | null;
+  eventTicketId?: number | null;
   bookingDate: string;
   guests: number;
   totalPrice: string;
@@ -153,21 +163,44 @@ interface BookingRow {
 
 async function serializeBookings(rows: BookingRow[]) {
   if (rows.length === 0) return [];
-  const eventIds = Array.from(new Set(rows.map((r) => r.eventId)));
-  const userIds = Array.from(new Set(rows.map((r) => r.userId)));
-  const vendorIds = Array.from(new Set(rows.map((r) => r.vendorId)));
-  const [events, users, vendors] = await Promise.all([
-    db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)),
+  // Null-safe id collection: organizer bookings (kind='organizer') leave
+  // eventId/vendorId null and instead carry organizer ids, so filter nulls
+  // before the IN() lookups (an array with null breaks the SQL).
+  const nums = (xs: (number | null | undefined)[]) =>
+    Array.from(new Set(xs.filter((x): x is number => x != null)));
+  const eventIds = nums(rows.map((r) => r.eventId));
+  const userIds = nums(rows.map((r) => r.userId));
+  const vendorIds = nums(rows.map((r) => r.vendorId));
+  const orgIds = nums(rows.map((r) => r.organizerId));
+  const orgEventIds = nums(rows.map((r) => r.organizerEventId));
+  const ticketIds = nums(rows.map((r) => r.eventTicketId));
+  const [events, users, vendors, organizers, orgEvents, eventTickets] = await Promise.all([
+    eventIds.length ? db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)) : Promise.resolve([]),
     db.select().from(usersTable).where(inArray(usersTable.id, userIds)),
-    db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
+    vendorIds.length ? db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)) : Promise.resolve([]),
+    orgIds.length ? db.select().from(organizersTable).where(inArray(organizersTable.id, orgIds)) : Promise.resolve([]),
+    orgEventIds.length ? db.select().from(organizerEventsTable).where(inArray(organizerEventsTable.id, orgEventIds)) : Promise.resolve([]),
+    ticketIds.length ? db.select().from(eventTicketsTable).where(inArray(eventTicketsTable.id, ticketIds)) : Promise.resolve([]),
   ]);
   const eMap = new Map(events.map((e) => [e.id, e]));
   const uMap = new Map(users.map((u) => [u.id, u]));
   const vMap = new Map(vendors.map((v) => [v.id, v]));
+  const orgMap = new Map(organizers.map((o) => [o.id, o]));
+  const oeMap = new Map(orgEvents.map((e) => [e.id, e]));
+  const etMap = new Map(eventTickets.map((t) => [t.id, t]));
   return rows.map((b) => {
-    const e = eMap.get(b.eventId);
+    const e = b.eventId != null ? eMap.get(b.eventId) : undefined;
     const u = uMap.get(b.userId);
-    const v = vMap.get(b.vendorId);
+    const v = b.vendorId != null ? vMap.get(b.vendorId) : undefined;
+    // Organizer-ticket overlay (kind='organizer'): resolve organizer/event/tier
+    // and a QR code signed with the organizer's prefix/salt.
+    const isOrg = b.kind === "organizer";
+    const oe = b.organizerEventId != null ? oeMap.get(b.organizerEventId) : undefined;
+    const org = b.organizerId != null ? orgMap.get(b.organizerId) : undefined;
+    const et = b.eventTicketId != null ? etMap.get(b.eventTicketId) : undefined;
+    const orgTicketCode = isOrg && org && org.ticketPrefix && org.ticketSalt
+      ? generateTicketCode(b.id, { ticketPrefix: org.ticketPrefix, ticketSalt: org.ticketSalt })
+      : null;
     const aw = b.actualWomen, am = b.actualMen, ac = b.actualCouple, ag = b.actualGuests;
     const hasActuals = aw != null || am != null || ac != null || ag != null;
     const actualEntry = hasActuals ? { women: aw, men: am, couple: ac, guests: ag } : null;
@@ -241,19 +274,32 @@ async function serializeBookings(rows: BookingRow[]) {
       actualAmountDue,
       freeEntryRules: e?.freeEntryRules ?? null,
       createdAt: b.createdAt.toISOString(),
-      eventTitle: e?.title ?? "",
-      eventImage: e?.imageUrl ?? "",
-      eventType_: e?.type ?? "",
-      eventCity: e?.city ?? "",
-      eventState: e?.state ?? "",
-      eventCountry: e?.country ?? "",
-      vendorName: v?.businessName ?? "",
-      partnerName: v?.businessName ?? "",
+      kind: b.kind ?? "pub",
+      eventTitle: isOrg ? (oe?.title ?? "") : (e?.title ?? ""),
+      eventImage: isOrg ? (oe?.coverImageUrl ?? "") : (e?.imageUrl ?? ""),
+      eventType_: isOrg ? "organizer" : (e?.type ?? ""),
+      eventCity: isOrg ? (oe?.city ?? "") : (e?.city ?? ""),
+      eventState: isOrg ? (oe?.state ?? "") : (e?.state ?? ""),
+      eventCountry: e?.country ?? "India",
+      vendorName: isOrg ? (org?.name ?? "") : (v?.businessName ?? ""),
+      partnerName: isOrg ? (org?.name ?? "") : (v?.businessName ?? ""),
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
-      ticketCode: v && v.ticketPrefix && v.ticketSalt
-        ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
-        : `RV-${String(b.id).padStart(6, "0")}`,
+      // Organizer-ticket fields (null/empty for pub bookings) — power the rich
+      // QR ticket card in My Bookings.
+      organizerName: isOrg ? (org?.name ?? "") : null,
+      organizerSlug: isOrg ? (org?.slug ?? "") : null,
+      organizerEventSlug: isOrg ? (oe?.slug ?? "") : null,
+      ticketType: isOrg ? (et?.name ?? "") : null,
+      venueName: isOrg ? (oe?.venueName ?? "") : null,
+      venueAddress: isOrg ? (oe?.address ?? "") : null,
+      eventStartTime: isOrg ? (oe?.startTime ?? "") : null,
+      eventEndTime: isOrg ? (oe?.endTime ?? "") : null,
+      ticketCode: isOrg
+        ? (orgTicketCode ?? `RV-${String(b.id).padStart(6, "0")}`)
+        : (v && v.ticketPrefix && v.ticketSalt
+          ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
+          : `RV-${String(b.id).padStart(6, "0")}`),
       // True when the event is far enough away that self-service cancellation is permitted.
       // Interpreted as midnight (local server time) of the booking date to align with how
       // the cancel handler enforces the same check.
@@ -2567,13 +2613,20 @@ router.get("/bookings/:bookingId/ticket-code", requireAuth(), async (req, res) =
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const vRows = await db.select({ ticketPrefix: vendorsTable.ticketPrefix, ticketSalt: vendorsTable.ticketSalt })
-    .from(vendorsTable)
-    .where(eq(vendorsTable.id, b.vendorId))
-    .limit(1);
-  const v = vRows[0];
-  const ticketCode = v && v.ticketPrefix && v.ticketSalt
-    ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
+  // Organizer tickets are signed with the organizer's prefix/salt; pub tickets
+  // with the vendor's. vendorId is null for organizer bookings, so branch first.
+  let signer: { ticketPrefix: string; ticketSalt: string } | undefined;
+  if (b.kind === "organizer" && b.organizerId != null) {
+    const oRows = await db.select({ ticketPrefix: organizersTable.ticketPrefix, ticketSalt: organizersTable.ticketSalt })
+      .from(organizersTable).where(eq(organizersTable.id, b.organizerId)).limit(1);
+    signer = oRows[0];
+  } else if (b.vendorId != null) {
+    const vRows = await db.select({ ticketPrefix: vendorsTable.ticketPrefix, ticketSalt: vendorsTable.ticketSalt })
+      .from(vendorsTable).where(eq(vendorsTable.id, b.vendorId)).limit(1);
+    signer = vRows[0];
+  }
+  const ticketCode = signer && signer.ticketPrefix && signer.ticketSalt
+    ? generateTicketCode(b.id, { ticketPrefix: signer.ticketPrefix, ticketSalt: signer.ticketSalt })
     : `RV-${String(b.id).padStart(6, "0")}`;
   res.json({ ticketCode });
 });

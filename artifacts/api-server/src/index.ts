@@ -5,7 +5,7 @@ import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingRemin
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import { runPointsExpiry } from "./jobs/pointsExpiry";
 import cron from "node-cron";
-import { db, usersTable, vendorsTable, eventsTable, wishlistsTable } from "@workspace/db";
+import { db, usersTable, vendorsTable, eventsTable, wishlistsTable, organizersTable } from "@workspace/db";
 import { eq, or, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { generateUniqueTicketPrefix, generateTicketSalt } from "./lib/ticketCode";
@@ -50,6 +50,36 @@ async function backfillVendorTicketPrefixes() {
     logger.info({ backfilled: missing.length }, "Startup audit: backfilled vendor ticketPrefix/ticketSalt");
   } catch (err) {
     logger.error({ err }, "Startup audit failed (vendor ticket prefix backfill)");
+  }
+}
+
+/**
+ * Boot-time backfill: populate `ticketPrefix` / `ticketSalt` for any organizer
+ * row whose values are still empty, so organizer QR ticket codes can be signed
+ * (mirrors backfillVendorTicketPrefixes). New organizers get these on profile
+ * creation; this only affects rows created before Phase 2A.
+ */
+async function backfillOrganizerTicketPrefixes() {
+  try {
+    const missing = await db
+      .select({ id: organizersTable.id, name: organizersTable.name, ticketPrefix: organizersTable.ticketPrefix, ticketSalt: organizersTable.ticketSalt })
+      .from(organizersTable)
+      .where(or(eq(organizersTable.ticketPrefix, ""), eq(organizersTable.ticketSalt, "")));
+    if (missing.length === 0) return;
+    const used = new Set(
+      (await db.select({ p: organizersTable.ticketPrefix }).from(organizersTable))
+        .map((r) => r.p)
+        .filter((p): p is string => Boolean(p)),
+    );
+    for (const o of missing) {
+      const prefix = o.ticketPrefix || (await generateUniqueTicketPrefix(o.name || "Organizer", Array.from(used)));
+      const salt = o.ticketSalt || generateTicketSalt();
+      used.add(prefix);
+      await db.update(organizersTable).set({ ticketPrefix: prefix, ticketSalt: salt }).where(eq(organizersTable.id, o.id));
+    }
+    logger.info({ backfilled: missing.length }, "Startup audit: backfilled organizer ticketPrefix/ticketSalt");
+  } catch (err) {
+    logger.error({ err }, "Startup audit failed (organizer ticket prefix backfill)");
   }
 }
 
@@ -329,6 +359,230 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "rejection_reason" text NOT NULL DEFAULT ''`);
     // Approve all existing announcements so they stay visible after deploy
     await db.execute(sql`UPDATE "announcements" SET "approval_status" = 'approved' WHERE "approval_status" = 'pending'`);
+    // ── Event Organizer vertical (separate from vendors/events) ─────────────
+    // Idempotent so a fresh deploy ships the whole organizer ecosystem without
+    // a drizzle-kit step. Mirrors lib/db/src/schema/index.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizers" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" integer NOT NULL,
+        "name" varchar(255) NOT NULL,
+        "slug" varchar(255) NOT NULL DEFAULT '',
+        "description" text NOT NULL DEFAULT '',
+        "logo_url" text NOT NULL DEFAULT '',
+        "cover_image_url" text NOT NULL DEFAULT '',
+        "website" varchar(255) NOT NULL DEFAULT '',
+        "instagram" varchar(255) NOT NULL DEFAULT '',
+        "facebook" varchar(255) NOT NULL DEFAULT '',
+        "youtube" varchar(255) NOT NULL DEFAULT '',
+        "support_email" varchar(255) NOT NULL DEFAULT '',
+        "support_phone" varchar(50) NOT NULL DEFAULT '',
+        "city" varchar(100) NOT NULL DEFAULT '',
+        "state" varchar(100) NOT NULL DEFAULT '',
+        "verified" boolean NOT NULL DEFAULT false,
+        "status" varchar(20) NOT NULL DEFAULT 'pending',
+        "approved_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "organizers_user_idx" ON "organizers" ("user_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "organizers_slug_idx" ON "organizers" ("slug")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizers_status_idx" ON "organizers" ("status")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_events" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "title" varchar(255) NOT NULL,
+        "slug" varchar(255) NOT NULL DEFAULT '',
+        "category" varchar(100) NOT NULL DEFAULT '',
+        "subcategory" varchar(100) NOT NULL DEFAULT '',
+        "short_description" varchar(500) NOT NULL DEFAULT '',
+        "description" text NOT NULL DEFAULT '',
+        "tags" text[] NOT NULL DEFAULT '{}'::text[],
+        "language" varchar(100) NOT NULL DEFAULT '',
+        "age_restriction" varchar(50) NOT NULL DEFAULT '',
+        "cover_image_url" text NOT NULL DEFAULT '',
+        "banner_url" text NOT NULL DEFAULT '',
+        "mobile_banner_url" text NOT NULL DEFAULT '',
+        "gallery_images" text[] NOT NULL DEFAULT '{}'::text[],
+        "promo_videos" text[] NOT NULL DEFAULT '{}'::text[],
+        "venue_name" varchar(255) NOT NULL DEFAULT '',
+        "address" text NOT NULL DEFAULT '',
+        "maps_url" text NOT NULL DEFAULT '',
+        "capacity" integer NOT NULL DEFAULT 0,
+        "city" varchar(100) NOT NULL DEFAULT '',
+        "state" varchar(100) NOT NULL DEFAULT '',
+        "start_date" date,
+        "end_date" date,
+        "start_time" varchar(8) NOT NULL DEFAULT '',
+        "end_time" varchar(8) NOT NULL DEFAULT '',
+        "is_multi_day" boolean NOT NULL DEFAULT false,
+        "artists" jsonb,
+        "highlights" jsonb,
+        "schedule" jsonb,
+        "policies" jsonb,
+        "faqs" jsonb,
+        "approval_status" varchar(20) NOT NULL DEFAULT 'pending',
+        "rejection_reason" text NOT NULL DEFAULT '',
+        "approved_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_events_organizer_idx" ON "organizer_events" ("organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_events_approval_idx" ON "organizer_events" ("approval_status")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_events_slug_idx" ON "organizer_events" ("slug")`);
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "is_featured_slider" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "event_tickets" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "event_id" integer NOT NULL REFERENCES "organizer_events"("id") ON DELETE CASCADE,
+        "type" varchar(20) NOT NULL DEFAULT 'paid',
+        "name" varchar(120) NOT NULL,
+        "description" text NOT NULL DEFAULT '',
+        "price" numeric(10,2) NOT NULL DEFAULT '0',
+        "quantity" integer NOT NULL DEFAULT 0,
+        "sold_count" integer NOT NULL DEFAULT 0,
+        "booking_limit" integer NOT NULL DEFAULT 0,
+        "sales_start_at" timestamp with time zone,
+        "sales_end_at" timestamp with time zone,
+        "active" boolean NOT NULL DEFAULT true,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "event_tickets_event_idx" ON "event_tickets" ("event_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_reviews" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "user_id" integer NOT NULL,
+        "rating" integer NOT NULL,
+        "comment" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_reviews_organizer_idx" ON "organizer_reviews" ("organizer_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "organizer_reviews_user_organizer_uniq" ON "organizer_reviews" ("user_id", "organizer_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_ticket_orders" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "event_id" integer NOT NULL REFERENCES "organizer_events"("id") ON DELETE CASCADE,
+        "ticket_id" integer NOT NULL REFERENCES "event_tickets"("id") ON DELETE CASCADE,
+        "booking_code" varchar(16) NOT NULL,
+        "name" varchar(255) NOT NULL DEFAULT '',
+        "email" varchar(255) NOT NULL DEFAULT '',
+        "phone" varchar(50) NOT NULL DEFAULT '',
+        "quantity" integer NOT NULL DEFAULT 1,
+        "total_price" numeric(10,2) NOT NULL DEFAULT '0',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_ticket_orders_event_idx" ON "organizer_ticket_orders" ("event_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "organizer_ticket_orders_code_idx" ON "organizer_ticket_orders" ("booking_code")`);
+    // ── Phase 2A: polymorphic bookings + organizer ticketing wallet ─────────
+    // Organizer ticket bookings reuse the SAME bookings table via a `kind`
+    // discriminator; vendor_id/event_id become nullable so organizer rows omit
+    // them. Idempotent and backward-compatible (existing rows default to 'pub').
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "kind" varchar(12) NOT NULL DEFAULT 'pub'`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "organizer_id" integer`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "organizer_event_id" integer`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "event_ticket_id" integer`);
+    await db.execute(sql`ALTER TABLE "bookings" ALTER COLUMN "event_id" DROP NOT NULL`);
+    await db.execute(sql`ALTER TABLE "bookings" ALTER COLUMN "vendor_id" DROP NOT NULL`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "bookings_organizer_idx" ON "bookings" ("organizer_id")`);
+    // Organizer QR signing material + settlement wallet.
+    await db.execute(sql`ALTER TABLE "organizers" ADD COLUMN IF NOT EXISTS "ticket_prefix" varchar(8) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "organizers" ADD COLUMN IF NOT EXISTS "ticket_salt" varchar(32) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "organizers" ADD COLUMN IF NOT EXISTS "online_balance" numeric(14,2) NOT NULL DEFAULT '0'`);
+    await db.execute(sql`ALTER TABLE "organizers" ADD COLUMN IF NOT EXISTS "commission_owed" numeric(14,2) NOT NULL DEFAULT '0'`);
+    // Per-event commission + gateway fee (Phase C admin-set).
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "commission_pct" numeric(5,2) NOT NULL DEFAULT '8'`);
+    await db.execute(sql`ALTER TABLE "organizer_events" ADD COLUMN IF NOT EXISTS "gateway_fee_percent" numeric(5,2) NOT NULL DEFAULT '2'`);
+    // ── Phase 2B: Event Managers (mirror vendor_managers) ───────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_managers" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "invited_email" varchar(255) NOT NULL,
+        "invited_by" integer NOT NULL,
+        "manager_id" integer,
+        "status" varchar(20) NOT NULL DEFAULT 'pending',
+        "permissions" jsonb,
+        "token" varchar(64) NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_managers_organizer_idx" ON "organizer_managers" ("organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "organizer_managers_manager_idx" ON "organizer_managers" ("manager_id")`);
+    // ── Phase 2C: organizer commission / banking / settlements ──────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_commission_ledger" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "organizer_event_id" integer,
+        "booking_id" integer REFERENCES "bookings"("id") ON DELETE SET NULL,
+        "revenue" numeric(12,2) NOT NULL DEFAULT '0',
+        "commission" numeric(12,2) NOT NULL DEFAULT '0',
+        "gateway_fee" numeric(12,2) NOT NULL DEFAULT '0',
+        "net" numeric(12,2) NOT NULL DEFAULT '0',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "ocl_organizer_idx" ON "organizer_commission_ledger" ("organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "ocl_event_idx" ON "organizer_commission_ledger" ("organizer_event_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "ocl_booking_uniq" ON "organizer_commission_ledger" ("booking_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_banking_details" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "account_holder_name" varchar(255) NOT NULL DEFAULT '',
+        "bank_name" varchar(255) NOT NULL DEFAULT '',
+        "account_number" varchar(50) NOT NULL DEFAULT '',
+        "ifsc_code" varchar(20) NOT NULL DEFAULT '',
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "obd_organizer_idx" ON "organizer_banking_details" ("organizer_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_settlements" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "amount" numeric(12,2) NOT NULL DEFAULT '0',
+        "status" varchar(20) NOT NULL DEFAULT 'settled',
+        "admin_note" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "osr_organizer_idx" ON "organizer_settlements" ("organizer_id")`);
+    // ── Phase 2D: organizer coupons + promote (ad) requests ─────────────────
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_coupons" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "event_id" integer,
+        "code" varchar(24) NOT NULL,
+        "discount_type" varchar(10) NOT NULL DEFAULT 'percent',
+        "discount_value" numeric(10,2) NOT NULL DEFAULT '0',
+        "active" boolean NOT NULL DEFAULT true,
+        "max_uses" integer,
+        "used_count" integer NOT NULL DEFAULT 0,
+        "expires_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "ocp_organizer_idx" ON "organizer_coupons" ("organizer_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "ocp_org_code_uniq" ON "organizer_coupons" ("organizer_id", "code")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_ad_requests" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "organizer_event_id" integer NOT NULL,
+        "status" varchar(20) NOT NULL DEFAULT 'pending',
+        "note" text NOT NULL DEFAULT '',
+        "admin_note" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "oar_organizer_idx" ON "organizer_ad_requests" ("organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "oar_status_idx" ON "organizer_ad_requests" ("status")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "organizer_profile_views" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "organizer_id" integer NOT NULL,
+        "viewer_user_id" integer,
+        "viewer_name" varchar(255) NOT NULL DEFAULT '',
+        "viewer_email" varchar(255) NOT NULL DEFAULT '',
+        "viewed_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "opv_organizer_idx" ON "organizer_profile_views" ("organizer_id")`);
     logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
@@ -361,6 +615,7 @@ app.listen(port, (err) => {
     .then(() => applyPendingSchemaChanges())
     .then(() => auditPasswordHashes())
     .then(() => backfillVendorTicketPrefixes())
+    .then(() => backfillOrganizerTicketPrefixes())
     .then(() => auditVendorManagerOverlap())
     .then(() => removeLegacyDemoVendor())
     .then(() => ensureEmailSchema())

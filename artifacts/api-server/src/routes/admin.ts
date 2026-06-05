@@ -14,6 +14,9 @@ import {
   vendorManagersTable,
   wishlistsTable,
   drinkPlansTable,
+  organizersTable,
+  organizerEventsTable,
+  eventTicketsTable,
 } from "@workspace/db";
 import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from "../lib/effectiveRevenue";
@@ -1156,33 +1159,51 @@ const REPORT_PAGE_SIZE = 50;
 
 async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
   if (rows.length === 0) return [];
-  const eventIds = [...new Set(rows.map((r) => r.eventId))];
-  const userIds = [...new Set(rows.map((r) => r.userId))];
-  const vendorIds = [...new Set(rows.map((r) => r.vendorId))];
+  // Null-safe id collection: organizer bookings (kind='organizer') leave
+  // eventId/vendorId null and carry organizer ids instead.
+  const nums = (xs: (number | null | undefined)[]) => [...new Set(xs.filter((x): x is number => x != null))];
+  const eventIds = nums(rows.map((r) => r.eventId));
+  const userIds = nums(rows.map((r) => r.userId));
+  const vendorIds = nums(rows.map((r) => r.vendorId));
+  const orgIds = nums(rows.map((r) => r.organizerId));
+  const orgEventIds = nums(rows.map((r) => r.organizerEventId));
+  const ticketIds = nums(rows.map((r) => r.eventTicketId));
   const bookingIds = rows.map((r) => r.id);
-  const [events, users, vendors, payments, { byBookingId: effectiveByBookingId }] = await Promise.all([
-    db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)),
+  const [events, users, vendors, payments, organizers, orgEvents, orgTickets, { byBookingId: effectiveByBookingId }] = await Promise.all([
+    eventIds.length ? db.select().from(eventsTable).where(inArray(eventsTable.id, eventIds)) : Promise.resolve([]),
     db.select().from(usersTable).where(inArray(usersTable.id, userIds)),
-    db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
+    vendorIds.length ? db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)) : Promise.resolve([]),
     db.select({ bookingId: paymentsTable.bookingId, phonepeTransactionId: paymentsTable.phonepeTransactionId, status: paymentsTable.status })
       .from(paymentsTable)
       .where(inArray(paymentsTable.bookingId, bookingIds)),
+    orgIds.length ? db.select().from(organizersTable).where(inArray(organizersTable.id, orgIds)) : Promise.resolve([]),
+    orgEventIds.length ? db.select().from(organizerEventsTable).where(inArray(organizerEventsTable.id, orgEventIds)) : Promise.resolve([]),
+    ticketIds.length ? db.select().from(eventTicketsTable).where(inArray(eventTicketsTable.id, ticketIds)) : Promise.resolve([]),
     computeEffectiveRevenues(rows),
   ]);
   const eMap = new Map(events.map((e) => [e.id, e]));
   const uMap = new Map(users.map((u) => [u.id, u]));
   const vMap = new Map(vendors.map((v) => [v.id, v]));
+  const orgMap = new Map(organizers.map((o) => [o.id, o]));
+  const oeMap = new Map(orgEvents.map((e) => [e.id, e]));
+  const otMap = new Map(orgTickets.map((t) => [t.id, t]));
   const payMap = new Map(payments.filter((p) => p.bookingId != null).map((p) => [p.bookingId!, p]));
   return rows.map((b) => {
-    const e = eMap.get(b.eventId);
+    const isOrg = b.kind === "organizer";
+    const e = b.eventId != null ? eMap.get(b.eventId) : undefined;
     const u = uMap.get(b.userId);
-    const v = vMap.get(b.vendorId);
+    const v = b.vendorId != null ? vMap.get(b.vendorId) : undefined;
+    const org = b.organizerId != null ? orgMap.get(b.organizerId) : undefined;
+    const oe = b.organizerEventId != null ? oeMap.get(b.organizerEventId) : undefined;
+    const ot = b.eventTicketId != null ? otMap.get(b.eventTicketId) : undefined;
     const pay = payMap.get(b.id);
-    const ticketCode = v
-      ? (v.ticketPrefix && v.ticketSalt
-          ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
+    const ticketCode = isOrg
+      ? (org?.ticketPrefix && org?.ticketSalt
+          ? generateTicketCode(b.id, { ticketPrefix: org.ticketPrefix, ticketSalt: org.ticketSalt })
           : `RV-${String(b.id).padStart(6, "0")}`)
-      : `RV-${String(b.id).padStart(6, "0")}`;
+      : (v && v.ticketPrefix && v.ticketSalt
+          ? generateTicketCode(b.id, { ticketPrefix: v.ticketPrefix, ticketSalt: v.ticketSalt })
+          : `RV-${String(b.id).padStart(6, "0")}`);
     let paymentMethod: string;
     if (pay) {
       paymentMethod = pay.phonepeTransactionId ? "PhonePe" : "Online";
@@ -1191,10 +1212,12 @@ async function enrichBookingRows(rows: (typeof bookingsTable.$inferSelect)[]) {
     }
     return {
       id: b.id,
+      kind: b.kind ?? "pub",
       vendorId: b.vendorId,
-      vendorName: v?.businessName ?? "",
+      vendorName: isOrg ? (org?.name ?? "") : (v?.businessName ?? ""),
       eventId: b.eventId,
-      eventTitle: e?.title ?? "",
+      eventTitle: isOrg ? (oe?.title ?? "") : (e?.title ?? ""),
+      ticketType: isOrg ? (ot?.name ?? "") : null,
       userId: b.userId,
       userName: u?.name ?? "",
       userEmail: u?.email ?? "",
@@ -1242,8 +1265,12 @@ router.get("/admin/bookings/report", requireAuth(["admin"]), async (req, res) =>
   const searchParam = (req.query["search"] as string | undefined)?.trim().toLowerCase();
   const sortBy = req.query["sortBy"] as string | undefined;
   const checkedInParam = req.query["checkedIn"] as string | undefined;
+  // Separate Event-Organizer ticket bookings from Pub/Club bookings. Defaults to
+  // 'pub' so the existing pub report never mixes in organizer rows.
+  const kindParam = (req.query["kind"] as string | undefined) === "organizer" ? "organizer" : "pub";
 
   const conditions: ReturnType<typeof sql>[] = [];
+  conditions.push(sql`${bookingsTable.kind} = ${kindParam}`);
   if (vendorIdParam && Number.isFinite(vendorIdParam))
     conditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
   if (userIdParam && Number.isFinite(userIdParam))
@@ -1908,7 +1935,8 @@ router.get("/admin/bookings/report/download", requireAuth(["admin"]), async (req
   const startDateParam = req.query["startDate"] as string | undefined;
   const endDateParam = req.query["endDate"] as string | undefined;
 
-  const conditions: ReturnType<typeof sql>[] = [sql`${bookingsTable.status} != ${"cancelled"}`];
+  const kindParam = (req.query["kind"] as string | undefined) === "organizer" ? "organizer" : "pub";
+  const conditions: ReturnType<typeof sql>[] = [sql`${bookingsTable.status} != ${"cancelled"}`, sql`${bookingsTable.kind} = ${kindParam}`];
   if (vendorIdParam && Number.isFinite(vendorIdParam))
     conditions.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
   if (statusParam && statusParam !== "all")

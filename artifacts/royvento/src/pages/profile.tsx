@@ -62,6 +62,7 @@ export function Profile() {
   const [referrals, setReferrals] = useState<ReferralData | null>(null);
   const [discountInfo, setDiscountInfo] = useState<DiscountInfo | null>(null);
   const [invitations, setInvitations] = useState<{ id: number; vendorName: string; createdAt: string }[]>([]);
+  const [orgInvitations, setOrgInvitations] = useState<{ id: number; organizerName: string; permissions: { scan: boolean; attendance: boolean; reports: boolean }; createdAt: string }[]>([]);
   const [actingInv, setActingInv] = useState<number | null>(null);
   const [pointsHistory, setPointsHistory] = useState<PointsHistory | null>(null);
 
@@ -80,6 +81,7 @@ export function Profile() {
     apiGet<ReferralData>("/api/referrals/me").then(setReferrals).catch(() => {});
     apiGet<DiscountInfo>("/api/users/me/discounts").then(setDiscountInfo).catch(() => {});
     apiGet<{ id: number; vendorName: string; createdAt: string }[]>("/api/manager/invitations").then(setInvitations).catch(() => {});
+    apiGet<{ id: number; organizerName: string; permissions: { scan: boolean; attendance: boolean; reports: boolean }; createdAt: string }[]>("/api/organizer-manager/invitations").then(setOrgInvitations).catch(() => {});
     apiGet<PointsHistory>("/api/users/me/points-history").then(setPointsHistory).catch(() => {});
   }, [user]);
 
@@ -147,6 +149,19 @@ export function Profile() {
       await apiPost(`/api/manager/invitations/${id}/${action}`, {});
       toast({ title: action === "accept" ? "Invitation accepted! You can now scan tickets." : "Invitation declined." });
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
+    } catch {
+      toast({ title: "Error", description: "Failed to respond to invitation.", variant: "destructive" });
+    } finally {
+      setActingInv(null);
+    }
+  };
+
+  const respondToOrgInvitation = async (id: number, action: "accept" | "reject") => {
+    setActingInv(id);
+    try {
+      await apiPost(`/api/organizer-manager/invitations/${id}/${action}`, {});
+      toast({ title: action === "accept" ? "You're now an Event Manager! Scan from the organizer's dashboard." : "Invitation declined." });
+      setOrgInvitations((prev) => prev.filter((inv) => inv.id !== id));
     } catch {
       toast({ title: "Error", description: "Failed to respond to invitation.", variant: "destructive" });
     } finally {
@@ -261,6 +276,31 @@ export function Profile() {
               <Button asChild variant="ghost" size="sm" className="mt-2 w-full text-xs text-muted-foreground">
                 <Link href="/dashboard/vendor/scanner"><ScanLine className="h-3 w-3 mr-1" />Open ticket scanner</Link>
               </Button>
+            </div>
+          )}
+          {orgInvitations.length > 0 && (
+            <div className="rounded-3xl glass-card-strong p-6 border border-primary/30 red-ring">
+              <div className="flex items-center gap-2 mb-3">
+                <Bell className="h-5 w-5 text-primary" />
+                <h2 className="font-serif text-lg">Event Manager invitations</h2>
+              </div>
+              <div className="space-y-3">
+                {orgInvitations.map((inv) => (
+                  <div key={inv.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                    <p className="text-sm font-medium mb-0.5">{inv.organizerName}</p>
+                    <p className="text-xs text-muted-foreground mb-2">Invited you to manage event entry</p>
+                    <p className="text-[11px] text-muted-foreground mb-3">
+                      Can: {[inv.permissions.scan && "scan", inv.permissions.attendance && "attendance", inv.permissions.reports && "reports"].filter(Boolean).join(" · ") || "—"}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" disabled={actingInv === inv.id} onClick={() => respondToOrgInvitation(inv.id, "accept")}
+                        className="flex-1 bg-gradient-to-br from-red-600 to-red-800 border-0 text-xs">Accept</Button>
+                      <Button size="sm" variant="outline" disabled={actingInv === inv.id} onClick={() => respondToOrgInvitation(inv.id, "reject")}
+                        className="flex-1 border-white/10 text-muted-foreground text-xs">Decline</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {discountInfo?.isNewUser && (

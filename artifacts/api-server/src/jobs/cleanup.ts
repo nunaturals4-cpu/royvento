@@ -1,4 +1,4 @@
-import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable } from "@workspace/db";
+import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable, organizerEventsTable } from "@workspace/db";
 import { and, ne, sql, lt, gte, eq, isNotNull, inArray } from "drizzle-orm";
 
 const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -216,6 +216,40 @@ export async function warnPartnersAboutUpcomingDeletion(): Promise<void> {
   }
 }
 
+// Delete Event-Organizer events whose date has passed. "Past" = the event's
+// end date (or start date when single-day) is before today (IST). Ticket tiers
+// and ticket orders cascade-delete via their FKs. Cover/banner/gallery images
+// are removed from storage too.
+export async function deletePastOrganizerEvents(): Promise<void> {
+  try {
+    const today = todayIstDate();
+    const rows = await db
+      .select({
+        id: organizerEventsTable.id,
+        coverImageUrl: organizerEventsTable.coverImageUrl,
+        bannerUrl: organizerEventsTable.bannerUrl,
+        mobileBannerUrl: organizerEventsTable.mobileBannerUrl,
+        galleryImages: organizerEventsTable.galleryImages,
+      })
+      .from(organizerEventsTable)
+      .where(sql`COALESCE(${organizerEventsTable.endDate}, ${organizerEventsTable.startDate}) < ${today}`);
+
+    if (rows.length === 0) return;
+
+    const imageUrls: (string | null | undefined)[] = rows.flatMap((r) => [
+      r.coverImageUrl, r.bannerUrl, r.mobileBannerUrl, ...(r.galleryImages ?? []),
+    ]);
+    const imageFailCount = await deleteImages(imageUrls);
+
+    const ids = rows.map((r) => r.id);
+    await db.delete(organizerEventsTable).where(inArray(organizerEventsTable.id, ids));
+
+    logger.info({ count: rows.length, imageFailCount }, "Cleanup: deleted past organizer events");
+  } catch (err) {
+    logger.error({ err }, "Cleanup: failed to delete past organizer events");
+  }
+}
+
 // SAFETY GUARD: This cleanup job only touches events, announcements, and
 // notifications. Vendor/pub listings (vendorsTable), user accounts, bookings,
 // and all other business records are NEVER deleted by any function here.
@@ -312,6 +346,7 @@ export async function deleteOldEmails(): Promise<void> {
 export async function runCleanup(): Promise<void> {
   await warnPartnersAboutUpcomingDeletion();
   await deletePastEvents();
+  await deletePastOrganizerEvents();
   await deleteExpiredAnnouncements();
   await deleteExpiredDrinkPlans();
   await deleteOldNotifications();

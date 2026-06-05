@@ -13,6 +13,9 @@ export interface SliderAnnouncement {
   eventId: number;
   vendorId: number;
   imageUrl?: string;
+  // When set (e.g. organizer events), the CTA links here instead of the
+  // default event/vendor URL derived from eventId/vendorId.
+  href?: string;
 }
 
 const AUTOPLAY_MS = 5000;
@@ -57,7 +60,7 @@ export function AnnouncementSlider({ announcements }: { announcements: SliderAnn
   if (announcements.length === 0) return null;
   const a = announcements[current];
   if (!a) return null;
-  const href = a.eventId ? `/events/${a.eventId}?book=event&aid=${a.id}` : `/vendors/${a.vendorId}`;
+  const href = a.href ?? (a.eventId ? `/events/${a.eventId}?book=event&aid=${a.id}` : `/vendors/${a.vendorId}`);
 
   return (
     <div

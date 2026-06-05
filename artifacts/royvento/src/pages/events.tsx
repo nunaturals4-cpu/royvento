@@ -24,6 +24,20 @@ interface EventAnnouncement {
   eventType: string;
 }
 
+interface OrganizerEventCard {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  shortDescription: string;
+  coverImageUrl: string;
+  bannerUrl: string;
+  city: string;
+  startDate: string | null;
+  startTime: string;
+  organizerName: string;
+}
+
 const ANN_GENRES = ["EDM", "Hip Hop", "Bollywood", "Rock", "Pop", "Jazz", "Retro", "House", "Techno", "R&B"];
 
 // Icon per category — mirrors the home page "Popular Categories" tile design.
@@ -41,7 +55,9 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
 export function Events() {
   const { t } = useTranslation();
   const [slider, setSlider] = useState<SliderAnnouncement[]>([]);
+  const [orgSlider, setOrgSlider] = useState<SliderAnnouncement[]>([]);
   const [announcements, setAnnouncements] = useState<EventAnnouncement[]>([]);
+  const [organizerEvents, setOrganizerEvents] = useState<OrganizerEventCard[]>([]);
   const [genreFilter, setGenreFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const whatsOnRef = useRef<HTMLDivElement | null>(null);
@@ -51,7 +67,13 @@ export function Events() {
     // recent fallback) — same source as the home/Events slider.
     apiGet<SliderAnnouncement[]>("/api/announcements/slider").then(setSlider).catch(() => {});
     apiGet<EventAnnouncement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
+    // Event Organizer vertical — approved events + admin-featured slider entries.
+    apiGet<OrganizerEventCard[]>("/api/organizer-events").then(setOrganizerEvents).catch(() => {});
+    apiGet<SliderAnnouncement[]>("/api/organizer-events/slider").then(setOrgSlider).catch(() => {});
   }, []);
+
+  // Admin-featured organizer events lead the hero slider, then pub announcements.
+  const heroSlides = useMemo(() => [...orgSlider, ...slider], [orgSlider, slider]);
 
   // Count upcoming announcements per category (the eventType partners pick in
   // the dashboard announcement tab maps 1:1 to these category tiles).
@@ -86,7 +108,7 @@ export function Events() {
 
       <div className="container mx-auto px-4 md:px-6 py-8">
         {/* ── Announcement slider (admin-controlled featured first) ── */}
-        {slider.length > 0 && <AnnouncementSlider announcements={slider} />}
+        {heroSlides.length > 0 && <AnnouncementSlider announcements={heroSlides} />}
 
         {/* ── Event Categories — home-style "Popular Categories" tiles ── */}
         <section className="py-6 md:py-8">
@@ -141,6 +163,49 @@ export function Events() {
             })}
           </div>
         </section>
+
+        {/* ── Live Events — ticketed events from Event Organizers ── */}
+        {organizerEvents.length > 0 && (
+          <section className="py-6 md:py-8">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">Live Events</span>
+              </div>
+              <div className="flex-1 h-px bg-white/[0.06]" />
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scrollbar-none">
+              {organizerEvents.map((e) => (
+                <Link key={e.id} href={`/organizer-events/${e.slug}`} className="snap-start flex-shrink-0 cursor-pointer">
+                  <div className="group w-[260px] sm:w-[280px] flex-shrink-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111] hover:border-primary/25 transition-colors">
+                    <div className="relative h-36 bg-black/40 overflow-hidden">
+                      {(e.coverImageUrl || e.bannerUrl) ? (
+                        <img src={e.coverImageUrl || e.bannerUrl} alt={e.title} loading="lazy" className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-black"><Sparkles className="h-8 w-8 text-primary/30" /></div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                      <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 rounded-full border border-primary/30 bg-black/60 backdrop-blur-md px-2.5 py-1">
+                        <Sparkles className="h-2.5 w-2.5 text-primary" />
+                        <span className="text-[9px] font-semibold text-primary uppercase tracking-wider truncate max-w-[100px]">{e.organizerName}</span>
+                      </div>
+                    </div>
+                    <div className="p-4 flex flex-col gap-2">
+                      {e.category && <span className="self-start text-[10px] uppercase tracking-wider text-amber-400">{e.category}</span>}
+                      <h3 className="font-serif text-base leading-snug tracking-tight text-white line-clamp-2">{e.title}</h3>
+                      {e.shortDescription && <p className="text-xs text-white/50 line-clamp-2">{e.shortDescription}</p>}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1.5 border-t border-white/[0.06]">
+                        {e.startDate && <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-primary" />{new Date(e.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>}
+                        {e.startTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-primary" />{e.startTime}</span>}
+                        {e.city && <span className="truncate">{e.city}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── What's On — announcements (pub-offers style) ── */}
         {hasAnnouncements && (

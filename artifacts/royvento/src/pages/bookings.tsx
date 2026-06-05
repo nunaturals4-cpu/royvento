@@ -62,6 +62,15 @@ interface BookingRecord {
   userName?: string | null;
   approvedBy?: string | null;
   paymentMethod?: string | null;
+  phone?: string | null;
+  // Organizer-ticket fields (kind='organizer')
+  kind?: string | null;
+  organizerName?: string | null;
+  organizerEventSlug?: string | null;
+  ticketType?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  eventStartTime?: string | null;
   freeEntryRules?: {
     enabled?: boolean;
     genders?: string[];
@@ -148,8 +157,9 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
     completed: t("bookings.status_completed"),
     cancelled: t("bookings.status_cancelled"),
   };
+  const isOrganizer = b.kind === "organizer";
   const isPubTicket = b.pubMode === "ticket" || b.pubMode === "free" || b.pubMode === "event";
-  const showTicket = isPubTicket && (b.status === "confirmed" || b.status === "completed");
+  const showTicket = (isPubTicket || isOrganizer) && (b.status === "confirmed" || b.status === "completed");
   const [cancelOpen, setCancelOpen] = useState(false);
   // cancellationAllowed is computed server-side; fall back to true so old API responses stay functional
   const cancellationBlocked = b.cancellationAllowed === false;
@@ -168,15 +178,19 @@ function BookingCard({ b, onRefetch }: { b: BookingRecord; onRefetch: () => void
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant={STATUS_VARIANT[b.status] ?? "default"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
               {b.eventType_ === "pub" && <Badge className="bg-red-600/20 border-red-500/40 text-red-200"><Wine className="h-3 w-3 mr-1" />{t("bookings.pub_badge")}</Badge>}
+              {isOrganizer && <Badge className="bg-primary/20 border-primary/40 text-primary"><TicketIcon className="h-3 w-3 mr-1" />Event Ticket</Badge>}
               {b.pubMode === "ticket" && <Badge variant="outline"><TicketIcon className="h-3 w-3 mr-1" />{t("bookings.ticket_badge")}</Badge>}
               {b.pubMode === "event" && <Badge variant="outline">{t("bookings.event_booking_badge")}</Badge>}
               <span className="text-xs text-muted-foreground">{t("bookings.booked_on")} {new Date(b.createdAt).toLocaleDateString()}</span>
             </div>
-            <Link href={`/events/${b.eventId}`} className="font-serif text-2xl hover:text-primary">{b.eventTitle}</Link>
+            {isOrganizer
+              ? <Link href={`/organizer-events/${b.organizerEventSlug ?? ""}`} className="font-serif text-2xl hover:text-primary">{b.eventTitle}</Link>
+              : <Link href={`/events/${b.eventId}`} className="font-serif text-2xl hover:text-primary">{b.eventTitle}</Link>}
             <p className="text-xs uppercase tracking-wider text-muted-foreground">{b.vendorName}</p>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground pt-2">
-              <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" />{b.bookingDate}</span>
-              <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{b.guests} {t("bookings.guests_label")}</span>
+              <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4 text-primary" />{b.bookingDate}{isOrganizer && b.eventStartTime ? ` · ${b.eventStartTime}` : ""}</span>
+              <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{b.guests} {isOrganizer ? "ticket(s)" : t("bookings.guests_label")}</span>
+              {isOrganizer && b.venueName && <span className="flex items-center gap-1.5"><Tag className="h-4 w-4 text-primary" />{b.venueName}</span>}
               {b.couponCode && (
                 <span className="flex items-center gap-1.5 text-green-400">
                   <Tag className="h-4 w-4" />{t("bookings.coupon_applied")} {b.couponCode}
@@ -359,6 +373,7 @@ function TicketField({ label, value }: { label: string; value: React.ReactNode }
 function PremiumTicket({ b }: { b: BookingRecord }) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const isOrganizer = b.kind === "organizer";
   const ticketCode: string = b.ticketCode ?? `RV-${String(b.id).padStart(6, "0")}`;
   const isEventMode = b.pubMode !== "ticket";
   const ticketSum = (b.ticketWomen ?? 0) + (b.ticketMen ?? 0) + (b.ticketCouple ?? 0) * 2;
@@ -646,20 +661,33 @@ function PremiumTicket({ b }: { b: BookingRecord }) {
           {/* Details grid + QR (desktop) */}
           <div className="flex items-start gap-6 mt-4 sm:mt-6">
             <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-3 sm:gap-y-4 flex-1 min-w-0">
-              <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
-              <TicketField label={t("bookings.date")} value={b.bookingDate} />
-              <TicketField
-                label={t("bookings.tickets")}
-                value={
-                  ticketBreakdownParts.length > 0 ? (
-                    <>
-                      {ticketBreakdownParts.join(" · ")}
-                      <span className="text-white/35 ml-1 text-xs">({total} {t("bookings.guests")})</span>
-                    </>
-                  ) : `${total} ${t("bookings.guests")}`
-                }
-              />
-              <TicketField label={t("bookings.approved_by")} value={<span className="capitalize">{b.approvedBy || t("bookings.partner")}</span>} />
+              {isOrganizer ? (
+                <>
+                  <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
+                  <TicketField label="Booking ID" value={`#${b.id}`} />
+                  <TicketField label={t("bookings.date")} value={`${b.bookingDate}${b.eventStartTime ? ` · ${b.eventStartTime}` : ""}`} />
+                  <TicketField label="Ticket type" value={`${b.ticketType || "Ticket"}${b.guests > 1 ? ` ×${b.guests}` : ""}`} />
+                  {b.venueName && <TicketField label="Venue" value={b.venueName} />}
+                  {b.venueAddress && <TicketField label="Address" value={b.venueAddress} />}
+                </>
+              ) : (
+                <>
+                  <TicketField label={t("bookings.guest")} value={b.personName || b.userName} />
+                  <TicketField label={t("bookings.date")} value={b.bookingDate} />
+                  <TicketField
+                    label={t("bookings.tickets")}
+                    value={
+                      ticketBreakdownParts.length > 0 ? (
+                        <>
+                          {ticketBreakdownParts.join(" · ")}
+                          <span className="text-white/35 ml-1 text-xs">({total} {t("bookings.guests")})</span>
+                        </>
+                      ) : `${total} ${t("bookings.guests")}`
+                    }
+                  />
+                  <TicketField label={t("bookings.approved_by")} value={<span className="capitalize">{b.approvedBy || t("bookings.partner")}</span>} />
+                </>
+              )}
             </div>
 
             {/* QR — desktop only */}
