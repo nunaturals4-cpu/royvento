@@ -1578,4 +1578,54 @@ router.patch("/admin/organizer-ads/:id", requireAuth(["admin"]), async (req, res
   return res.json(row);
 });
 
+// Admin: verify a user's email address (for seeding / support)
+router.post("/admin/users/:id/verify-email", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [row] = await db
+    .update(usersTable)
+    .set({ emailVerified: true, emailVerifyToken: "", emailVerifyExpiry: null })
+    .where(eq(usersTable.id, id))
+    .returning({ id: usersTable.id, email: usersTable.email, emailVerified: usersTable.emailVerified });
+  if (!row) return res.status(404).json({ error: "User not found" });
+  return res.json(row);
+});
+
+// Admin: create an organizer profile on behalf of any user + optionally promote their role.
+router.post("/admin/organizers/seed", requireAuth(["admin"]), async (req, res) => {
+  const AdminOrgBody = ProfileBody.extend({ userId: z.number().int() });
+  const parsed = AdminOrgBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { userId, ...profile } = parsed.data;
+  const existing = await db.select({ id: organizersTable.id }).from(organizersTable).where(eq(organizersTable.userId, userId)).limit(1);
+  if (existing[0]) return res.status(409).json({ error: "Organizer profile already exists for this user", id: existing[0].id });
+  const user = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user[0]) return res.status(404).json({ error: "User not found" });
+  const slug = await uniqueOrganizerSlug(profile.name);
+  const usedPrefixes = (await db.select({ p: organizersTable.ticketPrefix }).from(organizersTable)).map((r) => r.p).filter((p): p is string => Boolean(p));
+  const ticketPrefix = await generateUniqueTicketPrefix(profile.name, usedPrefixes);
+  const ticketSalt = generateTicketSalt();
+  const [row] = await db.insert(organizersTable).values({ userId, slug, ...profile, status: "approved", verified: true, ticketPrefix, ticketSalt }).returning();
+  await db.update(usersTable).set({ role: "organizer" }).where(eq(usersTable.id, userId));
+  return res.json(row);
+});
+
+// Admin: create an organizer event directly for any organizerId (auto-approved).
+router.post("/admin/organizer-events/seed", requireAuth(["admin"]), async (req, res) => {
+  const SeedEventBody = EventBody.extend({ organizerId: z.number().int() });
+  const parsed = SeedEventBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+  const { organizerId, ...eventData } = parsed.data;
+  const org = await db.select({ id: organizersTable.id }).from(organizersTable).where(eq(organizersTable.id, organizerId)).limit(1);
+  if (!org[0]) return res.status(404).json({ error: "Organizer not found" });
+  const slug = await uniqueEventSlug(eventData.title);
+  const [row] = await db.insert(organizerEventsTable).values({
+    organizerId,
+    slug,
+    approvalStatus: "approved",
+    ...eventValuesFromBody(eventData),
+  }).returning();
+  return res.json(row);
+});
+
 export default router;

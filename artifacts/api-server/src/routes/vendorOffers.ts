@@ -314,4 +314,38 @@ router.get("/partner/offers/analytics", requireAuth(["vendor", "admin"]), async 
   }
 });
 
+// Admin: create a drink/food offer for any vendor by vendorId (seeding / support).
+router.post("/admin/vendor-offers/seed", requireAuth(["admin"]), async (req, res) => {
+  try {
+    const AdminOfferBody = OfferBody.extend({ vendorId: z.number().int() });
+    const parsed = AdminOfferBody.safeParse(req.body);
+    if (!parsed.success) return respondInvalid(res, parsed.error);
+    const { vendorId, ...d } = parsed.data;
+    if (d.discountType === "free_item" && !d.freeItemName.trim()) {
+      return res.status(400).json({ error: "Free-item offers need a free item name." });
+    }
+    if ((d.discountType === "percent" || d.discountType === "fixed") && d.discountValue <= 0) {
+      return res.status(400).json({ error: "Discount value must be greater than zero." });
+    }
+    const [created] = await db.insert(vendorOffersTable).values({
+      vendorId,
+      category: d.category,
+      title: d.title.trim(),
+      description: d.description,
+      discountType: d.discountType,
+      discountValue: String(d.discountValue),
+      freeItemName: d.freeItemName.trim(),
+      days: d.days,
+      timeFrom: d.timeFrom,
+      timeTo: d.timeTo,
+      startsAt: d.startsAt ? new Date(d.startsAt) : null,
+      endsAt: d.endsAt ? new Date(d.endsAt) : null,
+      active: d.active,
+    }).returning();
+    return res.status(201).json(created);
+  } catch (err) {
+    return dbErrorResponse(res, "admin seed offer", err);
+  }
+});
+
 export default router;
