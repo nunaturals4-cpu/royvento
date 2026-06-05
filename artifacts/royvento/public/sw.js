@@ -1,3 +1,69 @@
+// ── Cache names — bump the version suffix to force eviction on deploy ──────
+const STATIC_CACHE = "royvento-assets-v1";
+const API_CACHE    = "royvento-api-v1";
+
+// Public read-only API paths that are safe to serve stale while revalidating.
+const CACHEABLE_API_PREFIXES = [
+  "/api/events/featured",
+  "/api/events/popular",
+  "/api/announcements/recent",
+  "/api/announcements/slider",
+];
+
+// Activate: clean up any old cache names we no longer use.
+self.addEventListener("activate", (event) => {
+  const valid = new Set([STATIC_CACHE, API_CACHE]);
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => !valid.has(k)).map((k) => caches.delete(k)))
+    )
+  );
+});
+
+// Fetch: cache-first for hashed Vite assets; stale-while-revalidate for
+// public API calls; everything else goes straight to the network.
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+
+  // Vite content-hashed bundles (/assets/*.js, /assets/*.css) — cache-first.
+  // A new build gets new filenames so stale entries are never re-requested.
+  if (url.pathname.startsWith("/assets/")) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) =>
+        cache.match(request).then(
+          (hit) =>
+            hit ??
+            fetch(request).then((res) => {
+              if (res.ok) cache.put(request, res.clone());
+              return res;
+            })
+        )
+      )
+    );
+    return;
+  }
+
+  // Public API endpoints — stale-while-revalidate: serve cached data
+  // immediately, then update the cache in the background.
+  if (CACHEABLE_API_PREFIXES.some((p) => url.pathname.startsWith(p))) {
+    event.respondWith(
+      caches.open(API_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          const fresh = fetch(request).then((res) => {
+            if (res.ok) cache.put(request, res.clone());
+            return res;
+          });
+          return cached ?? fresh;
+        })
+      )
+    );
+    return;
+  }
+});
+
 self.addEventListener("push", (event) => {
   if (!event.data) return;
   let payload;

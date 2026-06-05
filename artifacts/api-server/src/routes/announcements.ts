@@ -122,6 +122,7 @@ router.delete("/partner/announcements/:id", requireAuth(["vendor"]), async (req,
 });
 
 router.get("/announcements/recent", async (_req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const today = todayIstDate();
   const rows = await db.execute(sql`
     SELECT
@@ -156,6 +157,7 @@ router.get("/announcements/recent", async (_req, res) => {
 });
 
 router.get("/announcements/slider", async (_req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const today = todayIstDate();
 
   const featured = await db.execute(sql`

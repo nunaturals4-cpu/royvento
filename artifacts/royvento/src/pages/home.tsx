@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
 import {
@@ -191,10 +192,6 @@ export function Home() {
   const isLoggedIn = !!(me?.user);
   const { data: featured = [] } = useListFeaturedEvents();
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
-  const [popular, setPopular] = useState<PublicEvent[]>([]);
-  const [popularLoading, setPopularLoading] = useState(false);
-  const [pubs, setPubs] = useState<PublicEvent[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const { selectedCity: userCity } = useSelectedCity();
 
   // Hero search bar (functional): location → global city context + picker,
@@ -223,24 +220,30 @@ export function Home() {
     if (detectedState && !filterState) setFilterState(detectedState);
   }, [detectedCountry, detectedState]);
 
-  const fetchPopular = useCallback((country: string, state: string) => {
-    setPopularLoading(true);
-    const params = new URLSearchParams();
-    if (country) params.set("country", country);
-    if (state) params.set("state", state);
-    const qs = params.toString();
-    apiGet<PublicEvent[]>(`/api/events/popular${qs ? `?${qs}` : ""}`)
-      .then(setPopular)
-      .catch(() => {})
-      .finally(() => setPopularLoading(false));
-  }, []);
+  const { data: popular = [], isLoading: popularLoading } = useQuery({
+    queryKey: ["events-popular", filterCountry, filterState],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (filterCountry) params.set("country", filterCountry);
+      if (filterState) params.set("state", filterState);
+      const qs = params.toString();
+      return apiGet<PublicEvent[]>(`/api/events/popular${qs ? `?${qs}` : ""}`);
+    },
+    staleTime: 120_000,
+  });
 
-  useEffect(() => { fetchPopular(filterCountry, filterState); }, [filterCountry, filterState, fetchPopular]);
+  const { data: pubs = [] } = useQuery({
+    queryKey: ["events-pubs"],
+    queryFn: () => apiGet<PublicEvent[]>("/api/events?type=pub"),
+    staleTime: 120_000,
+    select: (data: PublicEvent[]) => data.slice(0, 6),
+  });
 
-  useEffect(() => {
-    apiGet<PublicEvent[]>("/api/events?type=pub").then((r) => setPubs(r.slice(0, 6))).catch(() => {});
-    apiGet<Announcement[]>("/api/announcements/recent").then(setAnnouncements).catch(() => {});
-  }, []);
+  const { data: announcements = [] } = useQuery({
+    queryKey: ["announcements-recent"],
+    queryFn: () => apiGet<Announcement[]>("/api/announcements/recent"),
+    staleTime: 60_000,
+  });
 
   const sortedPopular = useMemo(() => sortCityFirst(popular, userCity), [popular, userCity]);
   const sortedPubs = useMemo(() => sortCityFirst(pubs, userCity), [pubs, userCity]);

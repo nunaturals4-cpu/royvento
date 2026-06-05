@@ -204,6 +204,7 @@ router.get("/events", async (req, res) => {
 });
 
 router.get("/events/featured", async (_req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const rows = await db
     .select()
     .from(eventsTable)
@@ -224,6 +225,7 @@ router.get("/events/featured", async (_req, res) => {
 });
 
 router.get("/events/popular", async (req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const conditions = [eq(eventsTable.popular, true), eq(eventsTable.approvalStatus, "approved")];
   const country = req.query["country"] as string | undefined;
   const state = req.query["state"] as string | undefined;

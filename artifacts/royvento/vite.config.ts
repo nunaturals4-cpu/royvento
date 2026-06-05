@@ -78,6 +78,8 @@ export default defineConfig({
           if (/^(recharts|d3-|victory-vendor|internmap)/.test(pkg)) return "charts-vendor";
           if (pkg.startsWith("lucide-react/")) return "icons-vendor";
           if (pkg.startsWith("wouter")) return "router-vendor";
+          if (/^framer-motion(\/|$)/.test(pkg)) return "animation-vendor";
+          if (pkg.startsWith("@radix-ui/")) return "radix-vendor";
           return undefined;
         },
       },
