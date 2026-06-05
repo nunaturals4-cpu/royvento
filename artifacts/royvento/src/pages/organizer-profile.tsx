@@ -343,7 +343,7 @@ export function OrganizerEventDetail() {
           {e.description && (
             <section>
               <SectionHead icon={<Sparkles className="h-4 w-4" />}>About the event</SectionHead>
-              <p className="text-white/70 leading-relaxed whitespace-pre-line text-[15px]">{e.description}</p>
+              <div className="text-white/70 leading-relaxed text-[15px] [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1" dangerouslySetInnerHTML={{ __html: e.description }} />
             </section>
           )}
 
