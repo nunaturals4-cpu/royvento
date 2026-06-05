@@ -1,9 +1,9 @@
 ﻿import { Link, useLocation } from "wouter";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { SEO } from "@/components/SEO";
 import {
   ArrowRight, Bell, ChevronLeft,
-  Clock, GlassWater,
+  Clock, GlassWater, Tag, Percent, RotateCcw, Gift,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,23 @@ import { useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react"
 import type { VendorDrinkOffer } from "@workspace/api-client-react";
 import { FreeDrinkSection, TicketSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 import { useToast } from "@/hooks/use-toast";
+
+interface AllDrinkDeal {
+  id: number;
+  vendorId: number;
+  vendorName: string;
+  vendorLocation: string;
+  vendorCity: string;
+  vendorCoverImage: string;
+  title: string;
+  description: string;
+  discountType: "percent" | "fixed" | "bogo" | "free_item";
+  discountValue: string;
+  freeItemName: string;
+  days: string[];
+  timeFrom: string;
+  timeTo: string;
+}
 
 const DAYS_OF_WEEK = [
   { key: "",    label: "All Days"   },
@@ -23,28 +40,28 @@ const DAYS_OF_WEEK = [
   { key: "Sun", label: "Sunday"    },
 ] as const;
 
-/* â”€â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â"€â"€â"€ Main page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */
 export function PubOffers() {
   const { t } = useTranslation();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  // â”€â”€ data (all hooks unchanged) â”€â”€
+  // â"€â"€ data (all hooks unchanged) â"€â"€
   const { data: me } = useGetMe({ query: { retry: false } as any });
   const user = me?.user as any;
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
 
-  // â”€â”€ all filter state (unchanged) â”€â”€
+  // â"€â"€ all filter state (unchanged) â"€â"€
   const [dealGenderFilter, setDealGenderFilter]   = useState("");
   const [dayFilter, setDayFilter]                 = useState("");
 
-  // â”€â”€ split deals, then filter by selected day â”€â”€
+  // â"€â"€ split deals, then filter by selected day â"€â"€
   const { freeVendors: allFreeVendors, ticketVendors: allTicketVendors } = splitVendorsByPlanType(
     drinkOffers as VendorDrinkOffer[],
     dealGenderFilter as "" | "female" | "other",
   );
 
-  // Task 4: wire day filter â€” keep only vendors that have at least one plan
+  // Task 4: wire day filter â€" keep only vendors that have at least one plan
   // whose `days` array includes the selected day abbreviation.
   const freeVendors = dayFilter
     ? allFreeVendors.filter((v) =>
@@ -60,7 +77,21 @@ export function PubOffers() {
 
   const hasDeals        = (drinkOffers as VendorDrinkOffer[]).length > 0;
 
-  // â”€â”€ Task 3: Notify Me â€” goes to /subscription; if already subscribed show sweet toast â”€â”€
+  const [allDrinkDeals, setAllDrinkDeals] = useState<AllDrinkDeal[]>([]);
+  useEffect(() => {
+    apiGet<AllDrinkDeal[]>("/api/vendors/all-drink-deals")
+      .then((rows) => setAllDrinkDeals(rows))
+      .catch(() => {});
+  }, []);
+
+  const filteredDeals = dayFilter
+    ? allDrinkDeals.filter((d) => {
+        const dayLower = dayFilter.toLowerCase().slice(0, 3);
+        return d.days.length === 0 || d.days.includes(dayLower);
+      })
+    : allDrinkDeals;
+
+  // â"€â"€ Task 3: Notify Me â€" goes to /subscription; if already subscribed show sweet toast â"€â"€
   const handleNotifyMe = useCallback(async () => {
     if (user) {
       try {
@@ -85,10 +116,10 @@ export function PubOffers() {
         canonical="/pub-offers"
       />
 
-      {/* â•â•â• HERO â€” Premium full-bleed with split layout â•â•â• */}
+      {/* â•â•â• HERO â€" Premium full-bleed with split layout â•â•â• */}
       <div className="relative overflow-hidden border-b border-white/[0.06] bg-black">
 
-        {/* Full-bleed background image â€” hidden on mobile, visible md+ */}
+        {/* Full-bleed background image â€" hidden on mobile, visible md+ */}
         <div className="pointer-events-none absolute inset-0 hidden md:block">
           <img
             src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=1400&q=85"
@@ -104,7 +135,7 @@ export function PubOffers() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/45 to-transparent" />
           {/* Soft bottom fade to background */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-          {/* Brand accent glow â€” bottom-left */}
+          {/* Brand accent glow â€" bottom-left */}
           <div className="absolute bottom-0 left-0 w-[400px] h-[200px] bg-primary/15 blur-[80px] pointer-events-none" />
         </div>
 
@@ -133,7 +164,7 @@ export function PubOffers() {
             </div>
           </div>
 
-          {/* Day-of-week filter pills â€” scrollable on mobile */}
+          {/* Day-of-week filter pills â€" scrollable on mobile */}
           <div className="mt-6 md:mt-8">
             <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
               {DAYS_OF_WEEK.map(({ key, label }) => (
@@ -159,15 +190,16 @@ export function PubOffers() {
         {/* Announcements ("What's On") removed from Happy Hours — they now live
             on the dedicated Events page. */}
 
-        {/* Loading state */}
-        {!hasDeals && (
+        {/* Loading / empty state — show only if both offer sources are empty */}
+        {!hasDeals && allDrinkDeals.length === 0 && (
           <div className="rounded-2xl border border-white/[0.06] bg-[#111] p-16 text-center">
             <GlassWater className="h-10 w-10 text-primary/30 mx-auto mb-3" />
-            <p className="text-lg font-semibold text-white/60">{t("common.loading")}</p>
+            <p className="text-lg font-semibold text-white/60">No drink deals available right now.</p>
+            <p className="text-sm text-muted-foreground mt-1">Check back soon — new happy hour deals are added regularly.</p>
           </div>
         )}
 
-        {/* â”€â”€ DRINK DEALS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* â"€â"€ DRINK DEALS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
         {hasDeals && (
           <section className="mb-12">
             {/* Section header */}
@@ -229,7 +261,75 @@ export function PubOffers() {
           </section>
         )}
 
-        {/* â”€â”€ NOTIFY ME BANNER â€” Task 3 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── HAPPY HOUR & DRINK DEALS (vendor_offers) ─────────── */}
+        {filteredDeals.length > 0 && (
+          <section className="mb-12">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-amber-400" />
+                <span className="text-xs uppercase tracking-[0.22em] text-amber-400 font-semibold">Happy Hour &amp; Drink Deals</span>
+                {dayFilter && (
+                  <span className="text-xs text-white/50 ml-1">— {DAYS_OF_WEEK.find(d => d.key === dayFilter)?.label}</span>
+                )}
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredDeals.map((deal) => {
+                const badgeText =
+                  deal.discountType === "percent" ? `${deal.discountValue}% OFF` :
+                  deal.discountType === "fixed" ? `₹${deal.discountValue} FLAT` :
+                  deal.discountType === "bogo" ? "BUY 1 GET 1" :
+                  deal.freeItemName ? `FREE ${deal.freeItemName.toUpperCase()}` : "FREE ITEM";
+                const BadgeIcon =
+                  deal.discountType === "percent" ? Percent :
+                  deal.discountType === "bogo" ? RotateCcw :
+                  deal.discountType === "free_item" ? Gift : Tag;
+                const daysLabel = deal.days.length === 0 ? "Every Day" :
+                  deal.days.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(", ");
+                const timeLabel = deal.timeFrom && deal.timeTo
+                  ? `${deal.timeFrom} – ${deal.timeTo}`
+                  : deal.timeFrom || "";
+                return (
+                  <Link key={deal.id} href={`/vendors/${deal.vendorId}`}>
+                    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111] hover:border-amber-400/30 transition-all cursor-pointer">
+                      {deal.vendorCoverImage && (
+                        <div className="relative h-36 overflow-hidden">
+                          <img
+                            src={deal.vendorCoverImage}
+                            alt={deal.vendorName}
+                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 border border-amber-400/40 px-3 py-1 text-[11px] font-bold text-amber-300">
+                            <BadgeIcon className="h-3 w-3" />{badgeText}
+                          </span>
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1">{deal.vendorName}</p>
+                        <h3 className="font-semibold text-white leading-snug mb-2">{deal.title}</h3>
+                        {deal.description && (
+                          <p className="text-xs text-white/55 line-clamp-2 mb-3">{deal.description}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-white/40 bg-white/5 rounded-full px-2.5 py-1">
+                            <Clock className="h-3 w-3" />{daysLabel}
+                            {timeLabel && ` · ${timeLabel}`}
+                          </span>
+                          {deal.vendorCity && (
+                            <span className="text-[10px] text-white/40 bg-white/5 rounded-full px-2.5 py-1">{deal.vendorCity}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* â"€â"€ NOTIFY ME BANNER â€" Task 3 â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
         <div className="mt-14 relative overflow-hidden rounded-2xl border border-primary/20">
           <img
             src="https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=1200&q=70"

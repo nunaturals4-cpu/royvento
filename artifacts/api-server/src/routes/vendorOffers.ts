@@ -204,6 +204,50 @@ router.delete("/partner/offers/:id", requireAuth(["vendor", "admin"]), async (re
   }
 });
 
+// ─── Public: all active drink offers across all vendors (for pub-offers page) ─
+router.get("/vendors/all-drink-deals", async (_req, res) => {
+  try {
+    const now = new Date();
+    const rows = await db
+      .select({
+        id: vendorOffersTable.id,
+        vendorId: vendorOffersTable.vendorId,
+        title: vendorOffersTable.title,
+        description: vendorOffersTable.description,
+        discountType: vendorOffersTable.discountType,
+        discountValue: vendorOffersTable.discountValue,
+        freeItemName: vendorOffersTable.freeItemName,
+        days: vendorOffersTable.days,
+        timeFrom: vendorOffersTable.timeFrom,
+        timeTo: vendorOffersTable.timeTo,
+        startsAt: vendorOffersTable.startsAt,
+        endsAt: vendorOffersTable.endsAt,
+        vendorName: vendorsTable.businessName,
+        vendorLocation: vendorsTable.location,
+        vendorCity: vendorsTable.city,
+        vendorCoverImage: vendorsTable.bannerImage,
+      })
+      .from(vendorOffersTable)
+      .innerJoin(vendorsTable, eq(vendorOffersTable.vendorId, vendorsTable.id))
+      .where(and(
+        eq(vendorOffersTable.active, true),
+        eq(vendorOffersTable.category, "drink"),
+        eq(vendorsTable.status, "approved"),
+      ))
+      .orderBy(desc(vendorOffersTable.createdAt));
+    const live = rows.filter((o) => {
+      if (o.startsAt && now < new Date(o.startsAt)) return false;
+      if (o.endsAt && now > new Date(o.endsAt)) return false;
+      return true;
+    });
+    return res.json(live);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/relation .*"?vendor_offers"? does not exist/i.test(msg)) return res.json([]);
+    return dbErrorResponse(res, "all drink deals", err);
+  }
+});
+
 // ─── Public: offers active right now for a vendor ────────────────────────────
 
 router.get("/vendors/:vendorId/offers", async (req, res) => {
