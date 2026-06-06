@@ -368,9 +368,6 @@ export function Navbar() {
                       <DropdownMenuItem asChild>
                         <Link href="/dashboard/become-vendor" className="cursor-pointer w-full">{t("nav.become_partner")}</Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href="/dashboard/become-organizer" className="cursor-pointer w-full">{t("nav.become_organizer")}</Link>
-                      </DropdownMenuItem>
                     </>
                   )}
                   {user.role === "organizer" && (

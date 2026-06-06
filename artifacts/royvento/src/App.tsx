@@ -50,7 +50,6 @@ const VendorListingEditPage = lazy(() => import("@/pages/vendor-dashboard").then
 const TicketScanner = lazy(() => import("@/pages/ticket-scanner").then((m) => ({ default: m.TicketScanner })));
 const AdminPanel = lazy(() => import("@/pages/admin").then((m) => ({ default: m.AdminPanel })));
 const OrganizerDashboard = lazy(() => import("@/pages/organizer-dashboard").then((m) => ({ default: m.OrganizerDashboard })));
-const BecomeOrganizer = lazy(() => import("@/pages/organizer-dashboard").then((m) => ({ default: m.BecomeOrganizer })));
 const OrganizerProfile = lazy(() => import("@/pages/organizer-profile").then((m) => ({ default: m.OrganizerProfile })));
 const OrganizerEventDetail = lazy(() => import("@/pages/organizer-profile").then((m) => ({ default: m.OrganizerEventDetail })));
 const Subscription = lazy(() => import("@/pages/subscription").then((m) => ({ default: m.Subscription })));
@@ -218,10 +217,10 @@ function Router() {
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}
           </Route>
 
-          {/* Event Organizer vertical — separate from Pub/Club partner. */}
-          <Route path="/dashboard/become-organizer">
-            {() => <RequireAuth><BecomeOrganizer /></RequireAuth>}
-          </Route>
+          {/* Event Organizer vertical — onboarding is now unified under the
+              single "Become a Partner" flow (pick the Event Organizer category
+              there). Keep this path as a redirect for legacy links/bookmarks. */}
+          <Route path="/dashboard/become-organizer"><Redirect to="/dashboard/become-vendor" /></Route>
           <Route path="/dashboard/organizer">
             {() => <RequireAuth role="organizer"><OrganizerDashboard /></RequireAuth>}
           </Route>

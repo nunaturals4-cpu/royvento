@@ -6941,6 +6941,14 @@ function OrganizerAccountsAdmin() {
     try { await apiPatch(`/api/admin/organizers/${id}/verify`, { verified }); toast({ title: verified ? "Verified" : "Unverified" }); load(); }
     catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
   };
+  const remove = async (o: AdminOrganizer) => {
+    if (!window.confirm(`Delete organizer "${o.name}"? This permanently removes the organizer and all ${o.eventCount} event${o.eventCount !== 1 ? "s" : ""} they organize, along with related tickets and bookings. This cannot be undone.`)) return;
+    try {
+      const r = await apiDelete<{ deletedEvents: number }>(`/api/admin/organizers/${o.id}`);
+      toast({ title: "Organizer deleted", description: `Removed ${r.deletedEvents} event${r.deletedEvents !== 1 ? "s" : ""}` });
+      load();
+    } catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
 
   if (loading) return <p className="text-muted-foreground text-sm">Loading organizers...</p>;
   if (loadError) return (
@@ -6979,6 +6987,7 @@ function OrganizerAccountsAdmin() {
             <Button size="sm" variant="outline" onClick={() => setVerified(o.id, !o.verified)}>{o.verified ? "Unverify" : "Verify"}</Button>
             {o.status !== "approved" && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStatus(o.id, "approved")}>Approve</Button>}
             {o.status !== "rejected" && <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => setStatus(o.id, "rejected")}>Reject</Button>}
+            <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10" onClick={() => remove(o)}><Trash2 className="h-4 w-4" /></Button>
           </div>
         </div>
       ))}

@@ -4,6 +4,7 @@ import {
   vendorRequestsTable,
   usersTable,
   vendorsTable,
+  organizersTable,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
@@ -11,8 +12,43 @@ import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
 import { createUserNotification } from "../lib/notify";
 import { sendPartnerRequestApprovedEmail } from "../lib/notifications";
+import { generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 
 const router: IRouter = Router();
+
+// Partner categories that should unlock the Event Organizer vertical (organizer
+// role + organizer dashboard) instead of the pub/club vendor dashboard. Kept as
+// a set so future organizer-style categories can be added in one place.
+const ORGANIZER_CATEGORIES = new Set<string>(["Event Organizer"]);
+
+function slugifyOrganizer(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80);
+}
+
+// Generate a slug that no other organizer holds. The organizers table has a
+// unique index on `slug`, so two blank/duplicate slugs would collide — we must
+// resolve a unique value before inserting.
+async function uniqueOrganizerSlug(base: string): Promise<string> {
+  const root = slugifyOrganizer(base) || "organizer";
+  let candidate = root;
+  let n = 1;
+  while (true) {
+    const rows = await db
+      .select({ id: organizersTable.id })
+      .from(organizersTable)
+      .where(eq(organizersTable.slug, candidate))
+      .limit(1);
+    if (!rows[0]) return candidate;
+    n += 1;
+    candidate = `${root}-${n}`;
+  }
+}
 
 const CreateBody = z.object({
   businessName: z.string().min(1).max(255),
@@ -131,27 +167,68 @@ router.post(
       .update(vendorRequestsTable)
       .set({ status: "approved" })
       .where(eq(vendorRequestsTable.id, id));
-    // Promote the user to vendor role
-    await db
-      .update(usersTable)
-      .set({ role: "vendor" })
-      .where(eq(usersTable.id, r.userId));
-    // Auto-create the vendor profile if it doesn't already exist
-    const existing = await db
-      .select()
-      .from(vendorsTable)
-      .where(eq(vendorsTable.userId, r.userId))
-      .limit(1);
-    if (!existing[0]) {
-      await db.insert(vendorsTable).values({
-        userId: r.userId,
-        businessName: r.businessName,
-        category: r.category,
-        description: "",
-        location: "",
-        status: "approved",
-      });
+
+    // Unified partner onboarding: the requested category decides which role +
+    // profile + dashboard the applicant unlocks. "Event Organizer" applicants
+    // get the organizer vertical; everyone else gets the pub/club vendor flow.
+    const isOrganizer = ORGANIZER_CATEGORIES.has(r.category);
+    const dashboardUrl = isOrganizer ? "/dashboard/organizer" : "/dashboard/vendor";
+
+    if (isOrganizer) {
+      // Promote to organizer role and auto-create the organizer profile so the
+      // organizer dashboard + role gating unlock immediately on approval.
+      await db
+        .update(usersTable)
+        .set({ role: "organizer" })
+        .where(eq(usersTable.id, r.userId));
+      const existingOrg = await db
+        .select()
+        .from(organizersTable)
+        .where(eq(organizersTable.userId, r.userId))
+        .limit(1);
+      if (!existingOrg[0]) {
+        const slug = await uniqueOrganizerSlug(r.businessName);
+        const usedPrefixes = (
+          await db.select({ p: organizersTable.ticketPrefix }).from(organizersTable)
+        )
+          .map((row) => row.p)
+          .filter((p): p is string => Boolean(p));
+        const ticketPrefix = await generateUniqueTicketPrefix(r.businessName, usedPrefixes);
+        const ticketSalt = generateTicketSalt();
+        await db.insert(organizersTable).values({
+          userId: r.userId,
+          name: r.businessName,
+          slug,
+          status: "approved",
+          approvedAt: new Date(),
+          ticketPrefix,
+          ticketSalt,
+        });
+      }
+    } else {
+      // Promote the user to vendor role
+      await db
+        .update(usersTable)
+        .set({ role: "vendor" })
+        .where(eq(usersTable.id, r.userId));
+      // Auto-create the vendor profile if it doesn't already exist
+      const existing = await db
+        .select()
+        .from(vendorsTable)
+        .where(eq(vendorsTable.userId, r.userId))
+        .limit(1);
+      if (!existing[0]) {
+        await db.insert(vendorsTable).values({
+          userId: r.userId,
+          businessName: r.businessName,
+          category: r.category,
+          description: "",
+          location: "",
+          status: "approved",
+        });
+      }
     }
+
     // Fetch approved user to send notifications (email + in-app)
     const [approvedUser] = await db
       .select()
@@ -169,8 +246,8 @@ router.post(
         createUserNotification({
           userId: approvedUser.id,
           title: "Partner request approved!",
-          message: `Congratulations! Your application for ${r.businessName} has been approved. Access your partner dashboard to get started.`,
-          url: "/dashboard/vendor",
+          message: `Congratulations! Your application for ${r.businessName} has been approved. Access your dashboard to get started.`,
+          url: dashboardUrl,
           tag: `partner-approved-${r.id}`,
         }),
       ]);

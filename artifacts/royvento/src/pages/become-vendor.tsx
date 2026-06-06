@@ -73,7 +73,7 @@ export function BecomeVendor() {
         </div>
         <h1 className="font-serif text-4xl tracking-tight mb-3">Application submitted!</h1>
         <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
-          Thank you for applying to become a Royvento partner. Our team will review your application within <strong>1 working day</strong> and get in touch with you. Once approved, you'll be able to list your pub and manage bookings straight away.
+          Thank you for applying to become a Royvento partner. Our team will review your application within <strong>1 working day</strong> and get in touch with you. Once approved, your dashboard unlocks automatically based on the category you chose.
         </p>
         <p className="text-sm text-muted-foreground mt-4">
           Keep an eye on your notifications and email for updates.
@@ -146,7 +146,7 @@ export function BecomeVendor() {
         <h1 className="font-serif text-4xl tracking-tight">Become a partner</h1>
       </div>
       <p className="mt-2 text-muted-foreground">
-        Tell us about your pub. Once an admin approves your request, you'll be able to publish your listing and accept bookings.
+        Tell us about your business. Pick the category that fits — pubs and clubs get the partner dashboard, while event organizers unlock the event management dashboard. Once an admin approves your request, the right tools unlock automatically.
       </p>
 
       {existingRequest?.status === "rejected" && (
@@ -175,6 +175,11 @@ export function BecomeVendor() {
               ))}
             </SelectContent>
           </Select>
+          {category === "Event Organizer" && (
+            <p className="mt-2 text-xs text-primary/80">
+              Once approved, you'll get the Event Management dashboard to create events, sell tickets and scan entries.
+            </p>
+          )}
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />Where are you based?</Label>
@@ -188,8 +193,8 @@ export function BecomeVendor() {
           </div>
         </div>
         <div>
-          <Label htmlFor="breason">Tell us about your venue</Label>
-          <Textarea id="breason" rows={5} required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="A short description of your pub, the events you host, and why you'd like to be on Royvento." />
+          <Label htmlFor="breason">Tell us about your business</Label>
+          <Textarea id="breason" rows={5} required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="A short description of your venue or events, what you host, and why you'd like to be on Royvento." />
         </div>
         <Button type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Submit application"}</Button>
       </form>

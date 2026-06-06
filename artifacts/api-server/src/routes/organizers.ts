@@ -1387,6 +1387,52 @@ router.patch("/admin/organizers/:id/status", requireAuth(["admin"]), async (req,
   return res.json(row);
 });
 
+// Admin: permanently delete an organizer and everything they own. Removing an
+// organizer cascades to all events they organize plus the surrounding
+// per-organizer records (managers, reviews, coupons, banking, settlements,
+// ledger, ad requests, profile views, ticket bookings). Most of these tables
+// store organizer_id as a plain integer with no FK, so the cleanup is explicit;
+// event_tickets / organizer_ticket_orders cascade off organizer_events.
+router.delete("/admin/organizers/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const org = (await db.select().from(organizersTable).where(eq(organizersTable.id, id)).limit(1))[0];
+  if (!org) return res.status(404).json({ error: "Not found" });
+
+  const eventRows = await db
+    .select({ id: organizerEventsTable.id })
+    .from(organizerEventsTable)
+    .where(eq(organizerEventsTable.organizerId, id));
+  const eventIds = eventRows.map((e) => e.id);
+
+  await db.transaction(async (tx) => {
+    // Ticket bookings made against this organizer's events.
+    await tx.delete(bookingsTable).where(eq(bookingsTable.organizerId, id));
+    // Events — cascades to event_tickets and organizer_ticket_orders via FK.
+    await tx.delete(organizerEventsTable).where(eq(organizerEventsTable.organizerId, id));
+    // Per-organizer records (organizer_id is a plain column, no cascade).
+    await tx.delete(organizerAdRequestsTable).where(eq(organizerAdRequestsTable.organizerId, id));
+    await tx.delete(organizerCommissionLedgerTable).where(eq(organizerCommissionLedgerTable.organizerId, id));
+    await tx.delete(organizerCouponsTable).where(eq(organizerCouponsTable.organizerId, id));
+    await tx.delete(organizerReviewsTable).where(eq(organizerReviewsTable.organizerId, id));
+    await tx.delete(organizerManagersTable).where(eq(organizerManagersTable.organizerId, id));
+    await tx.delete(organizerBankingDetailsTable).where(eq(organizerBankingDetailsTable.organizerId, id));
+    await tx.delete(organizerSettlementsTable).where(eq(organizerSettlementsTable.organizerId, id));
+    await tx.delete(organizerProfileViewsTable).where(eq(organizerProfileViewsTable.organizerId, id));
+    await tx.delete(organizersTable).where(eq(organizersTable.id, id));
+    // The person keeps their account — only the organizer profile is removed.
+    // Demote them from the "organizer" partner role back to a regular user.
+    if (org.userId) {
+      await tx.update(usersTable)
+        .set({ role: "user" })
+        .where(and(eq(usersTable.id, org.userId), eq(usersTable.role, "organizer")));
+    }
+  });
+
+  logger.info({ organizerId: id, userId: org.userId, deletedEvents: eventIds.length }, "admin deleted organizer");
+  return res.json({ ok: true, deletedEvents: eventIds.length });
+});
+
 // All organizer events for the Announcement Slider admin tab (feature toggle).
 router.get("/admin/organizer-events", requireAuth(["admin"]), async (_req, res) => {
   const rows = await db.execute(sql`
