@@ -21,7 +21,7 @@ const SECRET = SESSION_SECRET;
 const COOKIE_NAME = "royvento_token";
 const TOKEN_TTL = "30d";
 
-export type Role = "user" | "vendor" | "admin" | "organizer";
+export type Role = "user" | "vendor" | "admin" | "organizer" | "game_organizer";
 
 export interface AuthUser {
   id: number;

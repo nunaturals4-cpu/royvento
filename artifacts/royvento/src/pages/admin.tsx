@@ -53,7 +53,7 @@ import {
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
   Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
   Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen,
-  Download, Users2, ArrowUpDown, ChevronRight,
+  Download, Users2, ArrowUpDown, ChevronRight, Gamepad2, Package,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -73,7 +73,7 @@ const ADMIN_TABS = [
   "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
   "booking-report", "attendance", "live-occupancy", "crm-leads",
   "create-pub", "announcement-slider", "settlements", "reviews",
-  "event-organizers",
+  "event-organizers", "game-organizers",
 ] as const;
 const DEFAULT_ADMIN_TAB = "analytics";
 const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
@@ -96,6 +96,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { value: "events",               label: "Events",            icon: Tag,           group: "partners" },
   { value: "create-pub",           label: "Create Pub/Club",   icon: Plus,          group: "partners" },
   { value: "event-organizers",     label: "Event Organizers",  icon: CalendarCheck, group: "partners" },
+  { value: "game-organizers",      label: "Game Organizers",   icon: Gamepad2,      group: "partners" },
   { value: "users",                label: "Users",             icon: Users,         group: "customers" },
   { value: "booking-report",       label: "Booking Report",    icon: FileText,      group: "customers" },
   { value: "attendance",           label: "Attendance",        icon: UserCheck,     group: "customers" },
@@ -328,6 +329,7 @@ export function AdminPanel() {
               <TabsContent value="settlements" className="mt-0"><SettlementsAdmin /></TabsContent>
               <TabsContent value="reviews" className="mt-0"><ReviewsAdmin /></TabsContent>
               <TabsContent value="event-organizers" className="mt-0"><EventOrganizersAdmin /></TabsContent>
+              <TabsContent value="game-organizers" className="mt-0"><GameOrganizersAdmin /></TabsContent>
             </div>
           </main>
         </div>
@@ -7067,6 +7069,356 @@ function OrganizerEventApprovalsAdmin() {
               )}
             </div>
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// GAME ORGANIZERS — accounts + game/package approvals + commission + settlements
+// ════════════════════════════════════════════════════════════════════════════
+
+interface AdminGameOrganizer {
+  id: number; name: string; slug: string; city: string; state: string;
+  verified: boolean; status: string; ownerEmail: string | null; gameCount: number; packageCount: number;
+}
+interface PendingGame {
+  id: number; name: string; slug: string; category: string; coverImageUrl: string;
+  pricingModel: string; price: string; hourlyRate: string; createdAt: string;
+  organizerId: number; organizerName: string; organizerVerified: boolean; kind: "game" | "package";
+}
+
+function GameOrganizersAdmin() {
+  return (
+    <div className="space-y-10">
+      <div>
+        <h2 className="font-serif text-xl mb-4">Game Organizer Accounts</h2>
+        <GameOrganizerAccountsAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Game & Package Approvals</h2>
+        <GameApprovalsAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Per-Game / Package Commission</h2>
+        <GameCommissionAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Game Organizer Settlements</h2>
+        <GameSettlementsAdmin />
+      </div>
+      <div>
+        <h2 className="font-serif text-xl mb-4">Promotion Requests</h2>
+        <GameAdsAdmin />
+      </div>
+    </div>
+  );
+}
+
+function GameOrganizerAccountsAdmin() {
+  const [items, setItems] = useState<AdminGameOrganizer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true); setLoadError(null);
+    apiGet<AdminGameOrganizer[]>("/api/admin/game-organizers")
+      .then((d) => { setItems(d); setLoadError(null); })
+      .catch((e) => { setLoadError(e?.message ?? "Failed to load"); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const setStatus = async (id: number, status: string) => {
+    try { await apiPatch(`/api/admin/game-organizers/${id}/status`, { status }); toast({ title: `Game organizer ${status}` }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+  const setVerified = async (id: number, verified: boolean) => {
+    try { await apiPatch(`/api/admin/game-organizers/${id}/verify`, { verified }); toast({ title: verified ? "Verified" : "Unverified" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+  const remove = async (o: AdminGameOrganizer) => {
+    if (!window.confirm(`Delete game organizer "${o.name}"? This permanently removes the venue and all ${o.gameCount} game(s) and ${o.packageCount} package(s), along with related bookings. This cannot be undone.`)) return;
+    try { await apiDelete(`/api/admin/game-organizers/${o.id}`); toast({ title: "Game organizer deleted" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading game organizers...</p>;
+  if (loadError) return (
+    <div className="rounded-2xl glass-card p-6 text-center space-y-3">
+      <XCircle className="h-8 w-8 text-red-400 mx-auto" />
+      <p className="text-sm text-muted-foreground">{loadError}</p>
+      <Button size="sm" variant="outline" onClick={load}>Retry</Button>
+    </div>
+  );
+  if (items.length === 0) return (
+    <div className="rounded-2xl glass-card p-6 text-center">
+      <Gamepad2 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+      <p className="text-sm text-muted-foreground">No game organizers yet</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {items.map((o) => (
+        <div key={o.id} className="rounded-2xl glass-card p-4 flex flex-wrap items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-medium truncate">{o.name}</p>
+              {o.verified && <ShieldCheck className="h-4 w-4 text-amber-400" />}
+              <span className={
+                "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border " +
+                (o.status === "approved" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
+                  : o.status === "rejected" ? "text-red-300 border-red-500/30 bg-red-500/10"
+                  : "text-amber-300 border-amber-500/30 bg-amber-500/10")
+              }>{o.status}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">{o.ownerEmail ?? "—"} · {[o.city, o.state].filter(Boolean).join(", ") || "—"} · {o.gameCount} game{o.gameCount !== 1 ? "s" : ""} · {o.packageCount} package{o.packageCount !== 1 ? "s" : ""}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {o.slug && <Button size="sm" variant="outline" asChild><a href={`/game-organizers/${o.slug}`} target="_blank" rel="noreferrer">View</a></Button>}
+            <Button size="sm" variant="outline" onClick={() => setVerified(o.id, !o.verified)}>{o.verified ? "Unverify" : "Verify"}</Button>
+            {o.status !== "approved" && <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setStatus(o.id, "approved")}>Approve</Button>}
+            {o.status !== "rejected" && <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => setStatus(o.id, "rejected")}>Reject</Button>}
+            <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10" onClick={() => remove(o)}><Trash2 className="h-4 w-4" /></Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GameApprovalsAdmin() {
+  const [items, setItems] = useState<PendingGame[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<PendingGame[]>("/api/admin/games/pending")
+      .then(setItems).catch(() => toast({ title: "Failed to load", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const base = (k: PendingGame["kind"]) => k === "package" ? "/api/admin/game-packages" : "/api/admin/games";
+  const approve = async (it: PendingGame) => {
+    try { await apiPatch(`${base(it.kind)}/${it.id}/approve`, {}); toast({ title: `${it.kind === "package" ? "Package" : "Game"} approved` }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+  const reject = async (it: PendingGame) => {
+    try { await apiPatch(`${base(it.kind)}/${it.id}/reject`, { rejectionReason: reason.trim() }); toast({ title: "Rejected" }); setRejecting(null); setReason(""); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (items.length === 0) return (
+    <div className="rounded-2xl glass-card p-6 text-center">
+      <CheckCircle className="h-8 w-8 text-green-400 mx-auto mb-2" />
+      <p className="text-sm text-muted-foreground">No pending games or packages</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""} awaiting review</p>
+      {items.map((e) => {
+        const key = `${e.kind}-${e.id}`;
+        return (
+          <div key={key} className="rounded-2xl glass-card overflow-hidden">
+            <div className="flex gap-4 p-4">
+              {e.coverImageUrl
+                ? <img src={e.coverImageUrl} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                : <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center shrink-0">{e.kind === "package" ? <Package className="h-7 w-7 text-muted-foreground" /> : <Gamepad2 className="h-7 w-7 text-muted-foreground" />}</div>}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{e.name} <Badge variant="secondary" className="ml-1 capitalize">{e.kind}</Badge></p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {e.organizerName}{e.organizerVerified ? " ✓" : ""}{e.category ? ` · ${e.category}` : ""} · {e.pricingModel === "hourly" ? `₹${Number(e.hourlyRate)}/hr` : `₹${Number(e.price)}`}
+                </p>
+                {rejecting === key ? (
+                  <div className="mt-3 space-y-2">
+                    <Textarea value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="Reason for rejection (optional)" rows={2} />
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => reject(e)}>Confirm reject</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setRejecting(null); setReason(""); }}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 mt-3">
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approve(e)}>Approve</Button>
+                    <Button size="sm" variant="outline" className="text-red-300 border-red-500/30" onClick={() => setRejecting(key)}>Reject</Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface CommissionItem { id: number; name: string; organizerName: string; commissionPct: string; kind: "game" | "package"; }
+function GameCommissionAdmin() {
+  const [items, setItems] = useState<CommissionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    Promise.all([
+      apiGet<any[]>("/api/admin/games").then((rows) => rows.map((r) => ({ ...r, kind: "game" as const }))),
+      apiGet<any[]>("/api/admin/game-packages").then((rows) => rows.map((r) => ({ ...r, kind: "package" as const }))),
+    ]).then(([g, p]) => {
+      const all: CommissionItem[] = [...g, ...p].map((r) => ({ id: r.id, name: r.name, organizerName: r.organizerName, commissionPct: r.commissionPct, kind: r.kind }));
+      setItems(all);
+      setEdits(Object.fromEntries(all.map((r) => [`${r.kind}-${r.id}`, String(Number(r.commissionPct))])));
+    }).catch(() => toast({ title: "Failed to load", variant: "destructive" })).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async (it: CommissionItem) => {
+    const key = `${it.kind}-${it.id}`;
+    const base = it.kind === "package" ? "/api/admin/game-packages" : "/api/admin/games";
+    setSaving(key);
+    try { await apiPatch(`${base}/${it.id}/commission`, { commissionPct: Number(edits[key]) }); toast({ title: "Commission updated" }); load(); }
+    catch (e: any) { toast({ title: "Update failed", description: e?.message, variant: "destructive" }); }
+    finally { setSaving(null); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground text-sm">No games or packages yet.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((e) => {
+        const key = `${e.kind}-${e.id}`;
+        return (
+          <div key={key} className="flex items-center gap-3 rounded-xl border border-white/10 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium truncate">{e.name} <Badge variant="secondary" className="capitalize">{e.kind}</Badge></p>
+              <p className="text-xs text-muted-foreground truncate">{e.organizerName}</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Input type="number" min={0} max={100} step={0.5} value={edits[key] ?? ""} onChange={(ev) => setEdits((p) => ({ ...p, [key]: ev.target.value }))} className="w-20 h-9 text-right" />
+              <span className="text-muted-foreground text-sm">%</span>
+              <Button size="sm" disabled={saving === key} onClick={() => save(e)}>Save</Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface SettlementGameOrg {
+  id: number; name: string; slug: string; commissionOwed: string;
+  accountHolderName: string | null; bankName: string | null; accountNumber: string | null; ifscCode: string | null;
+  lifetimeRevenue: string; lifetimeCommission: string;
+}
+function GameSettlementsAdmin() {
+  const [items, setItems] = useState<SettlementGameOrg[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [settling, setSettling] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<SettlementGameOrg[]>("/api/admin/game-settlements")
+      .then(setItems).catch(() => toast({ title: "Failed to load settlements", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const settle = async (o: SettlementGameOrg) => {
+    const owed = Number(o.commissionOwed);
+    const raw = window.prompt(`Settle commission for ${o.name}. Amount owed: ₹${owed.toLocaleString("en-IN")}.\nEnter amount to mark settled:`, String(owed));
+    if (raw == null) return;
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
+    setSettling(o.id);
+    try { await apiPost(`/api/admin/game-organizers/${o.id}/settle`, { amount }); toast({ title: "Settled" }); load(); }
+    catch (e: any) { toast({ title: "Settle failed", description: e?.message, variant: "destructive" }); }
+    finally { setSettling(null); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground text-sm">No game organizers yet.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((o) => {
+        const owed = Number(o.commissionOwed);
+        return (
+          <div key={o.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium truncate">{o.name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                Revenue ₹{Number(o.lifetimeRevenue).toLocaleString("en-IN")} · Commission ₹{Number(o.lifetimeCommission).toLocaleString("en-IN")}
+                {o.accountNumber ? ` · ${o.bankName || "Bank"} ••${o.accountNumber.slice(-4)} (${o.ifscCode})` : " · no bank details"}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Owed</p>
+                <p className={"font-serif text-lg " + (owed > 0 ? "text-amber-400" : "text-muted-foreground")}>₹{owed.toLocaleString("en-IN")}</p>
+              </div>
+              <Button size="sm" disabled={owed <= 0 || settling === o.id} onClick={() => settle(o)}>Settle</Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface GameAdRequest {
+  id: number; status: string; note: string; adminNote: string; createdAt: string;
+  organizerName: string; gameName: string; gameId: number; featured: boolean;
+}
+function GameAdsAdmin() {
+  const [items, setItems] = useState<GameAdRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<GameAdRequest[]>("/api/admin/game-ads")
+      .then(setItems).catch(() => toast({ title: "Failed to load requests", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const act = async (id: number, status: "approved" | "rejected") => {
+    setActing(id);
+    try { await apiPatch(`/api/admin/game-ads/${id}`, { status }); toast({ title: status === "approved" ? "Approved — game featured in slider" : "Rejected" }); load(); }
+    catch (e: any) { toast({ title: "Failed", description: e?.message, variant: "destructive" }); }
+    finally { setActing(null); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground text-sm">No promotion requests.</p>;
+  return (
+    <div className="space-y-2">
+      {items.map((a) => (
+        <div key={a.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate">{a.gameName} {a.featured && <Badge className="ml-1 bg-amber-500/20 border-amber-500/40 text-amber-300">Featured</Badge>}</p>
+            <p className="text-xs text-muted-foreground truncate">{a.organizerName}{a.note ? ` · "${a.note}"` : ""}</p>
+          </div>
+          {a.status === "pending" ? (
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" disabled={acting === a.id} onClick={() => act(a.id, "approved")}>Approve</Button>
+              <Button size="sm" variant="outline" disabled={acting === a.id} onClick={() => act(a.id, "rejected")}>Reject</Button>
+            </div>
+          ) : (
+            <Badge variant={a.status === "approved" ? "default" : "destructive"} className="shrink-0">{a.status}</Badge>
+          )}
         </div>
       ))}
     </div>

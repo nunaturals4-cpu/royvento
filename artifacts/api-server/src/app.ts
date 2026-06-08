@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
@@ -91,6 +92,23 @@ app.use(
   }),
 );
 app.set("trust proxy", 1);
+
+// ─── Response compression ──────────────────────────────────────────────────────
+//
+// gzip/brotli every compressible response (JSON API payloads, HTML, JS/CSS the
+// static mount serves). Typically shrinks text payloads ~70-80%, so the same
+// egress bandwidth serves several times more users and pages load faster on
+// slow connections. `compression` already skips already-compressed types
+// (images, video) and small bodies below `threshold`, and honours a
+// `x-no-compression` request header, so there is no behavioural/UI change —
+// clients receive identical bytes, just Content-Encoding'd. Registered early so
+// it wraps every downstream handler.
+app.use(
+  compression({
+    // Don't spend CPU compressing tiny bodies where framing overhead dominates.
+    threshold: 1024,
+  }),
+);
 
 // ─── Security response headers ────────────────────────────────────────────────
 //

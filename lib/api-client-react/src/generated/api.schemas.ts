@@ -195,6 +195,7 @@ export const Role = {
   vendor: 'vendor',
   admin: 'admin',
   organizer: 'organizer',
+  game_organizer: 'game_organizer',
 } as const;
 
 export interface User {

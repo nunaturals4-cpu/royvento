@@ -180,6 +180,11 @@ export function BecomeVendor() {
               Once approved, you'll get the Event Management dashboard to create events, sell tickets and scan entries.
             </p>
           )}
+          {category === "Game Organizer" && (
+            <p className="mt-2 text-xs text-primary/80">
+              For gaming businesses — arcades, VR arenas, bowling, paintball, go-kart, pool & PS/Xbox lounges. Once approved, you'll get the Game Management dashboard to list games, build packages, take bookings and scan QR tickets.
+            </p>
+          )}
         </div>
         <div>
           <Label className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-primary" />Where are you based?</Label>

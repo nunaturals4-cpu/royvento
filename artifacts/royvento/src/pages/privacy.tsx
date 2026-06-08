@@ -113,7 +113,7 @@ export function Privacy() {
           </p>
           <p className="mt-3">
             Royvento will never ask for your password, OTP, card CVV, PIN, or full card number by phone, email, or SMS. If you receive such a request, do not respond and report it to{" "}
-            <a href="mailto:info@royvento.com" className="text-primary hover:underline">info@royvento.com</a>.
+            <a href="mailto:support@royvento.com" className="text-primary hover:underline">support@royvento.com</a>.
           </p>
         </section>
 
@@ -136,7 +136,7 @@ export function Privacy() {
           <p>
             If you have questions or concerns about this Privacy Policy, please contact us via our{" "}
             <Link href="/contact" className="text-primary hover:underline">Contact page</Link> or email{" "}
-            <a href="mailto:info@royvento.com" className="text-primary hover:underline">info@royvento.com</a>.
+            <a href="mailto:support@royvento.com" className="text-primary hover:underline">support@royvento.com</a>.
           </p>
         </section>
 

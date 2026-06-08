@@ -175,6 +175,14 @@ export const bookingsTable = pgTable(
     organizerId: integer("organizer_id"),
     organizerEventId: integer("organizer_event_id"),
     eventTicketId: integer("event_ticket_id"),
+    // `kind = 'game'` is a Game Organizer booking. gameOrganizerId is always set;
+    // exactly one of gameId / gamePackageId is set (a single game vs a package).
+    // Like organizer bookings these DB columns are nullable; the TS columns below
+    // stay nullable too. durationHours is set only for hourly-priced games.
+    gameOrganizerId: integer("game_organizer_id"),
+    gameId: integer("game_id"),
+    gamePackageId: integer("game_package_id"),
+    durationHours: numeric("duration_hours", { precision: 5, scale: 1 }),
     bookingDate: date("booking_date").notNull(),
     guests: integer("guests").notNull().default(1),
     totalPrice: numeric("total_price", { precision: 12, scale: 2 })
@@ -1394,3 +1402,305 @@ export const organizerProfileViewsTable = pgTable(
   }),
 );
 export type OrganizerProfileView = typeof organizerProfileViewsTable.$inferSelect;
+
+// ─── Game Organizer vertical ───────────────────────────────────────────────
+//
+// A separate partner account type for gaming businesses (Gaming Zone, Arcade,
+// VR Arena, Bowling, Paintball, Go-Kart, Pool/Snooker, PS/Xbox lounge, …). It
+// mirrors the Event Organizer vertical (isolated `game_*` tables, same manager /
+// scanning / commission / settlement / leads workflow) but the bookable unit is
+// a **game** (with one of three pricing models) or a **package** of games — not
+// a ticketed event. Bookings reuse the shared bookings table (kind = 'game').
+// Role: `game_organizer`. See plan: Game Organizer Ecosystem.
+
+export const gameOrganizersTable = pgTable(
+  "game_organizers",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull().default(""),
+    description: text("description").notNull().default(""),
+    logoUrl: text("logo_url").notNull().default(""),
+    coverImageUrl: text("cover_image_url").notNull().default(""),
+    galleryImages: text("gallery_images").array().notNull().default([]),
+    website: varchar("website", { length: 255 }).notNull().default(""),
+    instagram: varchar("instagram", { length: 255 }).notNull().default(""),
+    facebook: varchar("facebook", { length: 255 }).notNull().default(""),
+    youtube: varchar("youtube", { length: 255 }).notNull().default(""),
+    supportEmail: varchar("support_email", { length: 255 }).notNull().default(""),
+    supportPhone: varchar("support_phone", { length: 50 }).notNull().default(""),
+    address: text("address").notNull().default(""),
+    mapsUrl: text("maps_url").notNull().default(""),
+    city: varchar("city", { length: 100 }).notNull().default(""),
+    state: varchar("state", { length: 100 }).notNull().default(""),
+    verified: boolean("verified").notNull().default(false),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    // Per-organizer QR ticket signing material (mirrors organizersTable).
+    ticketPrefix: varchar("ticket_prefix", { length: 8 }).notNull().default(""),
+    ticketSalt: varchar("ticket_salt", { length: 32 }).notNull().default(""),
+    // Settlement wallet — net booking revenue accrues here.
+    onlineBalance: numeric("online_balance", { precision: 14, scale: 2 }).notNull().default("0"),
+    commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: uniqueIndex("game_organizers_user_idx").on(t.userId),
+    slugIdx: uniqueIndex("game_organizers_slug_idx").on(t.slug),
+    statusIdx: index("game_organizers_status_idx").on(t.status),
+  }),
+);
+export type GameOrganizer = typeof gameOrganizersTable.$inferSelect;
+
+// A single bookable game. `pricingModel` selects which fields apply:
+//  - 'fixed'  → price (per person)
+//  - 'hourly' → hourlyRate (per hour) + minHours / maxHours
+// (The third model, packages, lives in game_packages.)
+export const gamesTable = pgTable(
+  "games",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull().default(""),
+    category: varchar("category", { length: 100 }).notNull().default(""),
+    description: text("description").notNull().default(""),
+    rules: text("rules").notNull().default(""),
+    coverImageUrl: text("cover_image_url").notNull().default(""),
+    images: text("images").array().notNull().default([]),
+    videos: text("videos").array().notNull().default([]),
+    capacity: integer("capacity").notNull().default(0),
+    ageRestriction: varchar("age_restriction", { length: 50 }).notNull().default(""),
+    // Pricing
+    pricingModel: varchar("pricing_model", { length: 12 }).notNull().default("fixed"), // fixed|hourly
+    price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"), // fixed: per person
+    hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }).notNull().default("0"),
+    minHours: integer("min_hours").notNull().default(1),
+    maxHours: integer("max_hours").notNull().default(0), // 0 = no max
+    // Commission (admin sets per-game; each booking locks its rate via
+    // bookings.eventCommissionPct so later changes don't re-price history).
+    commissionPct: numeric("commission_pct", { precision: 5, scale: 2 }).notNull().default("8"),
+    gatewayFeePercent: numeric("gateway_fee_percent", { precision: 5, scale: 2 }).notNull().default("2"),
+    // Workflow
+    active: boolean("active").notNull().default(true),
+    approvalStatus: varchar("approval_status", { length: 20 }).notNull().default("pending"),
+    rejectionReason: text("rejection_reason").notNull().default(""),
+    isFeaturedSlider: boolean("is_featured_slider").notNull().default(false),
+    soldCount: integer("sold_count").notNull().default(0),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("games_game_organizer_idx").on(t.gameOrganizerId),
+    approvalIdx: index("games_approval_idx").on(t.approvalStatus),
+    slugIdx: index("games_slug_idx").on(t.slug),
+  }),
+);
+export type Game = typeof gamesTable.$inferSelect;
+
+// A package bundling several games (+ optional add-ons) at a discounted price.
+export interface GamePackageItem {
+  gameId: number | null;
+  label: string;
+  quantity: number;
+}
+export interface GamePackageAddon {
+  label: string;
+  price: number;
+}
+export const gamePackagesTable = pgTable(
+  "game_packages",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 255 }).notNull().default(""),
+    description: text("description").notNull().default(""),
+    coverImageUrl: text("cover_image_url").notNull().default(""),
+    images: text("images").array().notNull().default([]),
+    price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
+    items: jsonb("items").$type<GamePackageItem[]>(),
+    addons: jsonb("addons").$type<GamePackageAddon[]>(),
+    groupSize: integer("group_size").notNull().default(0), // 0 = not a group package
+    capacity: integer("capacity").notNull().default(0),
+    ageRestriction: varchar("age_restriction", { length: 50 }).notNull().default(""),
+    commissionPct: numeric("commission_pct", { precision: 5, scale: 2 }).notNull().default("10"),
+    gatewayFeePercent: numeric("gateway_fee_percent", { precision: 5, scale: 2 }).notNull().default("2"),
+    active: boolean("active").notNull().default(true),
+    approvalStatus: varchar("approval_status", { length: 20 }).notNull().default("pending"),
+    rejectionReason: text("rejection_reason").notNull().default(""),
+    soldCount: integer("sold_count").notNull().default(0),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("game_packages_game_organizer_idx").on(t.gameOrganizerId),
+    approvalIdx: index("game_packages_approval_idx").on(t.approvalStatus),
+    slugIdx: index("game_packages_slug_idx").on(t.slug),
+  }),
+);
+export type GamePackage = typeof gamePackagesTable.$inferSelect;
+
+export const gameReviewsTable = pgTable(
+  "game_reviews",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    userId: integer("user_id").notNull(),
+    rating: integer("rating").notNull(),
+    comment: text("comment").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("game_reviews_game_organizer_idx").on(t.gameOrganizerId),
+    userOrganizerUniq: uniqueIndex("game_reviews_user_organizer_uniq").on(t.userId, t.gameOrganizerId),
+  }),
+);
+export type GameReview = typeof gameReviewsTable.$inferSelect;
+
+export interface GameManagerPermissions {
+  scan: boolean;
+  attendance: boolean;
+  reports: boolean;
+}
+
+// Game Managers — mirrors organizer_managers. A game organizer invites a person
+// by email; once accepted they can scan tickets / mark attendance / view reports.
+export const gameManagersTable = pgTable(
+  "game_managers",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    invitedEmail: varchar("invited_email", { length: 255 }).notNull(),
+    invitedBy: integer("invited_by").notNull(),
+    managerId: integer("manager_id"),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    permissions: jsonb("permissions").$type<GameManagerPermissions>(),
+    token: varchar("token", { length: 64 }).notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("game_managers_game_organizer_idx").on(t.gameOrganizerId),
+    managerIdx: index("game_managers_manager_idx").on(t.managerId),
+  }),
+);
+export type GameManager = typeof gameManagersTable.$inferSelect;
+
+// Per-booking commission split, realised at check-in (COD model). One row per
+// checked-in game booking.
+export const gameCommissionLedgerTable = pgTable(
+  "game_commission_ledger",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    gameId: integer("game_id"),
+    gamePackageId: integer("game_package_id"),
+    bookingId: integer("booking_id").references(() => bookingsTable.id, { onDelete: "set null" }),
+    revenue: numeric("revenue", { precision: 12, scale: 2 }).notNull().default("0"),
+    commission: numeric("commission", { precision: 12, scale: 2 }).notNull().default("0"),
+    gatewayFee: numeric("gateway_fee", { precision: 12, scale: 2 }).notNull().default("0"),
+    net: numeric("net", { precision: 12, scale: 2 }).notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("gcl_game_organizer_idx").on(t.gameOrganizerId),
+    gameIdx: index("gcl_game_idx").on(t.gameId),
+    bookingUniq: uniqueIndex("gcl_booking_uniq").on(t.bookingId),
+  }),
+);
+export type GameCommissionLedger = typeof gameCommissionLedgerTable.$inferSelect;
+
+export const gameBankingDetailsTable = pgTable(
+  "game_banking_details",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    accountHolderName: varchar("account_holder_name", { length: 255 }).notNull().default(""),
+    bankName: varchar("bank_name", { length: 255 }).notNull().default(""),
+    accountNumber: varchar("account_number", { length: 50 }).notNull().default(""),
+    ifscCode: varchar("ifsc_code", { length: 20 }).notNull().default(""),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: uniqueIndex("gbd_game_organizer_idx").on(t.gameOrganizerId),
+  }),
+);
+export type GameBankingDetails = typeof gameBankingDetailsTable.$inferSelect;
+
+export const gameSettlementsTable = pgTable(
+  "game_settlements",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+    status: varchar("status", { length: 20 }).notNull().default("settled"),
+    adminNote: text("admin_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("gsr_game_organizer_idx").on(t.gameOrganizerId),
+  }),
+);
+export type GameSettlement = typeof gameSettlementsTable.$inferSelect;
+
+// Game discount codes, applied at checkout. `gameId` null = valid for all of
+// the organizer's games & packages.
+export const gameCouponsTable = pgTable(
+  "game_coupons",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    gameId: integer("game_id"),
+    code: varchar("code", { length: 24 }).notNull(),
+    discountType: varchar("discount_type", { length: 10 }).notNull().default("percent"), // percent|fixed
+    discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull().default("0"),
+    active: boolean("active").notNull().default(true),
+    maxUses: integer("max_uses"),
+    usedCount: integer("used_count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("gcp_game_organizer_idx").on(t.gameOrganizerId),
+    codeUniq: uniqueIndex("gcp_org_code_uniq").on(t.gameOrganizerId, t.code),
+  }),
+);
+export type GameCoupon = typeof gameCouponsTable.$inferSelect;
+
+// "Promote my game" requests — admin approval flips the game into a featured
+// slider on the public listing.
+export const gameAdRequestsTable = pgTable(
+  "game_ad_requests",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    gameId: integer("game_id").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    note: text("note").notNull().default(""),
+    adminNote: text("admin_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("gar_game_organizer_idx").on(t.gameOrganizerId),
+    statusIdx: index("gar_status_idx").on(t.status),
+  }),
+);
+export type GameAdRequest = typeof gameAdRequestsTable.$inferSelect;
+
+// Profile views on a game organizer's public page — powers the Leads tab.
+export const gameProfileViewsTable = pgTable(
+  "game_profile_views",
+  {
+    id: serial("id").primaryKey(),
+    gameOrganizerId: integer("game_organizer_id").notNull(),
+    viewerUserId: integer("viewer_user_id"),
+    viewerName: varchar("viewer_name", { length: 255 }).notNull().default(""),
+    viewerEmail: varchar("viewer_email", { length: 255 }).notNull().default(""),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    organizerIdx: index("gpv_game_organizer_idx").on(t.gameOrganizerId),
+  }),
+);
+export type GameProfileView = typeof gameProfileViewsTable.$inferSelect;

@@ -4,7 +4,7 @@ import { useGetMe } from "@workspace/api-client-react";
 import { Spinner } from "@/components/ui/spinner";
 
 interface Props {
-  role?: "user" | "vendor" | "admin" | "organizer";
+  role?: "user" | "vendor" | "admin" | "organizer" | "game_organizer";
   children: React.ReactNode;
 }
 

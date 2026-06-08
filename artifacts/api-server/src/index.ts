@@ -583,6 +583,208 @@ async function applyPendingSchemaChanges() {
         "viewed_at" timestamp with time zone NOT NULL DEFAULT now()
       )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "opv_organizer_idx" ON "organizer_profile_views" ("organizer_id")`);
+
+    // ── Game Organizer vertical (separate from organizers/vendors) ──────────
+    // Idempotent so a fresh deploy ships the whole game-organizer ecosystem with
+    // no drizzle-kit step. Mirrors lib/db/src/schema/index.ts (game_* tables).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_organizers" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" integer NOT NULL,
+        "name" varchar(255) NOT NULL,
+        "slug" varchar(255) NOT NULL DEFAULT '',
+        "description" text NOT NULL DEFAULT '',
+        "logo_url" text NOT NULL DEFAULT '',
+        "cover_image_url" text NOT NULL DEFAULT '',
+        "gallery_images" text[] NOT NULL DEFAULT '{}'::text[],
+        "website" varchar(255) NOT NULL DEFAULT '',
+        "instagram" varchar(255) NOT NULL DEFAULT '',
+        "facebook" varchar(255) NOT NULL DEFAULT '',
+        "youtube" varchar(255) NOT NULL DEFAULT '',
+        "support_email" varchar(255) NOT NULL DEFAULT '',
+        "support_phone" varchar(50) NOT NULL DEFAULT '',
+        "address" text NOT NULL DEFAULT '',
+        "maps_url" text NOT NULL DEFAULT '',
+        "city" varchar(100) NOT NULL DEFAULT '',
+        "state" varchar(100) NOT NULL DEFAULT '',
+        "verified" boolean NOT NULL DEFAULT false,
+        "status" varchar(20) NOT NULL DEFAULT 'pending',
+        "ticket_prefix" varchar(8) NOT NULL DEFAULT '',
+        "ticket_salt" varchar(32) NOT NULL DEFAULT '',
+        "online_balance" numeric(14,2) NOT NULL DEFAULT '0',
+        "commission_owed" numeric(14,2) NOT NULL DEFAULT '0',
+        "approved_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "game_organizers_user_idx" ON "game_organizers" ("user_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "game_organizers_slug_idx" ON "game_organizers" ("slug")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_organizers_status_idx" ON "game_organizers" ("status")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "games" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "name" varchar(255) NOT NULL,
+        "slug" varchar(255) NOT NULL DEFAULT '',
+        "category" varchar(100) NOT NULL DEFAULT '',
+        "description" text NOT NULL DEFAULT '',
+        "rules" text NOT NULL DEFAULT '',
+        "cover_image_url" text NOT NULL DEFAULT '',
+        "images" text[] NOT NULL DEFAULT '{}'::text[],
+        "videos" text[] NOT NULL DEFAULT '{}'::text[],
+        "capacity" integer NOT NULL DEFAULT 0,
+        "age_restriction" varchar(50) NOT NULL DEFAULT '',
+        "pricing_model" varchar(12) NOT NULL DEFAULT 'fixed',
+        "price" numeric(10,2) NOT NULL DEFAULT '0',
+        "hourly_rate" numeric(10,2) NOT NULL DEFAULT '0',
+        "min_hours" integer NOT NULL DEFAULT 1,
+        "max_hours" integer NOT NULL DEFAULT 0,
+        "commission_pct" numeric(5,2) NOT NULL DEFAULT '8',
+        "gateway_fee_percent" numeric(5,2) NOT NULL DEFAULT '2',
+        "active" boolean NOT NULL DEFAULT true,
+        "approval_status" varchar(20) NOT NULL DEFAULT 'pending',
+        "rejection_reason" text NOT NULL DEFAULT '',
+        "is_featured_slider" boolean NOT NULL DEFAULT false,
+        "sold_count" integer NOT NULL DEFAULT 0,
+        "approved_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "games_game_organizer_idx" ON "games" ("game_organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "games_approval_idx" ON "games" ("approval_status")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "games_slug_idx" ON "games" ("slug")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_packages" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "name" varchar(255) NOT NULL,
+        "slug" varchar(255) NOT NULL DEFAULT '',
+        "description" text NOT NULL DEFAULT '',
+        "cover_image_url" text NOT NULL DEFAULT '',
+        "images" text[] NOT NULL DEFAULT '{}'::text[],
+        "price" numeric(10,2) NOT NULL DEFAULT '0',
+        "items" jsonb,
+        "addons" jsonb,
+        "group_size" integer NOT NULL DEFAULT 0,
+        "capacity" integer NOT NULL DEFAULT 0,
+        "age_restriction" varchar(50) NOT NULL DEFAULT '',
+        "commission_pct" numeric(5,2) NOT NULL DEFAULT '10',
+        "gateway_fee_percent" numeric(5,2) NOT NULL DEFAULT '2',
+        "active" boolean NOT NULL DEFAULT true,
+        "approval_status" varchar(20) NOT NULL DEFAULT 'pending',
+        "rejection_reason" text NOT NULL DEFAULT '',
+        "sold_count" integer NOT NULL DEFAULT 0,
+        "approved_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_packages_game_organizer_idx" ON "game_packages" ("game_organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_packages_approval_idx" ON "game_packages" ("approval_status")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_packages_slug_idx" ON "game_packages" ("slug")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_reviews" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "user_id" integer NOT NULL,
+        "rating" integer NOT NULL,
+        "comment" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_reviews_game_organizer_idx" ON "game_reviews" ("game_organizer_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "game_reviews_user_organizer_uniq" ON "game_reviews" ("user_id", "game_organizer_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_managers" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "invited_email" varchar(255) NOT NULL,
+        "invited_by" integer NOT NULL,
+        "manager_id" integer,
+        "status" varchar(20) NOT NULL DEFAULT 'pending',
+        "permissions" jsonb,
+        "token" varchar(64) NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_managers_game_organizer_idx" ON "game_managers" ("game_organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "game_managers_manager_idx" ON "game_managers" ("manager_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_commission_ledger" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "game_id" integer,
+        "game_package_id" integer,
+        "booking_id" integer REFERENCES "bookings"("id") ON DELETE SET NULL,
+        "revenue" numeric(12,2) NOT NULL DEFAULT '0',
+        "commission" numeric(12,2) NOT NULL DEFAULT '0',
+        "gateway_fee" numeric(12,2) NOT NULL DEFAULT '0',
+        "net" numeric(12,2) NOT NULL DEFAULT '0',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "gcl_game_organizer_idx" ON "game_commission_ledger" ("game_organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "gcl_game_idx" ON "game_commission_ledger" ("game_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "gcl_booking_uniq" ON "game_commission_ledger" ("booking_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_banking_details" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "account_holder_name" varchar(255) NOT NULL DEFAULT '',
+        "bank_name" varchar(255) NOT NULL DEFAULT '',
+        "account_number" varchar(50) NOT NULL DEFAULT '',
+        "ifsc_code" varchar(20) NOT NULL DEFAULT '',
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "gbd_game_organizer_idx" ON "game_banking_details" ("game_organizer_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_settlements" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "amount" numeric(12,2) NOT NULL DEFAULT '0',
+        "status" varchar(20) NOT NULL DEFAULT 'settled',
+        "admin_note" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "gsr_game_organizer_idx" ON "game_settlements" ("game_organizer_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_coupons" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "game_id" integer,
+        "code" varchar(24) NOT NULL,
+        "discount_type" varchar(10) NOT NULL DEFAULT 'percent',
+        "discount_value" numeric(10,2) NOT NULL DEFAULT '0',
+        "active" boolean NOT NULL DEFAULT true,
+        "max_uses" integer,
+        "used_count" integer NOT NULL DEFAULT 0,
+        "expires_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "gcp_game_organizer_idx" ON "game_coupons" ("game_organizer_id")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "gcp_org_code_uniq" ON "game_coupons" ("game_organizer_id", "code")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_ad_requests" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "game_id" integer NOT NULL,
+        "status" varchar(20) NOT NULL DEFAULT 'pending',
+        "note" text NOT NULL DEFAULT '',
+        "admin_note" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "gar_game_organizer_idx" ON "game_ad_requests" ("game_organizer_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "gar_status_idx" ON "game_ad_requests" ("status")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "game_profile_views" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "game_organizer_id" integer NOT NULL,
+        "viewer_user_id" integer,
+        "viewer_name" varchar(255) NOT NULL DEFAULT '',
+        "viewer_email" varchar(255) NOT NULL DEFAULT '',
+        "viewed_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "gpv_game_organizer_idx" ON "game_profile_views" ("game_organizer_id")`);
+    // Game bookings reuse the shared bookings table via kind='game'.
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "game_organizer_id" integer`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "game_id" integer`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "game_package_id" integer`);
+    await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "duration_hours" numeric(5,1)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "bookings_game_organizer_idx" ON "bookings" ("game_organizer_id")`);
+
     logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");

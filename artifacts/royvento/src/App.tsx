@@ -23,6 +23,7 @@ import { Home } from "@/pages/home";
 const Pubs = lazy(() => import("@/pages/pubs").then((m) => ({ default: m.Pubs })));
 const PubOffers = lazy(() => import("@/pages/pub-offers").then((m) => ({ default: m.PubOffers })));
 const Events = lazy(() => import("@/pages/events").then((m) => ({ default: m.Events })));
+const GamesAndSports = lazy(() => import("@/pages/games-and-sports").then((m) => ({ default: m.GamesAndSports })));
 const Vendors = lazy(() => import("@/pages/vendors").then((m) => ({ default: m.Vendors })));
 const Login = lazy(() => import("@/pages/login").then((m) => ({ default: m.Login })));
 const Register = lazy(() => import("@/pages/register").then((m) => ({ default: m.Register })));
@@ -52,6 +53,8 @@ const AdminPanel = lazy(() => import("@/pages/admin").then((m) => ({ default: m.
 const OrganizerDashboard = lazy(() => import("@/pages/organizer-dashboard").then((m) => ({ default: m.OrganizerDashboard })));
 const OrganizerProfile = lazy(() => import("@/pages/organizer-profile").then((m) => ({ default: m.OrganizerProfile })));
 const OrganizerEventDetail = lazy(() => import("@/pages/organizer-profile").then((m) => ({ default: m.OrganizerEventDetail })));
+const GameOrganizerDashboard = lazy(() => import("@/pages/game-organizer-dashboard").then((m) => ({ default: m.GameOrganizerDashboard })));
+const GameOrganizerProfile = lazy(() => import("@/pages/game-organizer-profile").then((m) => ({ default: m.GameOrganizerProfile })));
 const Subscription = lazy(() => import("@/pages/subscription").then((m) => ({ default: m.Subscription })));
 const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs })));
 const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ default: m.BlogDetail })));
@@ -102,6 +105,8 @@ function DashboardRedirect() {
       setLocation("/dashboard/vendor");
     } else if (data.user.role === "organizer") {
       setLocation("/dashboard/organizer");
+    } else if (data.user.role === "game_organizer") {
+      setLocation("/dashboard/game-organizer");
     } else {
       setLocation("/dashboard/profile");
     }
@@ -160,6 +165,7 @@ function Router() {
           <Route path="/pubs" component={Pubs} />
           <Route path="/pub-offers" component={PubOffers} />
           <Route path="/events" component={Events} />
+          <Route path="/games" component={GamesAndSports} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/partners" component={Vendors} />
           {/* Legacy ID URLs auto-redirect to the slugged canonical URL.
@@ -225,6 +231,12 @@ function Router() {
             {() => <RequireAuth role="organizer"><OrganizerDashboard /></RequireAuth>}
           </Route>
 
+          {/* Game Organizer vertical — onboarding unified under Become a Partner
+              (pick the Game Organizer category there). */}
+          <Route path="/dashboard/game-organizer">
+            {() => <RequireAuth role="game_organizer"><GameOrganizerDashboard /></RequireAuth>}
+          </Route>
+
           {/* SEO-friendly slugged detail URLs (canonical) — redirect to legacy
               detail components which set rel=canonical back to the slug URL. */}
           <Route path="/pubs/:city/:slug" component={VendorSlugRoute} />
@@ -233,6 +245,9 @@ function Router() {
           {/* Public organizer pages — must precede the greedy /:city patterns. */}
           <Route path="/organizers/:slug" component={OrganizerProfile} />
           <Route path="/organizer-events/:slug" component={OrganizerEventDetail} />
+
+          {/* Public game organizer page — must precede the greedy /:city patterns. */}
+          <Route path="/game-organizers/:slug" component={GameOrganizerProfile} />
 
           {/* Programmatic city / locality / category landing pages.
               These greedy patterns must come AFTER all specific top-level

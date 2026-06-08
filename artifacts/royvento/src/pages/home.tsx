@@ -5,6 +5,7 @@ import { useSelectedCity } from "@/components/LocationContext";
 import { CityPickerModal } from "@/components/CityPickerModal";
 import {
   ArrowRight,
+  ArrowUp,
   Calendar,
   Sparkles,
   ShieldCheck,
@@ -32,6 +33,7 @@ import { apiGet } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import { SEO } from "@/components/SEO";
 import { FreeDrinkSection, TicketSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
+import { HeroSlider } from "@/components/HeroSlider";
 import { COUNTRIES } from "@/lib/locations";
 
 interface PublicEvent {
@@ -180,10 +182,10 @@ function useUserLocation() {
 const CATEGORIES = [
   { label: "Pubs & Bars",    sub: "Find nearby pubs",        icon: GlassWater, href: "/pubs",       img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&q=70" },
   { label: "Nightclubs",     sub: "Dance the night away",    icon: Music,      href: "/pubs",       img: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=600&q=70" },
-  { label: "Exciting Games", sub: "Play & compete",          icon: Gamepad2,   href: "/pubs",       img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=70" },
-  { label: "Live Events",    sub: "Concerts & gigs",         icon: Mic2,       href: "/pubs",       img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70" },
+  { label: "Games & Sports", sub: "Play & compete",          icon: Gamepad2,   href: "/games",      img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=70" },
+  { label: "Live Events",    sub: "Concerts & gigs",         icon: Mic2,       href: "/events",     img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70" },
   { label: "Ladies Nights",  sub: "Special offers & events", icon: Sparkles,   href: "/pub-offers", img: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&q=70" },
-  { label: "Standup Shows",  sub: "Laugh out loud",          icon: Drama,      href: "/pubs",       img: "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=600&q=70" },
+  { label: "Standup Shows",  sub: "Laugh out loud",          icon: Drama,      href: "/events",     img: "https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=600&q=70" },
 ] as const;
 
 export function Home() {
@@ -292,89 +294,21 @@ export function Home() {
           },
         ]}
       />
-      {/* Hero — two-column: copy left, cinematic image right */}
+      {/* Hero — full-width premium ecosystem carousel */}
       <section className="relative overflow-hidden">
-        {/* Right-side cinematic image — bleeds to the top-right, dissolves into the background.
-            Constrained to the headline area so the search bar below sits on pure black. */}
-        <div className="pointer-events-none absolute top-0 right-0 -z-10 h-[58vh] md:h-[66vh] w-full lg:w-[58%]">
-          <img
-            src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1600&q=80"
-            alt=""
-            fetchPriority="high"
-            decoding="async"
-            className="h-full w-full object-cover object-center"
-          />
-          {/* Blood-red stage-light wash — matches the luxury nightlife reference */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-primary/35 via-primary/12 to-transparent mix-blend-screen" />
-          {/* Vignette for depth */}
-          <div className="absolute inset-0 bg-black/25" />
-          {/* Fade into the background on the left & bottom so copy stays legible */}
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-          <div className="absolute inset-0 lg:hidden bg-background/60" />
-        </div>
+        {/* SEO landmark heading — the carousel's per-slide headlines are
+            decorative h2s, so the page keeps one descriptive h1. */}
+        <h1 className="sr-only">
+          Royvento — book premium pubs &amp; clubs, events, games and exclusive offers across India
+        </h1>
+
+        {/* Full-bleed hero carousel cycling through every Royvento pillar:
+            Pubs & Clubs, Events & Concerts, Games & Entertainment and Rewards. */}
+        <HeroSlider />
 
         <div className="container mx-auto px-4 md:px-6">
-          {/* Copy + image area */}
-          <div className="grid lg:grid-cols-2 gap-8 items-center pt-14 md:pt-20 pb-8 min-h-[58vh] md:min-h-[66vh]">
-            <div className="max-w-xl">
-              <p className="reveal text-xs font-semibold uppercase tracking-[0.28em] text-primary mb-5">
-                {t("home.hero_eyebrow")}
-              </p>
-              <h1 className="reveal font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.04] tracking-tight">
-                <span className="text-white">{t("home.hero_title_1")}</span>
-                <br />
-                <span className="text-gradient-red">{t("home.hero_title_2")}</span>
-              </h1>
-              <p className="reveal mt-4 md:mt-5 text-sm md:text-base lg:text-lg text-muted-foreground max-w-xs sm:max-w-sm md:max-w-md leading-relaxed">
-                {t("home.hero_subtitle")}
-              </p>
-
-              <div className="reveal mt-5 md:mt-7 flex flex-wrap gap-3">
-                <Link href="/pubs">
-                  <Button
-                    size="lg"
-                    className="gap-2 bg-primary text-primary-foreground red-glow border-0 h-12 px-7 rounded-xl text-base font-semibold"
-                  >
-                    {t("home.explore_events")} <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link href="/pub-offers">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="gap-2 h-12 px-7 border-white/20 hover:bg-white/8 rounded-xl text-base font-semibold"
-                  >
-                    <GlassWater className="h-4 w-4" /> {t("home.happy_hours")}
-                  </Button>
-                </Link>
-              </div>
-
-              {/* Social proof */}
-              <div className="reveal mt-5 md:mt-7 flex items-center gap-3">
-                <div className="flex -space-x-2.5">
-                  {[12, 32, 45, 5].map((n) => (
-                    <img
-                      key={n}
-                      src={`https://i.pravatar.cc/72?img=${n}`}
-                      alt=""
-                      loading="lazy"
-                      className="h-9 w-9 rounded-full border-2 border-background object-cover"
-                    />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Join <span className="font-semibold text-primary">50K+</span> {t("home.join_enthusiasts")}
-                </p>
-              </div>
-            </div>
-
-            {/* Right column reserved for the bleeding background image */}
-            <div className="hidden lg:block" aria-hidden />
-          </div>
-
           {/* Search bar */}
-          <div className="reveal relative z-10">
+          <div className="reveal relative z-10 mt-8 md:mt-12">
             <div className="glass-card-strong rounded-2xl p-2 md:p-2.5 flex flex-col sm:flex-row items-stretch gap-1">
               {/* Location → opens the shared city picker, updates global city context */}
               <button
@@ -789,14 +723,13 @@ export function Home() {
               {t("home.nightout_sub")}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/register">
-                <Button
-                  size="lg"
-                  className="gap-2 bg-primary text-primary-foreground red-glow border-0 h-12 px-7 rounded-xl text-base font-semibold"
-                >
-                  {t("home.nightout_cta")} <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+              <Button
+                size="lg"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="gap-2 bg-primary text-primary-foreground red-glow border-0 h-12 px-7 rounded-xl text-base font-semibold"
+              >
+                {t("home.nightout_cta")} <ArrowUp className="h-4 w-4" />
+              </Button>
               <Link href="/pubs">
                 <Button
                   size="lg"

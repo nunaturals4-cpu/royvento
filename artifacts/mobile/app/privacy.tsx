@@ -45,7 +45,7 @@ const SECTIONS = [
   },
   {
     title: "9. Security",
-    body: "We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.\n\nRoyvento will never ask for your password, OTP, card CVV, PIN, or full card number by phone, email, or SMS. If you receive such a request, do not respond and report it to info@royvento.com.",
+    body: "We implement industry-standard security measures to protect your information, including encrypted connections (HTTPS), hashed passwords, and access controls. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.\n\nRoyvento will never ask for your password, OTP, card CVV, PIN, or full card number by phone, email, or SMS. If you receive such a request, do not respond and report it to support@royvento.com.",
   },
   {
     title: "10. Children's Privacy",
@@ -57,7 +57,7 @@ const SECTIONS = [
   },
   {
     title: "12. Contact Us",
-    body: "If you have questions or concerns about this Privacy Policy, please contact us via our Contact page or email info@royvento.com.",
+    body: "If you have questions or concerns about this Privacy Policy, please contact us via our Contact page or email support@royvento.com.",
   },
 ];
 

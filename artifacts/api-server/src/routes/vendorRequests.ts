@@ -5,6 +5,7 @@ import {
   usersTable,
   vendorsTable,
   organizersTable,
+  gameOrganizersTable,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
@@ -20,6 +21,26 @@ const router: IRouter = Router();
 // role + organizer dashboard) instead of the pub/club vendor dashboard. Kept as
 // a set so future organizer-style categories can be added in one place.
 const ORGANIZER_CATEGORIES = new Set<string>(["Event Organizer"]);
+
+// Partner categories that unlock the Game Organizer vertical (game_organizer
+// role + game organizer dashboard) for gaming businesses.
+const GAME_ORGANIZER_CATEGORIES = new Set<string>(["Game Organizer"]);
+
+async function uniqueGameOrganizerSlug(base: string): Promise<string> {
+  const root = slugifyOrganizer(base) || "game-zone";
+  let candidate = root;
+  let n = 1;
+  while (true) {
+    const rows = await db
+      .select({ id: gameOrganizersTable.id })
+      .from(gameOrganizersTable)
+      .where(eq(gameOrganizersTable.slug, candidate))
+      .limit(1);
+    if (!rows[0]) return candidate;
+    n += 1;
+    candidate = `${root}-${n}`;
+  }
+}
 
 function slugifyOrganizer(input: string): string {
   return input
@@ -172,9 +193,45 @@ router.post(
     // profile + dashboard the applicant unlocks. "Event Organizer" applicants
     // get the organizer vertical; everyone else gets the pub/club vendor flow.
     const isOrganizer = ORGANIZER_CATEGORIES.has(r.category);
-    const dashboardUrl = isOrganizer ? "/dashboard/organizer" : "/dashboard/vendor";
+    const isGameOrganizer = GAME_ORGANIZER_CATEGORIES.has(r.category);
+    const dashboardUrl = isGameOrganizer
+      ? "/dashboard/game-organizer"
+      : isOrganizer
+        ? "/dashboard/organizer"
+        : "/dashboard/vendor";
 
-    if (isOrganizer) {
+    if (isGameOrganizer) {
+      // Promote to game_organizer role and auto-create the game organizer
+      // profile so the dashboard + role gating unlock immediately on approval.
+      await db
+        .update(usersTable)
+        .set({ role: "game_organizer" })
+        .where(eq(usersTable.id, r.userId));
+      const existingGameOrg = await db
+        .select()
+        .from(gameOrganizersTable)
+        .where(eq(gameOrganizersTable.userId, r.userId))
+        .limit(1);
+      if (!existingGameOrg[0]) {
+        const slug = await uniqueGameOrganizerSlug(r.businessName);
+        const usedPrefixes = (
+          await db.select({ p: gameOrganizersTable.ticketPrefix }).from(gameOrganizersTable)
+        )
+          .map((row) => row.p)
+          .filter((p): p is string => Boolean(p));
+        const ticketPrefix = await generateUniqueTicketPrefix(r.businessName, usedPrefixes);
+        const ticketSalt = generateTicketSalt();
+        await db.insert(gameOrganizersTable).values({
+          userId: r.userId,
+          name: r.businessName,
+          slug,
+          status: "approved",
+          approvedAt: new Date(),
+          ticketPrefix,
+          ticketSalt,
+        });
+      }
+    } else if (isOrganizer) {
       // Promote to organizer role and auto-create the organizer profile so the
       // organizer dashboard + role gating unlock immediately on approval.
       await db

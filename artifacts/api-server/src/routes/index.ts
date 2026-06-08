@@ -31,6 +31,7 @@ import webPushRouter from "./webPush";
 import seoRouter from "./seo";
 import emailsRouter from "./emails";
 import organizersRouter from "./organizers";
+import gameOrganizersRouter from "./gameOrganizers";
 
 const router: IRouter = Router();
 
@@ -66,5 +67,6 @@ router.use(webPushRouter);
 router.use(seoRouter);
 router.use(emailsRouter);
 router.use(organizersRouter);
+router.use(gameOrganizersRouter);
 
 export default router;

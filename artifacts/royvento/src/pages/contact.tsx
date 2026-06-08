@@ -97,7 +97,7 @@ export function Contact() {
       <div className="container mx-auto px-4 md:px-6 py-8 max-w-5xl">
         <div className="grid sm:grid-cols-3 gap-4 mb-10">
           {[
-            { icon: Mail,   label: "Email us",    value: "info@royvento.com",  sub: "We respond within 24 hours." },
+            { icon: Mail,   label: "Email us",    value: "support@royvento.com",  sub: "We respond within 24 hours." },
             { icon: Phone,  label: "Call us",     value: "+91 9875554165",     sub: "Mon–Sat, 10am–7pm IST"       },
             { icon: MapPin, label: "Find us",     value: "Kolkata, West Bengal", sub: "India"                    },
           ].map(({ icon: Icon, label, value, sub }) => (

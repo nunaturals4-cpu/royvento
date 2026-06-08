@@ -99,7 +99,7 @@ export function Terms() {
           <h2 className="text-lg font-semibold text-foreground mb-2">7. Fraud Prevention &amp; Payment Safety</h2>
           <p>
             Royvento communicates with you only through its official website, mobile application, and the contact channels published on this site. Royvento and its staff will never ask for your one-time password (OTP), card CVV, PIN, full card number, UPI PIN, or account password by phone, email, SMS, or chat. All payments must be made only through the official payment options presented within the Service; never transfer money to a personal account or pay outside the platform at the request of any person claiming to represent Royvento or a Pub Partner. If you receive a suspicious request or believe you have been targeted by a fraudulent or phishing attempt, do not share any details and report it to us at{" "}
-            <a href="mailto:info@royvento.com" className="text-primary hover:underline">info@royvento.com</a>. Royvento is not responsible for losses arising from payments made, or information shared, outside its official channels.
+            <a href="mailto:support@royvento.com" className="text-primary hover:underline">support@royvento.com</a>. Royvento is not responsible for losses arising from payments made, or information shared, outside its official channels.
           </p>
         </section>
 
@@ -160,7 +160,7 @@ export function Terms() {
           <p>
             If you have questions about these Terms, please reach out via our{" "}
             <Link href="/contact" className="text-primary hover:underline">Contact page</Link> or email us at{" "}
-            <a href="mailto:info@royvento.com" className="text-primary hover:underline">info@royvento.com</a>.
+            <a href="mailto:support@royvento.com" className="text-primary hover:underline">support@royvento.com</a>.
           </p>
         </section>
 
