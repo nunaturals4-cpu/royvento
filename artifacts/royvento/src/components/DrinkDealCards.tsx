@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Wine, Ticket, Clock, Calendar, Heart, GlassWater } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { CarouselRow } from "@/components/CarouselRow";
 import type { VendorDrinkOffer, DrinkPlanSummary } from "@workspace/api-client-react";
 
 type PlanWithDates = DrinkPlanSummary & {
@@ -76,11 +77,14 @@ const toImg = (v: string | null | undefined) => v || null;
 
 /* ─── Day pills (M T W T F S S) ─────────────────────────────────────────── */
 function DayPills({ activeDays, accent = "primary" }: { activeDays: string[]; accent?: "primary" | "amber" }) {
-  const isAll = !activeDays || activeDays.length === 0;
+  // Match case-insensitively on the first three letters so any stored format
+  // ("Thu" / "thu" / "Thursday") highlights correctly. Empty = every day.
+  const activeSet = new Set((activeDays ?? []).map((d) => d.slice(0, 3).toLowerCase()));
+  const isAll = activeSet.size === 0;
   return (
     <div className="flex items-center gap-[5px]">
       {ALL_DAYS.map((day) => {
-        const active = isAll || activeDays.includes(day);
+        const active = isAll || activeSet.has(day.slice(0, 3).toLowerCase());
         const activeClass = accent === "amber"
           ? "bg-amber-500 text-black"
           : "bg-primary text-primary-foreground";
@@ -155,8 +159,9 @@ export function DrinkDealCard({
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-zinc-900 via-black to-zinc-800 flex items-center justify-center">
-            <GlassWater className="h-10 w-10 text-white/[0.06]" />
+          <div className="h-full w-full bg-gradient-to-br from-primary/20 via-zinc-900 to-black flex flex-col items-center justify-center gap-1.5">
+            <GlassWater className="h-10 w-10 text-primary/50" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{badge}</span>
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#111]/80 via-transparent to-transparent" />
@@ -290,12 +295,12 @@ function DealPanel({ vendors, accent, title, subtitle }: SectionProps) {
       </div>
       <p className="text-xs text-muted-foreground mb-5 ml-[2.25rem]">{subtitle}</p>
 
-      {/* Card grid — 2 cols mobile → 3 tablet → 4 desktop → 5 wide */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+      {/* Single-row rail with arrows — scroll for more, never wraps. */}
+      <CarouselRow itemClassName="w-[160px] sm:w-[200px] md:w-[220px]" gapClass="gap-3 md:gap-4">
         {vendors.map((v) => (
           <DealTile key={v.offer.vendorId} offer={v.offer} plans={v.plans} accent={accent} />
         ))}
-      </div>
+      </CarouselRow>
     </div>
   );
 }

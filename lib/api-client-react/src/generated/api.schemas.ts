@@ -209,6 +209,8 @@ export interface User {
   referralCode: string;
   referredBy?: number | null;
   points: number;
+  gender?: string | null;
+  genderCompleted: boolean;
   createdAt: string;
 }
 
@@ -223,6 +225,18 @@ export interface RegisterBody {
 export interface LoginBody {
   email: string;
   password: string;
+}
+
+export type GenderBodyGender = typeof GenderBodyGender[keyof typeof GenderBodyGender];
+
+
+export const GenderBodyGender = {
+  male: 'male',
+  female: 'female',
+} as const;
+
+export interface GenderBody {
+  gender: GenderBodyGender;
 }
 
 export interface AuthResponse {

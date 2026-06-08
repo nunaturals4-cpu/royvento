@@ -115,6 +115,19 @@ async function serializeEvents(rows: EventRow[]) {
       freeEntryForTable: (e as unknown as { freeEntryForTable?: boolean }).freeEntryForTable ?? false,
       freeEntryForTableDays: (e as unknown as { freeEntryForTableDays?: string[] | null }).freeEntryForTableDays ?? null,
       freeEntryForTableBeforeTime: (e as unknown as { freeEntryForTableBeforeTime?: string | null }).freeEntryForTableBeforeTime ?? null,
+      startTime: (e as unknown as { startTime?: string }).startTime ?? "",
+      endTime: (e as unknown as { endTime?: string }).endTime ?? "",
+      happeningTonight: (e as unknown as { happeningTonight?: boolean }).happeningTonight ?? true,
+      startingSoon: (e as unknown as { startingSoon?: boolean }).startingSoon ?? true,
+      lastMinuteDeal: (e as unknown as { lastMinuteDeal?: boolean }).lastMinuteDeal ?? false,
+      dealLabel: (e as unknown as { dealLabel?: string }).dealLabel ?? "",
+      // ── Going Out With Friends ── group-capacity controls.
+      tableCount: (e as unknown as { tableCount?: number }).tableCount ?? 0,
+      tableSize: (e as unknown as { tableSize?: number }).tableSize ?? 0,
+      vipCapacity: (e as unknown as { vipCapacity?: number }).vipCapacity ?? 0,
+      maxGroupSize: (e as unknown as { maxGroupSize?: number }).maxGroupSize ?? 0,
+      groupBookingEnabled: (e as unknown as { groupBookingEnabled?: boolean }).groupBookingEnabled ?? true,
+      groupOffer: (e as unknown as { groupOffer?: string }).groupOffer ?? "",
       galleryImages: e.galleryImages ?? [],
       galleryVideos: e.galleryVideos ?? [],
       approvalStatus: e.approvalStatus,
@@ -352,7 +365,16 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const { freeEntryForTable: rawFET, freeEntryForTableDays: rawFETD, freeEntryForTableBeforeTime: rawFETBT, ...createCleanBody } = req.body as Record<string, unknown>;
+  const {
+    freeEntryForTable: rawFET, freeEntryForTableDays: rawFETD, freeEntryForTableBeforeTime: rawFETBT,
+    // Happening Tonight fields — not in the generated zod schema, handled raw.
+    startTime: rawStartTime, endTime: rawEndTime, happeningTonight: rawHT, startingSoon: rawSS,
+    lastMinuteDeal: rawLMD, dealLabel: rawDealLabel,
+    // Going Out With Friends — group-capacity fields, also handled raw.
+    tableCount: rawTableCount, tableSize: rawTableSize, vipCapacity: rawVipCapacity,
+    maxGroupSize: rawMaxGroup, groupBookingEnabled: rawGroupEnabled, groupOffer: rawGroupOffer,
+    ...createCleanBody
+  } = req.body as Record<string, unknown>;
   const parsed = CreateEventBody.safeParse(createCleanBody);
   if (!parsed.success) {
     respondInvalid(res, parsed.error);
@@ -444,6 +466,18 @@ router.post("/events", requireAuth(["vendor"]), async (req, res) => {
       freeEntryForTable: rawFET !== undefined ? Boolean(rawFET) : false,
       freeEntryForTableDays: Array.isArray(rawFETD) ? rawFETD : null,
       freeEntryForTableBeforeTime: rawFETBT ? String(rawFETBT) : null,
+      startTime: rawStartTime ? String(rawStartTime) : "",
+      endTime: rawEndTime ? String(rawEndTime) : "",
+      happeningTonight: rawHT !== undefined ? Boolean(rawHT) : true,
+      startingSoon: rawSS !== undefined ? Boolean(rawSS) : true,
+      lastMinuteDeal: rawLMD !== undefined ? Boolean(rawLMD) : false,
+      dealLabel: rawDealLabel ? String(rawDealLabel) : "",
+      tableCount: rawTableCount != null ? Math.max(0, Math.trunc(Number(rawTableCount) || 0)) : 0,
+      tableSize: rawTableSize != null ? Math.max(0, Math.trunc(Number(rawTableSize) || 0)) : 0,
+      vipCapacity: rawVipCapacity != null ? Math.max(0, Math.trunc(Number(rawVipCapacity) || 0)) : 0,
+      maxGroupSize: rawMaxGroup != null ? Math.max(0, Math.trunc(Number(rawMaxGroup) || 0)) : 0,
+      groupBookingEnabled: rawGroupEnabled !== undefined ? Boolean(rawGroupEnabled) : true,
+      groupOffer: rawGroupOffer ? String(rawGroupOffer) : "",
       galleryImages: data.galleryImages ?? null,
       galleryVideos: data.galleryVideos ?? null,
       approvalStatus: "pending",
@@ -489,7 +523,14 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const { freeEntryForTable: rawFET, freeEntryForTableDays: rawFETD, freeEntryForTableBeforeTime: rawFETBT, ...patchCleanBody } = req.body as Record<string, unknown>;
+  const {
+    freeEntryForTable: rawFET, freeEntryForTableDays: rawFETD, freeEntryForTableBeforeTime: rawFETBT,
+    startTime: rawStartTime, endTime: rawEndTime, happeningTonight: rawHT, startingSoon: rawSS,
+    lastMinuteDeal: rawLMD, dealLabel: rawDealLabel,
+    tableCount: rawTableCount, tableSize: rawTableSize, vipCapacity: rawVipCapacity,
+    maxGroupSize: rawMaxGroup, groupBookingEnabled: rawGroupEnabled, groupOffer: rawGroupOffer,
+    ...patchCleanBody
+  } = req.body as Record<string, unknown>;
   const parsed = UpdateEventBody.safeParse(patchCleanBody);
   if (!parsed.success) {
     respondInvalid(res, parsed.error);
@@ -526,6 +567,18 @@ router.patch("/events/:eventId", requireAuth(["vendor"]), async (req, res) => {
   if (rawFET !== undefined) updates["freeEntryForTable"] = Boolean(rawFET);
   if (rawFETD !== undefined) updates["freeEntryForTableDays"] = rawFETD ?? null;
   if (rawFETBT !== undefined) updates["freeEntryForTableBeforeTime"] = rawFETBT ? String(rawFETBT) : null;
+  if (rawStartTime !== undefined) updates["startTime"] = rawStartTime ? String(rawStartTime) : "";
+  if (rawEndTime !== undefined) updates["endTime"] = rawEndTime ? String(rawEndTime) : "";
+  if (rawHT !== undefined) updates["happeningTonight"] = Boolean(rawHT);
+  if (rawSS !== undefined) updates["startingSoon"] = Boolean(rawSS);
+  if (rawLMD !== undefined) updates["lastMinuteDeal"] = Boolean(rawLMD);
+  if (rawDealLabel !== undefined) updates["dealLabel"] = rawDealLabel ? String(rawDealLabel) : "";
+  if (rawTableCount !== undefined) updates["tableCount"] = Math.max(0, Math.trunc(Number(rawTableCount) || 0));
+  if (rawTableSize !== undefined) updates["tableSize"] = Math.max(0, Math.trunc(Number(rawTableSize) || 0));
+  if (rawVipCapacity !== undefined) updates["vipCapacity"] = Math.max(0, Math.trunc(Number(rawVipCapacity) || 0));
+  if (rawMaxGroup !== undefined) updates["maxGroupSize"] = Math.max(0, Math.trunc(Number(rawMaxGroup) || 0));
+  if (rawGroupEnabled !== undefined) updates["groupBookingEnabled"] = Boolean(rawGroupEnabled);
+  if (rawGroupOffer !== undefined) updates["groupOffer"] = rawGroupOffer ? String(rawGroupOffer) : "";
 
   const [updated] = await db
     .update(eventsTable)

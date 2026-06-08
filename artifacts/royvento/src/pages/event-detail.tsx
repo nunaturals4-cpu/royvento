@@ -76,9 +76,17 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     queryFn: () => apiGet(`/api/partners/${vendorId}/blocked-dates`),
     enabled: !!vendorId,
   });
-  const { data: drinkPlans = [] } = useQuery<any[]>({
+  const { data: drinkPlans = [], isFetched: drinkPlansFetched } = useQuery<any[]>({
     queryKey: ["vendor-drink-plans", vendorId],
     queryFn: () => apiGet<any[]>(`/api/vendors/${vendorId}/drink-plans`),
+    enabled: (event as any)?.type === "pub" && !!vendorId,
+  });
+  // Lightweight parent-level copy of the venue's offers (shares the React Query
+  // cache key with FoodDrinkOffersSection, so no extra network call). Used by
+  // the smart "Happy Hours → Offers → Book" deep-link landing below.
+  const { data: smartOffers = [], isFetched: offersFetched } = useQuery<any[]>({
+    queryKey: ["vendor-offers", vendorId],
+    queryFn: () => apiGet<any[]>(`/api/vendors/${vendorId}/offers`),
     enabled: (event as any)?.type === "pub" && !!vendorId,
   });
 
@@ -264,6 +272,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
   const deepLinkSearch = useSearch();
   const deepLinkBook = useMemo(() => new URLSearchParams(deepLinkSearch).get("book"), [deepLinkSearch]);
   const deepLinkAid = useMemo(() => new URLSearchParams(deepLinkSearch).get("aid"), [deepLinkSearch]);
+  // ?to=happyhours | offers → smart landing on a pub's content section. Picks
+  // the first non-empty of a preferred order, falling back to Book a Table.
+  const deepLinkTo = useMemo(() => new URLSearchParams(deepLinkSearch).get("to"), [deepLinkSearch]);
 
   // Open the booking tab + scroll to the form as soon as the event loads.
   // Independent of announcements so the form always opens, even before the
@@ -281,6 +292,34 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     }, 120);
     return () => window.clearTimeout(tid);
   }, [isLoading, event, deepLinkBook]);
+
+  // Smart "Happy Hours → Food & Drink Offers → Book a Table" landing. Waits for
+  // the drink-plans + offers queries to settle so an empty section is never the
+  // reason we skip it, then opens the first section that actually has content.
+  const smartLandingDone = useRef(false);
+  useEffect(() => {
+    if (smartLandingDone.current) return;
+    if (isLoading || !event) return;
+    if (deepLinkTo !== "happyhours" && deepLinkTo !== "offers") return;
+    const ev2 = event as any;
+    if (ev2?.type !== "pub") return;
+    // Only decide once both content sources have loaded (defaults are []).
+    if (!drinkPlansFetched || !offersFetched) return;
+    smartLandingDone.current = true;
+    const hasHappy = !!(ev2?.freeEntryRules?.enabled) || drinkPlans.length > 0;
+    const hasOffers = smartOffers.length > 0;
+    const order = deepLinkTo === "offers"
+      ? (["offers", "happyHours", "book"] as const)
+      : (["happyHours", "offers", "book"] as const);
+    const target = order.find((t) =>
+      t === "happyHours" ? hasHappy : t === "offers" ? hasOffers : true,
+    ) ?? "book";
+    setPubTab(target);
+    const tid = window.setTimeout(() => {
+      pubTabRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(tid);
+  }, [isLoading, event, deepLinkTo, drinkPlansFetched, offersFetched, drinkPlans, smartOffers]);
 
   // Preselect the announcement for an event deep link once announcements load.
   const eventDeepLinkPreselected = useRef(false);

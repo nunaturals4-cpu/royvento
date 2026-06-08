@@ -95,7 +95,9 @@ export function EventLegacyRedirect() {
       city: event.vendor?.city,
     });
     if (typeof window !== "undefined" && window.location.pathname !== target) {
-      setLocation(target, { replace: true });
+      // Preserve query (?to=happyhours, ?book=1, …) and hash (#book) across the
+      // legacy→canonical redirect so deep-link landing still works.
+      setLocation(target + window.location.search + window.location.hash, { replace: true });
     }
   }, [event, setLocation]);
   if (!Number.isFinite(id) || id <= 0) return <NotFound />;

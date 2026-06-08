@@ -144,11 +144,11 @@ export function Navbar() {
   // the mobile drawer so the two never drift out of sync.
   const navItems = [
     { href: "/", label: t("nav.home") },
+    { href: "/tonight-plans", label: t("nav.tonight_plans", "Tonight Plans") },
     { href: "/pubs", label: t("nav.pubs") },
     { href: "/events", label: t("nav.events", "Events") },
     { href: "/games", label: t("nav.games", "Games & Sports") },
     { href: "/pub-offers", label: t("nav.pub_offers") },
-    { href: "/blogs", label: t("nav.blog") },
   ];
   // "List Your Venue" must land partners on the Become-a-Partner form without a
   // double click: logged-in users go straight there; logged-out users are routed
@@ -334,6 +334,9 @@ export function Navbar() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link href="/dashboard/profile" className="cursor-pointer w-full">{t("nav.my_profile")}</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/blogs" className="cursor-pointer w-full">{t("nav.blogs", "Blogs")}</Link>
                     </DropdownMenuItem>
                     {user.role === "user" && (
                       <>
@@ -555,6 +558,14 @@ export function Navbar() {
                     </Link>
                   );
                 })}
+                <Link
+                  href="/blogs"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-3 py-3.5 text-base font-medium text-white hover:text-primary transition-colors border-b border-border/40"
+                >
+                  <span className="h-5 w-1 rounded-full bg-transparent" aria-hidden="true" />
+                  {t("nav.blogs", "Blogs")}
+                </Link>
                 {user && (
                   <Link
                     href="/notifications"

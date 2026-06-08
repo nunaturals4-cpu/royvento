@@ -34,6 +34,8 @@ export interface AuthUser {
   referralCode: string;
   referredBy: number | null;
   points: number;
+  gender: string | null;
+  genderCompleted: boolean;
   createdAt: string;
 }
 
@@ -139,6 +141,8 @@ export function userToPublic(u: {
   referralCode?: string | null;
   referredBy?: number | null;
   points?: number | null;
+  gender?: string | null;
+  genderCompleted?: boolean | null;
   createdAt: Date;
 }): AuthUser {
   return {
@@ -152,6 +156,8 @@ export function userToPublic(u: {
     referralCode: u.referralCode ?? "",
     referredBy: u.referredBy ?? null,
     points: u.points ?? 0,
+    gender: u.gender ?? null,
+    genderCompleted: u.genderCompleted ?? false,
     createdAt: u.createdAt.toISOString(),
   };
 }

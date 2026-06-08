@@ -121,6 +121,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
 
+  /auth/gender:
+    put:
+      operationId: setGender
+      tags: [auth]
+      summary: Save the user's gender selection (one-time onboarding)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenderBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+
   /users:
     get:
       operationId: listUsers
@@ -2665,9 +2684,14 @@ components:
           nullable: true
         points:
           type: integer
+        gender:
+          type: string
+          nullable: true
+        genderCompleted:
+          type: boolean
         createdAt:
           type: string
-      required: [id, email, name, role, phone, about, profileImage, referralCode, points, createdAt]
+      required: [id, email, name, role, phone, about, profileImage, referralCode, points, genderCompleted, createdAt]
 
     RegisterBody:
       type: object
@@ -2691,6 +2715,14 @@ components:
         password:
           type: string
       required: [email, password]
+
+    GenderBody:
+      type: object
+      properties:
+        gender:
+          type: string
+          enum: [male, female]
+      required: [gender]
 
     AuthResponse:
       type: object

@@ -50,6 +50,7 @@ import type {
   DrinkPlanBody,
   Event,
   EventDetail,
+  GenderBody,
   GetAdminAnalyticsParams,
   GetAdminBookingsReportParams,
   GetAdminCheckinReportParams,
@@ -575,6 +576,77 @@ export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = Err
 
 
 
+
+export const getSetGenderUrl = () => {
+
+
+
+
+  return `/api/auth/gender`
+}
+
+/**
+ * @summary Save the user's gender selection (one-time onboarding)
+ */
+export const setGender = async (genderBody: GenderBody, options?: RequestInit): Promise<MeResponse> => {
+
+  return customFetch<MeResponse>(getSetGenderUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      genderBody,)
+  }
+);}
+
+
+
+
+export const getSetGenderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setGender>>, TError,{data: BodyType<GenderBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setGender>>, TError,{data: BodyType<GenderBody>}, TContext> => {
+
+const mutationKey = ['setGender'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setGender>>, {data: BodyType<GenderBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setGender(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetGenderMutationResult = NonNullable<Awaited<ReturnType<typeof setGender>>>
+    export type SetGenderMutationBody = BodyType<GenderBody>
+    export type SetGenderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save the user's gender selection (one-time onboarding)
+ */
+export const useSetGender = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setGender>>, TError,{data: BodyType<GenderBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setGender>>,
+        TError,
+        {data: BodyType<GenderBody>},
+        TContext
+      > => {
+      return useMutation(getSetGenderMutationOptions(options));
+    }
 
 export const getListUsersUrl = () => {
 

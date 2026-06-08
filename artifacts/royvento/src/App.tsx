@@ -56,6 +56,7 @@ const OrganizerEventDetail = lazy(() => import("@/pages/organizer-profile").then
 const GameOrganizerDashboard = lazy(() => import("@/pages/game-organizer-dashboard").then((m) => ({ default: m.GameOrganizerDashboard })));
 const GameOrganizerProfile = lazy(() => import("@/pages/game-organizer-profile").then((m) => ({ default: m.GameOrganizerProfile })));
 const Subscription = lazy(() => import("@/pages/subscription").then((m) => ({ default: m.Subscription })));
+const TonightPlans = lazy(() => import("@/pages/tonight-plans").then((m) => ({ default: m.TonightPlans })));
 const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs })));
 const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ default: m.BlogDetail })));
 
@@ -78,6 +79,7 @@ function PageFallback() {
 import { RequireAuth } from "@/components/RequireAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LocationProvider } from "@/components/LocationContext";
+import { GenderSelectionModal } from "@/components/GenderSelectionModal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -147,10 +149,15 @@ function OAuthErrorHandler() {
   return null;
 }
 
+function GenderGate() {
+  return <GenderSelectionModal />;
+}
+
 function Router() {
   const [location] = useLocation();
   return (
     <div className="flex flex-col min-h-[100dvh]">
+      <GenderGate />
       <ScrollToTop />
       <OAuthErrorHandler />
       <Navbar />
@@ -163,6 +170,7 @@ function Router() {
           {/* Explore page removed — redirect legacy/external links to Pubs */}
           <Route path="/explore"><Redirect to="/pubs" /></Route>
           <Route path="/pubs" component={Pubs} />
+          <Route path="/tonight-plans" component={TonightPlans} />
           <Route path="/pub-offers" component={PubOffers} />
           <Route path="/events" component={Events} />
           <Route path="/games" component={GamesAndSports} />

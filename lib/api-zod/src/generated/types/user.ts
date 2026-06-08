@@ -18,5 +18,7 @@ export interface User {
   referralCode: string;
   referredBy?: number | null;
   points: number;
+  gender?: string | null;
+  genderCompleted: boolean;
   createdAt: string;
 }

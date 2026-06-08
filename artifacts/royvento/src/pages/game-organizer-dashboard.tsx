@@ -4,6 +4,7 @@ import { apiGet, apiPost, apiPatch, apiPut, apiDelete, formatINR } from "@/lib/a
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
+import { TonightVisibilityFields } from "@/components/TonightVisibilityFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,8 @@ interface Game {
   coverImageUrl: string; images: string[]; videos: string[]; capacity: number; ageRestriction: string;
   pricingModel: "fixed" | "hourly"; price: string; hourlyRate: string; minHours: number; maxHours: number;
   commissionPct: string; gatewayFeePercent: string; active: boolean;
+  startTime?: string; endTime?: string;
+  happeningTonight?: boolean; startingSoon?: boolean; lastMinuteDeal?: boolean; dealLabel?: string;
   approvalStatus: string; rejectionReason: string; isFeaturedSlider: boolean; soldCount: number;
 }
 interface PackageItem { gameId: number | null; label: string; quantity: number; }
@@ -378,6 +381,7 @@ function blankGame(): Game {
     coverImageUrl: "", images: [], videos: [], capacity: 0, ageRestriction: "",
     pricingModel: "fixed", price: "0", hourlyRate: "0", minHours: 1, maxHours: 0,
     commissionPct: "8", gatewayFeePercent: "2", active: true,
+    startTime: "", endTime: "", happeningTonight: true, startingSoon: true, lastMinuteDeal: false, dealLabel: "",
     approvalStatus: "pending", rejectionReason: "", isFeaturedSlider: false, soldCount: 0,
   };
 }
@@ -406,6 +410,9 @@ function GameEditor({ gameId, onDone, onCancel }: { gameId: number | null; onDon
       capacity: f.capacity, ageRestriction: f.ageRestriction,
       pricingModel: f.pricingModel, price: Number(f.price), hourlyRate: Number(f.hourlyRate),
       minHours: f.minHours, maxHours: f.maxHours,
+      startTime: f.startTime ?? "", endTime: f.endTime ?? "",
+      happeningTonight: f.happeningTonight ?? true, startingSoon: f.startingSoon ?? true,
+      lastMinuteDeal: f.lastMinuteDeal ?? false, dealLabel: f.dealLabel ?? "",
     };
     try {
       if (gameId) await apiPatch(`/api/game-organizer/games/${gameId}`, body);
@@ -470,6 +477,17 @@ function GameEditor({ gameId, onDone, onCancel }: { gameId: number | null; onDon
         <GalleryEditor images={f.images} onChange={set("images")} />
         <StringListEditor label="Video links (YouTube etc.)" items={f.videos} onChange={set("videos")} placeholder="https://youtube.com/…" />
       </GlassCard>
+
+      <TonightVisibilityFields
+        value={{
+          startTime: f.startTime ?? "", endTime: f.endTime ?? "",
+          happeningTonight: f.happeningTonight ?? true,
+          startingSoon: f.startingSoon ?? true,
+          lastMinuteDeal: f.lastMinuteDeal ?? false,
+          dealLabel: f.dealLabel ?? "",
+        }}
+        onChange={(v) => setF((s) => ({ ...s, startTime: v.startTime, endTime: v.endTime, happeningTonight: v.happeningTonight, startingSoon: v.startingSoon, lastMinuteDeal: v.lastMinuteDeal, dealLabel: v.dealLabel }))}
+      />
 
       <div className="flex justify-end gap-3">
         <Button variant="ghost" className="text-white/60" onClick={onCancel}>Cancel</Button>

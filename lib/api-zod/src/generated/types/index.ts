@@ -81,6 +81,8 @@ export * from './eventVendorCrowdLevel';
 export * from './freeEntryRules';
 export * from './freeEntryRulesDaysItem';
 export * from './freeEntryRulesGendersItem';
+export * from './genderBody';
+export * from './genderBodyGender';
 export * from './getAdminAnalyticsParams';
 export * from './getAdminBookingsReportParams';
 export * from './getAdminCheckinReportParams';

@@ -32,6 +32,8 @@ import seoRouter from "./seo";
 import emailsRouter from "./emails";
 import organizersRouter from "./organizers";
 import gameOrganizersRouter from "./gameOrganizers";
+import happeningTonightRouter from "./happeningTonight";
+import goingOutRouter from "./goingOut";
 
 const router: IRouter = Router();
 
@@ -68,5 +70,7 @@ router.use(seoRouter);
 router.use(emailsRouter);
 router.use(organizersRouter);
 router.use(gameOrganizersRouter);
+router.use(happeningTonightRouter);
+router.use(goingOutRouter);
 
 export default router;

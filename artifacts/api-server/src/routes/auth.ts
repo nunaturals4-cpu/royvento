@@ -728,6 +728,32 @@ router.post("/auth/google/mobile", async (req, res) => {
   }
 });
 
+const GenderBody = z.object({ gender: z.enum(["male", "female"]) });
+
+router.put("/auth/gender", async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const parsed = GenderBody.safeParse(req.body);
+  if (!parsed.success) {
+    respondInvalid(res, parsed.error);
+    return;
+  }
+  await db
+    .update(usersTable)
+    .set({ gender: parsed.data.gender, genderCompleted: true })
+    .where(eq(usersTable.id, user.id));
+  const rows = await db.select().from(usersTable).where(eq(usersTable.id, user.id)).limit(1);
+  const updated = rows[0];
+  if (!updated) {
+    res.status(500).json({ error: "Failed to load user" });
+    return;
+  }
+  res.json({ user: userToPublic(updated) });
+});
+
 const PushTokenBody = z.object({ pushToken: z.string().min(1) });
 
 router.put("/auth/push-token", async (req, res) => {

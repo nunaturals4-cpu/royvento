@@ -34,6 +34,9 @@ import { useTranslation } from "react-i18next";
 import { SEO } from "@/components/SEO";
 import { FreeDrinkSection, TicketSection, splitVendorsByPlanType } from "@/components/DrinkDealCards";
 import { HeroSlider } from "@/components/HeroSlider";
+import { HappeningTonight } from "@/components/HappeningTonight";
+import { GoingOutWithFriends } from "@/components/GoingOutWithFriends";
+import { CarouselRow } from "@/components/CarouselRow";
 import { COUNTRIES } from "@/lib/locations";
 
 interface PublicEvent {
@@ -417,12 +420,12 @@ export function Home() {
             <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+        <CarouselRow itemClassName="w-[150px] sm:w-[180px]" gapClass="gap-3 md:gap-4">
           {CATEGORIES.map(({ label, sub, icon: Icon, href, img }) => (
             <Link
               key={label}
               href={href}
-              className="reveal sheen group relative overflow-hidden rounded-2xl border border-white/8 lift-3d aspect-[4/5]"
+              className="reveal sheen group relative block overflow-hidden rounded-2xl border border-white/8 lift-3d aspect-[4/5]"
             >
               <img
                 src={img}
@@ -441,8 +444,30 @@ export function Home() {
               </div>
             </Link>
           ))}
-        </div>
+        </CarouselRow>
       </section>
+
+      {/* 🔥 Happening Tonight — real-time discovery */}
+      <HappeningTonight />
+
+      {/* Popular Pubs In Your City — local-first pub rail right under Tonight */}
+      {sortedPubs.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-12">
+          <SectionHeader
+            icon={<PartyPopper className="h-3.5 w-3.5" />}
+            eyebrow={userCity ? `Trending in ${userCity}` : t("home.pubs_label")}
+            title={userCity ? `Popular Pubs in ${userCity}` : "Popular Pubs In Your City"}
+            seeAllHref="/pubs"
+            seeAllLabel={t("home.view_all_pubs")}
+          />
+          <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
+            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
+          </CarouselRow>
+        </section>
+      )}
+
+      {/* 👥 Going Out With Friends — group-first discovery & availability */}
+      <GoingOutWithFriends />
 
       {/* Trending / Popular section */}
       <section className="container mx-auto px-4 md:px-6 py-12">
@@ -517,9 +542,9 @@ export function Home() {
             ))}
           </div>
         ) : sortedPopular.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mt-8">
-            {sortedPopular.slice(0, 8).map((e) => <EventCard key={e.id} event={e} directBooking={e.type === "pub"} />)}
-          </div>
+          <CarouselRow className="mt-8" itemClassName="w-[280px] sm:w-[300px]">
+            {sortedPopular.map((e) => <EventCard key={e.id} event={e} directBooking={e.type === "pub"} />)}
+          </CarouselRow>
         ) : (
           <div className="mt-8 rounded-2xl border border-white/8 bg-white/3 p-10 text-center">
             <Flame className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-40" />
@@ -554,21 +579,6 @@ export function Home() {
         );
       })()}
 
-      {/* Top Pubs & Clubs */}
-      {sortedPubs.length > 0 && (
-        <section className="container mx-auto px-4 md:px-6 py-12">
-          <SectionHeader
-            icon={<PartyPopper className="h-3.5 w-3.5" />}
-            eyebrow={t("home.pubs_label")}
-            title={t("home.pubs_title")}
-            seeAllHref="/pubs"
-            seeAllLabel={t("home.view_all_pubs")}
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
-          </div>
-        </section>
-      )}
 
       {/* Promo banner */}
       <section className="container mx-auto px-4 md:px-6 py-8">
@@ -608,9 +618,9 @@ export function Home() {
           seeAllHref="/pubs"
           seeAllLabel={t("home.view_all")}
         />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
           {featured.map((e) => <EventCard key={e.id} event={e as any} directBooking={(e as any).type === "pub"} />)}
-        </div>
+        </CarouselRow>
       </section>
 
       {/* What's On — Announcements */}

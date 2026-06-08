@@ -37,6 +37,8 @@ export const usersTable = pgTable(
     pushToken: text("push_token").notNull().default(""),
     expoPushToken: text("expo_push_token"),
     webPushSubscription: text("web_push_subscription"),
+    gender: varchar("gender", { length: 10 }),
+    genderCompleted: boolean("gender_completed").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -116,6 +118,26 @@ export const eventsTable = pgTable(
     featured: boolean("featured").notNull().default(false),
     popular: boolean("popular").notNull().default(false),
     pubMode: varchar("pub_mode", { length: 20 }).notNull().default(""),
+    // ── Happening Tonight ── real-time discovery fields. start/end time are the
+    // event's tonight session window ("HH:MM", IST). The three booleans are
+    // partner opt-in visibility gates; time-window logic decides the bucket.
+    startTime: varchar("start_time", { length: 8 }).notNull().default(""),
+    endTime: varchar("end_time", { length: 8 }).notNull().default(""),
+    happeningTonight: boolean("happening_tonight").notNull().default(true),
+    startingSoon: boolean("starting_soon").notNull().default(true),
+    lastMinuteDeal: boolean("last_minute_deal").notNull().default(false),
+    dealLabel: varchar("deal_label", { length: 120 }).notNull().default(""),
+    // ── Going Out With Friends ── group-capacity controls. `capacity` above is
+    // the venue's total seating; availableCapacity is computed live at query
+    // time (capacity − today's booked guests). tableCount/tableSize/vipCapacity
+    // describe group seating; maxGroupSize=0 means "no stated cap" (treated as
+    // fits any group). groupOffer is the partner's free-text group promo label.
+    tableCount: integer("table_count").notNull().default(0),
+    tableSize: integer("table_size").notNull().default(0),
+    vipCapacity: integer("vip_capacity").notNull().default(0),
+    maxGroupSize: integer("max_group_size").notNull().default(0),
+    groupBookingEnabled: boolean("group_booking_enabled").notNull().default(true),
+    groupOffer: varchar("group_offer", { length: 160 }).notNull().default(""),
     priceWomen: numeric("price_women", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
@@ -1154,6 +1176,17 @@ export const organizerEventsTable = pgTable(
     startTime: varchar("start_time", { length: 8 }).notNull().default(""),
     endTime: varchar("end_time", { length: 8 }).notNull().default(""),
     isMultiDay: boolean("is_multi_day").notNull().default(false),
+    // ── Happening Tonight ── partner opt-in visibility gates + flash-deal label.
+    happeningTonight: boolean("happening_tonight").notNull().default(true),
+    startingSoon: boolean("starting_soon").notNull().default(true),
+    lastMinuteDeal: boolean("last_minute_deal").notNull().default(false),
+    dealLabel: varchar("deal_label", { length: 120 }).notNull().default(""),
+    // ── Going Out With Friends ── group-booking controls. Ticket availability
+    // is derived from event_tickets (quantity − sold_count); maxGroupSize=0
+    // means no stated cap. groupOffer is the partner's free-text group promo.
+    maxGroupSize: integer("max_group_size").notNull().default(0),
+    groupBookingEnabled: boolean("group_booking_enabled").notNull().default(true),
+    groupOffer: varchar("group_offer", { length: 160 }).notNull().default(""),
     // Rich blocks
     artists: jsonb("artists").$type<OrganizerArtist[]>(),
     highlights: jsonb("highlights").$type<string[]>(),
@@ -1475,6 +1508,19 @@ export const gamesTable = pgTable(
     // Pricing
     pricingModel: varchar("pricing_model", { length: 12 }).notNull().default("fixed"), // fixed|hourly
     price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"), // fixed: per person
+    // ── Happening Tonight ── tonight session window ("HH:MM", IST) for the venue,
+    // plus partner opt-in visibility gates + flash-deal label.
+    startTime: varchar("start_time", { length: 8 }).notNull().default(""),
+    endTime: varchar("end_time", { length: 8 }).notNull().default(""),
+    happeningTonight: boolean("happening_tonight").notNull().default(true),
+    startingSoon: boolean("starting_soon").notNull().default(true),
+    lastMinuteDeal: boolean("last_minute_deal").notNull().default(false),
+    dealLabel: varchar("deal_label", { length: 120 }).notNull().default(""),
+    // ── Going Out With Friends ── `capacity` above is the lane/room/arena seat
+    // count. maxGroupSize=0 means no stated cap; groupOffer is the group promo.
+    maxGroupSize: integer("max_group_size").notNull().default(0),
+    groupBookingEnabled: boolean("group_booking_enabled").notNull().default(true),
+    groupOffer: varchar("group_offer", { length: 160 }).notNull().default(""),
     hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }).notNull().default("0"),
     minHours: integer("min_hours").notNull().default(1),
     maxHours: integer("max_hours").notNull().default(0), // 0 = no max

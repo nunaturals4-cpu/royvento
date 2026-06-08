@@ -4,6 +4,7 @@ import { runCleanup } from "./jobs/cleanup";
 import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingReminders";
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import { runPointsExpiry } from "./jobs/pointsExpiry";
+import { runTonightDigest, runStartingSoonReminders } from "./jobs/tonightNotifications";
 import cron from "node-cron";
 import { db, usersTable, vendorsTable, eventsTable, wishlistsTable, organizersTable } from "@workspace/db";
 import { eq, or, sql, inArray } from "drizzle-orm";
@@ -253,6 +254,8 @@ async function ensureAdminAccount() {
 
 async function applyPendingSchemaChanges() {
   try {
+    await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gender" varchar(10)`);
+    await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gender_completed" boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "global_priority" integer`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "drink_plans_global_priority_idx" ON "drink_plans" ("global_priority")`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_percent" numeric(5,2) DEFAULT 3.50`);
@@ -785,6 +788,36 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "duration_hours" numeric(5,1)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "bookings_game_organizer_idx" ON "bookings" ("game_organizer_id")`);
 
+    // ── Happening Tonight — real-time discovery fields on the three partner
+    // listing tables. start/end time = the listing's tonight session window
+    // ("HH:MM", IST). happening_tonight/starting_soon default true so existing
+    // listings appear immediately; time-window logic decides the bucket.
+    for (const tbl of ["events", "organizer_events", "games"] as const) {
+      await db.execute(sql.raw(`ALTER TABLE "${tbl}" ADD COLUMN IF NOT EXISTS "happening_tonight" boolean NOT NULL DEFAULT true`));
+      await db.execute(sql.raw(`ALTER TABLE "${tbl}" ADD COLUMN IF NOT EXISTS "starting_soon" boolean NOT NULL DEFAULT true`));
+      await db.execute(sql.raw(`ALTER TABLE "${tbl}" ADD COLUMN IF NOT EXISTS "last_minute_deal" boolean NOT NULL DEFAULT false`));
+      await db.execute(sql.raw(`ALTER TABLE "${tbl}" ADD COLUMN IF NOT EXISTS "deal_label" varchar(120) NOT NULL DEFAULT ''`));
+    }
+    // organizer_events already has start_time/end_time; events & games need them.
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "start_time" varchar(8) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "end_time" varchar(8) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "start_time" varchar(8) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "end_time" varchar(8) NOT NULL DEFAULT ''`);
+
+    // ── Going Out With Friends — group-capacity controls on the three listing
+    // tables. maxGroupSize/groupBookingEnabled/groupOffer are shared; events
+    // (pubs/clubs) additionally get table_count/table_size/vip_capacity. All
+    // default-permissive so existing listings stay group-bookable. Live
+    // available capacity is computed at query time (capacity − today's guests).
+    for (const tbl of ["events", "organizer_events", "games"] as const) {
+      await db.execute(sql.raw(`ALTER TABLE "${tbl}" ADD COLUMN IF NOT EXISTS "max_group_size" integer NOT NULL DEFAULT 0`));
+      await db.execute(sql.raw(`ALTER TABLE "${tbl}" ADD COLUMN IF NOT EXISTS "group_booking_enabled" boolean NOT NULL DEFAULT true`));
+      await db.execute(sql.raw(`ALTER TABLE "${tbl}" ADD COLUMN IF NOT EXISTS "group_offer" varchar(160) NOT NULL DEFAULT ''`));
+    }
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "table_count" integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "table_size" integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "vip_capacity" integer NOT NULL DEFAULT 0`);
+
     logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status ensured");
   } catch (err) {
     logger.error({ err }, "Schema migration warning");
@@ -862,5 +895,21 @@ app.listen(port, (err) => {
       logger.error({ err }, "Expo push receipt-poll job failed"),
     );
   });
+
+  // Happening Tonight — evening digest at 17:00 IST: "N experiences tonight".
+  cron.schedule("0 17 * * *", () => {
+    logger.info("Running Happening Tonight digest job (5 PM IST)");
+    runTonightDigest().catch((err) =>
+      logger.error({ err }, "Tonight digest job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
+
+  // Happening Tonight — "starting soon" wishlist reminders, every 5 min (fires
+  // once per event ~90 min before its tonight start time).
+  cron.schedule("*/5 * * * *", () => {
+    runStartingSoonReminders().catch((err) =>
+      logger.error({ err }, "Tonight starting-soon reminder job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
 
 });

@@ -5,6 +5,7 @@ import { apiGet, apiPost, apiPatch, apiPut, apiDelete, formatINR } from "@/lib/a
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
 import { SEO } from "@/components/SEO";
+import { TonightVisibilityFields } from "@/components/TonightVisibilityFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,7 @@ interface OrganizerEvent {
   coverImageUrl: string; bannerUrl: string; mobileBannerUrl: string; galleryImages: string[]; promoVideos: string[];
   venueName: string; address: string; mapsUrl: string; capacity: number; city: string; state: string;
   startDate: string | null; endDate: string | null; startTime: string; endTime: string; isMultiDay: boolean;
+  happeningTonight?: boolean; startingSoon?: boolean; lastMinuteDeal?: boolean; dealLabel?: string;
   artists: Artist[] | null; highlights: string[] | null; schedule: ScheduleItem[] | null;
   policies: Policies | null; faqs: Faq[] | null;
   approvalStatus: string; rejectionReason: string;
@@ -540,6 +542,19 @@ function EventEditor({ eventId, onDone, onCancel }: { eventId: number | null; on
         </div>
       </GlassCard>
 
+      {/* HAPPENING TONIGHT */}
+      <TonightVisibilityFields
+        showTimes={false}
+        value={{
+          startTime: f.startTime, endTime: f.endTime,
+          happeningTonight: f.happeningTonight ?? true,
+          startingSoon: f.startingSoon ?? true,
+          lastMinuteDeal: f.lastMinuteDeal ?? false,
+          dealLabel: f.dealLabel ?? "",
+        }}
+        onChange={(v) => setF((p) => ({ ...p, happeningTonight: v.happeningTonight, startingSoon: v.startingSoon, lastMinuteDeal: v.lastMinuteDeal, dealLabel: v.dealLabel }))}
+      />
+
       {/* ARTISTS */}
       <GlassCard className="p-6 space-y-4">
         <SectionTitle><Users className="h-4 w-4 text-primary" /> Artists & performers</SectionTitle>
@@ -609,6 +624,7 @@ function blankEvent(): OrganizerEvent {
     tags: [], language: "", ageRestriction: "", coverImageUrl: "", bannerUrl: "", mobileBannerUrl: "",
     galleryImages: [], promoVideos: [], venueName: "", address: "", mapsUrl: "", capacity: 0, city: "", state: "",
     startDate: null, endDate: null, startTime: "", endTime: "", isMultiDay: false,
+    happeningTonight: true, startingSoon: true, lastMinuteDeal: false, dealLabel: "",
     artists: [], highlights: [], schedule: [], policies: { ...EMPTY_POLICIES }, faqs: [],
     approvalStatus: "pending", rejectionReason: "",
   };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch, useRoute } from "wouter";
 import { SEO } from "@/components/SEO";
+import { TonightVisibilityFields, defaultTonightVisibility, type TonightVisibilityValue } from "@/components/TonightVisibilityFields";
 import {
   useGetMyVendor,
   useCreateMyVendor,
@@ -849,6 +850,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
   const [freeEntryForTable, setFreeEntryForTable] = useState(false);
   const [freeEntryForTableDays, setFreeEntryForTableDays] = useState<string[]>([]);
   const [freeEntryForTableBeforeTime, setFreeEntryForTableBeforeTime] = useState("");
+  const [tonightVis, setTonightVis] = useState<TonightVisibilityValue>(defaultTonightVisibility);
   const [videoCompressing, setVideoCompressing] = useState(false);
   const create = useCreateEvent();
   const { toast } = useToast();
@@ -1176,6 +1178,7 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
       })(),
       galleryImages,
       galleryVideos,
+      ...tonightVis,
       ...(type === "pub" ? {
         freeEntryRules: {
           enabled: freeEntryEnabled,
@@ -1497,6 +1500,8 @@ function EventForm({ vendor, lockedType, onCancel, onSaved, onVenueSaved }: {
           </div>
         </div>
       )}
+
+      <TonightVisibilityFields value={tonightVis} onChange={setTonightVis} />
 
       <div>
         <Label>Description</Label>
@@ -1858,6 +1863,14 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
   const [freeEntryForTable, setFreeEntryForTable] = useState<boolean>(!!(event.freeEntryForTable));
   const [freeEntryForTableDays, setFreeEntryForTableDays] = useState<string[]>((event as any).freeEntryForTableDays ?? []);
   const [freeEntryForTableBeforeTime, setFreeEntryForTableBeforeTime] = useState<string>((event as any).freeEntryForTableBeforeTime ?? "");
+  const [tonightVis, setTonightVis] = useState<TonightVisibilityValue>({
+    startTime: (event as any).startTime ?? "",
+    endTime: (event as any).endTime ?? "",
+    happeningTonight: (event as any).happeningTonight ?? true,
+    startingSoon: (event as any).startingSoon ?? true,
+    lastMinuteDeal: (event as any).lastMinuteDeal ?? false,
+    dealLabel: (event as any).dealLabel ?? "",
+  });
   const { toast } = useToast();
   const isPub = event.type === "pub";
   const [videoCompressing, setVideoCompressing] = useState(false);
@@ -2059,6 +2072,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
       await apiPatch(`/api/events/${event.id}`, {
         title, description, imageUrl, capacity,
         price: recalcPrice, galleryImages, galleryVideos,
+        ...tonightVis,
         ...(isPub ? {
           pubMode, priceWomen, priceMen, priceCouple, pubEventTypes,
           dayPricing: (() => {
@@ -2136,6 +2150,7 @@ function EditListingForm({ event, vendor, onBack, onSaved, onVenueSaved }: { eve
           <Input value={title} onChange={(e) => setTitle(e.target.value)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("title"))} />
           {formErrors.fieldError("title") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("title")}</p>}
         </div>
+        <TonightVisibilityFields value={tonightVis} onChange={setTonightVis} />
         <div>
           <Label>Description</Label>
           <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className={fieldClass("bg-black/40 border-white/10", formErrors.fieldError("description"))} />

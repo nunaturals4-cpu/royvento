@@ -138,6 +138,13 @@ const GameBody = z.object({
   hourlyRate: z.coerce.number().min(0).max(9999999).optional().default(0),
   minHours: z.coerce.number().int().min(1).optional().default(1),
   maxHours: z.coerce.number().int().min(0).optional().default(0),
+  // Happening Tonight — tonight session window + real-time visibility controls.
+  startTime: z.string().optional().default(""),
+  endTime: z.string().optional().default(""),
+  happeningTonight: z.boolean().optional().default(true),
+  startingSoon: z.boolean().optional().default(true),
+  lastMinuteDeal: z.boolean().optional().default(false),
+  dealLabel: z.string().max(120).optional().default(""),
 });
 
 function gameValuesFromBody(data: z.infer<typeof GameBody>) {
@@ -156,6 +163,12 @@ function gameValuesFromBody(data: z.infer<typeof GameBody>) {
     hourlyRate: String(data.hourlyRate ?? 0),
     minHours: data.minHours,
     maxHours: data.maxHours,
+    startTime: data.startTime,
+    endTime: data.endTime,
+    happeningTonight: data.happeningTonight,
+    startingSoon: data.startingSoon,
+    lastMinuteDeal: data.lastMinuteDeal,
+    dealLabel: data.dealLabel,
   };
 }
 
