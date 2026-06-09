@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EVENT_TYPES, BUDGET_RANGES, formatINR, formatINRExact, apiPost, apiGet, apiDelete } from "@/lib/api";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
-import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap } from "lucide-react";
+import { Star, MapPin, Users, Calendar as CalIcon, Tag, Lock, Wine, Sparkle, Coins, BadgeCheck, Heart, ExternalLink, Clock, Navigation, X, ImagePlus, ChevronLeft, ChevronRight, ChevronDown, Utensils, ArrowRight, CreditCard, Ticket, Check, Crown, ShieldCheck, Headphones, Zap, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDayRanges } from "@/lib/days";
@@ -221,6 +221,17 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["wishlist"] }); toast({ title: t("events.wishlist_removed") }); },
     onError: () => toast({ title: t("events.wishlist_remove_error"), variant: "destructive" }),
   });
+
+  // Share this page — native share sheet on mobile, clipboard copy elsewhere.
+  const share = async () => {
+    const url = window.location.href;
+    const title = (event as any)?.title || "Royvento";
+    if (typeof navigator.share === "function") {
+      try { await navigator.share({ title, url }); } catch { /* cancelled */ }
+      return;
+    }
+    try { await navigator.clipboard.writeText(url); toast({ title: "Link copied" }); } catch { /* ignore */ }
+  };
 
   const { data: similarPubs = [] } = useQuery<any[]>({
     queryKey: ["similar-pubs", id],
@@ -955,6 +966,15 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               {inWishlist ? "Saved to wishlist" : "Save venue"}
             </button>
           )}
+
+          {/* Share */}
+          <button
+            onClick={share}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors"
+          >
+            <Share2 className="h-4 w-4" />
+            Share
+          </button>
 
         </aside>
 

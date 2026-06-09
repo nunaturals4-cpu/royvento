@@ -59,6 +59,7 @@ const Subscription = lazy(() => import("@/pages/subscription").then((m) => ({ de
 const TonightPlans = lazy(() => import("@/pages/tonight-plans").then((m) => ({ default: m.TonightPlans })));
 const Blogs = lazy(() => import("@/pages/blogs").then((m) => ({ default: m.Blogs })));
 const BlogDetail = lazy(() => import("@/pages/blog-detail").then((m) => ({ default: m.BlogDetail })));
+const SoloConnect = lazy(() => import("@/pages/solo-connect").then((m) => ({ default: m.SoloConnect })));
 
 function PageFallback() {
   return (
@@ -226,6 +227,9 @@ function Router() {
           </Route>
           <Route path="/dashboard/bookings">
             {() => <RequireAuth><Bookings /></RequireAuth>}
+          </Route>
+          <Route path="/solo-connect">
+            {() => <RequireAuth><SoloConnect /></RequireAuth>}
           </Route>
           <Route path="/admin">
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}

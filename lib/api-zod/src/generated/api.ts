@@ -165,6 +165,411 @@ export const SetGenderResponse = zod.object({
 
 
 /**
+ * @summary Solo Connect eligibility + verification status for the current user
+ */
+export const GetSoloAccessResponse = zod.object({
+  "eligible": zod.boolean(),
+  "reason": zod.enum(['ok', 'not_premium']),
+  "premium": zod.boolean(),
+  "verificationStatus": zod.enum(['none', 'pending', 'approved', 'rejected']),
+  "gender": zod.string().nullish()
+})
+
+
+/**
+ * @summary Venue options for group creation (source varies by activity type)
+ */
+export const ListSoloVenuesQueryParams = zod.object({
+  "activityType": zod.coerce.string().optional()
+}).strict()
+
+export const ListSoloVenuesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "sub": zod.string(),
+  "kind": zod.enum(['vendor', 'event', 'game'])
+})
+export const ListSoloVenuesResponse = zod.array(ListSoloVenuesResponseItem)
+
+
+/**
+ * @summary Current user's identity verification record (or null)
+ */
+export const GetSoloVerificationResponse = zod.union([zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "idType": zod.string(),
+  "idDocumentUrl": zod.string(),
+  "selfieUrl": zod.string(),
+  "phone": zod.string(),
+  "phoneVerified": zod.boolean(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "rejectionReason": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),zod.null()])
+
+
+/**
+ * @summary Upload ID document, selfie and phone for verification
+ */
+export const SubmitSoloVerificationBody = zod.object({
+  "idType": zod.enum(['aadhaar', 'passport', 'driving_license', 'voter_id']),
+  "idDocumentUrl": zod.string(),
+  "selfieUrl": zod.string(),
+  "phone": zod.string()
+}).strict()
+
+export const SubmitSoloVerificationResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "idType": zod.string(),
+  "idDocumentUrl": zod.string(),
+  "selfieUrl": zod.string(),
+  "phone": zod.string(),
+  "phoneVerified": zod.boolean(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "rejectionReason": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Generate a mobile OTP (dev-mode returns the code)
+ */
+export const RequestSoloOtpResponse = zod.object({
+  "ok": zod.boolean(),
+  "devCode": zod.string().nullish()
+})
+
+
+/**
+ * @summary Verify the mobile OTP
+ */
+export const VerifySoloOtpBody = zod.object({
+  "code": zod.string()
+}).strict()
+
+export const VerifySoloOtpResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "idType": zod.string(),
+  "idDocumentUrl": zod.string(),
+  "selfieUrl": zod.string(),
+  "phone": zod.string(),
+  "phoneVerified": zod.boolean(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "rejectionReason": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Admin approve/reject an identity verification
+ */
+export const ReviewSoloVerificationParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const ReviewSoloVerificationBody = zod.object({
+  "decision": zod.enum(['approved', 'rejected']),
+  "rejectionReason": zod.string().optional()
+}).strict()
+
+export const ReviewSoloVerificationResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "idType": zod.string(),
+  "idDocumentUrl": zod.string(),
+  "selfieUrl": zod.string(),
+  "phone": zod.string(),
+  "phoneVerified": zod.boolean(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "rejectionReason": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List groups in the caller's gender + current city
+ */
+export const ListSoloGroupsQueryParams = zod.object({
+  "city": zod.coerce.string(),
+  "activityType": zod.coerce.string().optional()
+}).strict()
+
+export const ListSoloGroupsResponseItem = zod.object({
+  "id": zod.number(),
+  "adminUserId": zod.number(),
+  "name": zod.string(),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityLabel": zod.string(),
+  "venueName": zod.string(),
+  "vendorId": zod.number().nullish(),
+  "eventId": zod.number().nullish(),
+  "groupDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "description": zod.string(),
+  "minMembers": zod.number(),
+  "maxMembers": zod.number(),
+  "country": zod.string(),
+  "state": zod.string(),
+  "city": zod.string(),
+  "genderType": zod.enum(['male', 'female']),
+  "visibility": zod.enum(['public', 'private']),
+  "status": zod.enum(['open', 'locked', 'closed']),
+  "reputationScore": zod.string(),
+  "ratingCount": zod.number(),
+  "createdAt": zod.string(),
+  "memberCount": zod.number(),
+  "myMembershipStatus": zod.string().nullish(),
+  "isAdmin": zod.boolean()
+})
+export const ListSoloGroupsResponse = zod.array(ListSoloGroupsResponseItem)
+
+
+/**
+ * @summary Create a new activity group
+ */
+export const CreateSoloGroupBody = zod.object({
+  "name": zod.string(),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityLabel": zod.string().optional(),
+  "venueName": zod.string().optional(),
+  "vendorId": zod.number().optional(),
+  "eventId": zod.number().optional(),
+  "groupDate": zod.string().optional(),
+  "startTime": zod.string().optional(),
+  "description": zod.string().optional(),
+  "maxMembers": zod.number(),
+  "visibility": zod.enum(['public', 'private']).optional(),
+  "country": zod.string().optional(),
+  "state": zod.string().optional(),
+  "city": zod.string()
+}).strict()
+
+export const CreateSoloGroupResponse = zod.object({
+  "id": zod.number(),
+  "adminUserId": zod.number(),
+  "name": zod.string(),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityLabel": zod.string(),
+  "venueName": zod.string(),
+  "vendorId": zod.number().nullish(),
+  "eventId": zod.number().nullish(),
+  "groupDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "description": zod.string(),
+  "minMembers": zod.number(),
+  "maxMembers": zod.number(),
+  "country": zod.string(),
+  "state": zod.string(),
+  "city": zod.string(),
+  "genderType": zod.enum(['male', 'female']),
+  "visibility": zod.enum(['public', 'private']),
+  "status": zod.enum(['open', 'locked', 'closed']),
+  "reputationScore": zod.string(),
+  "ratingCount": zod.number(),
+  "createdAt": zod.string(),
+  "memberCount": zod.number(),
+  "myMembershipStatus": zod.string().nullish(),
+  "isAdmin": zod.boolean()
+})
+
+
+/**
+ * @summary Group detail + members
+ */
+export const GetSoloGroupParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const GetSoloGroupQueryParams = zod.object({
+  "city": zod.coerce.string().optional()
+}).strict()
+
+export const GetSoloGroupResponse = zod.object({
+  "group": zod.object({
+  "id": zod.number(),
+  "adminUserId": zod.number(),
+  "name": zod.string(),
+  "activityType": zod.enum(['nightlife', 'events', 'games', 'activities', 'happy_hours', 'food_drinks']),
+  "activityLabel": zod.string(),
+  "venueName": zod.string(),
+  "vendorId": zod.number().nullish(),
+  "eventId": zod.number().nullish(),
+  "groupDate": zod.string().nullish(),
+  "startTime": zod.string(),
+  "description": zod.string(),
+  "minMembers": zod.number(),
+  "maxMembers": zod.number(),
+  "country": zod.string(),
+  "state": zod.string(),
+  "city": zod.string(),
+  "genderType": zod.enum(['male', 'female']),
+  "visibility": zod.enum(['public', 'private']),
+  "status": zod.enum(['open', 'locked', 'closed']),
+  "reputationScore": zod.string(),
+  "ratingCount": zod.number(),
+  "createdAt": zod.string(),
+  "memberCount": zod.number(),
+  "myMembershipStatus": zod.string().nullish(),
+  "isAdmin": zod.boolean()
+}),
+  "members": zod.array(zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "role": zod.enum(['admin', 'member']),
+  "status": zod.enum(['requested', 'approved', 'rejected', 'removed', 'left']),
+  "joinedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Request to join a group (location validated)
+ */
+export const JoinSoloGroupParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const JoinSoloGroupBody = zod.object({
+  "country": zod.string().optional(),
+  "state": zod.string().optional(),
+  "city": zod.string()
+}).strict()
+
+export const JoinSoloGroupResponse = zod.object({
+  "ok": zod.boolean(),
+  "status": zod.string().optional()
+})
+
+
+/**
+ * @summary Leave a group
+ */
+export const LeaveSoloGroupParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const LeaveSoloGroupResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Approve a join request (group admin)
+ */
+export const ApproveSoloMemberParams = zod.object({
+  "id": zod.coerce.number(),
+  "memberId": zod.coerce.number()
+}).strict()
+
+export const ApproveSoloMemberResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Reject a join request (group admin)
+ */
+export const RejectSoloMemberParams = zod.object({
+  "id": zod.coerce.number(),
+  "memberId": zod.coerce.number()
+}).strict()
+
+export const RejectSoloMemberResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Remove a member (group admin)
+ */
+export const RemoveSoloMemberParams = zod.object({
+  "id": zod.coerce.number(),
+  "memberId": zod.coerce.number()
+}).strict()
+
+export const RemoveSoloMemberResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Lock a group (group admin)
+ */
+export const LockSoloGroupParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const LockSoloGroupResponse = zod.object({
+  "ok": zod.boolean(),
+  "status": zod.string().optional()
+})
+
+
+/**
+ * @summary Close a group (group admin)
+ */
+export const CloseSoloGroupParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const CloseSoloGroupResponse = zod.object({
+  "ok": zod.boolean(),
+  "status": zod.string().optional()
+})
+
+
+/**
+ * @summary Group chat messages (members only; purged daily at 3 AM)
+ */
+export const ListSoloMessagesParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const ListSoloMessagesResponseItem = zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.string(),
+  "isMine": zod.boolean()
+})
+export const ListSoloMessagesResponse = zod.array(ListSoloMessagesResponseItem)
+
+
+/**
+ * @summary Post a chat message (members only)
+ */
+export const SendSoloMessageParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const SendSoloMessageBody = zod.object({
+  "body": zod.string()
+}).strict()
+
+export const SendSoloMessageResponse = zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.string(),
+  "isMine": zod.boolean()
+})
+
+
+/**
  * @summary List all users (admin only)
  */
 export const ListUsersResponseItem = zod.object({

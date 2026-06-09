@@ -206,6 +206,12 @@ async function serializeVendorList(rows: VendorRow[]) {
 }
 
 router.get("/vendors", async (req, res) => {
+  // Public, anonymous catalog (approved vendors only, no per-user data) — let
+  // Cloudflare/the edge serve it so the origin DB isn't hit on every request.
+  // Each distinct filter/city query is cached under its own URL key; SWR keeps
+  // responses instant while a fresh copy is fetched in the background. Matches
+  // the /events/featured + /events/popular convention. No behavioural change.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const parsed = ListVendorsQueryParams.safeParse(req.query);
   const filters = parsed.success ? parsed.data : {};
   const conditions = [eq(vendorsTable.status, "approved")];
@@ -373,6 +379,9 @@ router.get("/partner/crowd-level", requireAuth(["vendor"]), async (req, res) => 
 });
 
 router.get("/vendors/drink-offers", async (_req, res) => {
+  // Public, anonymous (no query params, identical bytes for everyone) — safe to
+  // edge-cache so the multi-table join doesn't run per request.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const vendorIdsWithPlans = await db
     .selectDistinct({ vendorId: drinkPlansTable.vendorId })
     .from(drinkPlansTable);
@@ -453,6 +462,9 @@ router.get("/vendors/:vendorId", async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  // Public vendor detail — same bytes for every viewer. Edge-cache for a minute
+  // (set only on the success path so 400/404 responses aren't cached).
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   res.json(await serializeVendor(v));
 });
 

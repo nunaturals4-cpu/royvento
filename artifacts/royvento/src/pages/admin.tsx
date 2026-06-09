@@ -53,7 +53,7 @@ import {
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
   Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
   Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen,
-  Download, Users2, ArrowUpDown, ChevronRight, Gamepad2, Package,
+  Download, Users2, ArrowUpDown, ChevronRight, Gamepad2, Package, Lock, MapPin, MessageSquare,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -73,7 +73,7 @@ const ADMIN_TABS = [
   "events", "subscriptions", "coupons", "ads", "messages", "users", "blogs",
   "booking-report", "attendance", "live-occupancy", "crm-leads",
   "create-pub", "announcement-slider", "settlements", "reviews",
-  "event-organizers", "game-organizers",
+  "event-organizers", "game-organizers", "solo-connect",
 ] as const;
 const DEFAULT_ADMIN_TAB = "analytics";
 const isValidAdminTab = (t: string | null | undefined): t is typeof ADMIN_TABS[number] =>
@@ -102,6 +102,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { value: "attendance",           label: "Attendance",        icon: UserCheck,     group: "customers" },
   { value: "crm-leads",            label: "CRM & Leads",       icon: Crown,         group: "customers" },
   { value: "reviews",              label: "Reviews",           icon: Star,          group: "customers" },
+  { value: "solo-connect",         label: "Solo Connect",      icon: ShieldCheck,   group: "customers" },
   { value: "messages",             label: "Messages",          icon: Mail,          group: "customers" },
 { value: "subscriptions",        label: "Subscriptions",     icon: Trophy,        group: "growth" },
   { value: "coupons",              label: "Coupons",           icon: Gift,          group: "growth" },
@@ -330,6 +331,7 @@ export function AdminPanel() {
               <TabsContent value="reviews" className="mt-0"><ReviewsAdmin /></TabsContent>
               <TabsContent value="event-organizers" className="mt-0"><EventOrganizersAdmin /></TabsContent>
               <TabsContent value="game-organizers" className="mt-0"><GameOrganizersAdmin /></TabsContent>
+              <TabsContent value="solo-connect" className="mt-0"><SoloConnectAdmin /></TabsContent>
             </div>
           </main>
         </div>
@@ -5575,6 +5577,794 @@ function SettlementsAdmin() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+interface AdminSoloVerification {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  idType: string;
+  idDocumentUrl: string;
+  selfieUrl: string;
+  phone: string;
+  phoneVerified: boolean;
+  status: string;
+  rejectionReason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AdminSoloGroup {
+  id: number;
+  adminUserId: number;
+  name: string;
+  activityType: string;
+  activityLabel: string;
+  venueName: string;
+  groupDate: string | null;
+  startTime: string;
+  description: string;
+  maxMembers: number;
+  minMembers: number;
+  city: string;
+  country: string;
+  state: string;
+  genderType: string;
+  status: string;
+  createdAt: string;
+  memberCount: number;
+  pendingCount: number;
+  totalMemberCount: number;
+  creatorName: string;
+  creatorEmail: string;
+}
+
+interface AdminSoloMember {
+  id: number;
+  groupId: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  role: string;
+  status: string;
+  joinedAt: string | null;
+  createdAt: string;
+}
+
+interface AdminSoloMessage {
+  id: number;
+  groupId: number;
+  userId: number;
+  userName: string;
+  body: string;
+  createdAt: string;
+}
+
+const SOLO_ID_LABELS: Record<string, string> = {
+  aadhaar: "Aadhaar",
+  passport: "Passport",
+  driving_license: "Driving License",
+  voter_id: "Voter ID",
+};
+
+// Preset rejection messages the admin picks from. The chosen `message` is stored
+// as the verification's rejectionReason and shown to the user on their Solo
+// Connect page, telling them exactly what to re-upload.
+const SOLO_REJECT_REASONS = [
+  { label: "Upload Aadhaar again", message: "Please upload your government ID (Aadhaar) again — the current image is unclear or invalid." },
+  { label: "Upload photo again", message: "Please upload your selfie photo again — the current image is unclear." },
+  { label: "Upload Aadhaar and photo again", message: "Please upload both your government ID (Aadhaar) and your selfie photo again — the current images are unclear." },
+] as const;
+
+// ── Shared badge helpers ──────────────────────────────────────────────────────
+function soloGroupStatusBadge(s: string) {
+  const map: Record<string, string> = {
+    open: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+    locked: "bg-amber-500/15 border-amber-500/30 text-amber-300",
+    closed: "bg-red-500/15 border-red-500/30 text-red-300",
+  };
+  return map[s] ?? "bg-white/10 border-white/20 text-white/70";
+}
+function soloMemberStatusBadge(s: string) {
+  const map: Record<string, string> = {
+    approved: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+    requested: "bg-amber-500/15 border-amber-500/30 text-amber-300",
+    rejected: "bg-red-500/15 border-red-500/30 text-red-300",
+    removed: "bg-white/5 border-white/10 text-white/40",
+    left: "bg-white/5 border-white/10 text-white/40",
+  };
+  return map[s] ?? "bg-white/10 border-white/20 text-white/70";
+}
+const soloActLabel = (a: string) => a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+// ── Group detail modal (Info / Members / Chat tabs) ───────────────────────────
+function GroupDetailModal({
+  group,
+  onClose,
+  onForceClose,
+  onDelete,
+}: {
+  group: AdminSoloGroup;
+  onClose: () => void;
+  onForceClose: (id: number) => Promise<void>;
+  onDelete: (id: number, name: string) => Promise<void>;
+}) {
+  const [innerTab, setInnerTab] = useState<"info" | "members" | "chat">("info");
+  const [members, setMembers] = useState<AdminSoloMember[]>([]);
+  const [messages, setMessages] = useState<AdminSoloMessage[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [loadingChat, setLoadingChat] = useState(false);
+  const [busyMember, setBusyMember] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setLoadingMembers(true);
+    apiGet<AdminSoloMember[]>(`/api/admin/solo-connect/groups/${group.id}/members`)
+      .then(setMembers)
+      .catch(() => toast({ title: "Could not load members", variant: "destructive" }))
+      .finally(() => setLoadingMembers(false));
+  }, [group.id]);
+
+  const loadChat = () => {
+    setLoadingChat(true);
+    apiGet<AdminSoloMessage[]>(`/api/admin/solo-connect/groups/${group.id}/messages`)
+      .then(setMessages)
+      .catch(() => {})
+      .finally(() => setLoadingChat(false));
+  };
+
+  useEffect(() => {
+    if (innerTab === "chat") loadChat();
+  }, [innerTab, group.id]);
+
+  const removeMember = async (m: AdminSoloMember) => {
+    if (!window.confirm(`Remove ${m.userName || m.userEmail} from "${group.name}"?`)) return;
+    setBusyMember(m.id);
+    try {
+      await apiPost(`/api/admin/solo-connect/groups/${group.id}/members/${m.id}/remove`, {});
+      toast({ title: "Member removed" });
+      setMembers((prev) => prev.map((x) => (x.id === m.id ? { ...x, status: "removed" } : x)));
+    } catch {
+      toast({ title: "Could not remove member", variant: "destructive" });
+    } finally {
+      setBusyMember(null);
+    }
+  };
+
+  const infoRows = [
+    { label: "Activity", value: soloActLabel(group.activityType) },
+    { label: "City", value: group.city },
+    { label: "State", value: group.state || "—" },
+    { label: "Country", value: group.country || "India" },
+    { label: "Gender", value: `${group.genderType} only` },
+    { label: "Venue", value: group.venueName || "—" },
+    { label: "Date", value: group.groupDate ? new Date(group.groupDate).toLocaleDateString("en-IN") : "—" },
+    { label: "Time", value: group.startTime || "—" },
+    { label: "Members", value: `${group.memberCount} approved · ${group.pendingCount} pending · ${group.maxMembers} max` },
+    { label: "Status", value: group.status },
+    { label: "Created", value: new Date(group.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)" }}
+    >
+      <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl glass-card overflow-hidden">
+        {/* Header */}
+        <div className="flex-none px-6 py-4 border-b border-white/10 flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-serif text-xl">{group.name}</h3>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${soloGroupStatusBadge(group.status)}`}>{group.status}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">{soloActLabel(group.activityType)} · {group.city} · {group.genderType} only</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-full border"
+            style={{ background: "rgba(185,28,28,0.2)", borderColor: "#b91c1c", boxShadow: "0 0 12px rgba(185,28,28,0.4)" }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Inner tabs */}
+        <div className="flex-none flex gap-1 px-6 pt-3 border-b border-white/10">
+          {(["info", "members", "chat"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setInnerTab(t)}
+              className={`px-4 py-2 text-sm rounded-t-lg capitalize transition-colors ${innerTab === t ? "bg-white/10 text-white font-medium" : "text-muted-foreground hover:text-white"}`}
+            >
+              {t === "members" ? `Members (${members.length})` : t === "chat" ? `Chat (${messages.length})` : "Info"}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
+          {innerTab === "info" && (
+            <div className="space-y-3">
+              <div className="grid sm:grid-cols-2 gap-3">
+                {infoRows.map((r) => (
+                  <div key={r.label} className="rounded-xl px-3.5 py-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{r.label}</p>
+                    <p className="text-sm mt-0.5 capitalize">{r.value}</p>
+                  </div>
+                ))}
+              </div>
+              {group.description && (
+                <div className="rounded-xl px-3.5 py-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Description</p>
+                  <p className="text-sm leading-relaxed text-white/80">{group.description}</p>
+                </div>
+              )}
+              <div className="rounded-xl px-3.5 py-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Group Creator</p>
+                <p className="text-sm font-medium">{group.creatorName || "—"}</p>
+                <p className="text-xs text-muted-foreground">{group.creatorEmail}</p>
+              </div>
+            </div>
+          )}
+
+          {innerTab === "members" && (
+            loadingMembers ? (
+              <p className="text-sm text-muted-foreground py-6">Loading…</p>
+            ) : members.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No members yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[520px]">
+                  <thead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="text-left pb-3">User</th>
+                      <th className="text-left pb-3">Role</th>
+                      <th className="text-left pb-3">Status</th>
+                      <th className="text-left pb-3">Joined</th>
+                      <th className="text-right pb-3">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.map((m) => (
+                      <tr key={m.id} className="border-t border-white/5">
+                        <td className="py-2.5 pr-4">
+                          <p className="font-medium">{m.userName || "—"}</p>
+                          <p className="text-xs text-muted-foreground">{m.userEmail}</p>
+                        </td>
+                        <td className="py-2.5 pr-4 text-xs capitalize">{m.role}</td>
+                        <td className="py-2.5 pr-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${soloMemberStatusBadge(m.status)}`}>{m.status}</span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-xs text-muted-foreground whitespace-nowrap">
+                          {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          {m.role !== "admin" && !["removed", "left", "rejected"].includes(m.status) && (
+                            <button
+                              type="button"
+                              disabled={busyMember === m.id}
+                              onClick={() => removeMember(m)}
+                              className="px-2.5 py-1 rounded-lg text-xs bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 disabled:opacity-50"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+
+          {innerTab === "chat" && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Read-only admin view · messages auto-deleted daily at 3 AM
+                </div>
+                <button
+                  type="button"
+                  onClick={loadChat}
+                  className="h-7 px-2.5 rounded-md text-xs bg-white/5 border border-white/15 text-white/70 hover:bg-white/10 flex items-center gap-1"
+                >
+                  <RefreshCw className="h-3 w-3" /> Refresh
+                </button>
+              </div>
+              {loadingChat ? (
+                <p className="text-sm text-muted-foreground py-6">Loading…</p>
+              ) : messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No messages in this group.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {messages.map((m) => (
+                    <div key={m.id} className="rounded-xl px-3.5 py-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-white/80">{m.userName || "Unknown"}</span>
+                        <span className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <p className="text-sm text-white/70 leading-relaxed">{m.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div className="flex-none border-t border-white/10 px-6 py-4 flex flex-wrap gap-3 justify-end">
+          {group.status !== "closed" && (
+            <button
+              type="button"
+              onClick={() => onForceClose(group.id)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
+            >
+              Force Close
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onDelete(group.id, group.name)}
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25"
+          >
+            Delete Group
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-white/5 border border-white/15 text-white/70 hover:bg-white/10"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Groups monitoring panel ───────────────────────────────────────────────────
+function SoloGroupsPanel() {
+  const [groups, setGroups] = useState<AdminSoloGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [actFilter, setActFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [detailGroup, setDetailGroup] = useState<AdminSoloGroup | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    setLoading(true);
+    apiGet<AdminSoloGroup[]>("/api/admin/solo-connect/groups")
+      .then(setGroups)
+      .catch(() => toast({ title: "Could not load groups", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const filtered = groups.filter((g) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!g.name.toLowerCase().includes(q) && !g.creatorName.toLowerCase().includes(q) && !g.creatorEmail.toLowerCase().includes(q) && !g.city.toLowerCase().includes(q)) return false;
+    }
+    if (actFilter && g.activityType !== actFilter) return false;
+    if (statusFilter && g.status !== statusFilter) return false;
+    return true;
+  });
+
+  const totalMembers = groups.reduce((s, g) => s + g.memberCount, 0);
+  const openGroups = groups.filter((g) => g.status === "open").length;
+  const pendingJoins = groups.reduce((s, g) => s + g.pendingCount, 0);
+  const citiesCount = new Set(groups.map((g) => g.city.toLowerCase())).size;
+
+  const forceClose = async (id: number) => {
+    try {
+      await apiPost(`/api/admin/solo-connect/groups/${id}/close`, {});
+      toast({ title: "Group force-closed" });
+      setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, status: "closed" } : g)));
+      setDetailGroup((d) => (d?.id === id ? { ...d, status: "closed" } : d));
+    } catch {
+      toast({ title: "Action failed", variant: "destructive" });
+    }
+  };
+
+  const deleteGroup = async (id: number, name: string) => {
+    if (!window.confirm(`Delete group "${name}"?\n\nThis permanently removes the group, all members, and all chat messages.`)) return;
+    try {
+      await apiDelete(`/api/admin/solo-connect/groups/${id}`);
+      toast({ title: "Group deleted" });
+      setGroups((prev) => prev.filter((g) => g.id !== id));
+      setDetailGroup((d) => (d?.id === id ? null : d));
+    } catch {
+      toast({ title: "Could not delete group", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Stats */}
+      <div className="grid sm:grid-cols-4 gap-4">
+        {[
+          { label: "Total Groups", value: groups.length, sub: "all time" },
+          { label: "Open Groups", value: openGroups, sub: "accepting members" },
+          { label: "Total Members", value: totalMembers, sub: "approved across groups" },
+          { label: "Pending Joins", value: pendingJoins, sub: "awaiting group admin" },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-2xl glass-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+            <p className="font-serif text-2xl mt-1">{stat.value}</p>
+            <p className="text-xs text-muted-foreground">{stat.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search group, creator or city…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-8 text-sm w-64"
+          />
+        </div>
+        <select
+          value={actFilter}
+          onChange={(e) => setActFilter(e.target.value)}
+          className="h-8 text-sm px-2 rounded-md bg-white/5 border border-white/15 text-foreground"
+        >
+          <option value="">All activities</option>
+          {["nightlife", "happy_hours", "food_drinks", "events", "games", "activities"].map((a) => (
+            <option key={a} value={a}>{soloActLabel(a)}</option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-8 text-sm px-2 rounded-md bg-white/5 border border-white/15 text-foreground"
+        >
+          <option value="">All statuses</option>
+          <option value="open">Open</option>
+          <option value="locked">Locked</option>
+          <option value="closed">Closed</option>
+        </select>
+        <button
+          type="button"
+          onClick={load}
+          className="h-8 px-3 rounded-md bg-white/5 border border-white/15 text-xs text-white/70 hover:bg-white/10 flex items-center gap-1.5"
+        >
+          <RefreshCw className="h-3 w-3" /> Refresh
+        </button>
+        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} / {groups.length} groups · {citiesCount} cities</span>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[60vh]">
+        {loading ? (
+          <p className="p-6 text-sm text-muted-foreground">Loading groups…</p>
+        ) : filtered.length === 0 ? (
+          <p className="p-6 text-muted-foreground">No groups found.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[900px]">
+            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">Group</th>
+                <th className="text-left p-3">City / Gender</th>
+                <th className="text-left p-3">Creator</th>
+                <th className="text-left p-3">Members</th>
+                <th className="text-left p-3">Status</th>
+                <th className="text-left p-3">Created</th>
+                <th className="text-right p-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((g) => (
+                <tr key={g.id} className="border-t border-white/5 align-top hover:bg-white/[0.02] transition-colors">
+                  <td className="p-3">
+                    <p className="font-medium">{g.name}</p>
+                    <span className="text-[10px] text-muted-foreground">{soloActLabel(g.activityType)}</span>
+                    {g.venueName && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                        <MapPin className="h-2.5 w-2.5 shrink-0" />{g.venueName}
+                      </p>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <p className="text-sm">{g.city}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{g.genderType} only</p>
+                  </td>
+                  <td className="p-3">
+                    <p className="text-sm">{g.creatorName || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{g.creatorEmail}</p>
+                  </td>
+                  <td className="p-3">
+                    <p className="text-sm font-medium">{g.memberCount}/{g.maxMembers}</p>
+                    {g.pendingCount > 0 && <p className="text-xs text-amber-300">{g.pendingCount} pending</p>}
+                  </td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${soloGroupStatusBadge(g.status)}`}>
+                      {g.status === "locked" && <Lock className="h-2.5 w-2.5" />}
+                      {g.status}
+                    </span>
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(g.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setDetailGroup(g)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/15 text-white/70 hover:bg-white/10"
+                      >
+                        View
+                      </button>
+                      {g.status !== "closed" && (
+                        <button
+                          type="button"
+                          onClick={() => forceClose(g.id)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
+                        >
+                          Close
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => deleteGroup(g.id, g.name)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {detailGroup && (
+        <GroupDetailModal
+          group={detailGroup}
+          onClose={() => setDetailGroup(null)}
+          onForceClose={forceClose}
+          onDelete={deleteGroup}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Identity verifications panel (extracted from old SoloConnectAdmin) ────────
+function SoloVerificationsPanel() {
+  const [items, setItems] = useState<AdminSoloVerification[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<AdminSoloVerification | null>(null);
+  const { toast } = useToast();
+
+  const load = () =>
+    apiGet<AdminSoloVerification[]>("/api/admin/solo-connect/verifications")
+      .then(setItems)
+      .catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  const review = async (id: number, decision: "approved" | "rejected", rejectionReason = "") => {
+    setBusyId(id);
+    try {
+      await apiPost(`/api/admin/solo-connect/verifications/${id}/review`, { decision, rejectionReason });
+      toast({ title: decision === "approved" ? "Verification approved" : "Verification rejected" });
+      setRejectTarget(null);
+      await load();
+    } catch {
+      toast({ title: "Action failed. Try again.", variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removeVerification = async (v: AdminSoloVerification) => {
+    if (!window.confirm(`Delete ${v.userName || v.userEmail}'s verification? They'll be able to start over from scratch.`)) return;
+    setBusyId(v.id);
+    try {
+      await apiDelete(`/api/admin/solo-connect/verifications/${v.id}`);
+      toast({ title: "Verification deleted" });
+      await load();
+    } catch {
+      toast({ title: "Could not delete. Try again.", variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const pending = items.filter((v) => v.status === "pending");
+  const approved = items.filter((v) => v.status === "approved");
+  const rejected = items.filter((v) => v.status === "rejected");
+
+  const verBadge = (s: string) => {
+    const map: Record<string, string> = {
+      pending: "bg-amber-500/15 border-amber-500/30 text-amber-300",
+      approved: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+      rejected: "bg-red-500/15 border-red-500/30 text-red-300",
+    };
+    return map[s] ?? "bg-white/10 border-white/20 text-white/70";
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="grid sm:grid-cols-3 gap-4">
+        {[
+          { label: "Pending Review", value: pending.length, suffix: "awaiting action" },
+          { label: "Approved", value: approved.length, suffix: "verified users" },
+          { label: "Rejected", value: rejected.length, suffix: "declined" },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-2xl glass-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+            <p className="font-serif text-2xl mt-1">{stat.value}</p>
+            <p className="text-xs text-muted-foreground">{stat.suffix}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[60vh]">
+        {items.length === 0 ? (
+          <p className="p-6 text-muted-foreground">No Solo Connect verifications yet.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[760px]">
+            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">User</th>
+                <th className="text-left p-3">ID Type</th>
+                <th className="text-left p-3">Phone</th>
+                <th className="text-left p-3">Documents</th>
+                <th className="text-left p-3">Status</th>
+                <th className="text-right p-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((v) => (
+                <tr key={v.id} className="border-t border-white/5 align-top">
+                  <td className="p-3">
+                    <p className="font-medium">{v.userName}</p>
+                    <p className="text-xs text-muted-foreground">{v.userEmail}</p>
+                  </td>
+                  <td className="p-3">{SOLO_ID_LABELS[v.idType] ?? (v.idType || "—")}</td>
+                  <td className="p-3">
+                    <span>{v.phone || "—"}</span>
+                    {v.phoneVerified && <span className="ml-1.5 text-[10px] text-emerald-300">✓ verified</span>}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2">
+                      {v.idDocumentUrl ? (
+                        <a href={v.idDocumentUrl} target="_blank" rel="noreferrer" title="Government ID">
+                          <img src={v.idDocumentUrl} alt="ID" className="h-12 w-16 object-cover rounded border border-white/10" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No ID</span>
+                      )}
+                      {v.selfieUrl ? (
+                        <a href={v.selfieUrl} target="_blank" rel="noreferrer" title="Selfie">
+                          <img src={v.selfieUrl} alt="Selfie" className="h-12 w-12 object-cover rounded-full border border-white/10" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No selfie</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${verBadge(v.status)}`}>{v.status}</span>
+                    {v.status === "rejected" && v.rejectionReason && (
+                      <p className="text-[10px] text-muted-foreground mt-1 max-w-[160px]">{v.rejectionReason}</p>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2 justify-end">
+                      {v.status !== "approved" && (
+                        <button
+                          type="button"
+                          disabled={busyId === v.id}
+                          onClick={() => review(v.id, "approved")}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                      )}
+                      {v.status !== "rejected" && (
+                        <button
+                          type="button"
+                          disabled={busyId === v.id}
+                          onClick={() => setRejectTarget(v)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busyId === v.id}
+                        onClick={() => removeVerification(v)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/15 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {rejectTarget && (
+        <div
+          className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)" }}
+          onClick={() => setRejectTarget(null)}
+        >
+          <div className="w-full max-w-md rounded-2xl glass-card p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-serif mb-1">Reject verification</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Choose what {rejectTarget.userName || rejectTarget.userEmail} should re-upload. They'll see this message on their Solo Connect page.
+            </p>
+            <div className="space-y-2">
+              {SOLO_REJECT_REASONS.map((r) => (
+                <button
+                  key={r.label}
+                  type="button"
+                  disabled={busyId === rejectTarget.id}
+                  onClick={() => review(rejectTarget.id, "rejected", r.message)}
+                  className="w-full text-left px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                >
+                  <p className="text-sm font-semibold text-red-200">{r.label}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{r.message}</p>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setRejectTarget(null)}
+              className="mt-4 w-full py-2.5 rounded-xl text-sm font-medium bg-white/5 border border-white/15 text-white/70 hover:bg-white/10"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Solo Connect admin entry-point (sub-tab switcher) ────────────────────
+function SoloConnectAdmin() {
+  const [subTab, setSubTab] = useState<"verifications" | "groups">("verifications");
+
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-1 p-1 rounded-xl bg-white/5 w-fit">
+        {(["verifications", "groups"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setSubTab(t)}
+            className={`px-5 py-2 rounded-lg text-sm font-medium capitalize transition-all ${subTab === t ? "bg-white/10 text-white shadow" : "text-muted-foreground hover:text-white"}`}
+          >
+            {t === "verifications" ? "Identity Verifications" : "Groups"}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "verifications" && <SoloVerificationsPanel />}
+      {subTab === "groups" && <SoloGroupsPanel />}
     </div>
   );
 }

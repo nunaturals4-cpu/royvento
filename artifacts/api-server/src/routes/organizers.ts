@@ -500,6 +500,8 @@ router.get("/organizers/:slug", async (req, res) => {
     .orderBy(desc(organizerReviewsTable.createdAt))
     .limit(20);
   const stats = await organizerStats(org.id);
+  // Public organizer profile (approved only) — edge-cache on the success path.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   return res.json({ organizer: org, upcoming, past, reviews, stats });
 });
 
@@ -513,6 +515,7 @@ router.get("/organizers/:slug/events", async (req, res) => {
     .from(organizerEventsTable)
     .where(and(eq(organizerEventsTable.organizerId, org.id), eq(organizerEventsTable.approvalStatus, "approved")))
     .orderBy(desc(organizerEventsTable.createdAt));
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   return res.json(events);
 });
 
@@ -520,6 +523,8 @@ router.get("/organizers/:slug/events", async (req, res) => {
 // /organizer-events/slider MUST be declared before /organizer-events/:slug so
 // "slider" isn't captured as a slug.
 router.get("/organizer-events", async (_req, res) => {
+  // Public approved-events grid — edge-cacheable (same bytes for everyone).
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const rows = await db.execute(sql`
     SELECT
       e.id, e.title, e.slug, e.category, e.short_description AS "shortDescription",
@@ -536,6 +541,7 @@ router.get("/organizer-events", async (_req, res) => {
 
 // Featured approved organizer events, shaped for the Events-page hero slider.
 router.get("/organizer-events/slider", async (_req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const rows = await db.execute(sql`
     SELECT
       e.id, e.title,
@@ -565,11 +571,15 @@ router.get("/organizer-events/:slug", async (req, res) => {
     .from(eventTicketsTable)
     .where(and(eq(eventTicketsTable.eventId, ev.id), eq(eventTicketsTable.active, true)))
     .orderBy(eventTicketsTable.price);
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   return res.json({ event: ev, organizer: orgRows[0] ?? null, tickets });
 });
 
 // Public: active discount coupons a customer can apply for this event.
 router.get("/organizer-events/:slug/coupons", async (req, res) => {
+  // Public discount codes shown on the event page (not per-user; booking-time
+  // validation still re-checks expiry/usage). Short edge-cache is safe.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const slug = String(req.params["slug"]);
   const evRows = await db.select({ id: organizerEventsTable.id, organizerId: organizerEventsTable.organizerId })
     .from(organizerEventsTable).where(eq(organizerEventsTable.slug, slug)).limit(1);

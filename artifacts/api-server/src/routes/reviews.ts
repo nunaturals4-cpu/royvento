@@ -336,6 +336,8 @@ router.delete("/reviews/:reviewId", requireAuth(), async (req, res) => {
 router.get("/reviews/event/:eventId", async (req, res) => {
   const id = Number(req.params["eventId"]);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  // Public event reviews (no auth, no per-user data) — edge-cacheable.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const { page, pageSize } = parsePaging(req);
   const offset = (page - 1) * pageSize;
 
@@ -363,6 +365,8 @@ router.get("/reviews/event/:eventId", async (req, res) => {
 router.get("/reviews/vendor/:vendorId", async (req, res) => {
   const id = Number(req.params["vendorId"]);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  // Public vendor reviews (no auth, no per-user data) — edge-cacheable.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const { page, pageSize } = parsePaging(req);
   const offset = (page - 1) * pageSize;
 

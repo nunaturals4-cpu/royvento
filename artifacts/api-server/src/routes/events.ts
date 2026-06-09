@@ -152,6 +152,10 @@ router.get("/events", async (req, res) => {
     return;
   }
   const q = parsedQ.data;
+  // Public, anonymous events catalog (approved only) — edge-cache so listing,
+  // filter and pagination requests are served from Cloudflare, not the DB. Set
+  // after validation so 400s aren't cached. Matches the featured/popular siblings.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const hasPage = q.page !== undefined;
   const conditions = [eq(eventsTable.approvalStatus, "approved")];
   if (q.category) conditions.push(eq(eventsTable.category, q.category));
@@ -324,6 +328,9 @@ router.get("/events/:eventId", async (req, res) => {
   const v = vrows[0];
   const { getVendorRating } = await import("../lib/aggregates");
   const rating = v ? await getVendorRating(v.id) : { rating: 0, reviewCount: 0 };
+  // Public event detail — identical for all viewers. Edge-cache on the success
+  // path only (the 400/404 returns above stay uncached).
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   res.json({
     ...base,
     vendor: v

@@ -431,11 +431,15 @@ router.get("/game-organizers/:slug", async (req, res) => {
     .where(eq(gameReviewsTable.gameOrganizerId, org.id))
     .orderBy(desc(gameReviewsTable.createdAt)).limit(20);
   const stats = await organizerStats(org.id);
+  // Public game-organizer profile (approved only) — edge-cache on success.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   return res.json({ organizer: org, games, packages, reviews, stats });
 });
 
 // All approved games (public grid). Declared before /games/:slug.
 router.get("/games", async (_req, res) => {
+  // Public approved-games grid — edge-cacheable (same bytes for everyone).
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const rows = await db.execute(sql`
     SELECT
       g.id, g.name, g.slug, g.category, g.cover_image_url AS "coverImageUrl",
@@ -450,6 +454,7 @@ router.get("/games", async (_req, res) => {
 });
 
 router.get("/games/slider", async (_req, res) => {
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const rows = await db.execute(sql`
     SELECT
       g.id, g.name AS "title",
@@ -472,6 +477,7 @@ router.get("/games/:slug", async (req, res) => {
   const game = rows[0];
   if (!game || game.approvalStatus !== "approved") return res.status(404).json({ error: "Game not found" });
   const orgRows = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, game.gameOrganizerId)).limit(1);
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   return res.json({ game, organizer: orgRows[0] ?? null });
 });
 
@@ -481,11 +487,14 @@ router.get("/game-packages/:slug", async (req, res) => {
   const pkg = rows[0];
   if (!pkg || pkg.approvalStatus !== "approved") return res.status(404).json({ error: "Package not found" });
   const orgRows = await db.select().from(gameOrganizersTable).where(eq(gameOrganizersTable.id, pkg.gameOrganizerId)).limit(1);
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   return res.json({ package: pkg, organizer: orgRows[0] ?? null });
 });
 
 // Public: active discount coupons a customer can apply for this organizer.
 router.get("/game-organizers/:slug/coupons", async (req, res) => {
+  // Public discount codes (not per-user; booking re-validates). Short cache ok.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   const slug = String(req.params["slug"]);
   const orgRows = await db.select({ id: gameOrganizersTable.id }).from(gameOrganizersTable).where(eq(gameOrganizersTable.slug, slug)).limit(1);
   const org = orgRows[0];

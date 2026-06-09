@@ -140,6 +140,323 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
 
+  # ─── Solo Connect (Phase 1) ───────────────────────────────────────────────
+  /solo-connect/access:
+    get:
+      operationId: getSoloAccess
+      tags: [solo-connect]
+      summary: Solo Connect eligibility + verification status for the current user
+      responses:
+        "200":
+          description: Access info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloAccess"
+
+  /solo-connect/venues:
+    get:
+      operationId: listSoloVenues
+      tags: [solo-connect]
+      summary: Venue options for group creation (source varies by activity type)
+      parameters:
+        - { name: activityType, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Venue options
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SoloVenueOption"
+
+  /solo-connect/verification:
+    get:
+      operationId: getSoloVerification
+      tags: [solo-connect]
+      summary: Current user's identity verification record (or null)
+      responses:
+        "200":
+          description: Verification record
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SoloVerification"
+                  - type: "null"
+    post:
+      operationId: submitSoloVerification
+      tags: [solo-connect]
+      summary: Upload ID document, selfie and phone for verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoloVerificationBody"
+      responses:
+        "200":
+          description: Verification record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloVerification"
+
+  /solo-connect/verification/otp/request:
+    post:
+      operationId: requestSoloOtp
+      tags: [solo-connect]
+      summary: Generate a mobile OTP (dev-mode returns the code)
+      responses:
+        "200":
+          description: OTP generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloOtpRequestResult"
+
+  /solo-connect/verification/otp/verify:
+    post:
+      operationId: verifySoloOtp
+      tags: [solo-connect]
+      summary: Verify the mobile OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoloOtpVerifyBody"
+      responses:
+        "200":
+          description: Verification record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloVerification"
+
+  /admin/solo-connect/verifications/{id}/review:
+    post:
+      operationId: reviewSoloVerification
+      tags: [solo-connect]
+      summary: Admin approve/reject an identity verification
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoloReviewBody"
+      responses:
+        "200":
+          description: Verification record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloVerification"
+
+  /solo-connect/groups:
+    get:
+      operationId: listSoloGroups
+      tags: [solo-connect]
+      summary: List groups in the caller's gender + current city
+      parameters:
+        - { name: city, in: query, required: true, schema: { type: string } }
+        - { name: activityType, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SoloGroup"
+    post:
+      operationId: createSoloGroup
+      tags: [solo-connect]
+      summary: Create a new activity group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoloGroupBody"
+      responses:
+        "200":
+          description: Created group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloGroup"
+
+  /solo-connect/groups/{id}:
+    get:
+      operationId: getSoloGroup
+      tags: [solo-connect]
+      summary: Group detail + members
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: city, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloGroupDetail"
+
+  /solo-connect/groups/{id}/join:
+    post:
+      operationId: joinSoloGroup
+      tags: [solo-connect]
+      summary: Request to join a group (location validated)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoloJoinBody"
+      responses:
+        "200":
+          description: Join result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloActionResult"
+
+  /solo-connect/groups/{id}/leave:
+    post:
+      operationId: leaveSoloGroup
+      tags: [solo-connect]
+      summary: Leave a group
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /solo-connect/groups/{id}/members/{memberId}/approve:
+    post:
+      operationId: approveSoloMember
+      tags: [solo-connect]
+      summary: Approve a join request (group admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: memberId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /solo-connect/groups/{id}/members/{memberId}/reject:
+    post:
+      operationId: rejectSoloMember
+      tags: [solo-connect]
+      summary: Reject a join request (group admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: memberId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /solo-connect/groups/{id}/members/{memberId}/remove:
+    post:
+      operationId: removeSoloMember
+      tags: [solo-connect]
+      summary: Remove a member (group admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: memberId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ok"
+
+  /solo-connect/groups/{id}/lock:
+    post:
+      operationId: lockSoloGroup
+      tags: [solo-connect]
+      summary: Lock a group (group admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloActionResult"
+
+  /solo-connect/groups/{id}/close:
+    post:
+      operationId: closeSoloGroup
+      tags: [solo-connect]
+      summary: Close a group (group admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloActionResult"
+
+  /solo-connect/groups/{id}/messages:
+    get:
+      operationId: listSoloMessages
+      tags: [solo-connect]
+      summary: Group chat messages (members only; purged daily at 3 AM)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SoloMessage"
+    post:
+      operationId: sendSoloMessage
+      tags: [solo-connect]
+      summary: Post a chat message (members only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoloMessageBody"
+      responses:
+        "200":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloMessage"
+
   /users:
     get:
       operationId: listUsers
@@ -2723,6 +3040,213 @@ components:
           type: string
           enum: [male, female]
       required: [gender]
+
+    # ─── Solo Connect ─────────────────────────────────────────────────────────
+    SoloAccess:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        reason:
+          type: string
+          enum: [ok, not_premium]
+        premium:
+          type: boolean
+        verificationStatus:
+          type: string
+          enum: [none, pending, approved, rejected]
+        gender:
+          type: string
+          nullable: true
+      required: [eligible, reason, premium, verificationStatus]
+
+    SoloVerification:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        idType: { type: string }
+        idDocumentUrl: { type: string }
+        selfieUrl: { type: string }
+        phone: { type: string }
+        phoneVerified: { type: boolean }
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        rejectionReason: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+      required: [id, userId, idType, idDocumentUrl, selfieUrl, phone, phoneVerified, status, rejectionReason, createdAt, updatedAt]
+
+    SoloVerificationBody:
+      type: object
+      properties:
+        idType:
+          type: string
+          enum: [aadhaar, passport, driving_license, voter_id]
+        idDocumentUrl: { type: string }
+        selfieUrl: { type: string }
+        phone: { type: string }
+      required: [idType, idDocumentUrl, selfieUrl, phone]
+
+    SoloOtpRequestResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        devCode:
+          type: string
+          nullable: true
+      required: [ok]
+
+    SoloOtpVerifyBody:
+      type: object
+      properties:
+        code: { type: string }
+      required: [code]
+
+    SoloReviewBody:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        rejectionReason: { type: string }
+      required: [decision]
+
+    SoloGroup:
+      type: object
+      properties:
+        id: { type: integer }
+        adminUserId: { type: integer }
+        name: { type: string }
+        activityType:
+          type: string
+          enum: [nightlife, events, games, activities, happy_hours, food_drinks]
+        activityLabel: { type: string }
+        venueName: { type: string }
+        vendorId: { type: integer, nullable: true }
+        eventId: { type: integer, nullable: true }
+        groupDate: { type: string, nullable: true }
+        startTime: { type: string }
+        description: { type: string }
+        minMembers: { type: integer }
+        maxMembers: { type: integer }
+        country: { type: string }
+        state: { type: string }
+        city: { type: string }
+        genderType:
+          type: string
+          enum: [male, female]
+        visibility:
+          type: string
+          enum: [public, private]
+        status:
+          type: string
+          enum: [open, locked, closed]
+        reputationScore: { type: string }
+        ratingCount: { type: integer }
+        createdAt: { type: string }
+        memberCount: { type: integer }
+        myMembershipStatus:
+          type: string
+          nullable: true
+        isAdmin: { type: boolean }
+      required: [id, adminUserId, name, activityType, activityLabel, venueName, startTime, description, minMembers, maxMembers, country, state, city, genderType, visibility, status, reputationScore, ratingCount, createdAt, memberCount, isAdmin]
+
+    SoloGroupMember:
+      type: object
+      properties:
+        id: { type: integer }
+        groupId: { type: integer }
+        userId: { type: integer }
+        userName: { type: string }
+        role:
+          type: string
+          enum: [admin, member]
+        status:
+          type: string
+          enum: [requested, approved, rejected, removed, left]
+        joinedAt: { type: string, nullable: true }
+        createdAt: { type: string }
+      required: [id, groupId, userId, userName, role, status, createdAt]
+
+    SoloGroupDetail:
+      type: object
+      properties:
+        group:
+          $ref: "#/components/schemas/SoloGroup"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/SoloGroupMember"
+      required: [group, members]
+
+    SoloGroupBody:
+      type: object
+      properties:
+        name: { type: string }
+        activityType:
+          type: string
+          enum: [nightlife, events, games, activities, happy_hours, food_drinks]
+        activityLabel: { type: string }
+        venueName: { type: string }
+        vendorId: { type: integer }
+        eventId: { type: integer }
+        groupDate: { type: string }
+        startTime: { type: string }
+        description: { type: string }
+        maxMembers: { type: integer }
+        visibility:
+          type: string
+          enum: [public, private]
+        country: { type: string }
+        state: { type: string }
+        city: { type: string }
+      required: [name, activityType, maxMembers, city]
+
+    SoloJoinBody:
+      type: object
+      properties:
+        country: { type: string }
+        state: { type: string }
+        city: { type: string }
+      required: [city]
+
+    SoloActionResult:
+      type: object
+      properties:
+        ok: { type: boolean }
+        status: { type: string }
+      required: [ok]
+
+    SoloVenueOption:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        sub: { type: string }
+        kind:
+          type: string
+          enum: [vendor, event, game]
+      required: [id, name, sub, kind]
+
+    SoloMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        groupId: { type: integer }
+        userId: { type: integer }
+        userName: { type: string }
+        body: { type: string }
+        createdAt: { type: string }
+        isMine: { type: boolean }
+      required: [id, groupId, userId, userName, body, createdAt, isMine]
+
+    SoloMessageBody:
+      type: object
+      properties:
+        body: { type: string }
+      required: [body]
 
     AuthResponse:
       type: object

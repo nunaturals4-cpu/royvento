@@ -1750,3 +1750,129 @@ export const gameProfileViewsTable = pgTable(
   }),
 );
 export type GameProfileView = typeof gameProfileViewsTable.$inferSelect;
+
+// ─── Solo Connect vertical ──────────────────────────────────────────────────
+//
+// A premium, heavily-moderated, activity-based group discovery feature. Users
+// join verified, single-gender, same-city groups tied to a real-world activity
+// (nightlife / events / games / activities) — explicitly NOT a dating product.
+// Access requires premium/verified-partner eligibility AND an approved identity
+// verification. Gender (from users.gender) and the user's current city are
+// enforced at BOTH the API and UI layers. Phase 1: verification + groups +
+// membership. (Chat, safety center, reporting, reputation are later phases.)
+
+// One identity-verification record per user. status drives participation:
+// only `approved` users may create or join groups. otpHash/otpExpiry back the
+// dev-mode mobile OTP step (a real SMS provider drops in behind the same flow).
+export const soloConnectVerificationsTable = pgTable(
+  "solo_connect_verifications",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    // aadhaar | passport | driving_license | voter_id
+    idType: varchar("id_type", { length: 20 }).notNull().default(""),
+    idDocumentUrl: text("id_document_url").notNull().default(""),
+    selfieUrl: text("selfie_url").notNull().default(""),
+    phone: varchar("phone", { length: 20 }).notNull().default(""),
+    otpHash: varchar("otp_hash", { length: 255 }).notNull().default(""),
+    otpExpiry: timestamp("otp_expiry", { withTimezone: true }),
+    phoneVerified: boolean("phone_verified").notNull().default(false),
+    // pending | approved | rejected
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    rejectionReason: text("rejection_reason").notNull().default(""),
+    reviewedByUserId: integer("reviewed_by_user_id"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userUniq: uniqueIndex("solo_verifications_user_uniq").on(t.userId),
+    statusIdx: index("solo_verifications_status_idx").on(t.status),
+  }),
+);
+export type SoloConnectVerification = typeof soloConnectVerificationsTable.$inferSelect;
+
+// An activity-based group. genderType is always `male` or `female` (never mixed)
+// and is locked to the creator's onboarding gender. country/state/city capture
+// the creator's verified location; only same-city members may join.
+export const soloGroupsTable = pgTable(
+  "solo_groups",
+  {
+    id: serial("id").primaryKey(),
+    adminUserId: integer("admin_user_id").notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    // nightlife | events | games | activities
+    activityType: varchar("activity_type", { length: 20 }).notNull().default("nightlife"),
+    // Free-text activity label, e.g. "Pub Crawl Tonight", "VR Gaming Group"
+    activityLabel: varchar("activity_label", { length: 160 }).notNull().default(""),
+    venueName: varchar("venue_name", { length: 255 }).notNull().default(""),
+    vendorId: integer("vendor_id"),
+    eventId: integer("event_id"),
+    groupDate: date("group_date"),
+    startTime: varchar("start_time", { length: 8 }).notNull().default(""),
+    description: text("description").notNull().default(""),
+    minMembers: integer("min_members").notNull().default(3),
+    maxMembers: integer("max_members").notNull().default(15),
+    country: varchar("country", { length: 100 }).notNull().default("India"),
+    state: varchar("state", { length: 100 }).notNull().default(""),
+    city: varchar("city", { length: 100 }).notNull().default(""),
+    // male | female — no mixed groups, enforced at API + UI
+    genderType: varchar("gender_type", { length: 10 }).notNull(),
+    // public | private
+    visibility: varchar("visibility", { length: 10 }).notNull().default("public"),
+    // open | locked | closed
+    status: varchar("status", { length: 10 }).notNull().default("open"),
+    reputationScore: numeric("reputation_score", { precision: 4, scale: 2 }).notNull().default("0"),
+    ratingCount: integer("rating_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    cityGenderStatusIdx: index("solo_groups_city_gender_status_idx").on(t.city, t.genderType, t.status),
+    adminIdx: index("solo_groups_admin_idx").on(t.adminUserId),
+  }),
+);
+export type SoloGroup = typeof soloGroupsTable.$inferSelect;
+
+// Membership / join-request rows. The creator is inserted as role=admin,
+// status=approved. status: requested | approved | rejected | removed | left.
+export const soloGroupMembersTable = pgTable(
+  "solo_group_members",
+  {
+    id: serial("id").primaryKey(),
+    groupId: integer("group_id")
+      .notNull()
+      .references(() => soloGroupsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull(),
+    role: varchar("role", { length: 10 }).notNull().default("member"),
+    status: varchar("status", { length: 12 }).notNull().default("requested"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    groupUserUniq: uniqueIndex("solo_group_members_group_user_uniq").on(t.groupId, t.userId),
+    userIdx: index("solo_group_members_user_idx").on(t.userId),
+  }),
+);
+export type SoloGroupMember = typeof soloGroupMembersTable.$inferSelect;
+
+// Temporary group chat. All rows are wiped daily at 03:00 (IST) by a cron job
+// for privacy/safety, so this table only ever holds the current day's messages.
+export const soloGroupMessagesTable = pgTable(
+  "solo_group_messages",
+  {
+    id: serial("id").primaryKey(),
+    groupId: integer("group_id")
+      .notNull()
+      .references(() => soloGroupsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull(),
+    body: text("body").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    groupIdx: index("solo_group_messages_group_idx").on(t.groupId),
+    createdIdx: index("solo_group_messages_created_idx").on(t.createdAt),
+  }),
+);
+export type SoloGroupMessage = typeof soloGroupMessagesTable.$inferSelect;

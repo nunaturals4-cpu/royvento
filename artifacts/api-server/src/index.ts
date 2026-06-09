@@ -256,6 +256,79 @@ async function applyPendingSchemaChanges() {
   try {
     await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gender" varchar(10)`);
     await db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gender_completed" boolean NOT NULL DEFAULT false`);
+    // ── Solo Connect vertical (Phase 1) ────────────────────────────────────
+    // Verified, single-gender, same-city activity groups. Idempotent so a fresh
+    // deploy ships the whole vertical without a drizzle-kit step. Mirrors
+    // lib/db/src/schema/index.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "solo_connect_verifications" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "id_type" varchar(20) NOT NULL DEFAULT '',
+        "id_document_url" text NOT NULL DEFAULT '',
+        "selfie_url" text NOT NULL DEFAULT '',
+        "phone" varchar(20) NOT NULL DEFAULT '',
+        "otp_hash" varchar(255) NOT NULL DEFAULT '',
+        "otp_expiry" timestamp with time zone,
+        "phone_verified" boolean NOT NULL DEFAULT false,
+        "status" varchar(20) NOT NULL DEFAULT 'pending',
+        "rejection_reason" text NOT NULL DEFAULT '',
+        "reviewed_by_user_id" integer,
+        "reviewed_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "solo_verifications_user_uniq" ON "solo_connect_verifications" ("user_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_verifications_status_idx" ON "solo_connect_verifications" ("status")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "solo_groups" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "admin_user_id" integer NOT NULL,
+        "name" varchar(160) NOT NULL,
+        "activity_type" varchar(20) NOT NULL DEFAULT 'nightlife',
+        "activity_label" varchar(160) NOT NULL DEFAULT '',
+        "venue_name" varchar(255) NOT NULL DEFAULT '',
+        "vendor_id" integer,
+        "event_id" integer,
+        "group_date" date,
+        "start_time" varchar(8) NOT NULL DEFAULT '',
+        "description" text NOT NULL DEFAULT '',
+        "min_members" integer NOT NULL DEFAULT 3,
+        "max_members" integer NOT NULL DEFAULT 15,
+        "country" varchar(100) NOT NULL DEFAULT 'India',
+        "state" varchar(100) NOT NULL DEFAULT '',
+        "city" varchar(100) NOT NULL DEFAULT '',
+        "gender_type" varchar(10) NOT NULL,
+        "visibility" varchar(10) NOT NULL DEFAULT 'public',
+        "status" varchar(10) NOT NULL DEFAULT 'open',
+        "reputation_score" numeric(4,2) NOT NULL DEFAULT '0',
+        "rating_count" integer NOT NULL DEFAULT 0,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_city_gender_status_idx" ON "solo_groups" ("city", "gender_type", "status")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_admin_idx" ON "solo_groups" ("admin_user_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "solo_group_members" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "group_id" integer NOT NULL REFERENCES "solo_groups"("id") ON DELETE CASCADE,
+        "user_id" integer NOT NULL,
+        "role" varchar(10) NOT NULL DEFAULT 'member',
+        "status" varchar(12) NOT NULL DEFAULT 'requested',
+        "joined_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "solo_group_members_group_user_uniq" ON "solo_group_members" ("group_id", "user_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_group_members_user_idx" ON "solo_group_members" ("user_id")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "solo_group_messages" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "group_id" integer NOT NULL REFERENCES "solo_groups"("id") ON DELETE CASCADE,
+        "user_id" integer NOT NULL,
+        "body" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_group_messages_group_idx" ON "solo_group_messages" ("group_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_group_messages_created_idx" ON "solo_group_messages" ("created_at")`);
     await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "global_priority" integer`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "drink_plans_global_priority_idx" ON "drink_plans" ("global_priority")`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_percent" numeric(5,2) DEFAULT 3.50`);
@@ -861,6 +934,15 @@ app.listen(port, (err) => {
   cron.schedule("0 2 * * *", () => {
     logger.info("Running daily cleanup job");
     runCleanup();
+  });
+
+  // Solo Connect — wipe ALL temporary group chat messages daily at 03:00 IST
+  // for privacy/safety (users are warned in-app).
+  cron.schedule("0 3 * * *", () => {
+    logger.info("Running Solo Connect chat purge (3 AM IST)");
+    db.execute(sql`DELETE FROM "solo_group_messages"`).catch((err) =>
+      logger.error({ err }, "Solo Connect chat purge failed"),
+    );
   });
 
   // Reminder 1: 10:00 AM IST — morning reminder for all today's bookings

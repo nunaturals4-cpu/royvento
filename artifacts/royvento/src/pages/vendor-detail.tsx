@@ -16,7 +16,7 @@ import { EventCard } from "@/components/EventCard";
 import {
   Star, MapPin, Navigation, Clock, GlassWater, Music2, Utensils, Bell,
   Heart, ChevronLeft, ChevronRight, X, ImagePlus, Users, Calendar,
-  Camera, Tag, Phone, User, CalendarDays, CheckCircle2, Ticket,
+  Camera, Tag, Phone, User, CalendarDays, CheckCircle2, Ticket, Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -227,6 +227,17 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
       .catch(() => qc.invalidateQueries({ queryKey: ["wishlist"] }));
   };
 
+  // Share this profile — native share sheet on mobile, clipboard copy elsewhere.
+  const share = async () => {
+    const url = window.location.href;
+    const title = vendor?.businessName || "Royvento";
+    if (typeof navigator.share === "function") {
+      try { await navigator.share({ title, url }); } catch { /* cancelled */ }
+      return;
+    }
+    try { await navigator.clipboard.writeText(url); toast({ title: "Link copied" }); } catch { /* ignore */ }
+  };
+
   const fmtTime = (hhmm: string) => {
     if (!hhmm) return "";
     const [h, m] = hhmm.split(":").map(Number);
@@ -348,6 +359,13 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
 
+        <button
+          onClick={share}
+          className="absolute top-4 right-16 h-9 w-9 rounded-full bg-black/55 border border-white/15 flex items-center justify-center hover:bg-black/75 transition-colors z-10"
+          aria-label="Share"
+        >
+          <Share2 className="h-4 w-4 text-white" />
+        </button>
         <button
           onClick={() => inWishlist ? removeFromWishlist() : addToWishlist()}
           className="absolute top-4 right-4 h-9 w-9 rounded-full bg-black/55 border border-white/15 flex items-center justify-center hover:bg-black/75 transition-colors z-10"

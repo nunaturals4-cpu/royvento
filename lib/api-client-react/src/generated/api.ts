@@ -65,6 +65,7 @@ import type {
   GetPartnerScannerBookingsParams,
   GetPartnerSettlementBalance200,
   GetSeoPageParams,
+  GetSoloGroupParams,
   HealthStatus,
   ImportGooglePubBody,
   ImportGooglePubResponse,
@@ -75,6 +76,8 @@ import type {
   ListMyVendorEventsParams,
   ListReviewsAdminParams,
   ListReviewsPartnerParams,
+  ListSoloGroupsParams,
+  ListSoloVenuesParams,
   ListVendorBookings200,
   ListVendorBookingsParams,
   ListVendorReviewsParams,
@@ -109,6 +112,20 @@ import type {
   SetPartnerCrowdLevelBody,
   SetVendorCommissionBody,
   SettlementRequest,
+  SoloAccess,
+  SoloActionResult,
+  SoloGroup,
+  SoloGroupBody,
+  SoloGroupDetail,
+  SoloJoinBody,
+  SoloMessage,
+  SoloMessageBody,
+  SoloOtpRequestResult,
+  SoloOtpVerifyBody,
+  SoloReviewBody,
+  SoloVenueOption,
+  SoloVerification,
+  SoloVerificationBody,
   TrackProfileViewResult,
   UpdateBookingStatusBody,
   UpdateEventBody,
@@ -646,6 +663,1419 @@ export const useSetGender = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSetGenderMutationOptions(options));
+    }
+
+export const getGetSoloAccessUrl = () => {
+
+
+
+
+  return `/api/solo-connect/access`
+}
+
+/**
+ * @summary Solo Connect eligibility + verification status for the current user
+ */
+export const getSoloAccess = async ( options?: RequestInit): Promise<SoloAccess> => {
+
+  return customFetch<SoloAccess>(getGetSoloAccessUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSoloAccessQueryKey = () => {
+    return [
+    `/api/solo-connect/access`
+    ] as const;
+    }
+
+
+export const getGetSoloAccessQueryOptions = <TData = Awaited<ReturnType<typeof getSoloAccess>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSoloAccessQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSoloAccess>>> = ({ signal }) => getSoloAccess({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSoloAccess>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSoloAccessQueryResult = NonNullable<Awaited<ReturnType<typeof getSoloAccess>>>
+export type GetSoloAccessQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Solo Connect eligibility + verification status for the current user
+ */
+
+export function useGetSoloAccess<TData = Awaited<ReturnType<typeof getSoloAccess>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSoloAccessQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListSoloVenuesUrl = (params?: ListSoloVenuesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/solo-connect/venues?${stringifiedParams}` : `/api/solo-connect/venues`
+}
+
+/**
+ * @summary Venue options for group creation (source varies by activity type)
+ */
+export const listSoloVenues = async (params?: ListSoloVenuesParams, options?: RequestInit): Promise<SoloVenueOption[]> => {
+
+  return customFetch<SoloVenueOption[]>(getListSoloVenuesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSoloVenuesQueryKey = (params?: ListSoloVenuesParams,) => {
+    return [
+    `/api/solo-connect/venues`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSoloVenuesQueryOptions = <TData = Awaited<ReturnType<typeof listSoloVenues>>, TError = ErrorType<unknown>>(params?: ListSoloVenuesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloVenues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSoloVenuesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSoloVenues>>> = ({ signal }) => listSoloVenues(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSoloVenues>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSoloVenuesQueryResult = NonNullable<Awaited<ReturnType<typeof listSoloVenues>>>
+export type ListSoloVenuesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Venue options for group creation (source varies by activity type)
+ */
+
+export function useListSoloVenues<TData = Awaited<ReturnType<typeof listSoloVenues>>, TError = ErrorType<unknown>>(
+ params?: ListSoloVenuesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloVenues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSoloVenuesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSoloVerificationUrl = () => {
+
+
+
+
+  return `/api/solo-connect/verification`
+}
+
+/**
+ * @summary Current user's identity verification record (or null)
+ */
+export const getSoloVerification = async ( options?: RequestInit): Promise<SoloVerification | null> => {
+
+  return customFetch<SoloVerification | null>(getGetSoloVerificationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSoloVerificationQueryKey = () => {
+    return [
+    `/api/solo-connect/verification`
+    ] as const;
+    }
+
+
+export const getGetSoloVerificationQueryOptions = <TData = Awaited<ReturnType<typeof getSoloVerification>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloVerification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSoloVerificationQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSoloVerification>>> = ({ signal }) => getSoloVerification({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSoloVerification>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSoloVerificationQueryResult = NonNullable<Awaited<ReturnType<typeof getSoloVerification>>>
+export type GetSoloVerificationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current user's identity verification record (or null)
+ */
+
+export function useGetSoloVerification<TData = Awaited<ReturnType<typeof getSoloVerification>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloVerification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSoloVerificationQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitSoloVerificationUrl = () => {
+
+
+
+
+  return `/api/solo-connect/verification`
+}
+
+/**
+ * @summary Upload ID document, selfie and phone for verification
+ */
+export const submitSoloVerification = async (soloVerificationBody: SoloVerificationBody, options?: RequestInit): Promise<SoloVerification> => {
+
+  return customFetch<SoloVerification>(getSubmitSoloVerificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      soloVerificationBody,)
+  }
+);}
+
+
+
+
+export const getSubmitSoloVerificationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloVerificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloVerificationBody>}, TContext> => {
+
+const mutationKey = ['submitSoloVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitSoloVerification>>, {data: BodyType<SoloVerificationBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitSoloVerification(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitSoloVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof submitSoloVerification>>>
+    export type SubmitSoloVerificationMutationBody = BodyType<SoloVerificationBody>
+    export type SubmitSoloVerificationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Upload ID document, selfie and phone for verification
+ */
+export const useSubmitSoloVerification = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloVerificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitSoloVerification>>,
+        TError,
+        {data: BodyType<SoloVerificationBody>},
+        TContext
+      > => {
+      return useMutation(getSubmitSoloVerificationMutationOptions(options));
+    }
+
+export const getRequestSoloOtpUrl = () => {
+
+
+
+
+  return `/api/solo-connect/verification/otp/request`
+}
+
+/**
+ * @summary Generate a mobile OTP (dev-mode returns the code)
+ */
+export const requestSoloOtp = async ( options?: RequestInit): Promise<SoloOtpRequestResult> => {
+
+  return customFetch<SoloOtpRequestResult>(getRequestSoloOtpUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRequestSoloOtpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestSoloOtp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestSoloOtp>>, TError,void, TContext> => {
+
+const mutationKey = ['requestSoloOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestSoloOtp>>, void> = () => {
+
+
+          return  requestSoloOtp(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestSoloOtpMutationResult = NonNullable<Awaited<ReturnType<typeof requestSoloOtp>>>
+
+    export type RequestSoloOtpMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Generate a mobile OTP (dev-mode returns the code)
+ */
+export const useRequestSoloOtp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestSoloOtp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestSoloOtp>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRequestSoloOtpMutationOptions(options));
+    }
+
+export const getVerifySoloOtpUrl = () => {
+
+
+
+
+  return `/api/solo-connect/verification/otp/verify`
+}
+
+/**
+ * @summary Verify the mobile OTP
+ */
+export const verifySoloOtp = async (soloOtpVerifyBody: SoloOtpVerifyBody, options?: RequestInit): Promise<SoloVerification> => {
+
+  return customFetch<SoloVerification>(getVerifySoloOtpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      soloOtpVerifyBody,)
+  }
+);}
+
+
+
+
+export const getVerifySoloOtpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySoloOtp>>, TError,{data: BodyType<SoloOtpVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifySoloOtp>>, TError,{data: BodyType<SoloOtpVerifyBody>}, TContext> => {
+
+const mutationKey = ['verifySoloOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifySoloOtp>>, {data: BodyType<SoloOtpVerifyBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifySoloOtp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifySoloOtpMutationResult = NonNullable<Awaited<ReturnType<typeof verifySoloOtp>>>
+    export type VerifySoloOtpMutationBody = BodyType<SoloOtpVerifyBody>
+    export type VerifySoloOtpMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Verify the mobile OTP
+ */
+export const useVerifySoloOtp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySoloOtp>>, TError,{data: BodyType<SoloOtpVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifySoloOtp>>,
+        TError,
+        {data: BodyType<SoloOtpVerifyBody>},
+        TContext
+      > => {
+      return useMutation(getVerifySoloOtpMutationOptions(options));
+    }
+
+export const getReviewSoloVerificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/solo-connect/verifications/${id}/review`
+}
+
+/**
+ * @summary Admin approve/reject an identity verification
+ */
+export const reviewSoloVerification = async (id: number,
+    soloReviewBody: SoloReviewBody, options?: RequestInit): Promise<SoloVerification> => {
+
+  return customFetch<SoloVerification>(getReviewSoloVerificationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      soloReviewBody,)
+  }
+);}
+
+
+
+
+export const getReviewSoloVerificationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewSoloVerification>>, TError,{id: number;data: BodyType<SoloReviewBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewSoloVerification>>, TError,{id: number;data: BodyType<SoloReviewBody>}, TContext> => {
+
+const mutationKey = ['reviewSoloVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewSoloVerification>>, {id: number;data: BodyType<SoloReviewBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewSoloVerification(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewSoloVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof reviewSoloVerification>>>
+    export type ReviewSoloVerificationMutationBody = BodyType<SoloReviewBody>
+    export type ReviewSoloVerificationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin approve/reject an identity verification
+ */
+export const useReviewSoloVerification = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewSoloVerification>>, TError,{id: number;data: BodyType<SoloReviewBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewSoloVerification>>,
+        TError,
+        {id: number;data: BodyType<SoloReviewBody>},
+        TContext
+      > => {
+      return useMutation(getReviewSoloVerificationMutationOptions(options));
+    }
+
+export const getListSoloGroupsUrl = (params: ListSoloGroupsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/solo-connect/groups?${stringifiedParams}` : `/api/solo-connect/groups`
+}
+
+/**
+ * @summary List groups in the caller's gender + current city
+ */
+export const listSoloGroups = async (params: ListSoloGroupsParams, options?: RequestInit): Promise<SoloGroup[]> => {
+
+  return customFetch<SoloGroup[]>(getListSoloGroupsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSoloGroupsQueryKey = (params?: ListSoloGroupsParams,) => {
+    return [
+    `/api/solo-connect/groups`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSoloGroupsQueryOptions = <TData = Awaited<ReturnType<typeof listSoloGroups>>, TError = ErrorType<unknown>>(params: ListSoloGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSoloGroupsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSoloGroups>>> = ({ signal }) => listSoloGroups(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSoloGroups>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSoloGroupsQueryResult = NonNullable<Awaited<ReturnType<typeof listSoloGroups>>>
+export type ListSoloGroupsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List groups in the caller's gender + current city
+ */
+
+export function useListSoloGroups<TData = Awaited<ReturnType<typeof listSoloGroups>>, TError = ErrorType<unknown>>(
+ params: ListSoloGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSoloGroupsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSoloGroupUrl = () => {
+
+
+
+
+  return `/api/solo-connect/groups`
+}
+
+/**
+ * @summary Create a new activity group
+ */
+export const createSoloGroup = async (soloGroupBody: SoloGroupBody, options?: RequestInit): Promise<SoloGroup> => {
+
+  return customFetch<SoloGroup>(getCreateSoloGroupUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      soloGroupBody,)
+  }
+);}
+
+
+
+
+export const getCreateSoloGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSoloGroup>>, TError,{data: BodyType<SoloGroupBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSoloGroup>>, TError,{data: BodyType<SoloGroupBody>}, TContext> => {
+
+const mutationKey = ['createSoloGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSoloGroup>>, {data: BodyType<SoloGroupBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSoloGroup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSoloGroupMutationResult = NonNullable<Awaited<ReturnType<typeof createSoloGroup>>>
+    export type CreateSoloGroupMutationBody = BodyType<SoloGroupBody>
+    export type CreateSoloGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new activity group
+ */
+export const useCreateSoloGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSoloGroup>>, TError,{data: BodyType<SoloGroupBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSoloGroup>>,
+        TError,
+        {data: BodyType<SoloGroupBody>},
+        TContext
+      > => {
+      return useMutation(getCreateSoloGroupMutationOptions(options));
+    }
+
+export const getGetSoloGroupUrl = (id: number,
+    params?: GetSoloGroupParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/solo-connect/groups/${id}?${stringifiedParams}` : `/api/solo-connect/groups/${id}`
+}
+
+/**
+ * @summary Group detail + members
+ */
+export const getSoloGroup = async (id: number,
+    params?: GetSoloGroupParams, options?: RequestInit): Promise<SoloGroupDetail> => {
+
+  return customFetch<SoloGroupDetail>(getGetSoloGroupUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSoloGroupQueryKey = (id: number,
+    params?: GetSoloGroupParams,) => {
+    return [
+    `/api/solo-connect/groups/${id}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSoloGroupQueryOptions = <TData = Awaited<ReturnType<typeof getSoloGroup>>, TError = ErrorType<unknown>>(id: number,
+    params?: GetSoloGroupParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSoloGroupQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSoloGroup>>> = ({ signal }) => getSoloGroup(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSoloGroup>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSoloGroupQueryResult = NonNullable<Awaited<ReturnType<typeof getSoloGroup>>>
+export type GetSoloGroupQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Group detail + members
+ */
+
+export function useGetSoloGroup<TData = Awaited<ReturnType<typeof getSoloGroup>>, TError = ErrorType<unknown>>(
+ id: number,
+    params?: GetSoloGroupParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSoloGroupQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getJoinSoloGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/join`
+}
+
+/**
+ * @summary Request to join a group (location validated)
+ */
+export const joinSoloGroup = async (id: number,
+    soloJoinBody: SoloJoinBody, options?: RequestInit): Promise<SoloActionResult> => {
+
+  return customFetch<SoloActionResult>(getJoinSoloGroupUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      soloJoinBody,)
+  }
+);}
+
+
+
+
+export const getJoinSoloGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinSoloGroup>>, TError,{id: number;data: BodyType<SoloJoinBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinSoloGroup>>, TError,{id: number;data: BodyType<SoloJoinBody>}, TContext> => {
+
+const mutationKey = ['joinSoloGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinSoloGroup>>, {id: number;data: BodyType<SoloJoinBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  joinSoloGroup(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinSoloGroupMutationResult = NonNullable<Awaited<ReturnType<typeof joinSoloGroup>>>
+    export type JoinSoloGroupMutationBody = BodyType<SoloJoinBody>
+    export type JoinSoloGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Request to join a group (location validated)
+ */
+export const useJoinSoloGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinSoloGroup>>, TError,{id: number;data: BodyType<SoloJoinBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinSoloGroup>>,
+        TError,
+        {id: number;data: BodyType<SoloJoinBody>},
+        TContext
+      > => {
+      return useMutation(getJoinSoloGroupMutationOptions(options));
+    }
+
+export const getLeaveSoloGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/leave`
+}
+
+/**
+ * @summary Leave a group
+ */
+export const leaveSoloGroup = async (id: number, options?: RequestInit): Promise<Ok> => {
+
+  return customFetch<Ok>(getLeaveSoloGroupUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getLeaveSoloGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveSoloGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof leaveSoloGroup>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['leaveSoloGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof leaveSoloGroup>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  leaveSoloGroup(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LeaveSoloGroupMutationResult = NonNullable<Awaited<ReturnType<typeof leaveSoloGroup>>>
+
+    export type LeaveSoloGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Leave a group
+ */
+export const useLeaveSoloGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveSoloGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof leaveSoloGroup>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getLeaveSoloGroupMutationOptions(options));
+    }
+
+export const getApproveSoloMemberUrl = (id: number,
+    memberId: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/members/${memberId}/approve`
+}
+
+/**
+ * @summary Approve a join request (group admin)
+ */
+export const approveSoloMember = async (id: number,
+    memberId: number, options?: RequestInit): Promise<Ok> => {
+
+  return customFetch<Ok>(getApproveSoloMemberUrl(id,memberId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getApproveSoloMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSoloMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveSoloMember>>, TError,{id: number;memberId: number}, TContext> => {
+
+const mutationKey = ['approveSoloMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveSoloMember>>, {id: number;memberId: number}> = (props) => {
+          const {id,memberId} = props ?? {};
+
+          return  approveSoloMember(id,memberId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveSoloMemberMutationResult = NonNullable<Awaited<ReturnType<typeof approveSoloMember>>>
+
+    export type ApproveSoloMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Approve a join request (group admin)
+ */
+export const useApproveSoloMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSoloMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveSoloMember>>,
+        TError,
+        {id: number;memberId: number},
+        TContext
+      > => {
+      return useMutation(getApproveSoloMemberMutationOptions(options));
+    }
+
+export const getRejectSoloMemberUrl = (id: number,
+    memberId: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/members/${memberId}/reject`
+}
+
+/**
+ * @summary Reject a join request (group admin)
+ */
+export const rejectSoloMember = async (id: number,
+    memberId: number, options?: RequestInit): Promise<Ok> => {
+
+  return customFetch<Ok>(getRejectSoloMemberUrl(id,memberId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRejectSoloMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectSoloMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejectSoloMember>>, TError,{id: number;memberId: number}, TContext> => {
+
+const mutationKey = ['rejectSoloMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectSoloMember>>, {id: number;memberId: number}> = (props) => {
+          const {id,memberId} = props ?? {};
+
+          return  rejectSoloMember(id,memberId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejectSoloMemberMutationResult = NonNullable<Awaited<ReturnType<typeof rejectSoloMember>>>
+
+    export type RejectSoloMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reject a join request (group admin)
+ */
+export const useRejectSoloMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectSoloMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejectSoloMember>>,
+        TError,
+        {id: number;memberId: number},
+        TContext
+      > => {
+      return useMutation(getRejectSoloMemberMutationOptions(options));
+    }
+
+export const getRemoveSoloMemberUrl = (id: number,
+    memberId: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/members/${memberId}/remove`
+}
+
+/**
+ * @summary Remove a member (group admin)
+ */
+export const removeSoloMember = async (id: number,
+    memberId: number, options?: RequestInit): Promise<Ok> => {
+
+  return customFetch<Ok>(getRemoveSoloMemberUrl(id,memberId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveSoloMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeSoloMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeSoloMember>>, TError,{id: number;memberId: number}, TContext> => {
+
+const mutationKey = ['removeSoloMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeSoloMember>>, {id: number;memberId: number}> = (props) => {
+          const {id,memberId} = props ?? {};
+
+          return  removeSoloMember(id,memberId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveSoloMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeSoloMember>>>
+
+    export type RemoveSoloMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a member (group admin)
+ */
+export const useRemoveSoloMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeSoloMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeSoloMember>>,
+        TError,
+        {id: number;memberId: number},
+        TContext
+      > => {
+      return useMutation(getRemoveSoloMemberMutationOptions(options));
+    }
+
+export const getLockSoloGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/lock`
+}
+
+/**
+ * @summary Lock a group (group admin)
+ */
+export const lockSoloGroup = async (id: number, options?: RequestInit): Promise<SoloActionResult> => {
+
+  return customFetch<SoloActionResult>(getLockSoloGroupUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getLockSoloGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lockSoloGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof lockSoloGroup>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['lockSoloGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof lockSoloGroup>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  lockSoloGroup(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LockSoloGroupMutationResult = NonNullable<Awaited<ReturnType<typeof lockSoloGroup>>>
+
+    export type LockSoloGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Lock a group (group admin)
+ */
+export const useLockSoloGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lockSoloGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof lockSoloGroup>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getLockSoloGroupMutationOptions(options));
+    }
+
+export const getCloseSoloGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/close`
+}
+
+/**
+ * @summary Close a group (group admin)
+ */
+export const closeSoloGroup = async (id: number, options?: RequestInit): Promise<SoloActionResult> => {
+
+  return customFetch<SoloActionResult>(getCloseSoloGroupUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCloseSoloGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeSoloGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeSoloGroup>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['closeSoloGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeSoloGroup>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  closeSoloGroup(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseSoloGroupMutationResult = NonNullable<Awaited<ReturnType<typeof closeSoloGroup>>>
+
+    export type CloseSoloGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Close a group (group admin)
+ */
+export const useCloseSoloGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeSoloGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closeSoloGroup>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCloseSoloGroupMutationOptions(options));
+    }
+
+export const getListSoloMessagesUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/messages`
+}
+
+/**
+ * @summary Group chat messages (members only; purged daily at 3 AM)
+ */
+export const listSoloMessages = async (id: number, options?: RequestInit): Promise<SoloMessage[]> => {
+
+  return customFetch<SoloMessage[]>(getListSoloMessagesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSoloMessagesQueryKey = (id: number,) => {
+    return [
+    `/api/solo-connect/groups/${id}/messages`
+    ] as const;
+    }
+
+
+export const getListSoloMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listSoloMessages>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSoloMessagesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSoloMessages>>> = ({ signal }) => listSoloMessages(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSoloMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSoloMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listSoloMessages>>>
+export type ListSoloMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Group chat messages (members only; purged daily at 3 AM)
+ */
+
+export function useListSoloMessages<TData = Awaited<ReturnType<typeof listSoloMessages>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSoloMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSoloMessagesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendSoloMessageUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/messages`
+}
+
+/**
+ * @summary Post a chat message (members only)
+ */
+export const sendSoloMessage = async (id: number,
+    soloMessageBody: SoloMessageBody, options?: RequestInit): Promise<SoloMessage> => {
+
+  return customFetch<SoloMessage>(getSendSoloMessageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      soloMessageBody,)
+  }
+);}
+
+
+
+
+export const getSendSoloMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSoloMessage>>, TError,{id: number;data: BodyType<SoloMessageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendSoloMessage>>, TError,{id: number;data: BodyType<SoloMessageBody>}, TContext> => {
+
+const mutationKey = ['sendSoloMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendSoloMessage>>, {id: number;data: BodyType<SoloMessageBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  sendSoloMessage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendSoloMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendSoloMessage>>>
+    export type SendSoloMessageMutationBody = BodyType<SoloMessageBody>
+    export type SendSoloMessageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Post a chat message (members only)
+ */
+export const useSendSoloMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSoloMessage>>, TError,{id: number;data: BodyType<SoloMessageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendSoloMessage>>,
+        TError,
+        {id: number;data: BodyType<SoloMessageBody>},
+        TContext
+      > => {
+      return useMutation(getSendSoloMessageMutationOptions(options));
     }
 
 export const getListUsersUrl = () => {

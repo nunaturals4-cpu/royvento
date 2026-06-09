@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { SEO } from "@/components/SEO";
 
-const LAST_UPDATED = "27 May 2026";
+const LAST_UPDATED = "9 June 2026";
 
 export function Terms() {
   return (
@@ -28,11 +28,14 @@ export function Terms() {
             These Terms apply to two types of account holders:
           </p>
           <ul className="list-disc pl-5 space-y-2 mt-3">
-            <li><strong className="text-foreground">Users</strong> (also "Customers") — individuals who browse, book, and attend events or reserve tables at venues listed on Royvento.</li>
-            <li><strong className="text-foreground">Pub Partners</strong> (also "Partners" or "Vendors") — pubs, clubs, restaurants, and event organisers who list their venues, events, offers, and tickets on Royvento.</li>
+            <li><strong className="text-foreground">Users</strong> (also "Customers") — individuals who browse, book, and attend events, reserve tables, book games, or join Solo Connect groups on Royvento.</li>
+            <li><strong className="text-foreground">Partners</strong> (also "Pub Partners" or "Vendors") — pubs, clubs, restaurants, event organisers, and game/entertainment organisers who list their venues, events, games, offers, and tickets on Royvento.</li>
           </ul>
           <p className="mt-3">
-            Sections 3–4 apply to all account holders. Section 5 applies specifically to Users; Section 6 applies specifically to Pub Partners.
+            Royvento brings these together across nightlife (pubs &amp; clubs), ticketed events, games &amp; entertainment venues, food &amp; drink offers, a loyalty points programme, and <strong className="text-foreground">Solo Connect</strong> — a premium, verified group-discovery feature for going out alone.
+          </p>
+          <p className="mt-3">
+            Sections 3–4 apply to all account holders. Section 5 applies specifically to Users; Section 6 applies specifically to Partners; Section 7 applies specifically to Solo Connect.
           </p>
         </section>
 
@@ -74,6 +77,9 @@ export function Terms() {
           <p className="mt-3">
             <strong className="text-foreground">At the venue.</strong> You are responsible for carrying valid ID and any required ticket or booking reference, for complying with all local laws and venue rules, and for drinking responsibly. Entry may be refused for intoxication, underage attendance, or breach of venue policy without a refund.
           </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Loyalty points.</strong> Royvento may award promotional loyalty points for activity such as bookings, check-ins, referrals, or subscriptions. Points have no cash value, are non-transferable, may expire (typically after a set period from the date earned), and may be adjusted or revoked where they were earned through error, fraud, or abuse. We may change or end the points programme at any time.
+          </p>
         </section>
 
         <section>
@@ -96,7 +102,35 @@ export function Terms() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">7. Fraud Prevention &amp; Payment Safety</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">7. Solo Connect</h2>
+          <p>
+            <strong className="text-foreground">What it is.</strong> Solo Connect is a premium, heavily-moderated feature that lets verified members discover and join small, activity-based groups (for nightlife, events, games, and activities) so they can go out safely when going alone. It is <strong className="text-foreground">not</strong> a dating service — members join experiences, not individuals.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Eligibility.</strong> Solo Connect is available only to Royvento Premium subscribers and verified Partners, and only to members aged 18 or over. Access may be withdrawn at any time for breach of these Terms.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Mandatory identity verification.</strong> Before creating or joining any group you must complete a one-time identity check: uploading a valid government ID (Aadhaar, Passport, Driving Licence, or Voter ID), a selfie, and verifying your mobile number by OTP. You represent and warrant that the documents are genuine, current, and your own. Royvento reviews submissions and may approve, reject, or later revoke verification at its discretion. Submitting false, altered, or another person's documents is a serious breach and may be reported to the authorities.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Single-gender, same-city groups.</strong> For member safety, groups are single-gender and you may only view or join groups that match the gender recorded on your profile and your current verified city. Mixed-gender groups are not permitted, and you may not attempt to access groups outside your gender category or city.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Conduct &amp; zero-tolerance policy.</strong> You must treat every member with respect. Harassment, abuse, threats, impersonation, fake identity, spam, solicitation, sharing of others' private information, or any unsafe behaviour is strictly prohibited. Violations result in <strong className="text-foreground">immediate and permanent removal from Solo Connect, forfeiture of your reputation points</strong>, and may lead to suspension of your Royvento account and referral to law-enforcement where appropriate.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Temporary group chat.</strong> Each group includes a temporary chat whose messages are automatically and permanently deleted every day at 3:00 AM. The chat is not a record-keeping service; do not rely on it to retain information and never share sensitive, personal, or financial details in it.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Offline meetings &amp; your safety.</strong> Members may choose to meet in person. Royvento does not arrange, host, supervise, vet beyond the verification described above, or guarantee any meetup, member, or venue, and is not responsible for what happens offline. You join and attend entirely at your own risk. Always meet in public places, tell someone where you are going, never share financial information, and use the in-app Safety Center emergency contacts if you feel unsafe.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Reputation &amp; ratings.</strong> After activities, members may rate the group, organiser, and overall experience. These feed a reputation score. Members with repeated violations or consistently poor ratings may lose visibility or access to Solo Connect.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-2">8. Fraud Prevention &amp; Payment Safety</h2>
           <p>
             Royvento communicates with you only through its official website, mobile application, and the contact channels published on this site. Royvento and its staff will never ask for your one-time password (OTP), card CVV, PIN, full card number, UPI PIN, or account password by phone, email, SMS, or chat. All payments must be made only through the official payment options presented within the Service; never transfer money to a personal account or pay outside the platform at the request of any person claiming to represent Royvento or a Pub Partner. If you receive a suspicious request or believe you have been targeted by a fraudulent or phishing attempt, do not share any details and report it to us at{" "}
             <a href="mailto:support@royvento.com" className="text-primary hover:underline">support@royvento.com</a>. Royvento is not responsible for losses arising from payments made, or information shared, outside its official channels.
@@ -104,21 +138,21 @@ export function Terms() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">8. Intellectual Property</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">9. Intellectual Property</h2>
           <p>
             All content on the Royvento platform — including logos, design, text, and software — is owned by or licensed to Royvento and may not be copied, reproduced, or distributed without prior written consent. Pub Partners grant Royvento a non-exclusive, royalty-free licence to display their venue name, logo, images, and listing content for the purpose of operating and promoting the Service.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">9. Disclaimer of Warranties</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">10. Disclaimer of Warranties</h2>
           <p>
             The Service is provided on an "as is" and "as available" basis, without warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, accuracy, or non-infringement. Royvento does not warrant that the Service will be uninterrupted, timely, secure, or error-free, or that listings, pricing, availability, or other information provided by Pub Partners are accurate, complete, or current. The quality, safety, and legality of venues, events, food, and beverages are the sole responsibility of the relevant Pub Partner, and any reliance you place on the Service or on Pub Partner content is at your own risk.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">10. Limitation of Liability</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">11. Limitation of Liability</h2>
           <p>
             To the fullest extent permitted by law, Royvento and its officers, directors, employees, and agents shall not be liable for any indirect, incidental, special, or consequential damages arising out of your use of the Service, including but not limited to damages for loss of profits, data, goodwill, or other intangible losses, or for the acts or omissions of any Pub Partner or User.
           </p>
@@ -128,35 +162,35 @@ export function Terms() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">11. Indemnification</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">12. Indemnification</h2>
           <p>
             You agree to indemnify, defend, and hold harmless Royvento and its officers, directors, employees, and agents from and against any claims, demands, liabilities, damages, losses, costs, and expenses (including reasonable legal fees) arising out of or related to: (a) your use or misuse of the Service; (b) your breach of these Terms or of any applicable law; (c) any content you submit or listing you publish; or (d) your violation of the rights of any third party, including any Pub Partner or User. Royvento may, at your expense, assume the exclusive defence and control of any matter subject to indemnification, and you agree to cooperate with that defence.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">12. Termination &amp; Suspension</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">13. Termination &amp; Suspension</h2>
           <p>
             You may stop using the Service and close your account at any time. Royvento may suspend, restrict, or terminate your access to the Service, in whole or in part, with or without prior notice, where we reasonably believe you have breached these Terms or any applicable law, engaged in fraudulent, abusive, or harmful conduct, or where action is needed to protect the Service, other Users, or Pub Partners. On termination your right to use the Service ends immediately; confirmed bookings and any payment, payout, refund, or tax obligations accrued beforehand survive, as do the provisions that by their nature should continue (including Intellectual Property, Disclaimer of Warranties, Limitation of Liability, Indemnification, and Governing Law).
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">13. Changes to These Terms</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">14. Changes to These Terms</h2>
           <p>
             We may update these Terms from time to time. We will notify you of significant changes by updating the "Last updated" date at the top of this page. Your continued use of the Service after any changes constitutes acceptance of the new Terms.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">14. Governing Law</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">15. Governing Law</h2>
           <p>
             These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts of Kolkata, West Bengal.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">15. Contact Us</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">16. Contact Us</h2>
           <p>
             If you have questions about these Terms, please reach out via our{" "}
             <Link href="/contact" className="text-primary hover:underline">Contact page</Link> or email us at{" "}

@@ -50,7 +50,7 @@ const USER_PLANS = [
   {
     id: "user_vip", name: "RoyVento VIP", tagline: "The ultimate nightlife pass",
     monthly: 499, yearly: 4990, icon: Crown, accent: true,
-    features: ["All Plus benefits included", "VIP event access", "Complimentary venue offers", "Priority support", "Exclusive nightlife experiences", "Higher loyalty rewards multiplier"],
+    features: ["All Plus benefits included", "VIP event access", "Complimentary venue offers", "Priority support", "Exclusive nightlife experiences", "Higher loyalty rewards multiplier", "Create & Join Verified Solo Activity Groups"],
     planType: "user_vip" as string | null,
   },
 ];
@@ -105,6 +105,7 @@ const PARTNER_PLANS = [
       { text: "Drinks deal promotion",                  included: true },
       { text: "Event promotion",                        included: true },
       { text: "16 days Facebook & Instagram marketing", included: true },
+      { text: "Offline marketing",                      included: true },
     ],
     planType: "partner_royal" as string | null,
   },

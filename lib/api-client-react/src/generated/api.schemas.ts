@@ -239,6 +239,272 @@ export interface GenderBody {
   gender: GenderBodyGender;
 }
 
+export type SoloAccessReason = typeof SoloAccessReason[keyof typeof SoloAccessReason];
+
+
+export const SoloAccessReason = {
+  ok: 'ok',
+  not_premium: 'not_premium',
+} as const;
+
+export type SoloAccessVerificationStatus = typeof SoloAccessVerificationStatus[keyof typeof SoloAccessVerificationStatus];
+
+
+export const SoloAccessVerificationStatus = {
+  none: 'none',
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface SoloAccess {
+  eligible: boolean;
+  reason: SoloAccessReason;
+  premium: boolean;
+  verificationStatus: SoloAccessVerificationStatus;
+  gender?: string | null;
+}
+
+export type SoloVerificationStatus = typeof SoloVerificationStatus[keyof typeof SoloVerificationStatus];
+
+
+export const SoloVerificationStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface SoloVerification {
+  id: number;
+  userId: number;
+  idType: string;
+  idDocumentUrl: string;
+  selfieUrl: string;
+  phone: string;
+  phoneVerified: boolean;
+  status: SoloVerificationStatus;
+  rejectionReason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SoloVerificationBodyIdType = typeof SoloVerificationBodyIdType[keyof typeof SoloVerificationBodyIdType];
+
+
+export const SoloVerificationBodyIdType = {
+  aadhaar: 'aadhaar',
+  passport: 'passport',
+  driving_license: 'driving_license',
+  voter_id: 'voter_id',
+} as const;
+
+export interface SoloVerificationBody {
+  idType: SoloVerificationBodyIdType;
+  idDocumentUrl: string;
+  selfieUrl: string;
+  phone: string;
+}
+
+export interface SoloOtpRequestResult {
+  ok: boolean;
+  devCode?: string | null;
+}
+
+export interface SoloOtpVerifyBody {
+  code: string;
+}
+
+export type SoloReviewBodyDecision = typeof SoloReviewBodyDecision[keyof typeof SoloReviewBodyDecision];
+
+
+export const SoloReviewBodyDecision = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface SoloReviewBody {
+  decision: SoloReviewBodyDecision;
+  rejectionReason?: string;
+}
+
+export type SoloGroupActivityType = typeof SoloGroupActivityType[keyof typeof SoloGroupActivityType];
+
+
+export const SoloGroupActivityType = {
+  nightlife: 'nightlife',
+  events: 'events',
+  games: 'games',
+  activities: 'activities',
+  happy_hours: 'happy_hours',
+  food_drinks: 'food_drinks',
+} as const;
+
+export type SoloGroupGenderType = typeof SoloGroupGenderType[keyof typeof SoloGroupGenderType];
+
+
+export const SoloGroupGenderType = {
+  male: 'male',
+  female: 'female',
+} as const;
+
+export type SoloGroupVisibility = typeof SoloGroupVisibility[keyof typeof SoloGroupVisibility];
+
+
+export const SoloGroupVisibility = {
+  public: 'public',
+  private: 'private',
+} as const;
+
+export type SoloGroupStatus = typeof SoloGroupStatus[keyof typeof SoloGroupStatus];
+
+
+export const SoloGroupStatus = {
+  open: 'open',
+  locked: 'locked',
+  closed: 'closed',
+} as const;
+
+export interface SoloGroup {
+  id: number;
+  adminUserId: number;
+  name: string;
+  activityType: SoloGroupActivityType;
+  activityLabel: string;
+  venueName: string;
+  vendorId?: number | null;
+  eventId?: number | null;
+  groupDate?: string | null;
+  startTime: string;
+  description: string;
+  minMembers: number;
+  maxMembers: number;
+  country: string;
+  state: string;
+  city: string;
+  genderType: SoloGroupGenderType;
+  visibility: SoloGroupVisibility;
+  status: SoloGroupStatus;
+  reputationScore: string;
+  ratingCount: number;
+  createdAt: string;
+  memberCount: number;
+  myMembershipStatus?: string | null;
+  isAdmin: boolean;
+}
+
+export type SoloGroupMemberRole = typeof SoloGroupMemberRole[keyof typeof SoloGroupMemberRole];
+
+
+export const SoloGroupMemberRole = {
+  admin: 'admin',
+  member: 'member',
+} as const;
+
+export type SoloGroupMemberStatus = typeof SoloGroupMemberStatus[keyof typeof SoloGroupMemberStatus];
+
+
+export const SoloGroupMemberStatus = {
+  requested: 'requested',
+  approved: 'approved',
+  rejected: 'rejected',
+  removed: 'removed',
+  left: 'left',
+} as const;
+
+export interface SoloGroupMember {
+  id: number;
+  groupId: number;
+  userId: number;
+  userName: string;
+  role: SoloGroupMemberRole;
+  status: SoloGroupMemberStatus;
+  joinedAt?: string | null;
+  createdAt: string;
+}
+
+export interface SoloGroupDetail {
+  group: SoloGroup;
+  members: SoloGroupMember[];
+}
+
+export type SoloGroupBodyActivityType = typeof SoloGroupBodyActivityType[keyof typeof SoloGroupBodyActivityType];
+
+
+export const SoloGroupBodyActivityType = {
+  nightlife: 'nightlife',
+  events: 'events',
+  games: 'games',
+  activities: 'activities',
+  happy_hours: 'happy_hours',
+  food_drinks: 'food_drinks',
+} as const;
+
+export type SoloGroupBodyVisibility = typeof SoloGroupBodyVisibility[keyof typeof SoloGroupBodyVisibility];
+
+
+export const SoloGroupBodyVisibility = {
+  public: 'public',
+  private: 'private',
+} as const;
+
+export interface SoloGroupBody {
+  name: string;
+  activityType: SoloGroupBodyActivityType;
+  activityLabel?: string;
+  venueName?: string;
+  vendorId?: number;
+  eventId?: number;
+  groupDate?: string;
+  startTime?: string;
+  description?: string;
+  maxMembers: number;
+  visibility?: SoloGroupBodyVisibility;
+  country?: string;
+  state?: string;
+  city: string;
+}
+
+export interface SoloJoinBody {
+  country?: string;
+  state?: string;
+  city: string;
+}
+
+export interface SoloActionResult {
+  ok: boolean;
+  status?: string;
+}
+
+export type SoloVenueOptionKind = typeof SoloVenueOptionKind[keyof typeof SoloVenueOptionKind];
+
+
+export const SoloVenueOptionKind = {
+  vendor: 'vendor',
+  event: 'event',
+  game: 'game',
+} as const;
+
+export interface SoloVenueOption {
+  id: number;
+  name: string;
+  sub: string;
+  kind: SoloVenueOptionKind;
+}
+
+export interface SoloMessage {
+  id: number;
+  groupId: number;
+  userId: number;
+  userName: string;
+  body: string;
+  createdAt: string;
+  isMine: boolean;
+}
+
+export interface SoloMessageBody {
+  body: string;
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
@@ -1801,6 +2067,19 @@ export interface RejectSettlementBody {
   /** @maxLength 2000 */
   note?: string;
 }
+
+export type ListSoloVenuesParams = {
+activityType?: string;
+};
+
+export type ListSoloGroupsParams = {
+city: string;
+activityType?: string;
+};
+
+export type GetSoloGroupParams = {
+city?: string;
+};
 
 export type ListVendorsParams = {
 category?: string;

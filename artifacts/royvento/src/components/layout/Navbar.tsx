@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
-import { useGetMe, useLogout } from "@workspace/api-client-react";
+import { useGetMe, useLogout, useGetSoloAccess } from "@workspace/api-client-react";
 import { Logo } from "@/components/Logo";
 import { Search, Bell, Menu, X as XIcon, MapPin, ChevronDown, Globe, Palette, Check, Gift } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
@@ -35,6 +35,11 @@ export function Navbar() {
   const { theme, setTheme } = useTheme();
   const currentTheme = THEMES.find((th) => th.id === theme) ?? THEMES[0]!;
   const { data: me, refetch } = useGetMe({ query: { retry: false } as any });
+  // Solo Connect is gated to premium / verified-partner accounts. Only query
+  // when logged in; the nav entry stays hidden for everyone else.
+  const { data: soloAccess } = useGetSoloAccess({
+    query: { enabled: !!me?.user, retry: false } as any,
+  });
   const logout = useLogout();
   const [location, setLocation] = useLocation();
   const [q, setQ] = useState("");
@@ -149,6 +154,8 @@ export function Navbar() {
     { href: "/events", label: t("nav.events", "Events") },
     { href: "/games", label: t("nav.games", "Games & Sports") },
     { href: "/pub-offers", label: t("nav.pub_offers") },
+    // Premium / verified-partner only — hidden entirely otherwise.
+    ...(soloAccess?.eligible ? [{ href: "/solo-connect", label: t("nav.solo_connect", "Solo Connect") }] : []),
   ];
   // "List Your Venue" must land partners on the Become-a-Partner form without a
   // double click: logged-in users go straight there; logged-out users are routed
