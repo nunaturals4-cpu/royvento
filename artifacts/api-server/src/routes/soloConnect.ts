@@ -909,7 +909,7 @@ router.get("/admin/solo-connect/groups", requireAuth(["admin"]), async (_req, re
   );
 });
 
-// Get all members of a group with email (admin, no city/gender gate).
+// Get all members of a group with email + verified phone (admin, no city/gender gate).
 router.get("/admin/solo-connect/groups/:id/members", requireAuth(["admin"]), async (req, res) => {
   const id = parseInt(String(req.params["id"]), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
@@ -920,6 +920,8 @@ router.get("/admin/solo-connect/groups/:id/members", requireAuth(["admin"]), asy
       userId: soloGroupMembersTable.userId,
       userName: usersTable.name,
       userEmail: usersTable.email,
+      phone: soloConnectVerificationsTable.phone,
+      phoneVerified: soloConnectVerificationsTable.phoneVerified,
       role: soloGroupMembersTable.role,
       status: soloGroupMembersTable.status,
       joinedAt: soloGroupMembersTable.joinedAt,
@@ -927,6 +929,7 @@ router.get("/admin/solo-connect/groups/:id/members", requireAuth(["admin"]), asy
     })
     .from(soloGroupMembersTable)
     .leftJoin(usersTable, eq(usersTable.id, soloGroupMembersTable.userId))
+    .leftJoin(soloConnectVerificationsTable, eq(soloConnectVerificationsTable.userId, soloGroupMembersTable.userId))
     .where(eq(soloGroupMembersTable.groupId, id))
     .orderBy(soloGroupMembersTable.id);
   res.json(
@@ -936,6 +939,8 @@ router.get("/admin/solo-connect/groups/:id/members", requireAuth(["admin"]), asy
       userId: m.userId,
       userName: m.userName ?? "",
       userEmail: m.userEmail ?? "",
+      phone: m.phone ?? "",
+      phoneVerified: m.phoneVerified ?? false,
       role: m.role,
       status: m.status,
       joinedAt: m.joinedAt?.toISOString() ?? null,

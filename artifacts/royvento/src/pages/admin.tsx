@@ -5628,6 +5628,8 @@ interface AdminSoloMember {
   userId: number;
   userName: string;
   userEmail: string;
+  phone: string;
+  phoneVerified: boolean;
   role: string;
   status: string;
   joinedAt: string | null;
@@ -5824,6 +5826,7 @@ function GroupDetailModal({
                   <thead className="text-xs uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th className="text-left pb-3">User</th>
+                      <th className="text-left pb-3">Phone</th>
                       <th className="text-left pb-3">Role</th>
                       <th className="text-left pb-3">Status</th>
                       <th className="text-left pb-3">Joined</th>
@@ -5836,6 +5839,13 @@ function GroupDetailModal({
                         <td className="py-2.5 pr-4">
                           <p className="font-medium">{m.userName || "—"}</p>
                           <p className="text-xs text-muted-foreground">{m.userEmail}</p>
+                        </td>
+                        <td className="py-2.5 pr-4">
+                          {m.phone ? (
+                            <span className="text-sm">{m.phone}{m.phoneVerified && <span className="ml-1.5 text-[10px] text-emerald-300">✓</span>}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="py-2.5 pr-4 text-xs capitalize">{m.role}</td>
                         <td className="py-2.5 pr-4">
