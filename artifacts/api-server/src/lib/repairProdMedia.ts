@@ -20,7 +20,7 @@
  * exactly as the partner set them), and category assignment is a pure function of
  * the row's sort position, so a second run changes nothing.
  */
-import { db, vendorsTable, eventsTable } from "@workspace/db";
+import { db, vendorsTable, eventsTable, announcementsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 // Dead Unsplash photo IDs → verified-working replacements (HTTP 200 as of the
@@ -63,8 +63,10 @@ function fixArr(arr: string[] | null | undefined): [string[] | null | undefined,
 export type RepairProdMediaReport = {
   vendorsScanned: number;
   eventsScanned: number;
+  announcementsScanned: number;
   vendorImagesFixed: number;
   eventImagesFixed: number;
+  announcementImagesFixed: number;
   recategorized: Array<{ vendorId: number; businessName: string; category: string }>;
 };
 
@@ -72,8 +74,10 @@ export async function repairProdMedia(): Promise<RepairProdMediaReport> {
   const report: RepairProdMediaReport = {
     vendorsScanned: 0,
     eventsScanned: 0,
+    announcementsScanned: 0,
     vendorImagesFixed: 0,
     eventImagesFixed: 0,
+    announcementImagesFixed: 0,
     recategorized: [],
   };
 
@@ -118,6 +122,17 @@ export async function repairProdMedia(): Promise<RepairProdMediaReport> {
     if (changed) {
       await db.update(eventsTable).set(patch).where(eq(eventsTable.id, e.id));
       report.eventImagesFixed++;
+    }
+  }
+
+  // ── 1c. Repair broken images on announcements ───────────────────────────────
+  const announcements = await db.select().from(announcementsTable);
+  report.announcementsScanned = announcements.length;
+  for (const a of announcements) {
+    const [img, changed] = fixUrl(a.imageUrl);
+    if (changed) {
+      await db.update(announcementsTable).set({ imageUrl: img ?? undefined }).where(eq(announcementsTable.id, a.id));
+      report.announcementImagesFixed++;
     }
   }
 
