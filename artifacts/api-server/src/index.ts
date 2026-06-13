@@ -890,6 +890,7 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "table_count" integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "table_size" integer NOT NULL DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "vip_capacity" integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "date_night" boolean NOT NULL DEFAULT false`);
 
     logger.info("Schema: drink_plans.global_priority + vendors.base_fee + bookings.base_fee + event_booking + vendor_offers + event listing indexes + events.approved_at + points_ledger + vendor_coupons + events.free_entry_for_table + drink_plans.image_url + announcements.approval_status ensured");
   } catch (err) {

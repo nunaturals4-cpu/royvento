@@ -42,6 +42,8 @@ const TYPE_TO_KINDS: Record<string, Kind[]> = {
   pub: ["pub"],
   club: ["club"],
   event: ["event"],
+  // Date night = couple-friendly outings: pubs/clubs plus live events/DJ nights.
+  "date-night": ["pub", "club", "event"],
   "dj-night": ["event", "club"],
   "live-music": ["event"],
   bowling: ["game"],

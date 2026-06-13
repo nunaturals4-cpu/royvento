@@ -1206,6 +1206,7 @@ export const PatchAdminEventBodyApprovalStatus = {
 export interface PatchAdminEventBody {
   popular?: boolean;
   featured?: boolean;
+  dateNight?: boolean;
   approvalStatus?: PatchAdminEventBodyApprovalStatus;
   /** @maxLength 2000 */
   rejectionReason?: string | null;

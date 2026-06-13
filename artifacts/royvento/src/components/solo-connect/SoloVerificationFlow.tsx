@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetSoloVerification,
@@ -14,7 +15,6 @@ const GOLD = "#d4af37";
 const RED = "#b91c1c";
 
 const ID_TYPES = [
-  { value: "aadhaar", label: "Aadhaar" },
   { value: "passport", label: "Passport" },
   { value: "driving_license", label: "Driving License" },
   { value: "voter_id", label: "Voter ID" },
@@ -119,7 +119,7 @@ export function SoloVerificationFlow() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const [idType, setIdType] = useState<IdType>("aadhaar");
+  const [idType, setIdType] = useState<IdType>("passport");
   const [idDocumentUrl, setIdDocumentUrl] = useState("");
   const [selfieUrl, setSelfieUrl] = useState("");
   const [phone, setPhone] = useState("");
@@ -301,10 +301,12 @@ function DetailsForm({
   onSubmit,
   submitting,
 }: DetailsFormProps) {
+  // Mandatory agreement to the Solo Connect terms before identity can be submitted.
+  const [agreed, setAgreed] = useState(false);
   // Only flag invalid once the user has typed something, so the field isn't red
   // on first paint. Submit stays disabled until everything is provided + valid.
   const phoneInvalid = phone.length > 0 && !isValidIndianMobile(phone);
-  const canSubmit = !!idDocumentUrl && !!selfieUrl && isValidIndianMobile(phone);
+  const canSubmit = !!idDocumentUrl && !!selfieUrl && isValidIndianMobile(phone) && agreed;
   return (
     <GlassPanel>
       <Header step={1} title="Identity verification" />
@@ -355,12 +357,46 @@ function DetailsForm({
         }}
       />
       {phoneInvalid ? (
-        <p className="text-xs mt-2 mb-5" style={{ color: "#fca5a5" }}>
+        <p className="text-xs mt-2 mb-4" style={{ color: "#fca5a5" }}>
           Enter a valid 10-digit mobile number (starting 6–9).
         </p>
       ) : (
-        <div className="mb-5" />
+        <div className="mb-4" />
       )}
+
+      {/* Mandatory terms agreement — gates submission. */}
+      <label
+        className="flex items-start gap-3 mb-5 p-3.5 rounded-xl cursor-pointer transition-all"
+        style={{
+          background: agreed ? "rgba(212,175,55,0.08)" : "rgba(255,255,255,0.03)",
+          border: `1px solid ${agreed ? `${GOLD}55` : "rgba(255,255,255,0.1)"}`,
+        }}
+      >
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={agreed}
+          onClick={() => setAgreed((v) => !v)}
+          className="mt-0.5 h-5 w-5 shrink-0 flex items-center justify-center rounded-md transition-all"
+          style={{
+            background: agreed ? `linear-gradient(135deg, ${GOLD}, #e0a951)` : "rgba(255,255,255,0.06)",
+            border: `1.5px solid ${agreed ? GOLD : "rgba(255,255,255,0.25)"}`,
+          }}
+        >
+          {agreed && <Check className="h-3.5 w-3.5" style={{ color: "#1a1a1a" }} strokeWidth={3} />}
+        </button>
+        <span className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>
+          I confirm my documents are genuine and I have read and agree to the{" "}
+          <Link href="/terms" target="_blank" className="underline" style={{ color: GOLD }} onClick={(e) => e.stopPropagation()}>
+            Terms &amp; Conditions
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" target="_blank" className="underline" style={{ color: GOLD }} onClick={(e) => e.stopPropagation()}>
+            Privacy Policy
+          </Link>
+          . I understand Solo Connect meetups happen offline at my own risk and that Royvento is not responsible for what happens between members.
+        </span>
+      </label>
 
       <PrimaryButton onClick={onSubmit} disabled={submitting || !canSubmit}>
         {submitting ? "Submitting…" : "Submit & continue"}

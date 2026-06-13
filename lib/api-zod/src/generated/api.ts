@@ -3103,6 +3103,7 @@ export const patchAdminEventBodyRejectionReasonMax = 2000;
 export const PatchAdminEventBody = zod.object({
   "popular": zod.boolean().optional(),
   "featured": zod.boolean().optional(),
+  "dateNight": zod.boolean().optional(),
   "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).optional(),
   "rejectionReason": zod.string().max(patchAdminEventBodyRejectionReasonMax).nullish(),
   "retainForever": zod.boolean().optional()

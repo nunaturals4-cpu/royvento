@@ -9,7 +9,6 @@ import {
   Calendar,
   Sparkles,
   ShieldCheck,
-  Flame,
   PartyPopper,
   Megaphone,
   Clock,
@@ -24,6 +23,7 @@ import {
   Mic2,
   Gamepad2,
   Drama,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useListFeaturedEvents, useListVendorDrinkOffers, useGetMe } from "@workspace/api-client-react";
@@ -37,7 +37,6 @@ import { HeroSlider } from "@/components/HeroSlider";
 import { HappeningTonight } from "@/components/HappeningTonight";
 import { GoingOutWithFriends } from "@/components/GoingOutWithFriends";
 import { CarouselRow } from "@/components/CarouselRow";
-import { COUNTRIES } from "@/lib/locations";
 
 interface PublicEvent {
   id: number;
@@ -185,6 +184,7 @@ function useUserLocation() {
 const CATEGORIES = [
   { label: "Pubs & Bars",    sub: "Find nearby pubs",        icon: GlassWater, href: "/pubs",       img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=600&q=70" },
   { label: "Nightclubs",     sub: "Dance the night away",    icon: Music,      href: "/pubs",       img: "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=600&q=70" },
+  { label: "Date Night",     sub: "Romantic spots for two",  icon: Heart,      href: "/pubs?when=weekend", img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=70" },
   { label: "Games & Sports", sub: "Play & compete",          icon: Gamepad2,   href: "/games",      img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=70" },
   { label: "Live Events",    sub: "Concerts & gigs",         icon: Mic2,       href: "/events",     img: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=70" },
   { label: "Ladies Nights",  sub: "Special offers & events", icon: Sparkles,   href: "/pub-offers", img: "https://images.unsplash.com/photo-1545128485-c400e7702796?w=600&q=70" },
@@ -225,7 +225,7 @@ export function Home() {
     if (detectedState && !filterState) setFilterState(detectedState);
   }, [detectedCountry, detectedState]);
 
-  const { data: popular = [], isLoading: popularLoading } = useQuery({
+  const { data: popular = [] } = useQuery({
     queryKey: ["events-popular", filterCountry, filterState],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -253,11 +253,19 @@ export function Home() {
   const sortedPopular = useMemo(() => sortCityFirst(popular, userCity), [popular, userCity]);
   const sortedPubs = useMemo(() => sortCityFirst(pubs, userCity), [pubs, userCity]);
 
-  const countryOptions = COUNTRIES.map((c) => c.name);
-  const stateOptions = useMemo(() => {
-    const found = COUNTRIES.find((c) => c.name.toLowerCase() === filterCountry.toLowerCase());
-    return found ? found.states.map((s) => s.name) : [];
-  }, [filterCountry]);
+  // Date Night rail — curate the 2 best-rated pubs (city-first) for couples.
+  // Derived client-side from existing pub data, so no backend change is needed.
+  const dateNightPubs = useMemo(() => {
+    const pool = [...sortedPubs, ...sortedPopular.filter((e) => e.type === "pub")];
+    const seen = new Set<number>();
+    const uniq: PublicEvent[] = [];
+    for (const e of pool) {
+      if (seen.has(e.id)) continue;
+      seen.add(e.id);
+      uniq.push(e);
+    }
+    return [...uniq].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 2);
+  }, [sortedPubs, sortedPopular]);
 
   const features = [
     { icon: ShieldCheck, title: t("home.feature1_title"), body: t("home.feature1_body") },
@@ -454,9 +462,9 @@ export function Home() {
       {sortedPubs.length > 0 && (
         <section className="container mx-auto px-4 md:px-6 py-12">
           <SectionHeader
-            icon={<PartyPopper className="h-3.5 w-3.5" />}
-            eyebrow={userCity ? `Trending in ${userCity}` : t("home.pubs_label")}
-            title={userCity ? `Popular Pubs in ${userCity}` : "Popular Pubs In Your City"}
+            icon={<MapPin className="h-3.5 w-3.5" />}
+            eyebrow={userCity ? `Trending in ${userCity}` : "Near you"}
+            title="Popular Pubs in your city"
             seeAllHref="/pubs"
             seeAllLabel={t("home.view_all_pubs")}
           />
@@ -466,95 +474,24 @@ export function Home() {
         </section>
       )}
 
+      {/* Date Night — curated romantic picks for couples, right under Tonight */}
+      {dateNightPubs.length > 0 && (
+        <section className="container mx-auto px-4 md:px-6 py-12">
+          <SectionHeader
+            icon={<Heart className="h-3.5 w-3.5" />}
+            eyebrow="For two"
+            title="Date Night"
+            seeAllHref="/pubs?when=weekend"
+            seeAllLabel="See all spots"
+          />
+          <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
+            {dateNightPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
+          </CarouselRow>
+        </section>
+      )}
+
       {/* 👥 Going Out With Friends — group-first discovery & availability */}
       <GoingOutWithFriends />
-
-      {/* Trending / Popular section */}
-      <section className="container mx-auto px-4 md:px-6 py-12">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-primary mb-2.5 flex items-center gap-2">
-                <Flame className="h-3.5 w-3.5" />
-                {t("home.trending_label")}
-              </p>
-              <h2 className="font-serif text-2xl sm:text-3xl md:text-5xl tracking-tight">{t("home.trending_title")}</h2>
-            </div>
-            <Link
-              href="/pubs"
-              className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-            >
-              {t("home.view_all_events")}
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
-          </div>
-
-          {/* Location filters */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5 text-primary" />
-              <span>Filter by location:</span>
-            </div>
-            <div className="relative">
-              <select
-                value={filterCountry}
-                onChange={(e) => { setFilterCountry(e.target.value); setFilterState(""); }}
-                className="appearance-none h-8 pl-3 pr-8 rounded-full border border-border/70 bg-card/60 text-sm text-foreground/80 hover:border-primary/50 transition-colors focus:outline-none focus:border-primary/60 cursor-pointer"
-              >
-                <option value="">All Countries</option>
-                {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-            </div>
-            {filterCountry && stateOptions.length > 0 && (
-              <div className="relative">
-                <select
-                  value={filterState}
-                  onChange={(e) => setFilterState(e.target.value)}
-                  className="appearance-none h-8 pl-3 pr-8 rounded-full border border-border/70 bg-card/60 text-sm text-foreground/80 hover:border-primary/50 transition-colors focus:outline-none focus:border-primary/60 cursor-pointer"
-                >
-                  <option value="">All States</option>
-                  {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-              </div>
-            )}
-            {(filterCountry || filterState) && (
-              <button
-                onClick={() => { setFilterCountry(""); setFilterState(""); }}
-                className="h-8 px-3 rounded-full text-xs text-muted-foreground border border-border/50 hover:border-destructive/50 hover:text-destructive transition-colors"
-              >
-                Clear
-              </button>
-            )}
-            {(filterCountry || filterState) && (
-              <span className="text-xs text-primary/70 ml-1">
-                {filterState ? `${filterState}, ${filterCountry}` : filterCountry}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {popularLoading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mt-8">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-2xl bg-white/5 animate-pulse h-64" />
-            ))}
-          </div>
-        ) : sortedPopular.length > 0 ? (
-          <CarouselRow className="mt-8" itemClassName="w-[280px] sm:w-[300px]">
-            {sortedPopular.map((e) => <EventCard key={e.id} event={e} directBooking={e.type === "pub"} />)}
-          </CarouselRow>
-        ) : (
-          <div className="mt-8 rounded-2xl border border-white/8 bg-white/3 p-10 text-center">
-            <Flame className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-40" />
-            <p className="text-muted-foreground text-sm">No popular venues found for this location.</p>
-            <button onClick={() => { setFilterCountry(""); setFilterState(""); }} className="mt-3 text-xs text-primary hover:underline">
-              Show all popular venues
-            </button>
-          </div>
-        )}
-      </section>
 
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (() => {

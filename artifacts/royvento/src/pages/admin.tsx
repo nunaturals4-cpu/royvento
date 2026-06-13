@@ -1384,8 +1384,10 @@ interface AdminEvent {
   city: string;
   state: string;
   isPublished: boolean;
+  featured: boolean;
   popular: boolean;
   popularSince: string | null;
+  dateNight: boolean;
   approvalStatus: string;
   imageUrl: string;
   retainForever: boolean;
@@ -1727,6 +1729,26 @@ function EventsAdmin() {
     }
   };
 
+  const toggleFeatured = async (e: AdminEvent) => {
+    try {
+      await apiPatch(`/api/admin/events/${e.id}`, { featured: !e.featured });
+      toast({ title: e.featured ? "Removed from Featured Events" : "Added to Featured Events" });
+      load();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    }
+  };
+
+  const toggleDateNight = async (e: AdminEvent) => {
+    try {
+      await apiPatch(`/api/admin/events/${e.id}`, { dateNight: !e.dateNight });
+      toast({ title: e.dateNight ? "Removed from Date Night" : "Added to Date Night" });
+      load();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    }
+  };
+
   const toggleRetain = async (e: AdminEvent) => {
     try {
       await apiPatch(`/api/admin/events/${e.id}`, { retainForever: !e.retainForever });
@@ -1831,6 +1853,8 @@ function EventsAdmin() {
                 <th className="text-center p-3">Status</th>
                 <th className="text-center p-3">Crowd Level</th>
                 <th className="text-center p-3">Popular Since</th>
+                <th className="text-center p-3">Featured</th>
+                <th className="text-center p-3">Date Night</th>
                 <th className="text-center p-3">Retain</th>
                 <th className="text-right p-3"></th>
               </tr>
@@ -1897,6 +1921,28 @@ function EventsAdmin() {
                     >
                       ★ {popularDays(e.popular ? e.popularSince : null)}
                     </button>
+                  </td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => toggleFeatured(e)}
+                      title={e.featured ? "Showing in Featured Events — click to remove" : "Add to Featured Events section"}
+                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.featured ? "bg-amber-500/30 text-amber-200" : "bg-white/5 text-white/40"}`}
+                    >
+                      {e.featured ? "★ Featured" : "Add"}
+                    </button>
+                  </td>
+                  <td className="p-3 text-center">
+                    {e.type === "pub" ? (
+                      <button
+                        onClick={() => toggleDateNight(e)}
+                        title={e.dateNight ? "Showing in Date Night — click to remove" : "Add to Date Night section"}
+                        className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${e.dateNight ? "bg-pink-500/30 text-pink-200" : "bg-white/5 text-white/40"}`}
+                      >
+                        {e.dateNight ? "💕 Date Night" : "Add"}
+                      </button>
+                    ) : (
+                      <span className="text-white/20 text-xs">—</span>
+                    )}
                   </td>
                   <td className="p-3 text-center">
                     <button

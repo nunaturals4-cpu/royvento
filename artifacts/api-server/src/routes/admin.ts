@@ -538,8 +538,10 @@ router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
         state: e.state,
         price: Number(e.price),
         imageUrl: e.imageUrl,
+        featured: e.featured,
         popular: e.popular,
         popularSince: e.popularSince ? e.popularSince.toISOString() : null,
+        dateNight: e.dateNight,
         approvalStatus: e.approvalStatus,
         retainForever: e.retainForever,
         partnerName: v?.businessName ?? "",
@@ -599,6 +601,7 @@ router.patch("/admin/events/:id", requireAuth(["admin"]), async (req, res) => {
     updates["popularSince"] = data.popular ? new Date() : null;
   }
   if (data.featured !== undefined) updates["featured"] = data.featured;
+  if (data.dateNight !== undefined) updates["dateNight"] = data.dateNight;
   if (data.retainForever !== undefined) updates["retainForever"] = data.retainForever;
   if (data.approvalStatus !== undefined) {
     updates["approvalStatus"] = data.approvalStatus;

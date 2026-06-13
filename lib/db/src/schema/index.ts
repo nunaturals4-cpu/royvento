@@ -117,6 +117,10 @@ export const eventsTable = pgTable(
     eventDate: date("event_date"),
     featured: boolean("featured").notNull().default(false),
     popular: boolean("popular").notNull().default(false),
+    // Admin-curated flag: surface this venue in the storefront "Date Night"
+    // rail (homepage) and the Pubs-page "Date Night" category. Single source of
+    // truth so both places show the exact same set.
+    dateNight: boolean("date_night").notNull().default(false),
     pubMode: varchar("pub_mode", { length: 20 }).notNull().default(""),
     // ── Happening Tonight ── real-time discovery fields. start/end time are the
     // event's tonight session window ("HH:MM", IST). The three booleans are

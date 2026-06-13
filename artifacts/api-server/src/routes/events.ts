@@ -105,6 +105,7 @@ async function serializeEvents(rows: EventRow[]) {
       eventDate: e.eventDate,
       featured: e.featured,
       popular: e.popular,
+      dateNight: (e as unknown as { dateNight?: boolean }).dateNight ?? false,
       pubMode: e.pubMode,
       priceWomen: Number(e.priceWomen),
       priceMen: Number(e.priceMen),

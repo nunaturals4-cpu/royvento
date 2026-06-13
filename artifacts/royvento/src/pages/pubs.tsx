@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, X, Star, MapPin, GlassWater,
-  Wine, Mic2, Building2, Coffee, Music, SlidersHorizontal, Store,
+  Wine, Mic2, Building2, Coffee, Music, SlidersHorizontal, Store, Heart,
 } from "lucide-react";
 import { apiGet, formatINR } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
@@ -37,6 +37,8 @@ interface PublicEvent {
   state: string;
   country: string;
   price: number;
+  priceCouple?: number;
+  dateNight?: boolean;
   startingPrice?: number;
   imageUrl: string;
   rating: number;
@@ -67,13 +69,19 @@ const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /* â”€â”€â”€ sidebar config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const SIDEBAR_CATEGORY_DEFS = [
-  { id: "All",    label: "All Venues",  icon: Store     },
-  { id: "Pub",    label: "Pubs & Bars", icon: Wine      },
-  { id: "Club",   label: "Nightclubs",  icon: Music     },
-  { id: "lounge", label: "Lounges",     icon: Coffee    },
-  { id: "roof",   label: "Rooftop Bars",icon: Building2 },
-  { id: "live",   label: "Live Music",  icon: Mic2      },
+  { id: "All",       label: "All Venues",  icon: Store     },
+  { id: "DateNight", label: "Date Night",  icon: Heart     },
+  { id: "Pub",       label: "Pubs & Bars", icon: Wine      },
+  { id: "Club",      label: "Nightclubs",  icon: Music     },
+  { id: "lounge",    label: "Lounges",     icon: Coffee    },
+  { id: "roof",      label: "Rooftop Bars",icon: Building2 },
+  { id: "live",      label: "Live Music",  icon: Mic2      },
 ] as const;
+
+// "Date Night" is admin-curated: an event carries a `dateNight` flag that admins
+// toggle from the panel. This is the single source of truth shared with the
+// homepage Date Night rail, so both surfaces show the exact same set.
+const isDateNightVenue = (p: PublicEvent) => p.dateNight === true;
 
 /* â”€â”€â”€ PubCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function PubCard({ pub }: { pub: PublicEvent }) {
@@ -221,6 +229,7 @@ export function Pubs() {
   const [freeEntry, setFreeEntry]   = useState(false);
   const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
   const [venueTab, setVenueTab]     = useState<"All" | "Pub" | "Club">("All");
+  const [dateNight, setDateNight]   = useState(false);
   const [pubs, setPubs]             = useState<PublicEvent[]>([]);
   const [loading, setLoading]       = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -257,14 +266,15 @@ export function Pubs() {
   const displayedPubs = useMemo(() => {
     let list = pubs;
     if (venueTab !== "All") list = list.filter((p) => p.vendorCategory === venueTab);
+    if (dateNight) list = list.filter(isDateNightVenue);
     if (hasDrinkDeal && !drinkPlanType) list = list.filter((p) => p.hasDrinkPlans);
     if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true && (p.freeEntryRules?.days?.length ?? 0) > 0);
     if (crowdLevel) list = list.filter((p) => p.vendorCrowdLevel === crowdLevel);
     return list;
-  }, [pubs, venueTab, hasDrinkDeal, drinkPlanType, freeEntry, crowdLevel]);
+  }, [pubs, venueTab, dateNight, hasDrinkDeal, drinkPlanType, freeEntry, crowdLevel]);
 
   const hasFilters = search || country || stateF || city || pricePreset !== null
-    || drinkPlanType || hasDrinkDeal || freeEntry || crowdLevel || venueTab !== "All";
+    || drinkPlanType || hasDrinkDeal || freeEntry || crowdLevel || venueTab !== "All" || dateNight;
 
   // Real counts derived from fetched data
   const categoryCounts = useMemo(() => {
@@ -273,18 +283,22 @@ export function Pubs() {
       const cat = p.vendorCategory ?? "";
       if (cat) counts[cat] = (counts[cat] ?? 0) + 1;
     }
+    counts["DateNight"] = pubs.filter(isDateNightVenue).length;
     return counts;
   }, [pubs]);
 
   function clearAll() {
     setSearch(""); setCountry(""); setStateF(""); setCity("");
     setPricePreset(null); setDrinkPlanType(""); setHasDrinkDeal(false);
-    setFreeEntry(false); setCrowdLevel(""); setVenueTab("All");
+    setFreeEntry(false); setCrowdLevel(""); setVenueTab("All"); setDateNight(false);
   }
 
   // sidebar category click â€” maps to existing venueTab filter
   function handleCategoryClick(id: string) {
-    if (id === "All" || id === "Pub" || id === "Club") {
+    if (id === "DateNight") {
+      // Independent toggle that composes with the venue-type tabs.
+      setDateNight((v) => !v);
+    } else if (id === "All" || id === "Pub" || id === "Club") {
       setVenueTab(id as "All" | "Pub" | "Club");
     } else {
       // for display-only extras, reset to All (they filter by type)
@@ -445,11 +459,13 @@ export function Pubs() {
               <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-3">Categories</h3>
               <ul className="space-y-0.5">
                 {SIDEBAR_CATEGORY_DEFS.map(({ id, label, icon: Icon }) => {
-                  const isActive = id === "All" ? venueTab === "All"
+                  const isActive = id === "DateNight" ? dateNight
+                    : id === "All" ? venueTab === "All"
                     : id === "Pub" ? venueTab === "Pub"
                     : id === "Club" ? venueTab === "Club"
                     : false;
                   const count = id === "All" ? (categoryCounts["All"] ?? 0)
+                    : id === "DateNight" ? (categoryCounts["DateNight"] ?? 0)
                     : id === "Pub" ? (categoryCounts["Pub"] ?? 0)
                     : id === "Club" ? (categoryCounts["Club"] ?? 0)
                     : null;

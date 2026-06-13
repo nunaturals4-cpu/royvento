@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Flame, Zap, GlassWater, Headphones, Ticket, Gamepad2, Mic2,
-  MapPin, Clock, Star, Sparkles, ArrowRight, X,
+  MapPin, Clock, Star, Sparkles, ArrowRight, X, Heart,
 } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { useSelectedCity } from "@/components/LocationContext";
@@ -45,11 +45,11 @@ interface TonightResponse {
 
 const FILTERS: { key: string; label: string; icon: React.ReactNode }[] = [
   { key: "all",   label: "All Tonight",      icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { key: "date",  label: "💕 Date Night",    icon: <Heart className="h-3.5 w-3.5" /> },
   { key: "now",   label: "🔥 Happening Now", icon: <Flame className="h-3.5 w-3.5" /> },
   { key: "soon",  label: "⚡ Starting Soon",  icon: <Zap className="h-3.5 w-3.5" /> },
   { key: "happy", label: "🍻 Happy Hours",    icon: <GlassWater className="h-3.5 w-3.5" /> },
   { key: "dj",    label: "🎧 DJ Nights",      icon: <Headphones className="h-3.5 w-3.5" /> },
-  { key: "deals", label: "🎟 Last-Minute",    icon: <Ticket className="h-3.5 w-3.5" /> },
   { key: "games", label: "🎮 Games Tonight",  icon: <Gamepad2 className="h-3.5 w-3.5" /> },
   { key: "live",  label: "🎤 Live Events",    icon: <Mic2 className="h-3.5 w-3.5" /> },
 ];
@@ -154,6 +154,11 @@ export function HappeningTonight() {
 
   const filtered = useMemo(() => {
     if (activeFilter === "all") return allItems;
+    // "Date Night" has no backend tag — derive it from couple-friendly kinds
+    // (pubs, happy hours, DJ nights and live events) so it works without an API change.
+    if (activeFilter === "date") {
+      return allItems.filter((i) => ["pub", "happyhour", "dj", "event"].includes(i.kind));
+    }
     return allItems.filter((i) => i.filters.includes(activeFilter));
   }, [allItems, activeFilter]);
 

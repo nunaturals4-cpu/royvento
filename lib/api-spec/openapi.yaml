@@ -4335,6 +4335,8 @@ components:
           type: boolean
         featured:
           type: boolean
+        dateNight:
+          type: boolean
         approvalStatus:
           type: string
           enum: [pending, approved, rejected]

@@ -58,7 +58,7 @@ export function Privacy() {
             If you use our premium <strong className="text-foreground">Solo Connect</strong> feature, we collect additional information specifically to verify identity and keep members safe:
           </p>
           <ul className="list-disc pl-5 space-y-2 mt-3">
-            <li><strong className="text-foreground">Identity documents:</strong> An image of a government ID you upload (Aadhaar, Passport, Driving Licence, or Voter ID) and a selfie, used solely to verify that you are a real, unique person.</li>
+            <li><strong className="text-foreground">Identity documents:</strong> An image of a government ID you upload (Passport, Driving Licence, or Voter ID) and a selfie, used solely to verify that you are a real, unique person.</li>
             <li><strong className="text-foreground">Mobile verification:</strong> Your mobile number and a one-time passcode (OTP) used to confirm it.</li>
             <li><strong className="text-foreground">Gender &amp; location:</strong> Your profile gender and current city — used to enforce single-gender, same-city groups. We request device location only to determine your city.</li>
             <li><strong className="text-foreground">Group activity:</strong> Groups you create or join, membership status, and ratings/reputation you give or receive.</li>
@@ -67,6 +67,9 @@ export function Privacy() {
           </ul>
           <p className="mt-3">
             Your ID document and selfie are reviewed only by Royvento's moderation team for verification and are <strong className="text-foreground">never shown to other members</strong>. Within a group, other members see only your name and approved status — not your documents, contact details, or exact location. We use this information to verify identity, enforce safety rules, review reports, and take enforcement action against misuse. Providing this information is optional, but Solo Connect cannot be used without it.
+          </p>
+          <p className="mt-3">
+            <strong className="text-foreground">Offline safety is your responsibility.</strong> Identity verification reduces but does not eliminate risk, and it is not a background check or a guarantee about any member's character or conduct. Joining Solo Connect and meeting anyone in person is entirely voluntary and at your own risk. Royvento does not supervise or take part in offline meetups and is not responsible for what happens during them. <strong className="text-foreground">If you ever feel unsafe, suspicious, or uncomfortable, leave immediately and contact local emergency services directly — in India dial 112, 100, or 1091.</strong> The in-app Safety Center provides these emergency contacts for your convenience only. Full details of these terms are set out in our <Link href="/terms" className="text-primary hover:underline">Terms &amp; Conditions</Link>.
           </p>
         </section>
 

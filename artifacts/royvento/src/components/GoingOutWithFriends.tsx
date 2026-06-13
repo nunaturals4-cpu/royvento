@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   UsersRound,
   UtensilsCrossed,
+  Heart,
 } from "lucide-react";
 import { useSelectedCity } from "@/components/LocationContext";
 import { CarouselRow } from "@/components/CarouselRow";
@@ -93,6 +94,7 @@ const WHEN_CHIPS: { label: string; value: string; icon: React.ReactNode }[] = [
 
 const TYPE_CHIPS: { label: string; value: string; icon: React.ReactNode }[] = [
   { label: "All", value: "", icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { label: "Date Night", value: "date-night", icon: <Heart className="h-3.5 w-3.5" /> },
   { label: "Pub", value: "pub", icon: <GlassWater className="h-3.5 w-3.5" /> },
   { label: "Club", value: "club", icon: <PartyPopper className="h-3.5 w-3.5" /> },
   { label: "Happy Hours", value: "happy-hours", icon: <GlassWater className="h-3.5 w-3.5" /> },
