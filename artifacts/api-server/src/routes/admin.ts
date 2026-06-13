@@ -26,7 +26,7 @@ import { seedProdShowcase } from "../lib/seedProdShowcase";
 import { repairProdMedia } from "../lib/repairProdMedia";
 import { eq, desc, asc, sql, inArray, isNotNull, isNull, and, gte, lte, or } from "drizzle-orm";
 import * as XLSX from "xlsx";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, hashPassword } from "../lib/auth";
 import { createUserNotification } from "../lib/notify";
 import { sendEventApprovedEmail } from "../lib/notifications";
 import { generateTicketCode } from "../lib/ticketCode";
@@ -2805,6 +2805,24 @@ router.post("/admin/repair-prod-media", requireAuth(["admin"]), async (req, res)
     req.log.error({ err }, "repair-prod-media failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Repair failed" });
   }
+});
+
+/**
+ * Admin: set (overwrite) a user's password. Used to recover access to partner
+ * accounts whose owner-chosen password is unknown (passwords are bcrypt-hashed
+ * and cannot be read back). Hashes with the same helper the login compares
+ * against. Body: { password: string } (min 8 chars).
+ */
+router.post("/admin/users/:userId/set-password", requireAuth(["admin"]), async (req, res) => {
+  const userId = Number(req.params["userId"]);
+  if (!Number.isFinite(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (password.length < 8) { res.status(400).json({ error: "password (min 8 chars) is required" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  const passwordHash = await hashPassword(password);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, userId));
+  res.json({ ok: true, userId, email: user.email });
 });
 
 // ─── Vendor Base Fee Settings ─────────────────────────────────────────────────
