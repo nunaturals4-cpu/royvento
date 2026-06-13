@@ -217,7 +217,7 @@ const NAV_ITEMS: NavItem[] = [
   { value: "announcements", label: "Announcements",    icon: Megaphone,    group: "growth" },
   { value: "leads",         label: "Leads",            icon: Crown,        group: "growth" },
   { value: "coupons",       label: "Coupons",          icon: Tag,          group: "growth" },
-  { value: "drinkplans",    label: "Drink Plans",      icon: GlassWater,   group: "growth" },
+  { value: "drinkplans",    label: "Food & Drinks Plan", icon: GlassWater,   group: "growth" },
   { value: "banking",       label: "Banking",          icon: Banknote,     group: "money" },
   { value: "reviews",       label: "Reviews",          icon: Star,         group: "money" },
 ];
@@ -543,7 +543,12 @@ export function VendorDashboard() {
                   <CouponsPanel />
                 </TabsContent>
                 {!isOrganiserCategory(vendor?.category ?? "") && (
-                  <TabsContent value="drinkplans" className="mt-0"><DrinkPlansPanel vendorId={vendor.id} /></TabsContent>
+                  <TabsContent value="drinkplans" className="mt-0">
+                    <div className="space-y-6">
+                      <DrinkPlansPanel vendorId={vendor.id} />
+                      <FoodDrinkOffersPanel vendorId={vendor.id} />
+                    </div>
+                  </TabsContent>
                 )}
                 <TabsContent value="attendance" className="mt-0"><AttendancePanel /></TabsContent>
                 <TabsContent value="managers" className="mt-0"><ManagersPanel /></TabsContent>
