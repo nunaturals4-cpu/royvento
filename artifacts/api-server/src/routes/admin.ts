@@ -23,6 +23,7 @@ import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from 
 import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { seedDemoPubs } from "../lib/seedDemoPubs";
 import { seedProdShowcase } from "../lib/seedProdShowcase";
+import { repairProdMedia } from "../lib/repairProdMedia";
 import { eq, desc, asc, sql, inArray, isNotNull, isNull, and, gte, lte, or } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { requireAuth } from "../lib/auth";
@@ -2780,6 +2781,29 @@ router.post("/admin/seed-prod-showcase", requireAuth(["admin"]), async (req, res
   } catch (err) {
     req.log.error({ err }, "prod-showcase seed failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * One-shot repair: rewrites the five dead Unsplash photo IDs (now 404) that are
+ * persisted in prod vendor/event image fields to verified-working images, and
+ * spreads approved pub vendors across the Pub / Club / Lounge category sections
+ * so the pubs page shows populated sections instead of one.
+ *
+ * Body: { confirm: "yes" }. Idempotent — only known-dead URLs are rewritten and
+ * category assignment is deterministic, so re-running is a no-op.
+ */
+router.post("/admin/repair-prod-media", requireAuth(["admin"]), async (req, res) => {
+  if (req.body?.confirm !== "yes") {
+    res.status(400).json({ error: "Set { confirm: \"yes\" } in the body to run the repair." });
+    return;
+  }
+  try {
+    const report = await repairProdMedia();
+    res.json(report);
+  } catch (err) {
+    req.log.error({ err }, "repair-prod-media failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Repair failed" });
   }
 });
 

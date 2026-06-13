@@ -43,16 +43,16 @@ const GALLERY = [
   "https://images.unsplash.com/photo-1538488881038-e252a119ace7?w=1200&q=80",
   "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=1200&q=80",
   "https://images.unsplash.com/photo-1519214605650-76a613ee3245?w=1200&q=80",
-  "https://images.unsplash.com/photo-1601481712810-8b09e0a3df93?w=1200&q=80",
+  "https://images.unsplash.com/photo-1546171753-97d7676e4602?w=1200&q=80",
   "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=1200&q=80",
   "https://images.unsplash.com/photo-1546171753-97d7676e4602?w=1200&q=80",
   "https://images.unsplash.com/photo-1438557068880-c5f474830377?w=1200&q=80",
-  "https://images.unsplash.com/photo-1485872299712-d4fd9b96d0a6?w=1200&q=80",
+  "https://images.unsplash.com/photo-1438557068880-c5f474830377?w=1200&q=80",
   "https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=1200&q=80",
   "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=1200&q=80",
 ];
 const DANCE_FLOOR = [
-  "https://images.unsplash.com/photo-1571266028243-d220c6e6f9bd?w=1400&q=80",
+  "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1400&q=80",
   "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1400&q=80",
 ];
 const MENUS = [
