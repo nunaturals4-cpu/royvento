@@ -57,16 +57,23 @@ export function OfferCard({
   variant = "customer",
   greyed,
   trailing,
+  coverImage,
   className,
 }: {
   offer: VendorOffer;
   variant?: "customer" | "partner";
   greyed?: boolean;
   trailing?: React.ReactNode;
+  /**
+   * Partner cover image. Food & drink offers carry no image of their own, so
+   * the customer card falls back to the partner's cover so it never looks bare.
+   */
+  coverImage?: string | null;
   className?: string;
 }) {
   const Icon = offer.category === "drink" ? Wine : Utensils;
   const badge = formatBadge(offer);
+  const showCover = variant === "customer" && !!coverImage;
 
   return (
     <div
@@ -80,16 +87,30 @@ export function OfferCard({
       )}
     >
       <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center",
-            offer.category === "drink"
-              ? "bg-rose-500/15 text-rose-300"
-              : "bg-emerald-500/15 text-emerald-300",
-          )}
-        >
-          <Icon className="w-5 h-5" />
-        </div>
+        {showCover ? (
+          <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-white/10 relative">
+            <img src={coverImage!} alt={offer.title} loading="lazy" className="h-full w-full object-cover" />
+            <div
+              className={cn(
+                "absolute bottom-0 right-0 w-5 h-5 rounded-tl-lg flex items-center justify-center",
+                offer.category === "drink" ? "bg-rose-500/80 text-white" : "bg-emerald-500/80 text-white",
+              )}
+            >
+              <Icon className="w-3 h-3" />
+            </div>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center",
+              offer.category === "drink"
+                ? "bg-rose-500/15 text-rose-300"
+                : "bg-emerald-500/15 text-emerald-300",
+            )}
+          >
+            <Icon className="w-5 h-5" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <h4 className="text-sm sm:text-base font-semibold text-foreground truncate">

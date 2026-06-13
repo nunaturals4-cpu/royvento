@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { OfferCard, type VendorOffer as VendorOfferData } from "@/components/OfferCard";
 import { formatDayRanges } from "@/lib/days";
 
-function TodaysOffers({ vendorId }: { vendorId: number }) {
+function TodaysOffers({ vendorId, coverImage }: { vendorId: number; coverImage?: string | null }) {
   const [offers, setOffers] = useState<VendorOfferData[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -57,7 +57,7 @@ function TodaysOffers({ vendorId }: { vendorId: number }) {
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           {items.map((o) => (
-            <OfferCard key={o.id} offer={o} variant="customer" />
+            <OfferCard key={o.id} offer={o} variant="customer" coverImage={coverImage} />
           ))}
         </div>
       </div>
@@ -698,7 +698,7 @@ export function VendorDetail({ vendorIdProp }: { vendorIdProp?: number } = {}) {
               )}
             </section>
 
-            <TodaysOffers vendorId={vendor.id} />
+            <TodaysOffers vendorId={vendor.id} coverImage={vendor.coverImageUrl || vendor.bannerImage} />
 
             <section>
               <h2 className="font-serif text-2xl mb-6 flex items-center gap-2">

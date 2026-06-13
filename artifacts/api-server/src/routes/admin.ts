@@ -22,6 +22,7 @@ import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_CO
 import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
 import { seedDemoPubs } from "../lib/seedDemoPubs";
+import { seedProdShowcase } from "../lib/seedProdShowcase";
 import { eq, desc, asc, sql, inArray, isNotNull, isNull, and, gte, lte, or } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { requireAuth } from "../lib/auth";
@@ -2751,6 +2752,32 @@ router.post("/admin/seed-demo-pubs", requireAuth(["admin"]), async (req, res) =>
     res.json(report);
   } catch (err) {
     req.log.error({ err }, "demo-pubs seed failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * One-shot endpoint that enriches the operator's REAL approved profiles so a
+ * visitor can see how a finished profile/event/announcement looks:
+ *   • fills cover/banner/gallery/dance-floor/menu images (empty fields only),
+ *   • ensures an approved pub event (pricing + group capacity + free entry),
+ *   • adds drink_plans (happy hours), food+drink offers and announcements,
+ *   • ensures the demo Game Organizer profile (gamezone@royvento.com) exists.
+ *
+ * Body: { confirm: "yes" }. Idempotent and non-destructive — it only fills
+ * empty image fields and inserts content that doesn't already exist (matched
+ * by title), so partner-entered data is never overwritten or duplicated.
+ */
+router.post("/admin/seed-prod-showcase", requireAuth(["admin"]), async (req, res) => {
+  if (req.body?.confirm !== "yes") {
+    res.status(400).json({ error: "Set { confirm: \"yes\" } in the body to run the seed." });
+    return;
+  }
+  try {
+    const report = await seedProdShowcase();
+    res.json(report);
+  } catch (err) {
+    req.log.error({ err }, "prod-showcase seed failed");
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
 });
