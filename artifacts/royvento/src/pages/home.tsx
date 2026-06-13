@@ -475,7 +475,7 @@ export function Home() {
             icon={<Heart className="h-3.5 w-3.5" />}
             eyebrow="For two"
             title="Date Night"
-            seeAllHref="/pubs?when=weekend"
+            seeAllHref="/pubs?category=DateNight"
             seeAllLabel="See all spots"
           />
           <CarouselRow itemClassName="w-[280px] sm:w-[300px]">

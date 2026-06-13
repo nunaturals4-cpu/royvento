@@ -229,7 +229,7 @@ export function Pubs() {
   const [freeEntry, setFreeEntry]   = useState(false);
   const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
   const [venueTab, setVenueTab]     = useState<"All" | "Pub" | "Club">("All");
-  const [dateNight, setDateNight]   = useState(false);
+  const [dateNight, setDateNight]   = useState(() => new URLSearchParams(searchStr).get("category") === "DateNight");
   const [pubs, setPubs]             = useState<PublicEvent[]>([]);
   const [loading, setLoading]       = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
