@@ -915,7 +915,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+const server = app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
@@ -999,3 +999,35 @@ app.listen(port, (err) => {
   }, { timezone: "Asia/Kolkata" });
 
 });
+
+// ── Graceful shutdown ───────────────────────────────────────────────────────
+// Railway sends SIGTERM to the old container during every deploy. Without an
+// explicit handler the process is kept alive by the open HTTP server + the
+// cron timers above, so SIGTERM is ignored, Railway waits out its stop-timeout
+// and then SIGKILLs us (exit 137) — which the dashboard reports as a momentary
+// "Crashed" on each deploy. Closing the server lets in-flight requests drain
+// and exits 0 (clean) so deploys roll over without the crash flicker.
+let shuttingDown = false;
+function shutdown(signal: NodeJS.Signals) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, "Received shutdown signal — closing server gracefully");
+  // Stop scheduled jobs so they don't hold the event loop open.
+  cron.getTasks().forEach((task) => task.stop());
+  const forceExit = setTimeout(() => {
+    logger.warn("Graceful shutdown timed out — forcing exit");
+    process.exit(0);
+  }, 10_000);
+  forceExit.unref();
+  server.close((err) => {
+    if (err) {
+      logger.error({ err }, "Error during server close");
+      process.exit(1);
+    }
+    logger.info("Server closed — exiting cleanly");
+    process.exit(0);
+  });
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

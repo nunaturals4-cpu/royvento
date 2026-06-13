@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Search, X, Star, MapPin, GlassWater,
-  Wine, Mic2, Building2, Coffee, Music, SlidersHorizontal, Store, Heart,
+  Search, X, Star,
+  Wine, Coffee, Music, SlidersHorizontal, Store, Heart,
 } from "lucide-react";
 import { apiGet, formatINR } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
@@ -67,16 +67,31 @@ const PRICE_PRESETS = [
 
 const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/* â”€â”€â”€ sidebar config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-const SIDEBAR_CATEGORY_DEFS = [
-  { id: "All",       label: "All Venues",  icon: Store     },
-  { id: "DateNight", label: "Date Night",  icon: Heart     },
-  { id: "Pub",       label: "Pubs & Bars", icon: Wine      },
-  { id: "Club",      label: "Nightclubs",  icon: Music     },
-  { id: "lounge",    label: "Lounges",     icon: Coffee    },
-  { id: "roof",      label: "Rooftop Bars",icon: Building2 },
-  { id: "live",      label: "Live Music",  icon: Mic2      },
+/* â”€â”€â”€ category config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+// Each venue category becomes its own section on the page. The `value` matches
+// the vendor's `category` field (set by admins), so re-categorising a pub from
+// the admin panel moves it into the matching section here. Venues whose
+// category doesn't match any known value fall into the "Other" section.
+const PUB_CATEGORY_SECTIONS = [
+  { value: "Pub",    label: "Pubs & Bars", icon: Wine   },
+  { value: "Club",   label: "Nightclubs",  icon: Music  },
+  { value: "Lounge", label: "Lounges",     icon: Coffee },
+  { value: "Other",  label: "Other",       icon: Store  },
 ] as const;
+
+type PubCategory = typeof PUB_CATEGORY_SECTIONS[number]["value"];
+type VenueTab = "All" | PubCategory;
+
+const KNOWN_PUB_CATEGORIES = new Set<string>(["Pub", "Club", "Lounge"]);
+// Map a venue to its section value, bucketing anything unknown into "Other".
+const sectionOf = (p: PublicEvent): PubCategory =>
+  KNOWN_PUB_CATEGORIES.has(p.vendorCategory ?? "") ? (p.vendorCategory as PubCategory) : "Other";
+
+const SIDEBAR_CATEGORY_DEFS = [
+  { id: "All" as const,       label: "All Venues", icon: Store },
+  { id: "DateNight" as const, label: "Date Night", icon: Heart },
+  ...PUB_CATEGORY_SECTIONS.map((s) => ({ id: s.value, label: s.label, icon: s.icon })),
+];
 
 // "Date Night" is admin-curated: an event carries a `dateNight` flag that admins
 // toggle from the panel. This is the single source of truth shared with the
@@ -228,7 +243,7 @@ export function Pubs() {
   const [hasDrinkDeal, setHasDrinkDeal] = useState(false);
   const [freeEntry, setFreeEntry]   = useState(false);
   const [crowdLevel, setCrowdLevel] = useState<CrowdFilter>("");
-  const [venueTab, setVenueTab]     = useState<"All" | "Pub" | "Club">("All");
+  const [venueTab, setVenueTab]     = useState<VenueTab>("All");
   const [dateNight, setDateNight]   = useState(() => new URLSearchParams(searchStr).get("category") === "DateNight");
   const [pubs, setPubs]             = useState<PublicEvent[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -265,7 +280,7 @@ export function Pubs() {
 
   const displayedPubs = useMemo(() => {
     let list = pubs;
-    if (venueTab !== "All") list = list.filter((p) => p.vendorCategory === venueTab);
+    if (venueTab !== "All") list = list.filter((p) => sectionOf(p) === venueTab);
     if (dateNight) list = list.filter(isDateNightVenue);
     if (hasDrinkDeal && !drinkPlanType) list = list.filter((p) => p.hasDrinkPlans);
     if (freeEntry) list = list.filter((p) => p.freeEntryRules?.enabled === true && (p.freeEntryRules?.days?.length ?? 0) > 0);
@@ -273,16 +288,23 @@ export function Pubs() {
     return list;
   }, [pubs, venueTab, dateNight, hasDrinkDeal, drinkPlanType, freeEntry, crowdLevel]);
 
+  // Group the filtered venues into per-category sections. Only sections with at
+  // least one venue are rendered. When a specific category tab is active this
+  // naturally collapses to a single section.
+  const groupedSections = useMemo(() =>
+    PUB_CATEGORY_SECTIONS
+      .map((sec) => ({ ...sec, items: displayedPubs.filter((p) => sectionOf(p) === sec.value) }))
+      .filter((sec) => sec.items.length > 0),
+  [displayedPubs]);
+
   const hasFilters = search || country || stateF || city || pricePreset !== null
     || drinkPlanType || hasDrinkDeal || freeEntry || crowdLevel || venueTab !== "All" || dateNight;
 
   // Real counts derived from fetched data
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { All: pubs.length };
-    for (const p of pubs) {
-      const cat = p.vendorCategory ?? "";
-      if (cat) counts[cat] = (counts[cat] ?? 0) + 1;
-    }
+    for (const sec of PUB_CATEGORY_SECTIONS) counts[sec.value] = 0;
+    for (const p of pubs) counts[sectionOf(p)] += 1;
     counts["DateNight"] = pubs.filter(isDateNightVenue).length;
     return counts;
   }, [pubs]);
@@ -294,15 +316,12 @@ export function Pubs() {
   }
 
   // sidebar category click â€” maps to existing venueTab filter
-  function handleCategoryClick(id: string) {
+  function handleCategoryClick(id: VenueTab | "DateNight") {
     if (id === "DateNight") {
       // Independent toggle that composes with the venue-type tabs.
       setDateNight((v) => !v);
-    } else if (id === "All" || id === "Pub" || id === "Club") {
-      setVenueTab(id as "All" | "Pub" | "Club");
     } else {
-      // for display-only extras, reset to All (they filter by type)
-      setVenueTab("All");
+      setVenueTab(id);
     }
   }
 
@@ -459,16 +478,8 @@ export function Pubs() {
               <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-3">Categories</h3>
               <ul className="space-y-0.5">
                 {SIDEBAR_CATEGORY_DEFS.map(({ id, label, icon: Icon }) => {
-                  const isActive = id === "DateNight" ? dateNight
-                    : id === "All" ? venueTab === "All"
-                    : id === "Pub" ? venueTab === "Pub"
-                    : id === "Club" ? venueTab === "Club"
-                    : false;
-                  const count = id === "All" ? (categoryCounts["All"] ?? 0)
-                    : id === "DateNight" ? (categoryCounts["DateNight"] ?? 0)
-                    : id === "Pub" ? (categoryCounts["Pub"] ?? 0)
-                    : id === "Club" ? (categoryCounts["Club"] ?? 0)
-                    : null;
+                  const isActive = id === "DateNight" ? dateNight : venueTab === id;
+                  const count = categoryCounts[id] ?? 0;
                   return (
                     <li key={id}>
                       <button
@@ -507,18 +518,18 @@ export function Pubs() {
                 )}
               </p>
               {/* Mobile venue type tabs */}
-              <div className="flex lg:hidden gap-1.5">
-                {(["All", "Pub", "Club"] as const).map((tab) => (
+              <div className="flex lg:hidden gap-1.5 overflow-x-auto">
+                {(["All", ...PUB_CATEGORY_SECTIONS.map((s) => s.value)] as const as VenueTab[]).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setVenueTab(tab)}
                     className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors",
+                      "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors whitespace-nowrap",
                       venueTab === tab
                         ? "bg-primary border-primary text-primary-foreground"
                         : "bg-white/[0.04] border-white/[0.08] text-muted-foreground",
                     )}
-                  >{tab === "All" ? "All" : tab === "Pub" ? "Pubs" : "Clubs"}</button>
+                  >{tab === "All" ? "All" : PUB_CATEGORY_SECTIONS.find((s) => s.value === tab)?.label ?? tab}</button>
                 ))}
               </div>
             </div>
@@ -540,8 +551,19 @@ export function Pubs() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
-                {displayedPubs.map((p) => <PubCard key={p.id} pub={p} />)}
+              <div className="space-y-10">
+                {groupedSections.map(({ value, label, icon: Icon, items }) => (
+                  <section key={value} aria-label={label}>
+                    <div className="mb-4 flex items-center gap-2.5">
+                      <Icon className="h-5 w-5 text-primary shrink-0" />
+                      <h2 className="text-lg md:text-xl font-bold tracking-tight text-white">{label}</h2>
+                      <span className="text-xs font-medium text-muted-foreground">({items.length})</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
+                      {items.map((p) => <PubCard key={p.id} pub={p} />)}
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
           </div>

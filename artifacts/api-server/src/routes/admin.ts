@@ -547,6 +547,7 @@ router.get("/admin/events", requireAuth(["admin"]), async (_req, res) => {
         retainForever: e.retainForever,
         partnerName: v?.businessName ?? "",
         vendorCrowdLevel: (v as unknown as { crowdLevel?: string | null })?.crowdLevel ?? null,
+        vendorCategory: v?.category ?? null,
         createdAt: e.createdAt.toISOString(),
       };
     }),

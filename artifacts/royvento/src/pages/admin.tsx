@@ -1392,6 +1392,7 @@ interface AdminEvent {
   imageUrl: string;
   retainForever: boolean;
   vendorCrowdLevel: string | null;
+  vendorCategory: string | null;
 }
 
 interface PendingAnnouncement {
@@ -1690,6 +1691,16 @@ const ADMIN_CROWD_LEVELS = [
   { value: "party", label: "High 🔥", color: "text-red-400", bg: "bg-red-500/15 border-red-500/30" },
 ] as const;
 
+// Pub categories — each maps to a section on the public /pubs page. Setting the
+// category here re-files the venue into the matching section. Keep these values
+// in sync with PUB_CATEGORY_SECTIONS in pages/pubs.tsx.
+const ADMIN_PUB_CATEGORIES = [
+  { value: "Pub", label: "Pubs & Bars", color: "text-violet-300", bg: "bg-violet-500/15 border-violet-500/30" },
+  { value: "Club", label: "Nightclubs", color: "text-fuchsia-300", bg: "bg-fuchsia-500/15 border-fuchsia-500/30" },
+  { value: "Lounge", label: "Lounges", color: "text-sky-300", bg: "bg-sky-500/15 border-sky-500/30" },
+  { value: "Other", label: "Other", color: "text-white/70", bg: "bg-white/10 border-white/20" },
+] as const;
+
 function EventsAdmin() {
   const [items, setItems] = useState<AdminEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1699,6 +1710,8 @@ function EventsAdmin() {
   const [filterPartner, setFilterPartner] = useState("all");
   const [crowdLevelOpen, setCrowdLevelOpen] = useState<number | null>(null);
   const [savingCrowd, setSavingCrowd] = useState<number | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState<number | null>(null);
+  const [savingCategory, setSavingCategory] = useState<number | null>(null);
   const { toast } = useToast();
 
   const load = () => {
@@ -1773,6 +1786,20 @@ function EventsAdmin() {
     }
   };
 
+  const setCategory = async (vendorId: number, category: string) => {
+    setSavingCategory(vendorId);
+    try {
+      await apiPatch(`/api/admin/vendors/${vendorId}`, { category });
+      setItems((prev) => prev.map((e) => e.vendorId === vendorId ? { ...e, vendorCategory: category } : e));
+      toast({ title: `Category set to "${category}"` });
+      setCategoryOpen(null);
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setSavingCategory(null);
+    }
+  };
+
   // Close crowd level dropdown when clicking outside
   useEffect(() => {
     if (!crowdLevelOpen) return;
@@ -1780,6 +1807,14 @@ function EventsAdmin() {
     setTimeout(() => document.addEventListener("click", handler), 0);
     return () => document.removeEventListener("click", handler);
   }, [crowdLevelOpen]);
+
+  // Close category dropdown when clicking outside
+  useEffect(() => {
+    if (!categoryOpen) return;
+    const handler = () => setCategoryOpen(null);
+    setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => document.removeEventListener("click", handler);
+  }, [categoryOpen]);
 
   const uniqueTypes = Array.from(new Set(items.map((e) => e.type).filter(Boolean))).sort();
   const uniquePartners = Array.from(new Set(items.map((e) => e.partnerName).filter(Boolean))).sort();
@@ -1848,8 +1883,7 @@ function EventsAdmin() {
                 <th className="text-left p-3">Title</th>
                 <th className="text-left p-3">Partner</th>
                 <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">Location</th>
-                <th className="text-right p-3">Price</th>
+                <th className="text-center p-3">Category</th>
                 <th className="text-center p-3">Status</th>
                 <th className="text-center p-3">Crowd Level</th>
                 <th className="text-center p-3">Popular Since</th>
@@ -1863,13 +1897,41 @@ function EventsAdmin() {
               {filtered.map((e) => {
                 const crowdOpt = ADMIN_CROWD_LEVELS.find((o) => o.value === e.vendorCrowdLevel);
                 const isSaving = savingCrowd === e.vendorId;
+                const catOpt = ADMIN_PUB_CATEGORIES.find((o) => o.value === e.vendorCategory);
+                const isSavingCat = savingCategory === e.vendorId;
                 return (
                 <tr key={e.id} className="border-t border-white/5">
                   <td className="p-3 font-medium">{e.title}</td>
                   <td className="p-3 text-muted-foreground">{e.partnerName}</td>
                   <td className="p-3"><Badge variant="outline">{e.type}</Badge></td>
-                  <td className="p-3 text-muted-foreground">{e.city}{e.state ? `, ${e.state}` : ""}</td>
-                  <td className="p-3 text-right">{formatINR(e.price)}</td>
+                  <td className="p-3 text-center relative">
+                    {e.type === "pub" ? (
+                      <div className="inline-block relative">
+                        <button
+                          disabled={isSavingCat}
+                          onClick={() => setCategoryOpen(categoryOpen === e.vendorId ? null : e.vendorId)}
+                          className={`text-xs px-2.5 py-1 rounded-full border inline-flex items-center gap-1 transition-colors disabled:opacity-50 ${catOpt ? `${catOpt.bg} ${catOpt.color}` : "bg-white/5 border-white/15 text-white/40 hover:border-white/30"}`}
+                        >
+                          {isSavingCat ? "…" : (catOpt?.label ?? e.vendorCategory ?? "Set category")}
+                        </button>
+                        {categoryOpen === e.vendorId && (
+                          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 min-w-[160px] rounded-xl border border-white/15 bg-card shadow-2xl p-2 space-y-1">
+                            {ADMIN_PUB_CATEGORIES.map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setCategory(e.vendorId, opt.value)}
+                                className={`w-full text-left text-xs px-3 py-2 rounded-lg transition-colors ${e.vendorCategory === opt.value ? `${opt.bg} ${opt.color} font-semibold` : "text-foreground/80 hover:bg-white/8"}`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-white/20 text-xs">—</span>
+                    )}
+                  </td>
                   <td className="p-3 text-center">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       e.approvalStatus === "approved" ? "bg-green-500/20 text-green-300" :
