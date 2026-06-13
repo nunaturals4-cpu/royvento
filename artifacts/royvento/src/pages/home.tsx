@@ -52,6 +52,7 @@ interface PublicEvent {
   reviewCount: number;
   partnerName: string;
   popular: boolean;
+  dateNight?: boolean;
 }
 
 interface Announcement {
@@ -241,7 +242,6 @@ export function Home() {
     queryKey: ["events-pubs"],
     queryFn: () => apiGet<PublicEvent[]>("/api/events?type=pub"),
     staleTime: 120_000,
-    select: (data: PublicEvent[]) => data.slice(0, 6),
   });
 
   const { data: announcements = [] } = useQuery({
@@ -253,19 +253,13 @@ export function Home() {
   const sortedPopular = useMemo(() => sortCityFirst(popular, userCity), [popular, userCity]);
   const sortedPubs = useMemo(() => sortCityFirst(pubs, userCity), [pubs, userCity]);
 
-  // Date Night rail — curate the 2 best-rated pubs (city-first) for couples.
-  // Derived client-side from existing pub data, so no backend change is needed.
-  const dateNightPubs = useMemo(() => {
-    const pool = [...sortedPubs, ...sortedPopular.filter((e) => e.type === "pub")];
-    const seen = new Set<number>();
-    const uniq: PublicEvent[] = [];
-    for (const e of pool) {
-      if (seen.has(e.id)) continue;
-      seen.add(e.id);
-      uniq.push(e);
-    }
-    return [...uniq].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 2);
-  }, [sortedPubs, sortedPopular]);
+  // Date Night rail — admin-curated. Filters the same /api/events?type=pub list
+  // the Pubs page uses by the `dateNight` flag, so this rail and the Pubs-page
+  // "Date Night" category always show the identical set (single source of truth).
+  const dateNightPubs = useMemo(
+    () => sortedPubs.filter((e) => e.dateNight === true),
+    [sortedPubs],
+  );
 
   const features = [
     { icon: ShieldCheck, title: t("home.feature1_title"), body: t("home.feature1_body") },
@@ -469,7 +463,7 @@ export function Home() {
             seeAllLabel={t("home.view_all_pubs")}
           />
           <CarouselRow itemClassName="w-[280px] sm:w-[300px]">
-            {sortedPubs.map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
+            {sortedPubs.slice(0, 8).map((e) => <EventCard key={e.id} event={e} hidePubBadge directBooking />)}
           </CarouselRow>
         </section>
       )}
