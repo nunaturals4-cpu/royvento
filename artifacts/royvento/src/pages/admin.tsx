@@ -5633,6 +5633,7 @@ interface AdminSoloVerification {
   userName: string;
   userEmail: string;
   idType: string;
+  idNumber: string;
   idDocumentUrl: string;
   selfieUrl: string;
   phone: string;
@@ -6280,7 +6281,7 @@ function SoloVerificationsPanel() {
               <tr>
                 <th className="text-left p-3">User</th>
                 <th className="text-left p-3">ID Type</th>
-                <th className="text-left p-3">Phone</th>
+                <th className="text-left p-3">ID Number</th>
                 <th className="text-left p-3">Documents</th>
                 <th className="text-left p-3">Status</th>
                 <th className="text-right p-3">Action</th>
@@ -6294,27 +6295,24 @@ function SoloVerificationsPanel() {
                     <p className="text-xs text-muted-foreground">{v.userEmail}</p>
                   </td>
                   <td className="p-3">{SOLO_ID_LABELS[v.idType] ?? (v.idType || "—")}</td>
+                  <td className="p-3 font-mono text-xs">{v.idNumber || "—"}</td>
                   <td className="p-3">
-                    <span>{v.phone || "—"}</span>
-                    {v.phoneVerified && <span className="ml-1.5 text-[10px] text-emerald-300">✓ verified</span>}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-2">
-                      {v.idDocumentUrl ? (
-                        <a href={v.idDocumentUrl} target="_blank" rel="noreferrer" title="Government ID">
-                          <img src={v.idDocumentUrl} alt="ID" className="h-12 w-16 object-cover rounded border border-white/10" />
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No ID</span>
-                      )}
-                      {v.selfieUrl ? (
-                        <a href={v.selfieUrl} target="_blank" rel="noreferrer" title="Selfie">
-                          <img src={v.selfieUrl} alt="Selfie" className="h-12 w-12 object-cover rounded-full border border-white/10" />
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No selfie</span>
-                      )}
-                    </div>
+                    {v.idDocumentUrl || v.selfieUrl ? (
+                      <div className="flex gap-2">
+                        {v.idDocumentUrl && (
+                          <a href={v.idDocumentUrl} target="_blank" rel="noreferrer" title="Government ID">
+                            <img src={v.idDocumentUrl} alt="ID" className="h-12 w-16 object-cover rounded border border-white/10" />
+                          </a>
+                        )}
+                        {v.selfieUrl && (
+                          <a href={v.selfieUrl} target="_blank" rel="noreferrer" title="Selfie">
+                            <img src={v.selfieUrl} alt="Selfie" className="h-12 w-12 object-cover rounded-full border border-white/10" />
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="p-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${verBadge(v.status)}`}>{v.status}</span>

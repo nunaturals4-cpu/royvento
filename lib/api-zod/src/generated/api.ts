@@ -199,6 +199,7 @@ export const GetSoloVerificationResponse = zod.union([zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "idType": zod.string(),
+  "idNumber": zod.string(),
   "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),
@@ -215,15 +216,14 @@ export const GetSoloVerificationResponse = zod.union([zod.object({
  */
 export const SubmitSoloVerificationBody = zod.object({
   "idType": zod.enum(['aadhaar', 'passport', 'driving_license', 'voter_id']),
-  "idDocumentUrl": zod.string(),
-  "selfieUrl": zod.string(),
-  "phone": zod.string()
+  "idNumber": zod.string()
 }).strict()
 
 export const SubmitSoloVerificationResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "idType": zod.string(),
+  "idNumber": zod.string(),
   "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),
@@ -255,6 +255,7 @@ export const VerifySoloOtpResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "idType": zod.string(),
+  "idNumber": zod.string(),
   "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),
@@ -282,6 +283,7 @@ export const ReviewSoloVerificationResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "idType": zod.string(),
+  "idNumber": zod.string(),
   "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),

@@ -1777,6 +1777,8 @@ export const soloConnectVerificationsTable = pgTable(
       .references(() => usersTable.id, { onDelete: "cascade" }),
     // aadhaar | passport | driving_license | voter_id
     idType: varchar("id_type", { length: 20 }).notNull().default(""),
+    // Government ID number typed by the applicant during verification.
+    idNumber: varchar("id_number", { length: 100 }).notNull().default(""),
     idDocumentUrl: text("id_document_url").notNull().default(""),
     selfieUrl: text("selfie_url").notNull().default(""),
     phone: varchar("phone", { length: 20 }).notNull().default(""),

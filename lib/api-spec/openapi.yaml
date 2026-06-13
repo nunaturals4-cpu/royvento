@@ -3066,6 +3066,7 @@ components:
         id: { type: integer }
         userId: { type: integer }
         idType: { type: string }
+        idNumber: { type: string }
         idDocumentUrl: { type: string }
         selfieUrl: { type: string }
         phone: { type: string }
@@ -3076,7 +3077,7 @@ components:
         rejectionReason: { type: string }
         createdAt: { type: string }
         updatedAt: { type: string }
-      required: [id, userId, idType, idDocumentUrl, selfieUrl, phone, phoneVerified, status, rejectionReason, createdAt, updatedAt]
+      required: [id, userId, idType, idNumber, idDocumentUrl, selfieUrl, phone, phoneVerified, status, rejectionReason, createdAt, updatedAt]
 
     SoloVerificationBody:
       type: object
@@ -3084,10 +3085,8 @@ components:
         idType:
           type: string
           enum: [aadhaar, passport, driving_license, voter_id]
-        idDocumentUrl: { type: string }
-        selfieUrl: { type: string }
-        phone: { type: string }
-      required: [idType, idDocumentUrl, selfieUrl, phone]
+        idNumber: { type: string }
+      required: [idType, idNumber]
 
     SoloOtpRequestResult:
       type: object

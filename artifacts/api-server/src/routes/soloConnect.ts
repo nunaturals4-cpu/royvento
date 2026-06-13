@@ -29,6 +29,7 @@ function verificationToPublic(v: typeof soloConnectVerificationsTable.$inferSele
     id: v.id,
     userId: v.userId,
     idType: v.idType,
+    idNumber: v.idNumber,
     idDocumentUrl: v.idDocumentUrl,
     selfieUrl: v.selfieUrl,
     phone: v.phone,
@@ -176,13 +177,11 @@ router.get("/solo-connect/verification", async (req, res) => {
 
 const VerificationBody = z.object({
   idType: z.enum(["aadhaar", "passport", "driving_license", "voter_id"]),
-  idDocumentUrl: z.string().min(1),
-  selfieUrl: z.string().min(1),
-  phone: z.string().min(6).max(20),
+  idNumber: z.string().min(1).max(100),
 });
 
-// Upsert the ID + selfie + phone. Resets the row to a fresh (un-verified,
-// pending) state so a re-submission must re-do the OTP step.
+// Upsert the ID type + number. Mobile verification was removed, so a submitted
+// record goes straight to the `pending` (under-review) state for admin review.
 router.post("/solo-connect/verification", async (req, res) => {
   const user = await requireEligible(req, res);
   if (!user) return;
@@ -191,7 +190,7 @@ router.post("/solo-connect/verification", async (req, res) => {
     respondInvalid(res, parsed.error);
     return;
   }
-  const { idType, idDocumentUrl, selfieUrl, phone } = parsed.data;
+  const { idType, idNumber } = parsed.data;
   const existing = await db
     .select({ id: soloConnectVerificationsTable.id })
     .from(soloConnectVerificationsTable)
@@ -203,12 +202,7 @@ router.post("/solo-connect/verification", async (req, res) => {
       .update(soloConnectVerificationsTable)
       .set({
         idType,
-        idDocumentUrl,
-        selfieUrl,
-        phone,
-        phoneVerified: false,
-        otpHash: "",
-        otpExpiry: null,
+        idNumber: idNumber.trim(),
         status: "pending",
         rejectionReason: "",
         updatedAt: new Date(),
@@ -218,9 +212,7 @@ router.post("/solo-connect/verification", async (req, res) => {
     await db.insert(soloConnectVerificationsTable).values({
       userId: user.id,
       idType,
-      idDocumentUrl,
-      selfieUrl,
-      phone,
+      idNumber: idNumber.trim(),
       status: "pending",
     });
   }
@@ -309,6 +301,7 @@ router.get("/admin/solo-connect/verifications", requireAuth(["admin"]), async (_
       id: soloConnectVerificationsTable.id,
       userId: soloConnectVerificationsTable.userId,
       idType: soloConnectVerificationsTable.idType,
+      idNumber: soloConnectVerificationsTable.idNumber,
       idDocumentUrl: soloConnectVerificationsTable.idDocumentUrl,
       selfieUrl: soloConnectVerificationsTable.selfieUrl,
       phone: soloConnectVerificationsTable.phone,
@@ -333,6 +326,7 @@ router.get("/admin/solo-connect/verifications", requireAuth(["admin"]), async (_
       userName: r.userName ?? "",
       userEmail: r.userEmail ?? "",
       idType: r.idType,
+      idNumber: r.idNumber,
       idDocumentUrl: r.idDocumentUrl,
       selfieUrl: r.selfieUrl,
       phone: r.phone,

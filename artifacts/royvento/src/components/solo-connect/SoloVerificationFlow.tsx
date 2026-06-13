@@ -1,20 +1,18 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetSoloVerification,
   useSubmitSoloVerification,
-  useRequestSoloOtp,
-  useVerifySoloOtp,
 } from "@workspace/api-client-react";
-import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, Upload, Loader2, Check } from "lucide-react";
+import { ShieldCheck, Check, ChevronDown } from "lucide-react";
 
 const GOLD = "#d4af37";
 const RED = "#b91c1c";
 
 const ID_TYPES = [
+  { value: "aadhaar", label: "Aadhaar" },
   { value: "passport", label: "Passport" },
   { value: "driving_license", label: "Driving License" },
   { value: "voter_id", label: "Voter ID" },
@@ -22,116 +20,19 @@ const ID_TYPES = [
 
 type IdType = (typeof ID_TYPES)[number]["value"];
 
-// Keep only digits and a single leading "+", so the field can never hold
-// letters/spaces/symbols. Used as the onChange sanitizer.
-function sanitizePhone(raw: string): string {
-  let v = raw.replace(/[^\d+]/g, "");
-  // collapse any "+" that isn't the very first character
-  v = (v.startsWith("+") ? "+" : "") + v.replace(/\+/g, "");
-  return v.slice(0, 13); // +91 + 10 digits
-}
-
-// Valid Indian mobile: 10 digits starting 6–9, optionally prefixed with +91/91.
-function isValidIndianMobile(raw: string): boolean {
-  return /^(\+?91)?[6-9]\d{9}$/.test(sanitizePhone(raw));
-}
-
-function UploadField({
-  label,
-  value,
-  onUploaded,
-}: {
-  label: string;
-  value: string;
-  onUploaded: (path: string) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const { toast } = useToast();
-
-  async function handleFile(file: File) {
-    const err = validateImageFile(file);
-    if (err) {
-      toast({ title: err, variant: "destructive" });
-      return;
-    }
-    setBusy(true);
-    try {
-      const path = await uploadImage(file);
-      onUploaded(path);
-    } catch {
-      toast({ title: "Upload failed. Please try again.", variant: "destructive" });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div>
-      <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>{label}</p>
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        className="w-full flex items-center justify-center gap-2 py-6 rounded-xl transition-all"
-        style={{
-          background: value ? "rgba(212,175,55,0.10)" : "rgba(255,255,255,0.04)",
-          border: `1.5px dashed ${value ? "rgba(212,175,55,0.6)" : "rgba(255,255,255,0.15)"}`,
-          color: value ? GOLD : "rgba(255,255,255,0.6)",
-        }}
-      >
-        {busy ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : value ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <Upload className="h-4 w-4" />
-        )}
-        <span className="text-sm font-medium">
-          {busy ? "Uploading…" : value ? "Uploaded — replace" : "Tap to upload"}
-        </span>
-      </button>
-      {value && (
-        <img
-          src={value}
-          alt={label}
-          className="mt-2 h-20 w-full object-cover rounded-lg"
-          style={{ border: "1px solid rgba(255,255,255,0.08)" }}
-        />
-      )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleFile(f);
-          e.target.value = "";
-        }}
-      />
-    </div>
-  );
-}
-
 export function SoloVerificationFlow() {
   const { data: verification } = useGetSoloVerification();
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const [idType, setIdType] = useState<IdType>("passport");
-  const [idDocumentUrl, setIdDocumentUrl] = useState("");
-  const [selfieUrl, setSelfieUrl] = useState("");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
+  // Empty until the user picks one — the ID-number field only appears after a
+  // government ID type is selected.
+  const [idType, setIdType] = useState<IdType | "">("");
+  const [idNumber, setIdNumber] = useState("");
 
   const submit = useSubmitSoloVerification();
-  const requestOtp = useRequestSoloOtp();
-  const verifyOtp = useVerifySoloOtp();
 
   const status = verification?.status ?? "none";
-  const phoneVerified = verification?.phoneVerified ?? false;
-  // Once details are submitted, the record exists and we move to the OTP step.
   const hasRecord = !!verification && status !== "none";
 
   function refresh() {
@@ -140,19 +41,19 @@ export function SoloVerificationFlow() {
   }
 
   function handleSubmitDetails() {
-    if (!idDocumentUrl || !selfieUrl) {
-      toast({ title: "Upload your government ID and a selfie first.", variant: "destructive" });
+    if (!idType) {
+      toast({ title: "Select your government ID type.", variant: "destructive" });
       return;
     }
-    if (!isValidIndianMobile(phone)) {
-      toast({ title: "Enter a valid 10-digit Indian mobile number.", variant: "destructive" });
+    if (!idNumber.trim()) {
+      toast({ title: "Enter your government ID number.", variant: "destructive" });
       return;
     }
     submit.mutate(
-      { data: { idType, idDocumentUrl, selfieUrl, phone: sanitizePhone(phone) } },
+      { data: { idType, idNumber: idNumber.trim() } },
       {
         onSuccess: () => {
-          toast({ title: "Details submitted. Verify your mobile number next." });
+          toast({ title: "Identity submitted. Your details are now under review." });
           refresh();
         },
         onError: () => toast({ title: "Could not submit. Try again.", variant: "destructive" }),
@@ -160,41 +61,14 @@ export function SoloVerificationFlow() {
     );
   }
 
-  function handleRequestOtp() {
-    requestOtp.mutate(undefined, {
-      onSuccess: (res) => {
-        toast({
-          title: "OTP sent",
-          description: res.devCode ? `Dev code: ${res.devCode}` : "Check your phone for the code.",
-        });
-      },
-      onError: () => toast({ title: "Could not send OTP.", variant: "destructive" }),
-    });
-  }
-
-  function handleVerifyOtp() {
-    verifyOtp.mutate(
-      { data: { code: otp.trim() } },
-      {
-        onSuccess: () => {
-          toast({ title: "Mobile verified! Your identity is now under review." });
-          setOtp("");
-          refresh();
-        },
-        onError: (e) =>
-          toast({ title: e instanceof Error ? e.message : "Incorrect OTP", variant: "destructive" }),
-      },
-    );
-  }
-
   // Approved users never see this component (page routes them onward).
   // Under-review state:
-  if (hasRecord && phoneVerified && status === "pending") {
+  if (hasRecord && status === "pending") {
     return (
       <ReviewCard
         tone="pending"
         title="Identity under review"
-        body="Thanks — your documents and mobile are verified. Our safety team is reviewing your identity. You'll get access to Solo Connect once approved."
+        body="Thanks — we've received your details. Our safety team is reviewing your identity. You'll get access to Solo Connect once approved."
       />
     );
   }
@@ -204,17 +78,13 @@ export function SoloVerificationFlow() {
         <ReviewCard
           tone="rejected"
           title="Verification rejected"
-          body={verification?.rejectionReason || "Your verification could not be approved. Please re-submit with clear documents."}
+          body={verification?.rejectionReason || "Your verification could not be approved. Please re-submit with correct details."}
         />
         <DetailsForm
           idType={idType}
           setIdType={setIdType}
-          idDocumentUrl={idDocumentUrl}
-          setIdDocumentUrl={setIdDocumentUrl}
-          selfieUrl={selfieUrl}
-          setSelfieUrl={setSelfieUrl}
-          phone={phone}
-          setPhone={setPhone}
+          idNumber={idNumber}
+          setIdNumber={setIdNumber}
           onSubmit={handleSubmitDetails}
           submitting={submit.isPending}
         />
@@ -222,51 +92,13 @@ export function SoloVerificationFlow() {
     );
   }
 
-  // Step 2 — OTP (record exists but mobile not yet verified)
-  if (hasRecord && !phoneVerified) {
-    return (
-      <GlassPanel>
-        <Header step={2} title="Verify your mobile number" />
-        <p className="text-sm mb-4" style={{ color: "rgba(255,255,255,0.55)" }}>
-          We sent a 6-digit code to <span style={{ color: "#fff" }}>{verification?.phone}</span>.
-        </p>
-        <div className="flex gap-2 mb-3">
-          <button
-            type="button"
-            onClick={handleRequestOtp}
-            disabled={requestOtp.isPending}
-            className="px-4 py-2.5 rounded-lg text-sm font-semibold"
-            style={{ background: "rgba(255,255,255,0.06)", color: GOLD, border: `1px solid ${GOLD}55` }}
-          >
-            {requestOtp.isPending ? "Sending…" : "Send / Resend OTP"}
-          </button>
-        </div>
-        <input
-          value={otp}
-          onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          placeholder="Enter 6-digit code"
-          inputMode="numeric"
-          className="w-full px-4 py-3 rounded-lg mb-3 tracking-[0.4em] text-center text-lg"
-          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
-        />
-        <PrimaryButton onClick={handleVerifyOtp} disabled={otp.length < 4 || verifyOtp.isPending}>
-          {verifyOtp.isPending ? "Verifying…" : "Verify mobile"}
-        </PrimaryButton>
-      </GlassPanel>
-    );
-  }
-
-  // Step 1 — details form (no record yet)
+  // No record yet — show the details form.
   return (
     <DetailsForm
       idType={idType}
       setIdType={setIdType}
-      idDocumentUrl={idDocumentUrl}
-      setIdDocumentUrl={setIdDocumentUrl}
-      selfieUrl={selfieUrl}
-      setSelfieUrl={setSelfieUrl}
-      phone={phone}
-      setPhone={setPhone}
+      idNumber={idNumber}
+      setIdNumber={setIdNumber}
       onSubmit={handleSubmitDetails}
       submitting={submit.isPending}
     />
@@ -274,94 +106,79 @@ export function SoloVerificationFlow() {
 }
 
 interface DetailsFormProps {
-  idType: IdType;
-  setIdType: (v: IdType) => void;
-  idDocumentUrl: string;
-  setIdDocumentUrl: (v: string) => void;
-  selfieUrl: string;
-  setSelfieUrl: (v: string) => void;
-  phone: string;
-  setPhone: (v: string) => void;
+  idType: IdType | "";
+  setIdType: (v: IdType | "") => void;
+  idNumber: string;
+  setIdNumber: (v: string) => void;
   onSubmit: () => void;
   submitting: boolean;
 }
 
 // Top-level (stable) component. Defining this INSIDE SoloVerificationFlow made
-// React remount it on every keystroke — which dropped focus from the phone
-// input after a single character (looked like focus "jumping" away).
+// React remount it on every keystroke — which dropped focus from inputs.
 function DetailsForm({
   idType,
   setIdType,
-  idDocumentUrl,
-  setIdDocumentUrl,
-  selfieUrl,
-  setSelfieUrl,
-  phone,
-  setPhone,
+  idNumber,
+  setIdNumber,
   onSubmit,
   submitting,
 }: DetailsFormProps) {
   // Mandatory agreement to the Solo Connect terms before identity can be submitted.
   const [agreed, setAgreed] = useState(false);
-  // Only flag invalid once the user has typed something, so the field isn't red
-  // on first paint. Submit stays disabled until everything is provided + valid.
-  const phoneInvalid = phone.length > 0 && !isValidIndianMobile(phone);
-  const canSubmit = !!idDocumentUrl && !!selfieUrl && isValidIndianMobile(phone) && agreed;
+  const canSubmit = !!idType && !!idNumber.trim() && agreed;
   return (
     <GlassPanel>
-      <Header step={1} title="Identity verification" />
+      <Header title="Identity verification" />
       <p className="text-sm mb-5" style={{ color: "rgba(255,255,255,0.55)" }}>
-        For everyone's safety, Solo Connect requires a one-time identity check. Your documents are private and used only for verification.
+        For everyone's safety, Solo Connect requires a one-time identity check. Your details are private and used only for verification.
       </p>
 
       <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Government ID type</p>
-      <div className="grid grid-cols-2 gap-2 mb-5">
-        {ID_TYPES.map((t) => {
-          const active = idType === t.value;
-          return (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setIdType(t.value)}
-              className="py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: active ? "rgba(185,28,28,0.18)" : "rgba(255,255,255,0.04)",
-                border: active ? `1.5px solid ${RED}` : "1.5px solid rgba(255,255,255,0.08)",
-                color: active ? "#fff" : "rgba(255,255,255,0.6)",
-              }}
-            >
+      <div className="relative mb-5">
+        <select
+          value={idType}
+          onChange={(e) => setIdType(e.target.value as IdType | "")}
+          className="w-full appearance-none px-4 py-3 rounded-lg text-sm pr-10"
+          style={{
+            background: "rgba(255,255,255,0.05)",
+            border: `1px solid ${idType ? `${GOLD}55` : "rgba(255,255,255,0.12)"}`,
+            color: idType ? "#fff" : "rgba(255,255,255,0.5)",
+          }}
+        >
+          <option value="" disabled style={{ color: "#000" }}>
+            Select government ID
+          </option>
+          {ID_TYPES.map((t) => (
+            <option key={t.value} value={t.value} style={{ color: "#000" }}>
               {t.label}
-            </button>
-          );
-        })}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4"
+          style={{ color: "rgba(255,255,255,0.5)" }}
+        />
       </div>
 
-      <div className="space-y-4 mb-5">
-        <UploadField label="Upload Government ID" value={idDocumentUrl} onUploaded={setIdDocumentUrl} />
-        <UploadField label="Upload a clear selfie" value={selfieUrl} onUploaded={setSelfieUrl} />
-      </div>
-
-      <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Mobile number</p>
-      <input
-        value={phone}
-        onChange={(e) => setPhone(sanitizePhone(e.target.value))}
-        placeholder="+91 9876543210"
-        inputMode="tel"
-        maxLength={13}
-        aria-invalid={phoneInvalid}
-        className="w-full px-4 py-3 rounded-lg"
-        style={{
-          background: "rgba(255,255,255,0.05)",
-          border: `1px solid ${phoneInvalid ? "rgba(239,68,68,0.7)" : "rgba(255,255,255,0.12)"}`,
-          color: "#fff",
-        }}
-      />
-      {phoneInvalid ? (
-        <p className="text-xs mt-2 mb-4" style={{ color: "#fca5a5" }}>
-          Enter a valid 10-digit mobile number (starting 6–9).
-        </p>
-      ) : (
-        <div className="mb-4" />
+      {/* ID number field appears only once an ID type is selected. */}
+      {idType && (
+        <div className="mb-5">
+          <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>
+            {ID_TYPES.find((t) => t.value === idType)?.label} number
+          </p>
+          <input
+            value={idNumber}
+            onChange={(e) => setIdNumber(e.target.value)}
+            placeholder="Enter your ID number"
+            className="w-full px-4 py-3 rounded-lg"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "#fff",
+            }}
+          />
+        </div>
       )}
 
       {/* Mandatory terms agreement — gates submission. */}
@@ -386,7 +203,7 @@ function DetailsForm({
           {agreed && <Check className="h-3.5 w-3.5" style={{ color: "#1a1a1a" }} strokeWidth={3} />}
         </button>
         <span className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>
-          I confirm my documents are genuine and I have read and agree to the{" "}
+          I confirm my details are genuine and I have read and agree to the{" "}
           <Link href="/terms" target="_blank" className="underline" style={{ color: GOLD }} onClick={(e) => e.stopPropagation()}>
             Terms &amp; Conditions
           </Link>{" "}
@@ -422,7 +239,7 @@ function GlassPanel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Header({ step, title }: { step: number; title: string }) {
+function Header({ title }: { title: string }) {
   return (
     <div className="mb-5">
       <div className="flex items-center gap-3">
@@ -433,16 +250,9 @@ function Header({ step, title }: { step: number; title: string }) {
           <ShieldCheck className="h-5 w-5" style={{ color: GOLD }} />
         </span>
         <div>
-          <p className="text-[11px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>Step {step} of 2</p>
+          <p className="text-[11px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>Verification</p>
           <h3 className="font-serif text-xl" style={{ color: "#fff" }}>{title}</h3>
         </div>
-      </div>
-      {/* progress rail */}
-      <div className="flex gap-1.5 mt-4">
-        {[1, 2].map((s) => (
-          <span key={s} className="h-1 flex-1 rounded-full transition-all"
-            style={{ background: s <= step ? `linear-gradient(90deg, ${GOLD}, #e0a951)` : "rgba(255,255,255,0.1)" }} />
-        ))}
       </div>
     </div>
   );

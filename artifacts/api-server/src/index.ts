@@ -265,6 +265,7 @@ async function applyPendingSchemaChanges() {
         "id" serial PRIMARY KEY NOT NULL,
         "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
         "id_type" varchar(20) NOT NULL DEFAULT '',
+        "id_number" varchar(100) NOT NULL DEFAULT '',
         "id_document_url" text NOT NULL DEFAULT '',
         "selfie_url" text NOT NULL DEFAULT '',
         "phone" varchar(20) NOT NULL DEFAULT '',
@@ -278,6 +279,8 @@ async function applyPendingSchemaChanges() {
         "created_at" timestamp with time zone NOT NULL DEFAULT now(),
         "updated_at" timestamp with time zone NOT NULL DEFAULT now()
       )`);
+    // Added after the initial table ship — backfill onto existing prod rows.
+    await db.execute(sql`ALTER TABLE "solo_connect_verifications" ADD COLUMN IF NOT EXISTS "id_number" varchar(100) NOT NULL DEFAULT ''`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "solo_verifications_user_uniq" ON "solo_connect_verifications" ("user_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_verifications_status_idx" ON "solo_connect_verifications" ("status")`);
     await db.execute(sql`

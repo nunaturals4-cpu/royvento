@@ -9,7 +9,5 @@ import type { SoloVerificationBodyIdType } from './soloVerificationBodyIdType';
 
 export interface SoloVerificationBody {
   idType: SoloVerificationBodyIdType;
-  idDocumentUrl: string;
-  selfieUrl: string;
-  phone: string;
+  idNumber: string;
 }

@@ -278,6 +278,7 @@ export interface SoloVerification {
   id: number;
   userId: number;
   idType: string;
+  idNumber: string;
   idDocumentUrl: string;
   selfieUrl: string;
   phone: string;
@@ -300,9 +301,7 @@ export const SoloVerificationBodyIdType = {
 
 export interface SoloVerificationBody {
   idType: SoloVerificationBodyIdType;
-  idDocumentUrl: string;
-  selfieUrl: string;
-  phone: string;
+  idNumber: string;
 }
 
 export interface SoloOtpRequestResult {

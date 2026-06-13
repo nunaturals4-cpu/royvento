@@ -11,6 +11,7 @@ export interface SoloVerification {
   id: number;
   userId: number;
   idType: string;
+  idNumber: string;
   idDocumentUrl: string;
   selfieUrl: string;
   phone: string;
