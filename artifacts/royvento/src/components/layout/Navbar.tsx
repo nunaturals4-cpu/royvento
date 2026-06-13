@@ -154,8 +154,12 @@ export function Navbar() {
     { href: "/events", label: t("nav.events", "Events") },
     { href: "/games", label: t("nav.games", "Games & Sports") },
     { href: "/pub-offers", label: t("nav.pub_offers") },
-    // Premium / verified-partner only — hidden entirely otherwise.
-    ...(soloAccess?.eligible ? [{ href: "/solo-connect", label: t("nav.solo_connect", "Solo Connect") }] : []),
+    // Solo Connect: shown to logged-out visitors (they land on the public
+    // showcase + login prompt) and to premium/verified-partner accounts. Hidden
+    // for logged-in users who aren't eligible to avoid a dead-end entry.
+    ...(!me?.user || soloAccess?.eligible
+      ? [{ href: "/solo-connect", label: t("nav.solo_connect", "Solo Connect") }]
+      : []),
   ];
   // "List Your Venue" must land partners on the Become-a-Partner form without a
   // double click: logged-in users go straight there; logged-out users are routed

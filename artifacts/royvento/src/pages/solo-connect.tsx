@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useGetSoloAccess, useListSoloGroups, type SoloGroup } from "@workspace/api-client-react";
+import { useGetSoloAccess, useGetMe, useListSoloGroups, type SoloGroup } from "@workspace/api-client-react";
 import { useSelectedCity } from "@/components/LocationContext";
 import { SEO } from "@/components/SEO";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,6 +23,13 @@ import {
   CalendarDays,
   Gamepad2,
   Trophy,
+  LogIn,
+  UserPlus,
+  IdCard,
+  MessageCircle,
+  Star,
+  CheckCircle2,
+  ChevronRight,
 } from "lucide-react";
 
 const GOLD = "#d4af37";
@@ -66,9 +73,19 @@ const ACTIVITY_SECTIONS = [
 const HERO_IMAGE = "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=80";
 
 export function SoloConnect() {
-  const { data: access, isLoading } = useGetSoloAccess();
+  // Solo Connect is now a PUBLIC page: logged-out visitors see a showcase that
+  // explains the product, the perks, and the safety/verification flow, with a
+  // clear "login first" call to action. Only authenticated users hit the
+  // eligibility/verification gates below.
+  const { data: me, isLoading: meLoading } = useGetMe({ query: { retry: false } as any });
+  const loggedIn = !!me?.user;
+  const { data: access, isLoading: accessLoading } = useGetSoloAccess({
+    query: { enabled: loggedIn, retry: false } as any,
+  });
   // Lifted so the hero filter bar drives the group list below.
   const [activity, setActivity] = useState("");
+
+  const loading = meLoading || (loggedIn && accessLoading);
 
   return (
     <>
@@ -91,8 +108,10 @@ export function SoloConnect() {
 
           {/* Gated content */}
           <div className="mt-8">
-            {isLoading ? (
+            {loading ? (
               <div className="py-24 flex justify-center"><Spinner /></div>
+            ) : !loggedIn ? (
+              <LoggedOutShowcase />
             ) : !access?.eligible ? (
               <PremiumGate />
             ) : access.verificationStatus !== "approved" ? (
@@ -264,6 +283,324 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
     >
       <div className="absolute top-0 left-1/2 -translate-x-1/2 h-px w-2/3" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)` }} />
       {children}
+    </div>
+  );
+}
+
+// Where login should return the visitor once authenticated.
+const LOGIN_NEXT = `/login?next=${encodeURIComponent("/solo-connect")}`;
+const SIGNUP_NEXT = "/register";
+
+// Perks shown to logged-out visitors — the "what you get when you join" grid.
+const SHOWCASE_FEATURES = [
+  {
+    icon: ShieldCheck,
+    accent: "#4ade80",
+    title: "ID-verified members only",
+    body: "Every member passes a one-time government-ID check, so you only ever meet real, verified people.",
+  },
+  {
+    icon: Users,
+    accent: "#a78bfa",
+    title: "Single-gender groups",
+    body: "Groups are strictly same-gender — a comfortable, low-pressure way to make plans with new people.",
+  },
+  {
+    icon: MapPin,
+    accent: "#fb7185",
+    title: "People in your city",
+    body: "You only see groups happening in your current city, so every plan is genuinely within reach.",
+  },
+  {
+    icon: CalendarDays,
+    accent: "#60a5fa",
+    title: "Six ways to hang out",
+    body: "Nightlife, happy hours, food & drinks, events, games and activities — pick whatever fits your vibe.",
+  },
+  {
+    icon: MessageCircle,
+    accent: GOLD,
+    title: "Private group chat",
+    body: "Coordinate the plan inside a temporary group chat that's auto-cleared daily for your privacy.",
+  },
+  {
+    icon: Star,
+    accent: "#fbbf24",
+    title: "Reputation & safety",
+    body: "Build trust through reputation points, backed by a strict zero-tolerance policy and easy reporting.",
+  },
+] as const;
+
+// The end-to-end journey, rendered as a visual flow diagram.
+const FLOW_STEPS = [
+  { icon: LogIn, label: "Log in", sub: "Sign in or create your free account" },
+  { icon: Crown, label: "Go Premium", sub: "Unlock Solo Connect with Royvento Premium" },
+  { icon: IdCard, label: "Verify ID", sub: "One-time government-ID identity check" },
+  { icon: Navigation, label: "Enable location", sub: "Share your city to see nearby groups" },
+  { icon: Users, label: "Join groups", sub: "Browse verified groups & meet up" },
+] as const;
+
+const ACCEPTED_IDS = ["Aadhaar", "Passport", "Driving License", "Voter ID"] as const;
+
+function LoggedOutShowcase() {
+  return (
+    <div className="space-y-10">
+      {/* ── Login-first call to action ───────────────────────────────── */}
+      <GlassCard className="!max-w-3xl p-8 md:p-10 text-center">
+        <span
+          className="inline-flex items-center justify-center h-16 w-16 rounded-2xl mb-5"
+          style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}55`, boxShadow: `0 0 30px ${GOLD}22` }}
+        >
+          <Lock className="h-7 w-7" style={{ color: GOLD }} />
+        </span>
+        <h3 className="font-serif text-2xl md:text-3xl mb-2" style={{ color: "#fff" }}>
+          Please log in first to join Solo Connect
+        </h3>
+        <p className="text-sm md:text-base mb-7 leading-relaxed max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.62)" }}>
+          Solo Connect is a verified, members-only space. Log in to your Royvento account to unlock it —
+          here's exactly what you get and how it works.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href={LOGIN_NEXT}
+            className="group inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+            style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 30px ${RED}4d` }}
+          >
+            <LogIn className="h-4 w-4" /> Log in to continue
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+          <Link
+            href={SIGNUP_NEXT}
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+            style={{ background: "rgba(255,255,255,0.06)", color: "#fff", border: `1px solid ${GOLD}55` }}
+          >
+            <UserPlus className="h-4 w-4" style={{ color: GOLD }} /> Create an account
+          </Link>
+        </div>
+      </GlassCard>
+
+      {/* ── Features: what you get when you join ─────────────────────── */}
+      <section>
+        <SectionTitle
+          eyebrow="Why join"
+          title="What you get when you join"
+          subtitle="A premium, safety-first way to meet verified people for real plans in your city."
+        />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {SHOWCASE_FEATURES.map((f) => {
+            const Icon = f.icon;
+            return (
+              <div
+                key={f.title}
+                className="relative p-5 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
+                style={{
+                  background: "linear-gradient(180deg, rgba(24,22,26,0.92), rgba(13,12,15,0.92))",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: "0 10px 34px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+                }}
+              >
+                <span className="absolute top-0 left-0 right-0 h-px opacity-60"
+                  style={{ background: `linear-gradient(90deg, transparent, ${f.accent}, transparent)` }} />
+                <span className="flex items-center justify-center h-11 w-11 rounded-2xl mb-3.5"
+                  style={{ background: `${f.accent}1a`, border: `1px solid ${f.accent}44`, boxShadow: `0 0 22px ${f.accent}1f` }}>
+                  <Icon className="h-5 w-5" style={{ color: f.accent }} />
+                </span>
+                <h4 className="font-serif text-lg mb-1.5" style={{ color: "#fff" }}>{f.title}</h4>
+                <p className="text-[13px] leading-relaxed" style={{ color: "rgba(255,255,255,0.58)" }}>{f.body}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ── Flow diagram: how it works ───────────────────────────────── */}
+      <section>
+        <SectionTitle
+          eyebrow="The journey"
+          title="How Solo Connect works"
+          subtitle="Five simple steps from sign-in to meeting your group — designed around trust and safety."
+        />
+        <FlowDiagram />
+      </section>
+
+      {/* ── Identity verification explainer ──────────────────────────── */}
+      <section>
+        <SectionTitle
+          eyebrow="Step 3 · Safety"
+          title="Identity verification"
+          subtitle="The one-time check that keeps Solo Connect trustworthy for everyone."
+        />
+        <VerificationPreview />
+      </section>
+    </div>
+  );
+}
+
+function SectionTitle({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
+  return (
+    <div className="text-center mb-6 max-w-2xl mx-auto">
+      <span className="inline-block text-[11px] uppercase tracking-[0.18em] mb-2" style={{ color: GOLD }}>{eyebrow}</span>
+      <h3 className="font-serif text-2xl md:text-3xl mb-2" style={{ color: "#fff" }}>{title}</h3>
+      <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>{subtitle}</p>
+    </div>
+  );
+}
+
+function FlowDiagram() {
+  return (
+    <div
+      className="relative rounded-3xl p-6 md:p-8"
+      style={{
+        background: "linear-gradient(180deg, rgba(24,22,26,0.9), rgba(13,12,15,0.9))",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 20px 50px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}
+    >
+      {/* Desktop: horizontal · Mobile: vertical. Connectors adapt direction. */}
+      <ol className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 md:gap-0">
+        {FLOW_STEPS.map((s, i) => {
+          const Icon = s.icon;
+          const last = i === FLOW_STEPS.length - 1;
+          return (
+            <li key={s.label} className="flex md:flex-1 md:flex-col items-center md:text-center gap-3 md:gap-0">
+              {/* Node */}
+              <div className="flex md:flex-col items-center gap-3 md:gap-2 md:w-full">
+                <div className="relative shrink-0">
+                  <span
+                    className="flex items-center justify-center h-12 w-12 rounded-2xl"
+                    style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}55`, boxShadow: `0 0 22px ${GOLD}22` }}
+                  >
+                    <Icon className="h-5 w-5" style={{ color: GOLD }} />
+                  </span>
+                  <span
+                    className="absolute -top-1.5 -left-1.5 flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold"
+                    style={{ background: RED, color: "#fff", boxShadow: `0 0 10px ${RED}88` }}
+                  >
+                    {i + 1}
+                  </span>
+                </div>
+                <div className="md:mt-2">
+                  <p className="font-semibold text-sm leading-tight" style={{ color: "#fff" }}>{s.label}</p>
+                  <p className="text-[12px] leading-snug mt-0.5 md:px-2" style={{ color: "rgba(255,255,255,0.5)" }}>{s.sub}</p>
+                </div>
+              </div>
+
+              {/* Connector (between nodes only) */}
+              {!last && (
+                <div className="flex items-center justify-center md:w-full md:py-0 self-stretch md:self-auto md:order-none">
+                  {/* down arrow on mobile, right arrow on desktop */}
+                  <ChevronRight className="hidden md:block h-5 w-5 mx-auto" style={{ color: `${GOLD}88` }} />
+                  <ChevronRight className="md:hidden h-5 w-5 rotate-90 ml-[18px] my-1" style={{ color: `${GOLD}88` }} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function VerificationPreview() {
+  return (
+    <div className="grid lg:grid-cols-2 gap-4 md:gap-5 items-stretch">
+      {/* Left: what to expect on the verification page */}
+      <div
+        className="relative rounded-3xl p-6 md:p-7 overflow-hidden"
+        style={{
+          background: "linear-gradient(180deg, rgba(24,22,26,0.94), rgba(13,12,15,0.94))",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-px w-2/3" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)` }} />
+        <div className="flex items-center gap-3 mb-4">
+          <span className="flex items-center justify-center h-11 w-11 rounded-2xl shrink-0"
+            style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}55`, boxShadow: `0 0 24px ${GOLD}1f` }}>
+            <IdCard className="h-5 w-5" style={{ color: GOLD }} />
+          </span>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>Verification page</p>
+            <h4 className="font-serif text-xl" style={{ color: "#fff" }}>A one-time identity check</h4>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed mb-5" style={{ color: "rgba(255,255,255,0.6)" }}>
+          After logging in and upgrading, you'll complete a quick verification. Pick a government ID type,
+          enter the number, and agree to the safety terms. Our team reviews it and unlocks your access.
+        </p>
+        <p className="text-xs mb-2.5" style={{ color: "rgba(255,255,255,0.55)" }}>Accepted government IDs</p>
+        <div className="flex flex-wrap gap-2 mb-5">
+          {ACCEPTED_IDS.map((id) => (
+            <span key={id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
+              style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${GOLD}33`, color: "rgba(255,255,255,0.75)" }}>
+              <CheckCircle2 className="h-3.5 w-3.5" style={{ color: GOLD }} /> {id}
+            </span>
+          ))}
+        </div>
+        <ul className="space-y-2.5">
+          {[
+            "Private & secure — used only to verify you're real",
+            "Reviewed by our safety team, usually within a day",
+            "Required once — never shown to other members",
+          ].map((x) => (
+            <li key={x} className="flex items-start gap-2.5 text-[13px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+              <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" style={{ color: "#4ade80" }} /> {x}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Right: mock of the verification form (visual preview, non-interactive) */}
+      <div
+        className="relative rounded-3xl p-6 md:p-7 overflow-hidden"
+        style={{
+          background: "linear-gradient(180deg, rgba(20,18,22,0.96), rgba(10,9,12,0.96))",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-5">
+          <ShieldCheck className="h-4 w-4" style={{ color: GOLD }} />
+          <span className="text-[11px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>Preview</span>
+        </div>
+
+        {/* Faux select */}
+        <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Government ID type</p>
+        <div className="flex items-center justify-between px-4 py-3 rounded-lg mb-4"
+          style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${GOLD}44`, color: "#fff" }}>
+          <span className="text-sm">Aadhaar</span>
+          <CheckCircle2 className="h-4 w-4" style={{ color: GOLD }} />
+        </div>
+
+        {/* Faux input */}
+        <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Aadhaar number</p>
+        <div className="px-4 py-3 rounded-lg mb-4 text-sm"
+          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.4)" }}>
+          •••• •••• ••••
+        </div>
+
+        {/* Faux agreement */}
+        <div className="flex items-start gap-3 p-3.5 rounded-xl mb-5"
+          style={{ background: "rgba(212,175,55,0.08)", border: `1px solid ${GOLD}55` }}>
+          <span className="mt-0.5 h-5 w-5 shrink-0 flex items-center justify-center rounded-md"
+            style={{ background: `linear-gradient(135deg, ${GOLD}, #e0a951)` }}>
+            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#1a1a1a" }} strokeWidth={3} />
+          </span>
+          <span className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
+            I confirm my details are genuine and agree to the Solo Connect safety terms.
+          </span>
+        </div>
+
+        {/* CTA mirrors real flow → goes to login */}
+        <Link
+          href={LOGIN_NEXT}
+          className="group flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+          style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 28px ${RED}4d` }}
+        >
+          Log in to start verification
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
     </div>
   );
 }

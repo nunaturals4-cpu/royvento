@@ -229,7 +229,7 @@ function Router() {
             {() => <RequireAuth><Bookings /></RequireAuth>}
           </Route>
           <Route path="/solo-connect">
-            {() => <RequireAuth><SoloConnect /></RequireAuth>}
+            {() => <SoloConnect />}
           </Route>
           <Route path="/admin">
             {() => <RequireAuth role="admin"><AdminPanel /></RequireAuth>}
