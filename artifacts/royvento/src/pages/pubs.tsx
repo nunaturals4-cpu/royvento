@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, X, Star,
-  Wine, Coffee, Music, SlidersHorizontal, Store, Heart,
+  Wine, Coffee, Music, SlidersHorizontal, Store, Heart, Sunset,
 } from "lucide-react";
 import { apiGet, formatINR } from "@/lib/api";
 import { LocationSelect } from "@/components/LocationSelect";
@@ -73,16 +73,17 @@ const DAY_ABBRS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // the admin panel moves it into the matching section here. Venues whose
 // category doesn't match any known value fall into the "Other" section.
 const PUB_CATEGORY_SECTIONS = [
-  { value: "Pub",    label: "Pubs & Bars", icon: Wine   },
-  { value: "Club",   label: "Nightclubs",  icon: Music  },
-  { value: "Lounge", label: "Lounges",     icon: Coffee },
-  { value: "Other",  label: "Other",       icon: Store  },
+  { value: "Pub",     label: "Pubs & Bars",  icon: Wine   },
+  { value: "Club",    label: "Nightclubs",   icon: Music  },
+  { value: "Lounge",  label: "Lounges",      icon: Coffee },
+  { value: "Rooftop", label: "Rooftop Bars", icon: Sunset },
+  { value: "Other",   label: "Other",        icon: Store  },
 ] as const;
 
 type PubCategory = typeof PUB_CATEGORY_SECTIONS[number]["value"];
 type VenueTab = "All" | PubCategory;
 
-const KNOWN_PUB_CATEGORIES = new Set<string>(["Pub", "Club", "Lounge"]);
+const KNOWN_PUB_CATEGORIES = new Set<string>(["Pub", "Club", "Lounge", "Rooftop"]);
 // Map a venue to its section value, bucketing anything unknown into "Other".
 const sectionOf = (p: PublicEvent): PubCategory =>
   KNOWN_PUB_CATEGORIES.has(p.vendorCategory ?? "") ? (p.vendorCategory as PubCategory) : "Other";

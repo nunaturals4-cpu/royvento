@@ -1698,6 +1698,7 @@ const ADMIN_PUB_CATEGORIES = [
   { value: "Pub", label: "Pubs & Bars", color: "text-violet-300", bg: "bg-violet-500/15 border-violet-500/30" },
   { value: "Club", label: "Nightclubs", color: "text-fuchsia-300", bg: "bg-fuchsia-500/15 border-fuchsia-500/30" },
   { value: "Lounge", label: "Lounges", color: "text-sky-300", bg: "bg-sky-500/15 border-sky-500/30" },
+  { value: "Rooftop", label: "Rooftop Bars", color: "text-amber-300", bg: "bg-amber-500/15 border-amber-500/30" },
   { value: "Other", label: "Other", color: "text-white/70", bg: "bg-white/10 border-white/20" },
 ] as const;
 
