@@ -1048,7 +1048,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
               { id: "overview" as const, label: "Overview" },
               ...(isPub ? [{ id: "happyHours" as const, label: "Happy Hours" }] : []),
               { id: "reviews" as const, label: "Reviews" },
-              { id: "photos" as const, label: "Photos & Videos" },
+              { id: "photos" as const, label: "Photos" },
               ...(isPub ? [{ id: "offers" as const, label: "Food & Drink Offers" }] : []),
               { id: "book" as const, label: "Book a Table" },
             ] as { id: typeof pubTab; label: string }[]).map((tab) => (
@@ -1240,13 +1240,13 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
 
           {/* Photos teaser → links to Photos tab */}
           {isPub && (() => {
-            const hasPhotos = ((ev as any).galleryImages?.length > 0) || ((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length > 0) || ((ev.vendor as any)?.menuUrls?.filter(Boolean).length > 0) || ((ev as any).galleryVideos?.length > 0);
+            const hasPhotos = ((ev as any).galleryImages?.length > 0) || ((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length > 0) || ((ev.vendor as any)?.menuUrls?.filter(Boolean).length > 0);
             if (!hasPhotos) return null;
             const preview: string[] = [...((ev as any).galleryImages ?? []), ...((ev.vendor as any)?.danceFloorPhotos ?? []).filter(Boolean)].slice(0, 4);
             return (
               <section>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-serif text-2xl accent-underline inline-block">Photos & Videos</h2>
+                  <h2 className="font-serif text-2xl accent-underline inline-block">Photos</h2>
                   <button type="button" onClick={() => switchPubTab("photos")} className="text-sm text-primary/70 hover:text-primary transition-colors">View all →</button>
                 </div>
                 <div className="grid grid-cols-4 gap-2 mt-4">
@@ -1634,20 +1634,8 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                 </section>
               );
             })()}
-            {(ev as any).galleryVideos?.length > 0 && (
-              <section>
-                <h2 className="font-serif text-3xl mb-6 accent-underline inline-block">Videos</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6">
-                  {((ev as any).galleryVideos ?? []).map((src: string, i: number) => (
-                    <div key={i} className="group relative aspect-video overflow-hidden rounded-2xl border border-white/8 hover:border-primary/30 transition-colors">
-                      <video src={src} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-            {!(ev as any).galleryImages?.length && !(ev as any).galleryVideos?.length && !((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length) && !((ev.vendor as any)?.menuUrls?.filter(Boolean).length) && (
-              <div className="text-center py-20 text-muted-foreground"><ImagePlus className="h-12 w-12 mx-auto mb-4 opacity-20" /><p>No photos or videos available yet.</p></div>
+            {!(ev as any).galleryImages?.length && !((ev.vendor as any)?.danceFloorPhotos?.filter(Boolean).length) && !((ev.vendor as any)?.menuUrls?.filter(Boolean).length) && (
+              <div className="text-center py-20 text-muted-foreground"><ImagePlus className="h-12 w-12 mx-auto mb-4 opacity-20" /><p>No photos available yet.</p></div>
             )}
           </div>
         )}
