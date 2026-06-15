@@ -536,7 +536,7 @@ const DrinkPlanLineItem = z.object({
   discountedPrice: z.number().int().min(0),
 });
 
-const DrinkPlanBody = z.object({
+export const DrinkPlanBody = z.object({
   type: z.enum(["welcome", "unlimited", "ticket", "custom"]),
   productName: z.string().max(255).default(""),
   gender: z.enum(["all", "female"]).default("all"),

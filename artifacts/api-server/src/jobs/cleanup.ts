@@ -1,4 +1,4 @@
-import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable, organizerEventsTable } from "@workspace/db";
+import { db, eventsTable, announcementsTable, notificationsTable, vendorsTable, usersTable, emailMessagesTable, emailAttachmentsTable, emailThreadsTable, drinkPlansTable, organizerEventsTable, bookingsTable } from "@workspace/db";
 import { and, ne, sql, lt, gte, eq, isNotNull, inArray } from "drizzle-orm";
 
 const _istFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -340,6 +340,35 @@ export async function deleteOldEmails(): Promise<void> {
     logger.info({ messages: msgIds.length, threadsPruned: pruned.length }, "Cleanup: deleted old emails");
   } catch (err) {
     logger.error({ err }, "Cleanup: failed to delete old emails");
+  }
+}
+
+// Auto-checkout: any booking still marked checked-in but not checked-out
+// from a previous IST day gets forcibly checked out. Runs at 3:50 AM IST so
+// guests who left without scanning out are cleared before the next trading day.
+export async function autoCheckoutStaleBookings(): Promise<void> {
+  try {
+    const now = new Date();
+    const todayIst = _istFmt.format(now);
+    const result = await db
+      .update(bookingsTable)
+      .set({ checkedOut: true, checkedOutAt: now })
+      .where(
+        and(
+          eq(bookingsTable.checkedIn, true),
+          eq(bookingsTable.checkedOut, false),
+          inArray(bookingsTable.status, ["confirmed", "completed"]),
+          // booking date is strictly before today IST
+          sql`${bookingsTable.bookingDate} < ${todayIst}`,
+        ),
+      )
+      .returning({ id: bookingsTable.id });
+
+    if (result.length > 0) {
+      logger.info({ count: result.length }, "Auto-checkout: checked out stale guests from previous day");
+    }
+  } catch (err) {
+    logger.error({ err }, "Auto-checkout job failed");
   }
 }
 

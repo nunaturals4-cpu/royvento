@@ -31,7 +31,7 @@ import {
 import { sendExpoPushToUser } from "../lib/expoPush";
 import { createUserNotification } from "../lib/notify";
 import { generateTicketCode, verifyTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
-import { eq, desc, and, inArray, sql, gte, lte } from "drizzle-orm";
+import { eq, desc, and, inArray, sql, gte, lte, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   UpdateBookingStatusBody,
@@ -805,11 +805,16 @@ router.get("/partner/commission", requireAuth(["vendor"]), async (req, res) => {
   });
 });
 
-router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
+router.get("/partner/analytics", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  // Admins may inspect any venue's analytics via ?vendorId= (used by the admin
+  // Venues → Analytics tab); partners always resolve to their own venue.
+  const adminVendorId = user.role === "admin" && req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const vRows = adminVendorId && Number.isFinite(adminVendorId)
+    ? await db.select().from(vendorsTable).where(eq(vendorsTable.id, adminVendorId)).limit(1)
+    : await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
   const vendor = vRows[0];
   const emptyTypeSummary = { count: 0, grossRevenue: 0, commissionAmount: 0, netRevenue: 0, peopleCount: 0 };
   if (!vendor) {
@@ -847,6 +852,7 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
           eq(bookingsTable.vendorId, vendor.id),
           inArray(bookingsTable.status, ["confirmed", "completed"]),
           eq(bookingsTable.checkedIn, true),
+          ne(bookingsTable.pubMode, "manual"),
           rangeStart ? gte(bookingsTable.createdAt, rangeStart) : undefined,
           rangeEnd ? lte(bookingsTable.createdAt, rangeEnd) : undefined,
         ),
@@ -1155,6 +1161,163 @@ router.get("/partner/analytics", requireAuth(["vendor"]), async (req, res) => {
   });
 });
 
+// Partner manual walk-in booking (no commission, no user account needed)
+const ManualBookingBody = z.object({
+  name: z.string().min(1, "Name is required"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  phone: z.string().regex(/^\d{10}$/, "Phone must be 10 digits"),
+  email: z.string().optional().default(""),
+  persons: z.number().int().min(1, "At least 1 person required"),
+  price: z.number().min(0).optional().default(0),
+  arrivalTime: z.string().min(1, "Arrival time is required"),
+});
+
+router.post("/partner/manual-booking", requireAuth(), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const parsed = ManualBookingBody.safeParse(req.body);
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
+
+  // Resolve allowed vendors: own vendor profile + accepted manager relationships
+  const allowedVendorIds = new Set<number>();
+  if (user.role === "vendor" || user.role === "admin") {
+    const ownRows = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+    if (ownRows[0]) allowedVendorIds.add(ownRows[0].id);
+  }
+  const mgRows = await db.select({ vendorId: vendorManagersTable.vendorId })
+    .from(vendorManagersTable)
+    .where(and(eq(vendorManagersTable.managerId, user.id), eq(vendorManagersTable.status, "accepted")));
+  for (const r of mgRows) allowedVendorIds.add(r.vendorId);
+
+  if (allowedVendorIds.size === 0) {
+    res.status(403).json({ error: "No partner venue found for your account" });
+    return;
+  }
+
+  const targetVendorId = Array.from(allowedVendorIds)[0]!;
+
+  // Find any approved event for the target vendor (needed for the FK)
+  const [eventRow] = await db.select({ id: eventsTable.id }).from(eventsTable)
+    .where(and(eq(eventsTable.vendorId, targetVendorId), eq(eventsTable.approvalStatus, "approved")))
+    .limit(1);
+  if (!eventRow) {
+    res.status(400).json({ error: "No approved event found for this venue" });
+    return;
+  }
+
+  const { name, date, phone, email, persons, price, arrivalTime } = parsed.data;
+  const priceStr = String(price ?? 0);
+
+  const [booking] = await db.insert(bookingsTable).values({
+    eventId: eventRow.id,
+    userId: 0,
+    vendorId: targetVendorId,
+    bookingDate: date,
+    guests: persons,
+    totalPrice: priceStr,
+    finalPrice: priceStr,
+    discountAmount: "0",
+    couponCode: "",
+    notes: email ?? "",
+    personName: name,
+    phone,
+    pubMode: "manual",
+    status: "confirmed",
+    checkedIn: true,
+    checkedInAt: new Date(),
+    arrivalTime,
+    approvedBy: "manual",
+    paymentMethod: "cod",
+    baseFee: 0,
+    budgetRange: "",
+    eventType: "other",
+    pointsUsed: 0,
+    ticketWomen: 0,
+    ticketMen: 0,
+    ticketCouple: 0,
+    selectedPubEvent: "",
+  }).returning();
+
+  res.json({ ok: true, id: booking?.id, bookingDate: date });
+});
+
+// Partner manual walk-in log (separate from online bookings)
+router.get("/bookings/vendor/manual", requireAuth(["vendor", "admin"]), async (req, res) => {
+  const user = await loadUserFromRequest(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const adminVendorId = user.role === "admin" && req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const vRows = adminVendorId && Number.isFinite(adminVendorId)
+    ? await db.select().from(vendorsTable).where(eq(vendorsTable.id, adminVendorId)).limit(1)
+    : await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  const vendor = vRows[0];
+  if (!vendor) {
+    res.json({ bookings: [], total: 0, page: 1, totalPages: 1, uniqueCustomers: 0, totalPersons: 0, totalRevenue: 0, customerDetails: [] });
+    return;
+  }
+
+  const rawPage = Math.max(1, parseInt(String(req.query["page"] ?? "1"), 10) || 1);
+  const rawLimit = Math.min(100, Math.max(1, parseInt(String(req.query["limit"] ?? "20"), 10) || 20));
+  const offset = (rawPage - 1) * rawLimit;
+  const rawFrom = String(req.query["from"] ?? "");
+  const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(rawFrom) ? rawFrom : null;
+
+  const conds = [eq(bookingsTable.vendorId, vendor.id), eq(bookingsTable.pubMode, "manual")];
+  if (fromDate) conds.push(gte(bookingsTable.bookingDate, fromDate));
+  const whereSQL = and(...conds);
+
+  const [countRow, rows, phoneAgg, totals] = await Promise.all([
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(whereSQL),
+    db.select().from(bookingsTable).where(whereSQL).orderBy(desc(bookingsTable.createdAt)).limit(rawLimit).offset(offset),
+    db.select({
+      phone: bookingsTable.phone,
+      name: bookingsTable.personName,
+      visits: sql<number>`count(*)::int`,
+      totalPersons: sql<number>`sum(${bookingsTable.guests})::int`,
+      totalRevenue: sql<string>`sum(cast(${bookingsTable.finalPrice} as numeric))::text`,
+    })
+      .from(bookingsTable)
+      .where(whereSQL)
+      .groupBy(bookingsTable.phone, bookingsTable.personName)
+      .orderBy(desc(sql`count(*)`)),
+    db.select({
+      totalPersons: sql<number>`coalesce(sum(${bookingsTable.guests}), 0)::int`,
+      totalRevenue: sql<string>`coalesce(sum(cast(${bookingsTable.finalPrice} as numeric)), 0)::text`,
+    }).from(bookingsTable).where(whereSQL),
+  ]);
+
+  const total = countRow[0]?.c ?? 0;
+  res.json({
+    bookings: rows.map((b) => ({
+      id: b.id,
+      name: b.personName ?? "",
+      phone: b.phone ?? "",
+      email: b.notes ?? "",
+      date: b.bookingDate,
+      persons: b.guests,
+      price: Number(b.finalPrice),
+      arrivalTime: b.arrivalTime ?? "",
+      checkedIn: b.checkedIn,
+      checkedInAt: b.checkedInAt?.toISOString() ?? null,
+      createdAt: b.createdAt.toISOString(),
+    })),
+    total,
+    page: rawPage,
+    totalPages: Math.max(1, Math.ceil(total / rawLimit)),
+    uniqueCustomers: phoneAgg.length,
+    totalPersons: totals[0]?.totalPersons ?? 0,
+    totalRevenue: Number(totals[0]?.totalRevenue ?? 0),
+    customerDetails: phoneAgg.map((r) => ({
+      phone: r.phone ?? "",
+      name: r.name ?? "",
+      visits: r.visits,
+      totalPersons: r.totalPersons ?? 0,
+      totalRevenue: Number(r.totalRevenue ?? 0),
+    })),
+  });
+});
+
 // Partner attendance / check-in report
 const PARTNER_CHECKIN_PAGE_SIZE = 50;
 
@@ -1292,10 +1455,14 @@ router.get("/partner/checkin-report", requireAuth(["vendor"]), async (req, res) 
   });
 });
 
-router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res) => {
+router.get("/bookings/vendor/summary", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const vRows = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+  // Admins may inspect any venue via ?vendorId= (admin Venues → Booking Report).
+  const adminVendorId = user.role === "admin" && req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const vRows = adminVendorId && Number.isFinite(adminVendorId)
+    ? await db.select().from(vendorsTable).where(eq(vendorsTable.id, adminVendorId)).limit(1)
+    : await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
   const vendor = vRows[0];
   if (!vendor) {
     res.json({ totalBookings: 0, totalRevenue: 0, totalGuests: 0, countConfirmed: 0, countCompleted: 0, countCancelled: 0, countPending: 0, monthlyRevenue: [], monthlyTrend: [], perEvent: [] });
@@ -1335,6 +1502,7 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res)
         baseWhere,
         inArray(bookingsTable.status, [...confirmedStatuses]),
         eq(bookingsTable.checkedIn, true),
+        ne(bookingsTable.pubMode, "manual"),
       )),
   ]);
 
@@ -1396,17 +1564,21 @@ router.get("/bookings/vendor/summary", requireAuth(["vendor"]), async (req, res)
   res.json({ ...stats, totalRevenue: Math.round(totalRevenue), monthlyRevenue, monthlyTrend: monthlyTrendRows, perEvent });
 });
 
-router.get("/bookings/vendor", requireAuth(["vendor"]), async (req, res) => {
+router.get("/bookings/vendor", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const vRows = await db
-    .select()
-    .from(vendorsTable)
-    .where(eq(vendorsTable.userId, user.id))
-    .limit(1);
+  // Admins may inspect any venue via ?vendorId= (admin Venues → Booking Report).
+  const adminVendorId = user.role === "admin" && req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const vRows = adminVendorId && Number.isFinite(adminVendorId)
+    ? await db.select().from(vendorsTable).where(eq(vendorsTable.id, adminVendorId)).limit(1)
+    : await db
+        .select()
+        .from(vendorsTable)
+        .where(eq(vendorsTable.userId, user.id))
+        .limit(1);
   const vendor = vRows[0];
   if (!vendor) {
     res.json({ data: [], total: 0, page: 1, totalPages: 1 });

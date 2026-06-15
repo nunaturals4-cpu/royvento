@@ -30,6 +30,23 @@ async function getMyVendor(userId: number) {
   return rows[0] ?? null;
 }
 
+// Admins (Venues → Announcements) target a specific venue via ?vendorId=;
+// partners always resolve to their own venue.
+async function resolveAnnVendor(
+  req: { query: Record<string, unknown> },
+  user: { id: number; role: string },
+) {
+  if (user.role === "admin") {
+    const raw = req.query["vendorId"];
+    const n = raw != null ? Number(raw) : NaN;
+    if (Number.isFinite(n)) {
+      const rows = await db.select().from(vendorsTable).where(eq(vendorsTable.id, n)).limit(1);
+      return rows[0] ?? null;
+    }
+  }
+  return getMyVendor(user.id);
+}
+
 const AnnouncementBody = z.object({
   title: z.string().min(1).max(255),
   body: z.string().optional().default(""),
@@ -41,10 +58,10 @@ const AnnouncementBody = z.object({
   price: z.coerce.number().min(0).max(99999.99).optional().default(0),
 });
 
-router.get("/partner/announcements", requireAuth(["vendor"]), async (req, res) => {
+router.get("/partner/announcements", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
-  const vendor = await getMyVendor(user.id);
+  const vendor = await resolveAnnVendor(req, user);
   if (!vendor) return res.json([]);
   const rows = await db
     .select()
@@ -54,10 +71,10 @@ router.get("/partner/announcements", requireAuth(["vendor"]), async (req, res) =
   return res.json(rows);
 });
 
-router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) => {
+router.post("/partner/announcements", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
-  const vendor = await getMyVendor(user.id);
+  const vendor = await resolveAnnVendor(req, user);
   if (!vendor) return res.status(403).json({ error: "No partner profile" });
   const parsed = AnnouncementBody.safeParse(req.body);
   if (!parsed.success) return respondInvalid(res, parsed.error);
@@ -73,7 +90,7 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
       genre: parsed.data.genre,
       eventType: parsed.data.eventType,
       price: String(parsed.data.price ?? 0),
-      approvalStatus: "pending",
+      approvalStatus: user.role === "admin" ? "approved" : "pending",
     })
     .returning();
 
@@ -81,10 +98,10 @@ router.post("/partner/announcements", requireAuth(["vendor"]), async (req, res) 
   return res.json(row);
 });
 
-router.patch("/partner/announcements/:id", requireAuth(["vendor"]), async (req, res) => {
+router.patch("/partner/announcements/:id", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
-  const vendor = await getMyVendor(user.id);
+  const vendor = await resolveAnnVendor(req, user);
   if (!vendor) return res.status(403).json({ error: "No partner profile" });
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
@@ -101,10 +118,10 @@ router.patch("/partner/announcements/:id", requireAuth(["vendor"]), async (req, 
   return res.json(row);
 });
 
-router.delete("/partner/announcements/:id", requireAuth(["vendor"]), async (req, res) => {
+router.delete("/partner/announcements/:id", requireAuth(["vendor", "admin"]), async (req, res) => {
   const user = await loadUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
-  const vendor = await getMyVendor(user.id);
+  const vendor = await resolveAnnVendor(req, user);
   if (!vendor) return res.status(403).json({ error: "No partner profile" });
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });

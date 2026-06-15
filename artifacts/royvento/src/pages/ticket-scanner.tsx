@@ -5,7 +5,7 @@ import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff, Plus, Minus, IndianRupee, Banknote, LogOut, Search } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine, Users, Ticket as TicketIcon, Wine, Bell, Camera, CameraOff, Zap, ZapOff, Plus, Minus, IndianRupee, Banknote, LogOut, Search, ClipboardList } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import {
   useGetMe,
@@ -560,11 +560,108 @@ function CameraScanner({
   );
 }
 
+type ScanMode = "camera" | "type" | "manual";
+
+function ManualBookingForm() {
+  const { toast } = useToast();
+  const today = new Date().toISOString().slice(0, 10);
+  const [name, setName] = useState("");
+  const [date, setDate] = useState(today);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [persons, setPersons] = useState(1);
+  const [price, setPrice] = useState("");
+  const [arrivalTime, setArrivalTime] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const reset = () => {
+    setName(""); setDate(today); setPhone(""); setEmail("");
+    setPersons(1); setPrice(""); setArrivalTime("");
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
+    if (!/^\d{10}$/.test(phone)) { toast({ title: "Phone must be 10 digits", variant: "destructive" }); return; }
+    if (!arrivalTime) { toast({ title: "Arrival time is required", variant: "destructive" }); return; }
+
+    setSaving(true);
+    try {
+      const r = await fetch("/api/partner/manual-booking", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          date,
+          phone,
+          email: email.trim() || "",
+          persons,
+          price: price !== "" ? Number(price) : 0,
+          arrivalTime,
+        }),
+      });
+      const j = await r.json() as { ok?: boolean; error?: string };
+      if (!r.ok) throw new Error(j.error ?? `Server error ${r.status}`);
+      toast({ title: "Booking recorded", description: `Walk-in for ${name.trim()} saved to booking report.` });
+      reset();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Network error";
+      toast({ title: "Failed to save", description: msg, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-3xl glass-card-strong p-6 space-y-4">
+      <div className="flex items-center gap-2 mb-1">
+        <ClipboardList className="h-5 w-5 text-primary" />
+        <p className="font-semibold text-base">Walk-in / Manual Booking</p>
+      </div>
+      <p className="text-xs text-muted-foreground -mt-2">Record a walk-in guest directly into the booking report.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Name *</label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" className="bg-black/40 border-white/10" required />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Date *</label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-black/40 border-white/10" required />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Phone *</label>
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit mobile" maxLength={10} inputMode="numeric" className="bg-black/40 border-white/10" required />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Email (optional)</label>
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="guest@example.com" className="bg-black/40 border-white/10" />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">No. of persons *</label>
+          <Input type="number" value={persons} min={1} onChange={(e) => setPersons(Math.max(1, Number(e.target.value)))} className="bg-black/40 border-white/10" required />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Price (optional)</label>
+          <Input type="number" value={price} min={0} onChange={(e) => setPrice(e.target.value)} placeholder="₹ 0" className="bg-black/40 border-white/10" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs uppercase tracking-wider text-muted-foreground mb-1 block">Arrival time *</label>
+          <Input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="bg-black/40 border-white/10" required />
+        </div>
+      </div>
+      <Button type="submit" disabled={saving} className="w-full bg-gradient-to-br from-primary to-primary/70 border-0 text-base py-3 gap-2">
+        {saving ? "Saving…" : <><ClipboardList className="h-5 w-5" /> Save Booking</>}
+      </Button>
+    </form>
+  );
+}
+
 export function TicketScanner() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
-  const [cameraMode, setCameraMode] = useState(true);
+  const [scanMode, setScanMode] = useState<ScanMode>("camera");
   const { toast } = useToast();
   const { accessStatus, managedVendors } = useAccessCheck();
   const queryClient = useQueryClient();
@@ -672,36 +769,43 @@ export function TicketScanner() {
       {/* Mode toggle */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => setCameraMode(false)}
+          onClick={() => { setScanMode("type"); setResult(null); }}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-            !cameraMode ? "bg-primary border-primary text-primary-foreground" : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20"
+            scanMode === "type" ? "bg-primary border-primary text-primary-foreground" : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20"
           }`}
         >
           <ScanLine className="h-4 w-4" /> Type code
         </button>
         <button
-          onClick={() => { setCameraMode(true); setResult(null); }}
+          onClick={() => { setScanMode("camera"); setResult(null); }}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-            cameraMode ? "bg-primary border-primary text-primary-foreground" : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20"
+            scanMode === "camera" ? "bg-primary border-primary text-primary-foreground" : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20"
           }`}
         >
           <Camera className="h-4 w-4" /> Camera scan
         </button>
+        <button
+          onClick={() => { setScanMode("manual"); setResult(null); }}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            scanMode === "manual" ? "bg-primary border-primary text-primary-foreground" : "bg-black/40 border-white/10 text-muted-foreground hover:border-white/20"
+          }`}
+        >
+          <ClipboardList className="h-4 w-4" /> Manual Booking
+        </button>
       </div>
 
-      {cameraMode ? (
+      {scanMode === "camera" ? (
         <div className="rounded-3xl glass-card-strong p-5 space-y-3">
           <CameraScanner
             disabled={loading}
             onDetect={(code) => {
               const cleaned = code.trim().toUpperCase();
               setInput(cleaned);
-              // Stay in camera mode — result appears below; scanner resumes after dismiss
               void validateCode(cleaned);
             }}
           />
         </div>
-      ) : (
+      ) : scanMode === "type" ? (
         <form onSubmit={scan} className="rounded-3xl glass-card-strong p-8 space-y-4">
           <div>
             <label className="text-sm font-medium mb-1 block">Ticket code</label>
@@ -724,7 +828,9 @@ export function TicketScanner() {
             {loading ? "Checking…" : <><ScanLine className="h-5 w-5" />Validate ticket</>}
           </Button>
         </form>
-      )}
+      ) : scanMode === "manual" ? (
+        <ManualBookingForm />
+      ) : null}
 
       {result && (
         <div

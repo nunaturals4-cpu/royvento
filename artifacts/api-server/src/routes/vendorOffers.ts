@@ -56,13 +56,27 @@ async function vendorIdForUser(userId: number): Promise<number | null> {
   return rows[0]?.id ?? null;
 }
 
+// Admins (Venues → Food & Drink Discounts) target a specific venue via
+// ?vendorId=; partners always resolve to their own venue.
+async function resolveVendorIdForReq(
+  req: { query: Record<string, unknown> },
+  user: { id: number; role: string },
+): Promise<number | null> {
+  if (user.role === "admin") {
+    const raw = req.query["vendorId"];
+    const n = raw != null ? Number(raw) : NaN;
+    if (Number.isFinite(n)) return n;
+  }
+  return vendorIdForUser(user.id);
+}
+
 // ─── Partner CRUD ─────────────────────────────────────────────────────────────
 
 router.get("/partner/offers", requireAuth(["vendor", "admin"]), async (req, res) => {
   try {
     const user = await loadUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const vendorId = await vendorIdForUser(user.id);
+    const vendorId = await resolveVendorIdForReq(req, user);
     if (!vendorId) return res.status(403).json({ error: "No partner profile found." });
     const rows = await db
       .select()
@@ -79,7 +93,7 @@ router.post("/partner/offers", requireAuth(["vendor", "admin"]), async (req, res
   try {
     const user = await loadUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const vendorId = await vendorIdForUser(user.id);
+    const vendorId = await resolveVendorIdForReq(req, user);
     if (!vendorId) return res.status(403).json({ error: "No partner profile found." });
 
     const parsed = OfferBody.safeParse(req.body);
@@ -145,7 +159,7 @@ router.patch("/partner/offers/:id", requireAuth(["vendor", "admin"]), async (req
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     const id = Number(req.params["id"]);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
-    const vendorId = await vendorIdForUser(user.id);
+    const vendorId = await resolveVendorIdForReq(req, user);
     if (!vendorId) return res.status(403).json({ error: "No partner profile found." });
 
     const existing = await db
@@ -190,7 +204,7 @@ router.delete("/partner/offers/:id", requireAuth(["vendor", "admin"]), async (re
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     const id = Number(req.params["id"]);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
-    const vendorId = await vendorIdForUser(user.id);
+    const vendorId = await resolveVendorIdForReq(req, user);
     if (!vendorId) return res.status(403).json({ error: "No partner profile found." });
 
     const [deleted] = await db
@@ -289,7 +303,7 @@ router.get("/partner/offers/analytics", requireAuth(["vendor", "admin"]), async 
   try {
     const user = await loadUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const vendorId = await vendorIdForUser(user.id);
+    const vendorId = await resolveVendorIdForReq(req, user);
     if (!vendorId) return res.status(403).json({ error: "No partner profile found." });
 
     const windowDays = Math.min(Math.max(Number(req.query["window"]) || 30, 1), 365);

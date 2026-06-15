@@ -17,7 +17,10 @@ import {
   organizersTable,
   organizerEventsTable,
   eventTicketsTable,
+  venueAssignmentLogTable,
+  partnerBlockedDatesTable,
 } from "@workspace/db";
+import { DrinkPlanBody } from "./vendors";
 import { computeCommissionFromPlanned, computeCommissionFromActuals, REALISED_COMMISSION_TRIGGERS } from "../lib/commission";
 import { bookingDiscountRatio, ferTierFreeness, computeEffectiveRevenues } from "../lib/effectiveRevenue";
 import { migrateMediaToS3 } from "../lib/migrateMedia";
@@ -26,10 +29,10 @@ import { seedProdShowcase } from "../lib/seedProdShowcase";
 import { repairProdMedia } from "../lib/repairProdMedia";
 import { eq, desc, asc, sql, inArray, isNotNull, isNull, and, gte, lte, or } from "drizzle-orm";
 import * as XLSX from "xlsx";
-import { requireAuth, hashPassword } from "../lib/auth";
+import { requireAuth, hashPassword, type AuthedRequest } from "../lib/auth";
 import { createUserNotification } from "../lib/notify";
 import { sendEventApprovedEmail } from "../lib/notifications";
-import { generateTicketCode } from "../lib/ticketCode";
+import { generateTicketCode, generateUniqueTicketPrefix, generateTicketSalt } from "../lib/ticketCode";
 import { resolvePlaceFromUrl, resolvePlaceById, downloadAndStorePhoto } from "../lib/googlePlaces";
 import { respondInvalid } from "../lib/validationError";
 import {
@@ -722,11 +725,14 @@ router.get("/admin/vendors", requireAuth(["admin"]), async (req, res) => {
     .groupBy(eventsTable.vendorId);
   const eCountMap = new Map(eventCounts.map((e) => [e.vendorId, e.count]));
 
-  const userIds = rows.map((v) => v.userId);
-  const users = await db
-    .select({ id: usersTable.id, email: usersTable.email })
-    .from(usersTable)
-    .where(sql`${usersTable.id} IN (${sql.join(userIds, sql`, `)})`);
+  // Skip the sentinel owner id 0 (unassigned admin-owned venues have no user).
+  const userIds = Array.from(new Set(rows.map((v) => v.userId).filter((idVal) => idVal && idVal !== 0)));
+  const users = userIds.length
+    ? await db
+        .select({ id: usersTable.id, email: usersTable.email })
+        .from(usersTable)
+        .where(sql`${usersTable.id} IN (${sql.join(userIds, sql`, `)})`)
+    : [];
   const uMap = new Map(users.map((u) => [u.id, u.email]));
 
   res.json({
@@ -1043,6 +1049,713 @@ router.post("/admin/create-pub", requireAuth(["admin"]), async (req, res) => {
   res.json({ ok: true, pubId: created.id, vendorId: vendor.id, partnerName: vendor.businessName });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Admin-owned venues: create & launch with no partner, operate unassigned, then
+// assign to a partner by email later — preserving all vendor_id-keyed history.
+// A venue = a `vendors` row + its `type='pub'` `events` row. Unassigned venues
+// use the sentinel owner id 0 and assignment_status='unassigned'.
+// ════════════════════════════════════════════════════════════════════════════
+
+const UNASSIGNED_VENUE_USER_ID = 0;
+
+// ── Admin: create an unassigned venue (no email, no approval) ────────────────
+router.post("/admin/create-venue", requireAuth(["admin"]), async (req, res) => {
+  const adminId = (req as AuthedRequest).user.id;
+  const {
+    businessName, category, description, location, city, state, country,
+    capacity, imageUrl, pubMode, priceWomen, priceMen, priceCouple,
+    galleryImages, galleryVideo, pubEventTypes, dayPricing,
+    freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
+    danceFloor, danceFloorPhotos, menuUrl, menuUrls,
+    startTime, endTime, happeningTonight, startingSoon, lastMinuteDeal, dealLabel,
+    freeEntryForTable, freeEntryForTableDays, freeEntryForTableBeforeTime,
+  } = req.body as {
+    businessName: string;
+    category?: string;
+    description?: string;
+    location?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    capacity?: number;
+    imageUrl?: string;
+    pubMode?: string;
+    priceWomen?: number;
+    priceMen?: number;
+    priceCouple?: number;
+    galleryImages?: string[];
+    galleryVideo?: string;
+    pubEventTypes?: string[];
+    dayPricing?: Record<string, { women: number; men: number; couple: number }>;
+    freeEntryEnabled?: boolean;
+    freeEntryGenders?: string[];
+    freeEntryDays?: string[];
+    freeEntryBeforeTime?: string;
+    danceFloor?: string;
+    danceFloorPhotos?: string[];
+    menuUrl?: string;
+    menuUrls?: string[];
+    startTime?: string;
+    endTime?: string;
+    happeningTonight?: boolean;
+    startingSoon?: boolean;
+    lastMinuteDeal?: boolean;
+    dealLabel?: string;
+    freeEntryForTable?: boolean;
+    freeEntryForTableDays?: string[];
+    freeEntryForTableBeforeTime?: string | null;
+  };
+
+  const title = (businessName ?? "").trim();
+  if (!title) {
+    res.status(400).json({ error: "Venue name is required" });
+    return;
+  }
+  const cat = (category ?? "Pub").trim() || "Pub";
+  if (cat !== "Pub" && cat !== "Club") {
+    res.status(400).json({ error: "category must be 'Pub' or 'Club'" });
+    return;
+  }
+
+  const freeEntryRules =
+    freeEntryEnabled &&
+    (freeEntryGenders?.length ?? 0) > 0 &&
+    (freeEntryDays?.length ?? 0) > 0
+      ? {
+          enabled: true,
+          genders: freeEntryGenders!,
+          days: freeEntryDays!,
+          ...(freeEntryBeforeTime ? { beforeTime: freeEntryBeforeTime } : {}),
+        }
+      : null;
+
+  const existingPrefixes = (await db.select({ p: vendorsTable.ticketPrefix }).from(vendorsTable)).map((r) => r.p).filter(Boolean);
+  const ticketPrefix = await generateUniqueTicketPrefix(title, existingPrefixes);
+  const menus = (menuUrls && menuUrls.length > 0) ? menuUrls : (menuUrl ? [menuUrl] : []);
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [vendor] = await tx
+        .insert(vendorsTable)
+        .values({
+          userId: UNASSIGNED_VENUE_USER_ID,
+          businessName: title,
+          category: cat,
+          description: description ?? "",
+          location: location ?? "",
+          state: state ?? "",
+          city: city ?? "",
+          country: country ?? "India",
+          bannerImage: imageUrl ?? "",
+          status: "approved",
+          assignmentStatus: "unassigned",
+          createdByAdminId: adminId,
+          ticketPrefix,
+          ticketSalt: generateTicketSalt(),
+          danceFloor: danceFloor || null,
+          danceFloorPhotos: (danceFloorPhotos && danceFloorPhotos.length > 0) ? danceFloorPhotos : null,
+          menuUrl: menus[0] ?? "",
+          menuUrls: menus,
+        })
+        .returning();
+
+      const [created] = await tx
+        .insert(eventsTable)
+        .values({
+          vendorId: vendor.id,
+          title,
+          description: description ?? "",
+          category: cat,
+          type: "pub",
+          location: location ?? "",
+          state: state ?? "",
+          city: city ?? "",
+          country: country ?? "India",
+          price: "0",
+          capacity: capacity ?? 100,
+          imageUrl: imageUrl ?? "",
+          pubMode: pubMode ?? "both",
+          priceWomen: String(priceWomen ?? 0),
+          priceMen: String(priceMen ?? 0),
+          priceCouple: String(priceCouple ?? 0),
+          galleryImages: galleryImages ?? [],
+          galleryVideos: galleryVideo ? [galleryVideo] : [],
+          pubEventTypes: pubEventTypes ?? [],
+          dayPricing: dayPricing && Object.keys(dayPricing).length > 0 ? dayPricing : null,
+          freeEntryRules,
+          startTime: startTime ?? "",
+          endTime: endTime ?? "",
+          happeningTonight: happeningTonight ?? true,
+          startingSoon: startingSoon ?? true,
+          lastMinuteDeal: lastMinuteDeal ?? false,
+          dealLabel: dealLabel ?? "",
+          freeEntryForTable: freeEntryForTable ?? false,
+          freeEntryForTableDays: freeEntryForTable ? (freeEntryForTableDays ?? []) : null,
+          freeEntryForTableBeforeTime: freeEntryForTable ? (freeEntryForTableBeforeTime || null) : null,
+          approvalStatus: "approved",
+          approvedAt: new Date(),
+        })
+        .returning();
+
+      await tx.insert(venueAssignmentLogTable).values({
+        vendorId: vendor.id,
+        action: "created",
+        actorAdminId: adminId,
+        note: `Venue "${title}" created unassigned`,
+      });
+
+      return { vendorId: vendor.id, pubId: created.id, businessName: title };
+    });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    req.log.error({ err }, "Failed to create venue");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to create venue" });
+  }
+});
+
+// ── Admin: list all venues with assignment status ───────────────────────────
+router.get("/admin/venues", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db.select().from(vendorsTable).orderBy(desc(vendorsTable.createdAt));
+  if (rows.length === 0) {
+    res.json({ data: [] });
+    return;
+  }
+
+  const ownerIds = Array.from(
+    new Set(rows.map((v) => v.userId).filter((idVal) => idVal && idVal !== UNASSIGNED_VENUE_USER_ID)),
+  );
+  const owners = ownerIds.length
+    ? await db
+        .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name })
+        .from(usersTable)
+        .where(inArray(usersTable.id, ownerIds))
+    : [];
+  const oMap = new Map(owners.map((u) => [u.id, u]));
+
+  const vendorIds = rows.map((v) => v.id);
+  const pubEvents = await db
+    .select({ id: eventsTable.id, vendorId: eventsTable.vendorId })
+    .from(eventsTable)
+    .where(and(inArray(eventsTable.vendorId, vendorIds), eq(eventsTable.type, "pub")));
+  const pubMap = new Map(pubEvents.map((e) => [e.vendorId, e.id]));
+
+  const eventCounts = await db
+    .select({ vendorId: eventsTable.vendorId, count: sql<number>`count(*)::int` })
+    .from(eventsTable)
+    .where(inArray(eventsTable.vendorId, vendorIds))
+    .groupBy(eventsTable.vendorId);
+  const ecMap = new Map(eventCounts.map((e) => [e.vendorId, e.count]));
+
+  const bookingCounts = await db
+    .select({ vendorId: bookingsTable.vendorId, count: sql<number>`count(*)::int` })
+    .from(bookingsTable)
+    .where(inArray(bookingsTable.vendorId, vendorIds))
+    .groupBy(bookingsTable.vendorId);
+  const bcMap = new Map(bookingCounts.map((b) => [b.vendorId, b.count]));
+
+  res.json({
+    data: rows.map((v) => {
+      const owner = v.userId && v.userId !== UNASSIGNED_VENUE_USER_ID ? oMap.get(v.userId) : null;
+      return {
+        id: v.id,
+        businessName: v.businessName,
+        category: v.category,
+        city: v.city,
+        state: v.state,
+        country: v.country,
+        bannerImage: v.bannerImage,
+        status: v.status,
+        assignmentStatus: v.assignmentStatus,
+        assignedAt: v.assignedAt ? v.assignedAt.toISOString() : null,
+        pubId: pubMap.get(v.id) ?? null,
+        eventCount: ecMap.get(v.id) ?? 0,
+        bookingCount: bcMap.get(v.id) ?? 0,
+        ownerUserId: owner?.id ?? null,
+        ownerEmail: owner?.email ?? "",
+        ownerName: owner?.name ?? "",
+        createdByAdminId: v.createdByAdminId ?? null,
+        createdAt: v.createdAt.toISOString(),
+      };
+    }),
+  });
+});
+
+// ── Admin: assign / reassign a venue to a partner by email ──────────────────
+router.post("/admin/venues/:id/assign", requireAuth(["admin"]), async (req, res) => {
+  const adminId = (req as AuthedRequest).user.id;
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid venue id" });
+    return;
+  }
+  const { email, note } = req.body as { email?: string; note?: string };
+  const emailRaw = String(email ?? "").trim();
+  if (!emailRaw) {
+    res.status(400).json({ error: "Partner email is required" });
+    return;
+  }
+  const normalized = emailRaw.toLowerCase();
+
+  const [venue] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
+  if (!venue) {
+    res.status(404).json({ error: "Venue not found" });
+    return;
+  }
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(sql`lower(${usersTable.email}) = ${normalized}`)
+    .limit(1);
+  if (!user) {
+    res.status(404).json({
+      error: `No account found for "${emailRaw}". The partner must have a registered Royvento account (email or Google Sign-In) before a venue can be assigned.`,
+    });
+    return;
+  }
+  if (user.role === "admin") {
+    res.status(400).json({ error: "Cannot assign a venue to an admin account." });
+    return;
+  }
+  if (user.role === "organizer" || user.role === "game_organizer") {
+    res.status(400).json({ error: `That account is an ${user.role} and cannot own a pub/club venue.` });
+    return;
+  }
+  if (venue.userId === user.id) {
+    res.status(409).json({ error: "This venue is already assigned to that partner." });
+    return;
+  }
+
+  // 1:1 rule — block if the target already owns a different venue.
+  const [otherVenue] = await db
+    .select({ id: vendorsTable.id, businessName: vendorsTable.businessName })
+    .from(vendorsTable)
+    .where(and(eq(vendorsTable.userId, user.id), sql`${vendorsTable.id} <> ${id}`))
+    .limit(1);
+  if (otherVenue) {
+    res.status(409).json({
+      error: `${user.email} already owns a venue ("${otherVenue.businessName}"). Each partner can own only one venue — unassign that one first.`,
+    });
+    return;
+  }
+
+  const wasAssigned = venue.assignmentStatus === "assigned" && venue.userId !== UNASSIGNED_VENUE_USER_ID;
+  const previousUserId = wasAssigned ? venue.userId : null;
+
+  try {
+    await db.transaction(async (tx) => {
+      // Relink ownership on the SAME vendor row → all vendor_id-keyed history
+      // (bookings, commission, reviews) is preserved with no copy/duplication.
+      await tx
+        .update(vendorsTable)
+        .set({
+          userId: user.id,
+          assignmentStatus: "assigned",
+          assignedAt: new Date(),
+          assignedByAdminId: adminId,
+          status: "approved",
+        })
+        .where(eq(vendorsTable.id, id));
+
+      if (user.role === "user") {
+        await tx.update(usersTable).set({ role: "vendor" }).where(eq(usersTable.id, user.id));
+      }
+
+      // On reassignment, revert the previous owner to a plain user if they no
+      // longer own any venue (1:1 ⇒ they now own none).
+      if (previousUserId) {
+        const stillOwns = await tx
+          .select({ id: vendorsTable.id })
+          .from(vendorsTable)
+          .where(eq(vendorsTable.userId, previousUserId))
+          .limit(1);
+        if (stillOwns.length === 0) {
+          await tx
+            .update(usersTable)
+            .set({ role: "user" })
+            .where(and(eq(usersTable.id, previousUserId), eq(usersTable.role, "vendor")));
+        }
+      }
+
+      await tx.insert(venueAssignmentLogTable).values({
+        vendorId: id,
+        action: wasAssigned ? "reassigned" : "assigned",
+        actorAdminId: adminId,
+        partnerUserId: user.id,
+        partnerEmail: user.email,
+        previousUserId,
+        note: String(note ?? "").slice(0, 500),
+      });
+    });
+  } catch (err) {
+    req.log.error({ err, venueId: id }, "Failed to assign venue");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to assign venue" });
+    return;
+  }
+
+  await createUserNotification({
+    userId: user.id,
+    title: "A venue has been assigned to you",
+    message: `You now manage "${venue.businessName}" on Royvento. Open your Partner Studio to take over.`,
+    url: "/vendor-dashboard",
+  });
+
+  res.json({
+    ok: true,
+    vendorId: id,
+    partnerUserId: user.id,
+    partnerEmail: user.email,
+    action: wasAssigned ? "reassigned" : "assigned",
+  });
+});
+
+// ── Admin: unassign a venue (override — returns it to unassigned state) ──────
+router.post("/admin/venues/:id/unassign", requireAuth(["admin"]), async (req, res) => {
+  const adminId = (req as AuthedRequest).user.id;
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid venue id" });
+    return;
+  }
+  const { note } = req.body as { note?: string };
+  const [venue] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
+  if (!venue) {
+    res.status(404).json({ error: "Venue not found" });
+    return;
+  }
+  if (venue.assignmentStatus !== "assigned" || venue.userId === UNASSIGNED_VENUE_USER_ID) {
+    res.status(409).json({ error: "Venue is already unassigned." });
+    return;
+  }
+  const previousUserId = venue.userId;
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(vendorsTable)
+        .set({
+          userId: UNASSIGNED_VENUE_USER_ID,
+          assignmentStatus: "unassigned",
+          assignedAt: null,
+          assignedByAdminId: null,
+        })
+        .where(eq(vendorsTable.id, id));
+
+      const stillOwns = await tx
+        .select({ id: vendorsTable.id })
+        .from(vendorsTable)
+        .where(eq(vendorsTable.userId, previousUserId))
+        .limit(1);
+      if (stillOwns.length === 0) {
+        await tx
+          .update(usersTable)
+          .set({ role: "user" })
+          .where(and(eq(usersTable.id, previousUserId), eq(usersTable.role, "vendor")));
+      }
+
+      await tx.insert(venueAssignmentLogTable).values({
+        vendorId: id,
+        action: "unassigned",
+        actorAdminId: adminId,
+        previousUserId,
+        note: String(note ?? "").slice(0, 500),
+      });
+    });
+  } catch (err) {
+    req.log.error({ err, venueId: id }, "Failed to unassign venue");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to unassign venue" });
+    return;
+  }
+  res.json({ ok: true, vendorId: id });
+});
+
+// ── Admin: venue assignment audit history ───────────────────────────────────
+router.get("/admin/venues/:id/audit", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid venue id" });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(venueAssignmentLogTable)
+    .where(eq(venueAssignmentLogTable.vendorId, id))
+    .orderBy(desc(venueAssignmentLogTable.createdAt));
+
+  const idsToResolve = Array.from(
+    new Set(
+      rows
+        .flatMap((r) => [r.actorAdminId, r.previousUserId])
+        .filter((x): x is number => typeof x === "number" && x > 0),
+    ),
+  );
+  const usersRows = idsToResolve.length
+    ? await db
+        .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name })
+        .from(usersTable)
+        .where(inArray(usersTable.id, idsToResolve))
+    : [];
+  const uMap = new Map(usersRows.map((u) => [u.id, u]));
+
+  res.json({
+    data: rows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      actorAdminId: r.actorAdminId,
+      actorAdminEmail: r.actorAdminId ? uMap.get(r.actorAdminId)?.email ?? "" : "",
+      partnerUserId: r.partnerUserId,
+      partnerEmail: r.partnerEmail,
+      previousUserId: r.previousUserId,
+      previousOwnerEmail: r.previousUserId ? uMap.get(r.previousUserId)?.email ?? "" : "",
+      note: r.note,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  });
+});
+
+// ── Admin: full venue detail (vendor + its pub event) for the edit form ──────
+router.get("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid venue id" }); return; }
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
+  if (!vendor) { res.status(404).json({ error: "Venue not found" }); return; }
+  const [pub] = await db
+    .select()
+    .from(eventsTable)
+    .where(and(eq(eventsTable.vendorId, id), eq(eventsTable.type, "pub")))
+    .limit(1);
+  const owner = vendor.userId && vendor.userId !== UNASSIGNED_VENUE_USER_ID
+    ? (await db.select({ email: usersTable.email, name: usersTable.name }).from(usersTable).where(eq(usersTable.id, vendor.userId)).limit(1))[0]
+    : null;
+
+  res.json({
+    id: vendor.id,
+    pubId: pub?.id ?? null,
+    businessName: vendor.businessName,
+    category: vendor.category,
+    description: vendor.description,
+    location: pub?.location ?? vendor.location,
+    city: vendor.city,
+    state: vendor.state,
+    country: vendor.country,
+    bannerImage: vendor.bannerImage,
+    assignmentStatus: vendor.assignmentStatus,
+    status: vendor.status,
+    ownerEmail: owner?.email ?? "",
+    ownerName: owner?.name ?? "",
+    baseFeePercent: vendor.baseFeePercent ?? "3.50",
+    baseFeeEnabled: vendor.baseFeeEnabled !== false,
+    // pub-event fields
+    capacity: pub?.capacity ?? 0,
+    pubMode: pub?.pubMode ?? "both",
+    priceWomen: Number(pub?.priceWomen ?? 0),
+    priceMen: Number(pub?.priceMen ?? 0),
+    priceCouple: Number(pub?.priceCouple ?? 0),
+    dayPricing: pub?.dayPricing ?? null,
+    galleryImages: pub?.galleryImages ?? [],
+    galleryVideos: pub?.galleryVideos ?? [],
+    pubEventTypes: pub?.pubEventTypes ?? [],
+    freeEntryRules: pub?.freeEntryRules ?? null,
+    danceFloor: vendor.danceFloor ?? "",
+    danceFloorPhotos: vendor.danceFloorPhotos ?? [],
+    menuUrls: vendor.menuUrls ?? [],
+    // Happening Tonight visibility + free-entry-for-table (pub-event fields)
+    startTime: pub?.startTime ?? "",
+    endTime: pub?.endTime ?? "",
+    happeningTonight: pub?.happeningTonight ?? true,
+    startingSoon: pub?.startingSoon ?? true,
+    lastMinuteDeal: pub?.lastMinuteDeal ?? false,
+    dealLabel: pub?.dealLabel ?? "",
+    freeEntryForTable: pub?.freeEntryForTable ?? false,
+    freeEntryForTableDays: (pub?.freeEntryForTableDays as string[] | null) ?? [],
+    freeEntryForTableBeforeTime: pub?.freeEntryForTableBeforeTime ?? "",
+  });
+});
+
+// ── Admin: edit a venue (updates the vendor row + its pub event) ─────────────
+router.patch("/admin/venues/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid venue id" }); return; }
+  const {
+    businessName, category, description, location, city, state, country,
+    capacity, imageUrl, pubMode, priceWomen, priceMen, priceCouple,
+    galleryImages, galleryVideo, pubEventTypes, dayPricing,
+    freeEntryEnabled, freeEntryGenders, freeEntryDays, freeEntryBeforeTime,
+    danceFloor, danceFloorPhotos, menuUrls,
+    startTime, endTime, happeningTonight, startingSoon, lastMinuteDeal, dealLabel,
+    freeEntryForTable, freeEntryForTableDays, freeEntryForTableBeforeTime,
+  } = req.body as Record<string, unknown>;
+
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
+  if (!vendor) { res.status(404).json({ error: "Venue not found" }); return; }
+
+  const title = typeof businessName === "string" ? businessName.trim() : vendor.businessName;
+  if (!title) { res.status(400).json({ error: "Venue name is required" }); return; }
+  const cat = typeof category === "string" && (category === "Pub" || category === "Club") ? category : vendor.category;
+
+  const menus = Array.isArray(menuUrls) ? (menuUrls as string[]) : (vendor.menuUrls ?? []);
+  const freeEntryRules =
+    freeEntryEnabled &&
+    Array.isArray(freeEntryGenders) && (freeEntryGenders as string[]).length > 0 &&
+    Array.isArray(freeEntryDays) && (freeEntryDays as string[]).length > 0
+      ? {
+          enabled: true,
+          genders: freeEntryGenders as string[],
+          days: freeEntryDays as string[],
+          ...(freeEntryBeforeTime ? { beforeTime: String(freeEntryBeforeTime) } : {}),
+        }
+      : null;
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(vendorsTable).set({
+        businessName: title,
+        category: cat,
+        description: typeof description === "string" ? description : vendor.description,
+        location: typeof location === "string" ? location : vendor.location,
+        city: typeof city === "string" ? city : vendor.city,
+        state: typeof state === "string" ? state : vendor.state,
+        country: typeof country === "string" ? country : vendor.country,
+        bannerImage: typeof imageUrl === "string" ? imageUrl : vendor.bannerImage,
+        danceFloor: typeof danceFloor === "string" ? (danceFloor || null) : vendor.danceFloor,
+        danceFloorPhotos: Array.isArray(danceFloorPhotos) ? (danceFloorPhotos as string[]) : vendor.danceFloorPhotos,
+        menuUrl: menus[0] ?? "",
+        menuUrls: menus,
+      }).where(eq(vendorsTable.id, id));
+
+      const [pub] = await tx
+        .select({ id: eventsTable.id })
+        .from(eventsTable)
+        .where(and(eq(eventsTable.vendorId, id), eq(eventsTable.type, "pub")))
+        .limit(1);
+      if (pub) {
+        await tx.update(eventsTable).set({
+          title,
+          category: cat,
+          description: typeof description === "string" ? description : undefined,
+          location: typeof location === "string" ? location : undefined,
+          city: typeof city === "string" ? city : undefined,
+          state: typeof state === "string" ? state : undefined,
+          country: typeof country === "string" ? country : undefined,
+          capacity: typeof capacity === "number" ? capacity : undefined,
+          imageUrl: typeof imageUrl === "string" ? imageUrl : undefined,
+          pubMode: typeof pubMode === "string" ? pubMode : undefined,
+          priceWomen: priceWomen !== undefined ? String(priceWomen) : undefined,
+          priceMen: priceMen !== undefined ? String(priceMen) : undefined,
+          priceCouple: priceCouple !== undefined ? String(priceCouple) : undefined,
+          galleryImages: Array.isArray(galleryImages) ? (galleryImages as string[]) : undefined,
+          galleryVideos: typeof galleryVideo === "string" ? (galleryVideo ? [galleryVideo] : []) : undefined,
+          pubEventTypes: Array.isArray(pubEventTypes) ? (pubEventTypes as string[]) : undefined,
+          dayPricing: dayPricing && typeof dayPricing === "object" && Object.keys(dayPricing).length > 0 ? (dayPricing as Record<string, { women: number; men: number; couple: number }>) : null,
+          freeEntryRules,
+          startTime: typeof startTime === "string" ? startTime : undefined,
+          endTime: typeof endTime === "string" ? endTime : undefined,
+          happeningTonight: typeof happeningTonight === "boolean" ? happeningTonight : undefined,
+          startingSoon: typeof startingSoon === "boolean" ? startingSoon : undefined,
+          lastMinuteDeal: typeof lastMinuteDeal === "boolean" ? lastMinuteDeal : undefined,
+          dealLabel: typeof dealLabel === "string" ? dealLabel : undefined,
+          freeEntryForTable: typeof freeEntryForTable === "boolean" ? freeEntryForTable : undefined,
+          freeEntryForTableDays: freeEntryForTable ? (Array.isArray(freeEntryForTableDays) ? (freeEntryForTableDays as string[]) : []) : null,
+          freeEntryForTableBeforeTime: freeEntryForTable ? ((freeEntryForTableBeforeTime as string) || null) : null,
+        }).where(eq(eventsTable.id, pub.id));
+      }
+    });
+  } catch (err) {
+    req.log.error({ err, venueId: id }, "Failed to edit venue");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to edit venue" });
+    return;
+  }
+  res.json({ ok: true, vendorId: id });
+});
+
+// ── Admin: venue Food & Drinks plans (CRUD by vendorId) ─────────────────────
+router.get("/admin/venues/:id/drink-plans", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid venue id" }); return; }
+  const plans = await db
+    .select()
+    .from(drinkPlansTable)
+    .where(eq(drinkPlansTable.vendorId, id))
+    .orderBy(sql`COALESCE(${drinkPlansTable.globalPriority}, 999)`, drinkPlansTable.createdAt);
+  res.json(plans);
+});
+
+router.post("/admin/venues/:id/drink-plans", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid venue id" }); return; }
+  const [vendor] = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.id, id)).limit(1);
+  if (!vendor) { res.status(404).json({ error: "Venue not found" }); return; }
+  const parsed = DrinkPlanBody.safeParse(req.body);
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
+  const [plan] = await db.insert(drinkPlansTable).values({ vendorId: id, ...parsed.data }).returning();
+  res.json(plan);
+});
+
+router.patch("/admin/venues/:id/drink-plans/:planId", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  const planId = Number(req.params["planId"]);
+  if (!Number.isFinite(id) || !Number.isFinite(planId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const parsed = DrinkPlanBody.partial().safeParse(req.body);
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
+  const [updated] = await db
+    .update(drinkPlansTable)
+    .set(parsed.data)
+    .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, id)))
+    .returning();
+  if (!updated) { res.status(404).json({ error: "Plan not found" }); return; }
+  res.json(updated);
+});
+
+router.delete("/admin/venues/:id/drink-plans/:planId", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  const planId = Number(req.params["planId"]);
+  if (!Number.isFinite(id) || !Number.isFinite(planId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const [deleted] = await db
+    .delete(drinkPlansTable)
+    .where(and(eq(drinkPlansTable.id, planId), eq(drinkPlansTable.vendorId, id)))
+    .returning();
+  if (!deleted) { res.status(404).json({ error: "Plan not found" }); return; }
+  res.json({ ok: true });
+});
+
+// ── Admin: venue blocked dates / calendar (CRUD by vendorId) ────────────────
+router.get("/admin/venues/:id/blocked-dates", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid venue id" }); return; }
+  const rows = await db
+    .select()
+    .from(partnerBlockedDatesTable)
+    .where(eq(partnerBlockedDatesTable.vendorId, id))
+    .orderBy(desc(partnerBlockedDatesTable.date));
+  res.json(rows);
+});
+
+router.post("/admin/venues/:id/blocked-dates", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid venue id" }); return; }
+  const dateRaw = String((req.body as { date?: unknown }).date ?? "").trim();
+  if (!dateRaw) { res.status(400).json({ error: "date is required" }); return; }
+  const reason = String((req.body as { reason?: unknown }).reason ?? "");
+  try {
+    const [b] = await db
+      .insert(partnerBlockedDatesTable)
+      .values({ vendorId: id, date: dateRaw.slice(0, 10), reason, source: "manual" })
+      .returning();
+    res.json(b);
+  } catch {
+    res.status(409).json({ error: "Date already blocked" });
+  }
+});
+
+router.delete("/admin/venues/:id/blocked-dates/:blockId", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  const blockId = Number(req.params["blockId"]);
+  if (!Number.isFinite(id) || !Number.isFinite(blockId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  await db
+    .delete(partnerBlockedDatesTable)
+    .where(and(eq(partnerBlockedDatesTable.id, blockId), eq(partnerBlockedDatesTable.vendorId, id)));
+  res.json({ ok: true });
+});
+
 router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => {
   const id = Number(req.params["id"]);
   if (!Number.isFinite(id)) {
@@ -1097,6 +1810,7 @@ router.delete("/admin/vendors/:id", requireAuth(["admin"]), async (req, res) => 
       await tx.execute(sql`DELETE FROM availability WHERE vendor_id = ${id}`);
       await tx.execute(sql`DELETE FROM review_deletions WHERE vendor_id = ${id}`);
       await tx.execute(sql`DELETE FROM vendor_commissions WHERE vendor_id = ${id}`);
+      await tx.execute(sql`DELETE FROM venue_assignment_log WHERE vendor_id = ${id}`);
       await tx.execute(sql`DELETE FROM vendors WHERE id = ${id}`);
     });
   } catch (err) {
@@ -2886,6 +3600,85 @@ router.post("/admin/drink-plans/priorities", requireAuth(["admin"]), async (req,
   }
 
   res.json({ ok: true, count: orderedIds.length });
+});
+
+// ── Manual (walk-in) booking report ─────────────────────────────────────────
+
+const MANUAL_REPORT_PAGE_SIZE = 50;
+
+router.get("/admin/bookings/manual-report", requireAuth(["admin"]), async (req, res) => {
+  const pageNum = Math.max(1, parseInt(req.query["page"] as string) || 1);
+  const offset = (pageNum - 1) * MANUAL_REPORT_PAGE_SIZE;
+  const vendorIdParam = req.query["vendorId"] ? Number(req.query["vendorId"]) : null;
+  const startDate = req.query["startDate"] as string | undefined;
+  const endDate = req.query["endDate"] as string | undefined;
+
+  const conds = [sql`${bookingsTable.pubMode} = 'manual'`];
+  if (vendorIdParam && Number.isFinite(vendorIdParam))
+    conds.push(sql`${bookingsTable.vendorId} = ${vendorIdParam}`);
+  if (startDate) conds.push(sql`${bookingsTable.bookingDate} >= ${startDate}`);
+  if (endDate) conds.push(sql`${bookingsTable.bookingDate} <= ${endDate}`);
+  const whereSQL = sql.join(conds, sql` AND `);
+
+  const [countRow, rows, phoneAgg, totals] = await Promise.all([
+    db.select({ c: sql<number>`count(*)::int` }).from(bookingsTable).where(whereSQL),
+    db.select().from(bookingsTable).where(whereSQL).orderBy(desc(bookingsTable.createdAt)).limit(MANUAL_REPORT_PAGE_SIZE).offset(offset),
+    db.select({
+      phone: bookingsTable.phone,
+      name: bookingsTable.personName,
+      visits: sql<number>`count(*)::int`,
+      totalPersons: sql<number>`sum(${bookingsTable.guests})::int`,
+      totalRevenue: sql<string>`sum(cast(${bookingsTable.finalPrice} as numeric))::text`,
+    })
+      .from(bookingsTable)
+      .where(whereSQL)
+      .groupBy(bookingsTable.phone, bookingsTable.personName)
+      .orderBy(desc(sql`count(*)`)),
+    db.select({
+      totalPersons: sql<number>`coalesce(sum(${bookingsTable.guests}), 0)::int`,
+      totalRevenue: sql<string>`coalesce(sum(cast(${bookingsTable.finalPrice} as numeric)), 0)::text`,
+    }).from(bookingsTable).where(whereSQL),
+  ]);
+
+  const vendorIds = [...new Set(rows.map((r) => r.vendorId).filter((id): id is number => id != null))];
+  const vendors = vendorIds.length
+    ? await db.select({ id: vendorsTable.id, businessName: vendorsTable.businessName }).from(vendorsTable).where(inArray(vendorsTable.id, vendorIds))
+    : [];
+  const vMap = new Map(vendors.map((v) => [v.id, v.businessName]));
+
+  const total = countRow[0]?.c ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / MANUAL_REPORT_PAGE_SIZE));
+
+  res.json({
+    bookings: rows.map((b) => ({
+      id: b.id,
+      vendorId: b.vendorId,
+      pubName: b.vendorId != null ? (vMap.get(b.vendorId) ?? "") : "",
+      name: b.personName ?? "",
+      phone: b.phone ?? "",
+      email: b.notes ?? "",
+      date: b.bookingDate,
+      persons: b.guests,
+      price: Number(b.finalPrice),
+      arrivalTime: b.arrivalTime ?? "",
+      checkedIn: b.checkedIn,
+      checkedInAt: b.checkedInAt?.toISOString() ?? null,
+      createdAt: b.createdAt.toISOString(),
+    })),
+    total,
+    page: pageNum,
+    totalPages,
+    uniqueCustomers: phoneAgg.length,
+    totalPersons: totals[0]?.totalPersons ?? 0,
+    totalRevenue: Number(totals[0]?.totalRevenue ?? 0),
+    customerDetails: phoneAgg.map((r) => ({
+      phone: r.phone ?? "",
+      name: r.name ?? "",
+      visits: r.visits,
+      totalPersons: r.totalPersons ?? 0,
+      totalRevenue: Number(r.totalRevenue ?? 0),
+    })),
+  });
 });
 
 export default router;

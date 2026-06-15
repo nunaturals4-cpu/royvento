@@ -45,6 +45,8 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { LocationSelect } from "@/components/LocationSelect";
+import { TonightVisibilityFields, defaultTonightVisibility, type TonightVisibilityValue } from "@/components/TonightVisibilityFields";
+import { DrinkPlansPanel, AnalyticsPanel, BookingReport as PartnerBookingReport, FoodDrinkOffersPanel, AnnouncementsPanel, LeadsPanel } from "./vendor-dashboard";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users, Briefcase, CalendarCheck, Clock, Mail, UserPlus,
@@ -94,7 +96,7 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { value: "requests",             label: "Partner Requests",  icon: UserPlus,      group: "partners" },
   { value: "event-approvals",      label: "Event Approvals",   icon: ShieldCheck,   group: "partners" },
   { value: "events",               label: "Events",            icon: Tag,           group: "partners" },
-  { value: "create-pub",           label: "Create Pub/Club",   icon: Plus,          group: "partners" },
+  { value: "create-pub",           label: "Venues",            icon: Plus,          group: "partners" },
   { value: "event-organizers",     label: "Event Organizers",  icon: CalendarCheck, group: "partners" },
   { value: "game-organizers",      label: "Game Organizers",   icon: Gamepad2,      group: "partners" },
   { value: "users",                label: "Users",             icon: Users,         group: "customers" },
@@ -2153,6 +2155,16 @@ interface AdminCoupon {
   isUsed: boolean; expiresAt: string | null; createdAt: string;
   userName: string | null; userEmail: string | null;
 }
+
+interface AdminVendorCoupon {
+  id: number; vendorId: number; vendorName: string | null; code: string;
+  discountType: "percent" | "fixed"; discountValue: string;
+  applicableTo: "ticket" | "event" | "both"; active: boolean;
+  maxUses: number | null; usedCount: number; expiresAt: string | null; createdAt: string;
+}
+
+const BLANK_ADMIN_VC = { vendorId: "", code: "", discountType: "percent" as "percent" | "fixed", discountValue: "10", applicableTo: "both" as "ticket" | "event" | "both", active: true, maxUses: "", expiresAt: "" };
+
 function CouponsAdmin() {
   const [items, setItems] = useState<AdminCoupon[]>([]);
   const [email, setEmail] = useState("");
@@ -2176,52 +2188,235 @@ function CouponsAdmin() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <form onSubmit={grant} className="rounded-2xl glass-card-strong p-5 grid md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
-        <div>
-          <Label className="flex items-center gap-1"><Tag className="h-3.5 w-3.5 text-primary" /> Grant coupon to user (email)</Label>
-          <Input value={email} onChange={(e) => { setEmail(e.target.value); formErrors.clearField("email"); }} placeholder="user@example.com" required className={fieldClass("bg-black/40 border-white/10 mt-1", formErrors.fieldError("email"))} />
-          {formErrors.fieldError("email") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("email")}</p>}
-        </div>
-        <div>
-          <Label>Discount %</Label>
-          <Input type="number" min={1} max={50} value={discount} onChange={(e) => { setDiscount(Number(e.target.value)); formErrors.clearField("discountPercent"); }} className={fieldClass("bg-black/40 border-white/10 mt-1", formErrors.fieldError("discountPercent"))} />
-          {formErrors.fieldError("discountPercent") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("discountPercent")}</p>}
-        </div>
-        <Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">Grant</Button>
-      </form>
-      {formErrors.topError && <p className="text-sm text-red-400">{formErrors.topError}</p>}
+  // ── Pub coupons (vendor-level) ──
+  const [vcItems, setVcItems] = useState<AdminVendorCoupon[]>([]);
+  const [showVcForm, setShowVcForm] = useState(false);
+  const [vcForm, setVcForm] = useState(BLANK_ADMIN_VC);
+  const [vcSaving, setVcSaving] = useState(false);
+  const [vcDeleting, setVcDeleting] = useState<number | null>(null);
+  const { data: allVendors } = useListVendors({ limit: 500 } as Parameters<typeof useListVendors>[0]);
+  const vendors = ((allVendors ?? []) as { id: number; userId: number; businessName: string }[]).filter((v) => v.userId === 0);
 
-      <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[70vh]">
-        {items.length === 0 ? (
-          <p className="p-6 text-muted-foreground">No coupons issued.</p>
-        ) : (
-          <table className="w-full text-sm min-w-[640px]">
-            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="text-left p-3">Code</th>
-                <th className="text-left p-3">Owner</th>
-                <th className="text-right p-3">Discount</th>
-                <th className="text-center p-3">Used</th>
-                <th className="text-right p-3">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((c) => (
-                <tr key={c.id} className="border-t border-white/5">
-                  <td className="p-3 font-mono text-xs">{c.code}</td>
-                  <td className="p-3">
-                    {c.userName ? (<><span>{c.userName}</span><span className="text-xs text-muted-foreground ml-2">{c.userEmail}</span></>) : <span className="text-muted-foreground">-- public --</span>}
-                  </td>
-                  <td className="p-3 text-right">{c.discountPercent}%</td>
-                  <td className="p-3 text-center">{c.isUsed ? "Yes" : "No"}</td>
-                  <td className="p-3 text-right text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</td>
+  const loadVc = () => apiGet<AdminVendorCoupon[]>("/api/admin/vendor-coupons").then(setVcItems).catch(() => {});
+  useEffect(() => { loadVc(); }, []);
+
+  const saveVc = async () => {
+    if (!vcForm.vendorId) { toast({ title: "Select a pub", variant: "destructive" }); return; }
+    setVcSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        vendorId: Number(vcForm.vendorId),
+        discountType: vcForm.discountType,
+        discountValue: Number(vcForm.discountValue),
+        applicableTo: vcForm.applicableTo,
+        active: vcForm.active,
+        maxUses: vcForm.maxUses ? Number(vcForm.maxUses) : null,
+        expiresAt: vcForm.expiresAt ? new Date(vcForm.expiresAt).toISOString() : null,
+      };
+      if (vcForm.code.trim()) payload.code = vcForm.code.trim().toUpperCase();
+      await apiPost("/api/admin/vendor-coupons", payload);
+      toast({ title: "Pub coupon created" });
+      setShowVcForm(false);
+      setVcForm(BLANK_ADMIN_VC);
+      loadVc();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message ?? "Failed to create coupon", variant: "destructive" });
+    }
+    setVcSaving(false);
+  };
+
+  const toggleVcActive = async (c: AdminVendorCoupon) => {
+    try {
+      await apiPatch(`/api/admin/vendor-coupons/${c.id}`, { active: !c.active });
+      setVcItems((prev) => prev.map((x) => x.id === c.id ? { ...x, active: !x.active } : x));
+    } catch { toast({ title: "Failed to update", variant: "destructive" }); }
+  };
+
+  const deleteVc = async (id: number) => {
+    setVcDeleting(id);
+    try {
+      await apiDelete(`/api/admin/vendor-coupons/${id}`);
+      toast({ title: "Coupon deleted" });
+      setVcItems((prev) => prev.filter((c) => c.id !== id));
+    } catch { toast({ title: "Delete failed", variant: "destructive" }); }
+    setVcDeleting(null);
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* ── Section 1: User coupons ── */}
+      <div className="space-y-4">
+        <h3 className="font-semibold text-base flex items-center gap-2"><Tag className="h-4 w-4 text-primary" /> User Coupons (grant by email)</h3>
+        <form onSubmit={grant} className="rounded-2xl glass-card-strong p-5 grid md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+          <div>
+            <Label>User email</Label>
+            <Input value={email} onChange={(e) => { setEmail(e.target.value); formErrors.clearField("email"); }} placeholder="user@example.com" required className={fieldClass("bg-black/40 border-white/10 mt-1", formErrors.fieldError("email"))} />
+            {formErrors.fieldError("email") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("email")}</p>}
+          </div>
+          <div>
+            <Label>Discount %</Label>
+            <Input type="number" min={1} max={50} value={discount} onChange={(e) => { setDiscount(Number(e.target.value)); formErrors.clearField("discountPercent"); }} className={fieldClass("bg-black/40 border-white/10 mt-1", formErrors.fieldError("discountPercent"))} />
+            {formErrors.fieldError("discountPercent") && <p className="mt-1 text-xs text-red-400">{formErrors.fieldError("discountPercent")}</p>}
+          </div>
+          <Button className="bg-gradient-to-br from-red-600 to-red-800 border-0">Grant</Button>
+        </form>
+        {formErrors.topError && <p className="text-sm text-red-400">{formErrors.topError}</p>}
+        <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[40vh]">
+          {items.length === 0 ? (
+            <p className="p-6 text-muted-foreground">No user coupons issued.</p>
+          ) : (
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left p-3">Code</th>
+                  <th className="text-left p-3">Owner</th>
+                  <th className="text-right p-3">Discount</th>
+                  <th className="text-center p-3">Used</th>
+                  <th className="text-right p-3">Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((c) => (
+                  <tr key={c.id} className="border-t border-white/5">
+                    <td className="p-3 font-mono text-xs">{c.code}</td>
+                    <td className="p-3">
+                      {c.userName ? (<><span>{c.userName}</span><span className="text-xs text-muted-foreground ml-2">{c.userEmail}</span></>) : <span className="text-muted-foreground">-- public --</span>}
+                    </td>
+                    <td className="p-3 text-right">{c.discountPercent}%</td>
+                    <td className="p-3 text-center">{c.isUsed ? "Yes" : "No"}</td>
+                    <td className="p-3 text-right text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* ── Section 2: Pub coupons ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-base flex items-center gap-2"><Gift className="h-4 w-4 text-primary" /> Pub Coupons (visible at booking)</h3>
+          <Button size="sm" className="gap-2" onClick={() => { setVcForm(BLANK_ADMIN_VC); setShowVcForm(true); }}>
+            <Plus className="h-4 w-4" /> New Pub Coupon
+          </Button>
+        </div>
+
+        {showVcForm && (
+          <div className="rounded-2xl glass-card p-6 space-y-5 border border-primary/20">
+            <h4 className="font-semibold">Create Pub Coupon</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Select Pub / Venue</Label>
+                <Select value={vcForm.vendorId} onValueChange={(v) => setVcForm({ ...vcForm, vendorId: v })}>
+                  <SelectTrigger className="bg-black/40 border-white/10 rounded-xl">
+                    <SelectValue placeholder="— choose a pub —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map((v) => <SelectItem key={v.id} value={String(v.id)}>{v.businessName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Code (blank = auto-generate)</Label>
+                <Input value={vcForm.code} onChange={(e) => setVcForm({ ...vcForm, code: e.target.value.toUpperCase().slice(0, 10) })} placeholder="e.g. PUB10" className="bg-black/40 border-white/10 rounded-xl font-mono tracking-widest" maxLength={10} />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Discount Type</Label>
+                <Select value={vcForm.discountType} onValueChange={(v) => setVcForm({ ...vcForm, discountType: v as "percent" | "fixed" })}>
+                  <SelectTrigger className="bg-black/40 border-white/10 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">Percentage (%)</SelectItem>
+                    <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">{vcForm.discountType === "percent" ? "Discount %" : "Discount ₹"}</Label>
+                <Input type="number" min={1} max={vcForm.discountType === "percent" ? 100 : undefined} value={vcForm.discountValue} onChange={(e) => setVcForm({ ...vcForm, discountValue: e.target.value })} className="bg-black/40 border-white/10 rounded-xl" />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Applicable To</Label>
+                <Select value={vcForm.applicableTo} onValueChange={(v) => setVcForm({ ...vcForm, applicableTo: v as "ticket" | "event" | "both" })}>
+                  <SelectTrigger className="bg-black/40 border-white/10 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="both">Both (Tickets & Events)</SelectItem>
+                    <SelectItem value="ticket">Ticket Bookings Only</SelectItem>
+                    <SelectItem value="event">Event/Table Bookings Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Max Uses (blank = unlimited)</Label>
+                <Input type="number" min={1} value={vcForm.maxUses} onChange={(e) => setVcForm({ ...vcForm, maxUses: e.target.value })} placeholder="Unlimited" className="bg-black/40 border-white/10 rounded-xl" />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-1.5 block">Expires On (blank = never)</Label>
+                <Input type="date" value={vcForm.expiresAt} onChange={(e) => setVcForm({ ...vcForm, expiresAt: e.target.value })} className="bg-black/40 border-white/10 rounded-xl" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input type="checkbox" checked={vcForm.active} onChange={(e) => setVcForm({ ...vcForm, active: e.target.checked })} className="rounded" />
+                Active
+              </label>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button onClick={saveVc} disabled={vcSaving} className="gap-2">
+                {vcSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Create Coupon
+              </Button>
+              <Button variant="outline" onClick={() => setShowVcForm(false)} disabled={vcSaving}>Cancel</Button>
+            </div>
+          </div>
         )}
+
+        <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[50vh]">
+          {vcItems.length === 0 ? (
+            <p className="p-6 text-muted-foreground">No pub coupons created yet.</p>
+          ) : (
+            <table className="w-full text-sm min-w-[700px]">
+              <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left p-3">Code</th>
+                  <th className="text-left p-3">Pub</th>
+                  <th className="text-left p-3">Discount</th>
+                  <th className="text-left p-3">Applies To</th>
+                  <th className="text-left p-3">Uses</th>
+                  <th className="text-left p-3">Expires</th>
+                  <th className="text-center p-3">Status</th>
+                  <th className="text-right p-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {vcItems.map((c) => (
+                  <tr key={c.id} className="hover:bg-white/[0.02]">
+                    <td className="p-3 font-mono text-xs font-semibold tracking-widest text-primary">{c.code}</td>
+                    <td className="p-3 text-sm">{c.vendorName ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="p-3 tabular-nums text-xs">
+                      {c.discountType === "percent"
+                        ? <span className="flex items-center gap-1"><Percent className="h-3.5 w-3.5 text-emerald-400" />{Number(c.discountValue)}% off</span>
+                        : <span className="flex items-center gap-1"><IndianRupee className="h-3.5 w-3.5 text-emerald-400" />{Number(c.discountValue)} off</span>}
+                    </td>
+                    <td className="p-3 text-xs text-muted-foreground capitalize">{c.applicableTo === "both" ? "All bookings" : `${c.applicableTo}s`}</td>
+                    <td className="p-3 text-xs text-muted-foreground tabular-nums">{c.usedCount}{c.maxUses != null ? `/${c.maxUses}` : ""}</td>
+                    <td className="p-3 text-xs text-muted-foreground">{c.expiresAt ? new Date(c.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" }) : "Never"}</td>
+                    <td className="p-3 text-center">
+                      <button onClick={() => toggleVcActive(c)} className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${c.active ? "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30" : "bg-white/5 text-muted-foreground hover:bg-white/10"}`}>
+                        {c.active ? "Active" : "Inactive"}
+                      </button>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button onClick={() => deleteVc(c.id)} disabled={vcDeleting === c.id} className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
+                        {vcDeleting === c.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2745,7 +2940,7 @@ function BookingReport() {
   const [page, setPage] = useState<number>(1);
   const [sortBy, setSortBy] = useState<string>("date");
   const [summaryOpen, setSummaryOpen] = useState(true);
-  const [reportSubTab, setReportSubTab] = useState<"all" | "unique">("all");
+  const [reportSubTab, setReportSubTab] = useState<"all" | "unique" | "walkin">("all");
 
   type TopUser = { userId: number; name: string; email: string; phone: string; totalTickets: number; bookingCount: number };
   type TopPub = { vendorId: number; businessName: string; city: string; totalTickets: number; bookingCount: number };
@@ -2844,23 +3039,24 @@ function BookingReport() {
   return (
     <div className="space-y-6">
       {/* Sub-tab switcher */}
-      <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10 w-fit">
+      <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10 w-fit flex-wrap">
         {([
-          { id: "all" as const, label: "Ticket Sales" },
-          { id: "unique" as const, label: "Unique Customers" },
-        ]).map((tab) => (
+          { id: "all" as const, label: "Ticket Sales", Icon: null },
+          { id: "unique" as const, label: "Unique Customers", Icon: Users2 },
+          { id: "walkin" as const, label: "Walk-In Log", Icon: BookOpen },
+        ] as const).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setReportSubTab(tab.id)}
             className={"flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors " + (reportSubTab === tab.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}
           >
-            {tab.id === "unique" && <Users2 className="h-3.5 w-3.5" />}
+            {tab.Icon && <tab.Icon className="h-3.5 w-3.5" />}
             {tab.label}
           </button>
         ))}
       </div>
 
-      {reportSubTab === "unique" ? <UniqueCustomerReport /> : <>
+      {reportSubTab === "unique" ? <UniqueCustomerReport /> : reportSubTab === "walkin" ? <AdminManualBookingLog /> : <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -3378,6 +3574,235 @@ function BookingReport() {
         </div>
       )}
       </>}
+    </div>
+  );
+}
+
+// ─── Admin Manual Booking Log ─────────────────────────────────────────────────
+
+interface AdminManualRow {
+  id: number;
+  vendorId: number | null;
+  pubName: string;
+  name: string;
+  phone: string;
+  email: string;
+  date: string;
+  persons: number;
+  price: number;
+  arrivalTime: string;
+  checkedIn: boolean;
+  checkedInAt: string | null;
+  createdAt: string;
+}
+
+interface AdminManualCustomer {
+  phone: string;
+  name: string;
+  visits: number;
+  totalPersons: number;
+  totalRevenue: number;
+}
+
+interface AdminManualReport {
+  bookings: AdminManualRow[];
+  total: number;
+  page: number;
+  totalPages: number;
+  uniqueCustomers: number;
+  totalPersons: number;
+  totalRevenue: number;
+  customerDetails: AdminManualCustomer[];
+}
+
+function AdminManualBookingLog() {
+  const [vendorId, setVendorId] = useState<string>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [page, setPage] = useState(1);
+  const [activeView, setActiveView] = useState<"bookings" | "customers">("bookings");
+  const [data, setData] = useState<AdminManualReport | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { data: partnerSummary } = useGetAdminBookingsPartnerSummary();
+  const allVendors = partnerSummary ?? [];
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    const qs = new URLSearchParams({ page: String(page) });
+    if (vendorId !== "all") qs.set("vendorId", vendorId);
+    if (startDate) qs.set("startDate", startDate);
+    if (endDate) qs.set("endDate", endDate);
+    apiGet<AdminManualReport>(`/api/admin/bookings/manual-report?${qs.toString()}`)
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [vendorId, startDate, endDate, page]);
+
+  const bookings = data?.bookings ?? [];
+  const customers = data?.customerDetails ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <BookOpen className="h-5 w-5 text-primary" />
+        <h2 className="text-xl font-semibold">Walk-In Log</h2>
+        <span className="text-xs text-muted-foreground ml-1">Manual bookings recorded at the venue</span>
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-2xl glass-card p-4 flex flex-wrap gap-3 items-end">
+        <Select value={vendorId} onValueChange={(v) => { setVendorId(v); setPage(1); }}>
+          <SelectTrigger className="h-9 text-sm w-48">
+            <SelectValue placeholder="All partners" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All pubs</SelectItem>
+            {allVendors.map((v) => (
+              <SelectItem key={v.vendorId} value={String(v.vendorId)}>{v.vendorName}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">From</Label>
+          <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="h-9 text-sm w-36" />
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="h-9 text-sm w-36" />
+        </div>
+        {(startDate || endDate || vendorId !== "all") && (
+          <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => { setVendorId("all"); setStartDate(""); setEndDate(""); setPage(1); }}>
+            Reset
+          </Button>
+        )}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total Walk-Ins", value: total, icon: BookOpen, color: "text-primary" },
+          { label: "Unique Customers", value: data?.uniqueCustomers ?? 0, icon: Users, color: "text-blue-300" },
+          { label: "Total Persons", value: data?.totalPersons ?? 0, icon: UserCheck, color: "text-green-300" },
+          { label: "Total Revenue", value: formatINR(data?.totalRevenue ?? 0), icon: IndianRupee, color: "text-yellow-300" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-2xl glass-card p-4 flex items-center gap-3">
+            <s.icon className={`h-5 w-5 shrink-0 ${s.color}`} />
+            <div>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+              <p className={`text-xl font-bold tabular-nums ${s.color}`}>{typeof s.value === "number" ? s.value.toLocaleString() : s.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* View toggle */}
+      <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10 w-fit">
+        {([
+          { id: "bookings" as const, label: "All Walk-Ins" },
+          { id: "customers" as const, label: "Customer Details" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveView(tab.id)}
+            className={"px-4 py-1.5 rounded-lg text-sm font-medium transition-colors " + (activeView === tab.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-2xl glass-card p-8 text-center text-muted-foreground text-sm">Loading…</div>
+      ) : activeView === "bookings" ? (
+        <div className="rounded-2xl glass-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-serif text-lg">Walk-In Entries</h3>
+            <span className="text-xs text-muted-foreground tabular-nums">{total} record{total !== 1 ? "s" : ""}</span>
+          </div>
+          {bookings.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No walk-in bookings found for this filter.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[760px]">
+                <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                  <tr>
+                    <th className="text-left py-2 pr-3">ID</th>
+                    <th className="text-left py-2 pr-3">Date</th>
+                    <th className="text-left py-2 pr-3">Pub</th>
+                    <th className="text-left py-2 pr-3">Name</th>
+                    <th className="text-left py-2 pr-3">Phone</th>
+                    <th className="text-left py-2 pr-3">Email</th>
+                    <th className="text-right py-2 pr-3">Persons</th>
+                    <th className="text-right py-2 pr-3">Price</th>
+                    <th className="text-left py-2">Arrival</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.map((b) => (
+                    <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-2.5 pr-3 text-muted-foreground tabular-nums text-xs">#{b.id}</td>
+                      <td className="py-2.5 pr-3 tabular-nums text-xs">{b.date}</td>
+                      <td className="py-2.5 pr-3 text-xs text-muted-foreground max-w-[120px] truncate">{b.pubName || "—"}</td>
+                      <td className="py-2.5 pr-3 font-medium">{b.name || "—"}</td>
+                      <td className="py-2.5 pr-3 text-muted-foreground text-xs tabular-nums">{b.phone || "—"}</td>
+                      <td className="py-2.5 pr-3 text-muted-foreground text-xs max-w-[140px] truncate">{b.email || "—"}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums">{b.persons}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-primary text-xs">{b.price > 0 ? formatINR(b.price) : "—"}</td>
+                      <td className="py-2.5 text-xs text-muted-foreground">{b.arrivalTime || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</Button>
+              <span className="text-xs text-muted-foreground">{page} / {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-2xl glass-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-serif text-lg">Unique Customers</h3>
+            <span className="text-xs text-muted-foreground tabular-nums">{customers.length} customer{customers.length !== 1 ? "s" : ""}</span>
+          </div>
+          {customers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No walk-in customers found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[560px]">
+                <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                  <tr>
+                    <th className="text-left py-2 pr-3">Name</th>
+                    <th className="text-left py-2 pr-3">Phone</th>
+                    <th className="text-right py-2 pr-3">Visits</th>
+                    <th className="text-right py-2 pr-3">Total Persons</th>
+                    <th className="text-right py-2">Total Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map((c, i) => (
+                    <tr key={i} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="py-2.5 pr-3 font-medium">{c.name || "—"}</td>
+                      <td className="py-2.5 pr-3 text-muted-foreground tabular-nums text-xs">{c.phone || "—"}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums">{c.visits}</td>
+                      <td className="py-2.5 pr-3 text-right tabular-nums text-green-300">{c.totalPersons}</td>
+                      <td className="py-2.5 text-right tabular-nums text-primary text-xs">{c.totalRevenue > 0 ? formatINR(c.totalRevenue) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -6855,82 +7280,131 @@ type LookupResult = {
   blockReason: string | null;
 };
 
-function CreatePubAdmin() {
+// Shape accepted by both POST /admin/create-venue and PATCH /admin/venues/:id.
+interface VenuePayload {
+  businessName: string;
+  category: "Pub" | "Club";
+  description?: string;
+  imageUrl?: string;
+  location?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  capacity?: number;
+  pubMode: string;
+  priceWomen?: number;
+  priceMen?: number;
+  priceCouple?: number;
+  galleryImages?: string[];
+  galleryVideo?: string;
+  pubEventTypes?: string[];
+  dayPricing?: Record<string, { women: number; men: number; couple: number }>;
+  freeEntryEnabled: boolean;
+  freeEntryGenders: string[];
+  freeEntryDays: string[];
+  freeEntryBeforeTime?: string;
+  danceFloor?: string;
+  danceFloorPhotos?: string[];
+  menuUrls?: string[];
+  // Happening Tonight visibility
+  startTime?: string;
+  endTime?: string;
+  happeningTonight: boolean;
+  startingSoon: boolean;
+  lastMinuteDeal: boolean;
+  dealLabel?: string;
+  // Free entry for table booking
+  freeEntryForTable: boolean;
+  freeEntryForTableDays: string[];
+  freeEntryForTableBeforeTime?: string | null;
+}
+
+interface VenueFormInitial {
+  businessName?: string; category?: string; description?: string; bannerImage?: string;
+  location?: string; country?: string; state?: string; city?: string;
+  capacity?: number; pubMode?: string;
+  priceWomen?: number; priceMen?: number; priceCouple?: number;
+  dayPricing?: Record<string, { women: number; men: number; couple: number } | null> | null;
+  galleryImages?: string[]; galleryVideos?: string[]; pubEventTypes?: string[];
+  freeEntryRules?: { enabled?: boolean; genders?: string[]; days?: string[]; beforeTime?: string } | null;
+  danceFloor?: string; danceFloorPhotos?: string[]; menuUrls?: string[];
+  startTime?: string; endTime?: string; happeningTonight?: boolean; startingSoon?: boolean;
+  lastMinuteDeal?: boolean; dealLabel?: string;
+  freeEntryForTable?: boolean; freeEntryForTableDays?: string[]; freeEntryForTableBeforeTime?: string | null;
+}
+
+// Shared create/edit venue form. Owns all field state + uploads; calls onSubmit
+// with the payload shape both the create and edit endpoints accept.
+function VenueForm({
+  initial, submitLabel, submittingLabel, onSubmit, resetOnSuccess, secondary,
+}: {
+  initial?: VenueFormInitial;
+  submitLabel: string;
+  submittingLabel: string;
+  onSubmit: (payload: VenuePayload) => Promise<void>;
+  resetOnSuccess?: boolean;
+  secondary?: { label: string; onClick: () => void };
+}) {
   const { toast } = useToast();
 
-  // -- Step 1: partner lookup ------------------------------------------------
-  const [emailInput, setEmailInput] = useState("");
-  const [looking, setLooking] = useState(false);
-  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
-  const [lookupError, setLookupError] = useState("");
-
-  // -- Step 2: pub details ---------------------------------------------------
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [title, setTitle] = useState(initial?.businessName ?? "");
+  const [category, setCategory] = useState<"Pub" | "Club">(initial?.category === "Club" ? "Club" : "Pub");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [imageUrl, setImageUrl] = useState(initial?.bannerImage ?? "");
   const [imageUploading, setImageUploading] = useState(false);
-  const [location, setLocation] = useState("");
-  const [country, setCountry] = useState("");
-  const [stateF, setStateF] = useState("");
-  const [city, setCity] = useState("");
-  const [capacity, setCapacity] = useState("");
-  const [pubMode, setPubMode] = useState<"ticket" | "event" | "both">("both");
-  const [priceWomen, setPriceWomen] = useState("");
-  const [priceMen, setPriceMen] = useState("");
-  const [priceCouple, setPriceCouple] = useState("");
-  const [varyByDay, setVaryByDay] = useState(false);
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [country, setCountry] = useState(initial?.country ?? "");
+  const [stateF, setStateF] = useState(initial?.state ?? "");
+  const [city, setCity] = useState(initial?.city ?? "");
+  const [capacity, setCapacity] = useState(initial?.capacity ? String(initial.capacity) : "");
+  const [pubMode, setPubMode] = useState<"ticket" | "event" | "both">(
+    initial?.pubMode === "ticket" || initial?.pubMode === "event" ? initial.pubMode : "both",
+  );
+  const [priceWomen, setPriceWomen] = useState(initial?.priceWomen ? String(initial.priceWomen) : "");
+  const [priceMen, setPriceMen] = useState(initial?.priceMen ? String(initial.priceMen) : "");
+  const [priceCouple, setPriceCouple] = useState(initial?.priceCouple ? String(initial.priceCouple) : "");
+  const initialDayOverrides: Record<string, { women: string; men: string; couple: string }> =
+    initial?.dayPricing
+      ? Object.fromEntries(
+          Object.entries(initial.dayPricing)
+            .filter(([, v]) => v)
+            .map(([d, v]) => [d, { women: String(v!.women), men: String(v!.men), couple: String(v!.couple) }]),
+        )
+      : {};
+  const [varyByDay, setVaryByDay] = useState(Object.keys(initialDayOverrides).length > 0);
   const [dayPricingOverrides, setDayPricingOverrides] = useState<
     Record<string, { women: string; men: string; couple: string }>
-  >({});
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  >(initialDayOverrides);
+  const [galleryImages, setGalleryImages] = useState<string[]>(initial?.galleryImages ?? []);
   const [galleryUploading, setGalleryUploading] = useState(0);
-  const [galleryVideo, setGalleryVideo] = useState("");
+  const [galleryVideo, setGalleryVideo] = useState(initial?.galleryVideos?.[0] ?? "");
   const [videoUploading, setVideoUploading] = useState(false);
-  const [pubEventTypes, setPubEventTypes] = useState<string[]>([]);
-  const [freeEntryEnabled, setFreeEntryEnabled] = useState(false);
-  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>([]);
-  const [freeEntryDays, setFreeEntryDays] = useState<string[]>([]);
-  const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState("");
-  const [danceFloor, setDanceFloor] = useState("");
-  const [danceFloorPhotos, setDanceFloorPhotos] = useState<string[]>([]);
+  const [pubEventTypes, setPubEventTypes] = useState<string[]>(initial?.pubEventTypes ?? []);
+  const [freeEntryEnabled, setFreeEntryEnabled] = useState(!!initial?.freeEntryRules?.enabled);
+  const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(initial?.freeEntryRules?.genders ?? []);
+  const [freeEntryDays, setFreeEntryDays] = useState<string[]>(initial?.freeEntryRules?.days ?? []);
+  const [freeEntryBeforeTime, setFreeEntryBeforeTime] = useState(initial?.freeEntryRules?.beforeTime ?? "");
+  const [danceFloor, setDanceFloor] = useState(initial?.danceFloor ?? "");
+  const [danceFloorPhotos, setDanceFloorPhotos] = useState<string[]>(initial?.danceFloorPhotos ?? []);
   const [danceFloorUploading, setDanceFloorUploading] = useState(0);
-  const [menuUrls, setMenuUrls] = useState<string[]>([]);
+  const [menuUrls, setMenuUrls] = useState<string[]>(initial?.menuUrls ?? []);
   const [menuUploading, setMenuUploading] = useState(0);
+  const [tonightVis, setTonightVis] = useState<TonightVisibilityValue>({
+    startTime: initial?.startTime ?? defaultTonightVisibility.startTime,
+    endTime: initial?.endTime ?? defaultTonightVisibility.endTime,
+    happeningTonight: initial?.happeningTonight ?? defaultTonightVisibility.happeningTonight,
+    startingSoon: initial?.startingSoon ?? defaultTonightVisibility.startingSoon,
+    lastMinuteDeal: initial?.lastMinuteDeal ?? defaultTonightVisibility.lastMinuteDeal,
+    dealLabel: initial?.dealLabel ?? defaultTonightVisibility.dealLabel,
+  });
+  const [freeEntryForTable, setFreeEntryForTable] = useState(!!initial?.freeEntryForTable);
+  const [freeEntryForTableDays, setFreeEntryForTableDays] = useState<string[]>(initial?.freeEntryForTableDays ?? []);
+  const [freeEntryForTableBeforeTime, setFreeEntryForTableBeforeTime] = useState(initial?.freeEntryForTableBeforeTime ?? "");
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ pubId: number; vendorId: number; partnerName: string } | null>(null);
   const [submitError, setSubmitError] = useState("");
 
-  // -- Lookup handler --------------------------------------------------------
-
-  async function handleLookup(e: any) {
-    e.preventDefault();
-    const email = emailInput.trim();
-    if (!email) return;
-    setLooking(true);
-    setLookupResult(null);
-    setLookupError("");
-    setResult(null);
-    setSubmitError("");
-    try {
-      const data = await apiGet<LookupResult>(`/api/admin/lookup-partner?email=${encodeURIComponent(email)}`);
-      setLookupResult(data);
-      // Pre-fill location from vendor profile
-      if (data.vendor) {
-        setCity(data.vendor.city ?? "");
-        setStateF(data.vendor.state ?? "");
-        setCountry("India");
-      }
-    } catch (err: any) {
-      setLookupError(err?.message ?? "Lookup failed");
-    } finally {
-      setLooking(false);
-    }
-  }
-
-  function resetLookup() {
-    setLookupResult(null);
-    setLookupError("");
-    setTitle(""); setDescription(""); setImageUrl("");
+  function resetForm() {
+    setTitle(""); setCategory("Pub"); setDescription(""); setImageUrl("");
     setLocation(""); setCountry(""); setStateF(""); setCity("");
     setCapacity(""); setPubMode("both");
     setPriceWomen(""); setPriceMen(""); setPriceCouple("");
@@ -6939,6 +7413,8 @@ function CreatePubAdmin() {
     setPubEventTypes([]);
     setFreeEntryEnabled(false); setFreeEntryGenders([]); setFreeEntryDays([]); setFreeEntryBeforeTime("");
     setDanceFloor(""); setDanceFloorPhotos([]); setMenuUrls([]);
+    setTonightVis(defaultTonightVisibility);
+    setFreeEntryForTable(false); setFreeEntryForTableDays([]); setFreeEntryForTableBeforeTime("");
     setSubmitError("");
   }
 
@@ -7038,9 +7514,8 @@ function CreatePubAdmin() {
 
   async function handleSubmit(e: any) {
     e.preventDefault();
-    if (!title.trim()) { setSubmitError("Pub name is required."); return; }
+    if (!title.trim()) { setSubmitError("Venue name is required."); return; }
     setSubmitError("");
-    setResult(null);
     setSubmitting(true);
 
     const dayPricing = varyByDay
@@ -7052,39 +7527,42 @@ function CreatePubAdmin() {
       : undefined;
 
     try {
-      const data = await apiPost<{ ok: boolean; pubId: number; vendorId: number; partnerName: string }>(
-        "/api/admin/create-pub",
-        {
-          email: emailInput.trim(),
-          title: title.trim(),
-          description: description.trim() || undefined,
-          imageUrl: imageUrl || undefined,
-          location: location.trim() || undefined,
-          country: country || undefined,
-          state: stateF || undefined,
-          city: city || undefined,
-          capacity: capacity ? Number(capacity) : undefined,
-          pubMode,
-          priceWomen: priceWomen ? Number(priceWomen) : undefined,
-          priceMen: priceMen ? Number(priceMen) : undefined,
-          priceCouple: priceCouple ? Number(priceCouple) : undefined,
-          galleryImages: galleryImages.length > 0 ? galleryImages : undefined,
-          galleryVideo: galleryVideo || undefined,
-          pubEventTypes: pubEventTypes.length > 0 ? pubEventTypes : undefined,
-          dayPricing: dayPricing && Object.keys(dayPricing).length > 0 ? dayPricing : undefined,
-          freeEntryEnabled,
-          freeEntryGenders,
-          freeEntryDays,
-          freeEntryBeforeTime: freeEntryBeforeTime || undefined,
-          danceFloor: danceFloor || undefined,
-          danceFloorPhotos: danceFloorPhotos.length > 0 ? danceFloorPhotos : undefined,
-          menuUrls: menuUrls.length > 0 ? menuUrls : undefined,
-        },
-      );
-      setResult(data);
-      toast({ title: "Pub created", description: `"${title}" assigned to ${data.partnerName}` });
-      setEmailInput("");
-      resetLookup();
+      await onSubmit({
+        businessName: title.trim(),
+        category,
+        description: description.trim() || undefined,
+        imageUrl: imageUrl || undefined,
+        location: location.trim() || undefined,
+        country: country || undefined,
+        state: stateF || undefined,
+        city: city || undefined,
+        capacity: capacity ? Number(capacity) : undefined,
+        pubMode,
+        priceWomen: priceWomen ? Number(priceWomen) : undefined,
+        priceMen: priceMen ? Number(priceMen) : undefined,
+        priceCouple: priceCouple ? Number(priceCouple) : undefined,
+        galleryImages: galleryImages.length > 0 ? galleryImages : undefined,
+        galleryVideo: galleryVideo || undefined,
+        pubEventTypes: pubEventTypes.length > 0 ? pubEventTypes : undefined,
+        dayPricing: dayPricing && Object.keys(dayPricing).length > 0 ? dayPricing : undefined,
+        freeEntryEnabled,
+        freeEntryGenders,
+        freeEntryDays,
+        freeEntryBeforeTime: freeEntryBeforeTime || undefined,
+        danceFloor: danceFloor || undefined,
+        danceFloorPhotos: danceFloorPhotos.length > 0 ? danceFloorPhotos : undefined,
+        menuUrls: menuUrls.length > 0 ? menuUrls : undefined,
+        startTime: tonightVis.startTime,
+        endTime: tonightVis.endTime,
+        happeningTonight: tonightVis.happeningTonight,
+        startingSoon: tonightVis.startingSoon,
+        lastMinuteDeal: tonightVis.lastMinuteDeal,
+        dealLabel: tonightVis.dealLabel,
+        freeEntryForTable,
+        freeEntryForTableDays: freeEntryForTable ? freeEntryForTableDays : [],
+        freeEntryForTableBeforeTime: freeEntryForTable ? (freeEntryForTableBeforeTime || null) : null,
+      });
+      if (resetOnSuccess) resetForm();
     } catch (err: any) {
       setSubmitError(err?.message ?? "Something went wrong.");
     } finally {
@@ -7093,94 +7571,6 @@ function CreatePubAdmin() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold mb-1">Create Pub / Club for Partner</h2>
-        <p className="text-sm text-muted-foreground">
-          Assign a new listing to an approved Pub or Club partner by their registered email (normal or Google Sign-In). The form adapts to the partner's category.
-        </p>
-      </div>
-
-      {result && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300 space-y-1">
-          <p className="font-semibold flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Pub created successfully</p>
-          <p>Partner: <span className="font-medium text-white">{result.partnerName}</span></p>
-          <p>Pub ID: <span className="font-mono text-white">#{result.pubId}</span></p>
-        </div>
-      )}
-
-      {/* -- Step 1: Find partner --------------------------------------------- */}
-      <section className="rounded-xl border border-white/8 p-4 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Find Partner</p>
-        <form onSubmit={handleLookup} className="flex gap-2">
-          <Input
-            type="email"
-            placeholder="partner@example.com"
-            value={emailInput}
-            onChange={(e) => { setEmailInput(e.target.value); setLookupResult(null); setLookupError(""); }}
-            className="bg-black/40 border-white/10 flex-1"
-            required
-          />
-          <Button type="submit" variant="outline" disabled={looking || !emailInput.trim()} className="shrink-0">
-            {looking ? "Looking..." : "Find Partner"}
-          </Button>
-        </form>
-
-        {lookupError && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 flex items-start gap-2">
-            <XCircle className="h-4 w-4 shrink-0 mt-0.5" /> {lookupError}
-          </div>
-        )}
-
-        {lookupResult && (
-          <div className={cn(
-            "rounded-lg border p-3 text-sm space-y-2",
-            lookupResult.canCreate
-              ? "border-emerald-500/30 bg-emerald-500/8"
-              : "border-amber-500/30 bg-amber-500/8",
-          )}>
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-white">{lookupResult.user.name}</p>
-              <span className="text-xs text-muted-foreground">{lookupResult.user.signInMethod} Sign-In</span>
-            </div>
-            <p className="text-xs text-muted-foreground font-mono">{lookupResult.user.email}</p>
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              <span className={cn(
-                "text-xs px-2 py-0.5 rounded-full border",
-                lookupResult.user.role === "vendor" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : "border-red-500/40 text-red-300 bg-red-500/10",
-              )}>
-                Role: {lookupResult.user.role}
-              </span>
-              {lookupResult.vendor && (
-                <span className={cn(
-                  "text-xs px-2 py-0.5 rounded-full border",
-                  lookupResult.vendor.status === "approved" ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/10" : "border-amber-500/40 text-amber-300 bg-amber-500/10",
-                )}>
-                  Vendor: {lookupResult.vendor.status}
-                </span>
-              )}
-              {lookupResult.existingPub && (
-                <span className="text-xs px-2 py-0.5 rounded-full border border-amber-500/40 text-amber-300 bg-amber-500/10">
-                  Has pub: {lookupResult.existingPub.title}
-                </span>
-              )}
-            </div>
-            {lookupResult.blockReason && (
-              <p className="text-xs text-amber-300 flex items-center gap-1.5 pt-0.5">
-                <XCircle className="h-3.5 w-3.5 shrink-0" /> {lookupResult.blockReason}
-              </p>
-            )}
-            {lookupResult.canCreate && (
-              <p className="text-xs text-emerald-300 flex items-center gap-1.5 pt-0.5">
-                <CheckCircle className="h-3.5 w-3.5" /> Ready -- fill in pub details below.
-              </p>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* -- Step 2: Pub details (only when partner is verified and eligible) -- */}
-      {lookupResult?.canCreate && (
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {submitError && (
@@ -7189,15 +7579,27 @@ function CreatePubAdmin() {
             </div>
           )}
 
-          {/* -- Pub Info ---------------------------------------------------- */}
+          {/* -- Venue Info --------------------------------------------------- */}
           <section className="rounded-xl border border-white/8 p-4 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2 -- Pub Info</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Venue Info</p>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="cp-title">Pub Name <span className="text-red-400">*</span></Label>
-              <Input id="cp-title" placeholder="e.g. The Brew House"
-                value={title} onChange={(e) => setTitle(e.target.value)}
-                className="bg-black/40 border-white/10" required />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="cp-title">Venue Name <span className="text-red-400">*</span></Label>
+                <Input id="cp-title" placeholder="e.g. The Brew House"
+                  value={title} onChange={(e) => setTitle(e.target.value)}
+                  className="bg-black/40 border-white/10" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={(v) => setCategory(v as "Pub" | "Club")}>
+                  <SelectTrigger className="bg-black/40 border-white/10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pub">Pub</SelectItem>
+                    <SelectItem value="Club">Club</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -7450,6 +7852,57 @@ function CreatePubAdmin() {
             )}
           </section>
 
+          {/* -- Free Entry for Table Booking --------------------------------- */}
+          <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+            <button type="button" onClick={() => setFreeEntryForTable((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-emerald-500/10 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm font-medium text-emerald-400">
+                <span className={cn(
+                  "inline-flex h-4 w-4 items-center justify-center rounded border",
+                  freeEntryForTable ? "border-emerald-500 bg-emerald-500" : "border-emerald-500/40 bg-transparent",
+                )}>
+                  {freeEntryForTable && <Check className="h-3 w-3 text-black" />}
+                </span>
+                Free Entry for Table Booking
+              </span>
+              <ChevronDown className={cn("h-4 w-4 text-emerald-400 transition-transform", freeEntryForTable && "rotate-180")} />
+            </button>
+            {freeEntryForTable && (
+              <div className="space-y-3 px-4 pb-4 pt-1">
+                <p className="text-xs text-emerald-300/70 leading-relaxed">
+                  Guests booking a table pay ₹0 entry fee. Commission uses the <span className="text-emerald-300 font-medium">Table Booking</span> rate.
+                </p>
+                <div>
+                  <Label className="text-xs text-white/60 mb-1.5 block">Valid on which days? (optional)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {CP_DAYS.map((d) => (
+                      <button key={d} type="button"
+                        onClick={() => setFreeEntryForTableDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
+                        className={cn(
+                          "text-xs px-3 py-1.5 rounded-full border",
+                          freeEntryForTableDays.includes(d) ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" : "border-white/10 text-white/60 hover:bg-white/5",
+                        )}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                  {freeEntryForTableDays.length === 0 && (
+                    <p className="text-xs text-white/30 mt-1">No days selected — applies every day.</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-white/60 block">Before time (optional, 24-hour format)</Label>
+                  <Input placeholder="e.g. 22:00" value={freeEntryForTableBeforeTime}
+                    onChange={(e) => setFreeEntryForTableBeforeTime(e.target.value)}
+                    className="bg-black/40 border-white/10 w-32 text-sm" />
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* -- Happening Tonight visibility --------------------------------- */}
+          <TonightVisibilityFields value={tonightVis} onChange={setTonightVis} />
+
           {/* -- Venue Details ------------------------------------------------ */}
           <section className="rounded-xl border border-white/8 p-4 space-y-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Venue Details</p>
@@ -7527,14 +7980,667 @@ function CreatePubAdmin() {
 
           <div className="flex gap-3">
             <Button type="submit" disabled={submitting} className="flex-1">
-              {submitting ? "Creating..." : `Create ${lookupResult.vendor?.category === "Club" ? "Club" : "Pub"} for ${lookupResult.user.name}`}
+              {submitting ? submittingLabel : submitLabel}
             </Button>
-            <Button type="button" variant="outline" onClick={resetLookup}>
-              Cancel
+            <Button type="button" variant="outline" onClick={secondary ? secondary.onClick : resetForm}>
+              {secondary ? secondary.label : "Reset"}
             </Button>
           </div>
         </form>
+  );
+}
+
+// Venues hub: create a venue (no partner needed) or manage & assign existing ones.
+function CreatePubAdmin() {
+  const { toast } = useToast();
+  const [view, setView] = useState<"create" | "manage">("create");
+  const [createResult, setCreateResult] = useState<{ vendorId: number; pubId: number; businessName: string } | null>(null);
+
+  async function createVenue(payload: VenuePayload) {
+    const data = await apiPost<{ ok: boolean; vendorId: number; pubId: number; businessName: string }>(
+      "/api/admin/create-venue", payload,
+    );
+    setCreateResult(data);
+    toast({ title: `${payload.category} created & live`, description: `"${payload.businessName}" is live and ready to assign to a partner.` });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold mb-1">Venues</h2>
+        <p className="text-sm text-muted-foreground">
+          Create and launch venues instantly — no partner or approval needed. Operate them unassigned, then assign any venue to a partner by email later. All bookings, commission and reviews are preserved on assignment.
+        </p>
+      </div>
+
+      {/* Sub-tab switcher */}
+      <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
+        {([
+          { id: "create" as const, label: "Create Venue", icon: Plus },
+          { id: "manage" as const, label: "Manage Venues", icon: Briefcase },
+        ]).map((t) => (
+          <button key={t.id} type="button" onClick={() => setView(t.id)}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+              view === t.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5",
+            )}>
+            <t.icon className="h-3.5 w-3.5" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "manage" ? (
+        <ManageVenuesAdmin />
+      ) : (
+        <div className="max-w-2xl space-y-6">
+          {createResult && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300 space-y-1">
+              <p className="font-semibold flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Venue created & live</p>
+              <p>Name: <span className="font-medium text-white">{createResult.businessName}</span></p>
+              <p>Venue ID: <span className="font-mono text-white">#{createResult.vendorId}</span> · Pub ID: <span className="font-mono text-white">#{createResult.pubId}</span></p>
+              <p className="text-emerald-300/80">It's now live and unassigned. Open <button type="button" className="underline" onClick={() => setView("manage")}>Manage Venues</button> to assign it to a partner.</p>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground flex items-start gap-2">
+            <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-white/40" />
+            <span>Operational modules — <b className="text-white/70">Managers, Attendance, Ads, Banking</b> — stay hidden until you assign this venue to a partner, then unlock automatically in their dashboard.</span>
+          </div>
+
+          <VenueForm
+            submitLabel="Create Venue (Live · Unassigned)"
+            submittingLabel="Creating..."
+            onSubmit={createVenue}
+            resetOnSuccess
+          />
+        </div>
       )}
+    </div>
+  );
+}
+
+// ── Admin: manage & assign venues ───────────────────────────────────────────
+
+interface AdminVenue {
+  id: number; businessName: string; category: string; city: string; state: string; country: string;
+  bannerImage: string; status: string; assignmentStatus: string; assignedAt: string | null;
+  pubId: number | null; eventCount: number; bookingCount: number;
+  ownerUserId: number | null; ownerEmail: string; ownerName: string; createdAt: string;
+}
+
+interface VenueAuditEntry {
+  id: number; action: string; actorAdminEmail: string;
+  partnerEmail: string; previousOwnerEmail: string; note: string; createdAt: string;
+}
+
+function ManageVenuesAdmin() {
+  const { toast } = useToast();
+  const [venues, setVenues] = useState<AdminVenue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "unassigned" | "assigned">("all");
+  const [assignTarget, setAssignTarget] = useState<AdminVenue | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<AdminVenue | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    apiGet<{ data: AdminVenue[] }>("/api/admin/venues")
+      .then((r) => setVenues(r.data))
+      .catch(() => toast({ title: "Failed to load venues", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  if (detailId != null) {
+    return <VenueDetailAdmin venueId={detailId} onBack={() => { setDetailId(null); load(); }} />;
+  }
+
+  const unassign = async (v: AdminVenue) => {
+    if (!window.confirm(`Unassign "${v.businessName}" from ${v.ownerEmail}? They will lose partner access to it (the venue and its history are kept).`)) return;
+    try {
+      await apiPost(`/api/admin/venues/${v.id}/unassign`, {});
+      toast({ title: "Venue unassigned" });
+      load();
+    } catch (e: any) { toast({ title: "Failed to unassign", description: e?.message, variant: "destructive" }); }
+  };
+
+  const unassignedCount = venues.filter((v) => v.assignmentStatus !== "assigned").length;
+  const shown = venues.filter((v) =>
+    filter === "all" ? true : filter === "unassigned" ? v.assignmentStatus !== "assigned" : v.assignmentStatus === "assigned");
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading venues…</p>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        {([
+          { id: "all" as const, label: `All (${venues.length})` },
+          { id: "unassigned" as const, label: `Unassigned (${unassignedCount})` },
+          { id: "assigned" as const, label: `Assigned (${venues.length - unassignedCount})` },
+        ]).map((f) => (
+          <button key={f.id} type="button" onClick={() => setFilter(f.id)}
+            className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              filter === f.id ? "bg-white/10 text-white" : "text-white/50 hover:text-white hover:bg-white/5")}>
+            {f.label}
+          </button>
+        ))}
+        <Button size="sm" variant="outline" className="ml-auto" onClick={load}><RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh</Button>
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No venues in this view.</p>
+      ) : (
+        <div className="space-y-2">
+          {shown.map((v) => {
+            const assigned = v.assignmentStatus === "assigned";
+            return (
+              <div key={v.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 p-3">
+                {v.bannerImage
+                  ? <img src={v.bannerImage} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                  : <div className="w-14 h-14 rounded-lg bg-white/5 flex items-center justify-center shrink-0"><Briefcase className="h-5 w-5 text-muted-foreground" /></div>}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium truncate">{v.businessName}</p>
+                    <Badge className={assigned ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300" : "bg-amber-500/15 border-amber-500/40 text-amber-300"}>
+                      {assigned ? "Assigned" : "Unassigned"}
+                    </Badge>
+                    <span className="text-[11px] text-muted-foreground">{v.category}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {[v.city, v.state].filter(Boolean).join(", ") || "—"} · {v.eventCount} event{v.eventCount === 1 ? "" : "s"} · {v.bookingCount} booking{v.bookingCount === 1 ? "" : "s"}
+                    {assigned && v.ownerEmail ? ` · ${v.ownerEmail}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <Button size="sm" variant="outline" onClick={() => setDetailId(v.id)}><Pencil className="h-3.5 w-3.5 mr-1" />Manage</Button>
+                  <Button size="sm" onClick={() => setAssignTarget(v)}>{assigned ? "Reassign" : "Assign Partner"}</Button>
+                  {assigned && <Button size="sm" variant="outline" onClick={() => unassign(v)}>Unassign</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => setHistoryTarget(v)}><Clock className="h-3.5 w-3.5 mr-1" />History</Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {assignTarget && (
+        <AssignVenueDialog venue={assignTarget} onClose={() => setAssignTarget(null)} onDone={() => { setAssignTarget(null); load(); }} />
+      )}
+      {historyTarget && (
+        <VenueHistoryDialog venue={historyTarget} onClose={() => setHistoryTarget(null)} />
+      )}
+    </div>
+  );
+}
+
+function AssignVenueDialog({ venue, onClose, onDone }: { venue: AdminVenue; onClose: () => void; onDone: () => void }) {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookup, setLookup] = useState<LookupResult | null>(null);
+  const [lookupErr, setLookupErr] = useState("");
+  const reassign = venue.assignmentStatus === "assigned";
+
+  // Proactive validation: when a full email is typed, look the account up and
+  // check whether it already owns a pub/club (1 venue per partner). Surfaces the
+  // block before submit; the assign endpoint enforces the same rule server-side.
+  useEffect(() => {
+    const e = email.trim();
+    setLookup(null); setLookupErr("");
+    if (!e || !e.includes("@")) { setLooking(false); return; }
+    let cancelled = false;
+    setLooking(true);
+    const t = setTimeout(() => {
+      apiGet<LookupResult>(`/api/admin/lookup-partner?email=${encodeURIComponent(e)}`)
+        .then((d) => { if (!cancelled) setLookup(d); })
+        .catch((err: any) => { if (!cancelled) setLookupErr(err?.message ?? "No account found for that email."); })
+        .finally(() => { if (!cancelled) setLooking(false); });
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [email]);
+
+  // The looked-up account already owns a venue → cannot own a second one.
+  const ownedVenue = lookup?.vendor ?? null;
+  const ownsSameVenue = !!ownedVenue && ownedVenue.id === venue.id;
+  const blockedByOwnership = !!ownedVenue;
+
+  const submit = async () => {
+    const e = email.trim();
+    if (!e) { setError("Partner email is required."); return; }
+    if (blockedByOwnership) {
+      setError(ownsSameVenue
+        ? "This venue is already assigned to that partner."
+        : `${e} already manages "${ownedVenue?.businessName}". Each partner can own only one pub/club.`);
+      return;
+    }
+    setError(""); setSubmitting(true);
+    try {
+      await apiPost(`/api/admin/venues/${venue.id}/assign`, { email: e, note: note.trim() || undefined });
+      toast({ title: reassign ? "Venue reassigned" : "Venue assigned", description: `"${venue.businessName}" → ${e}` });
+      onDone();
+    } catch (err: any) {
+      setError(err?.message ?? "Assignment failed.");
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{reassign ? "Reassign" : "Assign"} “{venue.businessName}”</DialogTitle>
+          <DialogDescription>
+            {reassign
+              ? `Currently owned by ${venue.ownerEmail}. Reassigning transfers the venue and all its history to a new partner; the previous owner loses access.`
+              : "Assign this venue to an existing partner account by email. All bookings, commission and reviews are preserved, and Managers / Attendance / Ads / Banking unlock for them."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="assign-email">Partner email</Label>
+            <Input id="assign-email" type="email" placeholder="partner@example.com" value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(""); }} className="bg-black/40 border-white/10" />
+            {/* Live partner-status check */}
+            {looking && <p className="text-xs text-muted-foreground">Checking account…</p>}
+            {!looking && blockedByOwnership && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-300 flex items-start gap-2">
+                <XCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                {ownsSameVenue
+                  ? "This venue is already assigned to that partner."
+                  : <span>{email.trim()} already manages <b className="text-amber-200">“{ownedVenue?.businessName}”</b>. Each partner can own only one pub/club — unassign that venue first.</span>}
+              </div>
+            )}
+            {!looking && lookup && !blockedByOwnership && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-300 flex items-start gap-2">
+                <CheckCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{lookup.user.name} ({lookup.user.role}) — ready to {reassign ? "reassign" : "assign"}.</span>
+              </div>
+            )}
+            {!looking && lookupErr && (
+              <p className="text-xs text-amber-300/80">{lookupErr}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="assign-note">Note (optional)</Label>
+            <Input id="assign-note" placeholder="Reason / reference" value={note}
+              onChange={(e) => setNote(e.target.value)} className="bg-black/40 border-white/10" />
+          </div>
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-300 flex items-start gap-2">
+              <XCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> {error}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting || !email.trim() || looking || blockedByOwnership}>
+            {submitting ? "Saving…" : reassign ? "Reassign Venue" : "Assign Venue"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VenueHistoryDialog({ venue, onClose }: { venue: AdminVenue; onClose: () => void }) {
+  const [entries, setEntries] = useState<VenueAuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    apiGet<{ data: VenueAuditEntry[] }>(`/api/admin/venues/${venue.id}/audit`)
+      .then((r) => setEntries(r.data))
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
+  }, [venue.id]);
+
+  const labelFor = (a: string) =>
+    a === "created" ? "Created" : a === "assigned" ? "Assigned" : a === "reassigned" ? "Reassigned" : a === "unassigned" ? "Unassigned" : a;
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>History — {venue.businessName}</DialogTitle>
+          <DialogDescription>Audit trail of creation and partner assignments.</DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-muted-foreground text-sm">Loading…</p>
+        ) : entries.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No history recorded.</p>
+        ) : (
+          <ul className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {entries.map((e) => (
+              <li key={e.id} className="relative pl-4 border-l border-white/10">
+                <span className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-primary" />
+                <p className="text-sm font-medium">{labelFor(e.action)}
+                  {e.partnerEmail ? <span className="text-white/70 font-normal"> → {e.partnerEmail}</span> : null}
+                </p>
+                {e.previousOwnerEmail && <p className="text-xs text-muted-foreground">Previous owner: {e.previousOwnerEmail}</p>}
+                {e.note && <p className="text-xs text-muted-foreground">{e.note}</p>}
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {new Date(e.createdAt).toLocaleString("en-IN")}{e.actorAdminEmail ? ` · by ${e.actorAdminEmail}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Admin: per-venue management hub (Edit + operational modules) ─────────────
+
+interface VenueDetail extends VenueFormInitial {
+  id: number; pubId: number | null; assignmentStatus: string; status: string;
+  ownerEmail: string; ownerName: string;
+  baseFeePercent?: string; baseFeeEnabled?: boolean;
+}
+
+const VENUE_DETAIL_TABS = [
+  { id: "edit", label: "Edit", assignedOnly: false },
+  { id: "drinks", label: "Food & Drinks", assignedOnly: false },
+  { id: "announcements", label: "Announcements", assignedOnly: false },
+  { id: "leads", label: "Leads", assignedOnly: false },
+  { id: "calendar", label: "Calendar Block", assignedOnly: false },
+  { id: "analytics", label: "Analytics", assignedOnly: false },
+  { id: "bookings", label: "Booking Report", assignedOnly: false },
+  { id: "commission", label: "Commission & Fees", assignedOnly: true },
+  { id: "reviews", label: "Reviews", assignedOnly: false },
+] as const;
+
+function VenueDetailAdmin({ venueId, onBack }: { venueId: number; onBack: () => void }) {
+  const { toast } = useToast();
+  const [detail, setDetail] = useState<VenueDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<typeof VENUE_DETAIL_TABS[number]["id"]>("edit");
+  const [bookTablePage, setBookTablePage] = useState(1);
+
+  const loadDetail = () => {
+    setLoading(true);
+    apiGet<VenueDetail>(`/api/admin/venues/${venueId}`)
+      .then(setDetail)
+      .catch(() => toast({ title: "Failed to load venue", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { loadDetail(); }, [venueId]);
+
+  const saveEdit = async (payload: VenuePayload) => {
+    await apiPatch(`/api/admin/venues/${venueId}`, payload);
+    toast({ title: "Venue updated" });
+    loadDetail();
+  };
+
+  return (
+    <div className="space-y-4">
+      <button type="button" onClick={onBack} className="text-sm text-muted-foreground hover:text-white inline-flex items-center gap-1">
+        <ChevronRight className="h-3.5 w-3.5 rotate-180" /> Back to venues
+      </button>
+
+      {loading || !detail ? (
+        <p className="text-muted-foreground text-sm">Loading venue…</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className="font-serif text-xl">{detail.businessName}</h3>
+            <Badge className={detail.assignmentStatus === "assigned" ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300" : "bg-amber-500/15 border-amber-500/40 text-amber-300"}>
+              {detail.assignmentStatus === "assigned" ? `Assigned · ${detail.ownerEmail}` : "Unassigned"}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{detail.category}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
+            {VENUE_DETAIL_TABS.filter((t) => !t.assignedOnly || detail.assignmentStatus === "assigned").map((t) => (
+              <button key={t.id} type="button" onClick={() => setTab(t.id)}
+                className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                  tab === t.id ? "bg-white/10 text-white" : "text-white/55 hover:text-white hover:bg-white/5")}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "edit" && (
+            <div className="max-w-2xl">
+              <VenueForm key={venueId} initial={detail} submitLabel="Save Changes" submittingLabel="Saving..." onSubmit={saveEdit} secondary={{ label: "Back", onClick: onBack }} />
+            </div>
+          )}
+          {tab === "drinks" && (
+            <div className="space-y-6">
+              <DrinkPlansPanel vendorId={venueId} writeBasePath={`/api/admin/venues/${venueId}/drink-plans`} />
+              <FoodDrinkOffersPanel vendorId={venueId} adminVendorId={venueId} />
+            </div>
+          )}
+          {tab === "announcements" && <AnnouncementsPanel adminVendorId={venueId} />}
+          {tab === "leads" && <LeadsPanel adminVendorId={venueId} />}
+          {tab === "calendar" && <VenueCalendarAdmin venueId={venueId} />}
+          {tab === "analytics" && <AnalyticsPanel adminVendorId={venueId} vendorCategory={detail.category ?? ""} />}
+          {tab === "bookings" && <PartnerBookingReport bookTablePage={bookTablePage} setBookTablePage={setBookTablePage} adminVendorId={venueId} />}
+          {tab === "commission" && (
+            detail.assignmentStatus === "assigned"
+              ? <VenueCommissionAdmin venueId={venueId} initialBaseFeePercent={detail.baseFeePercent ?? "3.50"} initialBaseFeeEnabled={detail.baseFeeEnabled !== false} onSaved={loadDetail} />
+              : <p className="text-muted-foreground text-sm">Assign a partner to this venue to configure commission &amp; fees.</p>
+          )}
+          {tab === "reviews" && <VenueReviewsAdmin venueId={venueId} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+interface BlockedDateRow { id: number; date: string; reason: string }
+
+// Commission & fees editor — only reachable once a venue is assigned to a partner.
+// Reuses the same admin endpoints + rate semantics as the global Commissions tab:
+// Free Entry / Table = flat ₹ per verified guest; Ticket / Event / Base Fee = %.
+function VenueCommissionAdmin({ venueId, initialBaseFeePercent, initialBaseFeeEnabled, onSaved }: {
+  venueId: number;
+  initialBaseFeePercent: string;
+  initialBaseFeeEnabled: boolean;
+  onSaved?: () => void;
+}) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [freeEntryRate, setFreeEntryRate] = useState("0");
+  const [ticketRate, setTicketRate] = useState("0");
+  const [tableBookingRate, setTableBookingRate] = useState("0");
+  const [eventRate, setEventRate] = useState("0");
+  const [eventCommissionEnabled, setEventCommissionEnabled] = useState(true);
+  const [baseFeePercent, setBaseFeePercent] = useState(initialBaseFeePercent);
+  const [baseFeeEnabled, setBaseFeeEnabled] = useState(initialBaseFeeEnabled);
+
+  useEffect(() => {
+    setLoading(true);
+    apiGet<{ freeEntryRate: string; ticketRate: string; tableBookingRate: string; eventRate: string; eventCommissionEnabled: boolean }>(`/api/admin/vendors/${venueId}/commission`)
+      .then((r) => {
+        setFreeEntryRate(String(Number(r.freeEntryRate)));
+        setTicketRate(String(Number(r.ticketRate)));
+        setTableBookingRate(String(Number(r.tableBookingRate)));
+        setEventRate(String(Number(r.eventRate ?? 0)));
+        setEventCommissionEnabled(r.eventCommissionEnabled !== false);
+      })
+      .catch(() => toast({ title: "Failed to load commission", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  }, [venueId]);
+
+  const save = async () => {
+    const free = Number(freeEntryRate), ticket = Number(ticketRate), table = Number(tableBookingRate), evt = Number(eventRate), bfp = Number(baseFeePercent);
+    if ([free, ticket, table, evt, bfp].some((n) => !Number.isFinite(n) || n < 0)) {
+      toast({ title: "Rates must be 0 or more", variant: "destructive" }); return;
+    }
+    if (ticket > 100 || evt > 100 || bfp > 100) {
+      toast({ title: "Percentage rates must be 0–100%", variant: "destructive" }); return;
+    }
+    setSaving(true);
+    try {
+      await apiPut(`/api/admin/vendors/${venueId}/commission`, {
+        freeEntryRate: free, ticketRate: ticket, tableBookingRate: table, eventRate: evt, eventCommissionEnabled,
+      });
+      await apiPatch(`/api/admin/vendors/${venueId}/base-fee`, { baseFeePercent: bfp, baseFeeEnabled });
+      toast({ title: "Commission & fees saved" });
+      onSaved?.();
+    } catch (e: any) {
+      toast({ title: "Failed to save", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading commission…</p>;
+
+  const rateInputs: { label: string; value: string; set: (v: string) => void }[] = [
+    { label: "Free Entry (₹/person)", value: freeEntryRate, set: setFreeEntryRate },
+    { label: "Ticket (%)", value: ticketRate, set: setTicketRate },
+    { label: "Table Booking (₹/person)", value: tableBookingRate, set: setTableBookingRate },
+    { label: "Event (%)", value: eventRate, set: setEventRate },
+  ];
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <section className="rounded-xl border border-white/10 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Commission Rates</p>
+        <p className="text-xs text-muted-foreground">Free Entry &amp; Table Booking are a flat ₹ per verified guest; Ticket &amp; Event are a percentage of final verified revenue.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {rateInputs.map((r) => (
+            <div key={r.label} className="space-y-1.5">
+              <Label className="text-xs">{r.label}</Label>
+              <Input type="number" min={0} step="0.01" value={r.value} onChange={(e) => r.set(e.target.value)} className="bg-black/40 border-white/10" />
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2.5 pt-1">
+          <Switch id="vc-event-comm" checked={eventCommissionEnabled} onCheckedChange={setEventCommissionEnabled} />
+          <Label htmlFor="vc-event-comm" className="text-sm cursor-pointer select-none">Charge commission on event bookings</Label>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-white/10 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platform Base Fee</p>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Base Fee (%)</Label>
+            <Input type="number" min={0} step="0.01" value={baseFeePercent} onChange={(e) => setBaseFeePercent(e.target.value)} className="bg-black/40 border-white/10 w-32" />
+          </div>
+          <div className="flex items-center gap-2.5 pb-1.5">
+            <Switch id="vc-basefee" checked={baseFeeEnabled} onCheckedChange={setBaseFeeEnabled} />
+            <Label htmlFor="vc-basefee" className="text-sm cursor-pointer select-none">Base fee enabled</Label>
+          </div>
+        </div>
+      </section>
+
+      <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Commission & Fees"}</Button>
+    </div>
+  );
+}
+
+function VenueCalendarAdmin({ venueId }: { venueId: number }) {
+  const { toast } = useToast();
+  const [rows, setRows] = useState<BlockedDateRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [date, setDate] = useState("");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    apiGet<BlockedDateRow[]>(`/api/admin/venues/${venueId}/blocked-dates`)
+      .then(setRows).catch(() => toast({ title: "Failed to load calendar", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, [venueId]);
+
+  const add = async () => {
+    if (!date) { toast({ title: "Pick a date", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await apiPost(`/api/admin/venues/${venueId}/blocked-dates`, { date, reason: reason.trim() });
+      toast({ title: "Date blocked" });
+      setDate(""); setReason(""); load();
+    } catch (e: any) { toast({ title: "Failed to block date", description: e?.message, variant: "destructive" }); }
+    finally { setSaving(false); }
+  };
+
+  const del = async (id: number) => {
+    try { await apiDelete(`/api/admin/venues/${venueId}/blocked-dates/${id}`); toast({ title: "Date unblocked" }); load(); }
+    catch (e: any) { toast({ title: "Failed to unblock", description: e?.message, variant: "destructive" }); }
+  };
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <section className="rounded-xl border border-white/10 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Block a date (venue closed / unavailable)</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Date</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-black/40 border-white/10 w-44" />
+          </div>
+          <div className="space-y-1.5 flex-1 min-w-[160px]">
+            <Label className="text-xs">Reason (optional)</Label>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Private event" className="bg-black/40 border-white/10" />
+          </div>
+          <Button size="sm" onClick={add} disabled={saving}>{saving ? "Blocking…" : "Block Date"}</Button>
+        </div>
+      </section>
+
+      {loading ? (
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No blocked dates.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-center gap-3 rounded-xl border border-white/10 p-3">
+              <CalendarCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{new Date(r.date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</p>
+                {r.reason && <p className="text-xs text-muted-foreground truncate">{r.reason}</p>}
+              </div>
+              <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 shrink-0" onClick={() => del(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface VenueReviewRow {
+  id: number; rating: number; comment: string; createdAt: string; userName: string; verifiedBooking: boolean;
+}
+
+function VenueReviewsAdmin({ venueId }: { venueId: number }) {
+  const { toast } = useToast();
+  const [items, setItems] = useState<VenueReviewRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    setLoading(true);
+    apiGet<{ items: VenueReviewRow[]; total: number }>(`/api/reviews/vendor/${venueId}?pageSize=50`)
+      .then((r) => { setItems(r.items); setTotal(r.total); })
+      .catch(() => toast({ title: "Failed to load reviews", variant: "destructive" }))
+      .finally(() => setLoading(false));
+  }, [venueId]);
+
+  if (loading) return <p className="text-muted-foreground text-sm">Loading reviews…</p>;
+  if (items.length === 0) return <p className="text-muted-foreground text-sm">No reviews yet.</p>;
+
+  return (
+    <div className="space-y-2 max-w-2xl">
+      <p className="text-xs text-muted-foreground">{total} review{total === 1 ? "" : "s"}</p>
+      {items.map((r) => (
+        <div key={r.id} className="rounded-xl border border-white/10 p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 text-sm">{"★".repeat(Math.max(0, Math.min(5, r.rating)))}<span className="text-white/20">{"★".repeat(Math.max(0, 5 - r.rating))}</span></span>
+            <span className="text-sm font-medium">{r.userName}</span>
+            {r.verifiedBooking && <Badge className="bg-emerald-500/15 border-emerald-500/40 text-emerald-300">Verified</Badge>}
+            <span className="text-[11px] text-muted-foreground ml-auto">{new Date(r.createdAt).toLocaleDateString("en-IN")}</span>
+          </div>
+          {r.comment && <p className="text-sm text-muted-foreground mt-1.5">{r.comment}</p>}
+        </div>
+      ))}
     </div>
   );
 }

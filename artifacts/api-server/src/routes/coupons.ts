@@ -355,4 +355,102 @@ router.patch("/admin/coupons/:id/deactivate", requireAuth(["admin"]), async (req
   return res.json(c);
 });
 
+// ─── Admin vendor-coupon routes (pub-level coupons created by admin) ──────────
+
+const AdminVendorCouponBody = z.object({
+  vendorId: z.number().int().positive(),
+  code: z.string().min(3).max(10).transform((v) => v.trim().toUpperCase()).optional(),
+  discountType: z.enum(["percent", "fixed"]).default("percent"),
+  discountValue: z.number().positive().max(100000),
+  applicableTo: z.enum(["ticket", "event", "both"]).default("both"),
+  active: z.boolean().default(true),
+  maxUses: z.number().int().positive().nullable().optional(),
+  expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+router.post("/admin/vendor-coupons", requireAuth(["admin"]), async (req, res) => {
+  const parsed = AdminVendorCouponBody.safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+
+  const vRow = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(eq(vendorsTable.id, parsed.data.vendorId)).limit(1);
+  if (!vRow[0]) return res.status(404).json({ error: "Vendor not found" });
+
+  let code = parsed.data.code ?? genVendorCode();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const existing = await db.select({ id: vendorCouponsTable.id }).from(vendorCouponsTable).where(eq(vendorCouponsTable.code, code)).limit(1);
+    if (!existing[0]) break;
+    code = genVendorCode();
+  }
+
+  const [created] = await db
+    .insert(vendorCouponsTable)
+    .values({
+      vendorId: parsed.data.vendorId,
+      code,
+      discountType: parsed.data.discountType,
+      discountValue: String(parsed.data.discountValue),
+      applicableTo: parsed.data.applicableTo,
+      active: parsed.data.active,
+      maxUses: parsed.data.maxUses ?? null,
+      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+    })
+    .returning();
+  return res.status(201).json(created);
+});
+
+router.get("/admin/vendor-coupons", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select({
+      id: vendorCouponsTable.id,
+      vendorId: vendorCouponsTable.vendorId,
+      code: vendorCouponsTable.code,
+      discountType: vendorCouponsTable.discountType,
+      discountValue: vendorCouponsTable.discountValue,
+      applicableTo: vendorCouponsTable.applicableTo,
+      active: vendorCouponsTable.active,
+      maxUses: vendorCouponsTable.maxUses,
+      usedCount: vendorCouponsTable.usedCount,
+      expiresAt: vendorCouponsTable.expiresAt,
+      createdAt: vendorCouponsTable.createdAt,
+      vendorName: vendorsTable.businessName,
+    })
+    .from(vendorCouponsTable)
+    .leftJoin(vendorsTable, eq(vendorCouponsTable.vendorId, vendorsTable.id))
+    .orderBy(desc(vendorCouponsTable.createdAt));
+  return res.json(rows);
+});
+
+router.patch("/admin/vendor-coupons/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const parsed = VendorCouponBody.partial().safeParse(req.body);
+  if (!parsed.success) return respondInvalid(res, parsed.error);
+
+  const existing = await db.select({ id: vendorCouponsTable.id }).from(vendorCouponsTable).where(eq(vendorCouponsTable.id, id)).limit(1);
+  if (!existing[0]) return res.status(404).json({ error: "Coupon not found." });
+
+  const [updated] = await db
+    .update(vendorCouponsTable)
+    .set({
+      ...(parsed.data.discountType !== undefined && { discountType: parsed.data.discountType }),
+      ...(parsed.data.discountValue !== undefined && { discountValue: String(parsed.data.discountValue) }),
+      ...(parsed.data.applicableTo !== undefined && { applicableTo: parsed.data.applicableTo }),
+      ...(parsed.data.active !== undefined && { active: parsed.data.active }),
+      ...(parsed.data.maxUses !== undefined && { maxUses: parsed.data.maxUses }),
+      ...(parsed.data.expiresAt !== undefined && { expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null }),
+    })
+    .where(eq(vendorCouponsTable.id, id))
+    .returning();
+  return res.json(updated);
+});
+
+router.delete("/admin/vendor-coupons/:id", requireAuth(["admin"]), async (req, res) => {
+  const id = Number(req.params["id"]);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [deleted] = await db.delete(vendorCouponsTable).where(eq(vendorCouponsTable.id, id)).returning();
+  if (!deleted) return res.status(404).json({ error: "Not found" });
+  return res.json({ ok: true });
+});
+
 export default router;

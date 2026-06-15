@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { runCleanup } from "./jobs/cleanup";
+import { runCleanup, autoCheckoutStaleBookings } from "./jobs/cleanup";
 import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingReminders";
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import { runPointsExpiry } from "./jobs/pointsExpiry";
@@ -336,6 +336,32 @@ async function applyPendingSchemaChanges() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "drink_plans_global_priority_idx" ON "drink_plans" ("global_priority")`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_percent" numeric(5,2) DEFAULT 3.50`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_enabled" boolean DEFAULT true`);
+    // ── Admin-owned venue lifecycle (create unassigned → assign to partner) ──
+    // Admin can create & launch venues with no partner. Such rows use the
+    // sentinel owner user_id = 0 and assignment_status = 'unassigned'. Existing
+    // rows all have real owners, so the new column defaults to 'assigned'.
+    // The unique index becomes partial (WHERE user_id <> 0) so multiple
+    // unassigned venues can share id 0 while real partners stay 1:1.
+    // Idempotent; mirrors lib/db/src/schema/index.ts.
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "assignment_status" varchar(20) NOT NULL DEFAULT 'assigned'`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "assigned_at" timestamp with time zone`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "assigned_by_admin_id" integer`);
+    await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "created_by_admin_id" integer`);
+    await db.execute(sql`DROP INDEX IF EXISTS "vendors_user_idx"`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "vendors_user_assigned_idx" ON "vendors" ("user_id") WHERE "user_id" <> 0`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "venue_assignment_log" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "vendor_id" integer NOT NULL,
+        "action" varchar(20) NOT NULL,
+        "actor_admin_id" integer,
+        "partner_user_id" integer,
+        "partner_email" varchar(255) NOT NULL DEFAULT '',
+        "previous_user_id" integer,
+        "note" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "venue_assignment_log_vendor_idx" ON "venue_assignment_log" ("vendor_id")`);
     await db.execute(sql`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "base_fee" integer DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "capacity" integer`);
     await db.execute(sql`ALTER TABLE "announcements" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true`);
@@ -948,6 +974,13 @@ const server = app.listen(port, (err) => {
       logger.error({ err }, "Solo Connect chat purge failed"),
     );
   });
+
+  // Auto-checkout — 3:50 AM IST: force-checkout guests still marked inside from the previous day.
+  cron.schedule("50 3 * * *", () => {
+    autoCheckoutStaleBookings().catch((err) =>
+      logger.error({ err }, "Auto-checkout job failed"),
+    );
+  }, { timezone: "Asia/Kolkata" });
 
   // Reminder 1: 10:00 AM IST — morning reminder for all today's bookings
   cron.schedule("0 10 * * *", () => {

@@ -34,6 +34,23 @@ async function getMyVendor(userId: number) {
   return rows[0] ?? null;
 }
 
+// Admins (Venues → Leads) target a specific venue via ?vendorId=; partners
+// always resolve to their own venue.
+async function resolveLeadsVendor(
+  req: { query: Record<string, unknown> },
+  user: { id: number; role: string },
+) {
+  if (user.role === "admin") {
+    const raw = req.query["vendorId"];
+    const n = raw != null ? Number(raw) : NaN;
+    if (Number.isFinite(n)) {
+      const rows = await db.select().from(vendorsTable).where(eq(vendorsTable.id, n)).limit(1);
+      return rows[0] ?? null;
+    }
+  }
+  return getMyVendor(user.id);
+}
+
 router.post(
   "/partner/ads/request",
   requireAuth(["vendor"]),
@@ -186,11 +203,11 @@ const CRM_TRIAL_DAYS = 60;
 
 router.get(
   "/partner/leads/me",
-  requireAuth(["vendor"]),
+  requireAuth(["vendor", "admin"]),
   async (req, res) => {
     const user = await loadUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const vendor = await getMyVendor(user.id);
+    const vendor = await resolveLeadsVendor(req, user);
     if (!vendor) {
       return res.json({
         premium: false,
@@ -210,19 +227,7 @@ router.get(
       Math.ceil(CRM_TRIAL_DAYS - daysSinceTrialStart),
     );
     const crmTrialActive = crmTrialDaysRemaining > 0;
-    const crmAccessGranted = vendor.isPremium || crmTrialActive;
-
-    if (!crmAccessGranted) {
-      return res.json({
-        premium: vendor.isPremium,
-        crmAccessGranted: false,
-        crmTrialActive: false,
-        crmTrialDaysRemaining: 0,
-        views: [],
-        message:
-          "Your 2-month free CRM trial has ended. Upgrade to Partner Premium to keep your leads.",
-      });
-    }
+    const crmAccessGranted = true;
 
     // Aggregate at the DB so totals stay accurate as history grows.
     // Known viewers: one row per viewerUserId with visitCount + lastViewedAt.
@@ -379,11 +384,11 @@ const SendDiscountBody = z.object({
 
 router.post(
   "/partner/leads/:profileViewId/send-discount",
-  requireAuth(["vendor"]),
+  requireAuth(["vendor", "admin"]),
   async (req, res) => {
     const user = await loadUserFromRequest(req);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const vendor = await getMyVendor(user.id);
+    const vendor = await resolveLeadsVendor(req, user);
     if (!vendor) return res.status(400).json({ error: "Partner profile required" });
 
     const profileViewId = Number(req.params["profileViewId"]);

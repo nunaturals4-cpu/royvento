@@ -2607,8 +2607,10 @@ interface VendorBookingSummary {
   perEvent: { eventId: number | null; eventTitle: string | null; bookingCount: number; ticketWomen: number; ticketMen: number; ticketCouple: number; revenue: number }[];
 }
 
-function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: number; setBookTablePage: React.Dispatch<React.SetStateAction<number>> }) {
+export function BookingReport({ bookTablePage, setBookTablePage, adminVendorId }: { bookTablePage: number; setBookTablePage: React.Dispatch<React.SetStateAction<number>>; adminVendorId?: number }) {
   const [preset, setPreset] = useState<ReportPreset>("12m");
+  // Admins (Venues → Booking Report) pass a vendorId; partners resolve to their own venue.
+  const vParam = adminVendorId ? `&vendorId=${adminVendorId}` : "";
 
   const now = new Date();
   const startDate = (() => {
@@ -2620,11 +2622,14 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
   const startStr = toReportDateStr(startDate);
 
   const { data: summary } = useQuery<VendorBookingSummary>({
-    queryKey: ["vendor-booking-summary", startStr],
-    queryFn: () => apiGet<VendorBookingSummary>(`/api/bookings/vendor/summary?from=${encodeURIComponent(startStr)}`),
+    queryKey: ["vendor-booking-summary", startStr, adminVendorId ?? "me"],
+    queryFn: () => apiGet<VendorBookingSummary>(`/api/bookings/vendor/summary?from=${encodeURIComponent(startStr)}${vParam}`),
   });
 
-  const { data: tableResp } = useListVendorBookings({ page: bookTablePage, limit: BR_PAGE_SIZE, from: startStr });
+  const { data: tableResp } = useQuery<{ data: any[]; total: number; page: number; totalPages: number }>({
+    queryKey: ["vendor-bookings", bookTablePage, startStr, adminVendorId ?? "me"],
+    queryFn: () => apiGet(`/api/bookings/vendor?page=${bookTablePage}&limit=${BR_PAGE_SIZE}&from=${encodeURIComponent(startStr)}${vParam}`),
+  });
 
   const totalBookings = summary?.totalBookings ?? 0;
   const totalRevenue = summary?.totalRevenue ?? 0;
@@ -2972,10 +2977,195 @@ function BookingReport({ bookTablePage, setBookTablePage }: { bookTablePage: num
           )}
         </>
       )}
+
+      {/* Walk-In Log — manual bookings shown separately */}
+      <PartnerManualBookingLog adminVendorId={adminVendorId} startStr={startStr} />
     </div>
   );
 }
 
+// ── Partner Walk-In Log ────────────────────────────────────────────────────────
+
+interface PartnerManualRow {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  date: string;
+  persons: number;
+  price: number;
+  arrivalTime: string;
+  checkedIn: boolean;
+  checkedInAt: string | null;
+}
+
+interface PartnerManualCustomer {
+  phone: string;
+  name: string;
+  visits: number;
+  totalPersons: number;
+  totalRevenue: number;
+}
+
+interface PartnerManualReport {
+  bookings: PartnerManualRow[];
+  total: number;
+  page: number;
+  totalPages: number;
+  uniqueCustomers: number;
+  totalPersons: number;
+  totalRevenue: number;
+  customerDetails: PartnerManualCustomer[];
+}
+
+const MANUAL_LOG_PAGE = 20;
+
+function PartnerManualBookingLog({ adminVendorId, startStr }: { adminVendorId?: number; startStr: string }) {
+  const [page, setPage] = useState(1);
+  const [activeView, setActiveView] = useState<"bookings" | "customers">("bookings");
+
+  const vParam = adminVendorId ? `&vendorId=${adminVendorId}` : "";
+  const qs = `page=${page}&limit=${MANUAL_LOG_PAGE}&from=${encodeURIComponent(startStr)}${vParam}`;
+
+  const { data, isLoading } = useQuery<PartnerManualReport>({
+    queryKey: ["partner-manual-log", adminVendorId ?? "me", startStr, page],
+    queryFn: () => apiGet<PartnerManualReport>(`/api/bookings/vendor/manual?${qs}`),
+  });
+
+  const bookings = data?.bookings ?? [];
+  const customers = data?.customerDetails ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+
+  if (!isLoading && total === 0) return null;
+
+  return (
+    <div className="space-y-4 pt-2">
+      {/* Section header */}
+      <div className="flex items-center gap-2 border-t border-white/10 pt-6">
+        <FileText className="h-4 w-4 text-primary" />
+        <h3 className="font-serif text-xl">Walk-In Log</h3>
+        <span className="text-xs text-muted-foreground ml-1">Manual bookings — kept separate from online bookings</span>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="rounded-xl glass-card p-3 flex items-center gap-2">
+          <FileText className="h-4 w-4 text-primary shrink-0" />
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Walk-Ins</p>
+            <p className="text-lg font-bold tabular-nums text-primary">{total}</p>
+          </div>
+        </div>
+        <div className="rounded-xl glass-card p-3 flex items-center gap-2">
+          <Users className="h-4 w-4 text-blue-300 shrink-0" />
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Unique Customers</p>
+            <p className="text-lg font-bold tabular-nums text-blue-300">{data?.uniqueCustomers ?? 0}</p>
+          </div>
+        </div>
+        <div className="rounded-xl glass-card p-3 flex items-center gap-2">
+          <UserCheck className="h-4 w-4 text-green-300 shrink-0" />
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Persons</p>
+            <p className="text-lg font-bold tabular-nums text-green-300">{data?.totalPersons ?? 0}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* View toggle */}
+      <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10 w-fit">
+        {([
+          { id: "bookings" as const, label: "All Walk-Ins" },
+          { id: "customers" as const, label: "Customer Details" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveView(tab.id)}
+            className={"px-3 py-1.5 rounded-lg text-xs font-medium transition-colors " + (activeView === tab.id ? "bg-primary text-white" : "text-white/60 hover:text-white hover:bg-white/5")}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-2xl glass-card p-6 text-center text-muted-foreground text-sm">Loading…</div>
+      ) : activeView === "bookings" ? (
+        <div className="rounded-2xl glass-card p-5">
+          <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
+            <table className="w-full text-sm min-w-[580px]">
+              <thead className="sticky top-0 z-10 text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10 bg-black/90 backdrop-blur">
+                <tr>
+                  <th className="text-left py-2 pr-3">ID</th>
+                  <th className="text-left py-2 pr-3">Date</th>
+                  <th className="text-left py-2 pr-3">Name</th>
+                  <th className="text-left py-2 pr-3">Phone</th>
+                  <th className="text-left py-2 pr-3">Email</th>
+                  <th className="text-right py-2 pr-3">Persons</th>
+                  <th className="text-right py-2 pr-3">Price</th>
+                  <th className="text-left py-2">Arrival</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bookings.map((b) => (
+                  <tr key={b.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-2.5 pr-3 text-muted-foreground tabular-nums text-xs">#{b.id}</td>
+                    <td className="py-2.5 pr-3 tabular-nums text-xs">{b.date}</td>
+                    <td className="py-2.5 pr-3 font-medium">{b.name || "—"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground text-xs tabular-nums">{b.phone || "—"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground text-xs max-w-[140px] truncate">{b.email || "—"}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums">{b.persons}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-xs">
+                      {b.price > 0 ? <span className="text-primary font-medium">{formatINR(b.price)}</span> : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="py-2.5 text-xs text-muted-foreground">{b.arrivalTime || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</Button>
+              <span className="text-xs text-muted-foreground">{(page - 1) * MANUAL_LOG_PAGE + 1}–{Math.min(page * MANUAL_LOG_PAGE, total)} of {total}</span>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-2xl glass-card p-5">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[440px]">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <tr>
+                  <th className="text-left py-2 pr-3">Name</th>
+                  <th className="text-left py-2 pr-3">Phone</th>
+                  <th className="text-right py-2 pr-3">Visits</th>
+                  <th className="text-right py-2 pr-3">Total Persons</th>
+                  <th className="text-right py-2">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.map((c, i) => (
+                  <tr key={i} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-2.5 pr-3 font-medium">{c.name || "—"}</td>
+                    <td className="py-2.5 pr-3 text-muted-foreground tabular-nums text-xs">{c.phone || "—"}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums">{c.visits}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums text-green-300">{c.totalPersons}</td>
+                    <td className="py-2.5 text-right tabular-nums text-xs">
+                      {c.totalRevenue > 0 ? <span className="text-primary font-medium">{formatINR(c.totalRevenue)}</span> : <span className="text-muted-foreground">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function BlockedCalendar({ vendorId: _vendorId }: { vendorId: number }) {
   const [items, setItems] = useState<BlockedDate[]>([]);
@@ -3281,8 +3471,10 @@ const ANN_EVENT_TYPES = [...ANNOUNCEMENT_CATEGORIES];
 
 const emptyAnnForm = { title: "", body: "", announceDate: "", announceTime: "", imageUrl: "", genre: "", eventType: "", price: "" };
 
-function AnnouncementsPanel() {
+export function AnnouncementsPanel({ adminVendorId }: { adminVendorId?: number } = {}) {
   const { toast } = useToast();
+  // Admins manage a specific venue's announcements via ?vendorId=; partners use their own.
+  const vq = adminVendorId ? `?vendorId=${adminVendorId}` : "";
   const [items, setItems] = useState<Announcement[]>([]);
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState(emptyAnnForm);
@@ -3294,7 +3486,7 @@ function AnnouncementsPanel() {
   const [imagePreview, setImagePreview] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
-  const load = () => apiGet<Announcement[]>("/api/partner/announcements").then(setItems).catch(() => {});
+  const load = () => apiGet<Announcement[]>(`/api/partner/announcements${vq}`).then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
@@ -3387,10 +3579,10 @@ function AnnouncementsPanel() {
       }
       const payload = { ...form, imageUrl };
       if (editing) {
-        await apiPatch(`/api/partner/announcements/${editing.id}`, payload);
+        await apiPatch(`/api/partner/announcements/${editing.id}${vq}`, payload);
         toast({ title: "Announcement updated" });
       } else {
-        await apiPost("/api/partner/announcements", payload);
+        await apiPost(`/api/partner/announcements${vq}`, payload);
         toast({ title: "Announcement posted" });
       }
       setEditing(null);
@@ -3408,7 +3600,7 @@ function AnnouncementsPanel() {
 
   const remove = async (id: number) => {
     try {
-      await apiDelete(`/api/partner/announcements/${id}`);
+      await apiDelete(`/api/partner/announcements/${id}${vq}`);
       toast({ title: "Deleted" });
       load();
     } catch {
@@ -3668,7 +3860,7 @@ function toAnalyticsDateStr(d: Date) {
   return _istFmt.format(d);
 }
 
-function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
+export function AnalyticsPanel({ vendorCategory = "", adminVendorId }: { vendorCategory?: string; adminVendorId?: number }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -3692,6 +3884,7 @@ function AnalyticsPanel({ vendorCategory = "" }: { vendorCategory?: string }) {
     const qs = new URLSearchParams();
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
+    if (adminVendorId) qs.set("vendorId", String(adminVendorId));
     const qStr = qs.toString();
     apiGet<AnalyticsData>(`/api/partner/analytics${qStr ? `?${qStr}` : ""}`)
       .then((d) => { setData(d); setLastUpdated(new Date()); })
@@ -4735,8 +4928,13 @@ function LeadBookingTable({ bookings }: { bookings: any[] }) {
   );
 }
 
-function LeadsPanel() {
-  const { data: bookingsResp } = useListVendorBookings({ page: 1, limit: 200 });
+export function LeadsPanel({ adminVendorId }: { adminVendorId?: number } = {}) {
+  // Admins (Venues → Leads) target a specific venue via ?vendorId=; partners use their own.
+  const vq = adminVendorId ? `?vendorId=${adminVendorId}` : "";
+  const { data: bookingsResp } = useQuery<{ data: any[] }>({
+    queryKey: ["leads-vendor-bookings", adminVendorId ?? "me"],
+    queryFn: () => apiGet(`/api/bookings/vendor?page=1&limit=200${adminVendorId ? `&vendorId=${adminVendorId}` : ""}`),
+  });
   const bookings = bookingsResp?.data ?? [];
   const [data, setData] = useState<Lead | null>(null);
   const [sentCodes, setSentCodes] = useState<Record<number, string>>({});
@@ -4744,7 +4942,7 @@ function LeadsPanel() {
   const { toast } = useToast();
 
   useEffect(() => {
-    apiGet<Lead>("/api/partner/leads/me").then((d) => {
+    apiGet<Lead>(`/api/partner/leads/me${vq}`).then((d) => {
       setData(d);
       const initial: Record<number, string> = {};
       (d.views ?? []).forEach((v: any) => {
@@ -4758,7 +4956,7 @@ function LeadsPanel() {
     setSendingId(viewId);
     try {
       const result = await apiPost<{ code: string; discountPercent: number }>(
-        `/api/partner/leads/${viewId}/send-discount`,
+        `/api/partner/leads/${viewId}/send-discount${vq}`,
         { discountPercent: 15 },
       );
       setSentCodes((prev) => ({ ...prev, [viewId]: result.code }));
@@ -4772,43 +4970,11 @@ function LeadsPanel() {
 
   if (!data) return <p className="text-muted-foreground">Loading…</p>;
 
-  if (!data.crmAccessGranted) {
-    const trialExpired = !data.crmTrialActive && !data.premium;
-    return (
-      <div className="rounded-3xl glass-card-strong p-10 text-center red-ring">
-        <Crown className="h-10 w-10 text-primary mx-auto mb-4" />
-        {trialExpired ? (
-          <>
-            <p className="font-serif text-3xl mb-2">Your 2-month free trial has ended</p>
-            <p className="text-muted-foreground mb-6">Upgrade to Partner Premium ({formatINR(999)}/mo) to keep your leads and CRM access.</p>
-          </>
-        ) : (
-          <>
-            <p className="font-serif text-3xl mb-2">Leads &amp; CRM is a Premium feature</p>
-            <p className="text-muted-foreground mb-6">Subscribe to Partner Premium ({formatINR(999)}/mo) to unlock who's viewing your profile and conversion analytics.</p>
-          </>
-        )}
-        <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground border-0">
-          <Link href="/subscription">Upgrade to Premium</Link>
-        </Button>
-      </div>
-    );
-  }
-
   const totalViews = data.totalViews ?? data.views.reduce((s, v) => s + (v.visitCount ?? 1), 0);
   const booked = data.bookedCount ?? data.views.filter((v) => v.hasBooked).length;
 
   return (
     <div className="space-y-6">
-      {data.crmTrialActive && !data.premium && (
-        <div className="rounded-2xl border border-primary/40 bg-primary/10 px-5 py-4 flex items-center gap-3">
-          <Crown className="h-5 w-5 text-primary shrink-0" />
-          <p className="text-sm text-primary font-medium">
-            You have <span className="font-bold">{data.crmTrialDaysRemaining} day{data.crmTrialDaysRemaining === 1 ? "" : "s"}</span> of free CRM access remaining.{" "}
-            <Link href="/subscription" className="underline underline-offset-2 hover:text-primary/80">Upgrade to keep it.</Link>
-          </p>
-        </div>
-      )}
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-2xl glass-card p-5">
           <Eye className="h-5 w-5 text-primary mb-2" />
@@ -5322,8 +5488,10 @@ function summariseWindow(from: string, to: string): string {
   return `${from}–${to}`;
 }
 
-function FoodDrinkOffersPanel({ vendorId: _vendorId }: { vendorId: number }) {
+export function FoodDrinkOffersPanel({ vendorId: _vendorId, adminVendorId }: { vendorId: number; adminVendorId?: number }) {
   const { toast } = useToast();
+  // Admins manage a specific venue's offers via ?vendorId=; partners use their own.
+  const vq = adminVendorId ? `?vendorId=${adminVendorId}` : "";
   const [offers, setOffers] = useState<VendorOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<OfferCategory>("food");
@@ -5335,7 +5503,7 @@ function FoodDrinkOffersPanel({ vendorId: _vendorId }: { vendorId: number }) {
 
   const load = async () => {
     try {
-      const rows = await apiGet<VendorOffer[]>("/api/partner/offers");
+      const rows = await apiGet<VendorOffer[]>(`/api/partner/offers${vq}`);
       setOffers(rows);
     } catch { /* ignore */ }
     setLoading(false);
@@ -5409,10 +5577,10 @@ function FoodDrinkOffersPanel({ vendorId: _vendorId }: { vendorId: number }) {
         active: form.active,
       };
       if (editing) {
-        await apiPatch(`/api/partner/offers/${editing.id}`, payload);
+        await apiPatch(`/api/partner/offers/${editing.id}${vq}`, payload);
         toast({ title: "Offer updated" });
       } else {
-        await apiPost("/api/partner/offers", payload);
+        await apiPost(`/api/partner/offers${vq}`, payload);
         toast({ title: "Offer created" });
       }
       setShowForm(false);
@@ -5426,7 +5594,7 @@ function FoodDrinkOffersPanel({ vendorId: _vendorId }: { vendorId: number }) {
   const remove = async (id: number) => {
     setDeleting(id);
     try {
-      await apiDelete(`/api/partner/offers/${id}`);
+      await apiDelete(`/api/partner/offers/${id}${vq}`);
       toast({ title: "Offer deleted" });
       setOffers((prev) => prev.filter((o) => o.id !== id));
     } catch {
@@ -5437,7 +5605,7 @@ function FoodDrinkOffersPanel({ vendorId: _vendorId }: { vendorId: number }) {
 
   const toggleActive = async (o: VendorOffer) => {
     try {
-      await apiPatch(`/api/partner/offers/${o.id}`, { active: !o.active });
+      await apiPatch(`/api/partner/offers/${o.id}${vq}`, { active: !o.active });
       setOffers((prev) => prev.map((x) => (x.id === o.id ? { ...x, active: !x.active } : x)));
     } catch {
       toast({ title: "Failed to update", variant: "destructive" });
@@ -5845,7 +6013,7 @@ function OffersAnalyticsBlock() {
   );
 }
 
-function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
+export function DrinkPlansPanel({ vendorId, writeBasePath = "/api/vendors/me/drink-plans" }: { vendorId: number; writeBasePath?: string }) {
   const { toast } = useToast();
   const [plans, setPlans] = useState<DrinkPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -5992,7 +6160,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       }
       if (freeEntryChecked) {
         for (const drinkType of feDrinkTypes) {
-          await apiPost("/api/vendors/me/drink-plans", {
+          await apiPost(writeBasePath, {
             type: drinkType,
             productName: drinkType === "welcome" ? "Free Drink" : "Unlimited Drinks",
             gender: feGender, price: 0,
@@ -6007,7 +6175,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
         }
       }
       if (ticketChecked) {
-        await apiPost("/api/vendors/me/drink-plans", {
+        await apiPost(writeBasePath, {
           type: "ticket", productName: "Included with Ticket", gender: "all", price: 0,
           lineItems: ticketItems.filter((i) => i.name.trim()).map(itemForWire),
           days: ticketDays, timeFrom: ticketTimeFrom.trim(), timeTo: ticketTimeTo.trim(),
@@ -6046,7 +6214,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
       if (editImageFile) {
         finalEditImageUrl = await uploadImageToStorage(editImageFile);
       }
-      const updated: DrinkPlan = await apiPatch(`/api/vendors/me/drink-plans/${editingId}`, {
+      const updated: DrinkPlan = await apiPatch(`${writeBasePath}/${editingId}`, {
         type: editType,
         productName: isTicket ? "Included with Ticket" : isFreeEntry ? (editType === "welcome" ? "Free Drink" : "Unlimited Drinks") : editProductName,
         gender: isTicket ? "all" : editGender,
@@ -6073,7 +6241,7 @@ function DrinkPlansPanel({ vendorId }: { vendorId: number }) {
   const handleDelete = async (planId: number) => {
     setDeleting(planId);
     try {
-      await apiDelete(`/api/vendors/me/drink-plans/${planId}`);
+      await apiDelete(`${writeBasePath}/${planId}`);
       setPlans((prev) => prev.filter((p) => p.id !== planId));
       toast({ title: "Drink plan removed" });
     } catch (err: unknown) {

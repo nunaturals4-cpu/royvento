@@ -88,13 +88,47 @@ export const vendorsTable = pgTable(
     commissionOwed: numeric("commission_owed", { precision: 14, scale: 2 }).notNull().default("0"),
     baseFeePercent: numeric("base_fee_percent", { precision: 5, scale: 2 }).notNull().default("3.50"),
     baseFeeEnabled: boolean("base_fee_enabled").notNull().default(true),
+    // ── Admin-owned venue lifecycle ──────────────────────────────────────────
+    // Admin can create & launch a venue with no partner: such rows use the
+    // sentinel owner `userId = 0` (UNASSIGNED_VENUE_USER_ID) and
+    // assignmentStatus='unassigned'. Assigning to a partner relinks `userId`
+    // and flips status to 'assigned' — preserving all vendor_id-keyed history.
+    assignmentStatus: varchar("assignment_status", { length: 20 }).notNull().default("assigned"),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    assignedByAdminId: integer("assigned_by_admin_id"),
+    createdByAdminId: integer("created_by_admin_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => ({
-    userIdx: uniqueIndex("vendors_user_idx").on(t.userId),
+    // Partial unique index: real partners stay 1:1 (one vendor per user), while
+    // multiple unassigned venues may share the sentinel owner id 0.
+    userIdx: uniqueIndex("vendors_user_assigned_idx").on(t.userId).where(sql`user_id <> 0`),
     statusIdx: index("vendors_status_idx").on(t.status),
+  }),
+);
+
+// Immutable audit trail for admin-owned venue lifecycle: who created a venue,
+// when it was assigned/reassigned/unassigned, to which partner, and the prior
+// owner on a reassignment. One row per action.
+export const venueAssignmentLogTable = pgTable(
+  "venue_assignment_log",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id").notNull(),
+    action: varchar("action", { length: 20 }).notNull(), // created | assigned | reassigned | unassigned
+    actorAdminId: integer("actor_admin_id"),
+    partnerUserId: integer("partner_user_id"),
+    partnerEmail: varchar("partner_email", { length: 255 }).notNull().default(""),
+    previousUserId: integer("previous_user_id"),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    vendorIdx: index("venue_assignment_log_vendor_idx").on(t.vendorId),
   }),
 );
 
