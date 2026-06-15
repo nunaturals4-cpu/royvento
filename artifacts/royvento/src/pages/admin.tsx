@@ -53,7 +53,7 @@ import {
   Tag, Megaphone, Trash2, Crown, IndianRupee, CheckCircle, XCircle, Pencil,
   ChevronDown, ChevronUp, FileText, Search, SortDesc, SortAsc,
   Eye, UserCheck, UserX, TrendingUp, Filter, Trophy, Gift, Banknote, CreditCard,
-  Percent, Save, Upload, ImageIcon, Video, X, Check, Navigation, RefreshCw,
+  Percent, Save, Upload, ImageIcon, X, Check, Navigation, RefreshCw,
   Activity, Plus, Star, Sparkles, Menu, ArrowUpRight, ShieldCheck, BookOpen,
   Download, Users2, ArrowUpDown, ChevronRight, Gamepad2, Package, Lock, MapPin, MessageSquare,
 } from "lucide-react";
@@ -7296,7 +7296,6 @@ interface VenuePayload {
   priceMen?: number;
   priceCouple?: number;
   galleryImages?: string[];
-  galleryVideo?: string;
   pubEventTypes?: string[];
   dayPricing?: Record<string, { women: number; men: number; couple: number }>;
   freeEntryEnabled: boolean;
@@ -7377,8 +7376,6 @@ function VenueForm({
   >(initialDayOverrides);
   const [galleryImages, setGalleryImages] = useState<string[]>(initial?.galleryImages ?? []);
   const [galleryUploading, setGalleryUploading] = useState(0);
-  const [galleryVideo, setGalleryVideo] = useState(initial?.galleryVideos?.[0] ?? "");
-  const [videoUploading, setVideoUploading] = useState(false);
   const [pubEventTypes, setPubEventTypes] = useState<string[]>(initial?.pubEventTypes ?? []);
   const [freeEntryEnabled, setFreeEntryEnabled] = useState(!!initial?.freeEntryRules?.enabled);
   const [freeEntryGenders, setFreeEntryGenders] = useState<string[]>(initial?.freeEntryRules?.genders ?? []);
@@ -7409,7 +7406,7 @@ function VenueForm({
     setCapacity(""); setPubMode("both");
     setPriceWomen(""); setPriceMen(""); setPriceCouple("");
     setVaryByDay(false); setDayPricingOverrides({});
-    setGalleryImages([]); setGalleryVideo("");
+    setGalleryImages([]);
     setPubEventTypes([]);
     setFreeEntryEnabled(false); setFreeEntryGenders([]); setFreeEntryDays([]); setFreeEntryBeforeTime("");
     setDanceFloor(""); setDanceFloorPhotos([]); setMenuUrls([]);
@@ -7446,17 +7443,6 @@ function VenueForm({
       finally { remaining--; setGalleryUploading(remaining); }
     }
     if (urls.length > 0) setGalleryImages((prev) => [...prev, ...urls]);
-  }
-
-  async function handleGalleryVideo(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
-    if (file.type !== "video/mp4") { toast({ title: "Only MP4 videos are allowed", variant: "destructive" }); return; }
-    if (file.size > 4 * 1024 * 1024) { toast({ title: "Video must be under 4 MB", variant: "destructive" }); return; }
-    setVideoUploading(true);
-    try { setGalleryVideo(await uploadImage(file)); }
-    catch { toast({ title: "Video upload failed", variant: "destructive" }); }
-    finally { setVideoUploading(false); }
   }
 
   async function handleMenuUpload(files: FileList | null) {
@@ -7542,7 +7528,6 @@ function VenueForm({
         priceMen: priceMen ? Number(priceMen) : undefined,
         priceCouple: priceCouple ? Number(priceCouple) : undefined,
         galleryImages: galleryImages.length > 0 ? galleryImages : undefined,
-        galleryVideo: galleryVideo || undefined,
         pubEventTypes: pubEventTypes.length > 0 ? pubEventTypes : undefined,
         dayPricing: dayPricing && Object.keys(dayPricing).length > 0 ? dayPricing : undefined,
         freeEntryEnabled,
@@ -7703,28 +7688,6 @@ function VenueForm({
                 {galleryUploading > 0 ? `Uploading ${galleryUploading}...` : `Add photos (${galleryImages.length}/6)`}
                 <input type="file" accept="image/*" multiple className="hidden"
                   onChange={(e) => handleGalleryImages(e.target.files)} />
-              </label>
-            )}
-          </section>
-
-          {/* -- Gallery Video ------------------------------------------------ */}
-          <section className="rounded-xl border border-white/8 p-4 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gallery Video</p>
-            {galleryVideo ? (
-              <div className="flex items-center gap-3">
-                <video src={galleryVideo} className="w-24 h-16 rounded-lg object-cover border border-white/10" />
-                <button type="button" onClick={() => setGalleryVideo("")}
-                  className="text-xs text-red-400 hover:text-red-300">Remove</button>
-              </div>
-            ) : (
-              <label className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-muted-foreground cursor-pointer hover:border-white/40 transition-colors w-fit",
-                videoUploading && "opacity-50 pointer-events-none",
-              )}>
-                <Video className="h-4 w-4" />
-                {videoUploading ? "Uploading..." : "Upload MP4 video (max 4 MB)"}
-                <input type="file" accept="video/mp4" className="hidden"
-                  onChange={(e) => handleGalleryVideo(e.target.files)} />
               </label>
             )}
           </section>
