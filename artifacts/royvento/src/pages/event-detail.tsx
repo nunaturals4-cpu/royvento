@@ -36,6 +36,17 @@ import { DrinkDealCard } from "@/components/DrinkDealCards";
 interface Coupon { id: number; code: string; discountPercent: number; }
 interface DiscountInfo { isNewUser: boolean; daysLeft: number; bookingDiscountPercent: number; subscriptionDiscountPercent: number; points: number; }
 
+function loadRazorpay(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) { resolve(true); return; }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 function getPlanSummary(plan: { type: string; gender: string; productName?: string; lineItems?: { name: string }[] | null }, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (plan.type === "welcome") return plan.gender === "female" ? t("events.drink_welcome_ladies") : t("events.drink_welcome_all");
   if (plan.type === "unlimited") return plan.gender === "female" ? t("events.drink_unlimited_ladies") : t("events.drink_unlimited_all");
@@ -612,8 +623,9 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
       return;
     }
     setBooking(true);
+    let razorpayHandling = false;
     try {
-      const result = await apiPost<{ id?: number; status?: string; requiresPayment?: boolean; redirectUrl?: string; bookingId?: number }>("/api/bookings", {
+      const result = await apiPost<{ id?: number; status?: string; requiresPayment?: boolean; redirectUrl?: string; bookingId?: number; paymentPending?: boolean; razorpayOrderId?: string; razorpayKeyId?: string; amountPaise?: number }>("/api/bookings", {
         eventId: event.id,
         bookingDate: date,
         guests: isPub && pubMode === "ticket" ? (ticketWomen + ticketMen + ticketCouple * 2) : guests,
@@ -641,6 +653,50 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         window.location.href = result.redirectUrl;
         return;
       }
+      if (result?.paymentPending && result.razorpayOrderId) {
+        const loaded = await loadRazorpay();
+        if (!loaded) {
+          toast({ title: "Payment error", description: "Could not load payment gateway. Please try again.", variant: "destructive" });
+          return;
+        }
+        const bookingId = result.id;
+        const rzpOptions = {
+          key: result.razorpayKeyId,
+          amount: result.amountPaise,
+          currency: "INR",
+          order_id: result.razorpayOrderId,
+          name: "Royvento",
+          description: `Booking at ${(event as any)?.vendor?.name ?? "venue"}`,
+          prefill: { name: personName, contact: phone },
+          theme: { color: "#e6a817" },
+          handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+            try {
+              await apiPost("/api/payments/razorpay/verify", {
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpaySignature: response.razorpay_signature,
+                bookingId,
+              });
+              toast({ title: t("events.booking_confirmed"), description: t("events.booking_confirmed_desc") });
+              setLocation(`/payment-result?status=success&type=booking&id=${bookingId}`);
+            } catch (err: any) {
+              toast({ title: "Payment verification failed", description: err?.message ?? "Contact support with your payment ID.", variant: "destructive" });
+            } finally {
+              setBooking(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              toast({ title: "Payment cancelled", description: "Your booking is on hold. Try again or choose Pay at Venue.", variant: "destructive" });
+              setBooking(false);
+            },
+          },
+        };
+        const rzp = new (window as any).Razorpay(rzpOptions);
+        rzp.open();
+        razorpayHandling = true;
+        return;
+      }
       toast({ title: t("events.booking_confirmed"), description: t("events.booking_confirmed_desc") });
       setLocation("/dashboard/bookings");
     } catch (e: any) {
@@ -655,7 +711,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
         toast({ title: t("events.booking_failed"), description: errMsg, variant: "destructive" });
       }
     } finally {
-      setBooking(false);
+      if (!razorpayHandling) setBooking(false);
     }
   };
 
@@ -1943,7 +1999,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "cod" | "online")} className="grid grid-cols-2 gap-3">
                       {[
                         { id: "pay-cod2", value: "cod", label: t("events.pay_cod") },
-                        { id: "pay-online2", value: "online", label: t("events.pay_online_phonepe") },
+                        { id: "pay-online2", value: "online", label: t("events.pay_online_razorpay") },
                       ].map((opt) => (
                         <label key={opt.value} htmlFor={opt.id} className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 cursor-pointer text-sm transition-all ${paymentMethod === opt.value ? "border-primary bg-primary/10 text-primary" : "border-white/8 bg-black/20 text-muted-foreground hover:border-white/15"}`}>
                           <RadioGroupItem id={opt.id} value={opt.value} className="sr-only" />
@@ -2006,7 +2062,7 @@ export function EventDetail({ eventIdProp }: { eventIdProp?: number } = {}) {
                     {!bookingIsFullyFree && (
                       <div className="flex items-center justify-between gap-4 py-2.5">
                         <dt className="text-muted-foreground">{t("events.payment_method")}</dt>
-                        <dd className="font-medium text-right">{paymentMethod === "cod" ? t("events.pay_cod") : t("events.pay_online_phonepe")}</dd>
+                        <dd className="font-medium text-right">{paymentMethod === "cod" ? t("events.pay_cod") : t("events.pay_online_razorpay")}</dd>
                       </div>
                     )}
                   </dl>

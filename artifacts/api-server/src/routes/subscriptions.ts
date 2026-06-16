@@ -7,11 +7,13 @@ import {
   usersTable,
   vendorsTable,
   pointsLedgerTable,
+  paymentsTable,
 } from "@workspace/db";
 import { eq, desc, and, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, loadUserFromRequest } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
+import { createOrder as createRazorpayOrder, isRazorpayConfigured, getKeyId as getRazorpayKeyId } from "../lib/razorpay";
 
 const router: IRouter = Router();
 
@@ -104,6 +106,9 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
   if (!prices) return res.status(400).json({ error: "Invalid plan" });
   const price = planPeriod === "monthly" ? prices.monthly : prices.yearly;
 
+  const bypass = process.env["PAYMENT_BYPASS"] === "true";
+  const useRazorpay = !bypass && price > 0 && isRazorpayConfigured();
+
   // Expire any existing active subscription
   await db
     .update(subscriptionsTable)
@@ -122,37 +127,71 @@ router.post("/subscriptions", requireAuth(), async (req, res) => {
       planType,
       planPeriod,
       price: String(price),
-      status: "active",
+      status: useRazorpay ? "pending" : "active",
       expiresAt: expiresFor(planPeriod),
     })
     .returning();
 
   if (!sub) return res.status(500).json({ error: "Failed to create subscription" });
 
-  if (PARTNER_PLAN_TYPES.has(planType)) {
-    await db
-      .update(vendorsTable)
-      .set({ isPremium: true })
-      .where(eq(vendorsTable.userId, user.id));
+  if (!useRazorpay) {
+    if (PARTNER_PLAN_TYPES.has(planType)) {
+      await db
+        .update(vendorsTable)
+        .set({ isPremium: true })
+        .where(eq(vendorsTable.userId, user.id));
+    }
+
+    // Award 200 loyalty points for subscribing / renewing.
+    try {
+      const ptExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      await Promise.all([
+        db.update(usersTable)
+          .set({ points: sql`${usersTable.points} + 200` })
+          .where(eq(usersTable.id, user.id)),
+        db.insert(pointsLedgerTable).values({
+          userId: user.id,
+          points: 200,
+          source: "subscription",
+          expiresAt: ptExpiresAt,
+        }),
+      ]);
+    } catch { /* non-critical */ }
+
+    return res.json(sub);
   }
 
-  // Award 200 loyalty points for subscribing / renewing.
+  // ── Razorpay order creation ──────────────────────────────────────────────
+  const amountPaise = price * 100;
+  let order: { id: string };
   try {
-    const ptExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    await Promise.all([
-      db.update(usersTable)
-        .set({ points: sql`${usersTable.points} + 200` })
-        .where(eq(usersTable.id, user.id)),
-      db.insert(pointsLedgerTable).values({
-        userId: user.id,
-        points: 200,
-        source: "subscription",
-        expiresAt: ptExpiresAt,
-      }),
-    ]);
-  } catch { /* non-critical */ }
+    order = await createRazorpayOrder({
+      amountPaise,
+      receipt: `sub_${sub.id}`,
+      notes: { subscriptionId: String(sub.id), planType, planPeriod },
+    });
+  } catch (err) {
+    req.log.error({ err }, "[razorpay] failed to create subscription order");
+    await db.update(subscriptionsTable).set({ status: "expired" }).where(eq(subscriptionsTable.id, sub.id));
+    return res.status(502).json({ error: "Payment gateway error. Please try again." });
+  }
 
-  return res.json(sub);
+  await db.insert(paymentsTable).values({
+    merchantTransactionId: order.id,
+    subscriptionId: sub.id,
+    amount: amountPaise,
+    status: "initiated",
+    razorpayOrderId: order.id,
+    phonepeTransactionId: "",
+  });
+
+  return res.json({
+    paymentPending: true,
+    razorpayOrderId: order.id,
+    razorpayKeyId: getRazorpayKeyId(),
+    amountPaise,
+    subscriptionId: sub.id,
+  });
 });
 
 // ── Active subscription for current user ──────────────────────────────────────

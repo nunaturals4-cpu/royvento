@@ -51,6 +51,7 @@ import {
   sendTicketScannedEmail,
 } from "../lib/notifications";
 import { initiatePayment, isPhonePeConfigured, getAppUrl } from "../lib/phonepe";
+import { createOrder as createRazorpayOrder, isRazorpayConfigured, getKeyId as getRazorpayKeyId } from "../lib/razorpay";
 import { computeEffectiveRevenues, bookingDiscountRatio } from "../lib/effectiveRevenue";
 import { respondInvalid } from "../lib/validationError";
 
@@ -575,10 +576,13 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   const bfPct = parseFloat(vendorSchedule?.baseFeePercent ?? "3.5");
   const baseFee = (bfEnabled && finalPrice > 0) ? Math.round(finalPrice * bfPct / 100) : 0;
 
-  // Online payment / PhonePe disabled — all bookings are COD.
-  const wantsOnline = false;
-  const usePhonePe = false;
-  const bookingStatus = "confirmed";
+  // Determine payment method: use Razorpay when client requests online and gateway is configured.
+  // PAYMENT_BYPASS=true in .env.local skips the gateway entirely for local dev.
+  const bypass = process.env["PAYMENT_BYPASS"] === "true";
+  const wantsOnline = !bypass && parsed.data.paymentMethod === "online" && finalPrice + baseFee > 0;
+  const useRazorpay = wantsOnline && isRazorpayConfigured();
+  const bookingStatus = useRazorpay ? "payment_pending" : "confirmed";
+  const bookingPaymentMethod = useRazorpay ? ("online" as const) : ("cod" as const);
 
   const bookingValues = {
     eventId: evt.id,
@@ -606,12 +610,10 @@ router.post("/bookings", requireAuth(), async (req, res) => {
     phone: parsed.data.phone ?? "",
     pointsUsed,
     arrivalTime: parsed.data.arrivalTime || null,
-    approvedBy: "auto",
-    paymentMethod: "cod" as const,
+    approvedBy: useRazorpay ? "payment" : "auto",
+    paymentMethod: bookingPaymentMethod,
   };
 
-  // All bookings are confirmed immediately (COD only — online payment disabled).
-  // No vendor balance credit since commission is realised at scan time.
   const [bMaybe] = await db.insert(bookingsTable).values(bookingValues).returning();
   if (!bMaybe) {
     res.status(500).json({ error: "Failed" });
@@ -619,6 +621,45 @@ router.post("/bookings", requireAuth(), async (req, res) => {
   }
   const b = bMaybe;
 
+  // For online payments: create Razorpay order and return payment details.
+  // Availability is NOT marked booked yet — the webhook does that on capture.
+  if (useRazorpay) {
+    try {
+      const amountPaise = Math.round((finalPrice + baseFee) * 100);
+      const order = await createRazorpayOrder({
+        amountPaise,
+        receipt: `booking_${b.id}`,
+        notes: { bookingId: String(b.id), userId: String(user.id) },
+      });
+
+      await db.insert(paymentsTable).values({
+        merchantTransactionId: order.id,
+        bookingId: b.id,
+        amount: amountPaise,
+        status: "initiated",
+        razorpayOrderId: order.id,
+        phonepeTransactionId: "",
+      });
+
+      const [out] = await serializeBookings([b]);
+      res.json({
+        ...out,
+        paymentPending: true,
+        razorpayOrderId: order.id,
+        razorpayKeyId: getRazorpayKeyId(),
+        amountPaise,
+      });
+      return;
+    } catch (err) {
+      // Razorpay order creation failed — cancel the booking and surface the error
+      req.log.error({ err, bookingId: b.id }, "[razorpay] Failed to create order, cancelling booking");
+      await db.update(bookingsTable).set({ status: "cancelled" }).where(eq(bookingsTable.id, b.id));
+      res.status(502).json({ error: "Payment gateway unavailable. Please try again." });
+      return;
+    }
+  }
+
+  // COD / free booking — confirm immediately
   await db
     .insert(availabilityTable)
     .values({ vendorId: evt.vendorId, date: dateStr, status: "booked" })
@@ -631,9 +672,7 @@ router.post("/bookings", requireAuth(), async (req, res) => {
 
   // Respond as soon as the booking is persisted. Everything below
   // (confirmation emails, referral/loyalty points, in-app notification) is a
-  // best-effort side-effect that must NOT hold up the client — notably the
-  // SMTP send, which can take seconds. Each block already swallows its own
-  // errors, so running them after the response is safe.
+  // best-effort side-effect that must NOT hold up the client.
   res.json(out);
 
   void (async () => {

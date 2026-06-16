@@ -822,6 +822,129 @@ export async function sendEventApprovedEmail(params: {
 
 // ─── Customer Cancelled Booking ────────────────────────────────────────────────
 
+// ─── Invoice Email (sent after successful Razorpay payment) ──────────────────
+
+export async function sendInvoiceEmail(params: {
+  bookingId: number;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  eventTitle: string;
+  venueName: string;
+  bookingDate: string;
+  pubMode: string;
+  ticketWomen: number;
+  ticketMen: number;
+  ticketCouple: number;
+  guests: number;
+  totalPrice: number;
+  discountAmount: number;
+  pointsUsed: number;
+  finalPrice: number;
+  baseFee: number;
+  razorpayPaymentId: string;
+}): Promise<void> {
+  const invoiceNumber = `INV-${String(params.bookingId).padStart(6, "0")}`;
+  const issuedDate = new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata" });
+  const grandTotal = params.finalPrice + params.baseFee;
+  const POINTS_RUPEE_RATE = 0.05;
+  const pointsValue = params.pointsUsed * POINTS_RUPEE_RATE;
+
+  const ticketRows: { label: string; value: string }[] = [];
+  if (params.pubMode === "ticket") {
+    if (params.ticketWomen > 0) ticketRows.push({ label: "Ladies Tickets", value: `${params.ticketWomen}` });
+    if (params.ticketMen > 0) ticketRows.push({ label: "Gents Tickets", value: `${params.ticketMen}` });
+    if (params.ticketCouple > 0) ticketRows.push({ label: "Couple Tickets", value: `${params.ticketCouple}` });
+  } else {
+    ticketRows.push({ label: "Guests", value: `${params.guests}` });
+  }
+
+  const html = layout(`
+    <p style="margin:0 0 4px 0;font-size:22px;font-weight:800;color:#1a1a1a;">Tax Invoice</p>
+    <p style="margin:0 0 24px 0;font-size:13px;color:#888888;">${invoiceNumber} &nbsp;·&nbsp; Issued ${issuedDate}</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="vertical-align:top;width:50%;">
+          <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;letter-spacing:1px;color:#888888;text-transform:uppercase;">From</p>
+          <p style="margin:0;font-size:14px;font-weight:700;color:#1a1a1a;">Royvento</p>
+          <p style="margin:0;font-size:13px;color:#555555;">support@royvento.com</p>
+          <p style="margin:0;font-size:13px;color:#555555;">royvento.com</p>
+        </td>
+        <td style="vertical-align:top;width:50%;text-align:right;">
+          <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;letter-spacing:1px;color:#888888;text-transform:uppercase;">Bill To</p>
+          <p style="margin:0;font-size:14px;font-weight:700;color:#1a1a1a;">${esc(params.userName)}</p>
+          <p style="margin:0;font-size:13px;color:#555555;">${esc(params.userEmail)}</p>
+          ${params.userPhone ? `<p style="margin:0;font-size:13px;color:#555555;">${esc(params.userPhone)}</p>` : ""}
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 8px 0;font-size:11px;font-weight:700;letter-spacing:1px;color:#888888;text-transform:uppercase;">Booking Details</p>
+    ${card([
+      { label: "Booking ID", value: `#${params.bookingId}` },
+      { label: "Venue", value: params.venueName },
+      { label: "Event", value: params.eventTitle },
+      { label: "Date", value: fmtDate(params.bookingDate) },
+      ...ticketRows,
+    ])}
+
+    <p style="margin:16px 0 8px 0;font-size:11px;font-weight:700;letter-spacing:1px;color:#888888;text-transform:uppercase;">Amount</p>
+    ${card([
+      { label: "Subtotal", value: fmtINR(params.totalPrice) },
+      ...(params.discountAmount > 0 ? [{ label: "Discount", value: `− ${fmtINR(params.discountAmount)}` }] : []),
+      ...(pointsValue > 0 ? [{ label: `Points Redeemed (${params.pointsUsed} pts)`, value: `− ${fmtINR(pointsValue)}` }] : []),
+      ...(params.baseFee > 0 ? [{ label: "Convenience Fee", value: fmtINR(params.baseFee) }] : []),
+      { label: "Total Paid", value: fmtINR(grandTotal) },
+    ])}
+
+    <p style="margin:16px 0 8px 0;font-size:11px;font-weight:700;letter-spacing:1px;color:#888888;text-transform:uppercase;">Payment</p>
+    ${card([
+      { label: "Gateway", value: "Razorpay" },
+      { label: "Payment ID", value: params.razorpayPaymentId },
+      { label: "Status", value: "Paid" },
+    ])}
+
+    <p style="margin:24px 0 0 0;font-size:12px;color:#999999;text-align:center;">
+      This is a system-generated invoice. For support, contact support@royvento.com.
+    </p>
+    ${signature(true)}
+  `);
+
+  const text = [
+    `TAX INVOICE — ${invoiceNumber}`,
+    `Issued: ${issuedDate}`,
+    ``,
+    `From: Royvento (royvento.com)`,
+    `To: ${params.userName} <${params.userEmail}>`,
+    ``,
+    `Booking #${params.bookingId}`,
+    `Venue: ${params.venueName}`,
+    `Event: ${params.eventTitle}`,
+    `Date: ${fmtDate(params.bookingDate)}`,
+    ``,
+    `Subtotal:        ${fmtINR(params.totalPrice)}`,
+    ...(params.discountAmount > 0 ? [`Discount:        − ${fmtINR(params.discountAmount)}`] : []),
+    ...(pointsValue > 0 ? [`Points redeemed: − ${fmtINR(pointsValue)}`] : []),
+    ...(params.baseFee > 0 ? [`Convenience fee: ${fmtINR(params.baseFee)}`] : []),
+    `Total Paid:      ${fmtINR(grandTotal)}`,
+    ``,
+    `Payment ID: ${params.razorpayPaymentId}`,
+    ``,
+    `— The Royvento team`,
+  ].join("\n");
+
+  await deliver("Invoice (to customer)", {
+    to: params.userEmail,
+    toName: params.userName,
+    subject: `Invoice ${invoiceNumber} — Booking at ${params.venueName}`,
+    text,
+    html,
+  });
+}
+
+// ─── Customer Cancelled Booking ────────────────────────────────────────────────
+
 export async function sendCustomerCancelledBookingEmail(
   b: CustomerCancelledNotification,
 ): Promise<void> {

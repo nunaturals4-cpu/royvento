@@ -13,6 +13,17 @@ import {
 } from "lucide-react";
 import { apiGet, apiPost, formatINR } from "@/lib/api";
 
+function loadRazorpay(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) { resolve(true); return; }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 /* ─── types & data (all unchanged) ─────────────────────────────────────── */
 interface Sub {
   id: number;
@@ -170,18 +181,67 @@ export function Subscription() {
     }
   }, [paymentParam]);
 
-  // Subscribe logic unchanged
   const subscribe = async (planType: string) => {
     if (!user) { toast({ title: "Please log in first", variant: "destructive" }); return; }
     setLoading(true);
+    let razorpayHandling = false;
     try {
-      const result = await apiPost<Sub>("/api/subscriptions", { planType, planPeriod: billing });
-      setActive(result);
+      const result = await apiPost<Sub & { paymentPending?: boolean; razorpayOrderId?: string; razorpayKeyId?: string; amountPaise?: number; subscriptionId?: number }>("/api/subscriptions", { planType, planPeriod: billing });
+
+      if (result?.paymentPending && result.razorpayOrderId) {
+        const loaded = await loadRazorpay();
+        if (!loaded) {
+          toast({ title: "Payment error", description: "Could not load payment gateway. Please try again.", variant: "destructive" });
+          return;
+        }
+        const planLabel = PLAN_DISPLAY_NAMES[planType] ?? planType;
+        const rzpOptions = {
+          key: result.razorpayKeyId,
+          amount: result.amountPaise,
+          currency: "INR",
+          order_id: result.razorpayOrderId,
+          name: "Royvento",
+          description: `${planLabel} — ${billing}`,
+          prefill: { name: user?.name ?? "", contact: user?.phone ?? "" },
+          theme: { color: "#e6a817" },
+          handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+            try {
+              await apiPost("/api/payments/razorpay/verify", {
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpaySignature: response.razorpay_signature,
+              });
+              refetch();
+              apiGet<Sub | null>("/api/subscriptions/me").then((s) => { if (s) setActive(s); }).catch(() => {});
+              toast({ title: "Subscription activated!", description: "Enjoy your RoyVento membership." });
+              window.location.href = "/subscription?payment=success";
+            } catch (err: any) {
+              toast({ title: "Payment verification failed", description: err?.message ?? "Contact support with your payment ID.", variant: "destructive" });
+            } finally {
+              setLoading(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              toast({ title: "Payment cancelled", description: "You can try again whenever you're ready.", variant: "destructive" });
+              setLoading(false);
+            },
+          },
+        };
+        const rzp = new (window as any).Razorpay(rzpOptions);
+        rzp.open();
+        razorpayHandling = true;
+        return;
+      }
+
+      setActive(result as Sub);
       refetch();
       toast({ title: "Subscription activated!", description: "Enjoy your RoyVento membership." });
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message, variant: "destructive" });
-    } finally { setLoading(false); }
+    } finally {
+      if (!razorpayHandling) setLoading(false);
+    }
   };
 
   const isActiveUserPlan = (planType: string | null) => {

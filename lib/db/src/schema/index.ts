@@ -669,6 +669,8 @@ export const paymentsTable = pgTable(
     amount: integer("amount").notNull(),
     status: varchar("status", { length: 20 }).notNull().default("initiated"),
     phonepeTransactionId: varchar("phonepe_transaction_id", { length: 128 }).notNull().default(""),
+    razorpayOrderId: varchar("razorpay_order_id", { length: 100 }).notNull().default(""),
+    razorpayPaymentId: varchar("razorpay_payment_id", { length: 100 }).notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
