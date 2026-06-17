@@ -120,12 +120,13 @@ import type {
   SoloJoinBody,
   SoloMessage,
   SoloMessageBody,
-  SoloOtpRequestResult,
-  SoloOtpVerifyBody,
+  SoloPhoneConfig,
+  SoloPhoneVerifyBody,
+  SoloReportBody,
   SoloReviewBody,
+  SoloSubmitBody,
   SoloVenueOption,
   SoloVerification,
-  SoloVerificationBody,
   TrackProfileViewResult,
   UpdateBookingStatusBody,
   UpdateEventBody,
@@ -908,13 +909,13 @@ export const getSubmitSoloVerificationUrl = () => {
 
 
 
-  return `/api/solo-connect/verification`
+  return `/api/solo-connect/verification/submit`
 }
 
 /**
- * @summary Upload ID document, selfie and phone for verification
+ * @summary Submit selfie + gender + consent to finalize verification (Pending Review)
  */
-export const submitSoloVerification = async (soloVerificationBody: SoloVerificationBody, options?: RequestInit): Promise<SoloVerification> => {
+export const submitSoloVerification = async (soloSubmitBody: SoloSubmitBody, options?: RequestInit): Promise<SoloVerification> => {
 
   return customFetch<SoloVerification>(getSubmitSoloVerificationUrl(),
   {
@@ -922,7 +923,7 @@ export const submitSoloVerification = async (soloVerificationBody: SoloVerificat
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      soloVerificationBody,)
+      soloSubmitBody,)
   }
 );}
 
@@ -930,8 +931,8 @@ export const submitSoloVerification = async (soloVerificationBody: SoloVerificat
 
 
 export const getSubmitSoloVerificationMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloVerificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloVerificationBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloSubmitBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloSubmitBody>}, TContext> => {
 
 const mutationKey = ['submitSoloVerification'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -943,7 +944,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitSoloVerification>>, {data: BodyType<SoloVerificationBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitSoloVerification>>, {data: BodyType<SoloSubmitBody>}> = (props) => {
           const {data} = props ?? {};
 
           return  submitSoloVerification(data,requestOptions)
@@ -957,40 +958,40 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type SubmitSoloVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof submitSoloVerification>>>
-    export type SubmitSoloVerificationMutationBody = BodyType<SoloVerificationBody>
+    export type SubmitSoloVerificationMutationBody = BodyType<SoloSubmitBody>
     export type SubmitSoloVerificationMutationError = ErrorType<unknown>
 
     /**
- * @summary Upload ID document, selfie and phone for verification
+ * @summary Submit selfie + gender + consent to finalize verification (Pending Review)
  */
 export const useSubmitSoloVerification = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloVerificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitSoloVerification>>, TError,{data: BodyType<SoloSubmitBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof submitSoloVerification>>,
         TError,
-        {data: BodyType<SoloVerificationBody>},
+        {data: BodyType<SoloSubmitBody>},
         TContext
       > => {
       return useMutation(getSubmitSoloVerificationMutationOptions(options));
     }
 
-export const getRequestSoloOtpUrl = () => {
+export const getGetSoloPhoneConfigUrl = () => {
 
 
 
 
-  return `/api/solo-connect/verification/otp/request`
+  return `/api/solo-connect/phone/config`
 }
 
 /**
- * @summary Generate a mobile OTP (dev-mode returns the code)
+ * @summary Whether real Firebase Phone Auth is configured (else dev-stub mode)
  */
-export const requestSoloOtp = async ( options?: RequestInit): Promise<SoloOtpRequestResult> => {
+export const getSoloPhoneConfig = async ( options?: RequestInit): Promise<SoloPhoneConfig> => {
 
-  return customFetch<SoloOtpRequestResult>(getRequestSoloOtpUrl(),
+  return customFetch<SoloPhoneConfig>(getGetSoloPhoneConfigUrl(),
   {
     ...options,
-    method: 'POST'
+    method: 'GET'
 
 
   }
@@ -999,82 +1000,89 @@ export const requestSoloOtp = async ( options?: RequestInit): Promise<SoloOtpReq
 
 
 
-export const getRequestSoloOtpMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestSoloOtp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof requestSoloOtp>>, TError,void, TContext> => {
 
-const mutationKey = ['requestSoloOtp'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestSoloOtp>>, void> = () => {
-
-
-          return  requestSoloOtp(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type RequestSoloOtpMutationResult = NonNullable<Awaited<ReturnType<typeof requestSoloOtp>>>
-
-    export type RequestSoloOtpMutationError = ErrorType<unknown>
-
-    /**
- * @summary Generate a mobile OTP (dev-mode returns the code)
- */
-export const useRequestSoloOtp = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestSoloOtp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof requestSoloOtp>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getRequestSoloOtpMutationOptions(options));
+export const getGetSoloPhoneConfigQueryKey = () => {
+    return [
+    `/api/solo-connect/phone/config`
+    ] as const;
     }
 
-export const getVerifySoloOtpUrl = () => {
+
+export const getGetSoloPhoneConfigQueryOptions = <TData = Awaited<ReturnType<typeof getSoloPhoneConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloPhoneConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSoloPhoneConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSoloPhoneConfig>>> = ({ signal }) => getSoloPhoneConfig({ signal, ...requestOptions });
 
 
 
 
-  return `/api/solo-connect/verification/otp/verify`
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSoloPhoneConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSoloPhoneConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getSoloPhoneConfig>>>
+export type GetSoloPhoneConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Whether real Firebase Phone Auth is configured (else dev-stub mode)
+ */
+
+export function useGetSoloPhoneConfig<TData = Awaited<ReturnType<typeof getSoloPhoneConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSoloPhoneConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSoloPhoneConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getVerifySoloPhoneUrl = () => {
+
+
+
+
+  return `/api/solo-connect/phone/verify`
 }
 
 /**
- * @summary Verify the mobile OTP
+ * @summary Verify a Firebase phone ID token (or dev-stub) and link the phone
  */
-export const verifySoloOtp = async (soloOtpVerifyBody: SoloOtpVerifyBody, options?: RequestInit): Promise<SoloVerification> => {
+export const verifySoloPhone = async (soloPhoneVerifyBody: SoloPhoneVerifyBody, options?: RequestInit): Promise<SoloVerification> => {
 
-  return customFetch<SoloVerification>(getVerifySoloOtpUrl(),
+  return customFetch<SoloVerification>(getVerifySoloPhoneUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      soloOtpVerifyBody,)
+      soloPhoneVerifyBody,)
   }
 );}
 
 
 
 
-export const getVerifySoloOtpMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySoloOtp>>, TError,{data: BodyType<SoloOtpVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof verifySoloOtp>>, TError,{data: BodyType<SoloOtpVerifyBody>}, TContext> => {
+export const getVerifySoloPhoneMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySoloPhone>>, TError,{data: BodyType<SoloPhoneVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifySoloPhone>>, TError,{data: BodyType<SoloPhoneVerifyBody>}, TContext> => {
 
-const mutationKey = ['verifySoloOtp'];
+const mutationKey = ['verifySoloPhone'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1084,10 +1092,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifySoloOtp>>, {data: BodyType<SoloOtpVerifyBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifySoloPhone>>, {data: BodyType<SoloPhoneVerifyBody>}> = (props) => {
           const {data} = props ?? {};
 
-          return  verifySoloOtp(data,requestOptions)
+          return  verifySoloPhone(data,requestOptions)
         }
 
 
@@ -1097,22 +1105,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type VerifySoloOtpMutationResult = NonNullable<Awaited<ReturnType<typeof verifySoloOtp>>>
-    export type VerifySoloOtpMutationBody = BodyType<SoloOtpVerifyBody>
-    export type VerifySoloOtpMutationError = ErrorType<unknown>
+    export type VerifySoloPhoneMutationResult = NonNullable<Awaited<ReturnType<typeof verifySoloPhone>>>
+    export type VerifySoloPhoneMutationBody = BodyType<SoloPhoneVerifyBody>
+    export type VerifySoloPhoneMutationError = ErrorType<unknown>
 
     /**
- * @summary Verify the mobile OTP
+ * @summary Verify a Firebase phone ID token (or dev-stub) and link the phone
  */
-export const useVerifySoloOtp = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySoloOtp>>, TError,{data: BodyType<SoloOtpVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useVerifySoloPhone = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySoloPhone>>, TError,{data: BodyType<SoloPhoneVerifyBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof verifySoloOtp>>,
+        Awaited<ReturnType<typeof verifySoloPhone>>,
         TError,
-        {data: BodyType<SoloOtpVerifyBody>},
+        {data: BodyType<SoloPhoneVerifyBody>},
         TContext
       > => {
-      return useMutation(getVerifySoloOtpMutationOptions(options));
+      return useMutation(getVerifySoloPhoneMutationOptions(options));
     }
 
 export const getReviewSoloVerificationUrl = (id: number,) => {
@@ -2076,6 +2084,78 @@ export const useSendSoloMessage = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSendSoloMessageMutationOptions(options));
+    }
+
+export const getReportSoloMemberUrl = (id: number,) => {
+
+
+
+
+  return `/api/solo-connect/groups/${id}/report`
+}
+
+/**
+ * @summary Report another member of a group you've joined
+ */
+export const reportSoloMember = async (id: number,
+    soloReportBody: SoloReportBody, options?: RequestInit): Promise<SoloActionResult> => {
+
+  return customFetch<SoloActionResult>(getReportSoloMemberUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      soloReportBody,)
+  }
+);}
+
+
+
+
+export const getReportSoloMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportSoloMember>>, TError,{id: number;data: BodyType<SoloReportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportSoloMember>>, TError,{id: number;data: BodyType<SoloReportBody>}, TContext> => {
+
+const mutationKey = ['reportSoloMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportSoloMember>>, {id: number;data: BodyType<SoloReportBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reportSoloMember(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportSoloMemberMutationResult = NonNullable<Awaited<ReturnType<typeof reportSoloMember>>>
+    export type ReportSoloMemberMutationBody = BodyType<SoloReportBody>
+    export type ReportSoloMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Report another member of a group you've joined
+ */
+export const useReportSoloMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportSoloMember>>, TError,{id: number;data: BodyType<SoloReportBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportSoloMember>>,
+        TError,
+        {id: number;data: BodyType<SoloReportBody>},
+        TContext
+      > => {
+      return useMutation(getReportSoloMemberMutationOptions(options));
     }
 
 export const getListUsersUrl = () => {

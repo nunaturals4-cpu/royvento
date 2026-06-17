@@ -14,9 +14,13 @@ export interface SoloAccess {
   // Why the caller is (not) eligible — surfaced to drive the UI gate.
   reason: "ok" | "not_premium";
   premium: boolean;
-  // null when the user has never started verification.
-  verificationStatus: "none" | "pending" | "approved" | "rejected";
+  // "draft" = onboarding started (phone verified) but not yet submitted.
+  // "none" = never started.
+  verificationStatus: "none" | "draft" | "pending" | "approved" | "rejected";
   gender: string | null;
+  // Moderation state — when blocked the UI shows a banned/suspended notice.
+  banned: boolean;
+  suspendedUntil: string | null;
 }
 
 // Eligibility for Solo Connect: admins, premium users (active subscription), or
@@ -70,16 +74,25 @@ export async function getSoloAccess(user: AuthUser): Promise<SoloAccess> {
   // Admins moderate Solo Connect and never go through identity verification —
   // they're treated as already approved.
   let verificationStatus: SoloAccess["verificationStatus"];
+  let banned = false;
+  let suspendedUntil: string | null = null;
   if (user.role === "admin") {
     verificationStatus = "approved";
   } else {
     const verRows = await db
-      .select({ status: soloConnectVerificationsTable.status })
+      .select({
+        status: soloConnectVerificationsTable.status,
+        banned: soloConnectVerificationsTable.banned,
+        suspendedUntil: soloConnectVerificationsTable.suspendedUntil,
+      })
       .from(soloConnectVerificationsTable)
       .where(eq(soloConnectVerificationsTable.userId, user.id))
       .orderBy(desc(soloConnectVerificationsTable.id))
       .limit(1);
     verificationStatus = (verRows[0]?.status ?? "none") as SoloAccess["verificationStatus"];
+    banned = verRows[0]?.banned ?? false;
+    const su = verRows[0]?.suspendedUntil ?? null;
+    suspendedUntil = su && su.getTime() > Date.now() ? su.toISOString() : null;
   }
 
   return {
@@ -88,5 +101,7 @@ export async function getSoloAccess(user: AuthUser): Promise<SoloAccess> {
     premium,
     verificationStatus,
     gender: user.gender,
+    banned,
+    suspendedUntil,
   };
 }

@@ -25,12 +25,32 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CityPickerSheet } from "@/components/CityPickerSheet";
 import { EventCard } from "@/components/EventCard";
+import { GoingOutWithFriends } from "@/components/GoingOutWithFriends";
+import { HappeningTonight } from "@/components/HappeningTonight";
+import { HomeHero } from "@/components/HomeHero";
 import { MobileFooter } from "@/components/MobileFooter";
+import { PopularCategories } from "@/components/PopularCategories";
+import { PromoMarquee } from "@/components/PromoMarquee";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useSelectedCity } from "@/context/CityContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useColors } from "@/hooks/useColors";
+
+interface DateNightEvent {
+  id: number;
+  vendorId?: number;
+  title: string;
+  imageUrl?: string;
+  location?: string;
+  priceWomen?: number;
+  price?: number;
+  rating?: number;
+  reviewCount?: number;
+  hasDrinkPlans?: boolean;
+  freeEntryRules?: { enabled: boolean; genders: string[]; days: string[]; beforeTime?: string } | null;
+  dateNight?: boolean;
+}
 
 interface RecentAnnouncement {
   id: number;
@@ -105,6 +125,14 @@ export default function HomeScreen() {
   const featured = useListFeaturedEvents();
   const popular = useListEvents({ category: "Pubs" });
   const { data: drinkOffers = [] } = useListVendorDrinkOffers();
+
+  // Date Night rail — admin-curated, mirrors the web home. Filters the same
+  // /api/events?type=pub list by the `dateNight` flag (single source of truth).
+  const { data: pubsForDateNight } = useQuery<DateNightEvent[]>({
+    queryKey: ["events", "type", "pub"],
+    queryFn: () => customFetch<DateNightEvent[]>("/api/events?type=pub"),
+    staleTime: 1000 * 60 * 2,
+  });
   const { data: announcements } = useQuery<RecentAnnouncement[]>({
     queryKey: ["announcements", "recent"],
     queryFn: () => customFetch<RecentAnnouncement[]>("/api/announcements/recent"),
@@ -113,6 +141,10 @@ export default function HomeScreen() {
 
   const sortedPopular = sortCityFirst(popular.data ?? [], selectedCity);
   const sortedFeatured = sortCityFirst(featured.data ?? [], selectedCity);
+  const dateNightPubs = sortCityFirst(
+    (pubsForDateNight ?? []).filter((e) => e.dateNight === true),
+    selectedCity
+  );
 
   const isLoading = featured.isLoading && popular.isLoading;
   const onRefresh = () => {
@@ -135,55 +167,12 @@ export default function HomeScreen() {
         />
       }
     >
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.card, colors.background]}
-        style={[styles.hero, { paddingTop: topPadding + 20 }]}
-      >
-        <View style={styles.heroInner}>
-          <Text style={[styles.heroTitle, { color: colors.foreground }]}>
-            {t("home.discover")}{" "}
-            <Text style={{ color: colors.primary }}>{t("home.events")}</Text>
-          </Text>
-          <Pressable
-            onPress={() => router.push("/(tabs)/explore")}
-            style={[styles.searchBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
-          >
-            <Ionicons name="search" size={18} color={colors.mutedForeground} />
-          </Pressable>
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.cityChip,
-            {
-              backgroundColor: selectedCity ? colors.primary + "18" : colors.muted,
-              borderColor: selectedCity ? colors.primary : colors.border,
-            },
-          ]}
-          onPress={() => setCityPickerOpen(true)}
-          activeOpacity={0.75}
-        >
-          <Ionicons
-            name="location-outline"
-            size={13}
-            color={selectedCity ? colors.primary : colors.mutedForeground}
-          />
-          <Text
-            style={[
-              styles.cityChipText,
-              { color: selectedCity ? colors.primary : colors.mutedForeground },
-            ]}
-            numberOfLines={1}
-          >
-            {selectedCity || t("home.all_cities")}
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={11}
-            color={selectedCity ? colors.primary : colors.mutedForeground}
-          />
-        </TouchableOpacity>
-      </LinearGradient>
+      {/* Multi-pillar hero carousel + search (mirrors web HeroSlider) */}
+      <HomeHero
+        selectedCity={selectedCity}
+        onOpenCityPicker={() => setCityPickerOpen(true)}
+        topPadding={topPadding}
+      />
 
       <CityPickerSheet
         visible={cityPickerOpen}
@@ -192,7 +181,12 @@ export default function HomeScreen() {
         onSelect={setSelectedCity}
       />
 
-      {/* Hero CTAs + stats */}
+      {/* Promo marquee */}
+      <View style={{ marginTop: 14 }}>
+        <PromoMarquee />
+      </View>
+
+      {/* CTAs + stats */}
       <View style={styles.heroCtaWrap}>
         <View style={styles.heroCtaRow}>
           <TouchableOpacity
@@ -239,6 +233,12 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Popular Categories */}
+      <PopularCategories />
+
+      {/* Happening Tonight — real-time discovery */}
+      <HappeningTonight />
+
       {/* Popular Pubs */}
       {(popular.data?.length ?? 0) > 0 && (
         <Section title={t("home.popular_pubs")} onSeeAll={() => router.push({ pathname: "/(tabs)/explore", params: { type: "pub" } })}>
@@ -269,6 +269,38 @@ export default function HomeScreen() {
           />
         </Section>
       )}
+
+      {/* Date Night — curated romantic picks */}
+      {dateNightPubs.length > 0 && (
+        <Section title="Date Night" icon="heart-outline" onSeeAll={() => router.push("/tonight-plans" as never)}>
+          <FlatList
+            horizontal
+            data={dateNightPubs}
+            keyExtractor={(item) => String(item.id)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            renderItem={({ item }) => (
+              <EventCard
+                id={item.id}
+                vendorId={item.vendorId}
+                title={item.title}
+                imageUrl={item.imageUrl}
+                location={item.location}
+                price={item.priceWomen}
+                type="pub"
+                rating={item.rating}
+                reviewCount={item.reviewCount}
+                hasDrinkPlans={item.hasDrinkPlans}
+                freeEntryRules={item.freeEntryRules}
+                directBooking
+              />
+            )}
+          />
+        </Section>
+      )}
+
+      {/* Going Out With Friends — group-first discovery */}
+      <GoingOutWithFriends />
 
       {/* Drink Deals */}
       {drinkOffers.length > 0 && (

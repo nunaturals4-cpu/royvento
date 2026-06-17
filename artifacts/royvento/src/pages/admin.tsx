@@ -6120,12 +6120,15 @@ interface AdminSoloVerification {
   userId: number;
   userName: string;
   userEmail: string;
-  idType: string;
-  idNumber: string;
-  idDocumentUrl: string;
+  gender: string | null;
   selfieUrl: string;
+  selfieStreamUrl: string;
   phone: string;
   phoneVerified: boolean;
+  consentAcceptedAt: string | null;
+  consentVersion: string;
+  suspendedUntil: string | null;
+  banned: boolean;
   status: string;
   rejectionReason: string;
   createdAt: string;
@@ -6151,10 +6154,63 @@ interface AdminSoloGroup {
   status: string;
   createdAt: string;
   memberCount: number;
+  menCount: number;
+  womenCount: number;
   pendingCount: number;
   totalMemberCount: number;
   creatorName: string;
   creatorEmail: string;
+  daysSinceActivity: number | null;
+  expiryWarnedAt: string | null;
+  deletedAt: string | null;
+  deletedReason: string;
+}
+
+interface AdminSoloReport {
+  id: number;
+  reporterUserId: number;
+  reporterName: string;
+  reporterEmail: string;
+  reportedUserId: number;
+  reportedName: string;
+  reportedEmail: string;
+  reportCountAgainstReported: number;
+  groupId: number;
+  groupName: string;
+  reason: string;
+  description: string;
+  evidenceUrl: string;
+  status: string;
+  actionTaken: string;
+  adminNote: string;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+interface AdminSoloModerationAction {
+  id: number;
+  adminUserId: number;
+  adminName: string;
+  targetUserId: number | null;
+  targetName: string;
+  groupId: number | null;
+  reportId: number | null;
+  action: string;
+  note: string;
+  createdAt: string;
+}
+
+interface AdminSoloDeletedGroup {
+  id: number;
+  groupId: number;
+  name: string;
+  memberCount: number;
+  reason: string;
+  deletedAt: string;
+  restorableUntil: string | null;
+  restoredAt: string | null;
+  purgedAt: string | null;
+  restorable: boolean;
 }
 
 interface AdminSoloMember {
@@ -6180,20 +6236,13 @@ interface AdminSoloMessage {
   createdAt: string;
 }
 
-const SOLO_ID_LABELS: Record<string, string> = {
-  aadhaar: "Aadhaar",
-  passport: "Passport",
-  driving_license: "Driving License",
-  voter_id: "Voter ID",
-};
-
 // Preset rejection messages the admin picks from. The chosen `message` is stored
 // as the verification's rejectionReason and shown to the user on their Solo
-// Connect page, telling them exactly what to re-upload.
+// Connector page, telling them exactly what to redo.
 const SOLO_REJECT_REASONS = [
-  { label: "Upload Aadhaar again", message: "Please upload your government ID (Aadhaar) again — the current image is unclear or invalid." },
-  { label: "Upload photo again", message: "Please upload your selfie photo again — the current image is unclear." },
-  { label: "Upload Aadhaar and photo again", message: "Please upload both your government ID (Aadhaar) and your selfie photo again — the current images are unclear." },
+  { label: "Retake selfie", message: "Please retake your selfie — the current image is unclear or doesn't show your face." },
+  { label: "Selfie doesn't match", message: "Your selfie could not be verified. Please capture a clear, well-lit live selfie." },
+  { label: "Suspected fake profile", message: "We couldn't verify your profile. Please re-submit with a genuine live selfie." },
 ] as const;
 
 // ── Shared badge helpers ──────────────────────────────────────────────────────
@@ -6276,12 +6325,13 @@ function GroupDetailModal({
     { label: "City", value: group.city },
     { label: "State", value: group.state || "—" },
     { label: "Country", value: group.country || "India" },
-    { label: "Gender", value: `${group.genderType} only` },
+    { label: "Vibe", value: group.genderType },
     { label: "Venue", value: group.venueName || "—" },
     { label: "Date", value: group.groupDate ? new Date(group.groupDate).toLocaleDateString("en-IN") : "—" },
     { label: "Time", value: group.startTime || "—" },
-    { label: "Members", value: `${group.memberCount} approved · ${group.pendingCount} pending · ${group.maxMembers} max` },
-    { label: "Status", value: group.status },
+    { label: "Members", value: `👨 ${group.menCount ?? 0} · 👩 ${group.womenCount ?? 0} · ${group.memberCount} approved · ${group.pendingCount} pending · ${group.maxMembers} max` },
+    { label: "Status", value: group.deletedAt ? "deleted" : group.status },
+    { label: "Inactivity", value: group.daysSinceActivity != null ? `${group.daysSinceActivity} days since activity` : "—" },
     { label: "Created", value: new Date(group.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
   ];
 
@@ -6298,7 +6348,7 @@ function GroupDetailModal({
               <h3 className="font-serif text-xl">{group.name}</h3>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${soloGroupStatusBadge(group.status)}`}>{group.status}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{soloActLabel(group.activityType)} · {group.city} · {group.genderType} only</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{soloActLabel(group.activityType)} · {group.city} · {group.genderType}</p>
           </div>
           <button
             type="button"
@@ -6625,7 +6675,7 @@ function SoloGroupsPanel() {
                   </td>
                   <td className="p-3">
                     <p className="text-sm">{g.city}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{g.genderType} only</p>
+                    <p className="text-xs text-muted-foreground capitalize">{g.genderType}{g.daysSinceActivity != null ? ` · ${g.daysSinceActivity}d idle` : ""}</p>
                   </td>
                   <td className="p-3">
                     <p className="text-sm">{g.creatorName || "—"}</p>
@@ -6768,9 +6818,10 @@ function SoloVerificationsPanel() {
             <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="text-left p-3">User</th>
-                <th className="text-left p-3">ID Type</th>
-                <th className="text-left p-3">ID Number</th>
-                <th className="text-left p-3">Documents</th>
+                <th className="text-left p-3">Selfie</th>
+                <th className="text-left p-3">Phone</th>
+                <th className="text-left p-3">Gender</th>
+                <th className="text-left p-3">Consent</th>
                 <th className="text-left p-3">Status</th>
                 <th className="text-right p-3">Action</th>
               </tr>
@@ -6781,27 +6832,25 @@ function SoloVerificationsPanel() {
                   <td className="p-3">
                     <p className="font-medium">{v.userName}</p>
                     <p className="text-xs text-muted-foreground">{v.userEmail}</p>
+                    {(v.banned || v.suspendedUntil) && (
+                      <p className="text-[10px] mt-1 text-red-300">{v.banned ? "Banned" : `Suspended until ${new Date(v.suspendedUntil!).toLocaleDateString()}`}</p>
+                    )}
                   </td>
-                  <td className="p-3">{SOLO_ID_LABELS[v.idType] ?? (v.idType || "—")}</td>
-                  <td className="p-3 font-mono text-xs">{v.idNumber || "—"}</td>
                   <td className="p-3">
-                    {v.idDocumentUrl || v.selfieUrl ? (
-                      <div className="flex gap-2">
-                        {v.idDocumentUrl && (
-                          <a href={v.idDocumentUrl} target="_blank" rel="noreferrer" title="Government ID">
-                            <img src={v.idDocumentUrl} alt="ID" className="h-12 w-16 object-cover rounded border border-white/10" />
-                          </a>
-                        )}
-                        {v.selfieUrl && (
-                          <a href={v.selfieUrl} target="_blank" rel="noreferrer" title="Selfie">
-                            <img src={v.selfieUrl} alt="Selfie" className="h-12 w-12 object-cover rounded-full border border-white/10" />
-                          </a>
-                        )}
-                      </div>
+                    {v.selfieStreamUrl ? (
+                      <a href={v.selfieStreamUrl} target="_blank" rel="noreferrer" title="View selfie (admin only)">
+                        <img src={v.selfieStreamUrl} alt="Selfie" className="h-12 w-12 object-cover rounded-full border border-white/10" />
+                      </a>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
+                  <td className="p-3">
+                    <span className="font-mono text-xs">{v.phone || "—"}</span>
+                    {v.phoneVerified && <span className="ml-1 text-emerald-400" title="Verified">✓</span>}
+                  </td>
+                  <td className="p-3 capitalize">{v.gender ? v.gender.replace(/_/g, " ") : "—"}</td>
+                  <td className="p-3 text-xs text-muted-foreground">{v.consentAcceptedAt ? `v${v.consentVersion}` : "—"}</td>
                   <td className="p-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${verBadge(v.status)}`}>{v.status}</span>
                     {v.status === "rejected" && v.rejectionReason && (
@@ -6886,27 +6935,283 @@ function SoloVerificationsPanel() {
   );
 }
 
-// ── Main Solo Connect admin entry-point (sub-tab switcher) ────────────────────
+const SOLO_REPORT_REASON_LABELS: Record<string, string> = {
+  harassment: "Harassment",
+  fake_profile: "Fake profile",
+  abuse: "Abuse",
+  spam: "Spam",
+  inappropriate: "Inappropriate behaviour",
+  safety: "Safety concern",
+  other: "Other",
+};
+
+// ── Reports management panel ──────────────────────────────────────────────────
+function SoloReportsPanel() {
+  const [data, setData] = useState<{ total: number; reports: AdminSoloReport[] }>({ total: 0, reports: [] });
+  const [statusFilter, setStatusFilter] = useState("");
+  const [reasonFilter, setReasonFilter] = useState("");
+  const [q, setQ] = useState("");
+  const [actionTarget, setActionTarget] = useState<AdminSoloReport | null>(null);
+  const { toast } = useToast();
+
+  const load = () => {
+    const qs = new URLSearchParams();
+    if (statusFilter) qs.set("status", statusFilter);
+    if (reasonFilter) qs.set("reason", reasonFilter);
+    if (q.trim()) qs.set("q", q.trim());
+    apiGet<{ total: number; reports: AdminSoloReport[] }>(`/api/admin/solo-connect/reports?${qs.toString()}`)
+      .then(setData)
+      .catch(() => {});
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter, reasonFilter]);
+
+  const exportCsv = () => {
+    const head = ["id", "reporter", "reported", "group", "reason", "status", "action", "created"];
+    const rows = data.reports.map((r) => [r.id, r.reporterEmail, r.reportedEmail, r.groupName, r.reason, r.status, r.actionTaken, r.createdAt]);
+    const csv = [head, ...rows].map((line) => line.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "solo-reports.csv";
+    a.click();
+  };
+
+  const repBadge = (s: string) => ({
+    open: "bg-amber-500/15 border-amber-500/30 text-amber-300",
+    under_review: "bg-sky-500/15 border-sky-500/30 text-sky-300",
+    resolved: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+    rejected: "bg-white/10 border-white/20 text-white/60",
+  }[s] ?? "bg-white/10 border-white/20 text-white/70");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm">
+          <option value="">All statuses</option>
+          {["open", "under_review", "resolved", "rejected"].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={reasonFilter} onChange={(e) => setReasonFilter(e.target.value)} className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm">
+          <option value="">All reasons</option>
+          {Object.entries(SOLO_REPORT_REASON_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") load(); }} placeholder="Search name/email…" className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm flex-1 min-w-[160px]" />
+        <button type="button" onClick={load} className="px-3 py-2 rounded-lg text-sm bg-white/10 border border-white/15">Search</button>
+        <button type="button" onClick={exportCsv} className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/15">Export CSV</button>
+      </div>
+
+      <div className="rounded-2xl glass-card overflow-x-auto overflow-y-auto max-h-[60vh]">
+        {data.reports.length === 0 ? (
+          <p className="p-6 text-muted-foreground">No reports.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[920px]">
+            <thead className="sticky top-0 z-10 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="text-left p-3">Reported</th>
+                <th className="text-left p-3">Reporter</th>
+                <th className="text-left p-3">Group</th>
+                <th className="text-left p-3">Reason</th>
+                <th className="text-left p-3">Evidence</th>
+                <th className="text-left p-3">Status</th>
+                <th className="text-right p-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.reports.map((r) => (
+                <tr key={r.id} className="border-t border-white/5 align-top">
+                  <td className="p-3">
+                    <p className="font-medium">{r.reportedName}</p>
+                    <p className="text-xs text-muted-foreground">{r.reportedEmail}</p>
+                    {r.reportCountAgainstReported > 1 && (
+                      <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 border border-red-500/30 text-red-300">{r.reportCountAgainstReported} reports total</span>
+                    )}
+                  </td>
+                  <td className="p-3"><p className="text-xs">{r.reporterName}</p><p className="text-[10px] text-muted-foreground">{r.reporterEmail}</p></td>
+                  <td className="p-3 text-xs">{r.groupName}</td>
+                  <td className="p-3">
+                    <p className="text-xs font-medium">{SOLO_REPORT_REASON_LABELS[r.reason] ?? r.reason}</p>
+                    {r.description && <p className="text-[10px] text-muted-foreground max-w-[200px]">{r.description}</p>}
+                  </td>
+                  <td className="p-3">
+                    {r.evidenceUrl ? <a href={r.evidenceUrl} target="_blank" rel="noreferrer"><img src={r.evidenceUrl} alt="Evidence" className="h-12 w-12 object-cover rounded border border-white/10" /></a> : <span className="text-xs text-muted-foreground">—</span>}
+                  </td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${repBadge(r.status)}`}>{r.status.replace(/_/g, " ")}</span>
+                    {r.actionTaken && r.actionTaken !== "none" && <p className="text-[10px] text-muted-foreground mt-1">action: {r.actionTaken}</p>}
+                  </td>
+                  <td className="p-3 text-right">
+                    {(r.status === "open" || r.status === "under_review") ? (
+                      <button type="button" onClick={() => setActionTarget(r)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 border border-white/20 hover:bg-white/20">Take action</button>
+                    ) : <span className="text-xs text-muted-foreground">closed</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {actionTarget && (
+        <ReportActionModal report={actionTarget} onClose={() => setActionTarget(null)} onDone={() => { setActionTarget(null); load(); }} />
+      )}
+    </div>
+  );
+}
+
+function ReportActionModal({ report, onClose, onDone }: { report: AdminSoloReport; onClose: () => void; onDone: () => void }) {
+  const { toast } = useToast();
+  const [note, setNote] = useState("");
+  const [suspendDays, setSuspendDays] = useState(7);
+  const [busy, setBusy] = useState(false);
+
+  const act = async (action: string) => {
+    setBusy(true);
+    try {
+      await apiPost(`/api/admin/solo-connect/reports/${report.id}/action`, {
+        action,
+        note: note.trim() || undefined,
+        ...(action === "suspend" ? { suspendDays } : {}),
+      });
+      toast({ title: `Action applied: ${action}` });
+      onDone();
+    } catch {
+      toast({ title: "Could not apply action.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const ACTIONS = [
+    { value: "warn", label: "Warn member", tone: "amber" },
+    { value: "remove", label: "Remove from group", tone: "amber" },
+    { value: "suspend", label: "Suspend", tone: "red" },
+    { value: "ban", label: "Ban", tone: "red" },
+    { value: "resolve", label: "Resolve (no action)", tone: "emerald" },
+    { value: "reject", label: "Reject report", tone: "white" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl glass-card p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-serif mb-1">Action on report</h3>
+        <p className="text-xs text-muted-foreground mb-4">{report.reportedName} · {SOLO_REPORT_REASON_LABELS[report.reason] ?? report.reason} · {report.groupName}</p>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Internal / member note (optional)…" className="w-full rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm mb-3" />
+        <label className="flex items-center gap-2 text-xs mb-4 text-muted-foreground">Suspend days:
+          <input type="number" min={1} max={365} value={suspendDays} onChange={(e) => setSuspendDays(Number(e.target.value))} className="w-20 rounded bg-white/5 border border-white/15 px-2 py-1" />
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {ACTIONS.map((a) => (
+            <button key={a.value} type="button" disabled={busy} onClick={() => act(a.value)} className="px-3 py-2 rounded-lg text-xs font-semibold bg-white/8 border border-white/20 hover:bg-white/15 disabled:opacity-50">{a.label}</button>
+          ))}
+        </div>
+        <button type="button" onClick={onClose} className="mt-4 w-full py-2.5 rounded-xl text-sm bg-white/5 border border-white/15 text-white/70">Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Auto-deletion logs panel ──────────────────────────────────────────────────
+function SoloDeletedGroupsPanel() {
+  const [items, setItems] = useState<AdminSoloDeletedGroup[]>([]);
+  const { toast } = useToast();
+  const load = () => apiGet<AdminSoloDeletedGroup[]>("/api/admin/solo-connect/deleted-groups").then(setItems).catch(() => {});
+  useEffect(() => { load(); }, []);
+  const restore = async (g: AdminSoloDeletedGroup) => {
+    try {
+      await apiPost(`/api/admin/solo-connect/groups/${g.groupId}/restore`, {});
+      toast({ title: "Group restored" });
+      await load();
+    } catch {
+      toast({ title: "Could not restore (window may have passed).", variant: "destructive" });
+    }
+  };
+  return (
+    <div className="rounded-2xl glass-card overflow-x-auto max-h-[60vh]">
+      {items.length === 0 ? <p className="p-6 text-muted-foreground">No auto-deleted groups yet.</p> : (
+        <table className="w-full text-sm min-w-[700px]">
+          <thead className="sticky top-0 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+            <tr><th className="text-left p-3">Group</th><th className="text-left p-3">Members</th><th className="text-left p-3">Reason</th><th className="text-left p-3">Deleted</th><th className="text-left p-3">Restorable until</th><th className="text-right p-3">Action</th></tr>
+          </thead>
+          <tbody>
+            {items.map((g) => (
+              <tr key={g.id} className="border-t border-white/5">
+                <td className="p-3">{g.name}</td>
+                <td className="p-3">{g.memberCount}</td>
+                <td className="p-3 text-xs">{g.reason}</td>
+                <td className="p-3 text-xs">{new Date(g.deletedAt).toLocaleString()}</td>
+                <td className="p-3 text-xs">{g.purgedAt ? "purged" : g.restoredAt ? "restored" : g.restorableUntil ? new Date(g.restorableUntil).toLocaleDateString() : "—"}</td>
+                <td className="p-3 text-right">
+                  {g.restorable ? <button type="button" onClick={() => restore(g)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">Restore</button> : <span className="text-xs text-muted-foreground">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ── Moderation actions audit log panel ────────────────────────────────────────
+function SoloModerationLogPanel() {
+  const [items, setItems] = useState<AdminSoloModerationAction[]>([]);
+  useEffect(() => { apiGet<AdminSoloModerationAction[]>("/api/admin/solo-connect/moderation-actions").then(setItems).catch(() => {}); }, []);
+  return (
+    <div className="rounded-2xl glass-card overflow-x-auto max-h-[60vh]">
+      {items.length === 0 ? <p className="p-6 text-muted-foreground">No moderation actions logged.</p> : (
+        <table className="w-full text-sm min-w-[640px]">
+          <thead className="sticky top-0 bg-white/5 backdrop-blur text-xs uppercase tracking-wider text-muted-foreground">
+            <tr><th className="text-left p-3">When</th><th className="text-left p-3">Admin</th><th className="text-left p-3">Action</th><th className="text-left p-3">Target</th><th className="text-left p-3">Note</th></tr>
+          </thead>
+          <tbody>
+            {items.map((a) => (
+              <tr key={a.id} className="border-t border-white/5">
+                <td className="p-3 text-xs">{new Date(a.createdAt).toLocaleString()}</td>
+                <td className="p-3 text-xs">{a.adminName}</td>
+                <td className="p-3"><span className="text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/20">{a.action}</span></td>
+                <td className="p-3 text-xs">{a.targetName || (a.groupId ? `group #${a.groupId}` : "—")}</td>
+                <td className="p-3 text-xs text-muted-foreground max-w-[260px]">{a.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ── Main Solo Connector admin entry-point (sub-tab switcher) ──────────────────
+const SOLO_SUBTABS = [
+  { id: "verifications", label: "Verifications" },
+  { id: "groups", label: "Groups & Inactivity" },
+  { id: "reports", label: "Reports" },
+  { id: "deleted", label: "Auto-Deletion Logs" },
+  { id: "moderation", label: "Moderation Log" },
+] as const;
+type SoloSubTab = (typeof SOLO_SUBTABS)[number]["id"];
+
 function SoloConnectAdmin() {
-  const [subTab, setSubTab] = useState<"verifications" | "groups">("verifications");
+  const [subTab, setSubTab] = useState<SoloSubTab>("verifications");
 
   return (
     <div className="space-y-5">
-      <div className="flex gap-1 p-1 rounded-xl bg-white/5 w-fit">
-        {(["verifications", "groups"] as const).map((t) => (
+      <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-white/5 w-fit">
+        {SOLO_SUBTABS.map((t) => (
           <button
-            key={t}
+            key={t.id}
             type="button"
-            onClick={() => setSubTab(t)}
-            className={`px-5 py-2 rounded-lg text-sm font-medium capitalize transition-all ${subTab === t ? "bg-white/10 text-white shadow" : "text-muted-foreground hover:text-white"}`}
+            onClick={() => setSubTab(t.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${subTab === t.id ? "bg-white/10 text-white shadow" : "text-muted-foreground hover:text-white"}`}
           >
-            {t === "verifications" ? "Identity Verifications" : "Groups"}
+            {t.label}
           </button>
         ))}
       </div>
 
       {subTab === "verifications" && <SoloVerificationsPanel />}
       {subTab === "groups" && <SoloGroupsPanel />}
+      {subTab === "reports" && <SoloReportsPanel />}
+      {subTab === "deleted" && <SoloDeletedGroupsPanel />}
+      {subTab === "moderation" && <SoloModerationLogPanel />}
     </div>
   );
 }

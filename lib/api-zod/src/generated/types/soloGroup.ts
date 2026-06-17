@@ -33,7 +33,11 @@ export interface SoloGroup {
   reputationScore: string;
   ratingCount: number;
   createdAt: string;
+  lastActivityAt?: string | null;
   memberCount: number;
+  menCount: number;
+  womenCount: number;
+  otherCount: number;
   myMembershipStatus?: string | null;
   isAdmin: boolean;
 }

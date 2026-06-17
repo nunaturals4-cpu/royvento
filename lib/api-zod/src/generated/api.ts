@@ -171,8 +171,10 @@ export const GetSoloAccessResponse = zod.object({
   "eligible": zod.boolean(),
   "reason": zod.enum(['ok', 'not_premium']),
   "premium": zod.boolean(),
-  "verificationStatus": zod.enum(['none', 'pending', 'approved', 'rejected']),
-  "gender": zod.string().nullish()
+  "verificationStatus": zod.enum(['none', 'draft', 'pending', 'approved', 'rejected']),
+  "gender": zod.string().nullish(),
+  "banned": zod.boolean(),
+  "suspendedUntil": zod.string().nullish()
 })
 
 
@@ -198,13 +200,14 @@ export const ListSoloVenuesResponse = zod.array(ListSoloVenuesResponseItem)
 export const GetSoloVerificationResponse = zod.union([zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "idType": zod.string(),
-  "idNumber": zod.string(),
-  "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),
   "phoneVerified": zod.boolean(),
-  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "consentAcceptedAt": zod.string().nullish(),
+  "consentVersion": zod.string(),
+  "suspendedUntil": zod.string().nullish(),
+  "banned": zod.boolean(),
+  "status": zod.enum(['draft', 'pending', 'approved', 'rejected']),
   "rejectionReason": zod.string(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -212,23 +215,25 @@ export const GetSoloVerificationResponse = zod.union([zod.object({
 
 
 /**
- * @summary Upload ID document, selfie and phone for verification
+ * @summary Submit selfie + gender + consent to finalize verification (Pending Review)
  */
 export const SubmitSoloVerificationBody = zod.object({
-  "idType": zod.enum(['aadhaar', 'passport', 'driving_license', 'voter_id']),
-  "idNumber": zod.string()
+  "selfieUrl": zod.string(),
+  "gender": zod.enum(['male', 'female', 'prefer_not_to_say']),
+  "consent": zod.literal(true)
 }).strict()
 
 export const SubmitSoloVerificationResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "idType": zod.string(),
-  "idNumber": zod.string(),
-  "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),
   "phoneVerified": zod.boolean(),
-  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "consentAcceptedAt": zod.string().nullish(),
+  "consentVersion": zod.string(),
+  "suspendedUntil": zod.string().nullish(),
+  "banned": zod.boolean(),
+  "status": zod.enum(['draft', 'pending', 'approved', 'rejected']),
   "rejectionReason": zod.string(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -236,31 +241,31 @@ export const SubmitSoloVerificationResponse = zod.object({
 
 
 /**
- * @summary Generate a mobile OTP (dev-mode returns the code)
+ * @summary Whether real Firebase Phone Auth is configured (else dev-stub mode)
  */
-export const RequestSoloOtpResponse = zod.object({
-  "ok": zod.boolean(),
-  "devCode": zod.string().nullish()
+export const GetSoloPhoneConfigResponse = zod.object({
+  "firebaseConfigured": zod.boolean()
 })
 
 
 /**
- * @summary Verify the mobile OTP
+ * @summary Verify a Firebase phone ID token (or dev-stub) and link the phone
  */
-export const VerifySoloOtpBody = zod.object({
-  "code": zod.string()
+export const VerifySoloPhoneBody = zod.object({
+  "idToken": zod.string()
 }).strict()
 
-export const VerifySoloOtpResponse = zod.object({
+export const VerifySoloPhoneResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "idType": zod.string(),
-  "idNumber": zod.string(),
-  "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),
   "phoneVerified": zod.boolean(),
-  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "consentAcceptedAt": zod.string().nullish(),
+  "consentVersion": zod.string(),
+  "suspendedUntil": zod.string().nullish(),
+  "banned": zod.boolean(),
+  "status": zod.enum(['draft', 'pending', 'approved', 'rejected']),
   "rejectionReason": zod.string(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -282,13 +287,14 @@ export const ReviewSoloVerificationBody = zod.object({
 export const ReviewSoloVerificationResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "idType": zod.string(),
-  "idNumber": zod.string(),
-  "idDocumentUrl": zod.string(),
   "selfieUrl": zod.string(),
   "phone": zod.string(),
   "phoneVerified": zod.boolean(),
-  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "consentAcceptedAt": zod.string().nullish(),
+  "consentVersion": zod.string(),
+  "suspendedUntil": zod.string().nullish(),
+  "banned": zod.boolean(),
+  "status": zod.enum(['draft', 'pending', 'approved', 'rejected']),
   "rejectionReason": zod.string(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -320,13 +326,17 @@ export const ListSoloGroupsResponseItem = zod.object({
   "country": zod.string(),
   "state": zod.string(),
   "city": zod.string(),
-  "genderType": zod.enum(['male', 'female']),
+  "genderType": zod.enum(['male', 'female', 'mixed']),
   "visibility": zod.enum(['public', 'private']),
   "status": zod.enum(['open', 'locked', 'closed']),
   "reputationScore": zod.string(),
   "ratingCount": zod.number(),
   "createdAt": zod.string(),
+  "lastActivityAt": zod.string().nullish(),
   "memberCount": zod.number(),
+  "menCount": zod.number(),
+  "womenCount": zod.number(),
+  "otherCount": zod.number(),
   "myMembershipStatus": zod.string().nullish(),
   "isAdmin": zod.boolean()
 })
@@ -348,6 +358,7 @@ export const CreateSoloGroupBody = zod.object({
   "description": zod.string().optional(),
   "maxMembers": zod.number(),
   "visibility": zod.enum(['public', 'private']).optional(),
+  "genderType": zod.enum(['male', 'female', 'mixed']).optional(),
   "country": zod.string().optional(),
   "state": zod.string().optional(),
   "city": zod.string()
@@ -370,13 +381,17 @@ export const CreateSoloGroupResponse = zod.object({
   "country": zod.string(),
   "state": zod.string(),
   "city": zod.string(),
-  "genderType": zod.enum(['male', 'female']),
+  "genderType": zod.enum(['male', 'female', 'mixed']),
   "visibility": zod.enum(['public', 'private']),
   "status": zod.enum(['open', 'locked', 'closed']),
   "reputationScore": zod.string(),
   "ratingCount": zod.number(),
   "createdAt": zod.string(),
+  "lastActivityAt": zod.string().nullish(),
   "memberCount": zod.number(),
+  "menCount": zod.number(),
+  "womenCount": zod.number(),
+  "otherCount": zod.number(),
   "myMembershipStatus": zod.string().nullish(),
   "isAdmin": zod.boolean()
 })
@@ -411,13 +426,17 @@ export const GetSoloGroupResponse = zod.object({
   "country": zod.string(),
   "state": zod.string(),
   "city": zod.string(),
-  "genderType": zod.enum(['male', 'female']),
+  "genderType": zod.enum(['male', 'female', 'mixed']),
   "visibility": zod.enum(['public', 'private']),
   "status": zod.enum(['open', 'locked', 'closed']),
   "reputationScore": zod.string(),
   "ratingCount": zod.number(),
   "createdAt": zod.string(),
+  "lastActivityAt": zod.string().nullish(),
   "memberCount": zod.number(),
+  "menCount": zod.number(),
+  "womenCount": zod.number(),
+  "otherCount": zod.number(),
   "myMembershipStatus": zod.string().nullish(),
   "isAdmin": zod.boolean()
 }),
@@ -426,6 +445,7 @@ export const GetSoloGroupResponse = zod.object({
   "groupId": zod.number(),
   "userId": zod.number(),
   "userName": zod.string(),
+  "gender": zod.string().nullish(),
   "role": zod.enum(['admin', 'member']),
   "status": zod.enum(['requested', 'approved', 'rejected', 'removed', 'left']),
   "joinedAt": zod.string().nullish(),
@@ -568,6 +588,26 @@ export const SendSoloMessageResponse = zod.object({
   "body": zod.string(),
   "createdAt": zod.string(),
   "isMine": zod.boolean()
+})
+
+
+/**
+ * @summary Report another member of a group you've joined
+ */
+export const ReportSoloMemberParams = zod.object({
+  "id": zod.coerce.number()
+}).strict()
+
+export const ReportSoloMemberBody = zod.object({
+  "reportedUserId": zod.number(),
+  "reason": zod.enum(['harassment', 'fake_profile', 'abuse', 'spam', 'inappropriate', 'safety', 'other']),
+  "description": zod.string().optional(),
+  "evidenceUrl": zod.string().optional()
+}).strict()
+
+export const ReportSoloMemberResponse = zod.object({
+  "ok": zod.boolean(),
+  "status": zod.string().optional()
 })
 
 

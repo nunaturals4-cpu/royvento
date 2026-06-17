@@ -57,8 +57,8 @@ export default function ExploreScreen() {
   const { t } = useLanguage();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ city?: string; type?: string }>();
-  const [search, setSearch] = useState("");
+  const params = useLocalSearchParams<{ city?: string; type?: string; search?: string }>();
+  const [search, setSearch] = useState(params.search ?? "");
   const [showFilter, setShowFilter] = useState(false);
   const [filters, setFilters] = useState<FilterState>(() =>
     params.city ? { ...EMPTY_FILTER, city: params.city } : EMPTY_FILTER
@@ -77,7 +77,8 @@ export default function ExploreScreen() {
     setDraftFilter(next);
     setDraftLocation(params.city ? { country: "", state: "", city: params.city } : { country: "", state: "", city: "" });
     setTypeFilter(params.type ?? "");
-  }, [params.city, params.type]);
+    if (params.search !== undefined) setSearch(params.search);
+  }, [params.city, params.type, params.search]);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");

@@ -12,4 +12,5 @@ export type SoloGroupGenderType = typeof SoloGroupGenderType[keyof typeof SoloGr
 export const SoloGroupGenderType = {
   male: 'male',
   female: 'female',
+  mixed: 'mixed',
 } as const;

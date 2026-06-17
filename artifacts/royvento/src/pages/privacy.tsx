@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { SEO } from "@/components/SEO";
 
-const LAST_UPDATED = "9 June 2026";
+const LAST_UPDATED = "16 June 2026";
 
 export function Privacy() {
   return (
@@ -53,23 +53,29 @@ export function Privacy() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">4. Solo Connect &amp; Identity Verification</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">4. Solo Connector &amp; Verification</h2>
           <p>
-            If you use our premium <strong className="text-foreground">Solo Connect</strong> feature, we collect additional information specifically to verify identity and keep members safe:
+            If you use our premium <strong className="text-foreground">Solo Connector</strong> feature, we collect additional information specifically to verify you are a real person and to keep members safe:
           </p>
           <ul className="list-disc pl-5 space-y-2 mt-3">
-            <li><strong className="text-foreground">Identity documents:</strong> An image of a government ID you upload (Passport, Driving Licence, or Voter ID) and a selfie, used solely to verify that you are a real, unique person.</li>
-            <li><strong className="text-foreground">Mobile verification:</strong> Your mobile number and a one-time passcode (OTP) used to confirm it.</li>
-            <li><strong className="text-foreground">Gender &amp; location:</strong> Your profile gender and current city — used to enforce single-gender, same-city groups. We request device location only to determine your city.</li>
-            <li><strong className="text-foreground">Group activity:</strong> Groups you create or join, membership status, and ratings/reputation you give or receive.</li>
+            <li><strong className="text-foreground">Mobile verification:</strong> Your mobile number, verified via <strong className="text-foreground">Firebase Phone Authentication</strong> (an OTP sent by SMS). We store the verified number and a Firebase account identifier; we do not store the SMS code.</li>
+            <li><strong className="text-foreground">Live selfie:</strong> A selfie captured live with your camera (gallery uploads are not accepted), used solely to confirm you are a real, unique person.</li>
+            <li><strong className="text-foreground">Gender &amp; location:</strong> The gender you select and your current city. Gender is shown only as an aggregate member count on group cards; city is used so you only see groups in your city.</li>
+            <li><strong className="text-foreground">Group activity:</strong> Groups you create or join and your membership status.</li>
             <li><strong className="text-foreground">Group chat:</strong> Messages you post in a group's temporary chat. These are visible to that group's members and are <strong className="text-foreground">automatically and permanently deleted every day at 3:00 AM</strong>.</li>
-            <li><strong className="text-foreground">Reports:</strong> Any reports you submit, or that are submitted about you, for safety and moderation.</li>
+            <li><strong className="text-foreground">Reports:</strong> Any reports (and optional evidence photos) you submit, or that are submitted about you, for safety and moderation.</li>
           </ul>
           <p className="mt-3">
-            Your ID document and selfie are reviewed only by Royvento's moderation team for verification and are <strong className="text-foreground">never shown to other members</strong>. Within a group, other members see only your name and approved status — not your documents, contact details, or exact location. We use this information to verify identity, enforce safety rules, review reports, and take enforcement action against misuse. Providing this information is optional, but Solo Connect cannot be used without it.
+            Your selfie is reviewed only by Royvento's moderation team for verification and is <strong className="text-foreground">never shown to other members</strong> — it is served only through an access-controlled, admin-authenticated channel. Within a group, other members see only your name, the group's aggregate gender counts, and your approved status — not your selfie, phone number, or exact location.
           </p>
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 mt-3 space-y-2">
+            <p>Royvento only provides a platform for users to discover and join social groups.</p>
+            <p>Royvento does not organize, supervise, verify, monitor, or take responsibility for meetings, outings, interactions, conversations, or activities that occur after users join a group.</p>
+            <p>Users participate entirely at their own risk and are responsible for exercising personal judgment and ensuring their own safety.</p>
+            <p>Royvento is not responsible for any disputes, misconduct, financial transactions, injuries, losses, damages, or incidents that occur during or after meeting group members.</p>
+          </div>
           <p className="mt-3">
-            <strong className="text-foreground">Offline safety is your responsibility.</strong> Identity verification reduces but does not eliminate risk, and it is not a background check or a guarantee about any member's character or conduct. Joining Solo Connect and meeting anyone in person is entirely voluntary and at your own risk. Royvento does not supervise or take part in offline meetups and is not responsible for what happens during them. <strong className="text-foreground">If you ever feel unsafe, suspicious, or uncomfortable, leave immediately and contact local emergency services directly — in India dial 112, 100, or 1091.</strong> The in-app Safety Center provides these emergency contacts for your convenience only. Full details of these terms are set out in our <Link href="/terms" className="text-primary hover:underline">Terms &amp; Conditions</Link>.
+            <strong className="text-foreground">If you ever feel unsafe, leave immediately and contact local emergency services directly — in India dial 112, 100, or 1091.</strong> See our <Link href="/community-guidelines" className="text-primary hover:underline">Community Guidelines</Link> and <Link href="/terms" className="text-primary hover:underline">Terms &amp; Conditions</Link>.
           </p>
         </section>
 
@@ -80,7 +86,7 @@ export function Privacy() {
             <li>To send booking confirmations, reminders, payout notices, and service updates via email or SMS.</li>
             <li>To personalise the experience — for example, surfacing events in your city.</li>
             <li>To verify Partner eligibility and the accuracy of listings.</li>
-            <li>To verify member identity for Solo Connect, enforce single-gender and same-city group rules, review reports, and act against misuse.</li>
+            <li>To verify members for Solo Connector, enforce same-city group rules, review reports, and act against misuse.</li>
             <li>To run the loyalty points programme — awarding, expiring, and reconciling points.</li>
             <li>To improve the platform through analytics and user research.</li>
             <li>To detect and prevent fraud, abuse, or security incidents.</li>
@@ -96,7 +102,7 @@ export function Privacy() {
           <ul className="list-disc pl-5 space-y-2 mt-3">
             <li><strong className="text-foreground">With Pub Partners:</strong> When you make a booking, your name and contact details are shared with the relevant Pub Partner so they can manage attendance and provide the service.</li>
             <li><strong className="text-foreground">With Users:</strong> A Partner's public venue and event information is displayed to Users; payout and private business details are never shown publicly.</li>
-            <li><strong className="text-foreground">Within Solo Connect groups:</strong> Other members of a group you join see only your name and approved status. Your identity documents, selfie, contact details, and exact location are never shared with other members.</li>
+            <li><strong className="text-foreground">Within Solo Connector groups:</strong> Other members of a group you join see only your name and approved status. Your selfie, phone number, and exact location are never shared with other members.</li>
             <li><strong className="text-foreground">Payment processors:</strong> Payment and payout data is handled by third-party processors (e.g. PhonePe) and is governed by their own privacy policies.</li>
             <li><strong className="text-foreground">Service providers:</strong> We use third-party services for hosting, analytics, and communications, all operating under data processing agreements.</li>
             <li><strong className="text-foreground">Legal requirements:</strong> We may disclose data if required by law, court order, or to protect the rights and safety of Royvento, our Users, or our Partners.</li>
@@ -113,7 +119,7 @@ export function Privacy() {
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-2">8. Data Retention</h2>
           <p>
-            We retain account, booking, and payout data for as long as your account is active or as required to fulfil the purposes described in this Policy. Transaction, invoice, and payout records may be retained for longer where tax or accounting law requires. <strong className="text-foreground">Solo Connect group chat messages are deleted automatically every day at 3:00 AM.</strong> Identity-verification records (including your ID document and selfie) are retained only while needed to keep your verification valid and to maintain platform safety, and are deleted when you close your account or your verification is removed, except where short-term retention is required to handle a safety report or to comply with law. You may request deletion of your account at any time; we will delete your personal data within 30 days, except where retention is required by law.
+            We retain account, booking, and payout data for as long as your account is active or as required to fulfil the purposes described in this Policy. Transaction, invoice, and payout records may be retained for longer where tax or accounting law requires. <strong className="text-foreground">Solo Connector group chat messages are deleted automatically every day at 3:00 AM, and inactive groups (with their chat and data) are removed automatically after 15 days.</strong> Verification records (including your selfie) are retained only while needed to keep your verification valid and to maintain platform safety, and are deleted when you close your account or your verification is removed, except where short-term retention is required to handle a safety report or to comply with law. You may request deletion of your account at any time; we will delete your personal data within 30 days, except where retention is required by law.
           </p>
         </section>
 

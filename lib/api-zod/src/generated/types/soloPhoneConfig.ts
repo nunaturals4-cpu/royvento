@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SoloOtpRequestResult {
-  ok: boolean;
-  devCode?: string | null;
+export interface SoloPhoneConfig {
+  firebaseConfigured: boolean;
 }

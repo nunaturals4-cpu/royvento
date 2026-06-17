@@ -1,5 +1,6 @@
 import { db, notificationsTable } from "@workspace/db";
 import { sendWebPushToUser } from "../routes/webPush";
+import { sendExpoPushToUser } from "./expoPush";
 import { logger } from "./logger";
 
 export interface CreateUserNotificationInput {
@@ -30,5 +31,13 @@ export async function createUserNotification(
     body: message,
     ...(url ? { url } : {}),
     ...(tag ? { tag } : {}),
+  }).catch(() => {});
+
+  // Fan out to the mobile app too (best-effort; no-op when the user has no
+  // Expo token registered or push is unconfigured).
+  sendExpoPushToUser(userId, {
+    title,
+    body: message,
+    data: { ...(url ? { url } : {}), ...(tag ? { tag } : {}) },
   }).catch(() => {});
 }

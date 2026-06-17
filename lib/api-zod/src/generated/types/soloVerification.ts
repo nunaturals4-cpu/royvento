@@ -10,12 +10,13 @@ import type { SoloVerificationStatus } from './soloVerificationStatus';
 export interface SoloVerification {
   id: number;
   userId: number;
-  idType: string;
-  idNumber: string;
-  idDocumentUrl: string;
   selfieUrl: string;
   phone: string;
   phoneVerified: boolean;
+  consentAcceptedAt?: string | null;
+  consentVersion: string;
+  suspendedUntil?: string | null;
+  banned: boolean;
   status: SoloVerificationStatus;
   rejectionReason: string;
   createdAt: string;

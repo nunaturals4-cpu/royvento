@@ -25,9 +25,10 @@ import {
   Trophy,
   LogIn,
   UserPlus,
-  IdCard,
+  Smartphone,
+  Camera,
+  Flag,
   MessageCircle,
-  Star,
   CheckCircle2,
   ChevronRight,
 } from "lucide-react";
@@ -150,8 +151,8 @@ function CompactHeading() {
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
         {[
-          { icon: ShieldCheck, label: "ID-verified members" },
-          { icon: Users, label: "Single-gender groups" },
+          { icon: ShieldCheck, label: "Selfie-verified members" },
+          { icon: Users, label: "Open to everyone" },
           { icon: MapPin, label: "Your city only" },
         ].map(({ icon: Icon, label }) => (
           <span
@@ -262,7 +263,7 @@ function MisuseWarning() {
       </ul>
       <div className="rounded-xl px-3 py-2.5 text-[12px] leading-snug"
         style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>
-        Violations lead to an <span style={{ color: "#fca5a5", fontWeight: 600 }}>immediate ban</span> and forfeiture of your <span style={{ color: GOLD, fontWeight: 600 }}>reputation points</span>.
+        Report any member in one tap. Our team reviews every report and can <span style={{ color: "#fca5a5", fontWeight: 600 }}>warn, suspend, or ban</span> offenders.
         Always report anyone who makes you uncomfortable.
       </div>
     </aside>
@@ -296,14 +297,14 @@ const SHOWCASE_FEATURES = [
   {
     icon: ShieldCheck,
     accent: "#4ade80",
-    title: "ID-verified members only",
-    body: "Every member passes a one-time government-ID check, so you only ever meet real, verified people.",
+    title: "Phone & selfie verified",
+    body: "Every member verifies their mobile number and takes a live selfie, so you only ever meet real, verified people.",
   },
   {
     icon: Users,
     accent: "#a78bfa",
-    title: "Single-gender groups",
-    body: "Groups are strictly same-gender — a comfortable, low-pressure way to make plans with new people.",
+    title: "Open to everyone",
+    body: "Anyone can join any group — men and women together. Each group card shows its makeup (👨/👩) so you always know who's in.",
   },
   {
     icon: MapPin,
@@ -321,13 +322,13 @@ const SHOWCASE_FEATURES = [
     icon: MessageCircle,
     accent: GOLD,
     title: "Private group chat",
-    body: "Coordinate the plan inside a temporary group chat that's auto-cleared daily for your privacy.",
+    body: "Coordinate the plan inside a temporary group chat that's auto-cleared daily. Inactive groups are removed after 15 days.",
   },
   {
-    icon: Star,
+    icon: Flag,
     accent: "#fbbf24",
-    title: "Reputation & safety",
-    body: "Build trust through reputation points, backed by a strict zero-tolerance policy and easy reporting.",
+    title: "Report & stay safe",
+    body: "Report any member in one tap. Our team reviews every report and can warn, suspend, or ban — backed by a zero-tolerance policy.",
   },
 ] as const;
 
@@ -335,12 +336,10 @@ const SHOWCASE_FEATURES = [
 const FLOW_STEPS = [
   { icon: LogIn, label: "Log in", sub: "Sign in or create your free account" },
   { icon: Crown, label: "Go Premium", sub: "Unlock Solo Connect with Royvento Premium" },
-  { icon: IdCard, label: "Verify ID", sub: "One-time government-ID identity check" },
-  { icon: Navigation, label: "Enable location", sub: "Share your city to see nearby groups" },
-  { icon: Users, label: "Join groups", sub: "Browse verified groups & meet up" },
+  { icon: Smartphone, label: "Verify phone", sub: "Confirm your mobile number with an OTP" },
+  { icon: Camera, label: "Selfie + consent", sub: "Take a live selfie, pick gender, accept the terms" },
+  { icon: Users, label: "Join groups", sub: "Get approved, then browse & meet up in your city" },
 ] as const;
-
-const ACCEPTED_IDS = ["Aadhaar", "Passport", "Driving License", "Voter ID"] as const;
 
 function LoggedOutShowcase() {
   return (
@@ -423,12 +422,12 @@ function LoggedOutShowcase() {
         <FlowDiagram />
       </section>
 
-      {/* ── Identity verification explainer ──────────────────────────── */}
+      {/* ── Verification explainer ───────────────────────────────────── */}
       <section>
         <SectionTitle
-          eyebrow="Step 3 · Safety"
-          title="Identity verification"
-          subtitle="The one-time check that keeps Solo Connect trustworthy for everyone."
+          eyebrow="Steps 3–4 · Safety"
+          title="Quick, phone-first verification"
+          subtitle="No documents to upload — just your phone, a live selfie, and your consent."
         />
         <VerificationPreview />
       </section>
@@ -517,31 +516,36 @@ function VerificationPreview() {
         <div className="flex items-center gap-3 mb-4">
           <span className="flex items-center justify-center h-11 w-11 rounded-2xl shrink-0"
             style={{ background: `linear-gradient(145deg, ${GOLD}26, ${RED}1a)`, border: `1px solid ${GOLD}55`, boxShadow: `0 0 24px ${GOLD}1f` }}>
-            <IdCard className="h-5 w-5" style={{ color: GOLD }} />
+            <Smartphone className="h-5 w-5" style={{ color: GOLD }} />
           </span>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>Verification page</p>
-            <h4 className="font-serif text-xl" style={{ color: "#fff" }}>A one-time identity check</h4>
+            <p className="text-[11px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>Verification</p>
+            <h4 className="font-serif text-xl" style={{ color: "#fff" }}>Phone, selfie & consent</h4>
           </div>
         </div>
         <p className="text-sm leading-relaxed mb-5" style={{ color: "rgba(255,255,255,0.6)" }}>
-          After logging in and upgrading, you'll complete a quick verification. Pick a government ID type,
-          enter the number, and agree to the safety terms. Our team reviews it and unlocks your access.
+          After logging in and upgrading, you'll verify your mobile number with a one-time code, capture a
+          live selfie, choose your gender, and accept the terms. Our team reviews it and unlocks your access.
         </p>
-        <p className="text-xs mb-2.5" style={{ color: "rgba(255,255,255,0.55)" }}>Accepted government IDs</p>
+        <p className="text-xs mb-2.5" style={{ color: "rgba(255,255,255,0.55)" }}>What you'll do</p>
         <div className="flex flex-wrap gap-2 mb-5">
-          {ACCEPTED_IDS.map((id) => (
-            <span key={id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
+          {[
+            { icon: Smartphone, label: "Mobile OTP" },
+            { icon: Camera, label: "Live selfie" },
+            { icon: Users, label: "Gender" },
+            { icon: ShieldCheck, label: "Consent" },
+          ].map(({ icon: Icon, label }) => (
+            <span key={label} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
               style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${GOLD}33`, color: "rgba(255,255,255,0.75)" }}>
-              <CheckCircle2 className="h-3.5 w-3.5" style={{ color: GOLD }} /> {id}
+              <Icon className="h-3.5 w-3.5" style={{ color: GOLD }} /> {label}
             </span>
           ))}
         </div>
         <ul className="space-y-2.5">
           {[
-            "Private & secure — used only to verify you're real",
-            "Reviewed by our safety team, usually within a day",
-            "Required once — never shown to other members",
+            "No documents to upload — phone + live selfie only",
+            "Selfie reviewed by our safety team, never shown to other members",
+            "Capture is live-only — gallery uploads aren't accepted",
           ].map((x) => (
             <li key={x} className="flex items-start gap-2.5 text-[13px]" style={{ color: "rgba(255,255,255,0.7)" }}>
               <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" style={{ color: "#4ade80" }} /> {x}
@@ -550,7 +554,7 @@ function VerificationPreview() {
         </ul>
       </div>
 
-      {/* Right: mock of the verification form (visual preview, non-interactive) */}
+      {/* Right: mock of the verification flow (visual preview, non-interactive) */}
       <div
         className="relative rounded-3xl p-6 md:p-7 overflow-hidden"
         style={{
@@ -564,30 +568,30 @@ function VerificationPreview() {
           <span className="text-[11px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>Preview</span>
         </div>
 
-        {/* Faux select */}
-        <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Government ID type</p>
+        {/* Faux phone field */}
+        <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Mobile number</p>
         <div className="flex items-center justify-between px-4 py-3 rounded-lg mb-4"
           style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${GOLD}44`, color: "#fff" }}>
-          <span className="text-sm">Aadhaar</span>
-          <CheckCircle2 className="h-4 w-4" style={{ color: GOLD }} />
+          <span className="text-sm">+91 90000 00000</span>
+          <Smartphone className="h-4 w-4" style={{ color: GOLD }} />
         </div>
 
-        {/* Faux input */}
-        <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Aadhaar number</p>
-        <div className="px-4 py-3 rounded-lg mb-4 text-sm"
+        {/* Faux OTP */}
+        <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>One-time code</p>
+        <div className="px-4 py-3 rounded-lg mb-4 text-sm text-center tracking-[0.4em]"
           style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.4)" }}>
-          •••• •••• ••••
+          • • • • • •
         </div>
 
-        {/* Faux agreement */}
-        <div className="flex items-start gap-3 p-3.5 rounded-xl mb-5"
-          style={{ background: "rgba(212,175,55,0.08)", border: `1px solid ${GOLD}55` }}>
-          <span className="mt-0.5 h-5 w-5 shrink-0 flex items-center justify-center rounded-md"
-            style={{ background: `linear-gradient(135deg, ${GOLD}, #e0a951)` }}>
-            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#1a1a1a" }} strokeWidth={3} />
+        {/* Faux selfie capture */}
+        <div className="flex items-center gap-3 p-3.5 rounded-xl mb-5"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)" }}>
+          <span className="h-10 w-10 shrink-0 flex items-center justify-center rounded-full"
+            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${GOLD}44` }}>
+            <Camera className="h-4 w-4" style={{ color: GOLD }} />
           </span>
           <span className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
-            I confirm my details are genuine and agree to the Solo Connect safety terms.
+            Take a live selfie — camera only, no gallery.
           </span>
         </div>
 
@@ -597,7 +601,7 @@ function VerificationPreview() {
           className="group flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
           style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 28px ${RED}4d` }}
         >
-          Log in to start verification
+          Log in to get verified
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
@@ -680,7 +684,7 @@ function ApprovedExperience({ gender, activity }: { gender: string | null; activ
             <MapPin className="h-4 w-4" style={{ color: GOLD }} /> {selectedCity}
           </span>
           <span className="inline-flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.78)" }}>
-            <Users className="h-4 w-4" style={{ color: GOLD }} /> {gender === "female" ? "Women's groups" : "Men's groups"}
+            <Users className="h-4 w-4" style={{ color: GOLD }} /> All groups
           </span>
         </div>
         <button
@@ -696,7 +700,7 @@ function ApprovedExperience({ gender, activity }: { gender: string | null; activ
       <GroupList city={selectedCity} activity={activity} onOpen={setOpenGroupId} />
 
       {showCreate && (
-        <CreateGroupModal city={selectedCity} gender={gender} onClose={() => setShowCreate(false)} />
+        <CreateGroupModal city={selectedCity} onClose={() => setShowCreate(false)} />
       )}
       {openGroupId !== null && (
         <SoloGroupDetail groupId={openGroupId} city={selectedCity} onClose={() => setOpenGroupId(null)} />
@@ -827,8 +831,12 @@ function GroupCard({ g, onOpen }: { g: SoloGroup; onOpen: (id: number) => void }
       )}
 
       <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <span className="flex items-center gap-1.5 text-sm" style={{ color: full ? "#fca5a5" : "rgba(255,255,255,0.75)" }}>
-          <Users className="h-4 w-4" style={{ color: full ? "#fca5a5" : GOLD }} /> {g.memberCount}/{g.maxMembers}
+        <span className="flex items-center gap-2 text-xs" style={{ color: full ? "#fca5a5" : "rgba(255,255,255,0.75)" }}>
+          <span className="inline-flex items-center gap-1" title="Men">👨 {g.menCount}</span>
+          <span className="inline-flex items-center gap-1" title="Women">👩 {g.womenCount}</span>
+          <span className="inline-flex items-center gap-1 ml-0.5" style={{ color: full ? "#fca5a5" : GOLD }} title="Total members">
+            <Users className="h-3.5 w-3.5" /> {g.memberCount}/{g.maxMembers}
+          </span>
         </span>
         {g.myMembershipStatus === "approved" ? (
           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(74,222,128,0.14)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.3)" }}>Joined</span>

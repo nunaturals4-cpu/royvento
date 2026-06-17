@@ -1,4 +1,6 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { Readable } from "stream";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import {
   db,
   usersTable,
@@ -6,39 +8,115 @@ import {
   soloGroupsTable,
   soloGroupMembersTable,
   soloGroupMessagesTable,
+  soloReportsTable,
+  soloModerationActionsTable,
+  soloDeletedGroupsLogTable,
 } from "@workspace/db";
-import { eq, and, desc, inArray, ne, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, ne, sql, isNull, count } from "drizzle-orm";
 import { z } from "zod";
 import {
   requireAuth,
   loadUserFromRequest,
-  hashPassword,
-  comparePassword,
+  type AuthedRequest,
   type AuthUser,
 } from "../lib/auth";
 import { respondInvalid } from "../lib/validationError";
 import { getSoloAccess } from "../lib/soloConnect";
+import {
+  verifyFirebaseIdToken,
+  PhoneVerificationError,
+  firebaseConfigured,
+} from "../lib/firebaseAuth";
+import { createUserNotification } from "../lib/notify";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
 
 const norm = (s: string) => s.trim().toLowerCase();
 
+// The consent text version the user acknowledges at onboarding. Bump when the
+// legal copy (Terms / Community Guidelines / risk disclaimer) materially changes.
+export const SOLO_CONSENT_VERSION = "2026-06-v1";
+
+// Per-user limiter for phone-verify (anti-spam on top of Firebase's own limits).
+const phoneVerifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 8,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const u = (req as AuthedRequest).user;
+    return u ? `user:${u.id}` : ipKeyGenerator(req.ip ?? "");
+  },
+  message: { error: "Too many verification attempts — please wait a minute." },
+});
+
+// Limiter for report submissions — prevents report-spam flooding the queue.
+const reportLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const u = (req as AuthedRequest).user;
+    return u ? `user:${u.id}` : ipKeyGenerator(req.ip ?? "");
+  },
+  message: { error: "Too many reports submitted — please try again later." },
+});
+
+// Accept only relative object paths produced by our signed-upload flow — never
+// an arbitrary external URL (prevents storing attacker-controlled links).
+// Handles every form the client may pass: the raw objectPath
+// (/objects/uploads/<uuid>), the served path (/api/storage/objects/uploads/…),
+// or a bare uploads/<uuid>.
+function isUploadPath(url: string): boolean {
+  return /^\/?(api\/)?(storage\/)?objects\/uploads\/[\w./-]+$/.test(url) || /^uploads\/[\w./-]+$/.test(url);
+}
+
+// Reduce any accepted upload reference to the canonical object-storage path
+// "/objects/uploads/<rest>" used by ObjectStorageService.getObjectEntityFile.
+function toObjectPath(url: string): string | null {
+  const m = url.match(/uploads\/([\w./-]+)$/);
+  return m ? `/objects/uploads/${m[1]}` : null;
+}
+
 // Strip server-only secret columns before sending a verification row to clients.
+// Note `selfieUrl` is returned only as a relative object path; the bytes are
+// served through the auth-gated /solo-connect/verification/selfie endpoint.
 function verificationToPublic(v: typeof soloConnectVerificationsTable.$inferSelect) {
   return {
     id: v.id,
     userId: v.userId,
-    idType: v.idType,
-    idNumber: v.idNumber,
-    idDocumentUrl: v.idDocumentUrl,
     selfieUrl: v.selfieUrl,
     phone: v.phone,
     phoneVerified: v.phoneVerified,
+    consentAcceptedAt: v.consentAcceptedAt ? v.consentAcceptedAt.toISOString() : null,
+    consentVersion: v.consentVersion,
+    suspendedUntil: v.suspendedUntil ? v.suspendedUntil.toISOString() : null,
+    banned: v.banned,
     status: v.status,
     rejectionReason: v.rejectionReason,
     createdAt: v.createdAt.toISOString(),
     updatedAt: v.updatedAt.toISOString(),
   };
+}
+
+// True when this user is currently blocked from Solo Connector participation by
+// a moderation action (banned, or within an active suspension window).
+function isModerationBlocked(v: { banned: boolean; suspendedUntil: Date | null } | undefined): {
+  blocked: boolean;
+  reason?: string;
+} {
+  if (!v) return { blocked: false };
+  if (v.banned) return { blocked: true, reason: "Your Solo Connector access has been banned." };
+  if (v.suspendedUntil && v.suspendedUntil.getTime() > Date.now()) {
+    return {
+      blocked: true,
+      reason: `Your Solo Connector access is suspended until ${v.suspendedUntil.toISOString()}.`,
+    };
+  }
+  return { blocked: false };
 }
 
 // Loads the caller and asserts Solo Connect eligibility. Returns null + responds
@@ -60,28 +138,35 @@ async function requireEligible(
   return user;
 }
 
-// Eligible AND identity-approved — required to create/join/view groups.
+// Eligible AND verification-approved AND not moderation-blocked — required to
+// create/join/view groups, chat, and report. Gender is captured at onboarding
+// but is NOT a participation gate (groups are no longer gender-restricted).
 async function requireApproved(
   req: Parameters<typeof loadUserFromRequest>[0],
   res: Response,
 ): Promise<AuthUser | null> {
   const user = await requireEligible(req, res);
   if (!user) return null;
-  // Admins never need identity verification — they moderate Solo Connect.
+  // Admins never need verification — they moderate Solo Connector.
   if (user.role !== "admin") {
     const rows = await db
-      .select({ status: soloConnectVerificationsTable.status })
+      .select({
+        status: soloConnectVerificationsTable.status,
+        banned: soloConnectVerificationsTable.banned,
+        suspendedUntil: soloConnectVerificationsTable.suspendedUntil,
+      })
       .from(soloConnectVerificationsTable)
       .where(eq(soloConnectVerificationsTable.userId, user.id))
       .limit(1);
     if (rows[0]?.status !== "approved") {
-      res.status(403).json({ error: "Identity verification required before joining groups." });
+      res.status(403).json({ error: "Verification required before joining groups." });
       return null;
     }
-  }
-  if (!user.gender) {
-    res.status(403).json({ error: "Complete your profile (gender) before using Solo Connect." });
-    return null;
+    const block = isModerationBlocked(rows[0]);
+    if (block.blocked) {
+      res.status(403).json({ error: block.reason });
+      return null;
+    }
   }
   return user;
 }
@@ -175,45 +260,75 @@ router.get("/solo-connect/verification", async (req, res) => {
   res.json(rows[0] ? verificationToPublic(rows[0]) : null);
 });
 
-const VerificationBody = z.object({
-  idType: z.enum(["aadhaar", "passport", "driving_license", "voter_id"]),
-  idNumber: z.string().min(1).max(100),
-});
-
-// Upsert the ID type + number. Mobile verification was removed, so a submitted
-// record goes straight to the `pending` (under-review) state for admin review.
-router.post("/solo-connect/verification", async (req, res) => {
+// Expose whether real Firebase is configured so the client knows whether to run
+// the live OTP flow or the local dev-stub flow.
+router.get("/solo-connect/phone/config", async (req, res) => {
   const user = await requireEligible(req, res);
   if (!user) return;
-  const parsed = VerificationBody.safeParse(req.body);
+  res.json({ firebaseConfigured });
+});
+
+const PhoneVerifyBody = z.object({ idToken: z.string().min(1).max(8000) });
+
+// Step 1–2 of onboarding: the client completes Firebase Phone Auth (or the dev
+// stub) and posts the resulting ID token. We verify it server-side, read the
+// phone FROM THE VERIFIED TOKEN, enforce one-account-per-phone, and mark the
+// user's verification row phone-verified (creating a draft row if needed).
+router.post("/solo-connect/phone/verify", phoneVerifyLimiter, async (req, res) => {
+  const user = await requireEligible(req, res);
+  if (!user) return;
+  const parsed = PhoneVerifyBody.safeParse(req.body);
   if (!parsed.success) {
     respondInvalid(res, parsed.error);
     return;
   }
-  const { idType, idNumber } = parsed.data;
+  let verified;
+  try {
+    verified = await verifyFirebaseIdToken(parsed.data.idToken);
+  } catch (err) {
+    const msg = err instanceof PhoneVerificationError ? err.message : "Phone verification failed.";
+    res.status(400).json({ error: msg });
+    return;
+  }
+
+  // One account per verified phone (anti-duplicate). Also protected by a partial
+  // unique index, but checked here for a friendly error.
+  const clash = await db
+    .select({ userId: soloConnectVerificationsTable.userId })
+    .from(soloConnectVerificationsTable)
+    .where(eq(soloConnectVerificationsTable.phone, verified.phoneNumber))
+    .limit(1);
+  if (clash[0] && clash[0].userId !== user.id) {
+    res.status(409).json({ error: "This phone number is already linked to another account." });
+    return;
+  }
+
   const existing = await db
-    .select({ id: soloConnectVerificationsTable.id })
+    .select()
     .from(soloConnectVerificationsTable)
     .where(eq(soloConnectVerificationsTable.userId, user.id))
     .limit(1);
 
+  // Keep an already-approved user approved; otherwise this is onboarding (draft).
+  const nextStatus = existing[0]?.status === "approved" ? "approved" : "draft";
   if (existing[0]) {
     await db
       .update(soloConnectVerificationsTable)
       .set({
-        idType,
-        idNumber: idNumber.trim(),
-        status: "pending",
-        rejectionReason: "",
+        phone: verified.phoneNumber,
+        firebaseUid: verified.uid,
+        phoneVerified: true,
+        status: nextStatus,
         updatedAt: new Date(),
       })
       .where(eq(soloConnectVerificationsTable.id, existing[0].id));
   } else {
     await db.insert(soloConnectVerificationsTable).values({
       userId: user.id,
-      idType,
-      idNumber: idNumber.trim(),
-      status: "pending",
+      phone: verified.phoneNumber,
+      firebaseUid: verified.uid,
+      phoneVerified: true,
+      status: "draft",
     });
   }
   const rows = await db
@@ -224,42 +339,26 @@ router.post("/solo-connect/verification", async (req, res) => {
   res.json(verificationToPublic(rows[0]!));
 });
 
-// Dev-mode OTP: generate, hash + store with 10-min expiry, and (only outside
-// production) return the code so the flow is testable end-to-end. A real SMS
-// provider (Twilio/MSG91) drops in here behind the same request/verify pair.
-router.post("/solo-connect/verification/otp/request", async (req, res) => {
-  const user = await requireEligible(req, res);
-  if (!user) return;
-  const rows = await db
-    .select()
-    .from(soloConnectVerificationsTable)
-    .where(eq(soloConnectVerificationsTable.userId, user.id))
-    .limit(1);
-  if (!rows[0]) {
-    res.status(400).json({ error: "Upload your ID and selfie before requesting an OTP." });
-    return;
-  }
-  const code = String(Math.floor(100000 + Math.random() * 900000));
-  const otpHash = await hashPassword(code);
-  const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-  await db
-    .update(soloConnectVerificationsTable)
-    .set({ otpHash, otpExpiry, updatedAt: new Date() })
-    .where(eq(soloConnectVerificationsTable.id, rows[0].id));
-  const isProd = process.env["NODE_ENV"] === "production";
-  // TODO(solo-connect): replace with real SMS provider send.
-  req.log.info({ phone: rows[0].phone, code }, "Solo Connect OTP generated (dev)");
-  res.json({ ok: true, devCode: isProd ? undefined : code });
+const SubmitBody = z.object({
+  selfieUrl: z.string().min(1).max(500),
+  gender: z.enum(["male", "female", "prefer_not_to_say"]),
+  consent: z.literal(true),
 });
 
-const OtpVerifyBody = z.object({ code: z.string().min(4).max(8) });
-
-router.post("/solo-connect/verification/otp/verify", async (req, res) => {
+// Step 3–5: capture the live selfie reference + gender + explicit consent, then
+// flip the verification to `pending` for admin review. Requires a phone-verified
+// draft row to exist first.
+router.post("/solo-connect/verification/submit", async (req, res) => {
   const user = await requireEligible(req, res);
   if (!user) return;
-  const parsed = OtpVerifyBody.safeParse(req.body);
+  const parsed = SubmitBody.safeParse(req.body);
   if (!parsed.success) {
     respondInvalid(res, parsed.error);
+    return;
+  }
+  const { selfieUrl, gender } = parsed.data;
+  if (!isUploadPath(selfieUrl)) {
+    res.status(400).json({ error: "Invalid selfie reference." });
     return;
   }
   const rows = await db
@@ -268,23 +367,37 @@ router.post("/solo-connect/verification/otp/verify", async (req, res) => {
     .where(eq(soloConnectVerificationsTable.userId, user.id))
     .limit(1);
   const ver = rows[0];
-  if (!ver || !ver.otpHash || !ver.otpExpiry) {
-    res.status(400).json({ error: "Request an OTP first." });
+  if (!ver || !ver.phoneVerified) {
+    res.status(400).json({ error: "Verify your phone number first." });
     return;
   }
-  if (ver.otpExpiry.getTime() < Date.now()) {
-    res.status(400).json({ error: "OTP expired. Please request a new one." });
-    return;
-  }
-  const ok = await comparePassword(parsed.data.code, ver.otpHash);
-  if (!ok) {
-    res.status(400).json({ error: "Incorrect OTP." });
-    return;
-  }
+
+  // Persist gender on the user record so it drives group member counts.
+  await db
+    .update(usersTable)
+    .set({ gender, genderCompleted: true })
+    .where(eq(usersTable.id, user.id));
+
   await db
     .update(soloConnectVerificationsTable)
-    .set({ phoneVerified: true, otpHash: "", otpExpiry: null, status: "pending", updatedAt: new Date() })
+    .set({
+      selfieUrl,
+      consentAcceptedAt: new Date(),
+      consentVersion: SOLO_CONSENT_VERSION,
+      status: "pending",
+      rejectionReason: "",
+      updatedAt: new Date(),
+    })
     .where(eq(soloConnectVerificationsTable.id, ver.id));
+
+  createUserNotification({
+    userId: user.id,
+    title: "Verification submitted",
+    message: "Your Solo Connector verification is under review. We'll notify you once it's decided.",
+    url: "/solo-connect",
+    tag: "solo-verification",
+  }).catch(() => {});
+
   const updated = await db
     .select()
     .from(soloConnectVerificationsTable)
@@ -293,44 +406,111 @@ router.post("/solo-connect/verification/otp/verify", async (req, res) => {
   res.json(verificationToPublic(updated[0]!));
 });
 
-// Admin: list all identity verifications (pending first), joined with the
-// applicant's name/email so the admin panel can review and approve/reject.
-router.get("/admin/solo-connect/verifications", requireAuth(["admin"]), async (_req, res) => {
+// Auth-gated selfie stream — owner or admin only. Selfies are NOT served from
+// the public /storage/objects path; this proxies the bytes after an ACL check.
+router.get("/solo-connect/verification/selfie/:userId", async (req: Request, res: Response) => {
+  const me = await loadUserFromRequest(req);
+  if (!me) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const userId = parseInt(String(req.params["userId"]), 10);
+  if (Number.isNaN(userId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  if (me.role !== "admin" && me.id !== userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const rows = await db
+    .select({ selfieUrl: soloConnectVerificationsTable.selfieUrl })
+    .from(soloConnectVerificationsTable)
+    .where(eq(soloConnectVerificationsTable.userId, userId))
+    .limit(1);
+  const objectPath = rows[0]?.selfieUrl ? toObjectPath(rows[0].selfieUrl) : null;
+  if (!objectPath) {
+    res.status(404).json({ error: "No selfie on file" });
+    return;
+  }
+  try {
+    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+    const response = await objectStorageService.downloadObject(objectFile);
+    res.status(response.status);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    // Never let a private selfie be cached by shared proxies.
+    res.setHeader("Cache-Control", "private, no-store");
+    if (response.body) {
+      Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (err) {
+    if (err instanceof ObjectNotFoundError) {
+      res.status(404).json({ error: "Selfie not found" });
+      return;
+    }
+    req.log.error({ err }, "Failed to stream Solo Connector selfie");
+    res.status(500).json({ error: "Failed to load selfie" });
+  }
+});
+
+// Admin: list verifications. Defaults to the review queue (pending first) but
+// supports ?status= and ?q= (name/email/phone search) for the full history view.
+router.get("/admin/solo-connect/verifications", requireAuth(["admin"]), async (req, res) => {
+  const statusFilter = typeof req.query["status"] === "string" ? req.query["status"] : "";
+  const q = (typeof req.query["q"] === "string" ? req.query["q"] : "").trim().toLowerCase();
   const rows = await db
     .select({
       id: soloConnectVerificationsTable.id,
       userId: soloConnectVerificationsTable.userId,
-      idType: soloConnectVerificationsTable.idType,
-      idNumber: soloConnectVerificationsTable.idNumber,
-      idDocumentUrl: soloConnectVerificationsTable.idDocumentUrl,
       selfieUrl: soloConnectVerificationsTable.selfieUrl,
       phone: soloConnectVerificationsTable.phone,
       phoneVerified: soloConnectVerificationsTable.phoneVerified,
+      consentAcceptedAt: soloConnectVerificationsTable.consentAcceptedAt,
+      consentVersion: soloConnectVerificationsTable.consentVersion,
+      suspendedUntil: soloConnectVerificationsTable.suspendedUntil,
+      banned: soloConnectVerificationsTable.banned,
       status: soloConnectVerificationsTable.status,
       rejectionReason: soloConnectVerificationsTable.rejectionReason,
       createdAt: soloConnectVerificationsTable.createdAt,
       updatedAt: soloConnectVerificationsTable.updatedAt,
       userName: usersTable.name,
       userEmail: usersTable.email,
+      gender: usersTable.gender,
     })
     .from(soloConnectVerificationsTable)
     .leftJoin(usersTable, eq(usersTable.id, soloConnectVerificationsTable.userId))
     .orderBy(desc(soloConnectVerificationsTable.updatedAt));
+  let filtered = rows;
+  if (statusFilter) filtered = filtered.filter((r) => r.status === statusFilter);
+  if (q) {
+    filtered = filtered.filter(
+      (r) =>
+        (r.userName ?? "").toLowerCase().includes(q) ||
+        (r.userEmail ?? "").toLowerCase().includes(q) ||
+        (r.phone ?? "").toLowerCase().includes(q),
+    );
+  }
   // Pending first so the admin sees what needs action at the top.
-  const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
-  rows.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+  const order: Record<string, number> = { pending: 0, draft: 1, approved: 2, rejected: 3 };
+  filtered.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
   res.json(
-    rows.map((r) => ({
+    filtered.map((r) => ({
       id: r.id,
       userId: r.userId,
       userName: r.userName ?? "",
       userEmail: r.userEmail ?? "",
-      idType: r.idType,
-      idNumber: r.idNumber,
-      idDocumentUrl: r.idDocumentUrl,
+      gender: r.gender ?? null,
       selfieUrl: r.selfieUrl,
+      // Auth-gated stream the admin UI loads instead of the raw object path.
+      selfieStreamUrl: r.selfieUrl ? `/api/solo-connect/verification/selfie/${r.userId}` : "",
       phone: r.phone,
       phoneVerified: r.phoneVerified,
+      consentAcceptedAt: r.consentAcceptedAt ? r.consentAcceptedAt.toISOString() : null,
+      consentVersion: r.consentVersion,
+      suspendedUntil: r.suspendedUntil ? r.suspendedUntil.toISOString() : null,
+      banned: r.banned,
       status: r.status,
       rejectionReason: r.rejectionReason,
       createdAt: r.createdAt.toISOString(),
@@ -339,7 +519,6 @@ router.get("/admin/solo-connect/verifications", requireAuth(["admin"]), async (_
   );
 });
 
-// Admin review (minimal — full moderation panel is Phase 3).
 const ReviewBody = z.object({
   decision: z.enum(["approved", "rejected"]),
   rejectionReason: z.string().max(500).optional(),
@@ -376,6 +555,26 @@ router.post("/admin/solo-connect/verifications/:id/review", requireAuth(["admin"
     res.status(404).json({ error: "Not found" });
     return;
   }
+  // Notify the applicant of the decision (in-app + web + mobile push).
+  if (parsed.data.decision === "approved") {
+    createUserNotification({
+      userId: rows[0].userId,
+      title: "Verification approved 🎉",
+      message: "You're verified for Solo Connector. You can now join and create groups.",
+      url: "/solo-connect",
+      tag: "solo-verification",
+    }).catch(() => {});
+  } else {
+    createUserNotification({
+      userId: rows[0].userId,
+      title: "Verification not approved",
+      message: parsed.data.rejectionReason
+        ? `Your Solo Connector verification was rejected: ${parsed.data.rejectionReason}`
+        : "Your Solo Connector verification was not approved. You can re-submit from the Solo Connector page.",
+      url: "/solo-connect",
+      tag: "solo-verification",
+    }).catch(() => {});
+  }
   res.json(verificationToPublic(rows[0]));
 });
 
@@ -393,26 +592,44 @@ router.delete("/admin/solo-connect/verifications/:id", requireAuth(["admin"]), a
 
 // ─── Groups ────────────────────────────────────────────────────────────────────
 
-// Counts approved members per group id.
-async function approvedCounts(groupIds: number[]): Promise<Map<number, number>> {
-  const map = new Map<number, number>();
+export interface GroupCounts {
+  total: number;
+  men: number;
+  women: number;
+  other: number;
+}
+
+const emptyCounts = (): GroupCounts => ({ total: 0, men: 0, women: 0, other: 0 });
+
+// Approved-member counts per group, broken down by the member's onboarding
+// gender (joined from users.gender) — powers the 👨/👩/total group-card stats.
+async function memberCounts(groupIds: number[]): Promise<Map<number, GroupCounts>> {
+  const map = new Map<number, GroupCounts>();
   if (groupIds.length === 0) return map;
   const rows = await db
-    .select({ groupId: soloGroupMembersTable.groupId })
+    .select({ groupId: soloGroupMembersTable.groupId, gender: usersTable.gender })
     .from(soloGroupMembersTable)
+    .leftJoin(usersTable, eq(usersTable.id, soloGroupMembersTable.userId))
     .where(
       and(
         inArray(soloGroupMembersTable.groupId, groupIds),
         eq(soloGroupMembersTable.status, "approved"),
       ),
     );
-  for (const r of rows) map.set(r.groupId, (map.get(r.groupId) ?? 0) + 1);
+  for (const r of rows) {
+    const c = map.get(r.groupId) ?? emptyCounts();
+    c.total++;
+    if (r.gender === "male") c.men++;
+    else if (r.gender === "female") c.women++;
+    else c.other++;
+    map.set(r.groupId, c);
+  }
   return map;
 }
 
 function groupToPublic(
   g: typeof soloGroupsTable.$inferSelect,
-  memberCount: number,
+  counts: GroupCounts,
   myStatus: string | null,
   isAdmin: boolean,
 ) {
@@ -433,20 +650,37 @@ function groupToPublic(
     country: g.country,
     state: g.state,
     city: g.city,
+    // Non-gating vibe label now (male | female | mixed).
     genderType: g.genderType,
     visibility: g.visibility,
     status: g.status,
     reputationScore: g.reputationScore,
     ratingCount: g.ratingCount,
     createdAt: g.createdAt.toISOString(),
-    memberCount,
+    lastActivityAt: g.lastActivityAt ? g.lastActivityAt.toISOString() : null,
+    // Real member-gender breakdown for the card.
+    memberCount: counts.total,
+    menCount: counts.men,
+    womenCount: counts.women,
+    otherCount: counts.other,
     myMembershipStatus: myStatus,
     isAdmin,
   };
 }
 
-// List groups in the caller's gender + current city. City is REQUIRED and
-// validated on every request so users can never browse other-city groups.
+// Bump a group's activity clock so the inactivity job leaves it alone. Also
+// clears any pending expiry warning since the group is alive again.
+async function touchGroupActivity(groupId: number): Promise<void> {
+  await db
+    .update(soloGroupsTable)
+    .set({ lastActivityAt: new Date(), expiryWarnedAt: null })
+    .where(eq(soloGroupsTable.id, groupId));
+}
+
+// List groups in the caller's current city. Gender is NO LONGER a filter —
+// both genders may see/join any group. City is REQUIRED and validated on every
+// request so users can never browse other-city groups. Soft-deleted groups
+// (deletedAt set) are excluded.
 router.get("/solo-connect/groups", async (req, res) => {
   const user = await requireApproved(req, res);
   if (!user) return;
@@ -456,20 +690,16 @@ router.get("/solo-connect/groups", async (req, res) => {
     res.status(400).json({ error: "Your current city is required to view groups." });
     return;
   }
-  const conds = [
-    eq(soloGroupsTable.genderType, user.gender!),
-    ne(soloGroupsTable.status, "closed"),
-  ];
   const all = await db
     .select()
     .from(soloGroupsTable)
-    .where(and(...conds))
+    .where(and(ne(soloGroupsTable.status, "closed"), isNull(soloGroupsTable.deletedAt)))
     .orderBy(desc(soloGroupsTable.createdAt));
   // City + (optional) activity filtering done in JS for case-insensitive match.
   const filtered = all.filter(
     (g) => norm(g.city) === norm(city) && (!activityType || g.activityType === activityType),
   );
-  const counts = await approvedCounts(filtered.map((g) => g.id));
+  const counts = await memberCounts(filtered.map((g) => g.id));
   const myMemberships = await db
     .select({ groupId: soloGroupMembersTable.groupId, status: soloGroupMembersTable.status })
     .from(soloGroupMembersTable)
@@ -477,7 +707,7 @@ router.get("/solo-connect/groups", async (req, res) => {
   const myMap = new Map(myMemberships.map((m) => [m.groupId, m.status]));
   res.json(
     filtered.map((g) =>
-      groupToPublic(g, counts.get(g.id) ?? 0, myMap.get(g.id) ?? null, g.adminUserId === user.id),
+      groupToPublic(g, counts.get(g.id) ?? emptyCounts(), myMap.get(g.id) ?? null, g.adminUserId === user.id),
     ),
   );
 });
@@ -494,14 +724,16 @@ const CreateGroupBody = z.object({
   description: z.string().max(2000).optional(),
   maxMembers: z.number().int().min(3).max(15),
   visibility: z.enum(["public", "private"]).optional(),
+  // Non-gating vibe label chosen by the creator (defaults to mixed).
+  genderType: z.enum(["male", "female", "mixed"]).optional(),
   country: z.string().optional(),
   state: z.string().optional(),
   city: z.string().min(1),
 });
 
-// Create a group. genderType is FORCED to the creator's onboarding gender and
-// the location is taken from the request body (the user's verified location);
-// the creator is auto-enrolled as the approved admin member.
+// Create a group. genderType is a non-gating vibe label (default mixed); the
+// location is taken from the request body (the user's verified location); the
+// creator is auto-enrolled as the approved admin member.
 router.post("/solo-connect/groups", async (req, res) => {
   const user = await requireApproved(req, res);
   if (!user) return;
@@ -529,7 +761,8 @@ router.post("/solo-connect/groups", async (req, res) => {
       country: d.country ?? "India",
       state: d.state ?? "",
       city: d.city,
-      genderType: user.gender!,
+      genderType: d.genderType ?? "mixed",
+      lastActivityAt: new Date(),
     })
     .returning();
   const group = inserted[0]!;
@@ -540,14 +773,19 @@ router.post("/solo-connect/groups", async (req, res) => {
     status: "approved",
     joinedAt: new Date(),
   });
-  res.json(groupToPublic(group, 1, "approved", true));
+  const counts = emptyCounts();
+  counts.total = 1;
+  if (user.gender === "male") counts.men = 1;
+  else if (user.gender === "female") counts.women = 1;
+  else counts.other = 1;
+  res.json(groupToPublic(group, counts, "approved", true));
 });
 
-// Loads a group and enforces gender + caller-city access. Returns null + sends a
-// response when access is denied.
+// Loads a group and enforces caller-city access (gender is no longer a gate).
+// Returns null + sends a response when access is denied or the group is gone.
 async function loadAccessibleGroup(
   groupId: number,
-  user: AuthUser,
+  _user: AuthUser,
   callerCity: string,
   res: Response,
 ): Promise<typeof soloGroupsTable.$inferSelect | null> {
@@ -557,12 +795,8 @@ async function loadAccessibleGroup(
     .where(eq(soloGroupsTable.id, groupId))
     .limit(1);
   const g = rows[0];
-  if (!g) {
+  if (!g || g.deletedAt) {
     res.status(404).json({ error: "Group not found" });
-    return null;
-  }
-  if (g.genderType !== user.gender) {
-    res.status(403).json({ error: "This group is not available for your account." });
     return null;
   }
   if (callerCity && norm(g.city) !== norm(callerCity)) {
@@ -590,6 +824,7 @@ router.get("/solo-connect/groups/:id", async (req, res) => {
       groupId: soloGroupMembersTable.groupId,
       userId: soloGroupMembersTable.userId,
       userName: usersTable.name,
+      gender: usersTable.gender,
       role: soloGroupMembersTable.role,
       status: soloGroupMembersTable.status,
       joinedAt: soloGroupMembersTable.joinedAt,
@@ -601,14 +836,23 @@ router.get("/solo-connect/groups/:id", async (req, res) => {
     .orderBy(desc(soloGroupMembersTable.id));
 
   const mine = members.find((m) => m.userId === user.id);
-  const approvedCount = members.filter((m) => m.status === "approved").length;
+  const counts = emptyCounts();
+  for (const m of members) {
+    if (m.status !== "approved") continue;
+    counts.total++;
+    if (m.gender === "male") counts.men++;
+    else if (m.gender === "female") counts.women++;
+    else counts.other++;
+  }
   res.json({
-    group: groupToPublic(g, approvedCount, mine?.status ?? null, g.adminUserId === user.id),
+    group: groupToPublic(g, counts, mine?.status ?? null, g.adminUserId === user.id),
     members: members.map((m) => ({
       id: m.id,
       groupId: m.groupId,
       userId: m.userId,
       userName: m.userName ?? "",
+      // Expose gender so the client can show a per-member 👨/👩 marker.
+      gender: m.gender ?? null,
       role: m.role,
       status: m.status,
       joinedAt: m.joinedAt ? m.joinedAt.toISOString() : null,
@@ -653,8 +897,8 @@ router.post("/solo-connect/groups/:id/join", async (req, res) => {
     res.status(409).json({ error: "You have already requested to join this group." });
     return;
   }
-  const counts = await approvedCounts([id]);
-  if ((counts.get(id) ?? 0) >= g.maxMembers) {
+  const counts = await memberCounts([id]);
+  if ((counts.get(id)?.total ?? 0) >= g.maxMembers) {
     res.status(403).json({ error: "This group is full." });
     return;
   }
@@ -671,6 +915,15 @@ router.post("/solo-connect/groups/:id/join", async (req, res) => {
       status: "requested",
     });
   }
+  // A join request keeps the group alive and pings the group admin.
+  await touchGroupActivity(id);
+  createUserNotification({
+    userId: g.adminUserId,
+    title: "New join request",
+    message: `${user.name} asked to join "${g.name}".`,
+    url: "/solo-connect",
+    tag: `solo-group-${id}`,
+  }).catch(() => {});
   res.json({ ok: true, status: "requested" });
 });
 
@@ -730,12 +983,18 @@ function memberAction(action: "approved" | "rejected" | "removed") {
     const g = await requireGroupAdmin(id, user, res);
     if (!g) return;
     if (action === "approved") {
-      const counts = await approvedCounts([id]);
-      if ((counts.get(id) ?? 0) >= g.maxMembers) {
+      const counts = await memberCounts([id]);
+      if ((counts.get(id)?.total ?? 0) >= g.maxMembers) {
         res.status(403).json({ error: "This group is full." });
         return;
       }
     }
+    // Resolve the affected member's user id (for notifications) before updating.
+    const target = await db
+      .select({ userId: soloGroupMembersTable.userId })
+      .from(soloGroupMembersTable)
+      .where(and(eq(soloGroupMembersTable.id, memberId), eq(soloGroupMembersTable.groupId, id)))
+      .limit(1);
     await db
       .update(soloGroupMembersTable)
       .set({ status: action, joinedAt: action === "approved" ? new Date() : null })
@@ -746,6 +1005,20 @@ function memberAction(action: "approved" | "rejected" | "removed") {
           ne(soloGroupMembersTable.role, "admin"),
         ),
       );
+    if (action === "approved") await touchGroupActivity(id);
+    const targetUserId = target[0]?.userId;
+    if (targetUserId && (action === "approved" || action === "removed")) {
+      createUserNotification({
+        userId: targetUserId,
+        title: action === "approved" ? "You're in!" : "Removed from group",
+        message:
+          action === "approved"
+            ? `You were approved to join "${g.name}".`
+            : `You were removed from "${g.name}".`,
+        url: "/solo-connect",
+        tag: `solo-group-${id}`,
+      }).catch(() => {});
+    }
     res.json({ ok: true });
   };
 }
@@ -849,6 +1122,8 @@ router.post("/solo-connect/groups/:id/messages", async (req, res) => {
     .values({ groupId: id, userId: user.id, body: parsed.data.body.trim() })
     .returning();
   const m = inserted[0]!;
+  // Chat activity keeps the group from auto-expiring.
+  await touchGroupActivity(id);
   res.json({
     id: m.id,
     groupId: m.groupId,
@@ -862,9 +1137,18 @@ router.post("/solo-connect/groups/:id/messages", async (req, res) => {
 
 // ─── Admin: group monitoring ─────────────────────────────────────────────────
 
-// List all groups (any gender, any city) with creator info + member counts.
-router.get("/admin/solo-connect/groups", requireAuth(["admin"]), async (_req, res) => {
-  const groups = await db.select().from(soloGroupsTable).orderBy(desc(soloGroupsTable.createdAt));
+// List groups with creator info, member counts, and inactivity bookkeeping.
+// Excludes soft-deleted groups by default; ?includeDeleted=1 shows them too
+// (for the Auto Deletion Logs view); ?inactiveDays=N filters the monitor.
+router.get("/admin/solo-connect/groups", requireAuth(["admin"]), async (req, res) => {
+  const includeDeleted = req.query["includeDeleted"] === "1";
+  const inactiveDays = Number(req.query["inactiveDays"] ?? 0);
+  let groups = await db.select().from(soloGroupsTable).orderBy(desc(soloGroupsTable.createdAt));
+  if (!includeDeleted) groups = groups.filter((g) => !g.deletedAt);
+  if (Number.isFinite(inactiveDays) && inactiveDays > 0) {
+    const cutoff = Date.now() - inactiveDays * 24 * 60 * 60 * 1000;
+    groups = groups.filter((g) => (g.lastActivityAt?.getTime() ?? 0) <= cutoff);
+  }
   if (groups.length === 0) {
     res.json([]);
     return;
@@ -879,27 +1163,44 @@ router.get("/admin/solo-connect/groups", requireAuth(["admin"]), async (_req, re
   const creatorMap = new Map(creators.map((c) => [c.id, c]));
 
   const allMembers = await db
-    .select({ groupId: soloGroupMembersTable.groupId, status: soloGroupMembersTable.status })
+    .select({ groupId: soloGroupMembersTable.groupId, status: soloGroupMembersTable.status, gender: usersTable.gender })
     .from(soloGroupMembersTable)
+    .leftJoin(usersTable, eq(usersTable.id, soloGroupMembersTable.userId))
     .where(inArray(soloGroupMembersTable.groupId, groupIds));
 
-  const stats = new Map<number, { approved: number; pending: number; total: number }>();
+  const stats = new Map<number, GroupCounts & { pending: number; allRows: number }>();
   for (const m of allMembers) {
-    const s = stats.get(m.groupId) ?? { approved: 0, pending: 0, total: 0 };
-    s.total++;
-    if (m.status === "approved") s.approved++;
+    const s = stats.get(m.groupId) ?? { ...emptyCounts(), pending: 0, allRows: 0 };
+    s.allRows++;
     if (m.status === "requested") s.pending++;
+    if (m.status === "approved") {
+      s.total++;
+      if (m.gender === "male") s.men++;
+      else if (m.gender === "female") s.women++;
+      else s.other++;
+    }
     stats.set(m.groupId, s);
   }
 
+  const now = Date.now();
   res.json(
-    groups.map((g) => ({
-      ...groupToPublic(g, stats.get(g.id)?.approved ?? 0, null, false),
-      creatorName: creatorMap.get(g.adminUserId)?.name ?? "",
-      creatorEmail: creatorMap.get(g.adminUserId)?.email ?? "",
-      pendingCount: stats.get(g.id)?.pending ?? 0,
-      totalMemberCount: stats.get(g.id)?.total ?? 0,
-    })),
+    groups.map((g) => {
+      const s = stats.get(g.id);
+      const daysSinceActivity = g.lastActivityAt
+        ? Math.floor((now - g.lastActivityAt.getTime()) / (24 * 60 * 60 * 1000))
+        : null;
+      return {
+        ...groupToPublic(g, s ?? emptyCounts(), null, false),
+        creatorName: creatorMap.get(g.adminUserId)?.name ?? "",
+        creatorEmail: creatorMap.get(g.adminUserId)?.email ?? "",
+        pendingCount: s?.pending ?? 0,
+        totalMemberCount: s?.allRows ?? 0,
+        daysSinceActivity,
+        expiryWarnedAt: g.expiryWarnedAt ? g.expiryWarnedAt.toISOString() : null,
+        deletedAt: g.deletedAt ? g.deletedAt.toISOString() : null,
+        deletedReason: g.deletedReason,
+      };
+    }),
   );
 });
 
@@ -980,13 +1281,415 @@ router.post("/admin/solo-connect/groups/:id/close", requireAuth(["admin"]), asyn
   res.json({ ok: true });
 });
 
-// Hard-delete a group and its members + messages.
+// Hard-delete a group and its members + messages + reports.
 router.delete("/admin/solo-connect/groups/:id", requireAuth(["admin"]), async (req, res) => {
   const id = parseInt(String(req.params["id"]), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   await db.delete(soloGroupMessagesTable).where(eq(soloGroupMessagesTable.groupId, id));
   await db.delete(soloGroupMembersTable).where(eq(soloGroupMembersTable.groupId, id));
+  await db.delete(soloReportsTable).where(eq(soloReportsTable.groupId, id));
   await db.delete(soloGroupsTable).where(eq(soloGroupsTable.id, id));
+  res.json({ ok: true });
+});
+
+// Admin: reset a group's inactivity clock (manual "extend" from the monitor).
+router.post("/admin/solo-connect/groups/:id/extend", requireAuth(["admin"]), async (req, res) => {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  await touchGroupActivity(id);
+  res.json({ ok: true });
+});
+
+// ─── Member reporting ────────────────────────────────────────────────────────
+
+const ReportBody = z.object({
+  reportedUserId: z.number().int().positive(),
+  reason: z.enum([
+    "harassment",
+    "fake_profile",
+    "abuse",
+    "spam",
+    "inappropriate",
+    "safety",
+    "other",
+  ]),
+  description: z.string().max(2000).optional(),
+  evidenceUrl: z.string().max(500).optional(),
+});
+
+// File a report against another member of a group the caller has joined.
+router.post("/solo-connect/groups/:id/report", reportLimiter, async (req, res) => {
+  const user = await requireApproved(req, res);
+  if (!user) return;
+  const groupId = parseInt(String(req.params["id"]), 10);
+  if (Number.isNaN(groupId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const parsed = ReportBody.safeParse(req.body);
+  if (!parsed.success) {
+    respondInvalid(res, parsed.error);
+    return;
+  }
+  const { reportedUserId, reason, description, evidenceUrl } = parsed.data;
+  if (reportedUserId === user.id) {
+    res.status(400).json({ error: "You can't report yourself." });
+    return;
+  }
+  if (evidenceUrl && !isUploadPath(evidenceUrl)) {
+    res.status(400).json({ error: "Invalid evidence reference." });
+    return;
+  }
+  // The reporter must be a member of this group, and the reported user too.
+  const memberships = await db
+    .select({ userId: soloGroupMembersTable.userId, status: soloGroupMembersTable.status })
+    .from(soloGroupMembersTable)
+    .where(eq(soloGroupMembersTable.groupId, groupId));
+  const me = memberships.find((m) => m.userId === user.id);
+  const them = memberships.find((m) => m.userId === reportedUserId);
+  if (!me || me.status !== "approved") {
+    res.status(403).json({ error: "Join this group before reporting a member." });
+    return;
+  }
+  if (!them) {
+    res.status(400).json({ error: "That person is not a member of this group." });
+    return;
+  }
+
+  try {
+    await db.insert(soloReportsTable).values({
+      reporterUserId: user.id,
+      reportedUserId,
+      groupId,
+      reason,
+      description: description ?? "",
+      evidenceUrl: evidenceUrl ?? "",
+      status: "open",
+    });
+  } catch (err) {
+    // Partial unique index → an open report for this trio already exists.
+    if ((err as { code?: string }).code === "23505") {
+      res.status(409).json({ error: "You already have an open report against this member." });
+      return;
+    }
+    throw err;
+  }
+
+  createUserNotification({
+    userId: user.id,
+    title: "Report submitted",
+    message: "Thanks — our team will review your report and follow up.",
+    url: "/solo-connect",
+    tag: "solo-report",
+  }).catch(() => {});
+  res.json({ ok: true });
+});
+
+// ─── Admin: reports management + moderation ──────────────────────────────────
+
+// Apply a punitive moderation effect to a user's verification row, creating the
+// row if the user never onboarded (so a ban sticks regardless).
+async function setModerationState(
+  userId: number,
+  patch: { suspendedUntil?: Date | null; banned?: boolean },
+): Promise<void> {
+  const existing = await db
+    .select({ id: soloConnectVerificationsTable.id })
+    .from(soloConnectVerificationsTable)
+    .where(eq(soloConnectVerificationsTable.userId, userId))
+    .limit(1);
+  if (existing[0]) {
+    await db
+      .update(soloConnectVerificationsTable)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(eq(soloConnectVerificationsTable.id, existing[0].id));
+  } else {
+    await db.insert(soloConnectVerificationsTable).values({ userId, status: "rejected", ...patch });
+  }
+}
+
+// List reports with reporter/reported/group context + repeat-offender counts.
+// Filters: ?status= ?reason= ?q= (name/email search). Paginated via ?limit ?offset.
+router.get("/admin/solo-connect/reports", requireAuth(["admin"]), async (req, res) => {
+  const statusFilter = typeof req.query["status"] === "string" ? req.query["status"] : "";
+  const reasonFilter = typeof req.query["reason"] === "string" ? req.query["reason"] : "";
+  const q = (typeof req.query["q"] === "string" ? req.query["q"] : "").trim().toLowerCase();
+  const limit = Math.min(Math.max(Number(req.query["limit"] ?? 50), 1), 200);
+  const offset = Math.max(Number(req.query["offset"] ?? 0), 0);
+
+  const reporter = { id: usersTable.id, name: usersTable.name, email: usersTable.email };
+  const all = await db
+    .select({
+      id: soloReportsTable.id,
+      reporterUserId: soloReportsTable.reporterUserId,
+      reportedUserId: soloReportsTable.reportedUserId,
+      groupId: soloReportsTable.groupId,
+      reason: soloReportsTable.reason,
+      description: soloReportsTable.description,
+      evidenceUrl: soloReportsTable.evidenceUrl,
+      status: soloReportsTable.status,
+      actionTaken: soloReportsTable.actionTaken,
+      adminNote: soloReportsTable.adminNote,
+      reviewedAt: soloReportsTable.reviewedAt,
+      createdAt: soloReportsTable.createdAt,
+      groupName: soloGroupsTable.name,
+    })
+    .from(soloReportsTable)
+    .leftJoin(soloGroupsTable, eq(soloGroupsTable.id, soloReportsTable.groupId))
+    .orderBy(desc(soloReportsTable.createdAt));
+
+  // Resolve reporter + reported user identities in one pass.
+  const userIds = [...new Set(all.flatMap((r) => [r.reporterUserId, r.reportedUserId]))];
+  const users = userIds.length
+    ? await db.select(reporter).from(usersTable).where(inArray(usersTable.id, userIds))
+    : [];
+  const uMap = new Map(users.map((u) => [u.id, u]));
+
+  // Repeat-offender: total reports filed against each reported user.
+  const offenderIds = [...new Set(all.map((r) => r.reportedUserId))];
+  const offenderRows = offenderIds.length
+    ? await db
+        .select({ uid: soloReportsTable.reportedUserId, c: count() })
+        .from(soloReportsTable)
+        .where(inArray(soloReportsTable.reportedUserId, offenderIds))
+        .groupBy(soloReportsTable.reportedUserId)
+    : [];
+  const offenderMap = new Map(offenderRows.map((o) => [o.uid, Number(o.c)]));
+
+  let filtered = all;
+  if (statusFilter) filtered = filtered.filter((r) => r.status === statusFilter);
+  if (reasonFilter) filtered = filtered.filter((r) => r.reason === reasonFilter);
+  if (q) {
+    filtered = filtered.filter((r) => {
+      const rep = uMap.get(r.reporterUserId);
+      const tgt = uMap.get(r.reportedUserId);
+      return [rep?.name, rep?.email, tgt?.name, tgt?.email]
+        .some((v) => (v ?? "").toLowerCase().includes(q));
+    });
+  }
+  const total = filtered.length;
+  const page = filtered.slice(offset, offset + limit);
+
+  res.json({
+    total,
+    reports: page.map((r) => ({
+      id: r.id,
+      reporterUserId: r.reporterUserId,
+      reporterName: uMap.get(r.reporterUserId)?.name ?? "",
+      reporterEmail: uMap.get(r.reporterUserId)?.email ?? "",
+      reportedUserId: r.reportedUserId,
+      reportedName: uMap.get(r.reportedUserId)?.name ?? "",
+      reportedEmail: uMap.get(r.reportedUserId)?.email ?? "",
+      reportCountAgainstReported: offenderMap.get(r.reportedUserId) ?? 0,
+      groupId: r.groupId,
+      groupName: r.groupName ?? "",
+      reason: r.reason,
+      description: r.description,
+      evidenceUrl: r.evidenceUrl,
+      status: r.status,
+      actionTaken: r.actionTaken,
+      adminNote: r.adminNote,
+      reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString() : null,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  });
+});
+
+const ReportActionBody = z.object({
+  action: z.enum(["warn", "suspend", "ban", "remove", "resolve", "reject"]),
+  suspendDays: z.number().int().min(1).max(365).optional(),
+  note: z.string().max(1000).optional(),
+});
+
+router.post("/admin/solo-connect/reports/:id/action", requireAuth(["admin"]), async (req, res) => {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const parsed = ReportActionBody.safeParse(req.body);
+  if (!parsed.success) { respondInvalid(res, parsed.error); return; }
+  const { action, suspendDays, note } = parsed.data;
+  const admin = (req as AuthedRequest).user;
+
+  const rows = await db.select().from(soloReportsTable).where(eq(soloReportsTable.id, id)).limit(1);
+  const report = rows[0];
+  if (!report) { res.status(404).json({ error: "Report not found" }); return; }
+
+  // Map the action to a punitive effect + the report's resulting status.
+  let nextStatus = "resolved";
+  let actionTaken = "none";
+  if (action === "warn") {
+    actionTaken = "warn";
+    createUserNotification({
+      userId: report.reportedUserId,
+      title: "Warning from Royvento moderation",
+      message: note || "A report about your conduct was reviewed. Please follow the Community Guidelines.",
+      url: "/community-guidelines",
+      tag: "solo-moderation",
+    }).catch(() => {});
+  } else if (action === "suspend") {
+    actionTaken = "suspend";
+    const until = new Date(Date.now() + (suspendDays ?? 7) * 24 * 60 * 60 * 1000);
+    await setModerationState(report.reportedUserId, { suspendedUntil: until });
+    createUserNotification({
+      userId: report.reportedUserId,
+      title: "Solo Connector access suspended",
+      message: `Your access is suspended until ${until.toDateString()}.`,
+      url: "/solo-connect",
+      tag: "solo-moderation",
+    }).catch(() => {});
+  } else if (action === "ban") {
+    actionTaken = "ban";
+    await setModerationState(report.reportedUserId, { banned: true });
+    createUserNotification({
+      userId: report.reportedUserId,
+      title: "Solo Connector access banned",
+      message: "Your access to Solo Connector has been permanently revoked.",
+      url: "/solo-connect",
+      tag: "solo-moderation",
+    }).catch(() => {});
+  } else if (action === "remove") {
+    actionTaken = "remove";
+    await db
+      .update(soloGroupMembersTable)
+      .set({ status: "removed" })
+      .where(
+        and(
+          eq(soloGroupMembersTable.groupId, report.groupId),
+          eq(soloGroupMembersTable.userId, report.reportedUserId),
+        ),
+      );
+  } else if (action === "reject") {
+    nextStatus = "rejected";
+  }
+
+  await db
+    .update(soloReportsTable)
+    .set({
+      status: nextStatus,
+      actionTaken,
+      adminNote: note ?? report.adminNote,
+      reviewedByUserId: admin.id,
+      reviewedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(soloReportsTable.id, id));
+
+  await db.insert(soloModerationActionsTable).values({
+    adminUserId: admin.id,
+    targetUserId: report.reportedUserId,
+    groupId: report.groupId,
+    reportId: report.id,
+    action,
+    note: note ?? "",
+  });
+
+  // Tell the reporter the outcome.
+  createUserNotification({
+    userId: report.reporterUserId,
+    title: "Your report was reviewed",
+    message:
+      nextStatus === "rejected"
+        ? "We reviewed your report and took no action."
+        : "We reviewed your report and acted on it. Thank you for keeping the community safe.",
+    url: "/solo-connect",
+    tag: "solo-report",
+  }).catch(() => {});
+
+  res.json({ ok: true, status: nextStatus, actionTaken });
+});
+
+// Append-only moderation audit feed (most recent first).
+router.get("/admin/solo-connect/moderation-actions", requireAuth(["admin"]), async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query["limit"] ?? 100), 1), 500);
+  const rows = await db
+    .select()
+    .from(soloModerationActionsTable)
+    .orderBy(desc(soloModerationActionsTable.createdAt))
+    .limit(limit);
+  const ids = [...new Set(rows.flatMap((r) => [r.adminUserId, r.targetUserId].filter((x): x is number => !!x)))];
+  const users = ids.length
+    ? await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email }).from(usersTable).where(inArray(usersTable.id, ids))
+    : [];
+  const uMap = new Map(users.map((u) => [u.id, u]));
+  res.json(
+    rows.map((r) => ({
+      id: r.id,
+      adminUserId: r.adminUserId,
+      adminName: uMap.get(r.adminUserId)?.name ?? "",
+      targetUserId: r.targetUserId,
+      targetName: r.targetUserId ? uMap.get(r.targetUserId)?.name ?? "" : "",
+      groupId: r.groupId,
+      reportId: r.reportId,
+      action: r.action,
+      note: r.note,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  );
+});
+
+// ─── Admin: auto-deletion logs + restore ─────────────────────────────────────
+
+router.get("/admin/solo-connect/deleted-groups", requireAuth(["admin"]), async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(soloDeletedGroupsLogTable)
+    .orderBy(desc(soloDeletedGroupsLogTable.deletedAt))
+    .limit(200);
+  res.json(
+    rows.map((r) => ({
+      id: r.id,
+      groupId: r.groupId,
+      name: r.name,
+      memberCount: r.memberCount,
+      reason: r.reason,
+      deletedAt: r.deletedAt.toISOString(),
+      restorableUntil: r.restorableUntil ? r.restorableUntil.toISOString() : null,
+      restoredAt: r.restoredAt ? r.restoredAt.toISOString() : null,
+      purgedAt: r.purgedAt ? r.purgedAt.toISOString() : null,
+      // Convenience flag for the UI's Restore button.
+      restorable:
+        !r.restoredAt && !r.purgedAt && !!r.restorableUntil && r.restorableUntil.getTime() > Date.now(),
+    })),
+  );
+});
+
+// Restore a soft-deleted group while still inside its grace window.
+router.post("/admin/solo-connect/groups/:id/restore", requireAuth(["admin"]), async (req, res) => {
+  const id = parseInt(String(req.params["id"]), 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const admin = (req as AuthedRequest).user;
+  const rows = await db.select().from(soloGroupsTable).where(eq(soloGroupsTable.id, id)).limit(1);
+  const g = rows[0];
+  if (!g || !g.deletedAt) {
+    res.status(404).json({ error: "No deleted group to restore." });
+    return;
+  }
+  const logRows = await db
+    .select()
+    .from(soloDeletedGroupsLogTable)
+    .where(and(eq(soloDeletedGroupsLogTable.groupId, id), isNull(soloDeletedGroupsLogTable.purgedAt), isNull(soloDeletedGroupsLogTable.restoredAt)))
+    .orderBy(desc(soloDeletedGroupsLogTable.deletedAt))
+    .limit(1);
+  const log = logRows[0];
+  if (log?.restorableUntil && log.restorableUntil.getTime() < Date.now()) {
+    res.status(410).json({ error: "The restore window for this group has passed." });
+    return;
+  }
+  await db
+    .update(soloGroupsTable)
+    .set({ deletedAt: null, deletedReason: "", lastActivityAt: new Date(), expiryWarnedAt: null })
+    .where(eq(soloGroupsTable.id, id));
+  if (log) {
+    await db
+      .update(soloDeletedGroupsLogTable)
+      .set({ restoredAt: new Date() })
+      .where(eq(soloDeletedGroupsLogTable.id, log.id));
+  }
+  await db.insert(soloModerationActionsTable).values({
+    adminUserId: admin.id,
+    groupId: id,
+    action: "restore",
+    note: "Group restored from auto-deletion.",
+  });
   res.json({ ok: true });
 });
 

@@ -10,6 +10,7 @@ export type SoloVerificationStatus = typeof SoloVerificationStatus[keyof typeof 
 
 
 export const SoloVerificationStatus = {
+  draft: 'draft',
   pending: 'pending',
   approved: 'approved',
   rejected: 'rejected',

@@ -16,7 +16,7 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
-  role: "user" | "vendor" | "admin";
+  role: "user" | "vendor" | "admin" | "organizer" | "game_organizer";
   createdAt: string;
   phone?: string;
   about?: string;

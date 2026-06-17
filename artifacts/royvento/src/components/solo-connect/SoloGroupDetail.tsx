@@ -14,7 +14,9 @@ import {
   getListSoloMessagesQueryKey,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send } from "lucide-react";
+import { apiPost } from "@/lib/api";
+import { uploadImage } from "@/lib/uploadImage";
+import { X, MapPin, Calendar, Users, Phone, Lock, ShieldAlert, Check, UserX, MessageCircle, Send, Flag } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 
 const GOLD = "#d4af37";
@@ -69,6 +71,12 @@ export function SoloGroupDetail({
   const pendingMembers = members.filter((m) => m.status === "requested");
   const isAdmin = group?.isAdmin ?? false;
   const myStatus = group?.myMembershipStatus ?? null;
+  const joined = myStatus === "approved" || isAdmin;
+
+  // Member the current user is reporting (null = modal closed).
+  const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null);
+
+  const genderMark = (g: string | null | undefined) => (g === "male" ? "👨" : g === "female" ? "👩" : "");
 
   return (
     <div
@@ -170,13 +178,21 @@ export function SoloGroupDetail({
                 {approvedMembers.map((m) => (
                   <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
                     <span className="text-sm flex items-center gap-2" style={{ color: "#fff" }}>
+                      {genderMark(m.gender) && <span aria-hidden>{genderMark(m.gender)}</span>}
                       {m.userName}
                       {m.role === "admin" && <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: `${GOLD}22`, color: GOLD }}>ADMIN</span>}
                     </span>
-                    {isAdmin && m.role !== "admin" && (
-                      <button type="button" onClick={() => remove.mutate({ id: groupId, memberId: m.id }, { onSuccess: () => { toast({ title: "Member removed" }); refresh(); } })}
-                        className="h-7 w-7 flex items-center justify-center rounded-md" style={{ background: `${RED}1a`, color: "#fca5a5" }}><UserX className="h-3.5 w-3.5" /></button>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {/* Any joined member can report another member. */}
+                      {joined && (
+                        <button type="button" title="Report member" onClick={() => setReportTarget({ id: m.userId, name: m.userName })}
+                          className="h-7 w-7 flex items-center justify-center rounded-md" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }}><Flag className="h-3.5 w-3.5" /></button>
+                      )}
+                      {isAdmin && m.role !== "admin" && (
+                        <button type="button" onClick={() => remove.mutate({ id: groupId, memberId: m.id }, { onSuccess: () => { toast({ title: "Member removed" }); refresh(); } })}
+                          className="h-7 w-7 flex items-center justify-center rounded-md" style={{ background: `${RED}1a`, color: "#fca5a5" }}><UserX className="h-3.5 w-3.5" /></button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -231,6 +247,126 @@ export function SoloGroupDetail({
             </button>
           </div>
         )}
+      </div>
+
+      {reportTarget && (
+        <ReportMemberModal
+          groupId={groupId}
+          member={reportTarget}
+          onClose={() => setReportTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+const REPORT_REASONS = [
+  { value: "harassment", label: "Harassment" },
+  { value: "fake_profile", label: "Fake profile" },
+  { value: "abuse", label: "Abuse" },
+  { value: "spam", label: "Spam" },
+  { value: "inappropriate", label: "Inappropriate behaviour" },
+  { value: "safety", label: "Safety concern" },
+  { value: "other", label: "Other" },
+] as const;
+
+// Report-a-member modal. Reason + description + optional live/gallery evidence
+// photo (uploaded via the signed-upload flow), POSTed to the report endpoint.
+function ReportMemberModal({
+  groupId,
+  member,
+  onClose,
+}: {
+  groupId: number;
+  member: { id: number; name: string };
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [reason, setReason] = useState<string>("");
+  const [description, setDescription] = useState("");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  async function onPickEvidence(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setEvidenceUrl(url);
+      toast({ title: "Evidence attached." });
+    } catch {
+      toast({ title: "Could not upload that image.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function submit() {
+    if (!reason) { toast({ title: "Choose a reason.", variant: "destructive" }); return; }
+    setBusy(true);
+    try {
+      await apiPost(`/api/solo-connect/groups/${groupId}/report`, {
+        reportedUserId: member.id,
+        reason,
+        description: description.trim() || undefined,
+        evidenceUrl: evidenceUrl || undefined,
+      });
+      toast({ title: "Report submitted. Our team will review it." });
+      onClose();
+    } catch (err) {
+      toast({ title: (err as { message?: string }).message || "Could not submit report.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}>
+      <div className="relative w-full max-w-md rounded-2xl p-6" style={{ background: "linear-gradient(180deg, rgba(24,22,26,0.99), rgba(13,12,15,0.99))", border: `1px solid ${RED}40`, boxShadow: "0 30px 70px rgba(0,0,0,0.7)" }}>
+        <div className="flex items-center gap-2 mb-4">
+          <Flag className="h-5 w-5" style={{ color: RED }} />
+          <h4 className="font-serif text-xl" style={{ color: "#fff" }}>Report {member.name}</h4>
+        </div>
+
+        <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Reason</p>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {REPORT_REASONS.map((r) => {
+            const active = reason === r.value;
+            return (
+              <button key={r.value} type="button" onClick={() => setReason(r.value)}
+                className="px-3 py-2 rounded-lg text-xs text-left transition-all"
+                style={{ background: active ? `${RED}26` : "rgba(255,255,255,0.04)", border: `1px solid ${active ? RED : "rgba(255,255,255,0.12)"}`, color: "#fff" }}>
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          maxLength={2000}
+          placeholder="Describe what happened (optional)…"
+          className="w-full px-3.5 py-2.5 rounded-lg text-sm mb-3"
+          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+        />
+
+        <label className="flex items-center gap-2 mb-4 text-xs cursor-pointer" style={{ color: "rgba(255,255,255,0.6)" }}>
+          <input type="file" accept="image/*" className="hidden" onChange={onPickEvidence} />
+          <span className="px-3 py-2 rounded-lg" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+            {uploading ? "Uploading…" : evidenceUrl ? "✓ Evidence attached" : "Attach supporting photo (optional)"}
+          </span>
+        </label>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-medium" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.15)" }}>Cancel</button>
+          <button type="button" onClick={submit} disabled={busy || !reason} className="flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ background: busy || !reason ? "rgba(255,255,255,0.08)" : `linear-gradient(135deg, ${RED}, #d23a2a)`, color: busy || !reason ? "rgba(255,255,255,0.4)" : "#fff" }}>
+            {busy ? "Submitting…" : "Submit report"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -28,6 +28,8 @@ import { MobileFooter } from "@/components/MobileFooter";
 import { BOTTOM_NAV_HEIGHT } from "@/components/PersistentBottomNav";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useThemeId } from "@/context/ThemeContext";
+import { THEMES } from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 import { useLogout } from "@/hooks/useLogout";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
@@ -81,9 +83,11 @@ export default function ProfileScreen() {
   const { user, updateUser } = useAuth();
   const handleLogout = useLogout();
   const { locale, setLocale, t, languages } = useLanguage();
+  const { theme, setTheme } = useThemeId();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const [editModal, setEditModal] = useState(false);
   const [langModal, setLangModal] = useState(false);
+  const [themeModal, setThemeModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editPhone, setEditPhone] = useState(user?.phone ?? "");
   const [editAbout, setEditAbout] = useState(user?.about ?? "");
@@ -430,6 +434,33 @@ export default function ProfileScreen() {
         </View>
       </LinearGradient>
 
+      {/* Reward Points — ₹ value + redeem CTA (mirrors web account menu).
+          Rate matches checkout: POINTS_RUPEE_RATE = 0.05 → 100 pts = ₹5. */}
+      {(() => {
+        const pts = user.points ?? 0;
+        const rupee = Math.floor(pts * 0.05);
+        return (
+          <Pressable
+            onPress={() => router.push("/(tabs)/deals")}
+            style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "33", marginBottom: 0 }]}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                Reward Points
+              </Text>
+              <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground }}>{pts} PTS</Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+              <Ionicons name="gift-outline" size={15} color={colors.primary} />
+              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primary }}>
+                {rupee > 0 ? `₹${rupee} discount available` : "Earn points to unlock discounts"}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} style={{ marginLeft: "auto" }} />
+            </View>
+          </Pressable>
+        );
+      })()}
+
       {/* Scanner Invitations */}
       {invitations.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.primary + "60" }]}>
@@ -634,17 +665,23 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
-      {/* Quick Actions (vendor/admin) */}
-      {(user.role === "vendor" || user.role === "admin") && (
+      {/* Quick Actions (partner roles + admin) */}
+      {(user.role === "vendor" || user.role === "admin" || user.role === "organizer" || user.role === "game_organizer") && (
         <View style={[styles.quickActions, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("profile.quick_actions")}</Text>
           <View style={styles.quickRow}>
             <TouchableOpacity
               style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
-              onPress={() => router.push("/vendor/dashboard")}
+              onPress={() => router.push(
+                user.role === "organizer" ? "/organizer/dashboard" as any
+                  : user.role === "game_organizer" ? "/game-organizer/dashboard" as any
+                  : "/vendor/dashboard"
+              )}
             >
               <Ionicons name="bar-chart-outline" size={22} color={colors.primary} />
-              <Text style={[styles.quickLabel, { color: colors.primary }]}>{t("profile.dashboard")}</Text>
+              <Text style={[styles.quickLabel, { color: colors.primary }]}>
+                {user.role === "organizer" ? "Event Management" : user.role === "game_organizer" ? "Game Management" : t("profile.dashboard")}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.quickBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
@@ -669,6 +706,10 @@ export default function ProfileScreen() {
       {/* Menu */}
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
+          { icon: "flame-outline" as const, label: "Tonight Plans", onPress: () => router.push("/tonight-plans" as any), badge: 0 },
+          { icon: "game-controller-outline" as const, label: "Games & Sports", onPress: () => router.push("/games-and-sports" as any), badge: 0 },
+          { icon: "mic-outline" as const, label: "Events", onPress: () => router.push("/events" as any), badge: 0 },
+          { icon: "people-outline" as const, label: "Solo Connector", onPress: () => router.push("/solo-connect" as any), badge: 0 },
           { icon: "storefront-outline" as const, label: "Become a Partner", onPress: () => router.push("/become-vendor"), badge: 0 },
           { icon: "notifications-outline" as const, label: "Notifications", onPress: () => router.push("/notifications"), badge: unreadCount },
           { icon: "ticket-outline" as const, label: t("bookings.title"), onPress: () => router.push("/(tabs)/bookings"), badge: 0 },
@@ -679,6 +720,7 @@ export default function ProfileScreen() {
           { icon: "star-outline" as const, label: t("profile.subscription_premium"), onPress: () => router.push("/subscription"), badge: 0 },
           { icon: "headset-outline" as const, label: t("profile.contact_help"), onPress: () => router.push("/contact"), badge: 0 },
           { icon: "language-outline" as const, label: t("profile.language"), onPress: () => setLangModal(true), badge: 0 },
+          { icon: "color-palette-outline" as const, label: "Theme", onPress: () => setThemeModal(true), badge: 0 },
           { icon: "document-text-outline" as const, label: "Terms of Service", onPress: () => router.push("/terms"), badge: 0 },
           { icon: "shield-checkmark-outline" as const, label: "Privacy Policy", onPress: () => router.push("/privacy"), badge: 0 },
           {
@@ -892,6 +934,50 @@ export default function ProfileScreen() {
                   );
                 })}
               </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Theme picker — mirrors the web Noir / Gold / Dusk switcher */}
+      <Modal visible={themeModal} animationType="slide" transparent presentationStyle="overFullScreen">
+        <View style={styles.modalOverlay}>
+          <View style={{ flex: 1, justifyContent: "flex-end" }}>
+            <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 32 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Choose a theme</Text>
+                <Pressable onPress={() => setThemeModal(false)}>
+                  <Ionicons name="close" size={22} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
+              {THEMES.map((th) => {
+                const active = theme === th.id;
+                return (
+                  <Pressable
+                    key={th.id}
+                    onPress={() => {
+                      setTheme(th.id);
+                      setThemeModal(false);
+                    }}
+                    style={({ pressed }) => [{
+                      flexDirection: "row" as const,
+                      alignItems: "center" as const,
+                      gap: 12,
+                      paddingVertical: 14,
+                      paddingHorizontal: 4,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
+                      opacity: pressed ? 0.7 : 1,
+                    }]}
+                  >
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: th.color, borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" }} />
+                    <Text style={{ flex: 1, fontSize: 16, fontFamily: active ? "Inter_700Bold" : "Inter_400Regular", color: active ? colors.primary : colors.foreground }}>
+                      {th.label}
+                    </Text>
+                    {active && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         </View>

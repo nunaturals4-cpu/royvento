@@ -21,6 +21,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { CityProvider } from "@/context/CityContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -211,6 +212,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider onAfterLogout={() => { queryClient.clear(); }}>
+          <ThemeProvider>
           <LanguageProvider>
           <CityProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>
@@ -232,7 +234,15 @@ export default function RootLayout() {
                   <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                   <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
                   <Stack.Screen name="partner/[id]" options={{ headerShown: false }} />
+                  <Stack.Screen name="tonight-plans" options={{ headerShown: false }} />
+                  <Stack.Screen name="events" options={{ headerShown: false }} />
+                  <Stack.Screen name="games-and-sports" options={{ headerShown: false }} />
+                  <Stack.Screen name="game-organizers/[slug]" options={{ headerShown: false }} />
+                  <Stack.Screen name="organizers/[slug]" options={{ headerShown: false }} />
+                  <Stack.Screen name="organizer-events/[slug]" options={{ headerShown: false }} />
                   <Stack.Screen name="vendor/dashboard" options={{ headerShown: false }} />
+                  <Stack.Screen name="organizer/dashboard" options={{ headerShown: false }} />
+                  <Stack.Screen name="game-organizer/dashboard" options={{ headerShown: false }} />
                   <Stack.Screen name="city/[city]/index" options={{ headerShown: false }} />
                   <Stack.Screen name="city/[city]/[locality]" options={{ headerShown: false }} />
                   <Stack.Screen name="+not-found" />
@@ -242,6 +252,7 @@ export default function RootLayout() {
           </GestureHandlerRootView>
           </CityProvider>
           </LanguageProvider>
+          </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

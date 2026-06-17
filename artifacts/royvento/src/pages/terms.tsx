@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { SEO } from "@/components/SEO";
 
-const LAST_UPDATED = "9 June 2026";
+const LAST_UPDATED = "16 June 2026";
 
 export function Terms() {
   return (
@@ -102,15 +102,21 @@ export function Terms() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-2">7. Solo Connect</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">7. Solo Connector</h2>
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 mb-3 space-y-2">
+            <p>Royvento only provides a platform for users to discover and join social groups.</p>
+            <p>Royvento does not organize, supervise, verify, monitor, or take responsibility for meetings, outings, interactions, conversations, or activities that occur after users join a group.</p>
+            <p>Users participate entirely at their own risk and are responsible for exercising personal judgment and ensuring their own safety.</p>
+            <p>Royvento is not responsible for any disputes, misconduct, financial transactions, injuries, losses, damages, or incidents that occur during or after meeting group members.</p>
+          </div>
           <p>
-            <strong className="text-foreground">What it is.</strong> Solo Connect is a premium, heavily-moderated feature that lets verified members discover and join small, activity-based groups (for nightlife, events, games, and activities) so they can go out safely when going alone. It is <strong className="text-foreground">not</strong> a dating service — members join experiences, not individuals.
+            <strong className="text-foreground">What it is.</strong> Solo Connector is a premium, moderated feature that lets verified members discover and join small, activity-based groups (for nightlife, events, games, and activities) so they can go out when going alone. It is <strong className="text-foreground">not</strong> a dating service — members join experiences, not individuals. See our <Link href="/community-guidelines" className="text-foreground underline">Community Guidelines</Link>.
           </p>
           <p className="mt-3">
-            <strong className="text-foreground">Eligibility.</strong> Solo Connect is available only to Royvento Premium subscribers and verified Partners, and only to members aged 18 or over. Access may be withdrawn at any time for breach of these Terms.
+            <strong className="text-foreground">Eligibility.</strong> Solo Connector is available only to Royvento Premium subscribers and verified Partners, and only to members aged 18 or over. Access may be withdrawn at any time for breach of these Terms.
           </p>
           <p className="mt-3">
-            <strong className="text-foreground">Mandatory identity verification.</strong> Before creating or joining any group you must complete a one-time identity check: uploading a valid government ID (Aadhaar, Passport, Driving Licence, or Voter ID), a selfie, and verifying your mobile number by OTP. You represent and warrant that the documents are genuine, current, and your own. Royvento reviews submissions and may approve, reject, or later revoke verification at its discretion. Submitting false, altered, or another person's documents is a serious breach and may be reported to the authorities.
+            <strong className="text-foreground">Verification &amp; consent.</strong> Before creating or joining any group you must verify your mobile number (via Firebase Phone Authentication), capture a live selfie, select your gender, and acknowledge these Terms, the Privacy Policy, and the Community Guidelines. You represent that the selfie is a genuine, current image of yourself. Royvento reviews submissions and may approve, reject, suspend, ban, or later revoke access at its discretion.
           </p>
           <p className="mt-3">
             <strong className="text-foreground">Single-gender, same-city groups.</strong> For member safety, groups are single-gender and you may only view or join groups that match the gender recorded on your profile and your current verified city. Mixed-gender groups are not permitted, and you may not attempt to access groups outside your gender category or city.

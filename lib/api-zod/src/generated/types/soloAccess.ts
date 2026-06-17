@@ -14,4 +14,6 @@ export interface SoloAccess {
   premium: boolean;
   verificationStatus: SoloAccessVerificationStatus;
   gender?: string | null;
+  banned: boolean;
+  suspendedUntil?: string | null;
 }

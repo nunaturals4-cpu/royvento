@@ -5,6 +5,7 @@ import { runMorningReminders, runPreArrivalReminders } from "./jobs/bookingRemin
 import { runExpoPushReceiptPoll } from "./jobs/expoPushReceipts";
 import { runPointsExpiry } from "./jobs/pointsExpiry";
 import { runTonightDigest, runStartingSoonReminders } from "./jobs/tonightNotifications";
+import { runSoloGroupExpiry } from "./jobs/soloGroupExpiry";
 import cron from "node-cron";
 import { db, usersTable, vendorsTable, eventsTable, wishlistsTable, organizersTable } from "@workspace/db";
 import { eq, or, sql, inArray } from "drizzle-orm";
@@ -332,6 +333,68 @@ async function applyPendingSchemaChanges() {
       )`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_group_messages_group_idx" ON "solo_group_messages" ("group_id")`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_group_messages_created_idx" ON "solo_group_messages" ("created_at")`);
+    // ── Solo Connector redesign (phone-first onboarding, no gender gate,
+    // reporting/moderation, auto-expiry). Idempotent; mirrors schema/index.ts.
+    await db.execute(sql`ALTER TABLE "solo_connect_verifications" ADD COLUMN IF NOT EXISTS "firebase_uid" varchar(128) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_connect_verifications" ADD COLUMN IF NOT EXISTS "consent_accepted_at" timestamp with time zone`);
+    await db.execute(sql`ALTER TABLE "solo_connect_verifications" ADD COLUMN IF NOT EXISTS "consent_version" varchar(20) NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE "solo_connect_verifications" ADD COLUMN IF NOT EXISTS "suspended_until" timestamp with time zone`);
+    await db.execute(sql`ALTER TABLE "solo_connect_verifications" ADD COLUMN IF NOT EXISTS "banned" boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "solo_verifications_phone_uniq" ON "solo_connect_verifications" ("phone") WHERE "phone" <> ''`);
+    // solo_groups: gender_type becomes a non-gating label (default mixed) + activity/soft-delete cols.
+    await db.execute(sql`ALTER TABLE "solo_groups" ALTER COLUMN "gender_type" SET DEFAULT 'mixed'`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "last_activity_at" timestamp with time zone NOT NULL DEFAULT now()`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "expiry_warned_at" timestamp with time zone`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp with time zone`);
+    await db.execute(sql`ALTER TABLE "solo_groups" ADD COLUMN IF NOT EXISTS "deleted_reason" varchar(30) NOT NULL DEFAULT ''`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_city_status_idx" ON "solo_groups" ("city", "status")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_groups_activity_idx" ON "solo_groups" ("last_activity_at")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "solo_reports" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "reporter_user_id" integer NOT NULL,
+        "reported_user_id" integer NOT NULL,
+        "group_id" integer NOT NULL,
+        "reason" varchar(24) NOT NULL,
+        "description" text NOT NULL DEFAULT '',
+        "evidence_url" text NOT NULL DEFAULT '',
+        "status" varchar(16) NOT NULL DEFAULT 'open',
+        "action_taken" varchar(16) NOT NULL DEFAULT '',
+        "admin_note" text NOT NULL DEFAULT '',
+        "reviewed_by_user_id" integer,
+        "reviewed_at" timestamp with time zone,
+        "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_reports_reported_idx" ON "solo_reports" ("reported_user_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_reports_status_idx" ON "solo_reports" ("status")`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "solo_reports_open_uniq" ON "solo_reports" ("reporter_user_id", "reported_user_id", "group_id") WHERE "status" = 'open'`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "solo_moderation_actions" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "admin_user_id" integer NOT NULL,
+        "target_user_id" integer,
+        "group_id" integer,
+        "report_id" integer,
+        "action" varchar(16) NOT NULL,
+        "note" text NOT NULL DEFAULT '',
+        "created_at" timestamp with time zone NOT NULL DEFAULT now()
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_moderation_actions_target_idx" ON "solo_moderation_actions" ("target_user_id")`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_moderation_actions_created_idx" ON "solo_moderation_actions" ("created_at")`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "solo_deleted_groups_log" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "group_id" integer NOT NULL,
+        "name" varchar(160) NOT NULL DEFAULT '',
+        "member_count" integer NOT NULL DEFAULT 0,
+        "reason" varchar(30) NOT NULL DEFAULT 'inactivity',
+        "deleted_at" timestamp with time zone NOT NULL DEFAULT now(),
+        "restorable_until" timestamp with time zone,
+        "restored_at" timestamp with time zone,
+        "purged_at" timestamp with time zone
+      )`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS "solo_deleted_groups_log_group_idx" ON "solo_deleted_groups_log" ("group_id")`);
     await db.execute(sql`ALTER TABLE "drink_plans" ADD COLUMN IF NOT EXISTS "global_priority" integer`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "drink_plans_global_priority_idx" ON "drink_plans" ("global_priority")`);
     await db.execute(sql`ALTER TABLE "vendors" ADD COLUMN IF NOT EXISTS "base_fee_percent" numeric(5,2) DEFAULT 3.50`);
@@ -979,6 +1042,19 @@ const server = app.listen(port, (err) => {
       logger.error({ err }, "Solo Connect chat purge failed"),
     );
   });
+
+  // Solo Connector — inactivity lifecycle at 03:30 IST: warn (3 days out),
+  // soft-delete at 15 days, hard-purge after the restore grace window.
+  cron.schedule(
+    "30 3 * * *",
+    () => {
+      logger.info("Running Solo Connector group-expiry job (3:30 AM IST)");
+      runSoloGroupExpiry().catch((err) =>
+        logger.error({ err }, "Solo Connector group-expiry job failed"),
+      );
+    },
+    { timezone: "Asia/Kolkata" },
+  );
 
   // Auto-checkout — 3:50 AM IST: force-checkout guests still marked inside from the previous day.
   cron.schedule("50 3 * * *", () => {

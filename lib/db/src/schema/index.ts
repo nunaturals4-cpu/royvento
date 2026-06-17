@@ -1802,8 +1802,11 @@ export type GameProfileView = typeof gameProfileViewsTable.$inferSelect;
 // membership. (Chat, safety center, reporting, reputation are later phases.)
 
 // One identity-verification record per user. status drives participation:
-// only `approved` users may create or join groups. otpHash/otpExpiry back the
-// dev-mode mobile OTP step (a real SMS provider drops in behind the same flow).
+// only `approved` users may create or join groups. The redesigned onboarding is
+// phone-first: phone is verified via Firebase (firebaseUid set), a live selfie
+// is captured, gender is recorded on the user, and consent is acknowledged.
+// idType/idNumber/otpHash/otpExpiry are retained nullable for back-compat with
+// the legacy ID-document + dev-OTP flow but are no longer written.
 export const soloConnectVerificationsTable = pgTable(
   "solo_connect_verifications",
   {
@@ -1811,16 +1814,24 @@ export const soloConnectVerificationsTable = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => usersTable.id, { onDelete: "cascade" }),
-    // aadhaar | passport | driving_license | voter_id
+    // Legacy (no longer written): aadhaar | passport | driving_license | voter_id
     idType: varchar("id_type", { length: 20 }).notNull().default(""),
-    // Government ID number typed by the applicant during verification.
     idNumber: varchar("id_number", { length: 100 }).notNull().default(""),
     idDocumentUrl: text("id_document_url").notNull().default(""),
     selfieUrl: text("selfie_url").notNull().default(""),
     phone: varchar("phone", { length: 20 }).notNull().default(""),
+    // Firebase Auth uid behind the verified phone (empty in dev-stub mode).
+    firebaseUid: varchar("firebase_uid", { length: 128 }).notNull().default(""),
+    // Legacy dev-OTP material (no longer written; Firebase handles OTP now).
     otpHash: varchar("otp_hash", { length: 255 }).notNull().default(""),
     otpExpiry: timestamp("otp_expiry", { withTimezone: true }),
     phoneVerified: boolean("phone_verified").notNull().default(false),
+    // Explicit consent to Terms / Community Guidelines / risk disclaimer.
+    consentAcceptedAt: timestamp("consent_accepted_at", { withTimezone: true }),
+    consentVersion: varchar("consent_version", { length: 20 }).notNull().default(""),
+    // Moderation state — checked before any participation.
+    suspendedUntil: timestamp("suspended_until", { withTimezone: true }),
+    banned: boolean("banned").notNull().default(false),
     // pending | approved | rejected
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     rejectionReason: text("rejection_reason").notNull().default(""),
@@ -1832,13 +1843,21 @@ export const soloConnectVerificationsTable = pgTable(
   (t) => ({
     userUniq: uniqueIndex("solo_verifications_user_uniq").on(t.userId),
     statusIdx: index("solo_verifications_status_idx").on(t.status),
+    // One account per verified phone number (anti-duplicate). Partial so the
+    // many rows with an empty phone don't collide.
+    phoneUniq: uniqueIndex("solo_verifications_phone_uniq")
+      .on(t.phone)
+      .where(sql`${t.phone} <> ''`),
   }),
 );
 export type SoloConnectVerification = typeof soloConnectVerificationsTable.$inferSelect;
 
-// An activity-based group. genderType is always `male` or `female` (never mixed)
-// and is locked to the creator's onboarding gender. country/state/city capture
-// the creator's verified location; only same-city members may join.
+// An activity-based group. genderType is now a non-gating LABEL
+// (`male` | `female` | `mixed`) describing the group's vibe — both genders may
+// join any group. country/state/city capture the creator's verified location;
+// only same-city members may join. lastActivityAt drives auto-expiry; deletedAt
+// is a soft delete that the inactivity job sets (restorable within a grace
+// window before the rows are hard-purged).
 export const soloGroupsTable = pgTable(
   "solo_groups",
   {
@@ -1860,19 +1879,27 @@ export const soloGroupsTable = pgTable(
     country: varchar("country", { length: 100 }).notNull().default("India"),
     state: varchar("state", { length: 100 }).notNull().default(""),
     city: varchar("city", { length: 100 }).notNull().default(""),
-    // male | female — no mixed groups, enforced at API + UI
-    genderType: varchar("gender_type", { length: 10 }).notNull(),
+    // male | female | mixed — a non-gating label (default mixed). Both genders
+    // may join any group; this only describes the intended vibe.
+    genderType: varchar("gender_type", { length: 10 }).notNull().default("mixed"),
     // public | private
     visibility: varchar("visibility", { length: 10 }).notNull().default("public"),
     // open | locked | closed
     status: varchar("status", { length: 10 }).notNull().default("open"),
     reputationScore: numeric("reputation_score", { precision: 4, scale: 2 }).notNull().default("0"),
     ratingCount: integer("rating_count").notNull().default(0),
+    // Auto-expiry bookkeeping: bumped on new member/approve/message. Once it
+    // goes 15 days stale the group is soft-deleted (deletedAt set).
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+    expiryWarnedAt: timestamp("expiry_warned_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedReason: varchar("deleted_reason", { length: 30 }).notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    cityGenderStatusIdx: index("solo_groups_city_gender_status_idx").on(t.city, t.genderType, t.status),
+    cityStatusIdx: index("solo_groups_city_status_idx").on(t.city, t.status),
     adminIdx: index("solo_groups_admin_idx").on(t.adminUserId),
+    activityIdx: index("solo_groups_activity_idx").on(t.lastActivityAt),
   }),
 );
 export type SoloGroup = typeof soloGroupsTable.$inferSelect;
@@ -1918,3 +1945,83 @@ export const soloGroupMessagesTable = pgTable(
   }),
 );
 export type SoloGroupMessage = typeof soloGroupMessagesTable.$inferSelect;
+
+// Member-to-member safety reports filed inside a joined group. status drives the
+// admin moderation queue; actionTaken records the moderation outcome. evidenceUrl
+// is an optional auth-gated upload supporting the report.
+export const soloReportsTable = pgTable(
+  "solo_reports",
+  {
+    id: serial("id").primaryKey(),
+    reporterUserId: integer("reporter_user_id").notNull(),
+    reportedUserId: integer("reported_user_id").notNull(),
+    groupId: integer("group_id").notNull(),
+    // harassment | fake_profile | abuse | spam | inappropriate | safety | other
+    reason: varchar("reason", { length: 24 }).notNull(),
+    description: text("description").notNull().default(""),
+    evidenceUrl: text("evidence_url").notNull().default(""),
+    // open | under_review | resolved | rejected
+    status: varchar("status", { length: 16 }).notNull().default("open"),
+    // warn | suspend | ban | remove | none
+    actionTaken: varchar("action_taken", { length: 16 }).notNull().default(""),
+    adminNote: text("admin_note").notNull().default(""),
+    reviewedByUserId: integer("reviewed_by_user_id"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    reportedIdx: index("solo_reports_reported_idx").on(t.reportedUserId),
+    statusIdx: index("solo_reports_status_idx").on(t.status),
+    // Throttle duplicate spam: one OPEN report per (reporter, reported, group).
+    openUniq: uniqueIndex("solo_reports_open_uniq")
+      .on(t.reporterUserId, t.reportedUserId, t.groupId)
+      .where(sql`${t.status} = 'open'`),
+  }),
+);
+export type SoloReport = typeof soloReportsTable.$inferSelect;
+
+// Append-only audit log of every moderation action an admin takes against a
+// Solo Connector member or group.
+export const soloModerationActionsTable = pgTable(
+  "solo_moderation_actions",
+  {
+    id: serial("id").primaryKey(),
+    adminUserId: integer("admin_user_id").notNull(),
+    targetUserId: integer("target_user_id"),
+    groupId: integer("group_id"),
+    reportId: integer("report_id"),
+    // warn | suspend | ban | remove | resolve | reject | restore
+    action: varchar("action", { length: 16 }).notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    targetIdx: index("solo_moderation_actions_target_idx").on(t.targetUserId),
+    createdIdx: index("solo_moderation_actions_created_idx").on(t.createdAt),
+  }),
+);
+export type SoloModerationAction = typeof soloModerationActionsTable.$inferSelect;
+
+// Auto-deletion audit + restore source. The inactivity job snapshots a group
+// here when it soft-deletes it; admins can restore until restorableUntil, after
+// which the group's rows + media are hard-purged.
+export const soloDeletedGroupsLogTable = pgTable(
+  "solo_deleted_groups_log",
+  {
+    id: serial("id").primaryKey(),
+    groupId: integer("group_id").notNull(),
+    name: varchar("name", { length: 160 }).notNull().default(""),
+    memberCount: integer("member_count").notNull().default(0),
+    // inactivity | admin
+    reason: varchar("reason", { length: 30 }).notNull().default("inactivity"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+    restorableUntil: timestamp("restorable_until", { withTimezone: true }),
+    restoredAt: timestamp("restored_at", { withTimezone: true }),
+    purgedAt: timestamp("purged_at", { withTimezone: true }),
+  },
+  (t) => ({
+    groupIdx: index("solo_deleted_groups_log_group_idx").on(t.groupId),
+  }),
+);
+export type SoloDeletedGroupLog = typeof soloDeletedGroupsLogTable.$inferSelect;

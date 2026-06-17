@@ -28,6 +28,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5",
     "express-rate-limit": "^8.4.1",
+    "firebase-admin": "^14.0.0",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.2.1",

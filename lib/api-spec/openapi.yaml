@@ -185,16 +185,17 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/SoloVerification"
                   - type: "null"
+  /solo-connect/verification/submit:
     post:
       operationId: submitSoloVerification
       tags: [solo-connect]
-      summary: Upload ID document, selfie and phone for verification
+      summary: Submit selfie + gender + consent to finalize verification (Pending Review)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SoloVerificationBody"
+              $ref: "#/components/schemas/SoloSubmitBody"
       responses:
         "200":
           description: Verification record
@@ -203,30 +204,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/SoloVerification"
 
-  /solo-connect/verification/otp/request:
-    post:
-      operationId: requestSoloOtp
+  /solo-connect/phone/config:
+    get:
+      operationId: getSoloPhoneConfig
       tags: [solo-connect]
-      summary: Generate a mobile OTP (dev-mode returns the code)
+      summary: Whether real Firebase Phone Auth is configured (else dev-stub mode)
       responses:
         "200":
-          description: OTP generated
+          description: Phone auth config
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SoloOtpRequestResult"
+                $ref: "#/components/schemas/SoloPhoneConfig"
 
-  /solo-connect/verification/otp/verify:
+  /solo-connect/phone/verify:
     post:
-      operationId: verifySoloOtp
+      operationId: verifySoloPhone
       tags: [solo-connect]
-      summary: Verify the mobile OTP
+      summary: Verify a Firebase phone ID token (or dev-stub) and link the phone
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SoloOtpVerifyBody"
+              $ref: "#/components/schemas/SoloPhoneVerifyBody"
       responses:
         "200":
           description: Verification record
@@ -456,6 +457,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SoloMessage"
+
+  /solo-connect/groups/{id}/report:
+    post:
+      operationId: reportSoloMember
+      tags: [solo-connect]
+      summary: Report another member of a group you've joined
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoloReportBody"
+      responses:
+        "200":
+          description: Report submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoloActionResult"
 
   /users:
     get:
@@ -3054,54 +3076,71 @@ components:
           type: boolean
         verificationStatus:
           type: string
-          enum: [none, pending, approved, rejected]
+          enum: [none, draft, pending, approved, rejected]
         gender:
           type: string
           nullable: true
-      required: [eligible, reason, premium, verificationStatus]
+        banned:
+          type: boolean
+        suspendedUntil:
+          type: string
+          nullable: true
+      required: [eligible, reason, premium, verificationStatus, banned]
 
     SoloVerification:
       type: object
       properties:
         id: { type: integer }
         userId: { type: integer }
-        idType: { type: string }
-        idNumber: { type: string }
-        idDocumentUrl: { type: string }
         selfieUrl: { type: string }
         phone: { type: string }
         phoneVerified: { type: boolean }
+        consentAcceptedAt: { type: string, nullable: true }
+        consentVersion: { type: string }
+        suspendedUntil: { type: string, nullable: true }
+        banned: { type: boolean }
         status:
           type: string
-          enum: [pending, approved, rejected]
+          enum: [draft, pending, approved, rejected]
         rejectionReason: { type: string }
         createdAt: { type: string }
         updatedAt: { type: string }
-      required: [id, userId, idType, idNumber, idDocumentUrl, selfieUrl, phone, phoneVerified, status, rejectionReason, createdAt, updatedAt]
+      required: [id, userId, selfieUrl, phone, phoneVerified, consentVersion, banned, status, rejectionReason, createdAt, updatedAt]
 
-    SoloVerificationBody:
+    SoloPhoneConfig:
       type: object
       properties:
-        idType:
+        firebaseConfigured: { type: boolean }
+      required: [firebaseConfigured]
+
+    SoloPhoneVerifyBody:
+      type: object
+      properties:
+        idToken: { type: string }
+      required: [idToken]
+
+    SoloSubmitBody:
+      type: object
+      properties:
+        selfieUrl: { type: string }
+        gender:
           type: string
-          enum: [aadhaar, passport, driving_license, voter_id]
-        idNumber: { type: string }
-      required: [idType, idNumber]
+          enum: [male, female, prefer_not_to_say]
+        consent:
+          type: boolean
+          enum: [true]
+      required: [selfieUrl, gender, consent]
 
-    SoloOtpRequestResult:
+    SoloReportBody:
       type: object
       properties:
-        ok: { type: boolean }
-        devCode:
+        reportedUserId: { type: integer }
+        reason:
           type: string
-          nullable: true
-      required: [ok]
-
-    SoloOtpVerifyBody:
-      type: object
-      properties:
-        code: { type: string }
-      required: [code]
+          enum: [harassment, fake_profile, abuse, spam, inappropriate, safety, other]
+        description: { type: string }
+        evidenceUrl: { type: string }
+      required: [reportedUserId, reason]
 
     SoloReviewBody:
       type: object
@@ -3135,7 +3174,7 @@ components:
         city: { type: string }
         genderType:
           type: string
-          enum: [male, female]
+          enum: [male, female, mixed]
         visibility:
           type: string
           enum: [public, private]
@@ -3145,12 +3184,16 @@ components:
         reputationScore: { type: string }
         ratingCount: { type: integer }
         createdAt: { type: string }
+        lastActivityAt: { type: string, nullable: true }
         memberCount: { type: integer }
+        menCount: { type: integer }
+        womenCount: { type: integer }
+        otherCount: { type: integer }
         myMembershipStatus:
           type: string
           nullable: true
         isAdmin: { type: boolean }
-      required: [id, adminUserId, name, activityType, activityLabel, venueName, startTime, description, minMembers, maxMembers, country, state, city, genderType, visibility, status, reputationScore, ratingCount, createdAt, memberCount, isAdmin]
+      required: [id, adminUserId, name, activityType, activityLabel, venueName, startTime, description, minMembers, maxMembers, country, state, city, genderType, visibility, status, reputationScore, ratingCount, createdAt, memberCount, menCount, womenCount, otherCount, isAdmin]
 
     SoloGroupMember:
       type: object
@@ -3159,6 +3202,7 @@ components:
         groupId: { type: integer }
         userId: { type: integer }
         userName: { type: string }
+        gender: { type: string, nullable: true }
         role:
           type: string
           enum: [admin, member]
@@ -3198,6 +3242,9 @@ components:
         visibility:
           type: string
           enum: [public, private]
+        genderType:
+          type: string
+          enum: [male, female, mixed]
         country: { type: string }
         state: { type: string }
         city: { type: string }

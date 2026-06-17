@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SoloGroupBodyActivityType } from './soloGroupBodyActivityType';
+import type { SoloGroupBodyGenderType } from './soloGroupBodyGenderType';
 import type { SoloGroupBodyVisibility } from './soloGroupBodyVisibility';
 
 export interface SoloGroupBody {
@@ -20,6 +21,7 @@ export interface SoloGroupBody {
   description?: string;
   maxMembers: number;
   visibility?: SoloGroupBodyVisibility;
+  genderType?: SoloGroupBodyGenderType;
   country?: string;
   state?: string;
   city: string;

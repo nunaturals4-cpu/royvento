@@ -35,7 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 
-type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews" | "plans";
+type AdminTab = "analytics" | "bookings" | "events" | "vendors" | "users" | "subscriptions" | "coupons" | "content" | "messages" | "booking-report" | "crm-leads" | "announcements" | "reports" | "commissions" | "settlements" | "live-occupancy" | "reviews" | "plans" | "create-pub" | "event-organizers" | "game-organizers" | "solo-connect";
 
 interface ContactMessage {
   id: number;
@@ -2948,6 +2948,10 @@ export default function AdminPanelScreen() {
     { key: "live-occupancy" as AdminTab, icon: "pulse-outline" as const, label: "Live Occ" },
     { key: "plans" as AdminTab, icon: "options-outline" as const, label: "Plans" },
     { key: "reviews" as AdminTab, icon: "star-outline" as const, label: "Reviews" },
+    { key: "event-organizers" as AdminTab, icon: "easel-outline" as const, label: "Event Orgs" },
+    { key: "game-organizers" as AdminTab, icon: "game-controller-outline" as const, label: "Game Orgs" },
+    { key: "solo-connect" as AdminTab, icon: "shield-checkmark-outline" as const, label: "Solo Mod" },
+    { key: "create-pub" as AdminTab, icon: "add-circle-outline" as const, label: "Create Pub" },
   ];
 
   if (!user || user.role !== "admin") {
@@ -3017,6 +3021,10 @@ export default function AdminPanelScreen() {
       {activeTab === "live-occupancy" && <AdminLiveOccupancyTab colors={colors} />}
       {activeTab === "reviews" && <AdminReviewsTab colors={colors} />}
       {activeTab === "plans" && <AdminPlansTab colors={colors} />}
+      {activeTab === "event-organizers" && <AdminEventOrganizersTab colors={colors} />}
+      {activeTab === "game-organizers" && <AdminGameOrganizersTab colors={colors} />}
+      {activeTab === "solo-connect" && <AdminSoloModerationTab colors={colors} />}
+      {activeTab === "create-pub" && <AdminCreatePubTab colors={colors} />}
 
       {/* Blog editor sheet — full-screen modal so the long content textarea
           has room. Renders at the page root so it overlays the active tab. */}
@@ -3418,6 +3426,246 @@ function AdminLiveOccupancyTab({ colors }: { colors: ReturnType<typeof useColors
             </Pressable>
           );
         })
+      )}
+    </ScrollView>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ADMIN MODERATION TABS (mobile parity with web admin)
+// ════════════════════════════════════════════════════════════════════════════
+type AdminPal = ReturnType<typeof useColors>;
+
+interface AdminOrganizer { id: number; name: string; slug: string; city: string; state: string; verified: boolean; status: string; ownerEmail: string | null; eventCount: number; }
+interface PendingOrganizerEvent { id: number; title: string; category: string; shortDescription: string; city: string; }
+interface AdminGameOrganizer { id: number; name: string; slug: string; city: string; state: string; verified: boolean; status: string; ownerEmail: string | null; gameCount: number; packageCount: number; }
+interface PendingGame { id: number; name: string; category: string; pricingModel: string; price: string; hourlyRate: string; organizerName: string; kind: "game" | "package"; }
+interface AdminSoloVerification { id: number; userName: string; userEmail: string; gender: string | null; selfieUrl: string; phone: string; phoneVerified: boolean; status: string; rejectionReason: string; banned: boolean; }
+interface AdminSoloReport { id: number; reporterName: string; reportedName: string; reportCountAgainstReported: number; groupName: string; reason: string; description: string; status: string; }
+
+function asArray<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  const r = res as Record<string, unknown>;
+  if (r && Array.isArray(r.data)) return r.data as T[];
+  if (r && Array.isArray(r.verifications)) return r.verifications as T[];
+  if (r && Array.isArray(r.reports)) return r.reports as T[];
+  return [];
+}
+
+function ModBtn({ colors, label, onPress, tone }: { colors: AdminPal; label: string; onPress: () => void; tone?: "primary" | "danger" | "muted" }) {
+  const bg = tone === "primary" ? colors.primary : tone === "danger" ? colors.red + "1a" : colors.muted;
+  const fg = tone === "primary" ? colors.primaryForeground : tone === "danger" ? colors.redLight : colors.foreground;
+  return (
+    <TouchableOpacity onPress={onPress} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: bg, borderWidth: tone === "primary" ? 0 : 1, borderColor: colors.border }}>
+      <Text style={{ color: fg, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+function ModCard({ colors, children }: { colors: AdminPal; children: React.ReactNode }) {
+  return <View style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, marginBottom: 10, gap: 6 }}>{children}</View>;
+}
+function ModEmpty({ colors, label }: { colors: AdminPal; label: string }) {
+  return <Text style={{ color: colors.mutedForeground, textAlign: "center", marginTop: 30, fontFamily: "Inter_400Regular" }}>{label}</Text>;
+}
+
+// ─── Create Pub / Club (admin-owned venue) ──────────────────────────────────
+function AdminCreatePubTab({ colors }: { colors: AdminPal }) {
+  const [f, setF] = useState({ businessName: "", category: "Pub" as "Pub" | "Club", description: "", city: "", state: "", country: "India", capacity: "" });
+  const [busy, setBusy] = useState(false);
+  const upd = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
+  async function create() {
+    if (!f.businessName.trim()) { Alert.alert("Business name is required"); return; }
+    setBusy(true);
+    try {
+      const r = await customFetch<{ ok: boolean; businessName: string }>("/api/admin/create-venue", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: f.businessName.trim(), category: f.category, description: f.description.trim(),
+          country: f.country, state: f.state, city: f.city, capacity: Number(f.capacity) || 0,
+          pubMode: "both", priceWomen: 0, priceMen: 0, priceCouple: 0,
+          freeEntryEnabled: false, freeEntryGenders: [], freeEntryDays: [],
+        }),
+      });
+      Alert.alert("Created & live", `"${r.businessName}" is live — assign it to a partner later.`);
+      setF({ businessName: "", category: "Pub", description: "", city: "", state: "", country: "India", capacity: "" });
+    } catch (e) { Alert.alert("Create failed", (e as Error).message); }
+    finally { setBusy(false); }
+  }
+  const input = { backgroundColor: colors.muted, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: colors.foreground, marginBottom: 12 } as const;
+  const lbl = { color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" as const, marginBottom: 6 };
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <Text style={{ color: colors.foreground, fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 12 }}>Create a venue (admin-owned)</Text>
+      <Text style={lbl}>Category</Text>
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+        {(["Pub", "Club"] as const).map((c) => (
+          <TouchableOpacity key={c} onPress={() => upd("category", c)} style={{ flex: 1, paddingVertical: 11, borderRadius: 10, borderWidth: 1, borderColor: f.category === c ? colors.primary : colors.border, backgroundColor: f.category === c ? colors.primary + "1f" : colors.muted, alignItems: "center" }}>
+            <Text style={{ color: f.category === c ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold" }}>{c}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={lbl}>Business name *</Text><TextInput value={f.businessName} onChangeText={(v) => upd("businessName", v)} placeholder="Venue name" placeholderTextColor={colors.mutedForeground} style={input} />
+      <Text style={lbl}>Description</Text><TextInput value={f.description} onChangeText={(v) => upd("description", v)} placeholder="About the venue" placeholderTextColor={colors.mutedForeground} multiline style={[input, { minHeight: 70, textAlignVertical: "top" }]} />
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flex: 1 }}><Text style={lbl}>City</Text><TextInput value={f.city} onChangeText={(v) => upd("city", v)} placeholder="City" placeholderTextColor={colors.mutedForeground} style={input} /></View>
+        <View style={{ flex: 1 }}><Text style={lbl}>State</Text><TextInput value={f.state} onChangeText={(v) => upd("state", v)} placeholder="State" placeholderTextColor={colors.mutedForeground} style={input} /></View>
+      </View>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flex: 1 }}><Text style={lbl}>Country</Text><TextInput value={f.country} onChangeText={(v) => upd("country", v)} placeholder="Country" placeholderTextColor={colors.mutedForeground} style={input} /></View>
+        <View style={{ flex: 1 }}><Text style={lbl}>Capacity</Text><TextInput value={f.capacity} onChangeText={(v) => upd("capacity", v)} placeholder="0" keyboardType="number-pad" placeholderTextColor={colors.mutedForeground} style={input} /></View>
+      </View>
+      <TouchableOpacity onPress={create} disabled={busy} style={{ backgroundColor: busy ? colors.muted : colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 4 }}>
+        <Text style={{ color: busy ? colors.mutedForeground : colors.primaryForeground, fontFamily: "Inter_700Bold" }}>{busy ? "Creating…" : "Create venue"}</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// ─── Event Organizers (verify/status + pending events) ──────────────────────
+function AdminEventOrganizersTab({ colors }: { colors: AdminPal }) {
+  const [orgs, setOrgs] = useState<AdminOrganizer[]>([]);
+  const [pending, setPending] = useState<PendingOrganizerEvent[]>([]);
+  const load = useCallback(() => {
+    customFetch<AdminOrganizer[]>("/api/admin/organizers").then((r) => setOrgs(asArray(r))).catch(() => {});
+    customFetch<PendingOrganizerEvent[]>("/api/admin/organizer-events/pending").then((r) => setPending(asArray(r))).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function patch(path: string, body: unknown) { try { await customFetch(path, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); load(); } catch (e) { Alert.alert("Failed", (e as Error).message); } }
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      {pending.length > 0 && (
+        <>
+          <Text style={{ color: colors.foreground, fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 10 }}>Pending events ({pending.length})</Text>
+          {pending.map((e) => (
+            <ModCard key={e.id} colors={colors}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{e.title}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{e.category} · {e.city}</Text>
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                <ModBtn colors={colors} label="Approve" tone="primary" onPress={() => patch(`/api/admin/organizer-events/${e.id}/approve`, {})} />
+                <ModBtn colors={colors} label="Reject" tone="danger" onPress={() => Alert.prompt ? Alert.prompt("Reject event", "Reason", (reason) => patch(`/api/admin/organizer-events/${e.id}/reject`, { rejectionReason: reason || "" })) : patch(`/api/admin/organizer-events/${e.id}/reject`, { rejectionReason: "" })} />
+              </View>
+            </ModCard>
+          ))}
+        </>
+      )}
+      <Text style={{ color: colors.foreground, fontSize: 16, fontFamily: "Inter_700Bold", marginVertical: 10 }}>Event organizers ({orgs.length})</Text>
+      {orgs.length === 0 ? <ModEmpty colors={colors} label="No event organizers." /> : orgs.map((o) => (
+        <ModCard key={o.id} colors={colors}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", flex: 1 }} numberOfLines={1}>{o.name}</Text>
+            {o.verified && <Ionicons name="checkmark-circle" size={15} color="#f59e0b" />}
+          </View>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{[o.city, o.state].filter(Boolean).join(", ")} · {o.eventCount} events · {o.status}</Text>
+          {!!o.ownerEmail && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{o.ownerEmail}</Text>}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+            <ModBtn colors={colors} label={o.verified ? "Unverify" : "Verify"} onPress={() => patch(`/api/admin/organizers/${o.id}/verify`, { verified: !o.verified })} />
+            <ModBtn colors={colors} label={o.status === "suspended" ? "Activate" : "Suspend"} tone={o.status === "suspended" ? "primary" : "danger"} onPress={() => patch(`/api/admin/organizers/${o.id}/status`, { status: o.status === "suspended" ? "active" : "suspended" })} />
+          </View>
+        </ModCard>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── Game Organizers (verify/status + pending games/packages) ───────────────
+function AdminGameOrganizersTab({ colors }: { colors: AdminPal }) {
+  const [orgs, setOrgs] = useState<AdminGameOrganizer[]>([]);
+  const [pending, setPending] = useState<PendingGame[]>([]);
+  const load = useCallback(() => {
+    customFetch<AdminGameOrganizer[]>("/api/admin/game-organizers").then((r) => setOrgs(asArray(r))).catch(() => {});
+    customFetch<PendingGame[]>("/api/admin/games/pending").then((r) => setPending(asArray(r))).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function patch(path: string, body: unknown) { try { await customFetch(path, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); load(); } catch (e) { Alert.alert("Failed", (e as Error).message); } }
+  const base = (k: PendingGame["kind"]) => k === "package" ? "/api/admin/game-packages" : "/api/admin/games";
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      {pending.length > 0 && (
+        <>
+          <Text style={{ color: colors.foreground, fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 10 }}>Pending games & packages ({pending.length})</Text>
+          {pending.map((g) => (
+            <ModCard key={`${g.kind}-${g.id}`} colors={colors}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{g.name} <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>· {g.kind}</Text></Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{g.category} · {g.organizerName}</Text>
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                <ModBtn colors={colors} label="Approve" tone="primary" onPress={() => patch(`${base(g.kind)}/${g.id}/approve`, {})} />
+                <ModBtn colors={colors} label="Reject" tone="danger" onPress={() => Alert.prompt ? Alert.prompt("Reject", "Reason", (reason) => patch(`${base(g.kind)}/${g.id}/reject`, { rejectionReason: reason || "" })) : patch(`${base(g.kind)}/${g.id}/reject`, { rejectionReason: "" })} />
+              </View>
+            </ModCard>
+          ))}
+        </>
+      )}
+      <Text style={{ color: colors.foreground, fontSize: 16, fontFamily: "Inter_700Bold", marginVertical: 10 }}>Game organizers ({orgs.length})</Text>
+      {orgs.length === 0 ? <ModEmpty colors={colors} label="No game organizers." /> : orgs.map((o) => (
+        <ModCard key={o.id} colors={colors}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", flex: 1 }} numberOfLines={1}>{o.name}</Text>
+            {o.verified && <Ionicons name="checkmark-circle" size={15} color="#f59e0b" />}
+          </View>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{[o.city, o.state].filter(Boolean).join(", ")} · {o.gameCount} games · {o.packageCount} pkgs · {o.status}</Text>
+          {!!o.ownerEmail && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{o.ownerEmail}</Text>}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+            <ModBtn colors={colors} label={o.verified ? "Unverify" : "Verify"} onPress={() => patch(`/api/admin/game-organizers/${o.id}/verify`, { verified: !o.verified })} />
+            <ModBtn colors={colors} label={o.status === "suspended" ? "Activate" : "Suspend"} tone={o.status === "suspended" ? "primary" : "danger"} onPress={() => patch(`/api/admin/game-organizers/${o.id}/status`, { status: o.status === "suspended" ? "active" : "suspended" })} />
+          </View>
+        </ModCard>
+      ))}
+    </ScrollView>
+  );
+}
+
+// ─── Solo Connect moderation (verifications + reports) ──────────────────────
+function AdminSoloModerationTab({ colors }: { colors: AdminPal }) {
+  const [view, setView] = useState<"verifications" | "reports">("verifications");
+  const [verifs, setVerifs] = useState<AdminSoloVerification[]>([]);
+  const [reports, setReports] = useState<AdminSoloReport[]>([]);
+  const load = useCallback(() => {
+    customFetch("/api/admin/solo-connect/verifications?status=pending").then((r) => setVerifs(asArray<AdminSoloVerification>(r))).catch(() => {});
+    customFetch("/api/admin/solo-connect/reports?status=pending").then((r) => setReports(asArray<AdminSoloReport>(r))).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function review(id: number, decision: "approved" | "rejected") {
+    try { await customFetch(`/api/admin/solo-connect/verifications/${id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, rejectionReason: "" }) }); load(); }
+    catch (e) { Alert.alert("Failed", (e as Error).message); }
+  }
+  async function reportAction(id: number, action: string) {
+    try { await customFetch(`/api/admin/solo-connect/reports/${id}/action`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); load(); }
+    catch (e) { Alert.alert("Failed", (e as Error).message); }
+  }
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+        {(["verifications", "reports"] as const).map((v) => (
+          <TouchableOpacity key={v} onPress={() => setView(v)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: view === v ? colors.primary : colors.border, backgroundColor: view === v ? colors.primary + "1f" : colors.muted, alignItems: "center" }}>
+            <Text style={{ color: view === v ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" }}>{v}{v === "verifications" ? ` (${verifs.length})` : ` (${reports.length})`}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {view === "verifications" ? (
+        verifs.length === 0 ? <ModEmpty colors={colors} label="No pending verifications." /> : verifs.map((v) => (
+          <ModCard key={v.id} colors={colors}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{v.userName}</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{v.userEmail} · {v.gender ?? "—"} · {v.phoneVerified ? "phone ✓" : "phone ✗"}</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+              <ModBtn colors={colors} label="Approve" tone="primary" onPress={() => review(v.id, "approved")} />
+              <ModBtn colors={colors} label="Reject" tone="danger" onPress={() => review(v.id, "rejected")} />
+            </View>
+          </ModCard>
+        ))
+      ) : (
+        reports.length === 0 ? <ModEmpty colors={colors} label="No pending reports." /> : reports.map((r) => (
+          <ModCard key={r.id} colors={colors}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{r.reportedName} <Text style={{ color: colors.redLight, fontSize: 11 }}>· {r.reportCountAgainstReported} reports</Text></Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>by {r.reporterName} · {r.reason} · {r.groupName}</Text>
+            {!!r.description && <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={3}>{r.description}</Text>}
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+              <ModBtn colors={colors} label="Dismiss" onPress={() => reportAction(r.id, "dismiss")} />
+              <ModBtn colors={colors} label="Warn" onPress={() => reportAction(r.id, "warn")} />
+              <ModBtn colors={colors} label="Suspend" tone="danger" onPress={() => reportAction(r.id, "suspend")} />
+              <ModBtn colors={colors} label="Ban" tone="danger" onPress={() => reportAction(r.id, "ban")} />
+            </View>
+          </ModCard>
+        ))
       )}
     </ScrollView>
   );

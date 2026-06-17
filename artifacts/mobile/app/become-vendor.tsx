@@ -25,6 +25,9 @@ import { useColors } from "@/hooks/useColors";
 const CATEGORIES = [
   "Pub",
   "Club",
+  "Pub & Club",
+  "Event Organizer",
+  "Game Organizer",
 ];
 
 interface ExistingRequest {

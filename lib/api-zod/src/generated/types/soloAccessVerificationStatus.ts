@@ -11,6 +11,7 @@ export type SoloAccessVerificationStatus = typeof SoloAccessVerificationStatus[k
 
 export const SoloAccessVerificationStatus = {
   none: 'none',
+  draft: 'draft',
   pending: 'pending',
   approved: 'approved',
   rejected: 'rejected',

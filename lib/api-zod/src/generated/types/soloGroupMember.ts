@@ -13,6 +13,7 @@ export interface SoloGroupMember {
   groupId: number;
   userId: number;
   userName: string;
+  gender?: string | null;
   role: SoloGroupMemberRole;
   status: SoloGroupMemberStatus;
   joinedAt?: string | null;

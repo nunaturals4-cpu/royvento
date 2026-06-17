@@ -252,6 +252,7 @@ export type SoloAccessVerificationStatus = typeof SoloAccessVerificationStatus[k
 
 export const SoloAccessVerificationStatus = {
   none: 'none',
+  draft: 'draft',
   pending: 'pending',
   approved: 'approved',
   rejected: 'rejected',
@@ -263,12 +264,15 @@ export interface SoloAccess {
   premium: boolean;
   verificationStatus: SoloAccessVerificationStatus;
   gender?: string | null;
+  banned: boolean;
+  suspendedUntil?: string | null;
 }
 
 export type SoloVerificationStatus = typeof SoloVerificationStatus[keyof typeof SoloVerificationStatus];
 
 
 export const SoloVerificationStatus = {
+  draft: 'draft',
   pending: 'pending',
   approved: 'approved',
   rejected: 'rejected',
@@ -277,40 +281,60 @@ export const SoloVerificationStatus = {
 export interface SoloVerification {
   id: number;
   userId: number;
-  idType: string;
-  idNumber: string;
-  idDocumentUrl: string;
   selfieUrl: string;
   phone: string;
   phoneVerified: boolean;
+  consentAcceptedAt?: string | null;
+  consentVersion: string;
+  suspendedUntil?: string | null;
+  banned: boolean;
   status: SoloVerificationStatus;
   rejectionReason: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export type SoloVerificationBodyIdType = typeof SoloVerificationBodyIdType[keyof typeof SoloVerificationBodyIdType];
+export interface SoloPhoneConfig {
+  firebaseConfigured: boolean;
+}
+
+export interface SoloPhoneVerifyBody {
+  idToken: string;
+}
+
+export type SoloSubmitBodyGender = typeof SoloSubmitBodyGender[keyof typeof SoloSubmitBodyGender];
 
 
-export const SoloVerificationBodyIdType = {
-  aadhaar: 'aadhaar',
-  passport: 'passport',
-  driving_license: 'driving_license',
-  voter_id: 'voter_id',
+export const SoloSubmitBodyGender = {
+  male: 'male',
+  female: 'female',
+  prefer_not_to_say: 'prefer_not_to_say',
 } as const;
 
-export interface SoloVerificationBody {
-  idType: SoloVerificationBodyIdType;
-  idNumber: string;
+export interface SoloSubmitBody {
+  selfieUrl: string;
+  gender: SoloSubmitBodyGender;
+  consent: true;
 }
 
-export interface SoloOtpRequestResult {
-  ok: boolean;
-  devCode?: string | null;
-}
+export type SoloReportBodyReason = typeof SoloReportBodyReason[keyof typeof SoloReportBodyReason];
 
-export interface SoloOtpVerifyBody {
-  code: string;
+
+export const SoloReportBodyReason = {
+  harassment: 'harassment',
+  fake_profile: 'fake_profile',
+  abuse: 'abuse',
+  spam: 'spam',
+  inappropriate: 'inappropriate',
+  safety: 'safety',
+  other: 'other',
+} as const;
+
+export interface SoloReportBody {
+  reportedUserId: number;
+  reason: SoloReportBodyReason;
+  description?: string;
+  evidenceUrl?: string;
 }
 
 export type SoloReviewBodyDecision = typeof SoloReviewBodyDecision[keyof typeof SoloReviewBodyDecision];
@@ -344,6 +368,7 @@ export type SoloGroupGenderType = typeof SoloGroupGenderType[keyof typeof SoloGr
 export const SoloGroupGenderType = {
   male: 'male',
   female: 'female',
+  mixed: 'mixed',
 } as const;
 
 export type SoloGroupVisibility = typeof SoloGroupVisibility[keyof typeof SoloGroupVisibility];
@@ -386,7 +411,11 @@ export interface SoloGroup {
   reputationScore: string;
   ratingCount: number;
   createdAt: string;
+  lastActivityAt?: string | null;
   memberCount: number;
+  menCount: number;
+  womenCount: number;
+  otherCount: number;
   myMembershipStatus?: string | null;
   isAdmin: boolean;
 }
@@ -415,6 +444,7 @@ export interface SoloGroupMember {
   groupId: number;
   userId: number;
   userName: string;
+  gender?: string | null;
   role: SoloGroupMemberRole;
   status: SoloGroupMemberStatus;
   joinedAt?: string | null;
@@ -446,6 +476,15 @@ export const SoloGroupBodyVisibility = {
   private: 'private',
 } as const;
 
+export type SoloGroupBodyGenderType = typeof SoloGroupBodyGenderType[keyof typeof SoloGroupBodyGenderType];
+
+
+export const SoloGroupBodyGenderType = {
+  male: 'male',
+  female: 'female',
+  mixed: 'mixed',
+} as const;
+
 export interface SoloGroupBody {
   name: string;
   activityType: SoloGroupBodyActivityType;
@@ -458,6 +497,7 @@ export interface SoloGroupBody {
   description?: string;
   maxMembers: number;
   visibility?: SoloGroupBodyVisibility;
+  genderType?: SoloGroupBodyGenderType;
   country?: string;
   state?: string;
   city: string;

@@ -6,6 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SoloOtpVerifyBody {
-  code: string;
+export interface SoloPhoneVerifyBody {
+  idToken: string;
 }

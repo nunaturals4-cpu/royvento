@@ -164,13 +164,18 @@ function VenueSelect({
   );
 }
 
+const GENDER_TYPES = [
+  { value: "mixed", label: "Mixed" },
+  { value: "male", label: "Men" },
+  { value: "female", label: "Women" },
+] as const;
+type GenderType = (typeof GENDER_TYPES)[number]["value"];
+
 export function CreateGroupModal({
   city,
-  gender,
   onClose,
 }: {
   city: string;
-  gender: string | null;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -187,6 +192,8 @@ export function CreateGroupModal({
   const [startTime, setStartTime] = useState("");
   const [description, setDescription] = useState("");
   const [maxMembers, setMaxMembers] = useState(8);
+  // Non-gating vibe label — anyone can join any group regardless.
+  const [genderType, setGenderType] = useState<GenderType>("mixed");
 
   function pickActivity(value: ActivityType) {
     setActivityType(value);
@@ -215,6 +222,7 @@ export function CreateGroupModal({
           description: description.trim(),
           maxMembers,
           visibility: "public",
+          genderType,
           city,
           country: "India",
         },
@@ -272,7 +280,7 @@ export function CreateGroupModal({
           <h3 className="font-serif text-2xl" style={{ color: "#fff" }}>Create a group</h3>
         </div>
         <div className="flex flex-wrap gap-1.5 mb-6 ml-[3.25rem]">
-          {[city, gender === "female" ? "Women only" : "Men only", "3–15 members"].map((chip) => (
+          {[city, "Open to everyone", "3–15 members"].map((chip) => (
             <span key={chip} className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: `${GOLD}14`, color: GOLD, border: `1px solid ${GOLD}33` }}>{chip}</span>
           ))}
         </div>
@@ -326,6 +334,30 @@ export function CreateGroupModal({
           </div>
 
           <textarea className={field} style={fieldStyle} rows={3} placeholder="Describe the plan…" value={description} onChange={(e) => setDescription(e.target.value)} />
+
+          <div>
+            <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Group vibe (anyone can still join)</p>
+            <div className="grid grid-cols-3 gap-2">
+              {GENDER_TYPES.map((gt) => {
+                const active = genderType === gt.value;
+                return (
+                  <button
+                    key={gt.value}
+                    type="button"
+                    onClick={() => setGenderType(gt.value)}
+                    className="py-2.5 rounded-lg text-sm transition-all"
+                    style={{
+                      background: active ? `${GOLD}1f` : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${active ? GOLD : "rgba(255,255,255,0.12)"}`,
+                      color: active ? "#fff" : "rgba(255,255,255,0.7)",
+                    }}
+                  >
+                    {gt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div>
             <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>Max members: <span style={{ color: GOLD }}>{maxMembers}</span></p>
