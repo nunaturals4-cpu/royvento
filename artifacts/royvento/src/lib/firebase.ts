@@ -63,6 +63,24 @@ export interface PhoneVerification {
   confirm(code: string): Promise<string>; // resolves to the ID token to POST
 }
 
+// Map Firebase phone-auth error codes to short, user-friendly messages so the UI
+// never surfaces a raw "Firebase: Error (auth/...)" string to the user.
+function friendlyOtpError(err: unknown): string {
+  const code = (err as { code?: string })?.code ?? "";
+  switch (code) {
+    case "auth/invalid-verification-code":
+      return "Incorrect code. Please check the 6-digit code and try again.";
+    case "auth/code-expired":
+      return "This code has expired. Tap “Resend code” to get a new one.";
+    case "auth/missing-verification-code":
+      return "Please enter the 6-digit code we sent you.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a few minutes and try again.";
+    default:
+      return "We couldn’t verify that code. Please try again.";
+  }
+}
+
 /**
  * Begin phone verification. In real mode this triggers Firebase to send an SMS
  * (Firebase enforces resend cooldowns, expiry, and rate limiting). In dev-stub
@@ -84,8 +102,13 @@ export async function startPhoneVerification(
   const confirmation: ConfirmationResult = await signInWithPhoneNumber(ensureAuth(), phoneE164, verifier);
   return {
     async confirm(code: string) {
-      const cred = await confirmation.confirm(code);
-      return cred.user.getIdToken();
+      try {
+        const cred = await confirmation.confirm(code);
+        return cred.user.getIdToken();
+      } catch (err) {
+        // Surface a clean validation message instead of the raw Firebase error.
+        throw new Error(friendlyOtpError(err));
+      }
     },
   };
 }
