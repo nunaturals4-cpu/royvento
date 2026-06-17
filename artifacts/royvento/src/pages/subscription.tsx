@@ -61,7 +61,7 @@ const USER_PLANS = [
   {
     id: "user_vip", name: "RoyVento VIP", tagline: "The ultimate nightlife pass",
     monthly: 499, yearly: 4990, icon: Crown, accent: true,
-    features: ["All Plus benefits included", "VIP event access", "Complimentary venue offers", "Priority support", "Exclusive nightlife experiences", "Higher loyalty rewards multiplier", "Create & Join Verified Solo Activity Groups"],
+    features: ["All Plus benefits included", "VIP event access", "Complimentary venue offers", "Priority support", "Exclusive nightlife experiences", "Higher loyalty rewards multiplier", "Create & Join Solo Connect activity groups"],
     planType: "user_vip" as string | null,
   },
 ];
@@ -164,6 +164,12 @@ export function Subscription() {
     ? new URLSearchParams(window.location.search).get("payment")
     : null;
 
+  // Deep-link target plan, e.g. the Solo Connect "Upgrade to Premium" button
+  // links to /subscription?plan=user_vip to land the user on the VIP plan.
+  const highlightPlan = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("plan")
+    : null;
+
   // All data fetching unchanged
   useEffect(() => {
     apiGet<{ showGrowthPlan: boolean; showPremiumPartner: boolean; showRoyalPlan: boolean }>("/api/plan-config")
@@ -180,6 +186,15 @@ export function Subscription() {
       apiGet<Sub | null>("/api/subscriptions/me").then(setActive).catch(() => {});
     }
   }, [paymentParam]);
+
+  // Scroll the deep-linked plan into view (and let its highlight ring draw the eye).
+  useEffect(() => {
+    if (!highlightPlan) return;
+    const t = setTimeout(() => {
+      document.getElementById(`plan-${highlightPlan}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [highlightPlan]);
 
   const subscribe = async (planType: string) => {
     if (!user) { toast({ title: "Please log in first", variant: "destructive" }); return; }
@@ -499,6 +514,7 @@ export function Subscription() {
               onSubscribe={plan.planType ? () => subscribe(plan.planType!) : undefined}
               loading={loading}
               notLoggedIn={!user}
+              highlight={plan.id === highlightPlan}
             />
           ))}
         </div>
@@ -734,21 +750,21 @@ interface UserPlanDef {
 }
 
 function UserPlanCard({
-  plan, billing, isActive, onSubscribe, loading, notLoggedIn,
+  plan, billing, isActive, onSubscribe, loading, notLoggedIn, highlight,
 }: {
   plan: UserPlanDef; billing: "monthly" | "yearly";
   isActive: boolean; onSubscribe?: () => void;
-  loading: boolean; notLoggedIn: boolean;
+  loading: boolean; notLoggedIn: boolean; highlight?: boolean;
 }) {
   const price = billing === "monthly" ? plan.monthly : plan.yearly;
   const isFree = price === 0;
 
   return (
-    <div className={`relative flex flex-col rounded-2xl border p-6 ${
+    <div id={`plan-${plan.id}`} className={`relative flex flex-col rounded-2xl border p-6 scroll-mt-24 ${
       plan.popular
         ? "border-primary shadow-[0_0_0_2px_rgba(232,41,28,0.40),0_0_40px_rgba(232,41,28,0.10)] bg-[#111]"
         : "border-white/[0.06] bg-[#111]"
-    } ${isActive ? "ring-2 ring-primary/60" : ""}`}>
+    } ${isActive ? "ring-2 ring-primary/60" : highlight ? "ring-2 ring-primary shadow-[0_0_44px_rgba(232,41,28,0.28)]" : ""}`}>
 
       {isActive && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">

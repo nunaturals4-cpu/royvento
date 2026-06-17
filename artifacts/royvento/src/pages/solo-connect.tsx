@@ -623,7 +623,7 @@ function PremiumGate() {
         Upgrade to Royvento Premium to unlock Solo Connect and meet verified people for real plans.
       </p>
       <Link
-        href="/subscription"
+        href="/subscription?plan=user_vip"
         className="group inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
         style={{ background: `linear-gradient(135deg, ${RED}, #d23a2a)`, color: "#fff", boxShadow: `0 10px 30px ${RED}4d` }}
       >
