@@ -36,7 +36,7 @@ const SLIDES: HeroSlide[] = [
     cta: "Explore Pubs & Clubs",
     icon: GlassWater,
     href: "/pubs",
-    img: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1600&q=75",
+    img: "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=1600&q=75",
   },
   {
     eyebrow: "Live",

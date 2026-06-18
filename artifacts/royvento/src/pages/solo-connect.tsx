@@ -114,7 +114,10 @@ export function SoloConnect() {
             ) : !loggedIn ? (
               <LoggedOutShowcase />
             ) : !access?.eligible ? (
-              <PremiumGate />
+              <div className="space-y-10">
+                <PremiumGate />
+                <ShowcaseSections />
+              </div>
             ) : access.verificationStatus !== "approved" ? (
               <SoloVerificationFlow />
             ) : (
@@ -378,6 +381,17 @@ function LoggedOutShowcase() {
         </div>
       </GlassCard>
 
+      <ShowcaseSections />
+    </div>
+  );
+}
+
+// The "what you get / how it works / verification" explainer trio. Shown to
+// logged-out visitors and, below the upgrade card, to logged-in non-premium
+// members so they can see exactly what Premium unlocks before paying.
+function ShowcaseSections() {
+  return (
+    <div className="space-y-10">
       {/* ── Features: what you get when you join ─────────────────────── */}
       <section>
         <SectionTitle
